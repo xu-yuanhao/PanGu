@@ -117,5 +117,17 @@ _Static_assert(sizeof(pangu_json_writer)==560,"JSON writer layout");
 pangu_i32 pangu_json_writer_init(pangu_json_writer *,unsigned char *,pangu_u64,pangu_u32);
 pangu_i32 pangu_json_writer_emit(pangu_json_writer *,pangu_u32,pangu_text_slice);
 pangu_i32 pangu_json_writer_finish(pangu_json_writer *,pangu_text_slice *);
+enum pangu_json_number_mode { PANGU_JSON_NUMBER_JSON=1,PANGU_JSON_NUMBER_STRING=2 };
+/* Format raw binary64 bits in decimal. Finite values use shortest roundtrip,
+ * closest/even choice and ECMAScript decimal/exponent layout. Both zero signs
+ * produce "0". JSON mode emits "null" for NaN/infinities; STRING mode emits
+ * NaN/Infinity/-Infinity. No boxing, radix options, allocation or NUL terminator.
+ * Invalid mode/arguments/overlap (1) leave all outputs unchanged. Otherwise
+ * length is zero on internal overflow (11); quota (2) reports required length.
+ * Every failure preserves output bytes; NULL output/zero capacity measures.
+ * Output and length must be valid disjoint caller storage; bits are passed by
+ * value, independent of native floating arithmetic/environment.
+ */
+pangu_i32 pangu_json_number_text(pangu_u64,pangu_u32,unsigned char *,pangu_u64,pangu_u64 *);
 #endif
 #endif

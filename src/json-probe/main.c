@@ -63,9 +63,13 @@ static int json_reader_tests(const pangu_memory_api *memory);
 static int json_quote_tests(const pangu_memory_api *memory);
 static int json_number_tests(const pangu_memory_api *memory);
 static int json_writer_tests(const pangu_memory_api *memory);
-int json_test(const pangu_memory_api *memory)
+static volatile pangu_u32 format_error;
+static int json_format_tests(const pangu_memory_api *memory,pangu_u32 shard);
+int json_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
+ if(shard>3) return 247;
+ if(shard) { int rc=json_format_tests(memory,(pangu_u32)shard);if(rc) { format_error=(pangu_u32)rc;return 246; }return 0; }
  /* First-use storage must be wholly zero, not just the header. Refusal must
   * preserve the dirty sentinel; valid resets may retain old frame contents. */
  init_probe.reserved=1;
@@ -156,6 +160,7 @@ int json_test(const pangu_memory_api *memory)
  int quote_rc=json_quote_tests(memory);if(quote_rc) return 100+quote_rc;
  int number_rc=json_number_tests(memory);if(number_rc) return 150+number_rc;
  int writer_rc=json_writer_tests(memory);if(writer_rc) return 190+writer_rc;
+ int format_rc=json_format_tests(memory,0);if(format_rc) { format_error=(pangu_u32)format_rc;return 246; }
  return 0;
 }
 
@@ -490,5 +495,82 @@ static int json_writer_tests(const pangu_memory_api *memory)
  /* Invalid init arguments preserve the previous state and bytes. */
  writer_save(8192);
  if(pangu_json_writer_init(&writer,writer_out,8192,0)!=1 || !writer_same(8192) || pangu_json_writer_init(&writer,writer_out,8192,65)!=1 || !writer_same(8192) || pangu_json_writer_init(&writer,(unsigned char *)&writer,560,64)!=1 || !writer_same(8192)) return 48;
+ return 0;
+}
+
+_Alignas(8) static unsigned char format_out[64];
+static volatile pangu_u64 format_case_index,format_mode,format_step;
+static void format_fill(void) { for(pangu_u32 i=0;i<64;i++) format_out[i]=0xa5; }
+static int format_clean(void) { for(pangu_u32 i=0;i<64;i++) if(format_out[i]!=0xa5) return 0;return 1; }
+static int json_format_tests(const pangu_memory_api *memory,pangu_u32 shard)
+{
+ for(pangu_u64 i=shard;i<sizeof(format_cases)/sizeof(format_cases[0]);i+=4) {
+  format_case_index=i;const struct format_case *v=&format_cases[i];
+  for(pangu_u32 mode=1;mode<=2;mode++) {
+   format_mode=mode;const unsigned char *bytes=mode==1 ? v->json : v->string;pangu_u64 n=mode==1 ? v->json_length : v->string_length,length=777;
+   format_fill();if(pangu_json_number_text(v->bits,mode,format_out,64,&length) || length!=n) return 1;
+   for(pangu_u64 j=0;j<n;j++) if(format_out[j]!=bytes[j]) return 2;
+   for(pangu_u64 j=n;j<64;j++) if(format_out[j]!=0xa5) return 3;
+   pangu_u64 magnitude=v->bits&0x7fffffffffffffffULL;
+   if(mode==1) {
+    pangu_text_slice input={format_out,n};if(reader_parse(input)) return 4;
+    if(magnitude>=0x7ff0000000000000ULL) { if(reader_result.tokens[0].kind!=PANGU_JSON_NULL) return 5; }
+    else { pangu_u64 roundtrip,expected_bits=magnitude ? v->bits : 0;if(pangu_json_number_bits(input,&reader_result,0,&roundtrip) || roundtrip!=expected_bits) return 6; }
+   }
+   if(i%257==0 || magnitude>=0x7ff0000000000000ULL || !magnitude) {
+    format_fill();length=777;
+    if(pangu_json_number_text(v->bits,mode,(void *)0,0,&length)!=2 || length!=n) return 7;
+    pangu_u64 caps[4]={0,n-1,n,n+1};
+    for(pangu_u32 k=0;k<4;k++) {
+     format_step=k;length=777;format_fill();pangu_i32 rc=pangu_json_number_text(v->bits,mode,format_out,caps[k],&length);
+     if(length!=n) return 8;
+     if(caps[k]<n) { if(rc!=2 || !format_clean()) return 9; }
+     else {
+      if(rc) return 10;
+      for(pangu_u64 j=0;j<n;j++) if(format_out[j]!=bytes[j]) return 11;
+      for(pangu_u64 j=n;j<64;j++) if(format_out[j]!=0xa5) return 12;
+     }
+    }
+   }
+  }
+ }
+ if(shard) return 0;
+ format_fill();pangu_u64 length=777;
+ if(pangu_json_number_text(0,0,format_out,64,&length)!=1 || length!=777 || !format_clean()) return 13;
+ if(pangu_json_number_text(0,3,format_out,64,&length)!=1 || length!=777 || !format_clean()) return 14;
+ if(pangu_json_number_text(0,1,(void *)0,1,&length)!=1 || length!=777 || !format_clean()) return 15;
+ if(pangu_json_number_text(0,1,format_out,64,(void *)0)!=1 || !format_clean()) return 16;
+ if(pangu_json_number_text(0,1,format_out,64,(pangu_u64 *)format_out)!=1 || !format_clean()) return 17;
+ /* Integrate formatted primitive numbers and JS numeric strings with writer. */
+ for(pangu_u32 strings=0;strings<2;strings++) {
+  if(pangu_json_writer_init(&writer,writer_out,8192,64) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_ARRAY,writer_none)) return 18;
+  for(pangu_u64 i=0;i<sizeof(format_integration_indices)/sizeof(format_integration_indices[0]);i++) {
+   const struct format_case *v=&format_cases[format_integration_indices[i]];
+   if(pangu_json_number_text(v->bits,strings ? 2 : 1,format_out,64,&length)) return 19;
+   pangu_text_slice input={format_out,length};pangu_u32 op=strings ? PANGU_JSON_WRITE_STRING : ((v->bits&0x7fffffffffffffffULL)>=0x7ff0000000000000ULL ? PANGU_JSON_WRITE_NULL : PANGU_JSON_WRITE_NUMBER);
+   if(op==PANGU_JSON_WRITE_NULL) input=writer_none;
+   if(pangu_json_writer_emit(&writer,op,input)) return 20;
+  }
+  pangu_text_slice out;if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_END_ARRAY,writer_none) || pangu_json_writer_finish(&writer,&out)) return 21;
+  const unsigned char *expected_bytes=strings ? format_integration_strings : format_integration_json;
+  pangu_u64 expected_length=strings ? sizeof(format_integration_strings) : sizeof(format_integration_json);
+  if(out.length!=expected_length || reader_parse(out)) return 22;
+  for(pangu_u64 i=0;i<out.length;i++) if(out.data[i]!=expected_bytes[i]) return 23;
+ }
+ pangu_mapping a,b;a.address=(void *)0;a.length=0;b.address=(void *)0;b.length=0;
+ if(memory->map(memory->context,4096,&a) || memory->map(memory->context,4096,&b)) return 24;
+ unsigned char *page=a.address,*length_page=b.address;pangu_u64 *edge_length=(pangu_u64 *)(length_page+4088);
+ for(pangu_u64 i=0;i<sizeof(format_integration_indices)/sizeof(format_integration_indices[0]);i++) {
+  const struct format_case *v=&format_cases[format_integration_indices[i]];
+  for(pangu_u32 mode=1;mode<=2;mode++) {
+   pangu_u64 n=mode==1 ? v->json_length : v->string_length;const unsigned char *bytes=mode==1 ? v->json : v->string;
+   *edge_length=777;if(pangu_json_number_text(v->bits,mode,page+4096-n,n,edge_length) || *edge_length!=n) return 25;
+   for(pangu_u64 j=0;j<n;j++) if(page[4096-n+j]!=bytes[j]) return 26;
+   for(pangu_u64 j=0;j<n;j++) page[4096-n+j]=0xa5;
+   *edge_length=777;if(pangu_json_number_text(v->bits,mode,page+4097-n,n-1,edge_length)!=2 || *edge_length!=n) return 27;
+   for(pangu_u64 j=0;j<n;j++) if(page[4096-n+j]!=0xa5) return 28;
+  }
+ }
+ if(memory->unmap(memory->context,&b) || memory->unmap(memory->context,&a)) return 29;
  return 0;
 }

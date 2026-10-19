@@ -11,6 +11,8 @@
 pangu_json_test_start:
  .cfi_startproc
  .cfi_undefined rip
+ mov rsi,[rsp]
+ dec rsi
  xor ebp,ebp
  and rsp,-16
  lea rdi,[rip+.Lmemory]
