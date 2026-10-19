@@ -74,5 +74,15 @@ pangu_i32 pangu_json_quote_utf8(pangu_text_slice,unsigned char *,pangu_u64,pangu
 pangu_i32 pangu_json_string_decode(pangu_text_slice,const pangu_json_result *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *);
 pangu_i32 pangu_json_object_find(pangu_text_slice,const pangu_json_result *,pangu_u64,pangu_text_slice,pangu_u64 *);
 
+/* Convert a NUMBER token from a successful result and matching immutable input
+ * to IEEE-754 binary64 bits (not a native floating operation). Nearest, ties to
+ * even; preserve negative zero; overflow produces signed infinity as JSON.parse.
+ * Schema finite-number checks are separate. No Number(string) coercion/repair.
+ * Maximum numeric lexeme 1 MiB; 2 quota, 9 wrong token kind, 10 invalid result,
+ * 14 malformed numeric lexeme, 1 arguments/storage overlap. Failure leaves bits
+ * unchanged. Output must be disjoint from source, result and token storage.
+ * Fixed private integer scratch, no allocation, libc or floating point state.
+ */
+pangu_i32 pangu_json_number_bits(pangu_text_slice,const pangu_json_result *,pangu_u64,pangu_u64 *);
 #endif
 #endif

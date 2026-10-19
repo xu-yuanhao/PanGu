@@ -61,6 +61,7 @@ static const pangu_json_token topology[]={
 };
 static int json_reader_tests(const pangu_memory_api *memory);
 static int json_quote_tests(const pangu_memory_api *memory);
+static int json_number_tests(const pangu_memory_api *memory);
 int json_test(const pangu_memory_api *memory)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
@@ -143,6 +144,7 @@ int json_test(const pangu_memory_api *memory)
  if(memory->unmap(memory->context,&token_mapping) || memory->unmap(memory->context,&input_mapping)) return 47;
  int reader_rc=json_reader_tests(memory);if(reader_rc) return 50+reader_rc;
  int quote_rc=json_quote_tests(memory);if(quote_rc) return 100+quote_rc;
+ int number_rc=json_number_tests(memory);if(number_rc) return 150+number_rc;
  return 0;
 }
 
@@ -294,5 +296,64 @@ static int json_quote_tests(const pangu_memory_api *memory)
  if(pangu_json_string_decode(encoded,&reader_result,0,quote_back,256,&length) || length!=3 || quote_back[0]!='"' || quote_back[1]!='\\' || quote_back[2]) return 16;
  src[4095]=255;quote_fill();if(pangu_json_quote_utf8(input,quote_out,2048,&length)!=12 || length || !quote_clean()) return 17;
  if(memory->unmap(memory->context,&b) || memory->unmap(memory->context,&a)) return 18;
+ return 0;
+}
+
+static volatile pangu_u64 number_case_index;
+static unsigned char number_over[1048577];
+static int json_number_tests(const pangu_memory_api *memory)
+{
+ for(pangu_u64 i=0;i<sizeof(number_cases)/sizeof(number_cases[0]);i++) {
+  number_case_index=i;const struct number_case *v=&number_cases[i];pangu_text_slice input={v->bytes,v->length};pangu_u64 bits=123;
+  if(reader_parse(input)) return 1;
+  if(pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=v->bits) return 2;
+ }
+ pangu_text_slice input={(const unsigned char *)"[0,null]",8};pangu_u64 bits=123;
+ if(reader_parse(input)) return 3;
+ if(pangu_json_number_bits(input,&reader_result,0,&bits)!=9 || bits!=123) return 4;
+ if(pangu_json_number_bits(input,&reader_result,2,&bits)!=9 || bits!=123) return 5;
+ if(pangu_json_number_bits(input,&reader_result,3,&bits)!=1 || bits!=123) return 6;
+ if(pangu_json_number_bits(input,&reader_result,1,&bits) || bits) return 7;
+ if(pangu_json_number_bits(input,&reader_result,1,(pangu_u64 *)input.data)!=1) return 8;
+ if(pangu_json_number_bits(input,&reader_result,1,(pangu_u64 *)tokens)!=1 || pangu_json_number_bits(input,&reader_result,1,(pangu_u64 *)&reader_result)!=1) return 9;
+ reader_result.status=13;bits=123;
+ if(pangu_json_number_bits(input,&reader_result,1,&bits)!=10 || bits!=123) return 10;
+ /* A million-digit mantissa with compensating exponent must not saturate
+  * before cancellation. Remaining input work is bounded by the lexeme quota. */
+ const pangu_u64 zeros=1048500;large[0]='1';for(pangu_u64 i=1;i<=zeros;i++) large[i]='0';
+ static const unsigned char suffix[]="e-1048500";
+ for(pangu_u64 i=0;i<9;i++) large[zeros+1+i]=suffix[i];
+ input.data=large;input.length=zeros+10;if(reader_parse(input)) return 11;
+ if(pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0x3ff0000000000000ULL) return 12;
+ /* Late nonzero after an exact midpoint: sticky tail must round upward. */
+ static const unsigned char half[]="1.00000000000000011102230246251565404236316680908203125";
+ for(pangu_u64 i=0;i<55;i++) large[i]=half[i];
+ for(pangu_u64 i=55;i<1048575;i++) large[i]='0';large[1048575]='1';input.length=1048576;
+ if(reader_parse(input)) return 13;
+ if(pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0x3ff0000000000001ULL) return 14;
+ /* Over-quota success at the parser remains a reader quota refusal. */
+ number_over[0]='1';for(pangu_u64 i=1;i<1048577;i++) number_over[i]='0';
+ input.data=number_over;input.length=1048577;bits=123;
+ if(reader_parse(input)) return 20;
+ if(pangu_json_number_bits(input,&reader_result,0,&bits)!=2 || bits!=123) return 21;
+ /* Exponent saturation remains dominant over every allowed mantissa. */
+ large[0]='-';large[1]='1';large[2]='e';for(pangu_u64 i=3;i<1048576;i++) large[i]='9';
+ input.data=large;input.length=1048576;
+ if(reader_parse(input) || pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0xfff0000000000000ULL) return 22;
+ large[3]='-';if(reader_parse(input) || pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0x8000000000000000ULL) return 23;
+ /* Leading fractional zeros cancel a large, exactly represented exponent. */
+ large[0]='0';large[1]='.';for(pangu_u64 i=2;i<1048502;i++) large[i]='0';large[1048502]='1';
+ static const unsigned char plus[]="e1048501";for(pangu_u64 i=0;i<8;i++) large[1048503+i]=plus[i];
+ input.length=1048511;
+ if(reader_parse(input) || pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0x3ff0000000000000ULL) return 24;
+
+ pangu_mapping mapping;mapping.address=(void *)0;mapping.length=0;
+ if(memory->map(memory->context,4096,&mapping)) return 15;
+ unsigned char *page=mapping.address;page[4094]='-';page[4095]='0';input.data=page+4094;input.length=2;
+ if(reader_parse(input) || pangu_json_number_bits(input,&reader_result,0,&bits) || bits!=0x8000000000000000ULL) return 16;
+ page[4095]='1';input.data=page+4095;input.length=1;if(reader_parse(input)) return 17;
+ pangu_u64 *out=(pangu_u64 *)(page+4080);
+ if(pangu_json_number_bits(input,&reader_result,0,out) || *out!=0x3ff0000000000000ULL) return 18;
+ if(memory->unmap(memory->context,&mapping)) return 19;
  return 0;
 }
