@@ -1,0 +1,109 @@
+{
+  "schema": "pangu.migration.evidence-contract.v1",
+  "status": "SPECIFICATION_ONLY_VALIDATOR_PENDING_T09",
+  "actual_runs": [],
+  "gate_namespace": "pangu G00-G11; Rust historical Gxx identifiers are unrelated",
+  "run_required_fields": [
+    "run_id",
+    "started_at_utc",
+    "finished_at_utc",
+    "reference_commit",
+    "reference_content_digest",
+    "reference_toolchain",
+    "reference_dependency_lock_digest",
+    "candidate_content_digest",
+    "candidate_binary_digest",
+    "candidate_toolchain",
+    "build_flags",
+    "policy_digest",
+    "profile_id",
+    "approved_scope_digest",
+    "case_manifest_digest",
+    "normalization_rules_digest",
+    "runner_digest",
+    "seed",
+    "clock_policy",
+    "platform",
+    "cpu_features",
+    "locale",
+    "terminal_size",
+    "environment_allowlist_redacted",
+    "workspace_initial_digest",
+    "cases",
+    "artifacts",
+    "final_verdict"
+  ],
+  "case_required_fields": [
+    "case_id",
+    "feature_ids",
+    "scenario_revision",
+    "comparison_mode",
+    "reference_exit",
+    "candidate_exit",
+    "reference_raw_artifact",
+    "candidate_raw_artifact",
+    "normalized_artifacts",
+    "diff_artifact",
+    "filesystem_effects",
+    "resource_measurements",
+    "duration",
+    "verdict",
+    "reason",
+    "approved_difference_id"
+  ],
+  "artifact_required_fields": [
+    "path",
+    "sha256",
+    "size_bytes",
+    "media_type",
+    "redaction_policy"
+  ],
+  "allowed_verdicts": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_APPLICABLE"
+  ],
+  "verdict_rules": {
+    "PASS": "Both executions and required comparisons succeeded with current complete evidence; documented intentional differences must match approved rule and limit compatibility claim.",
+    "FAIL": "Deterministic observed behavior or required invariant disagrees.",
+    "BLOCKED": "Missing runtime/case/credential/environment/artifact; timeout; malformed evidence; test not implemented. Never count as pass.",
+    "NOT_APPLICABLE": "Protected approved profile excludes the item; author cannot select it unilaterally."
+  },
+  "required_case_set_rule": "approved required case IDs minus valid protected exclusions; no percentage-based escape",
+  "normalization_allowlist": [
+    "explicit temporary root mapping",
+    "deterministically injected clock/IDs",
+    "declared independent-event partial order"
+  ],
+  "normalization_forbidden": [
+    "drop error/usage/tool results",
+    "erase authorization differences",
+    "ignore unregistered event or field differences",
+    "sort causally ordered events",
+    "replace unmatched outputs with constants"
+  ],
+  "validation_requirements": [
+    "reject duplicate/missing case IDs",
+    "reject evidence referring to stale candidate or policy",
+    "verify every artifact hash and source scope",
+    "reject unapproved exclusions/normalizers",
+    "include BLOCKED and missing in required-set denominator",
+    "do not infer proof from file existence or historical PASS summary",
+    "real endpoint text quality is separate from deterministic parity"
+  ],
+  "release_requirements": [
+    "approved profile scope",
+    "all required checks completed without FAIL/BLOCKED",
+    "no critical security/memory/data gaps",
+    "approved measured budgets, no required UNBASELINED metric",
+    "final package provenance and dependency checks",
+    "rollback drill evidence",
+    "explicit release approval"
+  ],
+  "never_store": [
+    "API keys",
+    "OAuth refresh tokens",
+    "raw user secrets or unapproved production content"
+  ]
+}

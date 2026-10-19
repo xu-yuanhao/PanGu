@@ -1,0 +1,230 @@
+{
+  "schema": "pangu.migration.reference-baseline.v1",
+  "recorded_date": "2026-10-19",
+  "purpose": "planning snapshot; not a certification",
+  "production_candidate": null,
+  "reference_execution_performed": false,
+  "repositories": [
+    {
+      "id": "pi",
+      "path": "references/pi",
+      "origin": "https://github.com/earendil-works/pi.git",
+      "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+      "tracked_worktree_status": [],
+      "tracked_clean": true,
+      "untracked_status": "not inventoried; not permitted as oracle inputs",
+      "key_files": [
+        {
+          "path": "package.json",
+          "sha256": "251d6944a533e034e5a28570cb460966916e6b10c29c398dc61cea11dcd21790",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "package-lock.json",
+          "sha256": "5c7ef167a17240e02139c123442bf909391646fcf7beffd3aa12e486ef4e9647",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/agent/src/agent-loop.ts",
+          "sha256": "28a2b03e34a7e32f004aa851e54d3b5be9dad71c392205614cbc9abdf3a9020a",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/agent/src/types.ts",
+          "sha256": "2e116ef60fdaca4e26be5a1ace8d8b47f545d648d365de60b8c9f9d1ba629ee4",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/src/core/agent-session.ts",
+          "sha256": "e0fa206e8c49a98c024708068df39c0e4944f4251633425fc083b2fbb5ec0ac6",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/src/core/session-manager.ts",
+          "sha256": "450d82c529933214e088b8422f00061815e617f352f6c834689787a314064bff",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/src/core/extensions/loader.ts",
+          "sha256": "0177db97c7e35ea39cdab53124c04dbf6e045ac379670bcae0b4e1269002eb3a",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/src/core/extensions/runner.ts",
+          "sha256": "3cd6d1ad18e8e4c7adf722aed9291bc64f06e3a7d461755c21e3cba4819f4e5e",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/docs/cli.md",
+          "sha256": "c45e59f31574de71770a71c9a7c9b6ac03bf9cad4928aa31bb6614d661733679",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/docs/json.md",
+          "sha256": "f103191816fdcf3627dfc98b89acad8a28eee737697130ddaeb2581131213543",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/docs/session-format.md",
+          "sha256": "4f8fc42179b332bcf71fe4c85cc95d914853ff7486d68742954a45316b512a4a",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/coding-agent/docs/configuration.md",
+          "sha256": "fc48d1ce7d885c5253222415fb7a4b46d75f80e6431eb924174657ff775099eb",
+          "status": "PRESENT_HASHED"
+        }
+      ]
+    },
+    {
+      "id": "deepseek-harness",
+      "path": "references/deepseek-harness",
+      "origin": "https://github.com/deepseek-ai/deepseek-harness.git",
+      "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+      "tracked_worktree_status": [],
+      "tracked_clean": true,
+      "untracked_status": "not inventoried; not permitted as oracle inputs",
+      "key_files": [
+        {
+          "path": "docs/architecture.md",
+          "sha256": "95a7722c7096d665d8adedeb733b8f5ad7740e67cb5c6e9dc91ec05f430cb760",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/cordis-primer.md",
+          "sha256": "f0cc573cc10b60d1bd76039fb0bd666edfb32c9b18027d4dc301c042a9e65d58",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "vendor/README.md",
+          "sha256": "463f0475336df70f35805c60ea897b94d15cdd295595d8a50074dedd4555d311",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/core/agent-loop/src/index.ts",
+          "sha256": "3ea0262656c8ddcaa3be315c150bdc2af09371031c3c471d4ded511e21c6e86b",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/bundle/sdk-minimal/cordis.patch.yml",
+          "sha256": "464ea07c03d3639c2c387fa3a684f5d4001e7ca39f8257b361c604f19487af66",
+          "status": "PRESENT_HASHED"
+        }
+      ]
+    },
+    {
+      "id": "cordis",
+      "path": "references/cordis",
+      "origin": "https://github.com/cordiverse/cordis.git",
+      "commit": "df4431eb43086bd1f8263a0e8c03e9b7c5233b68",
+      "tracked_worktree_status": [],
+      "tracked_clean": true,
+      "untracked_status": "not inventoried; not permitted as oracle inputs",
+      "key_files": [
+        {
+          "path": "packages/core/package.json",
+          "sha256": "4f79e613ba482a616c3d161ffa40edc25a14345849d3b7bfd54c929e78b188e6",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/core/src/context.ts",
+          "sha256": "de2a085933307a31fb01bdfee8f666726ff2db22304833b0c90ebb434c935b26",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/core/src/registry.ts",
+          "sha256": "019a328cd60fa5df1cafad10e66e4250a66f59d37d8410355dc65dd2a26bbec1",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/core/src/fiber.ts",
+          "sha256": "35152e86a8ceb68547531f730f57e521b8a7f04d459018e7d03cdc8d66c622eb",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "packages/core/src/events.ts",
+          "sha256": "3d17e89a3695b2585787fb46cdaaafbd1edaa73259410c10e7def3032d369450",
+          "status": "PRESENT_HASHED"
+        }
+      ]
+    },
+    {
+      "id": "vscode",
+      "path": "references/vscode",
+      "origin": "https://github.com/microsoft/vscode.git",
+      "commit": "113947563a3837013dbff0095e2bf29880b5d354",
+      "tracked_worktree_status": [],
+      "tracked_clean": true,
+      "untracked_status": "not inventoried; not permitted as oracle inputs",
+      "key_files": [
+        {
+          "path": "src/vs/workbench/api/common/extHostExtensionService.ts",
+          "sha256": "c369a154a909de184aa6cfabce0e8e79118cb1301f8a3daa4d69a19150808679",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "src/vs/workbench/services/extensions/common/extensionHostManager.ts",
+          "sha256": "98b7936a8c536250e909c35a71cdfec1df3458d550b62dfdebf38bb1d6cc0dcd",
+          "status": "PRESENT_HASHED"
+        }
+      ]
+    },
+    {
+      "id": "pi_agent_rust",
+      "path": "references/pi_agent_rust",
+      "origin": "https://github.com/Dicklesworthstone/pi_agent_rust.git",
+      "commit": "9fd02e42438fb01ca7766764a36bceb0330b9a87",
+      "tracked_worktree_status": [],
+      "tracked_clean": true,
+      "untracked_status": "not inventoried; not permitted as oracle inputs",
+      "key_files": [
+        {
+          "path": "AGENTS.md",
+          "sha256": "0e4ac1f678b3e5329e9690461fecc814241316776b9b965bc32783a3c03672d0",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/integrator-migration-playbook.md",
+          "sha256": "62303addf99e233e15ed6e61d220032329049511b59525eb14623ca797eef3b9",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/evidence/dropin-feature-inventory-matrix.json",
+          "sha256": "f68dc7725ed44ba69f43e30ed612d0232274be87dda551710b06aea09d1bee5a",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/evidence/dropin-differential-evidence-suite.json",
+          "sha256": "b8390a427e91887dcf9ac99f6e54ce90bcdf73039a4973e1afba26f2e813e579",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/conformance-operator-playbook.md",
+          "sha256": "7223bb718a6b318424d803a3443b89c7ed8069164cb8ae4d5449fe537a2b44d0",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "docs/dropin-upstream-baseline.json",
+          "sha256": null,
+          "status": "MISSING_IN_CHECKOUT"
+        },
+        {
+          "path": "tests/dropin_slash_differential.rs",
+          "sha256": "5f4b758bf9e9ea201e3c202531ea447d35c9f53fa16fb71bc084a565d56b179b",
+          "status": "PRESENT_HASHED"
+        },
+        {
+          "path": "tests/dropin_slash_differential/mod.rs",
+          "sha256": "48dca422960679a6cfd0f096cca0dcb357fe95762abe8ae0fbcec5dc8e366dfc",
+          "status": "PRESENT_HASHED"
+        }
+      ]
+    }
+  ],
+  "rust_historical_baseline": "10bca71fcfc2c4cb7bbbdb4110644a8c5aaef768",
+  "warnings": [
+    "Rust historical inventory pins an older Pi than this project; do not copy its feature names or default values without reconciliation.",
+    "Rust current AGENTS.md retires strict legacy drop-in authority; historical migration/conformance documents are methodology only.",
+    "Full reference provisioning, toolchain identity, dependency hydration and all-file oracle digest remain T01/T09 tasks."
+  ]
+}

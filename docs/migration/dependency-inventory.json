@@ -1,0 +1,596 @@
+{
+  "schema": "pangu.migration.dependency-inventory.v1",
+  "baseline": "reference-baseline.json",
+  "status": "SNAPSHOT_NOT_NATIVE_DEPENDENCY_APPROVAL",
+  "scope": "declared direct manifests reachable from pi-coding-agent; exports and actual entry graphs still require T07 audit",
+  "transitive_lockfile_audit": "PENDING_T07",
+  "product_native_dependencies_approved": [],
+  "pi_workspace_manifests": [
+    {
+      "name": "@earendil-works/pi-coding-agent",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/coding-agent/package.json",
+      "manifest_sha256": "a253f61695fcf170fb9a5b57a4d59adb4eb27518852fb0d285e608ce19c91caa",
+      "license_declared": "MIT",
+      "dependencies": {
+        "@earendil-works/pi-agent-core": "1.3.0",
+        "@earendil-works/pi-ai": "1.3.0",
+        "@earendil-works/pi-codemode": "1.3.0",
+        "@earendil-works/pi-mcp": "1.3.0",
+        "@earendil-works/pi-tui": "1.3.0",
+        "@silvia-odwyer/photon-node": "0.3.4",
+        "brace-expansion": "5.0.12",
+        "chalk": "6.0.0",
+        "cross-spawn": "7.0.6",
+        "diff": "8.0.4",
+        "grok-mermaid": "0.2.3",
+        "highlight.js": "10.7.3",
+        "hosted-git-info": "9.0.3",
+        "ignore": "7.0.8",
+        "jiti": "2.7.0",
+        "minimatch": "10.2.6",
+        "proper-lockfile": "4.1.2",
+        "quickjs-wasi": "3.6.2",
+        "semver": "7.8.5",
+        "typebox": "1.3.27",
+        "undici": "8.10.2",
+        "yaml": "2.9.0"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@types/cross-spawn": "6.0.6",
+        "@types/hosted-git-info": "3.0.5",
+        "@types/node": "22.19.19",
+        "@types/proper-lockfile": "4.1.4",
+        "@types/semver": "7.7.1",
+        "marked": "18.0.11",
+        "shx": "0.3.4",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-agent-core",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/agent/package.json",
+      "manifest_sha256": "67728d06e96459b7fe96c490b563865fb78f7eafcecb708e7ae43e6dd857a324",
+      "license_declared": "MIT",
+      "dependencies": {
+        "@earendil-works/pi-ai": "1.3.0",
+        "typebox": "1.3.27"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@types/node": "22.19.19",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/ai/package.json",
+      "manifest_sha256": "4e9ed07b06a91d844485874c251f312b610d015a4a4fd32c78cde58a7862a3f1",
+      "license_declared": "MIT",
+      "dependencies": {
+        "@anthropic-ai/sdk": "0.129.0",
+        "@aws-sdk/client-bedrock-runtime": "3.1127.0",
+        "@earendil-works/pi-telemetry": "1.3.0",
+        "@google/genai": "2.21.0",
+        "@smithy/node-http-handler": "4.12.1",
+        "http-proxy-agent": "9.1.0",
+        "https-proxy-agent": "9.1.0",
+        "openai": "7.19.0",
+        "partial-json": "0.1.7",
+        "typebox": "1.3.27"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@types/node": "22.19.19",
+        "canvas": "3.2.3",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-codemode",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/codemode/package.json",
+      "manifest_sha256": "537cbc71ff74ac9aee012faa7d0f8b7a082115434d2e3fa4305b434b3f9c000f",
+      "license_declared": "MIT",
+      "dependencies": {
+        "quickjs-wasi": "3.6.2"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "shx": "0.3.4",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-mcp",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/mcp/package.json",
+      "manifest_sha256": "139827d9a6f2dd45f06b2e9310580183ea11f9b4a003b36234a6d56b67952457",
+      "license_declared": "MIT",
+      "dependencies": {
+        "cross-spawn": "7.0.6"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@types/cross-spawn": "6.0.6",
+        "shx": "0.3.4",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-tui",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/tui/package.json",
+      "manifest_sha256": "a6a82af81ed5b6069267eabfdcf047d0af8013695b0e64d72f3c9f44f8e8124e",
+      "license_declared": "MIT",
+      "dependencies": {
+        "get-east-asian-width": "1.6.0",
+        "marked": "18.0.11"
+      },
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@xterm/headless": "5.5.0",
+        "chalk": "6.0.0"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    },
+    {
+      "name": "@earendil-works/pi-telemetry",
+      "version": "1.3.0",
+      "manifest": "references/pi/packages/telemetry/package.json",
+      "manifest_sha256": "386479e7767a2aff572fea6339558405b1b23e9e7951504731515fc71b7db6ae",
+      "license_declared": "MIT",
+      "dependencies": {},
+      "optionalDependencies": {},
+      "devDependencies": {
+        "@types/node": "22.19.19",
+        "vitest": "4.1.11"
+      },
+      "classification": "TS oracle/workflow source; not native product approval"
+    }
+  ],
+  "pi_external_runtime_direct_dependencies": {
+    "@silvia-odwyer/photon-node": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "0.3.4"
+      }
+    ],
+    "brace-expansion": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "5.0.12"
+      }
+    ],
+    "chalk": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "6.0.0"
+      }
+    ],
+    "cross-spawn": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "7.0.6"
+      },
+      {
+        "consumer": "@earendil-works/pi-mcp",
+        "version": "7.0.6"
+      }
+    ],
+    "diff": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "8.0.4"
+      }
+    ],
+    "grok-mermaid": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "0.2.3"
+      }
+    ],
+    "highlight.js": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "10.7.3"
+      }
+    ],
+    "hosted-git-info": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "9.0.3"
+      }
+    ],
+    "ignore": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "7.0.8"
+      }
+    ],
+    "jiti": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "2.7.0"
+      }
+    ],
+    "minimatch": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "10.2.6"
+      }
+    ],
+    "proper-lockfile": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "4.1.2"
+      }
+    ],
+    "quickjs-wasi": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "3.6.2"
+      },
+      {
+        "consumer": "@earendil-works/pi-codemode",
+        "version": "3.6.2"
+      }
+    ],
+    "semver": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "7.8.5"
+      }
+    ],
+    "typebox": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "1.3.27"
+      },
+      {
+        "consumer": "@earendil-works/pi-agent-core",
+        "version": "1.3.27"
+      },
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "1.3.27"
+      }
+    ],
+    "undici": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "8.10.2"
+      }
+    ],
+    "yaml": [
+      {
+        "consumer": "@earendil-works/pi-coding-agent",
+        "version": "2.9.0"
+      }
+    ],
+    "@anthropic-ai/sdk": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "0.129.0"
+      }
+    ],
+    "@aws-sdk/client-bedrock-runtime": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "3.1127.0"
+      }
+    ],
+    "@google/genai": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "2.21.0"
+      }
+    ],
+    "@smithy/node-http-handler": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "4.12.1"
+      }
+    ],
+    "http-proxy-agent": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "9.1.0"
+      }
+    ],
+    "https-proxy-agent": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "9.1.0"
+      }
+    ],
+    "openai": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "7.19.0"
+      }
+    ],
+    "partial-json": [
+      {
+        "consumer": "@earendil-works/pi-ai",
+        "version": "0.1.7"
+      }
+    ],
+    "get-east-asian-width": [
+      {
+        "consumer": "@earendil-works/pi-tui",
+        "version": "1.6.0"
+      }
+    ],
+    "marked": [
+      {
+        "consumer": "@earendil-works/pi-tui",
+        "version": "18.0.11"
+      }
+    ]
+  },
+  "root_dev_dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.26",
+    "@biomejs/biome": "2.3.5",
+    "@biomejs/wasm-nodejs": "2.3.5",
+    "@types/node": "22.19.19",
+    "esbuild": "0.28.2",
+    "husky": "9.1.7",
+    "pnpm": "11.15.1",
+    "shx": "0.3.4",
+    "typescript": "7.0.2",
+    "yaml": "2.9.0"
+  },
+  "mapping": [
+    {
+      "source": "Node.js/Bun",
+      "disposition": "oracle only; optional separately budgeted JS bridge",
+      "native_direction": "PAL + native process; no required managed language runtime",
+      "steps": [
+        "T06",
+        "T09",
+        "T39"
+      ]
+    },
+    {
+      "source": "typebox",
+      "disposition": "replace",
+      "native_direction": "native Schema service with approved subset; no silent coercion gaps",
+      "steps": [
+        "T08",
+        "T12",
+        "T24"
+      ]
+    },
+    {
+      "source": "jiti",
+      "disposition": "not ported into minimal runtime",
+      "native_direction": "native loader; JS modules require optional host or source rewrite",
+      "steps": [
+        "T16",
+        "T32",
+        "T39"
+      ]
+    },
+    {
+      "source": "openai / @anthropic-ai/sdk / @google/genai / AWS+Smithy",
+      "disposition": "replace behavior not SDK implementation",
+      "native_direction": "protocol-specific native Provider + HTTP/TLS; OAuth/signing separately scoped",
+      "steps": [
+        "T07",
+        "T27",
+        "T35"
+      ]
+    },
+    {
+      "source": "undici / proxy agents",
+      "disposition": "replace",
+      "native_direction": "network/PAL; proxy, cert store, SSE, timeout coverage",
+      "steps": [
+        "T07",
+        "T27"
+      ]
+    },
+    {
+      "source": "partial-json",
+      "disposition": "replace with bounded parser",
+      "native_direction": "incremental UI parse may exist; never execute truncated tool args",
+      "steps": [
+        "T12",
+        "T24"
+      ]
+    },
+    {
+      "source": "cross-spawn / proper-lockfile",
+      "disposition": "replace",
+      "native_direction": "PAL process + single-writer/locking service; platform semantics tested",
+      "steps": [
+        "T20",
+        "T26"
+      ]
+    },
+    {
+      "source": "diff / ignore / minimatch / brace-expansion",
+      "disposition": "replace selected behavior",
+      "native_direction": "native edit diff + search/resource pattern subset; exact compatibility cases",
+      "steps": [
+        "T25",
+        "T31",
+        "T47"
+      ]
+    },
+    {
+      "source": "chalk / marked / highlight.js / get-east-asian-width / grok-mermaid",
+      "disposition": "replace/defer by feature",
+      "native_direction": "native TUI; Unicode width fixtures; optional rich renderers",
+      "steps": [
+        "T33",
+        "T34"
+      ]
+    },
+    {
+      "source": "photon / image codecs",
+      "disposition": "candidate selection required",
+      "native_direction": "optional native image service; maintain model input semantics",
+      "steps": [
+        "T07",
+        "T35"
+      ]
+    },
+    {
+      "source": "yaml / semver / hosted-git-info",
+      "disposition": "replace subset or defer package manager compatibility",
+      "native_direction": "own config schema; version selection; safe source parser; no arbitrary !!js",
+      "steps": [
+        "T17",
+        "T40"
+      ]
+    },
+    {
+      "source": "quickjs-wasi / pi-codemode",
+      "disposition": "optional later",
+      "native_direction": "no JS engine in P1/P2 core; separate executable/host if approved",
+      "steps": [
+        "T39",
+        "T47"
+      ]
+    },
+    {
+      "source": "pi-mcp / telemetry / chord / durable / env",
+      "disposition": "split by actual required entry graph",
+      "native_direction": "MCP/observability/routing/state services optional; not blindly copy all workspaces",
+      "steps": [
+        "T03",
+        "T07",
+        "T47"
+      ]
+    }
+  ],
+  "native_candidates": [
+    {
+      "capability": "assembly toolchain",
+      "path": "references/fasm",
+      "status": "candidate",
+      "review_required": [
+        "dialect",
+        "debugger",
+        "relocations/PIC",
+        "object format",
+        "multi-architecture path",
+        "license"
+      ],
+      "steps": [
+        "T06"
+      ]
+    },
+    {
+      "capability": "TLS/HTTP",
+      "path": "references/BearSSL",
+      "status": "candidate, not selected",
+      "review_required": [
+        "required TLS versions/ciphers",
+        "peer validation",
+        "proxy",
+        "maintenance",
+        "trust store",
+        "deployment size"
+      ],
+      "steps": [
+        "T07",
+        "T27"
+      ]
+    },
+    {
+      "capability": "JSON SIMD",
+      "path": "references/simdjson",
+      "status": "reference or optional C++ provider, not core dependency",
+      "review_required": [
+        "C++ runtime footprint",
+        "C ABI wrapper",
+        "baseline CPU",
+        "scalar fallback",
+        "benchmark"
+      ],
+      "steps": [
+        "T07",
+        "T12"
+      ]
+    },
+    {
+      "capability": "search",
+      "path": "references/ripgrep",
+      "status": "reference or optional process plugin",
+      "review_required": [
+        "Rust executable dependency",
+        "packaging",
+        "ignore/glob behavior",
+        "startup cost"
+      ],
+      "steps": [
+        "T07",
+        "T47"
+      ]
+    },
+    {
+      "capability": "terminal",
+      "path": "references/termbox2",
+      "status": "candidate/reference",
+      "review_required": [
+        "Unicode and input fidelity",
+        "TUI behavior",
+        "license",
+        "native versus direct ANSI"
+      ],
+      "steps": [
+        "T07",
+        "T33"
+      ]
+    },
+    {
+      "capability": "inference",
+      "path": "references/llama.cpp",
+      "status": "optional later",
+      "review_required": [
+        "separate weight/backend size",
+        "C++ bridge",
+        "platform and CPU/GPU requirements"
+      ],
+      "steps": [
+        "T47"
+      ]
+    },
+    {
+      "capability": "Qt",
+      "path": "not vendored",
+      "status": "desktop only later",
+      "review_required": [
+        "separate GUI size",
+        "bridge ABI",
+        "framework deployment"
+      ],
+      "steps": [
+        "T47"
+      ]
+    }
+  ],
+  "approval_fields_required": [
+    "ID",
+    "exact source/version/hash",
+    "runtime versus developer-only",
+    "license and notices",
+    "direct and transitive consumers",
+    "supported platform/CPU",
+    "static/shared delivery",
+    "package and memory budget impact",
+    "protocol/security support",
+    "upgrade/rollback and reviewer"
+  ]
+}

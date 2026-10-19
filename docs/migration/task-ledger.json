@@ -1,0 +1,978 @@
+{
+  "schema": "pangu.migration.task-ledger.v1",
+  "status": "IMPLEMENTATION_STARTED",
+  "note": "Technical closure under review: see docs/migration/precore-closure-review.md; local candidate T10 package prepared, no independent policy approval or remote deployment.",
+  "tasks": [
+    {
+      "id": "T01",
+      "title": "冻结参考和本地状态",
+      "status": "VERIFIED",
+      "depends_on": [],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T01",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t01-t02-evidence.json",
+        "docs/migration/reference-audit.md"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; no protected policy promotion performed"
+    },
+    {
+      "id": "T02",
+      "title": "定义迁移对象与可声称范围",
+      "status": "VERIFIED",
+      "depends_on": [
+        "T01"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T02",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t01-t02-evidence.json",
+        "docs/migration/reference-audit.md"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; no protected policy promotion performed"
+    },
+    {
+      "id": "T03",
+      "title": "穷举 Pi 的外部表面",
+      "status": "VERIFIED",
+      "depends_on": [
+        "T02"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-01",
+        "CFG-02"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T03",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t03-t04-review.md",
+        "docs/migration/t03-t04-evidence.json"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; static inventory/traceability only"
+    },
+    {
+      "id": "T04",
+      "title": "建立差异账本和任务追踪",
+      "status": "VERIFIED",
+      "depends_on": [
+        "T03"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T04",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t03-t04-review.md",
+        "docs/migration/t03-t04-evidence.json"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; static inventory/traceability only"
+    },
+    {
+      "id": "T05",
+      "title": "先搭受保护门禁和构建控制面",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "T04"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T05",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t05-progress.md",
+        "docs/migration/t05-t06-evidence.json",
+        "docs/migration/t05-admission-evidence.json",
+        "docs/migration/t05-trusted-remote-closure.md",
+        "docs/migration/precore-handoff-report.md",
+        "docs/migration/precore-closure-review.md"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; public repository and active main ruleset configured; no initial commit or trusted publisher; automation still has admin permissions. See docs/migration/t05-trusted-remote-closure.md for the candidate design and the exact maintainer actions still required.",
+      "technical_milestones": [
+        "local Git boundary",
+        "native Assembly/C actual input, symbol, final ELF and retained artifact audits",
+        "root-scope static service preflight",
+        "separate-controller bypass rejection",
+        "frozen tool image and read-only offline namespace self-tests",
+        "candidate source admission with full-matrix build and receipt re-verification",
+        "current-tree T05 evidence ledger with evidence generations separated",
+        "trusted remote closure design and permission matrix (deployment BLOCKED)"
+      ],
+      "blocked_conditions": [
+        "independent control-plane approval with an externally pinned controller/tool-image digest",
+        "GitHub App installation, trusted check publisher and removal of automation admin rights",
+        "first default-branch bootstrap without bypass or fabricated status",
+        "ordinary coding identity proven unable to edit rules or publish the required check"
+      ]
+    },
+    {
+      "id": "T06",
+      "title": "选择并固定原生构建与调试链",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "T05"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T06",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t06-toolchain-review.md",
+        "docs/migration/t05-progress.md",
+        "docs/migration/t05-admission-evidence.json",
+        "docs/migration/precore-handoff-report.md",
+        "docs/migration/precore-closure-review.md"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "PENDING; candidate frontend/GNU as toolchain and isolated experiments only; T05 prerequisite remains outstanding",
+      "technical_milestones": [
+        "single Clang-frontend + GNU as/ld/nm + LLVM objdump + GDB candidate",
+        "C17/.S two-stage real input capture including .include/.incbin",
+        "debug/release repeat builds, C/Assembly line info, two-frame backtrace, PIC shared link",
+        "frozen development image with read-only offline namespace reproduction",
+        "toolchain approval candidate with pinned versions, paths and digests"
+      ],
+      "blocked_conditions": [
+        "T05 prerequisite not closed (independent control approval and trusted publisher)",
+        "cross-machine and cross-platform reproduction not performed",
+        "production PIE/DSO loading policy and full ABI left to T08/T13/T16"
+      ]
+    },
+    {
+      "id": "T07",
+      "title": "审查依赖与替换可行性",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "T06"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "LLM-02",
+        "LLM-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T07",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t07-dependency-decisions.md",
+        "docs/migration/dependency-inventory.json",
+        "docs/migration/precore-closure-review.md"
+      ],
+      "completion_approved": false,
+      "technical_milestones": [
+        "capability-by-capability decision table for TLS, HTTP, JSON, schema, allocator, file, process, terminal, search, dynamic loading",
+        "candidate versions and licenses with official sources",
+        "explicit deferrals with re-evaluation conditions",
+        "no third-party native dependency approved yet"
+      ],
+      "blocked_conditions": [
+        "no measured size/performance",
+        "terminal/GUI and YAML deferred by scope",
+        "T27/T12 runtime verification not run",
+        "no independent approval of the candidate dependencies"
+      ]
+    },
+    {
+      "id": "T08",
+      "title": "定义服务、ABI 与数据模型",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "T07"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "LLM-01",
+        "SDK-02",
+        "HOST-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T08",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t08-native-contract.md",
+        "docs/migration/precore-handoff-report.md",
+        "docs/migration/precore-closure-review.md"
+      ],
+      "completion_approved": false,
+      "technical_milestones": [
+        "fixed-width C boundary rules and version prefixes",
+        "service descriptor, allocator ownership, async/cancel minimal semantics",
+        "event ordering draft tied to Pi agent-loop source",
+        "independent C/Assembly consumer experiment for sizeof/offsetof, buffer ownership and rollback order (local pass)"
+      ],
+      "blocked_conditions": [
+        "production headers not admitted",
+        "threading, reentrancy, cancel race and DSO semantics unverified",
+        "wire and storage versions not implemented",
+        "no independent control approval"
+      ]
+    },
+    {
+      "id": "T09",
+      "title": "先实现对照执行与证据骨架",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "T08"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T09",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [
+        "docs/migration/t09-comparison-basis.md",
+        "tools/migration/t09-scenarios.json",
+        "tools/migration/oracle_pi.mjs",
+        "tools/migration/compare_trace.py",
+        "tools/migration/test_compare_trace.py",
+        "docs/migration/precore-handoff-report.md",
+        "docs/migration/precore-closure-review.md"
+      ],
+      "completion_approved": false,
+      "technical_milestones": [
+        "Pi oracle run from a separate work copy with npm ci --ignore-scripts",
+        "five deterministic scripted scenarios with fixed clock and IDs",
+        "comparator with raw/summary/diff output and 12 negative tests",
+        "native side explicitly BLOCKED, not PASS"
+      ],
+      "blocked_conditions": [
+        "no native implementation to compare",
+        "no protocol/request-payload comparison",
+        "no file-effect comparison",
+        "case manifest not yet a protected approved case set"
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "引导、PAL 和最小进程",
+      "status": "PLANNED",
+      "depends_on": [
+        "T09"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "HOST-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T10",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T11",
+      "title": "Allocator、Buffer 和字符串",
+      "status": "PLANNED",
+      "depends_on": [
+        "T10"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T11",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T12",
+      "title": "必需数据结构与 JSON",
+      "status": "PLANNED",
+      "depends_on": [
+        "T11"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T12",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T13",
+      "title": "插件发现、服务解析与作用域",
+      "status": "PLANNED",
+      "depends_on": [
+        "T12"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "EXT-01",
+        "HOST-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T13",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T14",
+      "title": "资源所有权与生命周期",
+      "status": "PLANNED",
+      "depends_on": [
+        "T13"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "EXT-01",
+        "EXT-03",
+        "HOST-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T14",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T15",
+      "title": "事件循环、异步操作和流控",
+      "status": "PLANNED",
+      "depends_on": [
+        "T14"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "EXT-02",
+        "WIRE-03"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T15",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T16",
+      "title": "原生动态模块装载",
+      "status": "PLANNED",
+      "depends_on": [
+        "T15"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "EXT-01",
+        "SDK-02"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T16",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T17",
+      "title": "配置与 Profile 组合",
+      "status": "PLANNED",
+      "depends_on": [
+        "T16"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-04",
+        "CFG-01",
+        "CFG-02",
+        "CFG-03",
+        "CFG-04",
+        "LLM-03",
+        "RESOURCE-01",
+        "SEC-01",
+        "OPS-01",
+        "LLM-07"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T17",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T18",
+      "title": "完成 P0 与首次资源预算",
+      "status": "PLANNED",
+      "depends_on": [
+        "T17"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "HOST-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T18",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T19",
+      "title": "Session 树和消息投影",
+      "status": "PLANNED",
+      "depends_on": [
+        "T18"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "SESSION-01",
+        "SESSION-02"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T19",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T20",
+      "title": "JSONL 持久化与崩溃恢复",
+      "status": "PLANNED",
+      "depends_on": [
+        "T19"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "SESSION-01",
+        "SESSION-03",
+        "SESSION-06"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T20",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T21",
+      "title": "Prompt、资源与 Context 基础",
+      "status": "PLANNED",
+      "depends_on": [
+        "T20"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "AGENT-03",
+        "SESSION-02",
+        "RESOURCE-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T21",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T22",
+      "title": "Model 服务与假 Provider",
+      "status": "PLANNED",
+      "depends_on": [
+        "T21"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "LLM-01",
+        "AGENT-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T22",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T23",
+      "title": "Agent Loop 原生服务",
+      "status": "PLANNED",
+      "depends_on": [
+        "T22"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "LLM-01",
+        "AGENT-01",
+        "AGENT-03",
+        "AGENT-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T23",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T24",
+      "title": "Tools 服务和受控执行管线",
+      "status": "PLANNED",
+      "depends_on": [
+        "T23"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-05",
+        "AGENT-01",
+        "TOOL-01",
+        "EXT-02",
+        "SEC-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T24",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T25",
+      "title": "文件服务与 read/write/edit",
+      "status": "PLANNED",
+      "depends_on": [
+        "T24"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "TOOL-02",
+        "TOOL-03",
+        "TOOL-04",
+        "TOOL-08"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T25",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T26",
+      "title": "进程服务与 bash",
+      "status": "PLANNED",
+      "depends_on": [
+        "T25"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CFG-03",
+        "TOOL-05",
+        "TUI-04",
+        "SEC-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T26",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T27",
+      "title": "HTTP/TLS 和首个真实 Provider",
+      "status": "PLANNED",
+      "depends_on": [
+        "T26"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "AUTH-01",
+        "LLM-02",
+        "LLM-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T27",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T28",
+      "title": "最小 CLI 与 P1 验收",
+      "status": "PLANNED",
+      "depends_on": [
+        "T27"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-01",
+        "CLI-02",
+        "CLI-03",
+        "CLI-04",
+        "CLI-05",
+        "SESSION-03",
+        "OPS-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T28",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T29",
+      "title": "队列、重试与终结语义",
+      "status": "PLANNED",
+      "depends_on": [
+        "T28"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "AGENT-02",
+        "AGENT-04",
+        "LLM-07"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T29",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T30",
+      "title": "Compaction、恢复和树操作",
+      "status": "PLANNED",
+      "depends_on": [
+        "T29"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "LLM-06",
+        "SESSION-02",
+        "SESSION-04",
+        "SESSION-05",
+        "EXT-03",
+        "TUI-03"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T30",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T31",
+      "title": "Skills、模板、资源发现",
+      "status": "PLANNED",
+      "depends_on": [
+        "T30"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "RESOURCE-01",
+        "RESOURCE-02",
+        "RESOURCE-03",
+        "RESOURCE-04",
+        "TUI-03"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T31",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T32",
+      "title": "原生扩展 API 与钩子",
+      "status": "PLANNED",
+      "depends_on": [
+        "T31"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-05",
+        "CFG-04",
+        "AGENT-03",
+        "TOOL-01",
+        "EXT-01",
+        "EXT-02",
+        "EXT-03",
+        "EXT-05"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T32",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T33",
+      "title": "TUI 输入与终端基础",
+      "status": "PLANNED",
+      "depends_on": [
+        "T32"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-02",
+        "TUI-01",
+        "TUI-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T33",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T34",
+      "title": "TUI 展示与交互",
+      "status": "PLANNED",
+      "depends_on": [
+        "T33"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "TOOL-08",
+        "SESSION-03",
+        "SESSION-04",
+        "EXT-05",
+        "TUI-01",
+        "TUI-02",
+        "TUI-03",
+        "TUI-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T34",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T35",
+      "title": "模型、认证与图像范围补齐",
+      "status": "PLANNED",
+      "depends_on": [
+        "T34"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-04",
+        "CLI-07",
+        "AUTH-01",
+        "AUTH-02",
+        "LLM-02",
+        "LLM-03",
+        "LLM-04",
+        "LLM-05",
+        "LLM-06",
+        "TOOL-08",
+        "TUI-03",
+        "LLM-07"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T35",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T36",
+      "title": "JSON/RPC 的 Pi 兼容适配",
+      "status": "PLANNED",
+      "depends_on": [
+        "T35"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-01",
+        "CLI-02",
+        "CLI-03",
+        "CLI-05",
+        "AGENT-02",
+        "AGENT-04",
+        "EXT-05",
+        "WIRE-01",
+        "WIRE-02",
+        "WIRE-03",
+        "WIRE-04"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T36",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T37",
+      "title": "配置与凭据迁移工具",
+      "status": "PLANNED",
+      "depends_on": [
+        "T36"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CFG-01",
+        "CFG-02",
+        "CFG-03",
+        "CFG-04",
+        "AUTH-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T37",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T38",
+      "title": "Session 导入、导出与一致性",
+      "status": "PLANNED",
+      "depends_on": [
+        "T37"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "SESSION-01",
+        "SESSION-02",
+        "SESSION-03",
+        "SESSION-04",
+        "SESSION-06",
+        "EXPORT-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T38",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T39",
+      "title": "SDK 和现有扩展迁移路线",
+      "status": "PLANNED",
+      "depends_on": [
+        "T38"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "AUTH-02",
+        "EXT-04",
+        "WIRE-04",
+        "SDK-01",
+        "SDK-02",
+        "CODEMODE-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T39",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T40",
+      "title": "包、安装、卸载与支持边界",
+      "status": "PLANNED",
+      "depends_on": [
+        "T39"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-06",
+        "CLI-07",
+        "RESOURCE-04",
+        "EXPORT-01",
+        "EXPORT-02",
+        "OPS-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T40",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T41",
+      "title": "离线双运行认证",
+      "status": "PLANNED",
+      "depends_on": [
+        "T40"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T41",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T42",
+      "title": "受控双轨试用",
+      "status": "PLANNED",
+      "depends_on": [
+        "T41"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T42",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T43",
+      "title": "发布前门禁与回滚演练",
+      "status": "PLANNED",
+      "depends_on": [
+        "T42"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T43",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T44",
+      "title": "小范围 Canary",
+      "status": "PLANNED",
+      "depends_on": [
+        "T43"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T44",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T45",
+      "title": "切换选定调用入口",
+      "status": "PLANNED",
+      "depends_on": [
+        "T44"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T45",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T46",
+      "title": "回滚或稳定退出",
+      "status": "PLANNED",
+      "depends_on": [
+        "T45"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [],
+      "definition": "docs/原生重写路线与迁移TODO.md#T46",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T47",
+      "title": "扩展执行位置与平台",
+      "status": "PLANNED",
+      "depends_on": [
+        "T46"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "CLI-07",
+        "LLM-05",
+        "TOOL-06",
+        "TOOL-07",
+        "EXT-04",
+        "MCP-01",
+        "CODEMODE-01",
+        "LOCAL-01",
+        "SEC-01",
+        "PLATFORM-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T47",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    },
+    {
+      "id": "T48",
+      "title": "参考更新与技术债复盘",
+      "status": "PLANNED",
+      "depends_on": [
+        "T47"
+      ],
+      "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
+      "feature_ids": [
+        "EXPORT-02",
+        "OPS-01"
+      ],
+      "definition": "docs/原生重写路线与迁移TODO.md#T48",
+      "owner_role": "unassigned module implementer and independent reviewer",
+      "evidence": [],
+      "completion_approved": false
+    }
+  ]
+}
