@@ -1,0 +1,9 @@
+{
+  "schema": "pangu.native-admission.v1",
+  "phase": "CANDIDATE_NOT_APPROVED",
+  "target": "linux-x86_64",
+  "toolchain": "governance/native-probe-toolchain.json",
+  "modules": [],
+  "service_definitions": [],
+  "builds": []
+}

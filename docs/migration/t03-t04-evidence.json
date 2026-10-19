@@ -1,0 +1,72 @@
+{
+  "schema": "pangu.migration.t03-t04-evidence.v1",
+  "status": "STATIC_TASK_VERIFICATION_PASS",
+  "recorded_date_client": "2026-10-19",
+  "verified_tasks": [
+    "T03",
+    "T04"
+  ],
+  "counts": {
+    "ast_items": 5393,
+    "document_items": 718,
+    "sources": 322,
+    "documents": 42,
+    "unknowns": 30,
+    "proposed_cases": 6111
+  },
+  "feature_families": 66,
+  "scope_requirements": 103,
+  "classified_discoveries": 30,
+  "digests": {
+    "tools/migration/surface_inventory.py": "aa5e7da6a8cf582ed24b9a6e1c462fe2a56b138c09283a77a000add17e1f3cbd",
+    "tools/migration/test_surface_inventory.py": "658807202a9e7f7bbc34d4c56f2a19d0f75f68276715487dc729d7a962a198be",
+    "tools/migration/surface_review.py": "b8e65d124b41d92f880695306684948f2902c808c7e17afbac56c891ee3b694d",
+    "tools/migration/test_surface_review.py": "b624fb7169b17f605f9f199c772be8aa42ef8665e55868454a53ecd18268848d",
+    "docs/migration/pi-public-surface-discovery.json": "f09887f9e9571a8ac5ba8b0dbe7e14bfd9a359494392ed3a18a38af716b311cd",
+    "docs/migration/pi-surface-catalogue.json": "af7ea44d683937cb4ce347575e063589ca608514b0ea2ccf7f51b1cfe0e10bd2",
+    "docs/migration/surface-gap-ledger.json": "c4a7902f43cbfb7ae0dc1c06dc106e9fb45810efda19449bd241b75818f4bc1f",
+    "docs/migration/feature-inventory.json": "feebed79926bf96bbcc998aec1782463d08b0fd72170e8cff8ccfeef437aaea1",
+    "docs/migration/implementation-scope.json": "cab4525ac4f913b0e47bb0aaf995216763874ba7fd9302082ff9372aeb49b76a",
+    "docs/migration/t03-t04-review.md": "8d0936c465ea7b3cd3fc07bc72f2b22e7f5ef424e0a47d97889ec9b2d7f9457d",
+    "docs/migration/task-ledger.json": "d92e38ffd4d85ddd692404e68909fec27bc65c50d8b416868f2849ba6ffeccdc",
+    "governance/bootstrap-policy.json": "34bc2c908e5be812cab3676754e2f7753d5dcaf24ddff7bfb1f45bef7e84282b"
+  },
+  "checks": [
+    {
+      "command": "python3 tools/migration/test_surface_inventory.py --typescript /home/xu-yuanhao/Documents/PanGu-artifacts/tooling/surface-parser/node_modules/typescript",
+      "tests": 16,
+      "verdict": "PASS"
+    },
+    {
+      "command": "python3 tools/migration/test_surface_review.py",
+      "tests": 14,
+      "verdict": "PASS"
+    },
+    {
+      "command": "python3 tools/gates/test_check.py",
+      "tests": 11,
+      "verdict": "PASS"
+    },
+    {
+      "command": "python3 tools/gates/check.py",
+      "verdict": "PASS"
+    },
+    {
+      "check": "source/docs/manifests/tool digests, full relative export closure, all IDs/mappings/case links and required-set provenance",
+      "verdict": "PASS"
+    }
+  ],
+  "all_implementation_gaps": "OPEN_IMPLEMENTATION / NOT_RUN",
+  "all_scope_requirement_evidence": "NOT_IMPLEMENTED / empty",
+  "independent_control_plane_approval": false,
+  "runtime_conformance_executed": false,
+  "production_code_added": false,
+  "not_run": [
+    "Pi/Rust runtime tests",
+    "native compilation",
+    "G01/G02 production admission",
+    "protected runner deployment",
+    "release"
+  ],
+  "next_task": "T05"
+}

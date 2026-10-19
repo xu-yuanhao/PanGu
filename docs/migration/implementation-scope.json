@@ -1,0 +1,279 @@
+{
+  "schema": "pangu.migration.implementation-scope.v1",
+  "status": "IMPLEMENTATION_BASELINE_NOT_RELEASE_CERTIFICATION",
+  "task": "T02",
+  "reference": "reference-baseline.json",
+  "basis": "User authorized implementation of the existing plan; no external migration user exists, so use project self-test scope as T02 specifies.",
+  "scope_owner": "project self-use implementation",
+  "review_authority": "human maintainer for control-plane promotion and any release",
+  "approval_boundaries": {
+    "routine_implementation_choices": "authorized by current user instruction within existing architecture",
+    "protected_policy_promotion": "not performed; independent review still required",
+    "production_release": "not authorized",
+    "real_credential_or_session_migration": "not performed"
+  },
+  "profiles": [
+    {
+      "id": "P0",
+      "name": "原生宿主实验",
+      "target": "x86_64-linux",
+      "milestone": "T18",
+      "required_features": [
+        "HOST-01"
+      ],
+      "execution_surfaces": [
+        "native test consumers"
+      ],
+      "model_protocols": [],
+      "tools": [],
+      "release_claim": "仅宿主服务组合/生命周期实验；不是可用 Agent"
+    },
+    {
+      "id": "P1",
+      "name": "项目自用最小 CLI Agent",
+      "target": "x86_64-linux",
+      "milestone": "T28",
+      "required_features": [
+        "CLI-01",
+        "CLI-02",
+        "CLI-03",
+        "CLI-04",
+        "CFG-01",
+        "CFG-02",
+        "CFG-03",
+        "CFG-04",
+        "AUTH-01",
+        "LLM-01",
+        "LLM-02",
+        "LLM-04",
+        "AGENT-01",
+        "AGENT-03",
+        "TOOL-01",
+        "TOOL-02",
+        "TOOL-03",
+        "TOOL-04",
+        "TOOL-05",
+        "SESSION-01",
+        "SESSION-03",
+        "SESSION-06",
+        "RESOURCE-01",
+        "HOST-01",
+        "SEC-01",
+        "OPS-01"
+      ],
+      "execution_surfaces": [
+        "one-shot CLI print",
+        "piped stdin",
+        "deterministic scripted model"
+      ],
+      "model_protocols": [
+        "scripted fake provider for required offline evidence",
+        "OpenAI Chat Completions compatible subset with SSE and tool calls; endpoint capability must be declared"
+      ],
+      "tools": [
+        "read (text)",
+        "write",
+        "edit",
+        "bash"
+      ],
+      "required_cli_subset": [
+        "--help",
+        "-h",
+        "--version",
+        "-v",
+        "--print",
+        "-p",
+        "--provider",
+        "--model",
+        "--api-key",
+        "--thinking",
+        "--system-prompt",
+        "--append-system-prompt",
+        "--tools",
+        "-t",
+        "--no-tools",
+        "--session",
+        "--session-id",
+        "--session-dir",
+        "--no-session",
+        "--name",
+        "-n",
+        "--",
+        "@text-file",
+        "stdin"
+      ],
+      "required_settings_subset": [
+        "defaultProvider",
+        "defaultModel",
+        "defaultThinkingLevel",
+        "defaultTools",
+        "sessionDir",
+        "defaultProjectTrust (user-only)"
+      ],
+      "required_env_subset": [
+        "PI_CODING_AGENT_DIR (import/mapping)",
+        "PI_CODING_AGENT_SESSION_DIR (import/mapping)",
+        "PI_SESSION_ID (compatibility mode)",
+        "PI_SESSION_FILE (compatibility mode)",
+        "PI_PROVIDER (compatibility mode)",
+        "PI_MODEL (compatibility mode)",
+        "PI_REASONING_LEVEL (compatibility mode)",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "explicit API-key env reference"
+      ],
+      "authentication": [
+        "ephemeral explicit key",
+        "explicit environment secret reference"
+      ],
+      "session_support": [
+        "native versioned JSONL",
+        "in-memory session",
+        "create/open/name/id",
+        "single writer; final record recovery"
+      ],
+      "permissions": [
+        "deny-all test policy",
+        "explicit trusted-local self-use mode; no OS sandbox claim"
+      ],
+      "scope_limits": [
+        "Feature IDs represent families; only listed subitems enter P1. T03/T04 must enumerate and map them before implementation.",
+        "@image, interactive resume/tree/fork, OAuth, model fuzzy search/cycling and all nonlisted options remain later work.",
+        "No full Pi CLI/JSON/RPC/SDK compatibility claim.",
+        "Unknown or unsupported flags/settings requiring behavior must produce explicit diagnostic; no silent fallback."
+      ],
+      "release_claim": "仅定义子集的最小 CLI；不宣称 Pi drop-in"
+    },
+    {
+      "id": "P2",
+      "name": "日常 TUI Agent",
+      "target": "x86_64-linux",
+      "milestone": "T35",
+      "inherits": "P1",
+      "required_features": [
+        "AGENT-02",
+        "AGENT-04",
+        "SESSION-02",
+        "SESSION-04",
+        "SESSION-05",
+        "RESOURCE-02",
+        "RESOURCE-03",
+        "EXT-01",
+        "EXT-02",
+        "EXT-03",
+        "EXT-05",
+        "TUI-01",
+        "TUI-02",
+        "TUI-03",
+        "TUI-04"
+      ],
+      "execution_surfaces": [
+        "interactive TUI"
+      ],
+      "model_protocols": [
+        "P1 protocol; additional protocols only after independent capability evidence"
+      ],
+      "tools": [
+        "P1 tools"
+      ],
+      "scope_limits": [
+        "Provider/auth/image exact requirements finalized before T35; no implicit all-provider support.",
+        "Native extensions only; arbitrary JS/TS modules not supported."
+      ],
+      "release_claim": "已验证范围的日常 TUI；其他功能不作兼容声明"
+    },
+    {
+      "id": "P3",
+      "name": "指定工作流兼容迁移",
+      "target": "x86_64-linux",
+      "milestone": "T40-T46",
+      "inherits": "P2",
+      "required_features": [
+        "WIRE-01",
+        "WIRE-02",
+        "WIRE-03",
+        "CFG-01",
+        "CFG-02",
+        "SESSION-01"
+      ],
+      "workflow_specific_required_features": [
+        "AUTH-02",
+        "LLM-06",
+        "WIRE-04",
+        "SDK-01",
+        "SDK-02",
+        "CLI-06",
+        "RESOURCE-04",
+        "EXPORT-01",
+        "EXT-04"
+      ],
+      "execution_surfaces": [
+        "selected Pi JSON and JSONL RPC compatibility adapter"
+      ],
+      "model_protocols": [
+        "exact protocol/auth/model capability required by that workflow"
+      ],
+      "scope_limits": [
+        "No real external migration user currently exists; cannot certify arbitrary usage.",
+        "Workflow-specific features become required when actually used, including currently deferred extensions/OAuth.",
+        "SDK migration via RPC is an API change, not in-process TS drop-in compatibility."
+      ],
+      "release_claim": "仅指定版本/工作流的兼容；上线必须另行批准"
+    },
+    {
+      "id": "P4",
+      "name": "扩展与多端组合",
+      "target": "per-profile platform matrix",
+      "milestone": "T47",
+      "inherits": null,
+      "required_features": [],
+      "execution_surfaces": [
+        "independently selected future clients"
+      ],
+      "scope_limits": [
+        "GUI framework deferred until GUI work; no current Qt/QML or custom renderer decision.",
+        "Each optional capability/platform requires its own exact dependency and conformance scope."
+      ],
+      "release_claim": "未实施；不得从 P0-P3 结论推导"
+    }
+  ],
+  "difference_register": [
+    {
+      "id": "DIFF-001",
+      "features": [
+        "HOST-01",
+        "EXT-01",
+        "SDK-02"
+      ],
+      "decision": "Native replaceable services/C ABI instead of TS object/extension ABI",
+      "basis": "Explicit user architecture decision before implementation",
+      "validation": "T08/T13/T14/T16/T32 tests pending"
+    },
+    {
+      "id": "DIFF-002",
+      "features": [
+        "CFG-04",
+        "SEC-01"
+      ],
+      "decision": "Explicit authorization pipeline and trusted Native boundary; no sandbox claim for same-process code",
+      "basis": "Accepted project architecture and engineering gate specification",
+      "validation": "T17/T24/T26 negative tests pending"
+    },
+    {
+      "id": "DIFF-003",
+      "features": [
+        "CLI-01",
+        "CFG-01",
+        "SESSION-01",
+        "SDK-01"
+      ],
+      "decision": "Independent pangu executable/home/native storage; Pi compatibility scoped to adapters/import tools; never overwrite Pi data",
+      "basis": "Accepted migration plan and user authorization to implement it",
+      "validation": "T28/T36/T37/T38/T39 pending"
+    }
+  ],
+  "go_no_go": {
+    "implementation": "Applicable prerequisite gates must be executable; implementation scope alone is insufficient.",
+    "release": "All required subitems have current evidence; G00-G11 applicable gates pass, no critical security/data/memory gaps, measured budgets, rollback drill, approved canary window and explicit release approval."
+  }
+}

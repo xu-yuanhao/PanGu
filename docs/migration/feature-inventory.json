@@ -1,0 +1,3927 @@
+{
+  "schema": "pangu.migration.feature-inventory.v1",
+  "date": "2026-10-19",
+  "scope_status": "DRAFT_REQUIRES_T02_T03_REVIEW",
+  "baseline": "reference-baseline.json",
+  "all_features_implemented": false,
+  "features": [
+    {
+      "id": "CLI-01",
+      "title": "help/version、参数解析、别名与互斥",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/cli.md"
+      ],
+      "target_service": "clients/cli",
+      "steps": [
+        "T03",
+        "T28",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-01-01",
+          "scenario": "help",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-01-02",
+          "scenario": "version",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-01-03",
+          "scenario": "unknown flag",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-01-04",
+          "scenario": "-- delimiter",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-01-05",
+          "scenario": "invalid combination",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-02",
+      "title": "stdin、@file、位置参数与 TTY 模式选择",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/cli.md"
+      ],
+      "target_service": "clients/cli",
+      "steps": [
+        "T28",
+        "T33",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-02-01",
+          "scenario": "piped input",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-02-02",
+          "scenario": "TTY detection",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-02-03",
+          "scenario": "@text",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-02-04",
+          "scenario": "@image",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-02-05",
+          "scenario": "RPC rejects @file",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-03",
+      "title": "print/text 模式和退出状态",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/cli-integration.md"
+      ],
+      "target_service": "clients/cli",
+      "steps": [
+        "T28",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-03-01",
+          "scenario": "final text only",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-03-02",
+          "scenario": "stderr diagnostics",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-03-03",
+          "scenario": "provider failure",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-03-04",
+          "scenario": "signal",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-04",
+      "title": "模型匹配、作用域、reasoning 与覆盖",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/models.md"
+      ],
+      "target_service": "model/config",
+      "steps": [
+        "T17",
+        "T28",
+        "T35"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-04-01",
+          "scenario": "exact/fuzzy ID",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-04-02",
+          "scenario": "ambiguous credentials",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-04-03",
+          "scenario": "thinking clamp",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-04-04",
+          "scenario": "CLI override",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-05",
+      "title": "工具 allowlist、加减项、排除与 reload",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/cli.md"
+      ],
+      "target_service": "tools/config",
+      "steps": [
+        "T24",
+        "T28",
+        "T32",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-05-01",
+          "scenario": "--no-tools",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-05-02",
+          "scenario": "--no-builtin-tools",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-05-03",
+          "scenario": "+/-",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-05-04",
+          "scenario": "MCP selection",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-05-05",
+          "scenario": "reload",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-06",
+      "title": "install/remove/uninstall/update/list/config",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/packages.md"
+      ],
+      "target_service": "plugin/package-manager",
+      "steps": [
+        "T40"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-06-01",
+          "scenario": "npm/git/local source",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-06-02",
+          "scenario": "offline",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-06-03",
+          "scenario": "failed install",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-06-04",
+          "scenario": "remove scope",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CLI-07",
+      "title": "auth/mcp 子命令",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/cli.md"
+      ],
+      "target_service": "auth/mcp clients",
+      "steps": [
+        "T35",
+        "T40",
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CLI-07-01",
+          "scenario": "missing credential",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-07-02",
+          "scenario": "auth check",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CLI-07-03",
+          "scenario": "MCP list/login/logout",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CFG-01",
+      "title": "用户/项目配置、路径与字段级优先级",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/configuration.md"
+      ],
+      "target_service": "config",
+      "steps": [
+        "T17",
+        "T37"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CFG-01-01",
+          "scenario": "agent dir",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-01-02",
+          "scenario": "relative resource roots",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-01-03",
+          "scenario": "SYSTEM override",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-01-04",
+          "scenario": "sessionDir before trust",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CFG-02",
+      "title": "settings 默认值/合并/无效值",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/settings.md"
+      ],
+      "target_service": "config",
+      "steps": [
+        "T03",
+        "T17",
+        "T37"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CFG-02-01",
+          "scenario": "model defaults",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-02-02",
+          "scenario": "tool arrays",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-02-03",
+          "scenario": "compaction",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-02-04",
+          "scenario": "retry",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-02-05",
+          "scenario": "unknown required key",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CFG-03",
+      "title": "环境变量和子进程 Session 标记",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/environment-variables.md"
+      ],
+      "target_service": "config/process",
+      "steps": [
+        "T17",
+        "T26",
+        "T37"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CFG-03-01",
+          "scenario": "directory overrides",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-03-02",
+          "scenario": "offline",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-03-03",
+          "scenario": "proxy",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-03-04",
+          "scenario": "session/model env",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-03-05",
+          "scenario": "no stale inherited values",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CFG-04",
+      "title": "项目信任与资源读取顺序",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/security.md"
+      ],
+      "target_service": "permission/config",
+      "steps": [
+        "T17",
+        "T32",
+        "T37"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CFG-04-01",
+          "scenario": "untrusted project extension",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-04-02",
+          "scenario": "context discovery",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-04-03",
+          "scenario": "sessionDir exception",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CFG-04-04",
+          "scenario": "explicit trust",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AUTH-01",
+      "title": "API key/秘密来源与优先级",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/auth-storage.ts"
+      ],
+      "target_service": "secrets/provider-auth",
+      "steps": [
+        "T27",
+        "T35",
+        "T37"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AUTH-01-01",
+          "scenario": "CLI ephemeral key",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-01-02",
+          "scenario": "env",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-01-03",
+          "scenario": "auth file",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-01-04",
+          "scenario": "missing key",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-01-05",
+          "scenario": "redaction",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-01-06",
+          "scenario": "no shell command auto-execution",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AUTH-02",
+      "title": "OAuth 登录、刷新与退出",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/providers.md"
+      ],
+      "target_service": "provider-auth",
+      "steps": [
+        "T35",
+        "T39"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AUTH-02-01",
+          "scenario": "refresh",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-02-02",
+          "scenario": "expired token",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-02-03",
+          "scenario": "logout",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AUTH-02-04",
+          "scenario": "provider-specific subscriptions",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-01",
+      "title": "消息内容块、usage、stopReason 与能力",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/../ai/src/types.ts"
+      ],
+      "target_service": "model",
+      "steps": [
+        "T08",
+        "T22",
+        "T23"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-01-01",
+          "scenario": "text/thinking/tool blocks",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-01-02",
+          "scenario": "images",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-01-03",
+          "scenario": "usage cost",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-01-04",
+          "scenario": "length/error/abort",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-02",
+      "title": "Provider 协议矩阵",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/providers.md"
+      ],
+      "target_service": "model providers",
+      "steps": [
+        "T07",
+        "T27",
+        "T35"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-02-01",
+          "scenario": "selected protocol stream",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-02-02",
+          "scenario": "tool schema",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-02-03",
+          "scenario": "reasoning",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-02-04",
+          "scenario": "route-specific behavior",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-03",
+      "title": "自定义 endpoint、模型目录与覆盖",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/models-configuration.md"
+      ],
+      "target_service": "model-registry",
+      "steps": [
+        "T17",
+        "T35"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-03-01",
+          "scenario": "models.json",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-03-02",
+          "scenario": "base URL",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-03-03",
+          "scenario": "headers",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-03-04",
+          "scenario": "capabilities",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-03-05",
+          "scenario": "advisory metadata",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-04",
+      "title": "HTTP/SSE、代理、证书、限流和超时",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/../ai/package.json"
+      ],
+      "target_service": "transport",
+      "steps": [
+        "T07",
+        "T27",
+        "T35"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-04-01",
+          "scenario": "fragmented SSE",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-04-02",
+          "scenario": "bad certificate",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-04-03",
+          "scenario": "proxy",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-04-04",
+          "scenario": "429",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-04-05",
+          "scenario": "idle timeout",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-04-06",
+          "scenario": "cancel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-05",
+      "title": "WebSocket 与缓存传输",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/settings.md"
+      ],
+      "target_service": "transport",
+      "steps": [
+        "T35",
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-05-01",
+          "scenario": "connect timeout",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-05-02",
+          "scenario": "reconnect",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-05-03",
+          "scenario": "cached history",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-05-04",
+          "scenario": "fallback explicitly declared",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-06",
+      "title": "虚拟模型路由与状态持久化",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/virtual-models.md"
+      ],
+      "target_service": "model-router",
+      "steps": [
+        "T30",
+        "T35"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-06-01",
+          "scenario": "selected versus physical model",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-06-02",
+          "scenario": "router custom state",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-06-03",
+          "scenario": "resume",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AGENT-01",
+      "title": "基础循环和工具结果续接",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/../agent/src/agent-loop.ts"
+      ],
+      "target_service": "agent-loop",
+      "steps": [
+        "T22",
+        "T23",
+        "T24"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AGENT-01-01",
+          "scenario": "no tool",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-01-02",
+          "scenario": "single/multi tool",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-01-03",
+          "scenario": "next request",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-01-04",
+          "scenario": "missing tool",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-01-05",
+          "scenario": "error",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AGENT-02",
+      "title": "steering/follow-up/队列模式",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/agent-session.ts"
+      ],
+      "target_service": "agent-loop/session",
+      "steps": [
+        "T29",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AGENT-02-01",
+          "scenario": "one-at-a-time/all",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-02-02",
+          "scenario": "boundary input",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-02-03",
+          "scenario": "follow-up",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-02-04",
+          "scenario": "clear_queue",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-02-05",
+          "scenario": "abort returns pending",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AGENT-03",
+      "title": "请求前准备与 Context 变换",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/../agent/src/types.ts"
+      ],
+      "target_service": "context/agent-loop",
+      "steps": [
+        "T21",
+        "T23",
+        "T32"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AGENT-03-01",
+          "scenario": "prepareNextTurn",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-03-02",
+          "scenario": "prepareRequest",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-03-03",
+          "scenario": "context transform",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-03-04",
+          "scenario": "finishTurn decision",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "AGENT-04",
+      "title": "取消、重试与 agent_settled",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/json.md"
+      ],
+      "target_service": "agent-loop",
+      "steps": [
+        "T23",
+        "T29",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-AGENT-04-01",
+          "scenario": "cancel preparing/model/tool/retry",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-04-02",
+          "scenario": "agent_end versus settled",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-AGENT-04-03",
+          "scenario": "retry exhaustion",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-01",
+      "title": "注册、Schema、动态暴露和执行模式",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/extensions/wrapper.ts"
+      ],
+      "target_service": "tools",
+      "steps": [
+        "T24",
+        "T32"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-01-01",
+          "scenario": "invalid args",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-01-02",
+          "scenario": "unknown tool",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-01-03",
+          "scenario": "sequential/parallel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-01-04",
+          "scenario": "dynamic tool declarations",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-02",
+      "title": "read 文本与截断",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/read.ts"
+      ],
+      "target_service": "filesystem/read tool",
+      "steps": [
+        "T25"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-02-01",
+          "scenario": "offset/limit",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-02-02",
+          "scenario": "bytes/lines",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-02-03",
+          "scenario": "binary",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-02-04",
+          "scenario": "BOM",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-02-05",
+          "scenario": "large file",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-02-06",
+          "scenario": "cwd",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-03",
+      "title": "write 文件与父目录",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/write.ts"
+      ],
+      "target_service": "filesystem/write tool",
+      "steps": [
+        "T25"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-03-01",
+          "scenario": "create",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-03-02",
+          "scenario": "overwrite",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-03-03",
+          "scenario": "missing parent",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-03-04",
+          "scenario": "denied write",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-03-05",
+          "scenario": "cancel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-04",
+      "title": "edit 原文多项替换与 diff",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/edit.ts"
+      ],
+      "target_service": "filesystem/edit tool",
+      "steps": [
+        "T25"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-04-01",
+          "scenario": "edits[]",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-04-02",
+          "scenario": "legacy input decision",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-04-03",
+          "scenario": "unique match",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-04-04",
+          "scenario": "overlap",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-04-05",
+          "scenario": "CRLF/BOM",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-04-06",
+          "scenario": "no partial write",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-05",
+      "title": "bash 进程、环境、输出、取消",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/bash.ts"
+      ],
+      "target_service": "process/shell/bash tool",
+      "steps": [
+        "T26"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-05-01",
+          "scenario": "nonpersistent shell",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-05-02",
+          "scenario": "cwd/env",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-05-03",
+          "scenario": "stdout/stderr",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-05-04",
+          "scenario": "timeout",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-05-05",
+          "scenario": "process tree",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-05-06",
+          "scenario": "truncate",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-06",
+      "title": "grep/find/ls 和忽略规则",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/index.ts"
+      ],
+      "target_service": "search/filesystem",
+      "steps": [
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-06-01",
+          "scenario": "glob",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-06-02",
+          "scenario": "ignore",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-06-03",
+          "scenario": "hidden path",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-06-04",
+          "scenario": "symlink",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-06-05",
+          "scenario": "binary",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-06-06",
+          "scenario": "result limit",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-07",
+      "title": "powershell 与 Windows 行为",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/tools/powershell.ts"
+      ],
+      "target_service": "platform/windows/shell",
+      "steps": [
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-07-01",
+          "scenario": "quoting",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-07-02",
+          "scenario": "env",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-07-03",
+          "scenario": "signal/kill",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-07-04",
+          "scenario": "path encoding",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-07-05",
+          "scenario": "default selection",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TOOL-08",
+      "title": "图片读取、缩放、阻止与展示",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/settings.md"
+      ],
+      "target_service": "image/attachments",
+      "steps": [
+        "T25",
+        "T35",
+        "T34"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TOOL-08-01",
+          "scenario": "oversize",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-08-02",
+          "scenario": "unsupported format",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-08-03",
+          "scenario": "blockImages",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-08-04",
+          "scenario": "model capability",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TOOL-08-05",
+          "scenario": "inline protocol",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-01",
+      "title": "JSONL header/entry 树与版本",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/session-format.md"
+      ],
+      "target_service": "session/storage",
+      "steps": [
+        "T19",
+        "T20",
+        "T38"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-01-01",
+          "scenario": "v1/v2/v3",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-01-02",
+          "scenario": "parentId",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-01-03",
+          "scenario": "active leaf",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-01-04",
+          "scenario": "unknown version",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-01-05",
+          "scenario": "custom entry preservation",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-02",
+      "title": "system/tool 历史、context_edit 与 accounting",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/session-format.md"
+      ],
+      "target_service": "session/projection",
+      "steps": [
+        "T19",
+        "T21",
+        "T30",
+        "T38"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-02-01",
+          "scenario": "sections patch",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-02-02",
+          "scenario": "toolsAdded/Removed",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-02-03",
+          "scenario": "usage kind",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-02-04",
+          "scenario": "branch-relative edit",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-03",
+      "title": "continue/resume/path/id/no-session/name",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/sessions.md"
+      ],
+      "target_service": "session/client",
+      "steps": [
+        "T20",
+        "T28",
+        "T34",
+        "T38"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-03-01",
+          "scenario": "latest project",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-03-02",
+          "scenario": "partial ID",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-03-03",
+          "scenario": "custom ID",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-03-04",
+          "scenario": "cross-project",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-03-05",
+          "scenario": "memory-only",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-04",
+      "title": "tree/fork/clone/branch summary",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/sessions.md"
+      ],
+      "target_service": "session",
+      "steps": [
+        "T30",
+        "T34",
+        "T38"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-04-01",
+          "scenario": "active branch",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-04-02",
+          "scenario": "new identity",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-04-03",
+          "scenario": "summary common ancestor",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-04-04",
+          "scenario": "abandoned history retained",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-05",
+      "title": "Compaction、阈值和 overflow 恢复",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/compaction.md"
+      ],
+      "target_service": "context/compaction",
+      "steps": [
+        "T30"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-05-01",
+          "scenario": "manual/threshold/overflow",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-05-02",
+          "scenario": "retain-none",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-05-03",
+          "scenario": "firstKeptEntryId",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-05-04",
+          "scenario": "model override",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-05-05",
+          "scenario": "abort",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SESSION-06",
+      "title": "持久化锁、尾损坏和写失败",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/session-manager.ts"
+      ],
+      "target_service": "storage",
+      "steps": [
+        "T20",
+        "T38"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SESSION-06-01",
+          "scenario": "single writer",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-06-02",
+          "scenario": "disk full",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-06-03",
+          "scenario": "truncated tail",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-06-04",
+          "scenario": "invalid middle",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SESSION-06-05",
+          "scenario": "unexpected exit",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "RESOURCE-01",
+      "title": "AGENTS/SYSTEM/APPEND_SYSTEM 与加载",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/configuration.md"
+      ],
+      "target_service": "context/resources",
+      "steps": [
+        "T17",
+        "T21",
+        "T31"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-RESOURCE-01-01",
+          "scenario": "ancestor instructions",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-01-02",
+          "scenario": "override only same dir",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-01-03",
+          "scenario": "project versus user",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "RESOURCE-02",
+      "title": "Skills 摘要、正文按需与命令",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/skills.md"
+      ],
+      "target_service": "resources/skills",
+      "steps": [
+        "T31"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-RESOURCE-02-01",
+          "scenario": "frontmatter",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-02-02",
+          "scenario": "discovery",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-02-03",
+          "scenario": "duplicates",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-02-04",
+          "scenario": "skill:name",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-02-05",
+          "scenario": "reload",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "RESOURCE-03",
+      "title": "Prompt templates 与参数展开",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/prompt-templates.md"
+      ],
+      "target_service": "resources/prompts",
+      "steps": [
+        "T31"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-RESOURCE-03-01",
+          "scenario": "slash template",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-03-02",
+          "scenario": "arguments",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-03-03",
+          "scenario": "resource precedence",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-03-04",
+          "scenario": "unknown name",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "RESOURCE-04",
+      "title": "包与资源路径、排除和来源",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/packages.md"
+      ],
+      "target_service": "resources/packages",
+      "steps": [
+        "T31",
+        "T40"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-RESOURCE-04-01",
+          "scenario": "npm/git/local",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-04-02",
+          "scenario": "filters",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-04-03",
+          "scenario": "relative roots",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-RESOURCE-04-04",
+          "scenario": "failed update",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXT-01",
+      "title": "原生插件服务与扩展注册",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/extensions.md"
+      ],
+      "target_service": "plugin-host/extensions",
+      "steps": [
+        "T13",
+        "T14",
+        "T16",
+        "T32"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXT-01-01",
+          "scenario": "tools/commands/flags/providers/renderer",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-01-02",
+          "scenario": "ownership",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-01-03",
+          "scenario": "ABI",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXT-02",
+      "title": "钩子顺序、变换、阻断与错误",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/extensions/runner.ts"
+      ],
+      "target_service": "events/tools/context",
+      "steps": [
+        "T15",
+        "T24",
+        "T32"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXT-02-01",
+          "scenario": "notification",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-02-02",
+          "scenario": "mutation",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-02-03",
+          "scenario": "chained transform",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-02-04",
+          "scenario": "gate",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-02-05",
+          "scenario": "handler throws",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXT-03",
+      "title": "reload、Session 替换、旧 ctx 失效",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/extensions/loader.ts"
+      ],
+      "target_service": "plugin/session-runtime",
+      "steps": [
+        "T14",
+        "T30",
+        "T32"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXT-03-01",
+          "scenario": "factory failure",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-03-02",
+          "scenario": "stale context",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-03-03",
+          "scenario": "subscription detach",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-03-04",
+          "scenario": "session_shutdown",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXT-04",
+      "title": "JS/TS 插件与 npm 依赖兼容",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/extensions.md"
+      ],
+      "target_service": "optional JS host",
+      "steps": [
+        "T39",
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXT-04-01",
+          "scenario": "jiti import",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-04-02",
+          "scenario": "relative modules",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-04-03",
+          "scenario": "sync API",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-04-04",
+          "scenario": "UI closure",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-04-05",
+          "scenario": "extra runtime budget",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXT-05",
+      "title": "工具渲染与非交互 UI API",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/extensions.md"
+      ],
+      "target_service": "client-ui service",
+      "steps": [
+        "T32",
+        "T34",
+        "T36"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXT-05-01",
+          "scenario": "headless UI unavailable",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-05-02",
+          "scenario": "tool renderer",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-05-03",
+          "scenario": "dialog cancel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXT-05-04",
+          "scenario": "RPC UI",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "WIRE-01",
+      "title": "JSON mode 首 header 与 delta-only 消息",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/json.md"
+      ],
+      "target_service": "clients/json compatibility",
+      "steps": [
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-WIRE-01-01",
+          "scenario": "header only JSON",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-01-02",
+          "scenario": "partial omitted",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-01-03",
+          "scenario": "usage",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-01-04",
+          "scenario": "authoritative final message",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "WIRE-02",
+      "title": "RPC 命令/响应/并发 ID 与错误",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/rpc-commands.md"
+      ],
+      "target_service": "clients/rpc compatibility",
+      "steps": [
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-WIRE-02-01",
+          "scenario": "prompt disposition",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-02-02",
+          "scenario": "get_state",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-02-03",
+          "scenario": "abort",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-02-04",
+          "scenario": "async ID",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-02-05",
+          "scenario": "parse response",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-02-06",
+          "scenario": "unknown command",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "WIRE-03",
+      "title": "LF/CRLF、Unicode、背压与 stderr",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/rpc.md"
+      ],
+      "target_service": "protocol transport",
+      "steps": [
+        "T15",
+        "T36"
+      ],
+      "compatibility_strategy": "EXACT",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-WIRE-03-01",
+          "scenario": "U+2028/U+2029",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-03-02",
+          "scenario": "split UTF-8",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-03-03",
+          "scenario": "oversize record",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-03-04",
+          "scenario": "slow reader",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-03-05",
+          "scenario": "EOF shutdown",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "WIRE-04",
+      "title": "RPC 扩展 UI 子协议",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/rpc-extension-ui.md"
+      ],
+      "target_service": "client-ui/rpc",
+      "steps": [
+        "T36",
+        "T39"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-WIRE-04-01",
+          "scenario": "request/response ID",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-04-02",
+          "scenario": "select/input/editor",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-04-03",
+          "scenario": "notify",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-04-04",
+          "scenario": "cancel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-WIRE-04-05",
+          "scenario": "unsupported UI",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SDK-01",
+      "title": "TS createAgentSession 与直接对象语义",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/sdk.md"
+      ],
+      "target_service": "optional SDK client bridge",
+      "steps": [
+        "T39"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SDK-01-01",
+          "scenario": "prompt promise",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-01-02",
+          "scenario": "subscribe before prompt",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-01-03",
+          "scenario": "session replacement",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-01-04",
+          "scenario": "sync access",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SDK-02",
+      "title": "原生 C SDK、句柄及取消",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/sdk.md"
+      ],
+      "target_service": "include/services",
+      "steps": [
+        "T08",
+        "T16",
+        "T39"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SDK-02-01",
+          "scenario": "ownership",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-02-02",
+          "scenario": "callback thread",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-02-03",
+          "scenario": "operation completion",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SDK-02-04",
+          "scenario": "error propagation",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TUI-01",
+      "title": "输入、键绑定、自动补全与编辑器",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/keybindings.md"
+      ],
+      "target_service": "clients/tui",
+      "steps": [
+        "T33",
+        "T34"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TUI-01-01",
+          "scenario": "paste",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-01-02",
+          "scenario": "ESC",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-01-03",
+          "scenario": "CJK/emoji width",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-01-04",
+          "scenario": "resize",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-01-05",
+          "scenario": "history",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-01-06",
+          "scenario": "custom keybindings",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TUI-02",
+      "title": "流、Markdown、diff、主题、图像",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/tui.md"
+      ],
+      "target_service": "clients/tui",
+      "steps": [
+        "T34"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TUI-02-01",
+          "scenario": "slow rendering",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-02-02",
+          "scenario": "final text",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-02-03",
+          "scenario": "ANSI safety",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-02-04",
+          "scenario": "theme",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-02-05",
+          "scenario": "diff",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-02-06",
+          "scenario": "image fallback",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TUI-03",
+      "title": "斜杠命令、Session/模型选择",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/slash-commands.md"
+      ],
+      "target_service": "client commands",
+      "steps": [
+        "T30",
+        "T31",
+        "T34",
+        "T35"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TUI-03-01",
+          "scenario": "settings/model/thinking",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-03-02",
+          "scenario": "new/resume/tree/fork/clone/compact",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-03-03",
+          "scenario": "reload/quit",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "TUI-04",
+      "title": "! / !! 用户 Shell、外部编辑器、剪贴板",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/usage.md"
+      ],
+      "target_service": "client/shell integration",
+      "steps": [
+        "T26",
+        "T33",
+        "T34"
+      ],
+      "compatibility_strategy": "SEMANTIC",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-TUI-04-01",
+          "scenario": "user shell versus tool env",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-04-02",
+          "scenario": "editor return",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-04-03",
+          "scenario": "clipboard fallback",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-TUI-04-04",
+          "scenario": "cancel",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXPORT-01",
+      "title": "JSONL/HTML 导出与脱敏",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/slash-commands.md"
+      ],
+      "target_service": "export plugin",
+      "steps": [
+        "T38",
+        "T40"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P3",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXPORT-01-01",
+          "scenario": "branch export",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-01-02",
+          "scenario": "unknown entries",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-01-03",
+          "scenario": "HTML escaping",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-01-04",
+          "scenario": "secret warning",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "EXPORT-02",
+      "title": "share/bug/changelog 与上游服务",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/slash-commands.md"
+      ],
+      "target_service": "optional product integrations",
+      "steps": [
+        "T40",
+        "T48"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-EXPORT-02-01",
+          "scenario": "no upload by default",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-02-02",
+          "scenario": "explicit target",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-02-03",
+          "scenario": "offline",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-EXPORT-02-04",
+          "scenario": "Pangu identity",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "MCP-01",
+      "title": "发现、工具、资源、认证和暴露",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/mcp.md"
+      ],
+      "target_service": "mcp plugin",
+      "steps": [
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-MCP-01-01",
+          "scenario": "stdio/remote",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-MCP-01-02",
+          "scenario": "tool_search",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-MCP-01-03",
+          "scenario": "instructions",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-MCP-01-04",
+          "scenario": "resource tools",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-MCP-01-05",
+          "scenario": "OAuth",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-MCP-01-06",
+          "scenario": "scope",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "CODEMODE-01",
+      "title": "QuickJS/codemode 与 tool_search",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/codemode.md"
+      ],
+      "target_service": "optional execution plugin",
+      "steps": [
+        "T39",
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-CODEMODE-01-01",
+          "scenario": "script isolation",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CODEMODE-01-02",
+          "scenario": "tool exposure",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CODEMODE-01-03",
+          "scenario": "runtime limits",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-CODEMODE-01-04",
+          "scenario": "no JS in minimal package",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LOCAL-01",
+      "title": "llama.cpp/router/local inference",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/llama-cpp.md"
+      ],
+      "target_service": "optional inference provider",
+      "steps": [
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-LOCAL-01-01",
+          "scenario": "model weights separate",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LOCAL-01-02",
+          "scenario": "load/unload",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LOCAL-01-03",
+          "scenario": "route metadata",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "HOST-01",
+      "title": "运行时自身及底层服务可替换",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "盘古 Pangu 项目完整文档.md",
+        "references/deepseek-harness/docs/architecture.md"
+      ],
+      "target_service": "bootstrap/native services",
+      "steps": [
+        "T08",
+        "T10",
+        "T13",
+        "T14",
+        "T18"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P0",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-HOST-01-01",
+          "scenario": "replace allocator/event/model/session/loop",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-HOST-01-02",
+          "scenario": "dependency conflict",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-HOST-01-03",
+          "scenario": "no privileged business core",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "SEC-01",
+      "title": "受控授权与 OS 沙箱能力",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/security.md"
+      ],
+      "target_service": "permissions/sandbox",
+      "steps": [
+        "T17",
+        "T24",
+        "T26",
+        "T47"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "critical",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-SEC-01-01",
+          "scenario": "deny executes nothing",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SEC-01-02",
+          "scenario": "Native trust",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SEC-01-03",
+          "scenario": "process confinement",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-SEC-01-04",
+          "scenario": "unsupported restriction rejects",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "OPS-01",
+      "title": "telemetry/update/离线/诊断",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "references/pi/packages/coding-agent/docs/environment-variables.md"
+      ],
+      "target_service": "optional diagnostics",
+      "steps": [
+        "T17",
+        "T28",
+        "T40",
+        "T48"
+      ],
+      "compatibility_strategy": "INTENTIONAL_CHANGE",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P1",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-OPS-01-01",
+          "scenario": "stdout clean",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-OPS-01-02",
+          "scenario": "offline no hidden network",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-OPS-01-03",
+          "scenario": "no default upstream upload",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-OPS-01-04",
+          "scenario": "secret redaction",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "PLATFORM-01",
+      "title": "daemon/IPC、多客户端和其他平台",
+      "granularity": "feature-family; T03 must expand public items",
+      "sources": [
+        "盘古 Pangu 项目完整文档.md",
+        "references/deepseek-harness/docs/architecture.md"
+      ],
+      "target_service": "daemon/transport/platform",
+      "steps": [
+        "T47"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P4",
+      "required_for_profile": "T02 to approve per workflow; earliest_profile is not a release allowlist",
+      "risk": "medium",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "module implementer + independent reviewer (unassigned)",
+      "proposed_cases": [
+        {
+          "id": "CASE-PLATFORM-01-01",
+          "scenario": "single Session writer",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-PLATFORM-01-02",
+          "scenario": "reconnect",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-PLATFORM-01-03",
+          "scenario": "remote auth",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-PLATFORM-01-04",
+          "scenario": "platform ABI",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-PLATFORM-01-05",
+          "scenario": "CPU fallback",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "id": "LLM-07",
+      "title": "模型缓存预热与隐式网络成本",
+      "granularity": "feature-family expanded from current source audit",
+      "sources": [
+        "references/pi/packages/coding-agent/src/core/cache-warmer.ts"
+      ],
+      "target_service": "optional model cache-warming policy",
+      "steps": [
+        "T17",
+        "T29",
+        "T35"
+      ],
+      "compatibility_strategy": "DEFERRED",
+      "strategy_approval": "PROPOSED",
+      "earliest_profile": "P2",
+      "required_for_profile": "only workflows explicitly requiring cache warming; no implicit P1 network activity",
+      "risk": "high",
+      "implementation_status": "PLANNED",
+      "verification_status": "NOT_RUN",
+      "owner_role": "model policy implementer + independent reviewer",
+      "proposed_cases": [
+        {
+          "id": "CASE-LLM-07-01",
+          "scenario": "off makes no automatic request",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-07-02",
+          "scenario": "streaming/idle triggers respect selected policy and session state",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        },
+        {
+          "id": "CASE-LLM-07-03",
+          "scenario": "cancellation, usage accounting and extension veto",
+          "status": "PLANNED",
+          "fixture": null,
+          "evidence": []
+        }
+      ],
+      "evidence": []
+    }
+  ],
+  "surface_seed": {
+    "status": "text-extracted discovery aid; not exhaustive or verified",
+    "cli_documented_flag_tokens": [
+      "--all",
+      "--api-key",
+      "--append-system-prompt",
+      "--approve",
+      "--bearer-token-env-var",
+      "--continue",
+      "--credentials",
+      "--cwd",
+      "--description",
+      "--env",
+      "--exclude-tools",
+      "--export",
+      "--exposure",
+      "--extension",
+      "--extensions",
+      "--force",
+      "--fork",
+      "--header",
+      "--help",
+      "--json",
+      "--list-models",
+      "--local",
+      "--min-expiry",
+      "--mode",
+      "--model",
+      "--models",
+      "--name",
+      "--no-approve",
+      "--no-builtin-tools",
+      "--no-context-files",
+      "--no-extensions",
+      "--no-mcp",
+      "--no-prompt-templates",
+      "--no-refresh",
+      "--no-session",
+      "--no-skills",
+      "--no-themes",
+      "--no-tools",
+      "--oauth-callback-port",
+      "--oauth-client-id",
+      "--oauth-client-name",
+      "--oauth-client-secret",
+      "--offline",
+      "--print",
+      "--prompt-template",
+      "--provider",
+      "--resume",
+      "--self",
+      "--session",
+      "--session-dir",
+      "--session-id",
+      "--skill",
+      "--system-prompt",
+      "--theme",
+      "--thinking",
+      "--timeout",
+      "--tools",
+      "--tui-mode",
+      "--url",
+      "--use-theme",
+      "--verbose",
+      "--version"
+    ],
+    "settings_documented_keys": [
+      "defaultProvider",
+      "defaultModel",
+      "defaultThinkingLevel",
+      "modelThinkingLevels",
+      "thinkingBudgets",
+      "enabledModels",
+      "hideThinkingBlock",
+      "showCacheMissNotices",
+      "cacheWarming",
+      "steeringMode",
+      "followUpMode",
+      "externalEditor",
+      "doubleEscapeAction",
+      "treeFilterMode",
+      "defaultProjectTrust",
+      "defaultTools",
+      "codemode.mode",
+      "codemode.inlineBudget",
+      "sessionDir",
+      "sessionShareDestination",
+      "compaction.enabled",
+      "compaction.reserveTokens",
+      "compaction.keepRecentTokens",
+      "compaction.modelOverrides",
+      "branchSummary.reserveTokens",
+      "branchSummary.skipPrompt",
+      "theme",
+      "quietStartup",
+      "tuiMode",
+      "fullscreenExitOutput",
+      "fullscreenScrollbar",
+      "fullscreenCopyOnSelect",
+      "fullscreenWheelScrollLines",
+      "editorPaddingX",
+      "outputPad",
+      "autocompleteMaxVisible",
+      "showHardwareCursor",
+      "terminal.showImages",
+      "terminal.imageWidthCells",
+      "terminal.clearOnShrink",
+      "terminal.showTerminalProgress",
+      "terminal.hyperlinks",
+      "terminal.images",
+      "terminal.trueColor",
+      "images.autoResize",
+      "images.blockImages",
+      "markdown.codeBlockIndent",
+      "markdown.mermaid",
+      "transport",
+      "httpProxy",
+      "httpIdleTimeoutMs",
+      "websocketConnectTimeoutMs",
+      "retry.enabled",
+      "retry.maxRetries",
+      "retry.baseDelayMs",
+      "retry.maxAgentDelayMs",
+      "retry.provider.timeoutMs",
+      "retry.provider.maxRetries",
+      "retry.provider.maxRetryDelayMs",
+      "shellPath",
+      "shellCommandPrefix",
+      "npmCommand",
+      "packages",
+      "extensions",
+      "skills",
+      "prompts",
+      "themes",
+      "enableSkillCommands",
+      "collapseChangelog",
+      "enableInstallTelemetry",
+      "enableAnalytics",
+      "warnings.anthropicExtraUsage"
+    ],
+    "environment_documented_names": [
+      "AI_AGENT",
+      "EDITOR",
+      "HTTPS_PROXY",
+      "HTTP_PROXY",
+      "PI_CACHE_RETENTION",
+      "PI_CODING_AGENT",
+      "PI_CODING_AGENT_DIR",
+      "PI_CODING_AGENT_SESSION_DIR",
+      "PI_HARDWARE_CURSOR",
+      "PI_HYPERLINKS",
+      "PI_IMAGE_PROTOCOL",
+      "PI_MODEL",
+      "PI_OFFLINE",
+      "PI_PACKAGE_DIR",
+      "PI_PROGRAM_STATUS",
+      "PI_PROVIDER",
+      "PI_RADIUS_GATEWAY",
+      "PI_REASONING_LEVEL",
+      "PI_SESSION_FILE",
+      "PI_SESSION_ID",
+      "PI_SHARE_VIEWER_URL",
+      "PI_SKIP_VERSION_CHECK",
+      "PI_TELEMETRY",
+      "PI_TRUE_COLOR",
+      "PI_TUI_ESC_TIMEOUT",
+      "VISUAL"
+    ],
+    "slash_documented_names": [
+      "/bug",
+      "/changelog",
+      "/clone",
+      "/compact",
+      "/copy",
+      "/export",
+      "/fork",
+      "/hotkeys",
+      "/import",
+      "/llama",
+      "/login",
+      "/logout",
+      "/model",
+      "/name",
+      "/new",
+      "/quit",
+      "/reload",
+      "/resume",
+      "/scoped-models",
+      "/session",
+      "/settings",
+      "/share",
+      "/skill:name",
+      "/thinking",
+      "/tree",
+      "/trust"
+    ],
+    "rpc_type_literal_candidates_including_noncommands": [
+      "abort",
+      "abort_bash",
+      "abort_retry",
+      "bash",
+      "clear_queue",
+      "clone",
+      "compact",
+      "cycle_model",
+      "cycle_thinking_level",
+      "export_html",
+      "extension_ui_request",
+      "extension_ui_response",
+      "follow_up",
+      "fork",
+      "get_available_models",
+      "get_available_thinking_levels",
+      "get_commands",
+      "get_entries",
+      "get_fork_messages",
+      "get_last_assistant_text",
+      "get_messages",
+      "get_session_stats",
+      "get_state",
+      "get_tree",
+      "new_session",
+      "prompt",
+      "response",
+      "set_auto_compaction",
+      "set_auto_retry",
+      "set_follow_up_mode",
+      "set_model",
+      "set_session_name",
+      "set_steering_mode",
+      "set_thinking_level",
+      "steer",
+      "switch_session"
+    ]
+  },
+  "completion_rule": "Every approved required public item must map to executable case IDs and current evidence. Family coverage or nonempty lists do not establish conformance."
+}

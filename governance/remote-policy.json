@@ -1,0 +1,9 @@
+{
+  "schema": "pangu.github-boundary.v1",
+  "repository": "xu-yuanhao/PanGu",
+  "visibility": "public",
+  "branch": "main",
+  "ruleset_id": 25399149,
+  "required_check": "pangu/trusted-gates",
+  "required_approvals": 1
+}

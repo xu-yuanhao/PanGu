@@ -1,0 +1,45 @@
+{
+  "schema": "pangu.migration.t01-t02-evidence.v1",
+  "recorded_date_client": "2026-10-19",
+  "task_verification": {
+    "T01": "PASS",
+    "T02": "PASS"
+  },
+  "not_a_release_or_protected_policy_approval": true,
+  "reference_bundle": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/references/2026-10-19-v1",
+    "manifest_sha256": "9ac236324f683cdb9de9677672c8a2010b3bcbdd9f0da484866a36c2f32c4533",
+    "repositories": 5,
+    "tracked_files": 61368,
+    "verification": "create() restored every bundle into a fresh temporary checkout and compared every canonical tracked file, Git object ID, mode and SHA-256; repeated live snapshots before publication",
+    "opaque_filtered_files": 98,
+    "opaque_filtered_policy": "Git pointer/blob retained; external LFS payload not fetched or allowed as oracle input"
+  },
+  "checks": [
+    {
+      "command": "python3 tools/migration/test_reference_bundle.py",
+      "result": "PASS",
+      "tests": 16,
+      "script_sha256": "c9befcf1022e4c050d73db3c021c8357d3f9ed04079772fc50f8b929ec477bc9",
+      "implementation_sha256": "93f2084d34b868477c5cc68bec36373b325453a762a83bdfa8d170bb121f3adb"
+    },
+    {
+      "command": "python3 tools/migration/reference_bundle.py create --output /home/xu-yuanhao/Documents/PanGu-artifacts/references/2026-10-19-v1",
+      "result": "PASS",
+      "reference_sources_modified": false
+    },
+    {
+      "check": "P0-P4 required feature IDs exist; P1 four-tool subset, selected protocol and non-release boundary validated",
+      "result": "PASS",
+      "scope_sha256": "cab4525ac4f913b0e47bb0aaf995216763874ba7fd9302082ff9372aeb49b76a"
+    }
+  ],
+  "source_audit": "docs/migration/reference-audit.md",
+  "not_run": [
+    "TS/Rust oracle dependency provisioning and execution (T09)",
+    "native build",
+    "compatibility certification",
+    "protected policy promotion",
+    "release"
+  ]
+}

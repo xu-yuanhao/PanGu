@@ -1,0 +1,170 @@
+{
+  "schema": "pangu.migration.gap-ledger.v1",
+  "status": "ACTIVE_REGISTER",
+  "gaps": [
+    {
+      "id": "GAP-001",
+      "severity": "high",
+      "title": "参考 Pi 运行环境与完整 oracle 内容尚未准备",
+      "steps": [
+        "T01",
+        "T09"
+      ],
+      "affected_scope": "ALL",
+      "reference": "reference-baseline.json",
+      "status": "PARTIALLY_RESOLVED",
+      "closure_evidence_required": "锁定依赖和工具链，隔离工作副本可重复运行，证据包含完整内容摘要",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": [
+        "t01-t02-evidence.json"
+      ],
+      "remaining": "Oracle dependencies/toolchain provisioning and execution remain T09; source freeze/recovery is complete."
+    },
+    {
+      "id": "GAP-002",
+      "severity": "high",
+      "title": "必需迁移范围与逐公开表面清单未批准/展开",
+      "steps": [
+        "T02",
+        "T03",
+        "T04"
+      ],
+      "affected_scope": "ALL",
+      "reference": "feature-inventory.json",
+      "status": "TECHNICAL_SCOPE_AND_TRACKING_ESTABLISHED",
+      "closure_evidence_required": "使用方所需 flag/键/方法/事件子项穷举并绑定 case，批准每个 Profile 分母",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": [
+        "implementation-scope.json",
+        "t03-t04-review.md",
+        "surface-gap-ledger.json"
+      ],
+      "remaining": "Per-item implementation, independent approvals and runtime evidence remain OPEN; no waiver or certification."
+    },
+    {
+      "id": "GAP-003",
+      "severity": "critical",
+      "title": "生产代码门禁及受保护执行尚未部署",
+      "steps": [
+        "T05"
+      ],
+      "affected_scope": "ALL",
+      "reference": "../工程门禁与架构守卫.md",
+      "status": "OPEN",
+      "closure_evidence_required": "G01/G02 和拒绝用例、受信任规则执行/审批可验证；G00 单独通过不足",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-004",
+      "severity": "high",
+      "title": "原生工具链、依赖、服务 ABI 未最终选型",
+      "steps": [
+        "T06",
+        "T07",
+        "T08"
+      ],
+      "affected_scope": "P0-P4",
+      "reference": "dependency-inventory.json",
+      "status": "OPEN",
+      "closure_evidence_required": "按平台/协议与预算批准候选，互操作和布局探针通过",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-005",
+      "severity": "critical",
+      "title": "无原生候选、差异 runner 和当前验证证据",
+      "steps": [
+        "T09",
+        "T10",
+        "T18",
+        "T28",
+        "T41"
+      ],
+      "affected_scope": "P0-P4",
+      "reference": "evidence-contract.json",
+      "status": "OPEN",
+      "closure_evidence_required": "原始双边运行/产物/差异可重现；所有必需用例有当前有效证据",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-006",
+      "severity": "high",
+      "title": "TS 进程内 SDK 及任意 JS 扩展不能直接装载",
+      "steps": [
+        "T32",
+        "T39"
+      ],
+      "affected_scope": "dependent workflows",
+      "reference": "feature-inventory.json",
+      "status": "OPEN",
+      "closure_evidence_required": "逐使用方选择 RPC/原生重写/可选 JS bridge；未支持项阻断依赖它的工作流",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-007",
+      "severity": "critical",
+      "title": "配置/Session 迁移、备份恢复与回滚未演练",
+      "steps": [
+        "T37",
+        "T38",
+        "T43",
+        "T46"
+      ],
+      "affected_scope": "P3-P4",
+      "reference": "../原生重写路线与迁移TODO.md",
+      "status": "OPEN",
+      "closure_evidence_required": "旧源文件不改写；检查点可读；已验证恢复；明确新数据和外部副作用处理",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-008",
+      "severity": "high",
+      "title": "体积性能预算与 Canary 窗口无实测批准值",
+      "steps": [
+        "T18",
+        "T28",
+        "T43",
+        "T44"
+      ],
+      "affected_scope": "release profiles",
+      "reference": "../工程门禁与架构守卫.md",
+      "status": "OPEN",
+      "closure_evidence_required": "建立实际基准、噪声规则、资源绝对上限及批准的窗口/样本",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": []
+    },
+    {
+      "id": "GAP-009",
+      "severity": "medium",
+      "title": "Rust 历史材料与当前方向/参考版本不一致",
+      "steps": [
+        "T01",
+        "T03"
+      ],
+      "affected_scope": "methodology only",
+      "reference": "../../references/pi_agent_rust/AGENTS.md",
+      "status": "REFERENCE_ROLE_CLASSIFIED",
+      "closure_evidence_required": "只使用方法；不得继承 PASS、阈值、旧 Pi 元素或当前产品方向",
+      "owner_role": "unassigned responsible implementer + independent reviewer",
+      "waiver": null,
+      "evidence": [
+        "reference-baseline.json",
+        "t03-t04-review.md"
+      ],
+      "remaining": "Historical-only reference role must be retained on future updates; no inherited PASS."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "pangu.t09.scenarios.v1",
+  "status": "CANDIDATE_NOT_APPROVED",
+  "reference_commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+  "notes": "Five deterministic high-value scenarios for T09. The scripted model is data; no network, credentials or real provider. Tool side effects are simulated in the oracle runner and must not touch the workspace.",
+  "cases": [
+    {
+      "case_id": "C01-single-text",
+      "feature_ids": ["AGENT-01", "LLM-01"],
+      "scenario_revision": 1,
+      "comparison_mode": "event-sequence",
+      "prompt": "say hello",
+      "tools": [],
+      "turns": [
+        { "blocks": [{ "type": "text", "text": "hello" }] }
+      ]
+    },
+    {
+      "case_id": "C02-tool-then-text",
+      "feature_ids": ["AGENT-01", "TOOL-01"],
+      "scenario_revision": 1,
+      "comparison_mode": "event-sequence",
+      "prompt": "read a",
+      "tools": [{ "name": "read", "description": "read a file", "result": "A" }],
+      "turns": [
+        { "blocks": [{ "type": "toolCall", "id": "call-1", "name": "read", "arguments": { "path": "a" } }] },
+        { "blocks": [{ "type": "text", "text": "done" }] }
+      ]
+    },
+    {
+      "case_id": "C03-tool-failure",
+      "feature_ids": ["AGENT-01", "TOOL-01"],
+      "scenario_revision": 1,
+      "comparison_mode": "event-sequence",
+      "prompt": "read missing",
+      "tools": [{ "name": "read", "description": "read a file", "fail": "file not found" }],
+      "turns": [
+        { "blocks": [{ "type": "toolCall", "id": "call-2", "name": "read", "arguments": { "path": "missing" } }] },
+        { "blocks": [{ "type": "text", "text": "could not read" }] }
+      ]
+    },
+    {
+      "case_id": "C04-missing-tool",
+      "feature_ids": ["AGENT-01", "TOOL-01"],
+      "scenario_revision": 1,
+      "comparison_mode": "event-sequence",
+      "prompt": "call absent",
+      "tools": [],
+      "turns": [
+        { "blocks": [{ "type": "toolCall", "id": "call-3", "name": "absent", "arguments": {} }] },
+        { "blocks": [{ "type": "text", "text": "tool was absent" }] }
+      ]
+    },
+    {
+      "case_id": "C05-cancel",
+      "feature_ids": ["AGENT-04"],
+      "scenario_revision": 1,
+      "comparison_mode": "event-sequence",
+      "prompt": "cancel me",
+      "tools": [],
+      "turns": [
+        { "blocks": [{ "type": "text", "text": "partial" }] }
+      ],
+      "cancel_after_events": 2
+    }
+  ]
+}

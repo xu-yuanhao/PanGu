@@ -1,0 +1,666 @@
+{
+  "schema": "pangu.native-admission.v1",
+  "phase": "CANDIDATE_NOT_APPROVED",
+  "target": "linux-x86_64",
+  "toolchain": "governance/native-probe-toolchain.json",
+  "modules": [
+    {
+      "id": "bootstrap-api",
+      "role": "interface",
+      "scope": "product",
+      "files": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h"
+      ],
+      "public_headers": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h"
+      ],
+      "dependencies": [],
+      "source_root": "src/bootstrap-api",
+      "responsibility": "minimal platform exit contract",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c-header"
+      ],
+      "exports": [],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap",
+        "memory-probe",
+        "io-probe"
+      ],
+      "activation_condition": "definition-only",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "platform-linux",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-linux/platform.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-linux",
+      "responsibility": "Linux x86_64 exit implementation",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_platform_exit"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap",
+        "memory-probe",
+        "io-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [
+        {
+          "service": "platform.exit",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "bootstrap",
+      "role": "host",
+      "scope": "product",
+      "files": [
+        "src/bootstrap/bootstrap.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/bootstrap",
+      "responsibility": "generic minimal consumer of injected platform exit function table",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_bootstrap_run"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "composition",
+      "role": "client",
+      "scope": "product",
+      "files": [
+        "src/composition/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap"
+      ],
+      "source_root": "src/composition",
+      "responsibility": "minimal static composition entry wiring platform implementation into generic bootstrap",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "platform-memory",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-memory/memory.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-memory",
+      "responsibility": "anonymous read/write mapping and exact-range release",
+      "non_responsibilities": [
+        "no allocator, heap policy, file access, executable mappings or shared memory"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_map",
+        "pangu_memory_unmap"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "memory-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller-owned mapping value; no global mapping registry",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller owns returned mapping; one matching unmap, failure retains ownership"
+      },
+      "provides": [
+        {
+          "service": "platform.memory",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "memory-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/memory-probe/main.c",
+        "src/memory-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory"
+      ],
+      "source_root": "src/memory-probe",
+      "responsibility": "fixed native gate fixture",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "memory-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "platform-io",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-io/io.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-io",
+      "responsibility": "minimal Linux regular-file handles and monotonic nanoseconds",
+      "non_responsibilities": [
+        "no policy authorization, path confinement, session storage, network or asynchronous I/O"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_file_open",
+        "pangu_file_read",
+        "pangu_file_write",
+        "pangu_file_close",
+        "pangu_clock_monotonic"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "io-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller owns opened descriptor; close consumes on Linux even on late close error; no global handle table"
+      },
+      "provides": [
+        {
+          "service": "platform.file",
+          "version": 1
+        },
+        {
+          "service": "platform.clock",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "io-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/io-probe/main.c",
+        "src/io-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io"
+      ],
+      "source_root": "src/io-probe",
+      "responsibility": "test-only injected file and clock API consumer",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_io_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "io-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.file",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.clock",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    }
+  ],
+  "service_definitions": [
+    {
+      "id": "platform.exit",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.memory",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.file",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.clock",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    }
+  ],
+  "builds": [
+    {
+      "id": "bootstrap",
+      "scope": "product",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap",
+        "composition"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "composition",
+        "symbol": "pangu_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "record real ELF bytes before assigning approved budget"
+      }
+    },
+    {
+      "id": "memory-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "memory-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "memory-probe",
+        "symbol": "pangu_memory_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "mapping correctness fixture; not allocator or product performance"
+      }
+    },
+    {
+      "id": "io-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io",
+        "io-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "io-probe",
+        "symbol": "pangu_io_test_start"
+      },
+      "bindings": {
+        "platform.file": "platform-io",
+        "platform.clock": "platform-io",
+        "platform.exit": "platform-linux"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "functional file/clock fixture; no approved performance limits"
+      }
+    }
+  ]
+}
