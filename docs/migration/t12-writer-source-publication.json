@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "experiments/t12-json-writer",
+  "commit": "d163091ad21fa4f8098d98604615844c5078417f",
+  "parent": "5ec146ba25cd5b04479931a7ee1428ea2a51ab1b",
+  "scope": "fixed Agent self-reviewed writer candidate including controller and 44 native source files; local experiments only",
+  "controller_sha256": "74020d49c1b57e7f5351086984c3798b1c7953ca160b968671a85905bab97757",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

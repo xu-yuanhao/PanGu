@@ -1,7 +1,7 @@
 {
   "schema": "pangu.migration.task-ledger.v1",
   "status": "IMPLEMENTATION_STARTED",
-  "note": "T10 local exit-only bootstrap in progress under explicit fixed-package approval; full PAL, later runtime tasks and protected remote integration remain outstanding.",
+  "note": "T10-T12 native local experiments progress under recorded human or Agent self-review approvals; production gates, full stage acceptance and protected remote integration remain incomplete.",
   "tasks": [
     {
       "id": "T01",
@@ -343,7 +343,10 @@
         "docs/migration/t12-quote-progress.md",
         "docs/migration/t12-quote-evidence.json",
         "docs/migration/t12-number-progress.md",
-        "docs/migration/t12-number-evidence.json"
+        "docs/migration/t12-number-evidence.json",
+        "docs/migration/t12-writer-progress.md",
+        "docs/migration/t12-writer-evidence.json",
+        "docs/migration/t12-writer-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -376,6 +379,20 @@
         "normal_builds_and_runs": 28,
         "ubsan": "SUPPLEMENTAL_PASS_NOT_ADMITTED",
         "full_T12": "INCOMPLETE"
+      },
+      "writer_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "74020d49c1b57e7f5351086984c3798b1c7953ca160b968671a85905bab97757",
+        "structural_cases": 140,
+        "capacity_variants": 6416,
+        "numeric_lexeme_roundtrips": 1315,
+        "normal_builds_and_runs": 28,
+        "full_T12": "INCOMPLETE",
+        "candidate_tree_sha256": "4f38c86fb38716d9ddb2387d0187f483dbf8e691bca7d100a00a6fb36f6354b7",
+        "approval_record_sha256": "a2538022bad1648edabd06420bcf119cc0b4168be079cddf23dc214eb430a577",
+        "source_commit": "d163091ad21fa4f8098d98604615844c5078417f",
+        "parser_init_contract": "whole-zero first-use enforced; valid resets retained; tested",
+        "supersedes_experimental_commit": "5ec146ba25cd5b04479931a7ee1428ea2a51ab1b"
       }
     },
     {

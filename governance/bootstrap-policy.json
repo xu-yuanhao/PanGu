@@ -125,6 +125,10 @@
     "docs/migration/t12-number-progress.md": "document",
     "docs/migration/t12-number-evidence.json": "control",
     "docs/migration/t12-number-candidate.json": "control",
-    "docs/migration/t12-number-source-publication.json": "control"
+    "docs/migration/t12-number-source-publication.json": "control",
+    "docs/migration/t12-writer-progress.md": "document",
+    "docs/migration/t12-writer-evidence.json": "control",
+    "docs/migration/t12-writer-candidate.json": "control",
+    "docs/migration/t12-writer-source-publication.json": "control"
   }
 }

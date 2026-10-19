@@ -254,11 +254,13 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] ~~有界增量 JSON token 本地预览：636 条双运行时语法共识、全部切分点／逐字节、1 MiB、配额与页尾边界，28 项构建运行及 UBSan 补充实验通过。~~ [候选与证据](migration/t12-json-progress.md)，固定包已获用户本地实验批准；Schema、Provider 修复及完整 T12 未完成。
 
-- [x] ~~JSON reader 本地预览：无损 UTF-8 解码、失败原子性与 decoded-key last-wins 查询，458 条字符串／33 条查找双运行时语料、全 UTF-16 单元与 pair 边界、28 项构建运行及补充 UBSan 通过。~~ [候选与证据](migration/t12-reader-progress.md)，固定 reader 包已获用户本地实验批准；序列化、数值、Schema 与 Pi 适配未完成。
+- [x] ~~JSON reader 本地预览：无损 UTF-8 解码、失败原子性与 decoded-key last-wins 查询，458 条字符串／33 条查找双运行时语料、全 UTF-16 单元与 pair 边界、28 项构建运行及补充 UBSan 通过。~~ [候选与证据](migration/t12-reader-progress.md)，固定 reader 包已获用户本地实验批准；不代表完整 JSON/Schema 或 Pi 兼容验收。
 
 - [x] ~~有界 UTF-8 字符串序列化本地预览：273 条 Python/Node 字节共识、reader 往返、容量与保护页、28 项构建运行及补充 UBSan 验证。~~ [候选与证据](migration/t12-quote-progress.md)，固定包按用户新规则已由 Agent 自审自批用于本地实验；不代表独立审核、完整序列化或 T12 验收。
 
 - [x] ~~JSON 数值读取本地实验：1315 条 binary64 位级共识、精确舍入与负零/溢出、百万位抵消/配额、28 项构建运行、归档恢复及补充 UBSan 通过。~~ [候选与证据](migration/t12-number-progress.md)，固定包已由 Agent 自审自批；不含数值序列化、Schema、强制转换或完整 T12。
+
+- [x] ~~有界结构化 JSON writer 本地实验：140 组字节共识、6416 种容量、1315 条数字词法往返、深度/页尾/1 MiB 边界、parser 首次完整清零检查、28 项构建运行、归档恢复与补充 UBSan 通过。~~ [候选与证据](migration/t12-writer-progress.md)，固定包已由 Agent 自审自批；不代表 binary64 格式化、Schema、Pi 适配或完整 T12。
 
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。
