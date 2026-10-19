@@ -250,7 +250,9 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T12：必需数据结构与 JSON
 
-开工依据：[严格 JSON／Pi 参数修复／Schema 转换边界](migration/t12-protocol-boundaries.md)。已核对冻结参考源码，尚未完成原生实现或差异验证。
+开工依据：[严格 JSON／Pi 参数修复／Schema 转换边界](migration/t12-protocol-boundaries.md)。已核对冻结参考源码；增量 token 局部实现与语法验证见下文，Provider/Schema 兼容未完成。
+
+- [x] ~~有界增量 JSON token 本地预览：636 条双运行时语法共识、全部切分点／逐字节、1 MiB、配额与页尾边界，28 项构建运行及 UBSan 补充实验通过。~~ [候选与证据](migration/t12-json-progress.md)，固定包已获用户本地实验批准；Schema、Provider 修复及完整 T12 未完成。
 
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。

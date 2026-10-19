@@ -326,7 +326,7 @@
     {
       "id": "T12",
       "title": "必需数据结构与 JSON",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T11"
       ],
@@ -334,8 +334,20 @@
       "feature_ids": [],
       "definition": "docs/原生重写路线与迁移TODO.md#T12",
       "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "evidence": [
+        "docs/migration/t12-protocol-boundaries.md",
+        "docs/migration/t12-json-progress.md",
+        "docs/migration/t12-json-evidence.json"
+      ],
+      "completion_approved": false,
+      "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
+      "technical_milestones": [
+        "strict bounded incremental JSON token candidate: 28 frozen builds/runs; 636 Python/Node syntax consensus cases; all cuts/byte streaming; page boundaries and 1 MiB; fixed package human-approved for local experiments"
+      ],
+      "local_control_approvals": [
+        "8df9fa8e0d15c6e81c51d54632a2f2e8e671fdbc77555c3146f244a68ae641f3"
+      ],
+      "independent_control_review": "Human approved fixed incremental JSON token package for local experiments; string/numeric conversion, Schema, Pi adapter, complete T12, formal sanitizer profile and production remain unapproved."
     },
     {
       "id": "T13",

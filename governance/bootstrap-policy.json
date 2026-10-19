@@ -109,6 +109,10 @@
     "docs/migration/t11-resource-evidence.json": "control",
     "docs/migration/t11-resource-candidate.json": "control",
     "docs/migration/t12-protocol-boundaries.md": "document",
-    "docs/migration/t11-source-publication.json": "control"
+    "docs/migration/t11-source-publication.json": "control",
+    "docs/migration/t12-json-progress.md": "document",
+    "docs/migration/t12-json-evidence.json": "control",
+    "docs/migration/t12-json-candidate.json": "control",
+    "docs/migration/t12-source-publication.json": "control"
   }
 }

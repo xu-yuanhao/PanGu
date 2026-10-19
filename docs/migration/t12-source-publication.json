@@ -1,0 +1,13 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "experiments/t12-json-token",
+  "commit": "c015384e9dc1b3a518a607f23b22e9b0035b73c3",
+  "parent": "912c858acdee8edfd5fa18b00f4f1e30ada084af",
+  "scope": "fixed candidate snapshot including controller and 40 native sources; local token experiments only",
+  "registry_path": "docs/migration/t10-native-candidate.json",
+  "controller_sha256": "8df9fa8e0d15c6e81c51d54632a2f2e8e671fdbc77555c3146f244a68ae641f3",
+  "validation": "frozen-controller preflight matched all original candidate inputs before commit; remote ref read-back equals local commit",
+  "release": "BLOCKED"
+}

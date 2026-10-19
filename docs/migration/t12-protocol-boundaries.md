@@ -1,6 +1,6 @@
 # T12 开工边界：严格 JSON 与 Pi 兼容适配
 
-日期：2026-10-20。状态：参考源码审查完成，尚无 T12 原生实现或兼容测试通过结论。T11 固定资源包已经获批用于本地实验，生产阶段批准仍未完成。
+日期：2026-10-20。状态：参考源码审查与 11 条 Pi 真基线已记录；增量 token 局部候选见 [实现与证据](t12-json-progress.md)，完整 T12／Provider／Schema 兼容仍未完成。T11 固定资源包已经获批用于本地实验，生产阶段批准仍未完成。
 
 ## 依据
 
@@ -46,4 +46,19 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 
 ## 状态边界
 
-本文件是实现依据与待测清单。T12 不勾选完成项，不登记新生产模块、不批准新依赖，也不把上述设计选择当成已经获得兼容差异批准。新 JSON 服务与构建组合须在实际候选、证据就绪后按根 AGENTS 独立审核。T11 正式 G07/预算和全阶段验收保持原状态。
+本文件是实现依据与待测清单。T12 仅勾选有证据的局部预览，不勾选整体完成；不据此批准生产模块、新依赖或兼容差异。新 JSON 服务与构建组合须在实际候选、证据就绪后按根 AGENTS 独立审核。T11 正式 G07/预算和全阶段验收保持原状态。
+
+## 四工具 Schema 的源码核对
+
+同一冻结提交中，`packages/coding-agent/src/core/tools/` 的输入声明：
+
+| 工具 | 必需字段 | 可选字段／嵌套 |
+|---|---|---|
+| read | path: string | offset、limit: number；声明并不是 integer |
+| write | path、content: string | 无其他输入字段声明 |
+| edit | path: string，edits: array | edits 每项 oldText、newText 均为 string |
+| bash | command: string | timeout: number |
+
+当前 edit 声明没有 minItems，工具说明中的“One or more”不能自动当作 Schema 已编码的限制；执行前另调用 validateEditInput，且存在 prepareArguments 处理，后续须分别追踪。additionalProperties 没有统一显式设置为 false，不能直接给原生四工具全部加上该规则并声称兼容。
+
+输出结构还包含 read 的 string/image union、bash 的 boolean/number/可选 string 等，输入最小子集不能冒充全部输入输出 Schema 支持。数值下游也有 JS truthiness/Math/slice 等可观察行为，整数收紧和超限策略须以相应工具 oracle 验证，不能由字段描述自行推断。
