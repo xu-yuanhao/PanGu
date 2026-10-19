@@ -95,6 +95,20 @@
     "docs/migration/t10-io-progress.md": "document",
     "docs/migration/t10-io-candidate.json": "control",
     "docs/migration/t10-io-evidence.json": "control",
-    "docs/migration/t10-source-publication.json": "control"
+    "docs/migration/t10-source-publication.json": "control",
+    "docs/migration/t11-arena-progress.md": "document",
+    "docs/migration/t11-arena-evidence.json": "control",
+    "docs/migration/t11-arena-candidate.json": "control",
+    "docs/migration/t11-buffer-progress.md": "document",
+    "docs/migration/t11-buffer-candidate.json": "control",
+    "docs/migration/t11-buffer-evidence.json": "control",
+    "docs/migration/t11-text-progress.md": "document",
+    "docs/migration/t11-text-candidate.json": "control",
+    "docs/migration/t11-text-evidence.json": "control",
+    "docs/migration/t11-resource-progress.md": "document",
+    "docs/migration/t11-resource-evidence.json": "control",
+    "docs/migration/t11-resource-candidate.json": "control",
+    "docs/migration/t12-protocol-boundaries.md": "document",
+    "docs/migration/t11-source-publication.json": "control"
   }
 }

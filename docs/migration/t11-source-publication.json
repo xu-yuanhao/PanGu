@@ -1,0 +1,13 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "experiments/t11-foundation",
+  "commit": "912c858acdee8edfd5fa18b00f4f1e30ada084af",
+  "parent": "4d52e0ec380c6b0441e82700c8d0a5bdb1cb8acc",
+  "scope": "fixed candidate snapshot including controller and 35 native sources; local experiments only",
+  "registry_path": "docs/migration/t10-native-candidate.json",
+  "controller_sha256": "c835648d00146ec52eb3412ed214f27f85ef62019074568bb9d353e5f65ae00b",
+  "validation": "frozen-controller preflight matched all original candidate inputs before commit; remote ref read-back equals local commit",
+  "release": "BLOCKED"
+}

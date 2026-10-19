@@ -290,7 +290,7 @@
     {
       "id": "T11",
       "title": "Allocator、Buffer 和字符串",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T10"
       ],
@@ -298,8 +298,30 @@
       "feature_ids": [],
       "definition": "docs/原生重写路线与迁移TODO.md#T11",
       "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "evidence": [
+        "docs/migration/t11-arena-progress.md",
+        "docs/migration/t11-arena-evidence.json",
+        "docs/migration/t11-buffer-progress.md",
+        "docs/migration/t11-buffer-evidence.json",
+        "docs/migration/t11-text-progress.md",
+        "docs/migration/t11-text-evidence.json",
+        "docs/migration/t11-resource-progress.md",
+        "docs/migration/t11-resource-evidence.json"
+      ],
+      "completion_approved": false,
+      "technical_milestones": [
+        "human-approved fixed local bounded region allocator; two providers; ten matrix builds/runs; four fault runs",
+        "human-approved fixed local Buffer experiment: bounded binary bytes, allocation failure atomicity and epoch/revision checked views; fourteen builds/runs",
+        "strict UTF-8 local candidate: 20 builds/runs; independent codec corpus and exhaustive scalar values; 4 expected guard faults; human-approved fixed local experiment",
+        "allocator swap uses identical consumer objects with arena and independent slots; 24 normal frozen builds/runs; 1 MiB/guard-boundary/resource accounting; supplemental UBSan 24 normal and 6 positive controls; fixed registry human-approved for local experiments"
+      ],
+      "independent_control_review": "Human approved fixed arena, Buffer, UTF-8/test-guard and resource/allocator substitution packages for local experiments; full production G07, formal sanitizer profile, T11 overall acceptance and production remain unapproved.",
+      "local_control_approvals": [
+        "aac168cf8100f64084946c024354f0b02a7442690209e426355c85cbf1c04bce",
+        "21e7f8c8827a52bc081ae5ffad38b0f0ac18d9b50bb4623eef5ad24f1679b7f9",
+        "71d141c484f7dde084991e2d11f931abdacb8a17219cbd4d46e5d6bb7d223b75",
+        "c835648d00146ec52eb3412ed214f27f85ef62019074568bb9d353e5f65ae00b"
+      ]
     },
     {
       "id": "T12",

@@ -1,0 +1,159 @@
+{
+  "schema": "pangu.t11-arena-progress.v1",
+  "date": "2026-10-20",
+  "task_status": "IN_PROGRESS",
+  "scope": "bounded scoped region allocator only; Buffer/strings not implemented",
+  "approval": "HUMAN_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+  "controller_sha256": "aac168cf8100f64084946c024354f0b02a7442690209e426355c85cbf1c04bce",
+  "registry_sha256": "5ad19bea3aa100898e0efef6a8e6e1deb1a06a9b2a6f603be946f06370bba57f",
+  "candidate_tree_sha256": "5f0a931808a0232f8906f0ac4fcf75dd25438b022c7122537f7ebe68a2eaae46",
+  "sources": {
+    "src/bootstrap-api/bootstrap.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/bootstrap-api/bootstrap.h",
+      "sha256": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49",
+      "mode": 420
+    },
+    "src/bootstrap-api/memory.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/bootstrap-api/memory.h",
+      "sha256": "8b7ad0f9dabced293dfb16087582f05e15ed31da9246b2c93bdc8eef0b1bbacc",
+      "mode": 420
+    },
+    "src/bootstrap-api/io.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/bootstrap-api/io.h",
+      "sha256": "ee95800ab902c8d2a846c5560741ac6a2a73e942b529b888811c6079a63b0a50",
+      "mode": 420
+    },
+    "src/bootstrap-api/arena.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/bootstrap-api/arena.h",
+      "sha256": "b3efb8ad54295f9b41c979aa3a3243bc4f13d59fca9e4cd791cc8ade7a16e840",
+      "mode": 420
+    },
+    "src/platform-linux/platform.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/platform-linux/platform.S",
+      "sha256": "2c670c835796d529114fc72e0dec01a9837dfc6c92dfbc58aacdb9b1d5c4a761",
+      "mode": 420
+    },
+    "src/bootstrap/bootstrap.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/bootstrap/bootstrap.c",
+      "sha256": "1742a636bdf75555adba2fdc8635a90ef75c56c56c8788a2bdd0fbfb951c045b",
+      "mode": 420
+    },
+    "src/composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/composition/entry.S",
+      "sha256": "60ef87604de62123eead8b5f544a907b6d0ecb717cab885ffa2981903381c0e7",
+      "mode": 420
+    },
+    "src/platform-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/platform-memory/memory.S",
+      "sha256": "82711047f0047f7cb273d014ab3116e00adadf454925758b7b6adcecac044605",
+      "mode": 420
+    },
+    "src/memory-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/memory-probe/main.c",
+      "sha256": "2b1d37ab97f8e05a738481ab1fbbf0f5824cc676770b6ef0c161143e0f2ee2f4",
+      "mode": 420
+    },
+    "src/memory-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/memory-probe/entry.S",
+      "sha256": "02cca72fe4110b95944c9927c22dd54305e337819fca778604e0c227d3599b7e",
+      "mode": 420
+    },
+    "src/platform-io/io.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/platform-io/io.S",
+      "sha256": "0869b4f281a940dd5ab907403cddce2c1eca300f7b298e6b7e032c2faa1396c1",
+      "mode": 420
+    },
+    "src/io-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/io-probe/main.c",
+      "sha256": "dd242ec44e15d0a7f3e9c59c095540565064f45d741c6d7b5c85abf6c518fc74",
+      "mode": 420
+    },
+    "src/io-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/io-probe/entry.S",
+      "sha256": "533021c8d17b976fe42173c553faa86e08eebb522b5392ea70cd7c17992a76e3",
+      "mode": 420
+    },
+    "src/arena/arena.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/arena/arena.c",
+      "sha256": "25e437967daa6966f2de7e54a33d103cb0a46036ac9bbff18233cb1f49e8ab3d",
+      "mode": 420
+    },
+    "src/arena-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/arena-probe/main.c",
+      "sha256": "c5ca1f9877ec9cfcc95af5dd14f9c6e5cd02ab15421af7a8637b3296b260e6b0",
+      "mode": 420
+    },
+    "src/arena-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/arena-probe/entry.S",
+      "sha256": "ad04ae776effee000dcd5602dac1dd892a66def163f7abd334284bf1fe593302",
+      "mode": 420
+    },
+    "src/test-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/candidate-v3/src/test-memory/memory.S",
+      "sha256": "896f3e6fba0b46d945b416c54aa51ae9e0210fe9f86a0209ede2b0d87c9c3851",
+      "mode": 420
+    }
+  },
+  "source_archive": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/source.tar",
+    "sha256": "b0adaaba870646bca09adc3c83eb1ce5b68178212c57eaf72243bab3a1dd0f02"
+  },
+  "receipts": {
+    "build-v3/isolation.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/build-v3/isolation.json",
+      "sha256": "c3cde018892de59a6a26a5d79ef13b0e08e1adce66dd4079f6a1a2c6666ecc88"
+    },
+    "build-v3/native/admission.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/build-v3/native/admission.json",
+      "sha256": "cd3a31f7c8f0ca1dfe5707d956c7fa856f6e7885b82dd8a31515067c373acb43"
+    },
+    "executions-v3.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/executions-v3.json",
+      "sha256": "6e44d856372a3516b0d455765bc4a82d5d2d717075d1e576bd3a41865a7d1069"
+    },
+    "faults.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/faults.json",
+      "sha256": "22f3a44ed35c279f102b64c2fcbc29c037d9ab5570f8147eb6742471251f575e"
+    }
+  },
+  "elf_bytes": {
+    "bootstrap-debug": 11712,
+    "bootstrap-release": 9344,
+    "memory-probe-debug": 13496,
+    "memory-probe-release": 9504,
+    "io-probe-debug": 14440,
+    "io-probe-release": 9752,
+    "arena-probe-debug": 17728,
+    "arena-probe-release": 9816,
+    "arena-alternate-debug": 17696,
+    "arena-alternate-release": 9824
+  },
+  "unchanged": "T10 bootstrap/memory/io ELF unchanged in both modes",
+  "coverage": [
+    "two registered memory providers; unchanged allocator and C consumer",
+    "logical capacity versus actual mapped range",
+    "size/alignment/OOM/overflow inputs; failed allocation does not consume capacity",
+    "reset/dispose/reinit epoch lifecycle and no wrap",
+    "32 rounds x16 mixed allocations; alignment/non-overlap/range/sentinel preservation",
+    "real map failure does not publish state; failed disposal preserves ownership"
+  ],
+  "limits": [
+    "no malloc/free/realloc, Buffer, strings, guard pages or sanitizers",
+    "reset does not zero memory; all previous borrows invalid after reset/dispose",
+    "raw dangling pointers are not prevented; future checked views must compare captured epoch",
+    "arena state and borrowed provider storage must outlive allocator tables; no forged-pointer safety",
+    "failed disposal fixture leaves mapping to process-exit cleanup when munmap is deliberately denied",
+    "static test provider is test-only; not product memory or ELF size baseline",
+    "budgets remain UNBASELINED; local candidate only"
+  ],
+  "release": "BLOCKED",
+  "approval_record": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-arena-gt_0ytu8/approval.json",
+    "sha256": "7550ef69999a4b9aef3edbb8f3c8da9b2c5fe4ab3cb7a9b4188a4ae4329810a6"
+  },
+  "registry_file_sha256": "92e7f613459fca03273e8720b4669189f626f3582303c45c266904f6f9fd48cb",
+  "evidence_metadata_correction": {
+    "date": "2026-10-20",
+    "reason": "registry_sha256 now matches canonical registry digest in immutable admission receipt; original raw file SHA retained as registry_file_sha256. Native evidence and approved control trees unchanged."
+  }
+}

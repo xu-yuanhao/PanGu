@@ -231,6 +231,16 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T11：Allocator、Buffer 和字符串
 
+进行中：[有界 arena 与证据](migration/t11-arena-progress.md)。
+
+- [x] ~~最小 Buffer 技术预览：有界字节、增长失败原子性、自引用追加与 checked view 生命周期，两后端十四项构建/复验/执行通过。~~ [候选与证据](migration/t11-buffer-progress.md)，固定 Buffer 包已获用户本地实验批准；字符串、guard page 与完整 G07 未完成。
+
+- [x] ~~有界 region allocator 技术预览：容量/对齐/失败不推进、scope 重置/释放/代数、两提供者替换及 OS 拒绝注入通过。~~ 固定 arena 包已获用户本地实验批准；Buffer、字符串及完整 G07 未完成。
+
+- [x] ~~最小 UTF-8 技术预览：严格标量解码、校验后 Buffer 追加、独立编码语料、三后端及 guard page 正对照，二十项构建/运行和四项预期故障通过。~~ [候选与证据](migration/t11-text-progress.md)，固定包已获用户本地实验批准，完整 G07/T11 未完成。
+
+- [x] ~~本地资源与替换预览：独立固定槽 allocator 与 arena 链接相同消费者对象，1 MiB 文本／整页 Buffer／原提供者计数，24 项常规构建运行通过；UBSan 补充实验及违规对照通过。~~ [候选与证据](migration/t11-resource-progress.md)，固定资源包已获用户本地实验批准；正式插桩配置、预算与阶段整体批准未完成。
+
 - [ ] 输入：T10。实现引导分配与可选择默认 allocator、显式长度 UTF-8/byte buffer 和容量限制。
 - [ ] 操作：C/Assembly 交叉调用；故障注入 OOM、长度溢出、guard page、借用失效和原分配器释放。
 - [ ] 产物：基础服务与边界语料，G07 原生资源探针。
@@ -239,6 +249,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 <a id="T12"></a>
 
 ### T12：必需数据结构与 JSON
+
+开工依据：[严格 JSON／Pi 参数修复／Schema 转换边界](migration/t12-protocol-boundaries.md)。已核对冻结参考源码，尚未完成原生实现或差异验证。
 
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。
