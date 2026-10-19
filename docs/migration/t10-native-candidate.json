@@ -15,7 +15,8 @@
         "src/bootstrap-api/arena.h",
         "src/bootstrap-api/buffer.h",
         "src/bootstrap-api/region.h",
-        "src/bootstrap-api/text.h"
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h"
       ],
       "public_headers": [
         "src/bootstrap-api/bootstrap.h",
@@ -24,7 +25,8 @@
         "src/bootstrap-api/arena.h",
         "src/bootstrap-api/buffer.h",
         "src/bootstrap-api/region.h",
-        "src/bootstrap-api/text.h"
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h"
       ],
       "dependencies": [],
       "source_root": "src/bootstrap-api",
@@ -58,7 +60,9 @@
         "text-alternate",
         "text-guard",
         "region-arena",
-        "region-slots"
+        "region-slots",
+        "json-probe",
+        "json-guard"
       ],
       "activation_condition": "definition-only",
       "lifecycle": {
@@ -125,7 +129,9 @@
         "text-alternate",
         "text-guard",
         "region-arena",
-        "region-slots"
+        "region-slots",
+        "json-probe",
+        "json-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -320,7 +326,8 @@
         "arena-probe",
         "buffer-probe",
         "text-probe",
-        "region-arena"
+        "region-arena",
+        "json-probe"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -859,7 +866,9 @@
         "text-alternate",
         "text-guard",
         "region-arena",
-        "region-slots"
+        "region-slots",
+        "json-probe",
+        "json-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1030,7 +1039,9 @@
         "text-alternate",
         "text-guard",
         "region-arena",
-        "region-slots"
+        "region-slots",
+        "json-probe",
+        "json-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1210,7 +1221,8 @@
       ],
       "linkage": "static",
       "compositions": [
-        "text-guard"
+        "text-guard",
+        "json-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1274,7 +1286,9 @@
       ],
       "linkage": "static",
       "compositions": [
-        "region-slots"
+        "region-slots",
+        "json-probe",
+        "json-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1537,6 +1551,169 @@
         },
         "measurement_plan": "fixture only; production budget remains unbaselined"
       }
+    },
+    {
+      "id": "json",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/json/json.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "text"
+      ],
+      "source_root": "src/json",
+      "responsibility": "bounded strict incremental JSON tokenization with explicit final commit",
+      "non_responsibilities": [
+        "no allocation, repair, numeric conversion, unescaping, Schema validation, provider or tool execution"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_json_init",
+        "pangu_json_feed",
+        "pangu_json_get_result"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller owns buffer metadata; bytes borrow allocator scope",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller-owned parser and token storage; no allocation; final success only publishes results"
+      },
+      "provides": [
+        {
+          "service": "foundation.json",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.text",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "text"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "json-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/json-probe/main.c",
+        "src/json-probe/entry.S",
+        "src/json-probe/cases.h"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "json",
+        "platform-memory",
+        "test-guard"
+      ],
+      "source_root": "src/json-probe",
+      "responsibility": "strict JSON grammar, token and every-split streaming conformance test",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas",
+        "c-header"
+      ],
+      "exports": [
+        "pangu_json_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "json"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
     }
   ],
   "service_definitions": [
@@ -1572,6 +1749,11 @@
     },
     {
       "id": "foundation.text",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.json",
       "version": 1,
       "definition_module": "bootstrap-api"
     }
@@ -1958,6 +2140,80 @@
         "foundation.region": "test-region",
         "foundation.buffer": "buffer",
         "foundation.text": "text"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "json-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "json-probe",
+        "platform-memory"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "json-probe",
+        "symbol": "pangu_json_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "platform-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "json-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "json-probe",
+        "test-guard"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "json-probe",
+        "symbol": "pangu_json_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "test-guard"
       },
       "budgets": {
         "artifact_bytes": {
