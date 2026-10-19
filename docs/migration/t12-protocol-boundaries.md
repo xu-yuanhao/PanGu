@@ -82,3 +82,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## 结构化输出本地实验
 
 [有界 writer](t12-writer-progress.md) 已验证显式调用顺序的对象/数组、UTF-8 字符串、布尔/null 和严格数字词法组装。只在完整根及容器闭合后发布结果，逐调用失败保持状态与字节不变。数字词法保留不等同于 JSON.stringify 的 binary64 格式化，对象调用顺序也不等同于 JS 属性枚举；这两类可观察差异仍须单独追踪，不能据此宣称 Pi wire/session 兼容。
+
+## binary64 标量格式化本地实验
+
+[数值格式化](t12-format-progress.md) 已验证数字 JSON 和 JS 数字 String 两模式的 16500 条字节对照，覆盖最短十进制、布局阈值、负零及非有限值差异。已有 writer 的 NUMBER 操作继续保留原词法；格式化后的 null 需用 NULL 操作，数字字符串需用 STRING 操作。这里仍未实现完整 JS 对象序列化、属性枚举、孤立 surrogate 输出或 Pi 通用强制转换，不能将标量格式化写成整个 wire/session 已兼容。

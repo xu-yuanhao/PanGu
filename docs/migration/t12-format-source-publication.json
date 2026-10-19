@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-json-format",
+  "commit": "130b857d399a43d7dca5848654e87d81b0263634",
+  "parent": "d163091ad21fa4f8098d98604615844c5078417f",
+  "scope": "fixed Agent self-reviewed numeric formatting candidate including controller and 44 native source files; local experiments only",
+  "controller_sha256": "f164a397053252ffe2310c37c13c36c5db9b8ccc91063c5ba9d0cba1783cc2a9",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

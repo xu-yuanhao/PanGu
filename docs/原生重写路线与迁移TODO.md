@@ -262,6 +262,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] ~~有界结构化 JSON writer 本地实验：140 组字节共识、6416 种容量、1315 条数字词法往返、深度/页尾/1 MiB 边界、parser 首次完整清零检查、28 项构建运行、归档恢复与补充 UBSan 通过。~~ [候选与证据](migration/t12-writer-progress.md)，固定包已由 Agent 自审自批；不代表 binary64 格式化、Schema、Pi 适配或完整 T12。
 
+- [x] ~~binary64 数值格式化本地实验：16500 条双模式字节对照、有限值往返/负零归一化、容量/页尾/组合、28 项构建与40次正常执行、归档恢复及补充 UBSan 通过。~~ [候选与证据](migration/t12-format-progress.md)，固定包已由 Agent 自审自批；不代表通用 JS 转换、Schema 或完整 T12。
+
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。
 - [ ] 产物：JSON/Schema 服务、协议边界 fuzz/差分语料和准确的限制错误。

@@ -346,7 +346,10 @@
         "docs/migration/t12-number-evidence.json",
         "docs/migration/t12-writer-progress.md",
         "docs/migration/t12-writer-evidence.json",
-        "docs/migration/t12-writer-source-publication.json"
+        "docs/migration/t12-writer-source-publication.json",
+        "docs/migration/t12-format-progress.md",
+        "docs/migration/t12-format-evidence.json",
+        "docs/migration/t12-format-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -393,6 +396,19 @@
         "source_commit": "d163091ad21fa4f8098d98604615844c5078417f",
         "parser_init_contract": "whole-zero first-use enforced; valid resets retained; tested",
         "supersedes_experimental_commit": "5ec146ba25cd5b04479931a7ee1428ea2a51ab1b"
+      },
+      "number_format_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "f164a397053252ffe2310c37c13c36c5db9b8ccc91063c5ba9d0cba1783cc2a9",
+        "oracle_bit_patterns": 16500,
+        "modes": 2,
+        "normal_builds": 28,
+        "normal_process_runs": 40,
+        "JSON_shards_per_profile": 4,
+        "full_T12": "INCOMPLETE",
+        "candidate_tree_sha256": "2ecc59e06ee4b78d3936ff7d1304a4edc620d78a6abcdbed7f41d42680021ce0",
+        "approval_record_sha256": "b46a2fb95e8e1c51bfd36c497b3bdd6e4682810c95865c7b32b9ceb107ac3069",
+        "source_commit": "130b857d399a43d7dca5848654e87d81b0263634"
       }
     },
     {
