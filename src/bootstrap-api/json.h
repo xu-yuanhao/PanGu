@@ -84,5 +84,36 @@ pangu_i32 pangu_json_object_find(pangu_text_slice,const pangu_json_result *,pang
  * Fixed private integer scratch, no allocation, libc or floating point state.
  */
 pangu_i32 pangu_json_number_bits(pangu_text_slice,const pangu_json_result *,pangu_u64,pangu_u64 *);
+enum pangu_json_write_op {
+ PANGU_JSON_WRITE_OBJECT=1,PANGU_JSON_WRITE_END_OBJECT,PANGU_JSON_WRITE_ARRAY,
+ PANGU_JSON_WRITE_END_ARRAY,PANGU_JSON_WRITE_KEY,PANGU_JSON_WRITE_STRING,
+ PANGU_JSON_WRITE_NUMBER,PANGU_JSON_WRITE_TRUE,PANGU_JSON_WRITE_FALSE,PANGU_JSON_WRITE_NULL
+};
+typedef struct pangu_json_write_frame { pangu_u32 kind,phase; } pangu_json_write_frame;
+typedef struct pangu_json_writer {
+ pangu_u32 abi_version,struct_size;
+ unsigned char *data;pangu_u64 capacity,length;
+ pangu_u32 depth,max_depth,root,sealed;
+ pangu_json_write_frame frames[64];
+} pangu_json_writer;
+_Static_assert(sizeof(pangu_json_writer)==560,"JSON writer layout");
+/* Caller owns writer and its disjoint fixed output bytes. Init resets metadata,
+ * not output bytes, and invalidates prior views. No allocation, NUL or IO.
+ * KEY/STRING take strict UTF-8; NUMBER takes a complete strict numeric lexeme
+ * <=1 MiB, preserving its spelling, not binary64 formatting/JSON.stringify.
+ * Other operations require NULL/zero argument. Explicit emission order and
+ * duplicate keys are preserved. Container depth is caller-limited to 1..64.
+ * Each rejected call leaves writer and every output byte unchanged: 1 invalid
+ * arguments/overlap, 2 output/depth/numeric quota, 9 non-number literal,
+ * 10 invalid state/order/sealed, 12 UTF-8, 14 numeric syntax. Source must stay
+ * immutable/disjoint from writer and entire output storage during a call.
+ * Finish publishes one complete root as a borrowed slice and seals emission;
+ * 13 incomplete leaves state/view unchanged. Failure never publishes a result.
+ * Finish view storage must be disjoint from writer/output. Caller-provided
+ * memory validity/lifetime is required; these checks are not native isolation.
+ */
+pangu_i32 pangu_json_writer_init(pangu_json_writer *,unsigned char *,pangu_u64,pangu_u32);
+pangu_i32 pangu_json_writer_emit(pangu_json_writer *,pangu_u32,pangu_text_slice);
+pangu_i32 pangu_json_writer_finish(pangu_json_writer *,pangu_text_slice *);
 #endif
 #endif

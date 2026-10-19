@@ -1560,7 +1560,8 @@
         "src/json/json.c",
         "src/json/read.c",
         "src/json/quote.c",
-        "src/json/number.c"
+        "src/json/number.c",
+        "src/json/write.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1568,9 +1569,9 @@
         "text"
       ],
       "source_root": "src/json",
-      "responsibility": "bounded incremental JSON, UTF-8 reader/quoting and exact binary64 numeric reading",
+      "responsibility": "bounded incremental JSON, UTF-8 read/quote, binary64 reading and structured emission",
       "non_responsibilities": [
-        "no allocation, Schema, numeric serialization, Number(string) coercion, Pi repair or tool execution"
+        "no allocation, binary64 formatting/JSON.stringify, Schema, Pi repair, coercion or tool execution"
       ],
       "boundary": {
         "reason": "required-replacement-point",
@@ -1588,7 +1589,10 @@
         "pangu_json_string_decode",
         "pangu_json_object_find",
         "pangu_json_quote_utf8",
-        "pangu_json_number_bits"
+        "pangu_json_number_bits",
+        "pangu_json_writer_init",
+        "pangu_json_writer_emit",
+        "pangu_json_writer_finish"
       ],
       "targets": [
         "linux-x86_64"
@@ -1602,10 +1606,10 @@
       "lifecycle": {
         "activate": null,
         "dispose": null,
-        "state_owner": "caller owns buffer metadata; bytes borrow allocator scope",
+        "state_owner": "caller owns parser, tokens, writer and fixed output storage; input/output views borrow caller-provided lifetimes",
         "threading": "single-thread",
         "callbacks": "none",
-        "resource_contract": "caller-owned parser and token storage; no allocation; final success only publishes results"
+        "resource_contract": "no allocation; caller retains valid input/token/output storage; only completed parser/writer publishes a result view; init invalidates old views"
       },
       "provides": [
         {

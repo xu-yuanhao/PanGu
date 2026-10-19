@@ -62,6 +62,7 @@ static const pangu_json_token topology[]={
 static int json_reader_tests(const pangu_memory_api *memory);
 static int json_quote_tests(const pangu_memory_api *memory);
 static int json_number_tests(const pangu_memory_api *memory);
+static int json_writer_tests(const pangu_memory_api *memory);
 int json_test(const pangu_memory_api *memory)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
@@ -145,6 +146,7 @@ int json_test(const pangu_memory_api *memory)
  int reader_rc=json_reader_tests(memory);if(reader_rc) return 50+reader_rc;
  int quote_rc=json_quote_tests(memory);if(quote_rc) return 100+quote_rc;
  int number_rc=json_number_tests(memory);if(number_rc) return 150+number_rc;
+ int writer_rc=json_writer_tests(memory);if(writer_rc) return 190+writer_rc;
  return 0;
 }
 
@@ -355,5 +357,129 @@ static int json_number_tests(const pangu_memory_api *memory)
  pangu_u64 *out=(pangu_u64 *)(page+4080);
  if(pangu_json_number_bits(input,&reader_result,0,out) || *out!=0x3ff0000000000000ULL) return 18;
  if(memory->unmap(memory->context,&mapping)) return 19;
+ return 0;
+}
+
+static pangu_json_writer writer;
+static unsigned char writer_out[8192],writer_before[8192],writer_state[560];
+static unsigned char writer_large[1048578];
+static volatile pangu_u64 writer_case_index,writer_capacity,writer_operation;
+static pangu_text_slice writer_none;
+static void writer_save(pangu_u64 n)
+{
+ const unsigned char *w=(const unsigned char *)&writer;
+ for(pangu_u64 i=0;i<560;i++) writer_state[i]=w[i];
+ for(pangu_u64 i=0;i<n;i++) writer_before[i]=writer_out[i];
+}
+static int writer_same(pangu_u64 n)
+{
+ const unsigned char *w=(const unsigned char *)&writer;
+ for(pangu_u64 i=0;i<560;i++) if(writer_state[i]!=w[i]) return 0;
+ for(pangu_u64 i=0;i<n;i++) if(writer_before[i]!=writer_out[i]) return 0;
+ return 1;
+}
+static int writer_reject(pangu_u32 op,pangu_text_slice arg,pangu_i32 expected_rc)
+{
+ writer_save(8192);pangu_i32 rc=pangu_json_writer_emit(&writer,op,arg);
+ return rc==expected_rc && writer_same(8192);
+}
+static int json_writer_tests(const pangu_memory_api *memory)
+{
+ for(pangu_u64 i=0;i<sizeof(writer_cases)/sizeof(writer_cases[0]);i++) {
+  writer_case_index=i;const struct writer_case *v=&writer_cases[i];pangu_u64 scope=v->length+16;
+  for(pangu_u64 cap=0;cap<=(pangu_u64)v->length+1;cap++) {
+   writer_capacity=cap;
+   for(pangu_u64 j=0;j<scope;j++) writer_out[j]=0xa5;
+   if(pangu_json_writer_init(&writer,writer_out,cap,64)) return 1;
+   int failed=0;
+   for(pangu_u64 j=0;j<v->count;j++) {
+    writer_operation=j;const struct writer_op *op=&writer_ops[v->start+j];pangu_text_slice arg;
+    arg.data=op->length ? op->bytes : (void *)0;arg.length=op->length;
+    writer_save(scope);pangu_i32 rc=pangu_json_writer_emit(&writer,op->op,arg);
+    if(rc) { if(rc!=2 || !writer_same(scope)) return 2;failed=1;break; }
+   }
+   pangu_text_slice out;out.data=(const unsigned char *)1;out.length=777;
+   if(cap<v->length) {
+    writer_save(scope);if(!failed || pangu_json_writer_finish(&writer,&out)!=13 || out.data!=(const unsigned char *)1 || out.length!=777 || !writer_same(scope)) return 3;
+   } else {
+    if(failed || pangu_json_writer_finish(&writer,&out) || out.data!=writer_out || out.length!=v->length) return 4;
+    for(pangu_u64 j=0;j<out.length;j++) if(out.data[j]!=v->bytes[j]) return 5;
+    for(pangu_u64 j=out.length;j<scope;j++) if(writer_out[j]!=0xa5) return 6;
+    if(reader_parse(out)) return 7;
+    writer_save(scope);if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NULL,writer_none)!=10 || !writer_same(scope)) return 8;
+    out.data=(void *)0;out.length=888;if(pangu_json_writer_finish(&writer,&out)!=10 || out.data || out.length!=888 || !writer_same(scope)) return 9;
+   }
+  }
+ }
+ if(pangu_json_writer_init(&writer,writer_out,8192,64)) return 10;
+ if(!writer_reject(PANGU_JSON_WRITE_END_OBJECT,writer_none,10) || !writer_reject(PANGU_JSON_WRITE_KEY,writer_none,10) || !writer_reject(0,writer_none,1) || !writer_reject(11,writer_none,1)) return 11;
+ pangu_text_slice arg={(const unsigned char *)"x",1};
+ if(!writer_reject(PANGU_JSON_WRITE_TRUE,arg,1)) return 12;
+ if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_OBJECT,writer_none)) return 13;
+ if(!writer_reject(PANGU_JSON_WRITE_END_ARRAY,writer_none,10) || !writer_reject(PANGU_JSON_WRITE_STRING,arg,10)) return 14;
+ if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_KEY,arg)) return 15;
+ if(!writer_reject(PANGU_JSON_WRITE_KEY,arg,10) || !writer_reject(PANGU_JSON_WRITE_END_OBJECT,writer_none,10)) return 16;
+ if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_ARRAY,writer_none) || !writer_reject(PANGU_JSON_WRITE_KEY,arg,10)) return 17;
+ static const unsigned char *const invalid[]={(const unsigned char *)"1e",(const unsigned char *)"1 2",(const unsigned char *)" 1 ",(const unsigned char *)"NaN",(const unsigned char *)"+1"};
+ static const pangu_u64 sizes[]={2,3,3,3,2};
+ for(pangu_u64 i=0;i<5;i++) { arg.data=invalid[i];arg.length=sizes[i];if(!writer_reject(PANGU_JSON_WRITE_NUMBER,arg,14)) return 18; }
+ arg.data=(const unsigned char *)"true";arg.length=4;if(!writer_reject(PANGU_JSON_WRITE_NUMBER,arg,9)) return 19;
+ static const unsigned char bad[]={0xed,0xa0,0x80};arg.data=bad;arg.length=3;if(!writer_reject(PANGU_JSON_WRITE_STRING,arg,12)) return 20;
+ arg.data=writer_out;arg.length=1;if(!writer_reject(PANGU_JSON_WRITE_STRING,arg,1)) return 21;
+ arg.data=(const unsigned char *)&writer;arg.length=1;if(!writer_reject(PANGU_JSON_WRITE_KEY,arg,1)) return 22;
+ writer_save(8192);if(pangu_json_writer_finish(&writer,(pangu_text_slice *)writer_out)!=1 || !writer_same(8192) || pangu_json_writer_finish(&writer,(pangu_text_slice *)&writer)!=1 || !writer_same(8192)) return 23;
+ number_over[0]='1';for(pangu_u64 i=1;i<1048577;i++) number_over[i]='0';arg.data=number_over;arg.length=1048577;
+ if(!writer_reject(PANGU_JSON_WRITE_NUMBER,arg,2)) return 24;
+ /* A rejected operation must not poison later valid completion. */
+ arg.data=(const unsigned char *)"-0";arg.length=2;
+ if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NUMBER,arg) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_END_ARRAY,writer_none) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_END_OBJECT,writer_none)) return 25;
+ pangu_text_slice out;if(pangu_json_writer_finish(&writer,&out) || reader_parse(out)) return 26;
+ if(out.length!=10) return 27;
+ static const unsigned char duplicate[]="{\"a\":1,\"a\":2}";
+ if(pangu_json_writer_init(&writer,writer_out,8192,64) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_OBJECT,writer_none)) return 28;
+ for(pangu_u32 i=1;i<=2;i++) {
+  arg.data=(const unsigned char *)"a";arg.length=1;if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_KEY,arg)) return 29;
+  unsigned char n=(unsigned char)('0'+i);arg.data=&n;if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NUMBER,arg)) return 30;
+ }
+ if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_END_OBJECT,writer_none) || pangu_json_writer_finish(&writer,&out) || out.length!=13) return 31;
+ for(pangu_u64 i=0;i<13;i++) if(out.data[i]!=duplicate[i]) return 32;
+ if(reader_parse(out)) return 33;
+ pangu_u64 index,bits;arg.data=(const unsigned char *)"a";arg.length=1;
+ if(pangu_json_object_find(out,&reader_result,0,arg,&index) || pangu_json_number_bits(out,&reader_result,index,&bits) || bits!=0x4000000000000000ULL) return 34;
+ if(pangu_json_writer_init(&writer,writer_out,8192,64)) return 35;
+ for(pangu_u32 i=0;i<64;i++) if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_ARRAY,writer_none)) return 36;
+ if(!writer_reject(PANGU_JSON_WRITE_ARRAY,writer_none,2) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NULL,writer_none)) return 37;
+ for(pangu_u32 i=0;i<64;i++) if(pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_END_ARRAY,writer_none)) return 38;
+ if(pangu_json_writer_finish(&writer,&out) || out.length!=132 || reader_parse(out)) return 39;
+ /* Large successful string: no temporary proportional allocation. */
+ for(pangu_u64 i=0;i<1048576;i++) large[i]='a';arg.data=large;arg.length=1048576;
+ if(pangu_json_writer_init(&writer,writer_large,1048578,64) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_STRING,arg) || pangu_json_writer_finish(&writer,&out)) return 40;
+ if(out.length!=1048578 || out.data[0]!='"' || out.data[1048577]!='"') return 41;
+ for(pangu_u64 i=1;i<=1048576;i++) if(out.data[i]!='a') return 42;
+ if(reader_parse(out)) return 43;
+ pangu_mapping a,b;a.address=(void *)0;a.length=0;b.address=(void *)0;b.length=0;
+ if(memory->map(memory->context,4096,&a) || memory->map(memory->context,4096,&b)) return 44;
+ unsigned char *page=a.address,*dest=b.address;pangu_json_writer *edge=(pangu_json_writer *)(page+4096-560);
+ if(pangu_json_writer_init(edge,dest+4094,2,1) || pangu_json_writer_emit(edge,PANGU_JSON_WRITE_STRING,writer_none) || pangu_json_writer_finish(edge,&out) || out.length!=2 || dest[4094]!='"' || dest[4095]!='"') return 45;
+ dest[4095]=0xa5;
+ if(pangu_json_writer_init(edge,dest+4095,1,1) || pangu_json_writer_emit(edge,PANGU_JSON_WRITE_STRING,writer_none)!=2 || edge->length || edge->root || dest[4095]!=0xa5) return 46;
+ if(memory->unmap(memory->context,&b) || memory->unmap(memory->context,&a)) return 47;
+ /* Preserve every strict number lexeme, including -0 and overflow. This
+  * intentionally does not promise JSON.stringify(Number(lexeme)) spelling. */
+ for(pangu_u64 i=0;i<sizeof(number_cases)/sizeof(number_cases[0]);i++) {
+  const struct number_case *v=&number_cases[i];arg.data=v->bytes;arg.length=v->length;
+  if(pangu_json_writer_init(&writer,writer_out,v->length-1,64) || !writer_reject(PANGU_JSON_WRITE_NUMBER,arg,2)) return 49;
+  if(pangu_json_writer_init(&writer,writer_out,v->length,64) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NUMBER,arg) || pangu_json_writer_finish(&writer,&out) || out.length!=v->length) return 50;
+  for(pangu_u64 j=0;j<out.length;j++) if(out.data[j]!=v->bytes[j]) return 51;
+  if(reader_parse(out) || pangu_json_number_bits(out,&reader_result,0,&bits) || bits!=v->bits) return 52;
+ }
+ /* Largest permitted numeric lexeme succeeds and retains every byte. */
+ large[0]='1';for(pangu_u64 i=1;i<1048576;i++) large[i]='0';arg.data=large;arg.length=1048576;
+ if(pangu_json_writer_init(&writer,writer_large,1048576,64) || pangu_json_writer_emit(&writer,PANGU_JSON_WRITE_NUMBER,arg) || pangu_json_writer_finish(&writer,&out) || out.length!=1048576) return 53;
+ for(pangu_u64 i=0;i<out.length;i++) if(out.data[i]!=large[i]) return 54;
+ if(reader_parse(out) || pangu_json_number_bits(out,&reader_result,0,&bits) || bits!=0x7ff0000000000000ULL) return 55;
+ /* Invalid init arguments preserve the previous state and bytes. */
+ writer_save(8192);
+ if(pangu_json_writer_init(&writer,writer_out,8192,0)!=1 || !writer_same(8192) || pangu_json_writer_init(&writer,writer_out,8192,65)!=1 || !writer_same(8192) || pangu_json_writer_init(&writer,(unsigned char *)&writer,560,64)!=1 || !writer_same(8192)) return 48;
  return 0;
 }
