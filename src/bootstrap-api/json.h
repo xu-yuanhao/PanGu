@@ -30,6 +30,8 @@ _Static_assert(sizeof(pangu_json_limits)==16,"JSON limits layout");
 _Static_assert(sizeof(pangu_json_parser)==1144,"JSON parser layout");
 _Static_assert(sizeof(pangu_json_result)==32,"JSON result layout");
 /* Zero-init parser storage once; init resets it and invalidates prior results.
+ * An empty header with nonzero remaining bytes is rejected (1), unchanged.
+ * Reinitializing a valid parser does not require clearing prior frames.
  * Caller owns parser and nonoverlapping token storage. Feed input is readable
  * for the call only; offsets refer to the caller's retained logical byte stream.
  * Token lexemes include quotes/brackets. parent==UINT64_MAX means root.

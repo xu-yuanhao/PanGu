@@ -46,6 +46,10 @@ pangu_i32 pangu_json_init(pangu_json_parser *p,pangu_json_token *tokens,pangu_u6
 {
  if(!p || (capacity && !tokens) || !limits.max_bytes || !limits.max_depth || limits.max_depth>64 || limits.reserved) return 1;
  if(!((p->abi_version==0 && p->struct_size==0) || valid(p))) return 1;
+ if(!p->abi_version && !p->struct_size) {
+  const unsigned char *bytes=(const unsigned char *)p;
+  for(pangu_u32 i=0;i<sizeof(*p);i++) if(bytes[i]) return 1;
+ }
  p->abi_version=1;p->struct_size=1144;p->tokens=tokens;p->capacity=capacity;
  p->count=0;p->offset=0;p->max_bytes=limits.max_bytes;p->error_offset=0;p->active_index=0;
  p->depth=0;p->max_depth=limits.max_depth;p->root_phase=0;p->mode=IDLE;p->status=13;p->sealed=0;

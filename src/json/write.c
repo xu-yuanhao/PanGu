@@ -43,7 +43,9 @@ static pangu_i32 number_ok(pangu_text_slice s)
  if(!s.length) return 14;
  if(s.length>1048576) return 2;
  pangu_json_parser parser;pangu_json_token token;pangu_json_result result;pangu_json_limits limits;
- parser.abi_version=0;parser.struct_size=0;limits.max_bytes=1048576;limits.max_depth=1;limits.reserved=0;
+ unsigned char *raw=(unsigned char *)&parser;
+ for(pangu_u32 i=0;i<sizeof(parser);i++) raw[i]=0;
+ limits.max_bytes=1048576;limits.max_depth=1;limits.reserved=0;
  pangu_i32 rc=pangu_json_init(&parser,&token,1,limits);if(rc) return rc;
  rc=pangu_json_feed(&parser,s,1);if(rc) return rc==13 ? 14 : rc;
  rc=pangu_json_get_result(&parser,&result);if(rc) return rc;

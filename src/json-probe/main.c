@@ -1,7 +1,7 @@
 #include "src/bootstrap-api/json.h"
 #include "src/bootstrap-api/memory.h"
 #include "src/json-probe/cases.h"
-static pangu_json_parser one,stream;
+static pangu_json_parser one,stream,init_probe;
 static pangu_json_token tokens[512],other[512];
 static pangu_json_result expected,observed;
 static volatile pangu_u64 test_case,test_step;
@@ -66,6 +66,15 @@ static int json_writer_tests(const pangu_memory_api *memory);
 int json_test(const pangu_memory_api *memory)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
+ /* First-use storage must be wholly zero, not just the header. Refusal must
+  * preserve the dirty sentinel; valid resets may retain old frame contents. */
+ init_probe.reserved=1;
+ if(pangu_json_init(&init_probe,tokens,512,limits)!=1 || init_probe.abi_version || init_probe.struct_size || init_probe.reserved!=1) return 48;
+ init_probe.reserved=0;
+ if(pangu_json_init(&init_probe,tokens,512,limits)) return 49;
+ init_probe.frames[63].phase=99;
+ if(pangu_json_init(&init_probe,tokens,512,limits)) return 50;
+
  for(pangu_u64 i=0;i<sizeof(cases)/sizeof(cases[0]);i++) {
   test_case=i;int rc=run_case(cases[i].bytes,cases[i].length,(int)cases[i].valid);if(rc) return rc;
  }
