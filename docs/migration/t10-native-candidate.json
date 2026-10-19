@@ -1558,7 +1558,8 @@
       "scope": "product",
       "files": [
         "src/json/json.c",
-        "src/json/read.c"
+        "src/json/read.c",
+        "src/json/quote.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1566,9 +1567,9 @@
         "text"
       ],
       "source_root": "src/json",
-      "responsibility": "bounded incremental JSON tokens and lossless UTF-8 string/member reading",
+      "responsibility": "bounded incremental JSON tokens, lossless UTF-8 reader and UTF-8 quoting",
       "non_responsibilities": [
-        "no allocation, numeric conversion, Schema validation, Pi repair or tool execution"
+        "no allocation, numeric conversion, Schema, Pi repair or tool execution"
       ],
       "boundary": {
         "reason": "required-replacement-point",
@@ -1584,7 +1585,8 @@
         "pangu_json_feed",
         "pangu_json_get_result",
         "pangu_json_string_decode",
-        "pangu_json_object_find"
+        "pangu_json_object_find",
+        "pangu_json_quote_utf8"
       ],
       "targets": [
         "linux-x86_64"

@@ -60,6 +60,7 @@ static const pangu_json_token topology[]={
  {PANGU_JSON_NULL,0,26,30,0,9,0}
 };
 static int json_reader_tests(const pangu_memory_api *memory);
+static int json_quote_tests(const pangu_memory_api *memory);
 int json_test(const pangu_memory_api *memory)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
@@ -141,6 +142,7 @@ int json_test(const pangu_memory_api *memory)
  if(pangu_json_init(&one,tokens,512,limits) || pangu_json_feed(&one,input,1)!=12 || pangu_json_get_result(&one,&observed)!=12 || observed.error_offset!=1) return 46;
  if(memory->unmap(memory->context,&token_mapping) || memory->unmap(memory->context,&input_mapping)) return 47;
  int reader_rc=json_reader_tests(memory);if(reader_rc) return 50+reader_rc;
+ int quote_rc=json_quote_tests(memory);if(quote_rc) return 100+quote_rc;
  return 0;
 }
 
@@ -252,5 +254,45 @@ static int json_reader_tests(const pangu_memory_api *memory)
  for(pangu_u32 i=0;i<8;i++) if(out[4088+i]!=0xa5) return 34;
  if(pangu_json_string_decode(input,&reader_result,0,out+4092,4,&length) || length!=4 || out[4092]!=0xf0 || out[4093]!=0x9f || out[4094]!=0x98 || out[4095]!=0x80) return 35;
  if(memory->unmap(memory->context,&out_map) || memory->unmap(memory->context,&in_map)) return 36;
+ return 0;
+}
+
+_Alignas(8) static unsigned char quote_out[2048];
+static unsigned char quote_back[256];
+static void quote_fill(void) { for(pangu_u32 i=0;i<2048;i++) quote_out[i]=0xa5; }
+static int quote_clean(void) { for(pangu_u32 i=0;i<2048;i++) if(quote_out[i]!=0xa5) return 0;return 1; }
+static int json_quote_tests(const pangu_memory_api *memory)
+{
+ for(pangu_u64 i=0;i<sizeof(quote_cases)/sizeof(quote_cases[0]);i++) {
+  const struct quote_case *v=&quote_cases[i];pangu_text_slice input={v->bytes,v->length};
+  pangu_u64 n=v->quoted_length,length=777,caps[4]={0,n-1,n,n+1};
+  if(pangu_json_quote_utf8(input,(void *)0,0,&length)!=2 || length!=n) return 1;
+  for(pangu_u32 k=0;k<4;k++) {
+   quote_fill();length=777;pangu_i32 rc=pangu_json_quote_utf8(input,quote_out,caps[k],&length);
+   if(length!=n) return 2;
+   if(caps[k]<n) { if(rc!=2 || !quote_clean()) return 3;continue; }
+   if(rc) return 4;
+   for(pangu_u64 j=0;j<n;j++) if(quote_out[j]!=v->quoted[j]) return 5;
+   if(quote_out[n]!=0xa5) return 6;
+   pangu_text_slice encoded={quote_out,n};if(reader_parse(encoded)) return 7;
+   if(pangu_json_string_decode(encoded,&reader_result,0,quote_back,256,&length) || length!=input.length) return 8;
+   for(pangu_u64 j=0;j<length;j++) if(quote_back[j]!=input.data[j]) return 9;
+  }
+ }
+ static const unsigned char bad[][5]={{255,0,0,0,0},{192,128,0,0,0},{237,160,128,0,0},{244,144,128,128,0},{'a',226,130,0,0}};
+ static const pangu_u64 sizes[]={1,2,3,4,3};
+ for(pangu_u32 i=0;i<5;i++) { pangu_text_slice input={bad[i],sizes[i]};pangu_u64 length=777;quote_fill();if(pangu_json_quote_utf8(input,quote_out,2048,&length)!=12 || length || !quote_clean()) return 10; }
+ pangu_text_slice input={quote_out,1};pangu_u64 length=777;quote_fill();
+ if(pangu_json_quote_utf8(input,quote_out,2048,&length)!=1 || length!=777 || !quote_clean()) return 11;
+ input.data=(const unsigned char *)"a";
+ if(pangu_json_quote_utf8(input,quote_out,2048,(pangu_u64 *)quote_out)!=1 || !quote_clean()) return 12;
+ pangu_mapping a,b;a.address=(void *)0;a.length=0;b.address=(void *)0;b.length=0;if(memory->map(memory->context,4096,&a) || memory->map(memory->context,4096,&b)) return 13;
+ unsigned char *src=a.address,*dst=b.address;src[4093]='"';src[4094]='\\';src[4095]=0;
+ input.data=src+4093;input.length=3;length=777;
+ if(pangu_json_quote_utf8(input,dst+4084,12,&length) || length!=12) return 14;
+ pangu_text_slice encoded={dst+4084,12};if(reader_parse(encoded)) return 15;
+ if(pangu_json_string_decode(encoded,&reader_result,0,quote_back,256,&length) || length!=3 || quote_back[0]!='"' || quote_back[1]!='\\' || quote_back[2]) return 16;
+ src[4095]=255;quote_fill();if(pangu_json_quote_utf8(input,quote_out,2048,&length)!=12 || length || !quote_clean()) return 17;
+ if(memory->unmap(memory->context,&b) || memory->unmap(memory->context,&a)) return 18;
  return 0;
 }

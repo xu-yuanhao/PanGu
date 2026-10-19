@@ -47,6 +47,15 @@ _Static_assert(sizeof(pangu_json_result)==32,"JSON result layout");
 pangu_i32 pangu_json_init(pangu_json_parser *,pangu_json_token *,pangu_u64,pangu_json_limits);
 pangu_i32 pangu_json_feed(pangu_json_parser *,pangu_text_slice,pangu_u32);
 pangu_i32 pangu_json_get_result(const pangu_json_parser *,pangu_json_result *);
+/* Quote one strict UTF-8 byte slice as a JSON string, without trailing NUL.
+ * Input must remain unchanged during the call. No allocation or numeric/Schema
+ * conversion. Output and length storage must not overlap input or each other.
+ * Invalid arguments (1) leave outputs untouched. With valid storage, UTF-8 or
+ * overflow failures (12/11) set length zero; capacity failure (2) reports required
+ * length. Every failure leaves output bytes unchanged. NULL output/capacity zero
+ * supports measuring; even empty input requires two bytes for quotes.
+ */
+pangu_i32 pangu_json_quote_utf8(pangu_text_slice,unsigned char *,pangu_u64,pangu_u64 *);
 /* Reader calls accept only a successful result and the corresponding unchanged
  * complete input. All borrowed storage must remain valid; no authentication of
  * arbitrary caller-forged tokens or detection of reinit through raw pointers.
