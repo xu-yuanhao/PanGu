@@ -62,3 +62,11 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 当前 edit 声明没有 minItems，工具说明中的“One or more”不能自动当作 Schema 已编码的限制；执行前另调用 validateEditInput，且存在 prepareArguments 处理，后续须分别追踪。additionalProperties 没有统一显式设置为 false，不能直接给原生四工具全部加上该规则并声称兼容。
 
 输出结构还包含 read 的 string/image union、bash 的 boolean/number/可选 string 等，输入最小子集不能冒充全部输入输出 Schema 支持。数值下游也有 JS truthiness/Math/slice 等可观察行为，整数收紧和超限策略须以相应工具 oracle 验证，不能由字段描述自行推断。
+
+## 真实参数转换基线（2026-10-20）
+
+另实际执行冻结 Pi 的 validateToolArguments，共 25 条用例，Schema 夹具按上述四工具的输入字段/可选性/嵌套声明构造，使用该工作副本的 TypeBox。没有实例化工具工厂或执行工具，因此只证明参数校验函数和这些夹具的行为，不证明完整工具调用链。原始输入、结果、错误及源码/运行时/TypeBox 文件摘要记录于 [reader 证据](t12-reader-evidence.json) 的 pi_schema_boundary_baseline。
+
+确认的边界：optional null 被删除；数字字符串转 number，boolean 可转 0/1；必需 string 字段的 number/null 可转为 `"7"`/`"null"`；read 的小数/负数和额外字段在该 Schema 下可以通过；空 edits 数组通过 Schema，但不代表工具级业务校验已通过。孤立 surrogate 和 NUL 仍可通过 string 类型检查，不能把原生无损 UTF-8 reader 的 unsupported 当作 Pi 校验拒绝。
+
+大指数 Infinity 被 Number Schema 拒绝；`1.7976931348623158e308` 在 JS 中舍入到有限的最大 double 并通过。这进一步表明，原生 number 语义不能以十进制字面大小或简单整数解析替代。当前未实现数值/Schema，不把这些基线写成兼容测试通过。

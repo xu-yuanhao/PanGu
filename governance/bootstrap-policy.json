@@ -113,6 +113,9 @@
     "docs/migration/t12-json-progress.md": "document",
     "docs/migration/t12-json-evidence.json": "control",
     "docs/migration/t12-json-candidate.json": "control",
-    "docs/migration/t12-source-publication.json": "control"
+    "docs/migration/t12-source-publication.json": "control",
+    "docs/migration/t12-reader-progress.md": "document",
+    "docs/migration/t12-reader-evidence.json": "control",
+    "docs/migration/t12-reader-candidate.json": "control"
   }
 }

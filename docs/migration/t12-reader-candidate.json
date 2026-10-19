@@ -1,0 +1,2230 @@
+{
+  "schema": "pangu.native-admission.v1",
+  "phase": "CANDIDATE_NOT_APPROVED",
+  "target": "linux-x86_64",
+  "toolchain": "governance/native-probe-toolchain.json",
+  "modules": [
+    {
+      "id": "bootstrap-api",
+      "role": "interface",
+      "scope": "product",
+      "files": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h"
+      ],
+      "public_headers": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h"
+      ],
+      "dependencies": [],
+      "source_root": "src/bootstrap-api",
+      "responsibility": "minimal platform exit contract",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c-header"
+      ],
+      "exports": [],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap",
+        "memory-probe",
+        "io-probe",
+        "arena-probe",
+        "arena-alternate",
+        "buffer-probe",
+        "buffer-alternate",
+        "text-probe",
+        "text-alternate",
+        "text-guard",
+        "region-arena",
+        "region-slots",
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "definition-only",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "platform-linux",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-linux/platform.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-linux",
+      "responsibility": "Linux x86_64 exit implementation",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_platform_exit"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap",
+        "memory-probe",
+        "io-probe",
+        "arena-probe",
+        "arena-alternate",
+        "buffer-probe",
+        "buffer-alternate",
+        "text-probe",
+        "text-alternate",
+        "text-guard",
+        "region-arena",
+        "region-slots",
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [
+        {
+          "service": "platform.exit",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "bootstrap",
+      "role": "host",
+      "scope": "product",
+      "files": [
+        "src/bootstrap/bootstrap.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/bootstrap",
+      "responsibility": "generic minimal consumer of injected platform exit function table",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_bootstrap_run"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "composition",
+      "role": "client",
+      "scope": "product",
+      "files": [
+        "src/composition/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap"
+      ],
+      "source_root": "src/composition",
+      "responsibility": "minimal static composition entry wiring platform implementation into generic bootstrap",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "bootstrap"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "composition",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "T10: no persistent resources or allocations"
+      },
+      "provides": [],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement"
+      }
+    },
+    {
+      "id": "platform-memory",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-memory/memory.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-memory",
+      "responsibility": "anonymous read/write mapping and exact-range release",
+      "non_responsibilities": [
+        "no allocator, heap policy, file access, executable mappings or shared memory"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_map",
+        "pangu_memory_unmap"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "memory-probe",
+        "arena-probe",
+        "buffer-probe",
+        "text-probe",
+        "region-arena",
+        "json-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller-owned mapping value; no global mapping registry",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller owns returned mapping; one matching unmap, failure retains ownership"
+      },
+      "provides": [
+        {
+          "service": "platform.memory",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "memory-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/memory-probe/main.c",
+        "src/memory-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory"
+      ],
+      "source_root": "src/memory-probe",
+      "responsibility": "fixed native gate fixture",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "memory-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "platform-io",
+      "role": "platform",
+      "scope": "product",
+      "files": [
+        "src/platform-io/io.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/platform-io",
+      "responsibility": "minimal Linux regular-file handles and monotonic nanoseconds",
+      "non_responsibilities": [
+        "no policy authorization, path confinement, session storage, network or asynchronous I/O"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_file_open",
+        "pangu_file_read",
+        "pangu_file_write",
+        "pangu_file_close",
+        "pangu_clock_monotonic"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "io-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller owns opened descriptor; close consumes on Linux even on late close error; no global handle table"
+      },
+      "provides": [
+        {
+          "service": "platform.file",
+          "version": 1
+        },
+        {
+          "service": "platform.clock",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "io-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/io-probe/main.c",
+        "src/io-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io"
+      ],
+      "source_root": "src/io-probe",
+      "responsibility": "test-only injected file and clock API consumer",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_io_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "io-probe"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.file",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.clock",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "arena",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/arena/arena.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/arena",
+      "responsibility": "bounded scoped region allocator through injected memory provider",
+      "non_responsibilities": [
+        "no general malloc/free, realloc, Buffer, strings, libc or platform calls"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_arena_init",
+        "pangu_arena_reset",
+        "pangu_arena_dispose",
+        "pangu_arena_allocator"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "arena-probe",
+        "arena-alternate",
+        "buffer-probe",
+        "buffer-alternate",
+        "text-probe",
+        "text-alternate",
+        "text-guard",
+        "region-arena"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller owns initialized arena; returned blocks borrow its mapping",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "dispose through original memory provider; failed disposal retains ownership; reset invalidates all borrows"
+      },
+      "provides": [
+        {
+          "service": "foundation.region",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "arena-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/arena-probe/main.c",
+        "src/arena-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "test-memory"
+      ],
+      "source_root": "src/arena-probe",
+      "responsibility": "test composition and allocator contract consumer",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_arena_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "arena-probe",
+        "arena-alternate"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.region",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "test-memory",
+      "role": "platform",
+      "scope": "test",
+      "files": [
+        "src/test-memory/memory.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/test-memory",
+      "responsibility": "test-only bounded static page provider for substitution",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_map",
+        "pangu_memory_unmap"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "arena-alternate",
+        "buffer-alternate",
+        "text-alternate"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [
+        {
+          "service": "platform.memory",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "buffer",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/buffer/buffer.c",
+        "src/buffer/move.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/buffer",
+      "responsibility": "bounded bytes and checked borrowed views over injected region allocator",
+      "non_responsibilities": [
+        "no heap provider, per-block free, NUL or UTF-8 semantics, platform calls or UI"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_buffer_init",
+        "pangu_buffer_append",
+        "pangu_buffer_clear",
+        "pangu_buffer_dispose",
+        "pangu_buffer_view",
+        "pangu_buffer_view_validate"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "buffer-probe",
+        "buffer-alternate",
+        "text-probe",
+        "text-alternate",
+        "text-guard",
+        "region-arena",
+        "region-slots",
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller owns buffer metadata; bytes borrow allocator scope",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "dispose metadata without freeing region blocks; reset/dispose of arena invalidates checked views"
+      },
+      "provides": [
+        {
+          "service": "foundation.buffer",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.region",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "buffer-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/buffer-probe/main.c",
+        "src/buffer-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "buffer",
+        "test-memory"
+      ],
+      "source_root": "src/buffer-probe",
+      "responsibility": "test composition of arena and bounded Buffer",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_buffer_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "buffer-probe",
+        "buffer-alternate"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.region",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.buffer",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena",
+        "buffer"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "text",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/text/text.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "buffer"
+      ],
+      "source_root": "src/text",
+      "responsibility": "strict UTF-8 scalar decoding and validated bounded append",
+      "non_responsibilities": [
+        "no normalization, graphemes, display width, UTF-16 indexes, allocator or platform access"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_text_next",
+        "pangu_text_validate",
+        "pangu_text_append"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "text-probe",
+        "text-alternate",
+        "text-guard",
+        "region-arena",
+        "region-slots",
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller owns buffer metadata; bytes borrow allocator scope",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "no owned resources; caller retains readable bytes; append uses injected composition Buffer"
+      },
+      "provides": [
+        {
+          "service": "foundation.text",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.buffer",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "buffer"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "text-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/text-probe/main.c",
+        "src/text-probe/entry.S",
+        "src/text-probe/cases.h"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "buffer",
+        "test-memory",
+        "text",
+        "test-guard"
+      ],
+      "source_root": "src/text-probe",
+      "responsibility": "UTF-8 independent corpus and exhaustive scalar tests over two memory providers",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas",
+        "c-header"
+      ],
+      "exports": [
+        "pangu_text_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "text-probe",
+        "text-alternate",
+        "text-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.region",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.buffer",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.text",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena",
+        "buffer",
+        "text"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "test-guard",
+      "role": "platform",
+      "scope": "test",
+      "files": [
+        "src/test-guard/memory.c",
+        "src/test-guard/syscall.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/test-guard",
+      "responsibility": "test-only one page mapping with inaccessible neighboring pages",
+      "non_responsibilities": [
+        "not a general memory provider; accepts at most 4096 bytes, test only"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_map",
+        "pangu_memory_unmap"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "text-guard",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [
+        {
+          "service": "platform.memory",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "test-region",
+      "role": "foundation",
+      "scope": "test",
+      "files": [
+        "src/test-region/slots.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/test-region",
+      "responsibility": "test-only independent fixed-slot region allocator",
+      "non_responsibilities": [
+        "no mmap, arena algorithm, per-block free or production use"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_test_slots_allocate",
+        "pangu_test_slots_epoch"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "region-slots",
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "test-only process scope",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "16 static slots, 256 bytes each; monotonic allocation; fixed epoch until process exit"
+      },
+      "provides": [
+        {
+          "service": "foundation.region",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "region-consumer",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/region-consumer/main.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "buffer",
+        "text"
+      ],
+      "source_root": "src/region-consumer",
+      "responsibility": "allocator-agnostic Buffer/text test consumer",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_region_consumer"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "region-arena",
+        "region-slots"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "foundation.region",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.buffer",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.text",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "buffer",
+        "text"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "region-arena-composition",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/region-arena-composition/main.c",
+        "src/region-arena-composition/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "region-consumer"
+      ],
+      "source_root": "src/region-arena-composition",
+      "responsibility": "test-only explicit allocator composition",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_region_arena_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "region-arena"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "region-consumer"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "region-slots-composition",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/region-slots-composition/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "region-consumer"
+      ],
+      "source_root": "src/region-slots-composition",
+      "responsibility": "test-only explicit allocator composition",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "gas"
+      ],
+      "exports": [
+        "pangu_region_slots_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "region-slots"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "region-consumer"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "json",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/json/json.c",
+        "src/json/read.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "text"
+      ],
+      "source_root": "src/json",
+      "responsibility": "bounded incremental JSON tokens and lossless UTF-8 string/member reading",
+      "non_responsibilities": [
+        "no allocation, numeric conversion, Schema validation, Pi repair or tool execution"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_json_init",
+        "pangu_json_feed",
+        "pangu_json_get_result",
+        "pangu_json_string_decode",
+        "pangu_json_object_find"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller owns buffer metadata; bytes borrow allocator scope",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "caller-owned parser and token storage; no allocation; final success only publishes results"
+      },
+      "provides": [
+        {
+          "service": "foundation.json",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.text",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "text"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "json-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/json-probe/main.c",
+        "src/json-probe/entry.S",
+        "src/json-probe/cases.h"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "platform-linux",
+        "json",
+        "platform-memory",
+        "test-guard"
+      ],
+      "source_root": "src/json-probe",
+      "responsibility": "strict JSON grammar, token and every-split streaming conformance test",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas",
+        "c-header"
+      ],
+      "exports": [
+        "pangu_json_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "json-probe",
+        "json-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "json"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    }
+  ],
+  "service_definitions": [
+    {
+      "id": "platform.exit",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.memory",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.file",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "platform.clock",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.region",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.buffer",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.text",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.json",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    }
+  ],
+  "builds": [
+    {
+      "id": "bootstrap",
+      "scope": "product",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "bootstrap",
+        "composition"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "composition",
+        "symbol": "pangu_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "record real ELF bytes before assigning approved budget"
+      }
+    },
+    {
+      "id": "memory-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "memory-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "memory-probe",
+        "symbol": "pangu_memory_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "mapping correctness fixture; not allocator or product performance"
+      }
+    },
+    {
+      "id": "io-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-io",
+        "io-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "io-probe",
+        "symbol": "pangu_io_test_start"
+      },
+      "bindings": {
+        "platform.file": "platform-io",
+        "platform.clock": "platform-io",
+        "platform.exit": "platform-linux"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "functional file/clock fixture; no approved performance limits"
+      }
+    },
+    {
+      "id": "arena-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "arena-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "arena-probe",
+        "symbol": "pangu_arena_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory",
+        "foundation.region": "arena"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded arena correctness; no approved product performance budget"
+      }
+    },
+    {
+      "id": "arena-alternate",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena",
+        "test-memory",
+        "arena-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "arena-probe",
+        "symbol": "pangu_arena_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-memory",
+        "foundation.region": "arena"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "test-only provider substitution; not production footprint"
+      }
+    },
+    {
+      "id": "buffer-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "buffer",
+        "buffer-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "buffer-probe",
+        "symbol": "pangu_buffer_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "buffer-alternate",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-memory",
+        "arena",
+        "buffer",
+        "buffer-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "buffer-probe",
+        "symbol": "pangu_buffer_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-memory",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "unchanged Buffer consumer with static test memory provider; no production budget"
+      }
+    },
+    {
+      "id": "text-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "buffer",
+        "text",
+        "text-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "text-probe",
+        "symbol": "pangu_text_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "text-alternate",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-memory",
+        "arena",
+        "buffer",
+        "text",
+        "text-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "text-probe",
+        "symbol": "pangu_text_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-memory",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "unchanged Buffer consumer with static test memory provider; no production budget"
+      }
+    },
+    {
+      "id": "text-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena",
+        "buffer",
+        "text",
+        "text-probe",
+        "test-guard"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "text-probe",
+        "symbol": "pangu_text_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-guard",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "region-arena",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "buffer",
+        "text",
+        "region-consumer",
+        "region-arena-composition",
+        "platform-memory",
+        "arena"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "region-arena-composition",
+        "symbol": "pangu_region_arena_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "platform.memory": "platform-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "region-slots",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "buffer",
+        "text",
+        "region-consumer",
+        "region-slots-composition",
+        "test-region"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "region-slots-composition",
+        "symbol": "pangu_region_slots_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "json-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "json-probe",
+        "platform-memory"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "json-probe",
+        "symbol": "pangu_json_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "platform-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "json-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "json-probe",
+        "test-guard"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "json-probe",
+        "symbol": "pangu_json_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    }
+  ]
+}
