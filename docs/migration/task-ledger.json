@@ -1,7 +1,7 @@
 {
   "schema": "pangu.migration.task-ledger.v1",
   "status": "IMPLEMENTATION_STARTED",
-  "note": "Technical closure under review: see docs/migration/precore-closure-review.md; local candidate T10 package prepared, no independent policy approval or remote deployment.",
+  "note": "T10 local exit-only bootstrap in progress under explicit fixed-package approval; full PAL, later runtime tasks and protected remote integration remain outstanding.",
   "tasks": [
     {
       "id": "T01",
@@ -251,7 +251,7 @@
     {
       "id": "T10",
       "title": "引导、PAL 和最小进程",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T09"
       ],
@@ -261,8 +261,31 @@
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T10",
       "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "evidence": [
+        "docs/migration/t10-bootstrap-progress.md",
+        "docs/migration/t10-bootstrap-evidence.json",
+        "docs/migration/t10-memory-progress.md",
+        "docs/migration/t10-memory-evidence.json",
+        "docs/migration/t10-io-progress.md",
+        "docs/migration/t10-io-evidence.json"
+      ],
+      "completion_approved": false,
+      "independent_control_review": "Explicit human approvals recorded for three fixed local packages; no production policy promotion or protected remote integration.",
+      "technical_milestones": [
+        "exit-only C/Assembly bootstrap",
+        "two-mode frozen isolated build and retained verification",
+        "injected provider substitution with unchanged generic consumer",
+        "ABI invalid-input rejection and unexpected callback return",
+        "unknown source / forbidden provider dependency / artifact tamper rejected",
+        "human-approved fixed local memory PAL experiment: map/unmap, ENOMEM, injected EPERM and released-address invalidation in both modes",
+        "human-approved fixed local file/clock experiment: six builds and eight syscall-denial runs, exact file effects and monotonic samples"
+      ],
+      "local_control_approvals": [
+        "43934daa97303ce26af404a222959435dd356e3e9dc3282aed2d4c8fcca18d38",
+        "1cc5f7794cd46bc3695bb303ee9025f6426c9f8110dacb21a7b3fbbc170ac687",
+        "fee6a9e905dc1413339e3af505e43e7e8d75bb3da40acbe7082808982d1b863d"
+      ],
+      "local_readiness": "minimal local PAL implemented and verified; eligible as input to T11 candidate work, not formal production stage exit"
     },
     {
       "id": "T11",
@@ -569,7 +592,7 @@
     },
     {
       "id": "T28",
-      "title": "最小 CLI 与 P1 验收",
+      "title": "最小 TUI 与 P1 首次体验验收",
       "status": "PLANNED",
       "depends_on": [
         "T27"
@@ -582,12 +605,18 @@
         "CLI-04",
         "CLI-05",
         "SESSION-03",
-        "OPS-01"
+        "OPS-01",
+        "TUI-01",
+        "TUI-02",
+        "TUI-04"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T28",
       "owner_role": "unassigned module implementer and independent reviewer",
       "evidence": [],
-      "completion_approved": false
+      "completion_approved": false,
+      "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
+      "ux_reference": "docs/TUI体验参考与设计原则.md",
+      "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json"
     },
     {
       "id": "T29",
@@ -673,7 +702,7 @@
     },
     {
       "id": "T33",
-      "title": "TUI 输入与终端基础",
+      "title": "完善 TUI 输入与终端能力",
       "status": "PLANNED",
       "depends_on": [
         "T32"
@@ -687,11 +716,13 @@
       "definition": "docs/原生重写路线与迁移TODO.md#T33",
       "owner_role": "unassigned module implementer and independent reviewer",
       "evidence": [],
-      "completion_approved": false
+      "completion_approved": false,
+      "ux_reference": "docs/TUI体验参考与设计原则.md",
+      "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json"
     },
     {
       "id": "T34",
-      "title": "TUI 展示与交互",
+      "title": "完善 TUI 展示与日常交互",
       "status": "PLANNED",
       "depends_on": [
         "T33"
@@ -710,7 +741,9 @@
       "definition": "docs/原生重写路线与迁移TODO.md#T34",
       "owner_role": "unassigned module implementer and independent reviewer",
       "evidence": [],
-      "completion_approved": false
+      "completion_approved": false,
+      "ux_reference": "docs/TUI体验参考与设计原则.md",
+      "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json"
     },
     {
       "id": "T35",

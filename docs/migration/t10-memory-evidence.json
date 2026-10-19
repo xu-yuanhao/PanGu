@@ -1,0 +1,97 @@
+{
+  "schema": "pangu.t10-memory-progress.v1",
+  "date": "2026-10-20",
+  "task_status": "IN_PROGRESS",
+  "scope": "local unapproved memory PAL preview, not promoted or production release",
+  "approval": "HUMAN_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+  "controller_sha256": "1cc5f7794cd46bc3695bb303ee9025f6426c9f8110dacb21a7b3fbbc170ac687",
+  "registry_sha256": "517aeafcc8687574c0d84258c58adc0d57ef29a5705803d2796436c800d2aada",
+  "candidate_tree_sha256": "d87e66436ad491c64f43d14f59ef9e9adedcfb6d0751b0e6ce028ca1937e11ac",
+  "sources": {
+    "src/bootstrap-api/bootstrap.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/bootstrap-api/bootstrap.h",
+      "sha256": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49",
+      "mode": 420
+    },
+    "src/bootstrap-api/memory.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/bootstrap-api/memory.h",
+      "sha256": "8b7ad0f9dabced293dfb16087582f05e15ed31da9246b2c93bdc8eef0b1bbacc",
+      "mode": 420
+    },
+    "src/platform-linux/platform.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/platform-linux/platform.S",
+      "sha256": "2c670c835796d529114fc72e0dec01a9837dfc6c92dfbc58aacdb9b1d5c4a761",
+      "mode": 420
+    },
+    "src/bootstrap/bootstrap.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/bootstrap/bootstrap.c",
+      "sha256": "1742a636bdf75555adba2fdc8635a90ef75c56c56c8788a2bdd0fbfb951c045b",
+      "mode": 420
+    },
+    "src/composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/composition/entry.S",
+      "sha256": "60ef87604de62123eead8b5f544a907b6d0ecb717cab885ffa2981903381c0e7",
+      "mode": 420
+    },
+    "src/platform-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/platform-memory/memory.S",
+      "sha256": "82711047f0047f7cb273d014ab3116e00adadf454925758b7b6adcecac044605",
+      "mode": 420
+    },
+    "src/memory-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/memory-probe/main.c",
+      "sha256": "2b1d37ab97f8e05a738481ab1fbbf0f5824cc676770b6ef0c161143e0f2ee2f4",
+      "mode": 420
+    },
+    "src/memory-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/candidate/src/memory-probe/entry.S",
+      "sha256": "02cca72fe4110b95944c9927c22dd54305e337819fca778604e0c227d3599b7e",
+      "mode": 420
+    }
+  },
+  "source_archive": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/source.tar",
+    "sha256": "a4672b4e3f55953e0b3733fc9fe29e9885588a91f5d9e21aeb912a785264a0ff"
+  },
+  "build_receipt": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/build-v5/native/admission.json",
+    "sha256": "9e059b563d867671dd19c46cd864870ff7c0a5b54bba3d21b106a61132ee4bb1"
+  },
+  "verification": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/verification.json",
+    "sha256": "24e3d04de133a87b5be403fd4e30d702cc3e02a95455bf2f8a40b36b8198430c",
+    "cases": [
+      "boundaries",
+      "map-denied",
+      "unmap-denied",
+      "released-access"
+    ]
+  },
+  "elf_bytes": {
+    "bootstrap-debug": 11712,
+    "bootstrap-release": 9344,
+    "memory-probe-debug": 13496,
+    "memory-probe-release": 9504
+  },
+  "unchanged": "old exit-only bootstrap ELF byte-identical in debug/release",
+  "failures_retained": [
+    "build: implicit memcpy",
+    "build-v2: unadmitted GOT symbol from C taking external function addresses",
+    "build-v3: implicit memset",
+    "verification harness initially expected -11 instead of bubblewrap encoded 139 for SIGSEGV; expectations corrected without changing provider"
+  ],
+  "claim_limits": [
+    "no complete PAL, allocator, lifetime registry, cross-thread or forged-pointer protection",
+    "mmap failure test uses impossible range for ENOMEM; seccomp injects EPERM for OS-error mapping",
+    "failed unmap retains ownership; denied-unmap fixture leaves range to process-exit cleanup",
+    "released-access is deliberate SIGSEGV; core dumps disabled; not an unexpected product crash",
+    "Linux x86_64 base page size 4096 is provider-specific, not a general ABI alignment rule",
+    "mapped pointer must be valid caller-owned storage; trusted native ABI is not a sandbox"
+  ],
+  "budgets": "UNBASELINED",
+  "release": "BLOCKED",
+  "approval_record": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-memory-h25mtquw/approval.json",
+    "sha256": "1f891433da38cdbc87d6559153826e2c7c1d5699010e8721836370da9aaaa435"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "experiments/t10-native-pal",
+  "commit": "4d52e0ec380c6b0441e82700c8d0a5bdb1cb8acc",
+  "scope": "complete T10 local candidate snapshot including fixed controller and 12 native source files; not production integration",
+  "registry_path": "docs/migration/t10-native-candidate.json",
+  "controller_sha256": "fee6a9e905dc1413339e3af505e43e7e8d75bb3da40acbe7082808982d1b863d",
+  "validation": "remote ref read-back matched local commit; candidate preflight matched original inputs before publish",
+  "release": "BLOCKED"
+}

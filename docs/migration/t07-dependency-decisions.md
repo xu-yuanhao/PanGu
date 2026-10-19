@@ -102,10 +102,10 @@ Schema：Pi 用 typebox 在工具参数边界做校验。原生首版不照搬 J
 
 | 候选 | 版本/来源 | 许可证 | 结论 |
 |---|---|---|---|
-| termbox2 | 2.5.0，github.com/termbox/termbox2 | MIT | T33 候选（单头文件、无额外依赖） |
+| termbox2 | 2.5.0，github.com/termbox/termbox2 | MIT | T28 最小终端需求评估候选，T33 扩展能力前复核 |
 | ncurses | 未核实具体版本 | X11/MIT 风格（未在本次核实文本） | 备选；系统库 |
 
-决定：T33 之前不引入终端库，不建 TUI 抽象。P1 只用一次性 CLI 输出；交互式 TUI 属 P2。GUI/Qt/自写渲染器继续延期。
+决定（按用户 2026-10-20 调整）：T28 引入首个薄 TUI 所需的最小终端 PAL；优先复用已有平台层，不提前建设通用 UI 框架。若需要终端库，须在 T28 前固定来源/许可证/依赖并登记。T33/T34 完善输入和展示；GUI/Qt/自写渲染器继续延期。
 
 ### 3.7 搜索
 
@@ -161,7 +161,7 @@ Pi 的 settings 是 JSON，扩展配置使用 YAML。P1 只要求 `required_sett
 | DEP-FS-01 | 文件 | P0 | POSIX + PAL | DECIDED |
 | DEP-PROC-01 | 进程 | P1 | POSIX spawn/exec，自有管道 | DECIDED |
 | DEP-DL-01 | 动态加载 | P2/T16 | dlopen，静态注册优先 | DEFERRED |
-| DEP-TERM-01 | 终端 | P2 | termbox2 候选 | DEFERRED |
+| DEP-TERM-01 | 终端 | P1 最小 / P2 完整 | T28 最小 PAL；按需求评估 termbox2 | CANDIDATE |
 | DEP-REGEX-01 | 正则 | P2 | PCRE2 候选 | DEFERRED |
 | DEP-YAML-01 | YAML | 未定 | 不引入 | DEFERRED |
 

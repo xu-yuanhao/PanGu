@@ -1,0 +1,125 @@
+{
+  "schema": "pangu.t10-io-progress.v1",
+  "date": "2026-10-20",
+  "task_status": "IN_PROGRESS",
+  "approval": "HUMAN_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+  "controller_sha256": "fee6a9e905dc1413339e3af505e43e7e8d75bb3da40acbe7082808982d1b863d",
+  "registry_sha256": "eb4b68d7301da0429ba95cc914714c4591d8abe2b6b2080a266a3249dc2a1d78",
+  "candidate_tree_sha256": "112f60c6660f41927d83e9e40470f43e8305fa45933268c94656e927d85508f5",
+  "source_archive": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/source.tar",
+    "sha256": "7947c6abd667110893d80a59aa6f44d78d6cde9db1ae9b47db682822c4fd7f74"
+  },
+  "sources": {
+    "src/bootstrap-api/bootstrap.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/bootstrap-api/bootstrap.h",
+      "sha256": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49",
+      "mode": 420
+    },
+    "src/bootstrap-api/memory.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/bootstrap-api/memory.h",
+      "sha256": "8b7ad0f9dabced293dfb16087582f05e15ed31da9246b2c93bdc8eef0b1bbacc",
+      "mode": 420
+    },
+    "src/bootstrap-api/io.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/bootstrap-api/io.h",
+      "sha256": "ee95800ab902c8d2a846c5560741ac6a2a73e942b529b888811c6079a63b0a50",
+      "mode": 420
+    },
+    "src/platform-linux/platform.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/platform-linux/platform.S",
+      "sha256": "2c670c835796d529114fc72e0dec01a9837dfc6c92dfbc58aacdb9b1d5c4a761",
+      "mode": 420
+    },
+    "src/bootstrap/bootstrap.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/bootstrap/bootstrap.c",
+      "sha256": "1742a636bdf75555adba2fdc8635a90ef75c56c56c8788a2bdd0fbfb951c045b",
+      "mode": 420
+    },
+    "src/composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/composition/entry.S",
+      "sha256": "60ef87604de62123eead8b5f544a907b6d0ecb717cab885ffa2981903381c0e7",
+      "mode": 420
+    },
+    "src/platform-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/platform-memory/memory.S",
+      "sha256": "82711047f0047f7cb273d014ab3116e00adadf454925758b7b6adcecac044605",
+      "mode": 420
+    },
+    "src/memory-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/memory-probe/main.c",
+      "sha256": "2b1d37ab97f8e05a738481ab1fbbf0f5824cc676770b6ef0c161143e0f2ee2f4",
+      "mode": 420
+    },
+    "src/memory-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/memory-probe/entry.S",
+      "sha256": "02cca72fe4110b95944c9927c22dd54305e337819fca778604e0c227d3599b7e",
+      "mode": 420
+    },
+    "src/platform-io/io.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/platform-io/io.S",
+      "sha256": "0869b4f281a940dd5ab907403cddce2c1eca300f7b298e6b7e032c2faa1396c1",
+      "mode": 420
+    },
+    "src/io-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/io-probe/main.c",
+      "sha256": "dd242ec44e15d0a7f3e9c59c095540565064f45d741c6d7b5c85abf6c518fc74",
+      "mode": 420
+    },
+    "src/io-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/candidate/src/io-probe/entry.S",
+      "sha256": "533021c8d17b976fe42173c553faa86e08eebb522b5392ea70cd7c17992a76e3",
+      "mode": 420
+    }
+  },
+  "receipts": {
+    "build-v2/isolation.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/build-v2/isolation.json",
+      "sha256": "a4864c1408caa2ea8a780330e71b771766904650e939d17c922e6608024c47c5"
+    },
+    "build-v2/native/admission.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/build-v2/native/admission.json",
+      "sha256": "b7686c48f5b63e82d7e8b2ca2dff140a83e1fb0e04fa902eb6571bb7af1dcddc"
+    },
+    "executions-v2.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/executions-v2.json",
+      "sha256": "57d92dfa79cc46ef9aa8cb67eaddded5ba8f2c773470d1b54fda1db6c3e292e4"
+    },
+    "faults.json": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/faults.json",
+      "sha256": "f2ad2a05e9fd9197a242761bd19fe554fb086e4e455374f8b0248ee397bebe11"
+    }
+  },
+  "elf_bytes": {
+    "bootstrap-debug": 11712,
+    "bootstrap-release": 9344,
+    "memory-probe-debug": 13496,
+    "memory-probe-release": 9504,
+    "io-probe-debug": 14440,
+    "io-probe-release": 9752
+  },
+  "unchanged": "approved exit and memory probe ELF identical in both modes",
+  "coverage": [
+    "regular read, EOF and zero-length read",
+    "exclusive create, exact file bytes and 0600 fixture permissions",
+    "existing file and final symlink rejected without overwrite",
+    "directory/FIFO rejected without blocking; descriptor reuse verifies cleanup on rejection",
+    "invalid fd/buffer/size/output and duplicate close",
+    "1000 monotonic clock samples, nondecreasing",
+    "EPERM injection for openat/read/write/clock_gettime in both modes"
+  ],
+  "limits": [
+    "no Tools/policy authorization, path confinement, intermediate-symlink safety or atomic persistence",
+    "no arbitrary invalid-pointer safety; borrowed path must be a valid NUL-terminated string",
+    "short transfers returned to caller, no read-all/write-all promise",
+    "Linux close is consumed; cleanup syscall must be allowed by execution backend; cannot promise cleanup under seccomp denial of close",
+    "EINTR retry implemented for read/write but not fault-injection tested",
+    "no async I/O, cross-thread handle ownership, seek, fsync, rename or Windows support"
+  ],
+  "budgets": "UNBASELINED",
+  "release": "BLOCKED",
+  "approval_record": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-io-_neth7by/approval.json",
+    "sha256": "8cf295173f92352e716965434c556de0099cf3090c3ba2ba46103e6ec6fe0107"
+  }
+}

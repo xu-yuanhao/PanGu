@@ -1,0 +1,84 @@
+{
+  "schema": "pangu.t10-progress.v1",
+  "date": "2026-10-20",
+  "task": "T10",
+  "task_status": "IN_PROGRESS",
+  "technical_milestone": "exit-only native bootstrap completed under explicitly approved local candidate controller",
+  "approval_record": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/approval.json",
+  "controller_tree_sha256": "43934daa97303ce26af404a222959435dd356e3e9dc3282aed2d4c8fcca18d38",
+  "registry": "docs/migration/t10-native-candidate.json",
+  "sources": {
+    "src/bootstrap-api/bootstrap.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/candidate/src/bootstrap-api/bootstrap.h",
+      "sha256": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49"
+    },
+    "src/platform-linux/platform.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/candidate/src/platform-linux/platform.S",
+      "sha256": "2c670c835796d529114fc72e0dec01a9837dfc6c92dfbc58aacdb9b1d5c4a761"
+    },
+    "src/bootstrap/bootstrap.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/candidate/src/bootstrap/bootstrap.c",
+      "sha256": "1742a636bdf75555adba2fdc8635a90ef75c56c56c8788a2bdd0fbfb951c045b"
+    },
+    "src/composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/candidate/src/composition/entry.S",
+      "sha256": "60ef87604de62123eead8b5f544a907b6d0ecb717cab885ffa2981903381c0e7"
+    }
+  },
+  "source_archive": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-tests-sdu3m2i4/t10-source.tar",
+    "sha256": "497f0dd0ee68e6605b039b9998e628e2a7b523cc6f7de5f7e7c07b0a78067a5e"
+  },
+  "native_receipt": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/t10-first-build/native/admission.json",
+    "sha256": "ed65cf12f33552c5d149bcd15c3fd0b545f184017a8e3214aaa8dbd8f8d8051c"
+  },
+  "isolated_build_receipt": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/precore-close-mvyd71fh/t10-first-build/isolation.json",
+    "sha256": "4501793abebac2695cfa384ed2d8de26b5d0c599892a2289f393173eb003e60e"
+  },
+  "verification_and_execution": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-tests-sdu3m2i4/evidence.json",
+    "sha256": "3d6439d0e96f6cdd3324366834269c45ac62eabe7a2b75c0e9ef1c048f5a114b",
+    "cases": [
+      "baseline",
+      "abi-boundaries",
+      "alternate-platform",
+      "unknown-source",
+      "private-provider-call",
+      "tamper-artifact"
+    ]
+  },
+  "reproduction_driver": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t10-tests-sdu3m2i4/reproduce-tests.py",
+    "sha256": "ea0051f20eb70c9fc85b883a6a42de273f88c61422e7fb9bb04c36f554e86089"
+  },
+  "elf_bytes": {
+    "debug": 11712,
+    "release": 9344
+  },
+  "native_matrix": "PASS",
+  "product_compatibility": "NOT_RUN",
+  "budgets": "UNBASELINED; measurements are not approved limits",
+  "release": "BLOCKED",
+  "remaining": [
+    "PAL memory mapping, file/time support required by later consumers",
+    "resource ownership/error mapping beyond exit-only process",
+    "allocation and memory probes belong to T11",
+    "protected remote integration/publisher not established"
+  ],
+  "reference_basis": [
+    {
+      "path": "references/pi/packages/agent/src/agent-loop.ts",
+      "decision": "keep Agent behavior out of bootstrap; no loop port in T10"
+    },
+    {
+      "path": "references/deepseek-harness/packages/core/agent-loop/src/index.ts",
+      "decision": "composition selects concrete provider; consumer uses a contract"
+    },
+    {
+      "path": "references/cordis/packages/core/src/service.ts",
+      "decision": "separate service identity and implementation; no JS registry transplanted"
+    }
+  ]
+}

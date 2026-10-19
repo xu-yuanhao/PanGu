@@ -30,7 +30,7 @@
     },
     {
       "id": "P1",
-      "name": "项目自用最小 CLI Agent",
+      "name": "项目自用最小 TUI Agent",
       "target": "x86_64-linux",
       "milestone": "T28",
       "required_features": [
@@ -59,12 +59,14 @@
         "RESOURCE-01",
         "HOST-01",
         "SEC-01",
-        "OPS-01"
+        "OPS-01",
+        "TUI-01",
+        "TUI-02",
+        "TUI-04"
       ],
       "execution_surfaces": [
-        "one-shot CLI print",
-        "piped stdin",
-        "deterministic scripted model"
+        "interactive minimal TUI (primary user experience)",
+        "deterministic headless driver (automation only)"
       ],
       "model_protocols": [
         "scripted fake provider for required offline evidence",
@@ -78,29 +80,11 @@
       ],
       "required_cli_subset": [
         "--help",
-        "-h",
         "--version",
-        "-v",
-        "--print",
-        "-p",
         "--provider",
         "--model",
-        "--api-key",
-        "--thinking",
-        "--system-prompt",
-        "--append-system-prompt",
-        "--tools",
-        "-t",
-        "--no-tools",
         "--session",
-        "--session-id",
-        "--session-dir",
-        "--no-session",
-        "--name",
-        "-n",
-        "--",
-        "@text-file",
-        "stdin"
+        "--session-dir"
       ],
       "required_settings_subset": [
         "defaultProvider",
@@ -138,11 +122,22 @@
       ],
       "scope_limits": [
         "Feature IDs represent families; only listed subitems enter P1. T03/T04 must enumerate and map them before implementation.",
-        "@image, interactive resume/tree/fork, OAuth, model fuzzy search/cycling and all nonlisted options remain later work.",
+        "@image, advanced editing/themes, interactive resume/tree/fork, OAuth, model fuzzy search/cycling and all nonlisted options remain later work.",
         "No full Pi CLI/JSON/RPC/SDK compatibility claim.",
-        "Unknown or unsupported flags/settings requiring behavior must produce explicit diagnostic; no silent fallback."
+        "Unknown or unsupported flags/settings requiring behavior must produce explicit diagnostic; no silent fallback.",
+        "TUI feature IDs represent only required_tui_subset here; full T33/T34 capabilities remain P2. No full-featured CLI product is planned."
       ],
-      "release_claim": "仅定义子集的最小 CLI；不宣称 Pi drop-in"
+      "release_claim": "仅已验证范围的最薄 TUI 与必要启动/自动化入口；不宣称完整 Pi CLI/TUI 或 drop-in 兼容",
+      "required_tui_subset": [
+        "submit text prompt, basic CJK input and paste",
+        "append streamed model text",
+        "show tool start/result/error",
+        "cancel active request",
+        "resize and restore terminal on normal/error exit"
+      ],
+      "optional_automation_subset": [
+        "one-shot print or piped stdin only when a concrete automation consumer requires it"
+      ]
     },
     {
       "id": "P2",
@@ -275,5 +270,11 @@
   "go_no_go": {
     "implementation": "Applicable prerequisite gates must be executable; implementation scope alone is insufficient.",
     "release": "All required subitems have current evidence; G00-G11 applicable gates pass, no critical security/data/memory gaps, measured budgets, rollback drill, approved canary window and explicit release approval."
+  },
+  "interaction_direction_update": {
+    "date": "2026-10-20",
+    "basis": "explicit user preference: TUI first, minimal launch/automation interfaces",
+    "status": "PLAN_UPDATED_NOT_RUNTIME_VERIFIED",
+    "historical_evidence": "Existing inventory and receipts retain their original input scope; future required-case mapping must include the revised P1 TUI subset."
   }
 }

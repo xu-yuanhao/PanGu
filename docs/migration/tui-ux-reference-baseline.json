@@ -1,0 +1,68 @@
+{
+  "schema": "pangu.tui-ux-references.v1",
+  "recorded_date": "2026-10-20",
+  "scope": "supplemental TUI UI/UX references, not a replacement for agent behavior or architecture baseline",
+  "primary_ux_reference": "grok-build",
+  "selection_status": "design direction; not a comparative usability benchmark",
+  "repositories": [
+    {
+      "id": "codex",
+      "path": "references/codex",
+      "remote": "https://github.com/openai/codex.git",
+      "commit": "8dd6099e265f14b80cb1b3fcf10c29a12bb6b23d",
+      "shallow": true,
+      "purpose": "UI/UX study only; no product build or runtime dependency",
+      "origin_class": "upstream repository",
+      "review_entry_sha256": {
+        "README.md": "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7",
+        "codex-rs/tui/src/tui.rs": "7f8ec37b386a452ac452a098ed234db9b11ffbd7c63c7b5cf2fd220c9d98c1f8",
+        "codex-rs/tui/src/approval_events.rs": "7167f7ea1b8fb5eb2c7868a0f28401f7470b888e507b84673070fd6be75ac020"
+      }
+    },
+    {
+      "id": "grok-build",
+      "path": "references/grok-build",
+      "remote": "https://github.com/xai-org/grok-build.git",
+      "commit": "2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8",
+      "shallow": true,
+      "purpose": "UI/UX study only; no product build or runtime dependency",
+      "origin_class": "upstream repository",
+      "review_entry_sha256": {
+        "README.md": "322066de9f5bc136295bd0ae4f1752cef3d8dcb1a8f9d88044609e7b6d7abcf7",
+        "SOURCE_REV": "ef218bf538f31e240aff551a39d6d9a6564b03bb2a75c49f309bf46015ee3030",
+        "crates/codegen/xai-grok-pager/docs/user-guide/03-keyboard-shortcuts.md": "a8ffdfff2b73ed2865375e857bfb6bc001a8081e4855074da11379fc91b9688b",
+        "crates/codegen/xai-grok-pager/docs/user-guide/05-configuration.md": "0cfd310c226568f997f15ca8ea2cd88fe0b01304f690f0f4a37dee8ea3693613",
+        "crates/codegen/xai-grok-pager/docs/user-guide/21-terminal-support.md": "f694595298cf19db43e88ae7cb459c6b53e749fc6b0a6d015e6212ce70a9774e"
+      }
+    },
+    {
+      "id": "Claude-Code",
+      "path": "references/Claude-Code",
+      "remote": "https://github.com/pengchengneo/Claude-Code.git",
+      "commit": "b78dd22a091b717c8938ab98c736bc04825a8ee8",
+      "shallow": true,
+      "purpose": "UI/UX study only; no product build or runtime dependency",
+      "origin_class": "unofficial source-map reconstruction; repository self-description, not verified official release",
+      "review_entry_sha256": {
+        "README.md": "207784abadfae8db162800a87b5109d64e5d881887db11df634c323cec3d24ae",
+        "src/components/permissions/SandboxPermissionRequest.tsx": "f51a40d1bbfb61ba1498de792bac6256fe3fe0b2589797c71dce7ac1bb248c63"
+      }
+    },
+    {
+      "id": "pi",
+      "path": "references/pi",
+      "remote": "https://github.com/earendil-works/pi.git",
+      "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+      "shallow": true,
+      "purpose": "UI/UX study only; no product build or runtime dependency",
+      "origin_class": "upstream repository",
+      "review_entry_sha256": {
+        "packages/tui/README.md": "13e8b964f1fd06010ec13b71fdfc3069f4fa36b42567262762ef68f76e56e4e0",
+        "packages/agent/src/agent-loop.ts": "28a2b03e34a7e32f004aa851e54d3b5be9dad71c392205614cbc9abdf3a9020a"
+      }
+    }
+  ],
+  "product_stack": "existing approved Assembly/C and explicitly admitted C++ areas; no Rust/React/Ink/Node runtime adoption",
+  "reference_execution": "not installed, built, or executed",
+  "existing_approved_controller": "unchanged external fixed snapshot; this design-plan update does not extend its approval"
+}

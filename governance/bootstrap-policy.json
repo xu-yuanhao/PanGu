@@ -84,6 +84,17 @@
     "tools/migration/test_compare_trace.py": "gate-test",
     "tools/migration/t09-scenarios.json": "control",
     "docs/migration/t10-native-candidate.json": "control",
-    "docs/migration/precore-closure-review.md": "document"
+    "docs/migration/precore-closure-review.md": "document",
+    "docs/TUI体验参考与设计原则.md": "document",
+    "docs/migration/tui-ux-reference-baseline.json": "control",
+    "docs/migration/t10-bootstrap-progress.md": "document",
+    "docs/migration/t10-bootstrap-evidence.json": "control",
+    "docs/migration/t10-memory-progress.md": "document",
+    "docs/migration/t10-memory-evidence.json": "control",
+    "docs/migration/t10-memory-candidate.json": "control",
+    "docs/migration/t10-io-progress.md": "document",
+    "docs/migration/t10-io-candidate.json": "control",
+    "docs/migration/t10-io-evidence.json": "control",
+    "docs/migration/t10-source-publication.json": "control"
   }
 }
