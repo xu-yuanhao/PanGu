@@ -121,6 +121,10 @@
     "docs/migration/t12-quote-evidence.json": "control",
     "docs/migration/t12-quote-candidate.json": "control",
     "docs/migration/t12-reader-source-publication.json": "control",
-    "docs/migration/t12-quote-source-publication.json": "control"
+    "docs/migration/t12-quote-source-publication.json": "control",
+    "docs/migration/t12-number-progress.md": "document",
+    "docs/migration/t12-number-evidence.json": "control",
+    "docs/migration/t12-number-candidate.json": "control",
+    "docs/migration/t12-number-source-publication.json": "control"
   }
 }

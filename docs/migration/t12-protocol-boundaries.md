@@ -76,3 +76,5 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 2026-10-20 建立 547 条 JSON 数值字面量语料，保存于 `/home/xu-yuanhao/Documents/PanGu-artifacts/t12-number-baseline-i5z0ch26`，oracle.json SHA256 `ac4f9bd9695f725a69f66fdcff09fdf227d4d02c7a212902d2ff68e3abb35822`。Node JSON.parse 结果以 binary64 原始位记录，Python float 的位结果逐条相同。包含负零、整数精度边界、溢出为无穷、次正规数、正规/次正规边界及精确 midpoint 的上下邻近十进制值；midpoint 用 Decimal 精度 2200 构造，随机种子 120064。
 
 这是下一步原生转换的参考基线，不是原生兼容性通过。严格 JSON 数值语法、JSON.parse 的 binary64 转换、Number(string) 强制转换以及 TypeBox 有限数校验必须分开处理；例如合法 `1e400` 可解析成 Infinity，但工具 Number Schema 可拒绝它。当前不实现后两类转换，也没有数值序列化结论。
+
+原生数值读取现已完成局部实现与位级验证，见 [T12 数值读取实验](t12-number-progress.md)：1315 条对照通过，转换为 binary64 位模式。前述 547 条为历史参考基线，不再代表当前完全没有转换实现；Schema、强制转换和数值序列化仍未实现。
