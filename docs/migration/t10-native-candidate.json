@@ -1557,7 +1557,8 @@
       "role": "foundation",
       "scope": "product",
       "files": [
-        "src/json/json.c"
+        "src/json/json.c",
+        "src/json/read.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1565,9 +1566,9 @@
         "text"
       ],
       "source_root": "src/json",
-      "responsibility": "bounded strict incremental JSON tokenization with explicit final commit",
+      "responsibility": "bounded incremental JSON tokens and lossless UTF-8 string/member reading",
       "non_responsibilities": [
-        "no allocation, repair, numeric conversion, unescaping, Schema validation, provider or tool execution"
+        "no allocation, numeric conversion, Schema validation, Pi repair or tool execution"
       ],
       "boundary": {
         "reason": "required-replacement-point",
@@ -1581,7 +1582,9 @@
       "exports": [
         "pangu_json_init",
         "pangu_json_feed",
-        "pangu_json_get_result"
+        "pangu_json_get_result",
+        "pangu_json_string_decode",
+        "pangu_json_object_find"
       ],
       "targets": [
         "linux-x86_64"

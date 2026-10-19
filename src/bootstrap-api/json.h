@@ -47,5 +47,23 @@ _Static_assert(sizeof(pangu_json_result)==32,"JSON result layout");
 pangu_i32 pangu_json_init(pangu_json_parser *,pangu_json_token *,pangu_u64,pangu_json_limits);
 pangu_i32 pangu_json_feed(pangu_json_parser *,pangu_text_slice,pangu_u32);
 pangu_i32 pangu_json_get_result(const pangu_json_parser *,pangu_json_result *);
+/* Reader calls accept only a successful result and the corresponding unchanged
+ * complete input. All borrowed storage must remain valid; no authentication of
+ * arbitrary caller-forged tokens or detection of reinit through raw pointers.
+ * Decode is lossless UTF-8, no NUL terminator. Two passes: output bytes unchanged
+ * on failure. Capacity failure (2) reports required length; other runtime failures
+ * report length zero after argument/result checks. Rejected arguments/results
+ * leave outputs untouched; callers must check the return status.
+ * Lone escaped UTF-16 surrogate: 9 unsupported (raw token remains available).
+ * Decode output/length and find output must not overlap input, tokens or result;
+ * find output must not overlap key. NULL output is valid only at capacity zero.
+ * Find compares decoded UTF-8 keys, last matching member wins, skips subtrees.
+ * A legal non-UTF-8-representable key cannot match a UTF-8 query. Missing is 3
+ * with index UINT64_MAX; present null returns 0 and a NULL-kind token index.
+ * Readers allocate nothing and do not perform Schema conversion/Pi repair.
+ */
+pangu_i32 pangu_json_string_decode(pangu_text_slice,const pangu_json_result *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *);
+pangu_i32 pangu_json_object_find(pangu_text_slice,const pangu_json_result *,pangu_u64,pangu_text_slice,pangu_u64 *);
+
 #endif
 #endif

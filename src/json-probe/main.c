@@ -59,6 +59,7 @@ static const pangu_json_token topology[]={
  {PANGU_JSON_STRING,PANGU_JSON_KEY,22,25,0,8,0},
  {PANGU_JSON_NULL,0,26,30,0,9,0}
 };
+static int json_reader_tests(const pangu_memory_api *memory);
 int json_test(const pangu_memory_api *memory)
 {
  limits.max_bytes=2097152;limits.max_depth=64;limits.reserved=0;
@@ -139,5 +140,117 @@ int json_test(const pangu_memory_api *memory)
  page[4093]='"';page[4094]=0xe4;page[4095]=0xb8;input.data=page+4093;input.length=3;
  if(pangu_json_init(&one,tokens,512,limits) || pangu_json_feed(&one,input,1)!=12 || pangu_json_get_result(&one,&observed)!=12 || observed.error_offset!=1) return 46;
  if(memory->unmap(memory->context,&token_mapping) || memory->unmap(memory->context,&input_mapping)) return 47;
+ int reader_rc=json_reader_tests(memory);if(reader_rc) return 50+reader_rc;
+ return 0;
+}
+
+_Alignas(8) static unsigned char reader_out[128];
+static unsigned char reader_encoded[16];
+static pangu_json_result reader_result;
+static volatile pangu_u64 reader_case;
+static int reader_parse(pangu_text_slice input)
+{
+ return pangu_json_init(&one,tokens,512,limits) || pangu_json_feed(&one,input,1) || pangu_json_get_result(&one,&reader_result);
+}
+static void reader_fill(void) { for(pangu_u32 i=0;i<128;i++) reader_out[i]=0xa5; }
+static int reader_untouched(void) { for(pangu_u32 i=0;i<128;i++) if(reader_out[i]!=0xa5) return 0;return 1; }
+static pangu_u32 reference_utf8(pangu_u32 cp,unsigned char *out)
+{
+ if(cp<128) { out[0]=(unsigned char)cp;return 1; }
+ if(cp<2048) { out[0]=(unsigned char)(192+cp/64);out[1]=(unsigned char)(128+cp%64);return 2; }
+ if(cp<65536) { out[0]=(unsigned char)(224+cp/4096);out[1]=(unsigned char)(128+(cp/64)%64);out[2]=(unsigned char)(128+cp%64);return 3; }
+ out[0]=(unsigned char)(240+cp/262144);out[1]=(unsigned char)(128+(cp/4096)%64);out[2]=(unsigned char)(128+(cp/64)%64);out[3]=(unsigned char)(128+cp%64);return 4;
+}
+static int reader_scalar(pangu_u32 first,pangu_u32 second,pangu_u32 pair)
+{
+ static const unsigned char digits[]="0123456789abcdef";
+ reader_encoded[0]='"';reader_encoded[1]='\\';reader_encoded[2]='u';
+ for(pangu_u32 i=0;i<4;i++) reader_encoded[3+i]=digits[(first>>((3-i)*4))&15];
+ pangu_text_slice input;input.data=reader_encoded;input.length=8;reader_encoded[7]='"';
+ if(pair) {
+  reader_encoded[7]='\\';reader_encoded[8]='u';
+  for(pangu_u32 i=0;i<4;i++) reader_encoded[9+i]=digits[(second>>((3-i)*4))&15];
+  reader_encoded[13]='"';input.length=14;
+ }
+ if(reader_parse(input)) return 1;
+ pangu_u64 length=777;reader_fill();pangu_i32 rc=pangu_json_string_decode(input,&reader_result,0,reader_out,128,&length);
+ if(!pair && first>=0xd800 && first<=0xdfff) return rc==9 && !length && reader_untouched() ? 0 : 2;
+ pangu_u32 cp=pair ? 65536+(first-0xd800)*1024+second-0xdc00 : first;
+ unsigned char expected_bytes[4];pangu_u32 n=reference_utf8(cp,expected_bytes);
+ if(rc || length!=n) return 3;
+ for(pangu_u32 i=0;i<n;i++) if(reader_out[i]!=expected_bytes[i]) return 4;
+ if(reader_out[n]!=0xa5) return 5;
+ return 0;
+}
+static int json_reader_tests(const pangu_memory_api *memory)
+{
+ for(pangu_u64 i=0;i<sizeof(reader_cases)/sizeof(reader_cases[0]);i++) {
+  reader_case=i;const struct reader_case *v=&reader_cases[i];pangu_text_slice input;input.data=v->bytes;input.length=v->length;
+  if(reader_parse(input)) return 1;
+  pangu_u64 n=v->decoded_length;
+  pangu_u64 capacities[4];capacities[0]=0;capacities[1]=n ? n-1 : 0;capacities[2]=n;capacities[3]=n+1;
+  for(pangu_u32 k=0;k<4;k++) {
+   pangu_u64 length=777;reader_fill();pangu_i32 rc=pangu_json_string_decode(input,&reader_result,0,reader_out,capacities[k],&length);
+   if(v->status) { if(rc!=(pangu_i32)v->status || length || !reader_untouched()) return 2; }
+   else if(capacities[k]<n) { if(rc!=2 || length!=n || !reader_untouched()) return 3; }
+   else {
+    if(rc || length!=n) return 4;
+    for(pangu_u32 b=0;b<n;b++) if(reader_out[b]!=v->decoded[b]) return 5;
+    for(pangu_u64 b=n;b<128;b++) if(reader_out[b]!=0xa5) return 6;
+   }
+  }
+  pangu_u64 length=777;pangu_i32 rc=pangu_json_string_decode(input,&reader_result,0,(void *)0,0,&length);
+  if(v->status) { if(rc!=(pangu_i32)v->status || length) return 7; }
+  else if(rc!=(n ? 2 : 0) || length!=n) return 8;
+ }
+ for(pangu_u64 i=0;i<sizeof(find_cases)/sizeof(find_cases[0]);i++) {
+  reader_case=i;const struct find_case *v=&find_cases[i];pangu_text_slice input,key;input.data=v->bytes;input.length=v->length;key.data=v->key;key.length=v->key_length;
+  if(reader_parse(input)) return 9;
+  pangu_u64 value=777;pangu_i32 rc=pangu_json_object_find(input,&reader_result,0,key,&value);
+  if(rc!=(pangu_i32)v->status) return 10;
+  if(rc) { if(value!=~(pangu_u64)0) return 11;continue; }
+  if(value>=reader_result.count || reader_result.tokens[value].kind!=v->kind || reader_result.tokens[value].parent!=0) return 12;
+  if(v->kind==PANGU_JSON_STRING) {
+   pangu_u64 length=777;if(pangu_json_string_decode(input,&reader_result,value,reader_out,128,&length) || length!=v->value_length) return 13;
+   for(pangu_u64 j=0;j<length;j++) if(reader_out[j]!=v->value[j]) return 14;
+  } else if(v->kind<=PANGU_JSON_NUMBER) {
+   const pangu_json_token *t=&reader_result.tokens[value];if(t->end-t->start!=v->value_length) return 15;
+   for(pangu_u64 j=0;j<v->value_length;j++) if(input.data[t->start+j]!=v->value[j]) return 16;
+  }
+ }
+ /* Every UTF-16 code unit, including all 2048 isolated surrogate units. */
+ for(pangu_u32 cp=0;cp<=65535;cp++) { reader_case=cp;if(reader_scalar(cp,0,0)) return 17; }
+ for(pangu_u32 high=0;high<1024;high++) {
+  if(reader_scalar(0xd800+high,0xdc00,1) || reader_scalar(0xd800+high,0xdfff,1)) return 18;
+ }
+ for(pangu_u32 low=0;low<1024;low++) if(reader_scalar(0xd955,0xdc00+low,1)) return 19;
+ pangu_text_slice input;input.data=(const unsigned char *)"\"prefix\\ud800\"";input.length=14;
+ if(reader_parse(input)) return 20;
+ reader_fill();pangu_u64 length=777;
+ if(pangu_json_string_decode(input,&reader_result,0,reader_out,128,&length)!=9 || length || !reader_untouched()) return 21;
+ input.data=(const unsigned char *)"\"text\"";input.length=6;if(reader_parse(input)) return 22;
+ length=777;if(pangu_json_string_decode(input,&reader_result,0,(unsigned char *)input.data,input.length,&length)!=1 || length!=777) return 23;
+ if(pangu_json_string_decode(input,&reader_result,99,reader_out,128,&length)!=1 || length!=777) return 24;
+ if(pangu_json_string_decode(input,&reader_result,0,reader_out,128,&tokens[0].start)!=1 || tokens[0].start) return 25;
+ if(pangu_json_init(&one,tokens,512,limits) || pangu_json_feed(&one,input,0)!=13 || pangu_json_get_result(&one,&reader_result)!=13) return 26;
+ if(pangu_json_string_decode(input,&reader_result,0,reader_out,128,&length)!=10 || length!=777) return 27;
+ input.data=(const unsigned char *)"{\"x\":1}";input.length=7;if(reader_parse(input)) return 28;
+ pangu_text_slice key;key.data=(const unsigned char *)"x";key.length=1;pangu_u64 index=777;
+ if(pangu_json_object_find(input,&reader_result,0,key,&reader_result.count)!=1 || reader_result.count!=3) return 29;
+ unsigned char bad=0xff;key.data=&bad;key.length=1;
+ if(pangu_json_object_find(input,&reader_result,0,key,&index)!=12 || index!=~(pangu_u64)0) return 30;
+ /* Exact-capacity UTF-8 output and escaped input both touch page ends. */
+ static pangu_mapping in_map,out_map;
+ if(memory->map(memory->context,4096,&in_map) || memory->map(memory->context,4096,&out_map)) return 31;
+ unsigned char *in=in_map.address,*out=out_map.address;
+ const unsigned char *literal=(const unsigned char *)"\"\\uD83D\\uDE00\"";
+ for(pangu_u32 i=0;i<14;i++) in[4082+i]=literal[i];
+ input.data=in+4082;input.length=14;if(reader_parse(input)) return 32;
+ for(pangu_u32 i=0;i<8;i++) out[4088+i]=0xa5;
+ length=777;
+ if(pangu_json_string_decode(input,&reader_result,0,out+4093,3,&length)!=2 || length!=4) return 33;
+ for(pangu_u32 i=0;i<8;i++) if(out[4088+i]!=0xa5) return 34;
+ if(pangu_json_string_decode(input,&reader_result,0,out+4092,4,&length) || length!=4 || out[4092]!=0xf0 || out[4093]!=0x9f || out[4094]!=0x98 || out[4095]!=0x80) return 35;
+ if(memory->unmap(memory->context,&out_map) || memory->unmap(memory->context,&in_map)) return 36;
  return 0;
 }
