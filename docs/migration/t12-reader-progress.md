@@ -56,3 +56,5 @@ ELF 体积见证据，包含大批测试语料，不作为 Agent 体积。预算
 下一步推进有界字符串序列化、完整字段数值策略、受支持 Schema 和 Pi 修复/转换适配。当前 reader 不等于 TypeBox 校验器，也不等于 Pi fs.writeFile 对孤立 surrogate 的替换行为；这类兼容选择必须有单独证据和范围。完整 T12、生产 G07、正式 sanitizer、未来模块和发布不在本包内。
 
 源码归档及恢复复验为最终权威输入；setup.py 记录最初派生过程，初次编译前另做过输出语义/索引检查审查，记录在 initial-review.json。测试模板和语料生成器一并绑定，不能把生成器草稿当作最终源码。复验须开新目录，不覆盖 build、已有 exec/work 或冻结控制器。
+
+已批准 reader 源码公开实验分支：[`experiments/t12-json-reader`](https://github.com/xu-yuanhao/PanGu/tree/96987ca2920f471d8341e6fac5654e8e57bb1714)，固定提交 `96987ca2920f471d8341e6fac5654e8e57bb1714`。发布副本的全部 preflight 输入与获批候选一致，远端 ref 已回读核对；这不表示受保护主线或生产发布已准入。

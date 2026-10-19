@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "experiments/t12-json-reader",
+  "commit": "96987ca2920f471d8341e6fac5654e8e57bb1714",
+  "parent": "c015384e9dc1b3a518a607f23b22e9b0035b73c3",
+  "scope": "fixed approved reader candidate including controller and 41 native source files; local experiments only",
+  "controller_sha256": "3b8e916d94590852dc15a6ed891ea8a3cb4abd70e06a411a1e77be36ae778da0",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

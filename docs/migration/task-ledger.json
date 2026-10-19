@@ -339,7 +339,9 @@
         "docs/migration/t12-json-progress.md",
         "docs/migration/t12-json-evidence.json",
         "docs/migration/t12-reader-progress.md",
-        "docs/migration/t12-reader-evidence.json"
+        "docs/migration/t12-reader-evidence.json",
+        "docs/migration/t12-quote-progress.md",
+        "docs/migration/t12-quote-evidence.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -351,7 +353,14 @@
         "8df9fa8e0d15c6e81c51d54632a2f2e8e671fdbc77555c3146f244a68ae641f3",
         "3b8e916d94590852dc15a6ed891ea8a3cb4abd70e06a411a1e77be36ae778da0"
       ],
-      "independent_control_review": "Human approved fixed incremental token and lossless UTF-8 reader packages for local experiments; lone surrogate replacement, numeric conversion, serialization, Schema, Pi adapter, complete T12 and production remain unapproved."
+      "independent_control_review": "Human approved fixed incremental token and lossless UTF-8 reader packages for local experiments; lone surrogate replacement, numeric conversion, serialization, Schema, Pi adapter, complete T12 and production remain unapproved.",
+      "quote_local_preview": {
+        "status": "TESTED_PENDING_INDEPENDENT_REVIEW",
+        "controller_sha256": "9e179618f81e66a6694f34e8a06d25d15ce1fe7eabed4c335704165ae353c14a",
+        "builds": 28,
+        "oracle_cases": 273,
+        "ubsan": "SUPPLEMENTAL_PASS_NOT_ADMITTED"
+      }
     },
     {
       "id": "T13",
