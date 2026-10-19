@@ -70,3 +70,9 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 确认的边界：optional null 被删除；数字字符串转 number，boolean 可转 0/1；必需 string 字段的 number/null 可转为 `"7"`/`"null"`；read 的小数/负数和额外字段在该 Schema 下可以通过；空 edits 数组通过 Schema，但不代表工具级业务校验已通过。孤立 surrogate 和 NUL 仍可通过 string 类型检查，不能把原生无损 UTF-8 reader 的 unsupported 当作 Pi 校验拒绝。
 
 大指数 Infinity 被 Number Schema 拒绝；`1.7976931348623158e308` 在 JS 中舍入到有限的最大 double 并通过。这进一步表明，原生 number 语义不能以十进制字面大小或简单整数解析替代。当前未实现数值/Schema，不把这些基线写成兼容测试通过。
+
+## 数值读取后续基线（尚无原生转换实现）
+
+2026-10-20 建立 547 条 JSON 数值字面量语料，保存于 `/home/xu-yuanhao/Documents/PanGu-artifacts/t12-number-baseline-i5z0ch26`，oracle.json SHA256 `ac4f9bd9695f725a69f66fdcff09fdf227d4d02c7a212902d2ff68e3abb35822`。Node JSON.parse 结果以 binary64 原始位记录，Python float 的位结果逐条相同。包含负零、整数精度边界、溢出为无穷、次正规数、正规/次正规边界及精确 midpoint 的上下邻近十进制值；midpoint 用 Decimal 精度 2200 构造，随机种子 120064。
+
+这是下一步原生转换的参考基线，不是原生兼容性通过。严格 JSON 数值语法、JSON.parse 的 binary64 转换、Number(string) 强制转换以及 TypeBox 有限数校验必须分开处理；例如合法 `1e400` 可解析成 Infinity，但工具 Number Schema 可拒绝它。当前不实现后两类转换，也没有数值序列化结论。

@@ -1,6 +1,6 @@
 {
   "schema": "pangu.t12-quote-preview.v1",
-  "approval": "PENDING_INDEPENDENT_REVIEW",
+  "approval": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
   "request": {
     "image": "/home/xu-yuanhao/Documents/PanGu-artifacts/toolchain/frozen-gas-9sf3ohft/image",
     "image_sha256": "9765bb42bfca5bce3787c83801b9201563d59f758b61a327bfb644c3737c1dc4",
@@ -97,5 +97,10 @@
   ],
   "ubsan_source_delta": [
     "src/text-probe/main.c"
-  ]
+  ],
+  "approval_record": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-quote-032yqsn2/approval.json",
+    "sha256": "af691f7a4a3af6f34f99b7458d4f671c4d11e8c40ce4d3f18048a053d5ab4cc7"
+  },
+  "review_authority": "User explicitly instructed: \u4ee5\u540e\u6539\u4e3aAgent\u81ea\u6279\u81ea\u5ba1"
 }

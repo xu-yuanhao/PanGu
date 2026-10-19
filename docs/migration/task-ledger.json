@@ -355,11 +355,17 @@
       ],
       "independent_control_review": "Human approved fixed incremental token and lossless UTF-8 reader packages for local experiments; lone surrogate replacement, numeric conversion, serialization, Schema, Pi adapter, complete T12 and production remain unapproved.",
       "quote_local_preview": {
-        "status": "TESTED_PENDING_INDEPENDENT_REVIEW",
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
         "controller_sha256": "9e179618f81e66a6694f34e8a06d25d15ce1fe7eabed4c335704165ae353c14a",
         "builds": 28,
         "oracle_cases": 273,
-        "ubsan": "SUPPLEMENTAL_PASS_NOT_ADMITTED"
+        "ubsan": "SUPPLEMENTAL_PASS_NOT_ADMITTED",
+        "approval_record_sha256": "af691f7a4a3af6f34f99b7458d4f671c4d11e8c40ce4d3f18048a053d5ab4cc7"
+      },
+      "approval_policy": {
+        "authority": "user 2026-10-20: 以后改为Agent自批自审",
+        "review": "implementing Agent self-review permitted; fixed evidence required",
+        "independent_review_claim": false
       }
     },
     {
