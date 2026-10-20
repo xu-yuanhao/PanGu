@@ -271,8 +271,67 @@ static int null_pages(const pangu_memory_api *memory)
  for(pangu_u32 i=0;i<4;i++) if(memory->unmap(memory->context,&maps[i])) return 105;
  return 0;
 }
-int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+static int repair_null_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  if(shard) return 247;
  int rc=repair_final_test(memory,0);if(rc) return rc;rc=null_corpus();if(rc) return rc;rc=null_boundaries();if(rc) return rc;rc=null_refusals();if(rc) return rc;return null_pages(memory);
+}
+
+_Alignas(8) static unsigned char numeric_scratch[1048578];
+static unsigned char numeric_large[1048578];
+static int numeric_corpus(void)
+{
+ for(pangu_u64 i=0;i<sizeof(number_string_cases)/sizeof(number_string_cases[0]);i++) {
+  test_case=i;const number_string_case *c=&number_string_cases[i];pangu_text_slice input={c->text,c->length};pangu_u64 bits=99;
+  if(pangu_pi_number_string(input,numeric_scratch,c->need,c->length,&bits) || bits!=c->bits) return 110;
+  if(c->need) { bits=99;if(pangu_pi_number_string(input,numeric_scratch,c->need-1,c->length,&bits)!=2 || bits!=99) return 111; }
+ }
+ return 0;
+}
+static int numeric_boundaries(void)
+{
+ pangu_text_slice input;input.data=(void *)0;input.length=0;pangu_u64 bits=99;
+ if(pangu_pi_number_string(input,(void *)0,0,0,&bits) || bits) return 112;
+ for(pangu_u64 i=0;i<sizeof(numeric_large);i++) numeric_large[i]='0';
+ input.data=numeric_large;input.length=1048577;
+ if(pangu_pi_number_string(input,numeric_scratch,1,1048577,&bits) || bits) return 113;
+ numeric_large[0]='1';bits=99;
+ if(pangu_pi_number_string(input,numeric_scratch,sizeof(numeric_scratch),1048577,&bits)!=2 || bits!=99) return 114;
+ input.length=1048576;if(pangu_pi_number_string(input,numeric_scratch,1048576,1048576,&bits) || bits!=0x7ff0000000000000ULL) return 115;
+ bits=99;if(pangu_pi_number_string(input,numeric_scratch,1048576,1048575,&bits)!=2 || bits!=99) return 116;
+ /* Huge radix must still reject invalid trailing digits after known overflow. */
+ numeric_large[0]='0';numeric_large[1]='x';for(pangu_u64 i=2;i<1048576;i++) numeric_large[i]='f';
+ if(pangu_pi_number_string(input,(void *)0,0,1048576,&bits) || bits!=0x7ff0000000000000ULL) return 117;
+ numeric_large[1048575]='g';if(pangu_pi_number_string(input,(void *)0,0,1048576,&bits) || bits!=0x7ff8000000000000ULL) return 118;
+ static const unsigned char invalid[][4]={{0x80,0,0,0},{0xc0,0x80,0,0},{0xed,0xa0,0x80,0},{0xf4,0x90,0x80,0x80},{0xe2,0x82,0,0}};
+ static const pangu_u64 lengths[]={1,2,3,4,2};
+ for(pangu_u64 i=0;i<5;i++) { bits=99;input.data=invalid[i];input.length=lengths[i];if(pangu_pi_number_string(input,numeric_scratch,32,32,&bits)!=12 || bits!=99) return 119; }
+ return 0;
+}
+static int numeric_refusals(void)
+{
+ pangu_text_slice input={(const unsigned char *)"1",1};pangu_u64 bits=99;
+ if(pangu_pi_number_string(input,(unsigned char *)input.data,1,1,&bits)!=1 || bits!=99) return 120;
+ if(pangu_pi_number_string(input,numeric_scratch,32,1,(pangu_u64 *)numeric_scratch)!=1) return 121;
+ if(pangu_pi_number_string(input,numeric_scratch,32,1,(void *)0)!=1) return 122;
+ input.data=(const unsigned char *)(~(pangu_u64)0-1);input.length=4;
+ if(pangu_pi_number_string(input,numeric_scratch,32,8,&bits)!=1 || bits!=99) return 123;
+ return 0;
+}
+static int numeric_pages(const pangu_memory_api *memory)
+{
+ pangu_mapping maps[3];for(pangu_u32 i=0;i<3;i++) { maps[i].address=(void *)0;maps[i].length=0;if(memory->map(memory->context,4096,&maps[i])) return 124; }
+ static const unsigned char text[]={0xef,0xbb,0xbf,'+','.','5','e','2',0xc2,0xa0};
+ unsigned char *s=(unsigned char *)maps[0].address+4096-sizeof(text),*scratch=(unsigned char *)maps[1].address+4096-5;
+ for(pangu_u64 i=0;i<sizeof(text);i++) s[i]=text[i];
+ pangu_u64 *bits=(pangu_u64 *)((unsigned char *)maps[2].address+4096-8);*bits=99;pangu_text_slice input={s,sizeof(text)};
+ if(pangu_pi_number_string(input,scratch,5,4096,bits) || *bits!=0x4049000000000000ULL) return 125;
+ *bits=99;if(pangu_pi_number_string(input,scratch,4,4096,bits)!=2 || *bits!=99) return 126;
+ for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 127;
+ return 0;
+}
+int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+{
+ if(shard) return 247;
+ int rc=repair_null_test(memory,0);if(rc) return rc;rc=numeric_corpus();if(rc) return rc;rc=numeric_boundaries();if(rc) return rc;rc=numeric_refusals();if(rc) return rc;return numeric_pages(memory);
 }

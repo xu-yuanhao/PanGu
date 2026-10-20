@@ -63,5 +63,19 @@ pangu_i32 pangu_pi_arguments_parse(pangu_text_slice,pangu_u32,unsigned char *,pa
  * Schema; source errors propagate. No allocation or raw-pointer authentication.
  */
 pangu_i32 pangu_pi_optional_nulls(const pangu_schema_view *,const pangu_schema_view *,pangu_schema_limits,pangu_u64 *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *,pangu_schema_report *);
+/* ECMAScript Number(string) prerequisite, NOT TypeBox TryNumber or full Pi
+ * coercion. Accepts decoded strict UTF8, trims ECMAScript whitespace, handles
+ * empty/+/-/decimal/exponents/Infinity and unsigned 0x/0o/0b integer text.
+ * Invalid numeric grammar succeeds with canonical quiet NaN bits; callers must
+ * apply their own finite/integer/conversion policy. No raw unpaired UTF16 input.
+ * Decimal canonicalization uses caller scratch (at most input.length+2 bytes),
+ * then unchanged strict JSON and binary64 conversion; numeric lexeme max1MiB.
+ * max_bytes bounds input before scanning. Nondecimal/empty/Infinity/invalid
+ * grammar need no scratch; decimal scratch shortage/limits return2, UTF8 12,
+ * invalid arguments/overlap1. Source, scratch capacity and aligned u64 output
+ * must be disjoint. Every failure preserves bits; scratch is disposable.
+ * No allocation/FP arithmetic/libc or tool execution; caller owns lifetimes.
+ */
+pangu_i32 pangu_pi_number_string(pangu_text_slice,unsigned char *,pangu_u64,pangu_u64,pangu_u64 *);
 #endif
 #endif
