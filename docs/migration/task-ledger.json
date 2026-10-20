@@ -931,6 +931,23 @@
           "midpass_completion_wake_fixed": true,
           "general_call_slot_budget": false,
           "native_admission": false
+        },
+        "call_budget_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c",
+          "source_manifest_sha256": "aa90a6a339bb525ef862896697e6e743c06c19ba0aa1a58b5dd810d114b9e9ce",
+          "evidence_sha256": "fbbba58d44290087bda7181e32a3f434206bc291c33e0db92ae5e46876ac7ae0",
+          "combinations_per_optimization": 98,
+          "actual_calls_per_optimization": 276,
+          "insufficient_budget_refusals_per_optimization": 1769,
+          "quota_refusals_per_optimization": 138,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "supplemental_host_ubsan": true,
+          "admission_mode": "atomic retry, no held request on failure",
+          "native_admission": false
         }
       }
     },
