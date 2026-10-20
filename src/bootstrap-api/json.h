@@ -129,5 +129,17 @@ enum pangu_json_number_mode { PANGU_JSON_NUMBER_JSON=1,PANGU_JSON_NUMBER_STRING=
  * value, independent of native floating arithmetic/environment.
  */
 pangu_i32 pangu_json_number_text(pangu_u64,pangu_u32,unsigned char *,pangu_u64,pangu_u64 *);
+/* Compare two STRING tokens by decoded UTF-16 code units, including lone
+ * escaped surrogates; equivalent raw UTF-8/pair escapes compare equal. No
+ * normalization, allocation, conversion to UTF-8 or generic value equality.
+ * Each source/result must be successful, matching and immutable as for reader
+ * calls. Output is 0/1 only on success; every error leaves it unchanged.
+ * Output storage must be valid and disjoint from BOTH inputs/results/tokens.
+ * Same source/result is allowed. 1 arguments/index/overlap, 9 wrong kind,
+ * 10 invalid result/token metadata, 12 UTF-8, 14 malformed string. Borrow
+ * lifetime and native memory validity remain caller contracts.
+ */
+pangu_i32 pangu_json_string_equal(pangu_text_slice,const pangu_json_result *,pangu_u64,
+ pangu_text_slice,const pangu_json_result *,pangu_u64,pangu_u32 *);
 #endif
 #endif

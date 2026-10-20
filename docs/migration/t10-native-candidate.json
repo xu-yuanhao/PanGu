@@ -1569,7 +1569,7 @@
         "text"
       ],
       "source_root": "src/json",
-      "responsibility": "bounded incremental JSON, UTF-8 read/quote, binary64 conversion/formatting and structured emission",
+      "responsibility": "bounded JSON parsing, UTF-8 read/quote, UTF-16 string equality, binary64 conversion and structured emission",
       "non_responsibilities": [
         "no allocation, JS object enumeration, Schema, Pi repair, generic coercion or tool execution"
       ],
@@ -1593,7 +1593,8 @@
         "pangu_json_writer_init",
         "pangu_json_writer_emit",
         "pangu_json_writer_finish",
-        "pangu_json_number_text"
+        "pangu_json_number_text",
+        "pangu_json_string_equal"
       ],
       "targets": [
         "linux-x86_64"

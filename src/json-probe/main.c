@@ -63,6 +63,8 @@ static int json_reader_tests(const pangu_memory_api *memory);
 static int json_quote_tests(const pangu_memory_api *memory);
 static int json_number_tests(const pangu_memory_api *memory);
 static int json_writer_tests(const pangu_memory_api *memory);
+static int json_equal_tests(const pangu_memory_api *memory);
+static volatile pangu_u32 equal_error;
 static volatile pangu_u32 format_error;
 static int json_format_tests(const pangu_memory_api *memory,pangu_u32 shard);
 int json_test(const pangu_memory_api *memory,pangu_u64 shard)
@@ -160,6 +162,7 @@ int json_test(const pangu_memory_api *memory,pangu_u64 shard)
  int quote_rc=json_quote_tests(memory);if(quote_rc) return 100+quote_rc;
  int number_rc=json_number_tests(memory);if(number_rc) return 150+number_rc;
  int writer_rc=json_writer_tests(memory);if(writer_rc) return 190+writer_rc;
+ int equal_rc=json_equal_tests(memory);if(equal_rc) { equal_error=(pangu_u32)equal_rc;return 248; }
  int format_rc=json_format_tests(memory,0);if(format_rc) { format_error=(pangu_u32)format_rc;return 246; }
  return 0;
 }
@@ -572,5 +575,87 @@ static int json_format_tests(const pangu_memory_api *memory,pangu_u32 shard)
   }
  }
  if(memory->unmap(memory->context,&b) || memory->unmap(memory->context,&a)) return 29;
+ return 0;
+}
+
+static unsigned char equal_a[32],equal_b[32];
+static unsigned char equal_large[1048576];
+_Alignas(8) static unsigned char equal_alias_a[8]={'"','a','b','"'},equal_alias_b[8]={'"','a','b','"'};
+static volatile pangu_u64 equal_case_index;
+static int equal_parse(pangu_text_slice a,pangu_text_slice b)
+{
+ return pangu_json_init(&one,tokens,512,limits) || pangu_json_feed(&one,a,1) || pangu_json_get_result(&one,&expected)
+  || pangu_json_init(&stream,other,512,limits) || pangu_json_feed(&stream,b,1) || pangu_json_get_result(&stream,&observed);
+}
+static int equal_check(pangu_text_slice a,pangu_u64 ia,pangu_text_slice b,pangu_u64 ib,pangu_u32 wanted)
+{
+ pangu_u32 value=777;if(pangu_json_string_equal(a,&expected,ia,b,&observed,ib,&value) || value!=wanted) return 1;
+ value=777;if(pangu_json_string_equal(b,&observed,ib,a,&expected,ia,&value) || value!=wanted) return 2;
+ return 0;
+}
+static void equal_escape(unsigned char *out,pangu_u32 u,pangu_u32 upper)
+{
+ const unsigned char *digits=(const unsigned char *)(upper ? "0123456789ABCDEF" : "0123456789abcdef");
+ out[0]='"';out[1]='\\';out[2]='u';
+ for(pangu_u32 i=0;i<4;i++) out[3+i]=digits[(u>>((3-i)*4))&15];out[7]='"';
+}
+static int equal_pair(pangu_u32 high,pangu_u32 low)
+{
+ equal_escape(equal_a,high,0);equal_a[7]='\\';equal_a[8]='u';
+ static const unsigned char digits[]="0123456789abcdef";
+ for(pangu_u32 i=0;i<4;i++) equal_a[9+i]=digits[(low>>((3-i)*4))&15];equal_a[13]='"';
+ equal_b[0]='"';pangu_u32 cp=0x10000+(high-0xd800)*1024+low-0xdc00,n=reference_utf8(cp,equal_b+1);equal_b[n+1]='"';
+ pangu_text_slice a={equal_a,14},b={equal_b,n+2};return equal_parse(a,b) || equal_check(a,0,b,0,1);
+}
+static int json_equal_tests(const pangu_memory_api *memory)
+{
+ for(pangu_u64 i=0;i<sizeof(equal_cases)/sizeof(equal_cases[0]);i++) {
+  equal_case_index=i;const struct equal_case *v=&equal_cases[i];pangu_text_slice a={v->a,v->a_length},b={v->b,v->b_length};
+  if(equal_parse(a,b) || equal_check(a,0,b,0,v->equal)) return 1;
+  pangu_u32 value=777;if(pangu_json_string_equal(a,&expected,0,a,&expected,0,&value) || value!=1) return 2;
+ }
+ for(pangu_u32 u=0;u<65536;u++) {
+  equal_case_index=u;equal_escape(equal_a,u,0);equal_escape(equal_b,u,1);pangu_text_slice a={equal_a,8},b={equal_b,8};
+  if(equal_parse(a,b) || equal_check(a,0,b,0,1)) return 3;
+  equal_escape(equal_b,(u+1)&65535,0);if(equal_parse(a,b) || equal_check(a,0,b,0,0)) return 4;
+  if(u>=0x20 && u!='"' && u!='\\' && !(u>=0xd800 && u<=0xdfff)) {
+   equal_b[0]='"';pangu_u32 n=reference_utf8(u,equal_b+1);equal_b[n+1]='"';b.length=n+2;
+   if(equal_parse(a,b) || equal_check(a,0,b,0,1)) return 5;
+  }
+ }
+ for(pangu_u32 high=0xd800;high<=0xdbff;high++) if(equal_pair(high,0xdc00) || equal_pair(high,0xdfff)) return 6;
+ for(pangu_u32 low=0xdc00;low<=0xdfff;low++) if(equal_pair(0xd835,low)) return 7;
+ static const unsigned char key_json[]="{\"\\ud800\":1}",lone_json[]="\"\\uD800\"";
+ pangu_text_slice a={key_json,sizeof(key_json)-1},b={lone_json,sizeof(lone_json)-1};
+ if(equal_parse(a,b) || equal_check(a,1,b,0,1)) return 8;
+ static const unsigned char nested_a[]="[\"a\",\"b\"]",nested_b[]="{\"k\":\"\\u0062\"}";
+ a.data=nested_a;a.length=sizeof(nested_a)-1;b.data=nested_b;b.length=sizeof(nested_b)-1;
+ if(equal_parse(a,b) || equal_check(a,2,b,2,1)) return 9;
+ a.data=equal_alias_a;a.length=4;b.data=equal_alias_b;b.length=4;if(equal_parse(a,b)) return 10;
+ pangu_u32 value=777;
+ if(pangu_json_string_equal(a,&expected,1,b,&observed,0,&value)!=1 || value!=777 || pangu_json_string_equal(a,&expected,0,b,&observed,1,&value)!=1 || value!=777) return 11;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,(void *)0)!=1) return 12;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)equal_alias_a)!=1 || equal_alias_a[0]!='"' || equal_alias_a[1]!='a') return 13;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)equal_alias_b)!=1 || equal_alias_b[0]!='"' || equal_alias_b[1]!='a') return 14;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)&expected)!=1 || pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)&observed)!=1 || pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)tokens)!=1 || pangu_json_string_equal(a,&expected,0,b,&observed,0,(pangu_u32 *)other)!=1 || equal_check(a,0,b,0,1)) return 15;
+ observed.status=13;if(pangu_json_string_equal(a,&expected,0,b,&observed,0,&value)!=10 || value!=777) return 16;observed.status=0;
+ expected.reserved=1;if(pangu_json_string_equal(a,&expected,0,b,&observed,0,&value)!=10 || value!=777) return 17;expected.reserved=0;
+ static const unsigned char number[]="0";a.data=number;a.length=1;if(equal_parse(a,b)) return 18;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,&value)!=9 || value!=777) return 19;
+ if(pangu_json_string_equal(b,&observed,0,a,&expected,0,&value)!=9 || value!=777) return 20;
+ /* Full-size input and late mismatch: no proportional temporary storage. */
+ large[0]='"';equal_large[0]='"';for(pangu_u64 i=1;i<1048575;i++) { large[i]='a';equal_large[i]='a'; }
+ large[1048575]='"';equal_large[1048575]='"';a.data=large;a.length=1048576;b.data=equal_large;b.length=1048576;
+ if(equal_parse(a,b) || equal_check(a,0,b,0,1)) return 21;
+ equal_large[1048574]='b';if(equal_parse(a,b) || equal_check(a,0,b,0,0)) return 22;
+ pangu_mapping x,y,z;x.address=(void *)0;x.length=0;y.address=(void *)0;y.length=0;z.address=(void *)0;z.length=0;
+ if(memory->map(memory->context,4096,&x) || memory->map(memory->context,4096,&y) || memory->map(memory->context,4096,&z)) return 23;
+ unsigned char *px=x.address,*py=y.address,*pz=z.address;
+ static const unsigned char pair[]="\"\\ud83d\\ude00\"";for(pangu_u32 i=0;i<14;i++) px[4082+i]=pair[i];
+ py[4090]='"';py[4091]=0xf0;py[4092]=0x9f;py[4093]=0x98;py[4094]=0x80;py[4095]='"';
+ a.data=px+4082;a.length=14;b.data=py+4090;b.length=6;if(equal_parse(a,b)) return 24;
+ pangu_u32 *edge=(pangu_u32 *)(pz+4092);*edge=777;
+ if(pangu_json_string_equal(a,&expected,0,b,&observed,0,edge) || *edge!=1) return 25;
+ if(memory->unmap(memory->context,&z) || memory->unmap(memory->context,&y) || memory->unmap(memory->context,&x)) return 26;
  return 0;
 }

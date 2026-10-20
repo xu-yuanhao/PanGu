@@ -137,3 +137,45 @@ pangu_i32 pangu_json_object_find(pangu_text_slice s,const pangu_json_result *r,p
  if(seen!=o->children) return 10;
  *value=found;return found==~(pangu_u64)0 ? 3 : 0;
 }
+
+
+typedef struct unit_cursor { string_cursor raw;pangu_u32 pending,have; } unit_cursor;
+static pangu_i32 next_unit(unit_cursor *c,pangu_u32 *unit)
+{
+ if(c->have) { *unit=c->pending;c->have=0;return 0; }
+ if(c->raw.at==c->raw.end) return 3;
+ unsigned char b=c->raw.input.data[c->raw.at];
+ if(b<0x20 || b=='"') return 14;
+ if(b!='\\') {
+  pangu_u32 cp;pangu_i32 rc=pangu_text_next(c->raw.input,&c->raw.at,&cp);if(rc) return rc;
+  if(cp<=0xffff) *unit=cp;
+  else { cp-=0x10000;*unit=0xd800+(cp>>10);c->pending=0xdc00+(cp&1023);c->have=1; }
+  return 0;
+ }
+ c->raw.at++;if(c->raw.at==c->raw.end) return 14;
+ b=c->raw.input.data[c->raw.at++];
+ switch(b) {
+ case '"':case '\\':case '/':*unit=b;return 0;
+ case 'b':*unit=8;return 0;case 'f':*unit=12;return 0;
+ case 'n':*unit=10;return 0;case 'r':*unit=13;return 0;case 't':*unit=9;return 0;
+ case 'u':return hex4(&c->raw,unit);
+ default:return 14;
+ }
+}
+pangu_i32 pangu_json_string_equal(pangu_text_slice a,const pangu_json_result *ra,pangu_u64 ia,
+ pangu_text_slice b,const pangu_json_result *rb,pangu_u64 ib,pangu_u32 *equal)
+{
+ if(!equal) return 1;
+ pangu_i32 rc=result_ok(a,ra);if(rc) return rc;rc=result_ok(b,rb);if(rc) return rc;
+ if(!output_ok(a,ra,equal,4) || !output_ok(b,rb,equal,4)) return 1;
+ unit_cursor x,y;rc=string_start(a,ra,ia,&x.raw);if(rc) return rc;
+ rc=string_start(b,rb,ib,&y.raw);if(rc) return rc;
+ x.pending=0;x.have=0;y.pending=0;y.have=0;
+ for(;;) {
+  pangu_u32 u,v;pangu_i32 left=next_unit(&x,&u),right=next_unit(&y,&v);
+  if(left && left!=3) return left;
+  if(right && right!=3) return right;
+  if(left==3 || right==3) { *equal=left==3 && right==3;return 0; }
+  if(u!=v) { *equal=0;return 0; }
+ }
+}
