@@ -90,3 +90,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## 解码后 UTF-16 字符串相等
 
 [字符串相等判断](t12-equal-progress.md) 已验证 surrogate 保留、转义/原始 UTF-8 等价和不同单元序列不等，用于后续 Schema 字段名/枚举比较。已有无损 UTF-8 decode 的 unsupported 范围保持不变；相等判断不等于 UTF-16 编码、Schema 验证或完整 Pi 字符串行为迁移。
+
+## 当前局部实现状态更新
+
+[严格 Schema 子集](t12-schema-progress.md) 和 [Pi 字符串词法修复](t12-repair-progress.md) 已完成各自固定包的本地验证。前述“尚未实现”描述属于当时基线；当前仍未完成完整 Schema/TypeBox、最终参数解析和强制转换。词法修复成功不表示参数可执行，参考 parseToolCallArguments 的接受/拒绝还不能记为原生兼容通过。

@@ -355,7 +355,10 @@
         "docs/migration/t12-equal-source-publication.json",
         "docs/migration/t12-schema-progress.md",
         "docs/migration/t12-schema-evidence.json",
-        "docs/migration/t12-schema-source-publication.json"
+        "docs/migration/t12-schema-source-publication.json",
+        "docs/migration/t12-repair-progress.md",
+        "docs/migration/t12-repair-evidence.json",
+        "docs/migration/t12-repair-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -441,6 +444,20 @@
         "Pi_repair_coercion": "NOT_IMPLEMENTED",
         "full_T12": "INCOMPLETE",
         "source_commit": "892c5a8ec2ee0974c39447e27f33e71d86950b23"
+      },
+      "repair_lexical_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "8383620bf6b774c1b9db2ef64c618ab8ae5aabdfefd8b92e8ff8074fc2e7f476",
+        "candidate_tree_sha256": "4b7222aeef9a0e6e7d2e781a935edf19af2dd95c0f2170f0dc7dc7155fc84705",
+        "approval_record_sha256": "faad02733ccd942b8f67d45098bff49451b47317c0b95ab99f32d5b4b7e03f49",
+        "Pi_byte_cases": 3364,
+        "native_capacity_variants": 306573,
+        "normal_builds": 36,
+        "normal_process_runs": 48,
+        "final_arguments_parsing": "NOT_IMPLEMENTED",
+        "Schema_coercion": "NOT_IMPLEMENTED",
+        "full_T12": "INCOMPLETE",
+        "source_commit": "7b21806f2a034cd90f4d3537b05c2883e1564077"
       }
     },
     {

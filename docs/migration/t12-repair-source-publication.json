@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-pi-repair",
+  "commit": "7b21806f2a034cd90f4d3537b05c2883e1564077",
+  "parent": "892c5a8ec2ee0974c39447e27f33e71d86950b23",
+  "scope": "fixed Agent self-reviewed Pi repairJson lexical adapter including controller and 54 native source files; local experiments only",
+  "controller_sha256": "8383620bf6b774c1b9db2ef64c618ab8ae5aabdfefd8b92e8ff8074fc2e7f476",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

@@ -141,6 +141,10 @@
     "docs/migration/t12-schema-progress.md": "document",
     "docs/migration/t12-schema-evidence.json": "control",
     "docs/migration/t12-schema-candidate.json": "control",
-    "docs/migration/t12-schema-source-publication.json": "control"
+    "docs/migration/t12-schema-source-publication.json": "control",
+    "docs/migration/t12-repair-progress.md": "document",
+    "docs/migration/t12-repair-evidence.json": "control",
+    "docs/migration/t12-repair-candidate.json": "control",
+    "docs/migration/t12-repair-source-publication.json": "control"
   }
 }
