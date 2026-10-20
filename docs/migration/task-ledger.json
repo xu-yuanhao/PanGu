@@ -333,7 +333,7 @@
       "dependency_policy": "conservative serial default; explicit inputs in plan are also required",
       "feature_ids": [],
       "definition": "docs/原生重写路线与迁移TODO.md#T12",
-      "owner_role": "unassigned module implementer and independent reviewer",
+      "owner_role": "implementing Agent with recorded self-review; external production authority pending",
       "evidence": [
         "docs/migration/t12-protocol-boundaries.md",
         "docs/migration/t12-json-progress.md",
@@ -352,7 +352,10 @@
         "docs/migration/t12-format-source-publication.json",
         "docs/migration/t12-equal-progress.md",
         "docs/migration/t12-equal-evidence.json",
-        "docs/migration/t12-equal-source-publication.json"
+        "docs/migration/t12-equal-source-publication.json",
+        "docs/migration/t12-schema-progress.md",
+        "docs/migration/t12-schema-evidence.json",
+        "docs/migration/t12-schema-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -364,7 +367,7 @@
         "8df9fa8e0d15c6e81c51d54632a2f2e8e671fdbc77555c3146f244a68ae641f3",
         "3b8e916d94590852dc15a6ed891ea8a3cb4abd70e06a411a1e77be36ae778da0"
       ],
-      "independent_control_review": "Human approved fixed incremental token and lossless UTF-8 reader packages for local experiments; lone surrogate replacement, numeric conversion, serialization, Schema, Pi adapter, complete T12 and production remain unapproved.",
+      "independent_control_review": "Historical human approval covered fixed token/reader packages. Subsequent local experiments use the user-authorized same-Agent review recorded in per-package fields; full T12 and production remain incomplete.",
       "quote_local_preview": {
         "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
         "controller_sha256": "9e179618f81e66a6694f34e8a06d25d15ce1fe7eabed4c335704165ae353c14a",
@@ -424,6 +427,20 @@
         "candidate_tree_sha256": "f6ad4c96dad68f5e0492aff6040fe75c251277c311643d5240a152950d806429",
         "approval_record_sha256": "24c54e0e225bd63f541ca782cf5449b2a7e1066eeb3838fd9c567b2aa1befc3d",
         "source_commit": "509267628524e46cbd41faeb3617f25f122c2a62"
+      },
+      "schema_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "96aebd55b8f965b82280e0a8555c3e18fee41f58f049db7b191f712d73593af4",
+        "candidate_tree_sha256": "42c47755ac9e2af4b3ca70d40d87a8dbc9e0234b0941c269834f1639e2000f24",
+        "approval_record_sha256": "6dc408df227e87cf5d7744ab74fa94610311f9412e0c5fea6c1cb510920cd0b4",
+        "strict_TypeBox_reference_cases": 640,
+        "native_profile_refusal_cases": 16,
+        "normal_builds": 32,
+        "normal_process_runs": 44,
+        "full_TypeBox": "INCOMPLETE",
+        "Pi_repair_coercion": "NOT_IMPLEMENTED",
+        "full_T12": "INCOMPLETE",
+        "source_commit": "892c5a8ec2ee0974c39447e27f33e71d86950b23"
       }
     },
     {

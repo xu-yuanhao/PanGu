@@ -137,6 +137,10 @@
     "docs/migration/t12-equal-progress.md": "document",
     "docs/migration/t12-equal-evidence.json": "control",
     "docs/migration/t12-equal-candidate.json": "control",
-    "docs/migration/t12-equal-source-publication.json": "control"
+    "docs/migration/t12-equal-source-publication.json": "control",
+    "docs/migration/t12-schema-progress.md": "document",
+    "docs/migration/t12-schema-evidence.json": "control",
+    "docs/migration/t12-schema-candidate.json": "control",
+    "docs/migration/t12-schema-source-publication.json": "control"
   }
 }

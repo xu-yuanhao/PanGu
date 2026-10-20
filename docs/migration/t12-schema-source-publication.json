@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-schema",
+  "commit": "892c5a8ec2ee0974c39447e27f33e71d86950b23",
+  "parent": "509267628524e46cbd41faeb3617f25f122c2a62",
+  "scope": "fixed Agent self-reviewed strict Schema subset candidate including controller and 49 native source files; local experiments only",
+  "controller_sha256": "96aebd55b8f965b82280e0a8555c3e18fee41f58f049db7b191f712d73593af4",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}
