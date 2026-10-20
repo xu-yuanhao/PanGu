@@ -413,8 +413,128 @@ static int scalar_pages(const pangu_memory_api *memory)
  for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 155;
  return 0;
 }
-int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+static int repair_scalar_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  if(shard) return 247;
  int rc=repair_numeric_test(memory,0);if(rc) return rc;rc=scalar_corpus();if(rc) return rc;rc=scalar_boundaries();if(rc) return rc;return scalar_pages(memory);
+}
+
+_Alignas(8) static unsigned char tree_workspace[8192];
+_Alignas(8) static unsigned char tree_output[2][8192],tree_final_scratch[8192];
+static pangu_json_token tree_final_tokens[512];
+static pangu_u32 tree_kind_workspace[512];
+static void tree_schema_init(pangu_pi_tree_schema *s,const pangu_u32 *kinds,pangu_u64 count)
+{
+ s->json.input.data=null_views[0].input.data;s->json.input.length=null_views[0].input.length;s->json.result=&null_results[0];s->json.root=0;s->kinds=kinds;s->kind_count=count;
+}
+static int tree_untouched(const unsigned char *p,pangu_u64 n)
+{
+ for(pangu_u64 i=0;i<n;i++) if(p[i]!=0x5a) return 0;return 1;
+}
+static int tree_stages(void)
+{
+ for(pangu_u64 i=0;i<sizeof(tree_cases)/sizeof(tree_cases[0]);i++) {
+  const tree_case *c=&tree_cases[i];test_case=i;
+  if(null_parse(0,c->schema,c->sn) || null_results[0].count!=c->kn) return 156;
+  pangu_pi_tree_schema schema;tree_schema_init(&schema,c->kinds,c->kn);
+  for(pangu_u32 pass=1;pass<=2;pass++) {
+   const unsigned char *input=pass==1 ? c->normalized : c->typed_mutation,*expected=pass==1 ? c->typed : c->plain;
+   pangu_u64 n=pass==1 ? c->nn : c->mn,en=pass==1 ? c->tn : c->pn,need=123456;
+   pangu_i32 expected_status=(pangu_i32)(pass==1 ? c->typed_status : c->plain_status);pangu_schema_report report;
+   if(null_parse(1,input,n)) return 157;
+   fill(tree_output[0],8192,0x5a);
+   pangu_i32 rc=pangu_pi_tree_convert(&schema,&null_views[1],pass,null_limits,tree_workspace,8192,tree_output[0],8192,&need,&report);
+   if(rc!=expected_status || report.status!=rc) return 158;
+   if(rc) { if(need!=123456 || !tree_untouched(tree_output[0],8192)) return 159;continue; }
+   if(null_parse(1,tree_output[0],need) || null_parse(2,expected,en) || !null_equal(&null_views[1],0,&null_views[2],0,1)) return 160;
+   if(null_parse(1,input,n)) return 161;
+   pangu_u64 measured=123456;
+   if(pangu_pi_tree_convert(&schema,&null_views[1],pass,null_limits,tree_workspace,8192,(void *)0,0,&measured,&report) || measured!=need) return 162;
+   for(pangu_u64 capacity=0;capacity<need;capacity++) {
+    test_capacity=capacity;pangu_u64 written=123456;fill(tree_output[0],8192,0x5a);
+    if(pangu_pi_tree_convert(&schema,&null_views[1],pass,null_limits,tree_workspace,8192,tree_output[0],capacity,&written,&report)!=2 || written!=123456 || !tree_untouched(tree_output[0],8192)) return 163;
+   }
+  }
+ }
+ return 0;
+}
+static int tree_tool_chain(void)
+{
+ for(pangu_u64 i=0;i<sizeof(tree_cases)/sizeof(tree_cases[0]);i++) {
+  const tree_case *c=&tree_cases[i];if(!c->tool) continue;test_case=i;
+  if(null_parse(0,c->schema,c->sn)) return 164;
+  pangu_pi_tree_schema schema;tree_schema_init(&schema,c->kinds,c->kn);
+  pangu_pi_arguments_result parsed;pangu_text_slice input={c->raw,c->rn};pangu_json_limits limits={8192,64,0};
+  if(pangu_pi_arguments_parse(input,1,tree_final_scratch,8192,tree_final_tokens,512,limits,&parsed)) return 165;
+  pangu_schema_view value;value.input.data=parsed.input.data;value.input.length=parsed.input.length;value.result=&parsed.json;value.root=0;
+  pangu_u64 n=0;pangu_schema_report report;
+  if(pangu_pi_optional_nulls(&schema.json,&value,null_limits,null_drops,512,tree_output[0],8192,&n,&report)) return 166;
+  if(null_parse(1,tree_output[0],n)) return 167;
+  if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[1],8192,&n,&report)) return 168;
+  if(null_parse(1,tree_output[1],n)) return 169;
+  if(pangu_pi_tree_convert(&schema,&null_views[1],2,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report)) return 170;
+  if(null_parse(1,tree_output[0],n)) return 171;
+  pangu_i32 rc=pangu_schema_validate(&schema.json,&null_views[1],&null_limits,&report);
+  if(rc!=(c->accepted ? 0 : 15)) return 172;
+  if(c->accepted && (null_parse(2,c->public_value,c->en) || !null_equal(&null_views[1],0,&null_views[2],0,1))) return 173;
+ }
+ return 0;
+}
+static int tree_setup(void)
+{
+ static const unsigned char schema[]="{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"}},\"required\":[\"x\"]}",value[]="{\"x\":\"2\"}";
+ if(null_parse(0,schema,sizeof(schema)-1) || null_parse(1,value,sizeof(value)-1)) return 174;
+ for(pangu_u64 i=0;i<512;i++) tree_kind_workspace[i]=0;
+ tree_kind_workspace[0]=7;
+ pangu_u64 props=0,child=0;pangu_text_slice p={(const unsigned char *)"properties",10},x={(const unsigned char *)"x",1};
+ if(pangu_json_object_find(null_views[0].input,&null_results[0],0,p,&props) || pangu_json_object_find(null_views[0].input,&null_results[0],props,x,&child)) return 175;
+ tree_kind_workspace[child]=1;return 0;
+}
+static int tree_boundaries(void)
+{
+ if(tree_setup()) return 176;pangu_pi_tree_schema schema;tree_schema_init(&schema,tree_kind_workspace,null_results[0].count);
+ pangu_u64 n=123456;pangu_schema_report report;pangu_schema_limits limits;
+ limits.max_work=1;limits.max_depth=64;limits.max_nodes=4096;fill(tree_output[0],8192,0x5a);
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=2 || n!=123456 || !tree_untouched(tree_output[0],8192)) return 177;
+ limits.max_work=16777216;limits.max_depth=1;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=2 || n!=123456 || !tree_untouched(tree_output[0],8192)) return 178;
+ limits.max_depth=64;limits.max_nodes=1;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=2 || n!=123456 || !tree_untouched(tree_output[0],8192)) return 179;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,(unsigned char *)tree_kind_workspace,sizeof(tree_kind_workspace),tree_output[0],8192,&n,&report)!=1) return 180;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,(unsigned char *)null_views[1].input.data,null_views[1].input.length,&n,&report)!=1) return 181;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,(pangu_u64 *)tree_output[0],&report)!=1) return 182;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,&n,(pangu_schema_report *)&schema)!=1) return 183;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],3,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=1) return 184;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,(void *)0,1,&n,&report)!=1) return 185;
+ tree_kind_workspace[0]=99;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=9 || n!=123456 || !tree_untouched(tree_output[0],8192)) return 186;
+ tree_kind_workspace[0]=7;schema.kind_count--;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=1) return 187;
+ schema.kind_count++;null_results[1].status=13;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report)!=10) return 188;
+ null_results[1].status=0;
+ static const unsigned char duplicate[]="{\"x\":\"bad\",\"\\u0078\":\"2\"}",expected[]="{\"x\":2}";
+ if(null_parse(1,duplicate,sizeof(duplicate)-1) || pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,tree_workspace,8192,tree_output[0],8192,&n,&report) || null_parse(1,tree_output[0],n) || null_parse(2,expected,sizeof(expected)-1) || !null_equal(&null_views[1],0,&null_views[2],0,1)) return 189;
+ return 0;
+}
+static int tree_pages(const pangu_memory_api *memory)
+{
+ if(tree_setup()) return 190;
+ pangu_mapping maps[6];for(pangu_u32 i=0;i<6;i++) { maps[i].address=(void *)0;maps[i].length=0;if(memory->map(memory->context,4096,&maps[i])) return 191; }
+ static const unsigned char input[]="{\"x\":\"2\"}",expected[]="{\"x\":2}";
+ unsigned char *bytes=(unsigned char *)maps[0].address+4096-(sizeof(input)-1),*scratch=(unsigned char *)maps[1].address+4096-32,*out=(unsigned char *)maps[2].address+4096-(sizeof(expected)-1);
+ pangu_u32 *kinds=(pangu_u32 *)((unsigned char *)maps[3].address+4096-null_results[0].count*4);
+ pangu_schema_report *report=(pangu_schema_report *)((unsigned char *)maps[4].address+4096-32);pangu_u64 *n=(pangu_u64 *)((unsigned char *)maps[5].address+4096-8);
+ for(pangu_u64 i=0;i<sizeof(input)-1;i++) bytes[i]=input[i];for(pangu_u64 i=0;i<null_results[0].count;i++) kinds[i]=tree_kind_workspace[i];
+ if(null_parse(1,bytes,sizeof(input)-1)) return 192;
+ pangu_pi_tree_schema schema;tree_schema_init(&schema,kinds,null_results[0].count);
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,scratch,32,out,sizeof(expected)-1,n,report) || *n!=sizeof(expected)-1 || !same(out,expected,*n)) return 193;
+ fill(out,sizeof(expected)-1,0x5a);*n=123456;
+ if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,scratch,32,out,sizeof(expected)-2,n,report)!=2 || *n!=123456 || !tree_untouched(out,sizeof(expected)-1)) return 194;
+ for(pangu_u32 i=0;i<6;i++) if(memory->unmap(memory->context,&maps[i])) return 195;return 0;
+}
+int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+{
+ if(shard) return 247;int rc=repair_scalar_test(memory,0);if(rc) return rc;
+ rc=tree_stages();if(rc) return rc;rc=tree_tool_chain();if(rc) return rc;rc=tree_boundaries();if(rc) return rc;return tree_pages(memory);
 }

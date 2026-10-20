@@ -105,5 +105,19 @@ _Static_assert(sizeof(pangu_pi_scalar_result)==32,"scalar result layout");
  * when transporting replacement number bits between conversion stages.
  */
 pangu_i32 pangu_pi_scalar_convert(const pangu_schema_view *,pangu_u32,pangu_u32,unsigned char *,pangu_u64,pangu_u64,pangu_pi_scalar_result *);
+/* EXPERIMENTAL tree stage: kind metadata supplied by caller; never infer from
+ * serialized Schema. Pass1 TypeBox, pass2 Pi plain. Kind0 identity, 1..5 scalar
+ * targets,6 Array,7 Object,8 Literal,9 Enum; other typed kinds unsupported9.
+ * Matching successful immutable views required; no authorization/final validation.
+ * Caller supplies disjoint scratch/output/written/report and immutable kind map
+ * indexed by schema token. Measurement NULL/0 succeeds; failure preserves output
+ * and written. Scratch/report disposable after runtime failure. Depth <=64.
+ * This is a staged converter, not public validateToolArguments (root return differs).
+ */
+typedef struct pangu_pi_tree_schema {
+ pangu_schema_view json;const pangu_u32 *kinds;pangu_u64 kind_count;
+} pangu_pi_tree_schema;
+_Static_assert(sizeof(pangu_pi_tree_schema)==48,"tree schema layout");
+pangu_i32 pangu_pi_tree_convert(const pangu_pi_tree_schema *,const pangu_schema_view *,pangu_u32,pangu_schema_limits,unsigned char *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *,pangu_schema_report *);
 #endif
 #endif

@@ -1941,7 +1941,8 @@
         "src/pi-arguments/final.c",
         "src/pi-arguments/normalize.c",
         "src/pi-arguments/numeric.c",
-        "src/pi-arguments/scalar.c"
+        "src/pi-arguments/scalar.c",
+        "src/pi-arguments/coerce.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1951,9 +1952,9 @@
         "schema"
       ],
       "source_root": "src/pi-arguments",
-      "responsibility": "bounded Pi parsing/optional-null and unconstrained primitive rules; no full traversal/constraints/validation/execution",
+      "responsibility": "bounded Pi parsing, optional-null, primitive rules and explicit-kind object/array/literal/enum tree conversion stages; no full Pi validation/execution",
       "non_responsibilities": [
-        "no partial salvage, Schema coercion or tool execution"
+        "no union/regexp coercion, complete validateToolArguments root semantics or tool execution"
       ],
       "boundary": {
         "reason": "required-replacement-point",
@@ -1969,7 +1970,8 @@
         "pangu_pi_arguments_parse",
         "pangu_pi_optional_nulls",
         "pangu_pi_number_string",
-        "pangu_pi_scalar_convert"
+        "pangu_pi_scalar_convert",
+        "pangu_pi_tree_convert"
       ],
       "targets": [
         "linux-x86_64"
@@ -1986,7 +1988,7 @@
         "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
         "threading": "single-thread",
         "callbacks": "none",
-        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch; scalar rules preserve result on failure and return original-token or replacement representation with borrowed static/workspace string"
+        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch; scalar rules preserve result on failure and return original-token or replacement representation with borrowed static/workspace string; tree conversion uses caller Kind map/scratch, fixed64 traversal and failure-atomic destination/length; requires reparsing and final Schema validation"
       },
       "provides": [
         {
@@ -2045,10 +2047,11 @@
         "platform-linux",
         "platform-memory",
         "test-guard",
-        "json"
+        "json",
+        "schema"
       ],
       "source_root": "src/repair-probe",
-      "responsibility": "Pi repair lexical byte differential and capacity/alias/UTF8 boundary probe",
+      "responsibility": "Pi compatibility stage and full four-tool argument-chain differential, capacity/alias/quota and guard-page probes",
       "non_responsibilities": [
         "not a production agent"
       ],
@@ -2108,6 +2111,12 @@
           "version": 1,
           "optional": false,
           "on_missing": "pending"
+        },
+        {
+          "service": "foundation.schema",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
         }
       ],
       "third_party_dependencies": [],
@@ -2115,7 +2124,8 @@
         "bootstrap-api",
         "pi-arguments",
         "platform-linux",
-        "json"
+        "json",
+        "schema"
       ],
       "budgets": {
         "object_bytes": {
