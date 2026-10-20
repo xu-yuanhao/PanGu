@@ -17,7 +17,8 @@
         "src/bootstrap-api/region.h",
         "src/bootstrap-api/text.h",
         "src/bootstrap-api/json.h",
-        "src/bootstrap-api/schema.h"
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h"
       ],
       "public_headers": [
         "src/bootstrap-api/bootstrap.h",
@@ -28,7 +29,8 @@
         "src/bootstrap-api/region.h",
         "src/bootstrap-api/text.h",
         "src/bootstrap-api/json.h",
-        "src/bootstrap-api/schema.h"
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h"
       ],
       "dependencies": [],
       "source_root": "src/bootstrap-api",
@@ -66,7 +68,9 @@
         "json-probe",
         "json-guard",
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "definition-only",
       "lifecycle": {
@@ -137,7 +141,9 @@
         "json-probe",
         "json-guard",
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -334,7 +340,8 @@
         "text-probe",
         "region-arena",
         "json-probe",
-        "schema-probe"
+        "schema-probe",
+        "repair-probe"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -638,7 +645,9 @@
         "text-probe",
         "text-alternate",
         "text-guard",
-        "region-arena"
+        "region-arena",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -877,7 +886,9 @@
         "json-probe",
         "json-guard",
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1052,7 +1063,9 @@
         "json-probe",
         "json-guard",
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1234,7 +1247,8 @@
       "compositions": [
         "text-guard",
         "json-guard",
-        "schema-guard"
+        "schema-guard",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1913,6 +1927,167 @@
         },
         "measurement_plan": "fixture only; production budget remains unbaselined"
       }
+    },
+    {
+      "id": "pi-arguments",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/pi-arguments/repair.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "text"
+      ],
+      "source_root": "src/pi-arguments",
+      "responsibility": "bounded Pi-compatible UTF8 repairJson lexical transform",
+      "non_responsibilities": [
+        "no JSON completion, parsing, Schema coercion or tool execution"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_pi_repair_utf8"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "repair-probe",
+        "repair-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller immutable source, bounded destination and length",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "no allocation; measure before emit, failed calls preserve all output"
+      },
+      "provides": [
+        {
+          "service": "compat.pi-arguments",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.text",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "text"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "repair-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/repair-probe/main.c",
+        "src/repair-probe/entry.S",
+        "src/repair-probe/cases.h"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "pi-arguments",
+        "platform-linux",
+        "platform-memory",
+        "test-guard"
+      ],
+      "source_root": "src/repair-probe",
+      "responsibility": "Pi repair lexical byte differential and capacity/alias/UTF8 boundary probe",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas",
+        "c-header"
+      ],
+      "exports": [
+        "pangu_repair_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "repair-probe",
+        "repair-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "compat.pi-arguments",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "pi-arguments",
+        "platform-linux"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
     }
   ],
   "service_definitions": [
@@ -1958,6 +2133,11 @@
     },
     {
       "id": "foundation.schema",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "compat.pi-arguments",
       "version": 1,
       "definition_module": "bootstrap-api"
     }
@@ -2496,6 +2676,80 @@
         "foundation.json": "json",
         "platform.memory": "test-guard",
         "foundation.schema": "schema"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "repair-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "arena",
+        "buffer",
+        "text",
+        "pi-arguments",
+        "repair-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "repair-probe",
+        "symbol": "pangu_repair_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "compat.pi-arguments": "pi-arguments"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "repair-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "arena",
+        "buffer",
+        "text",
+        "test-guard",
+        "pi-arguments",
+        "repair-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "repair-probe",
+        "symbol": "pangu_repair_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-guard",
+        "foundation.region": "arena",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "compat.pi-arguments": "pi-arguments"
       },
       "budgets": {
         "artifact_bytes": {
