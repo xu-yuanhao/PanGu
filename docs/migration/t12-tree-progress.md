@@ -31,3 +31,11 @@ typed对象属性名实际是未转义正则，当前遇正则元字符显式返
 union/高级Schema、typed正则属性、公共函数全部根值/错误文本、Provider最终事件、wire/session、正式资源预算/完整G07、完整T12及受保护发布仍未完成。native_matrix=PASS与release=BLOCKED同时成立。
 
 源码发布至 [`codex/t12-pi-tree-conversion`](https://github.com/xu-yuanhao/PanGu/tree/887e3edc5a8d930f01270543c9afe9ad2b29583d)，提交 `887e3edc5a8d930f01270543c9afe9ad2b29583d`；发布副本全部preflight输入与固定候选一致，远端ref回读一致，不代表生产准入。
+
+## 统一校验入口草稿（后续实验，未准入）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t12-validation-wip-wiskk69h` 从上述固定包扩展validate.c和头文件，60份源码；新文件、导出和96字节storage/112字节result描述尚未登记，不属于上方已批准包。`wip-evidence.json`绑定源清单和验证脚本/结果。
+
+入口组合最终对象解析、optional-null、typed/plain树转换和严格Schema验证，只有最后验证成功才发布借用结果。非final清空结果且不碰工作区；运行时失败不发布input/tokens，非法参数/坏Schema结果头保留调用者原result。JSON字节/深度与跨四个Schema阶段的总work分别受限；调用者提供互斥的repair、双字节缓冲、tokens、scalar、drops存储，需遵守返回状态和借用生命周期。Typed Array根仍显式不支持，不能冒充完整Pi根值语义或工具执行授权。
+
+实际宿主验证：286条四工具公共Pi对照和286次不修改工作区的非final检查；全部3341个不足总work配额返回2且不发布，精确3342配额成功；94组双缓冲容量、15组token容量、原始字节配额及别名/元数据拒绝通过。另1570条真实Pi最终文本解析+验证对照，196次接受、其中56次修复成功，拒绝调用不发布结果。宿主O0/O2无未解析符号链接通过。尚未完成原生探针、冻结构建、保护页、UBSan、归档恢复或控制面自审，不新增完成勾选。
