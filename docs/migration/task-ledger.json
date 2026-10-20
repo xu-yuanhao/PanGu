@@ -626,6 +626,20 @@
         "lower_contract_graph_composition": true,
         "unskippable_host_entry": "NOT_IMPLEMENTED",
         "production_module_admitted": false
+      },
+      "pre_admission_host_prepare_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-prepare-wip-zaqrcy4t",
+        "insufficient_total_work_checks": 4423,
+        "failure_phases": [
+          1,
+          2,
+          3
+        ],
+        "explicit_controls": 7,
+        "runtime_failure_unpublishes_views": true,
+        "real_entry_table": "NOT_IMPLEMENTED",
+        "production_module_admitted": false
       }
     },
     {
