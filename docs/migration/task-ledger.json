@@ -596,6 +596,16 @@
         "Cordis_execution_conformance": "NOT_RUN",
         "stage_inputs_accepted": false,
         "production_module_admitted": false
+      },
+      "pre_admission_dependency_graph_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-graph-wip-dz3c4swl",
+        "random_graphs": 240,
+        "cycle_refusals": 145,
+        "insufficient_fuel_probes": 3667,
+        "full_scope_graph_case": true,
+        "plugin_activation": "NOT_IMPLEMENTED",
+        "production_module_admitted": false
       }
     },
     {
