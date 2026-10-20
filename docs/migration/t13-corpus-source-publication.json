@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-21",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t13-native-graph-corpus",
+  "commit": "9217a7a1b349e7604dd970343b8670f6c94a835d",
+  "parent": "bfb6bc85b925f1be63cec477f41fd98a2e8e185c",
+  "scope": "fixed Agent self-reviewed test-only240 graph corpus,65 native sources, unchanged planner ABI; local experiments only",
+  "controller_sha256": "d22b6f03eb83bebbb83539885ee0354a320cc0e4a0f43a77ed9318e3de01cd53",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

@@ -22,3 +22,5 @@
 更大的多节点/随机循环与多提供者语料、完整G05配置/替换矩阵、Pending/循环明细、配置Schema/权限、T14生命周期、正式资源预算/完整G07及完整T13未完成；生产发布保持BLOCKED。安装表/服务定义均为可信测试夹具，未建立针对任意Native输入的元数据来源安全保证。
 
 源码分支 [`codex/t13-native-combinations`](https://github.com/xu-yuanhao/PanGu/tree/bfb6bc85b925f1be63cec477f41fd98a2e8e185c)，提交 `bfb6bc85b925f1be63cec477f41fd98a2e8e185c`；发布副本输入与固定候选一致，远端ref已回读。
+
+后续：[240组原生图语料](t13-corpus-progress.md)已补充无自环多节点循环和间接Pending；随机有效图不含多活跃提供者，仍保留本页正/逆序MANY用例，完整T13未完成。

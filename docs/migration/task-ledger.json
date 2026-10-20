@@ -591,7 +591,10 @@
         "docs/migration/t13-host-plan-source-publication.json",
         "docs/migration/t13-combinations-progress.md",
         "docs/migration/t13-combinations-evidence.json",
-        "docs/migration/t13-combinations-source-publication.json"
+        "docs/migration/t13-combinations-source-publication.json",
+        "docs/migration/t13-corpus-progress.md",
+        "docs/migration/t13-corpus-evidence.json",
+        "docs/migration/t13-corpus-source-publication.json"
       ],
       "completion_approved": false,
       "pre_admission_scope_design": {
@@ -720,6 +723,22 @@
         "source_commit": "bfb6bc85b925f1be63cec477f41fd98a2e8e185c",
         "full_T13": "INCOMPLETE",
         "release": "BLOCKED"
+      },
+      "native_graph_corpus_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "d22b6f03eb83bebbb83539885ee0354a320cc0e4a0f43a77ed9318e3de01cd53",
+        "candidate_tree_sha256": "855d3a803afe6b92d405f6dc494eb84c79c4553a9799b71bbe527bc9bcea5830",
+        "approval_record_sha256": "b5371a47d8e7f8fef9c2a2021bb6cd76f01141deabf1d7850f49b1bd5548e01d",
+        "graphs": 240,
+        "valid": 95,
+        "cycle_refusals": 145,
+        "pure_multi_node_cycles": 14,
+        "propagated_pending": 69,
+        "normal_builds": 40,
+        "normal_process_runs": 52,
+        "source_commit": "9217a7a1b349e7604dd970343b8670f6c94a835d",
+        "build_timeout": "initial180s exceeded; same-input180s full replay passed; cause unknown",
+        "full_T13": "INCOMPLETE"
       }
     },
     {
