@@ -45,3 +45,11 @@
 完整转换、Provider/wire/session、完整T12及生产准入未完成；native_matrix=PASS和release=BLOCKED同时保留。
 
 源码已公开至 [`codex/t12-pi-scalar-rules`](https://github.com/xu-yuanhao/PanGu/tree/e7a794157a85cbfba78fe8c9016e6acdbab5ee84)，固定提交 `e7a794157a85cbfba78fe8c9016e6acdbab5ee84`。发布副本全部preflight输入与固定候选一致，远端ref已回读核对；[发布记录](t12-scalar-source-publication.json)不代表生产准入。
+
+## 对象转换接线前的参考复验（2026-10-20）
+
+已执行320条冻结Pi/TypeBox参考观察，位于 `/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-oracle-20261020`。`oracle.mjs` 使用完整原始validation.ts加私有helper导出，逐条保留optional-null、typed原地结果、typed返回结果、plain结果和公共接受/拒绝；各阶段在后续原地修改前立即快照。`reference-binding.json`记录源文件与执行脚本/结果摘要。此为参考证据，不是原生对象转换通过。
+
+三条执行断言确认：Type.Literal("")与Type.String({const:""})序列化JSON相同，但内部字段null的公共接受结果不同；typed数组会把字符串"1.8"包装并转换为[1]；typed属性名a.b按未转义正则匹配，会转换名为axb的值。因此后续转换描述必须显式保留Kind来源，不能从JSON猜测。对象名称的正则语义须显式实现或返回不支持，不能静默改成精确名称匹配。另保存primitive/array根的返回值丢弃观察，接线时区分返回值与原地修改。
+
+下一实现仍是有界对象/数组转换及四工具完整链路对照；本次没有新增原生实现，也没有勾选转换完成项。
