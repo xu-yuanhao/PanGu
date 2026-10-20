@@ -756,8 +756,18 @@
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T14",
       "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "evidence": [
+        "docs/migration/t14-owner-boundaries.md"
+      ],
+      "completion_approved": false,
+      "pre_admission_owner_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-owner-wip-5stexo34",
+        "scenario_groups": 6,
+        "native_module_admitted": false,
+        "full_stage_inputs_accepted": false,
+        "async_cleanup": "NOT_IMPLEMENTED"
+      }
     },
     {
       "id": "T15",
