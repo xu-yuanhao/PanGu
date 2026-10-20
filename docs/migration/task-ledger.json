@@ -874,6 +874,22 @@
           "callback_time_preemption": false,
           "startup_budget": false,
           "native_admission": false
+        },
+        "runtime_geometry_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah",
+          "source_manifest_sha256": "dca2c1b0771b4bd79ec99c2e0f2c28387fee52415e7ec626065064b4733d137f",
+          "evidence_sha256": "8db9d4661d5d45dbfcc8f92f0bda56600ab92417395dbd10909757fd42cfdfbe",
+          "geometry_cases_per_optimization": 98,
+          "refused_operations_per_optimization": 77611,
+          "comparison": "exact protected-byte snapshots",
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "supplemental_host_ubsan": true,
+          "adapter_output_alias_checks": false,
+          "native_admission": false
         }
       }
     },
