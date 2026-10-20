@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-json-equality",
+  "commit": "509267628524e46cbd41faeb3617f25f122c2a62",
+  "parent": "130b857d399a43d7dca5848654e87d81b0263634",
+  "scope": "fixed Agent self-reviewed UTF-16 equality candidate including controller and 44 native source files; local experiments only",
+  "controller_sha256": "fa0639a356b7c29510178b9669d279de4c84636346d7ee8d6b56b4ea368a9137",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

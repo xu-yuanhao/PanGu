@@ -349,7 +349,10 @@
         "docs/migration/t12-writer-source-publication.json",
         "docs/migration/t12-format-progress.md",
         "docs/migration/t12-format-evidence.json",
-        "docs/migration/t12-format-source-publication.json"
+        "docs/migration/t12-format-source-publication.json",
+        "docs/migration/t12-equal-progress.md",
+        "docs/migration/t12-equal-evidence.json",
+        "docs/migration/t12-equal-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -409,6 +412,18 @@
         "candidate_tree_sha256": "2ecc59e06ee4b78d3936ff7d1304a4edc620d78a6abcdbed7f41d42680021ce0",
         "approval_record_sha256": "b46a2fb95e8e1c51bfd36c497b3bdd6e4682810c95865c7b32b9ceb107ac3069",
         "source_commit": "130b857d399a43d7dca5848654e87d81b0263634"
+      },
+      "string_equal_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "fa0639a356b7c29510178b9669d279de4c84636346d7ee8d6b56b4ea368a9137",
+        "oracle_pairs": 2060,
+        "UTF16_units": 65536,
+        "normal_builds": 28,
+        "normal_process_runs": 40,
+        "full_T12": "INCOMPLETE",
+        "candidate_tree_sha256": "f6ad4c96dad68f5e0492aff6040fe75c251277c311643d5240a152950d806429",
+        "approval_record_sha256": "24c54e0e225bd63f541ca782cf5449b2a7e1066eeb3838fd9c567b2aa1befc3d",
+        "source_commit": "509267628524e46cbd41faeb3617f25f122c2a62"
       }
     },
     {

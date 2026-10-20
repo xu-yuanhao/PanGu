@@ -86,3 +86,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## binary64 标量格式化本地实验
 
 [数值格式化](t12-format-progress.md) 已验证数字 JSON 和 JS 数字 String 两模式的 16500 条字节对照，覆盖最短十进制、布局阈值、负零及非有限值差异。已有 writer 的 NUMBER 操作继续保留原词法；格式化后的 null 需用 NULL 操作，数字字符串需用 STRING 操作。这里仍未实现完整 JS 对象序列化、属性枚举、孤立 surrogate 输出或 Pi 通用强制转换，不能将标量格式化写成整个 wire/session 已兼容。
+
+## 解码后 UTF-16 字符串相等
+
+[字符串相等判断](t12-equal-progress.md) 已验证 surrogate 保留、转义/原始 UTF-8 等价和不同单元序列不等，用于后续 Schema 字段名/枚举比较。已有无损 UTF-8 decode 的 unsupported 范围保持不变；相等判断不等于 UTF-16 编码、Schema 验证或完整 Pi 字符串行为迁移。
