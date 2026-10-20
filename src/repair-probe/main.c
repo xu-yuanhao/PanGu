@@ -533,8 +533,108 @@ static int tree_pages(const pangu_memory_api *memory)
  if(pangu_pi_tree_convert(&schema,&null_views[1],1,null_limits,scratch,32,out,sizeof(expected)-2,n,report)!=2 || *n!=123456 || !tree_untouched(out,sizeof(expected)-1)) return 194;
  for(pangu_u32 i=0;i<6;i++) if(memory->unmap(memory->context,&maps[i])) return 195;return 0;
 }
-int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+static int repair_tree_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  if(shard) return 247;int rc=repair_scalar_test(memory,0);if(rc) return rc;
  rc=tree_stages();if(rc) return rc;rc=tree_tool_chain();if(rc) return rc;rc=tree_boundaries();if(rc) return rc;return tree_pages(memory);
+}
+
+static void validation_storage(pangu_pi_validation_storage *s)
+{
+ s->repair=tree_final_scratch;s->repair_capacity=8192;s->bytes[0]=tree_output[0];s->bytes[1]=tree_output[1];s->byte_capacity[0]=8192;s->byte_capacity[1]=8192;
+ s->tokens=tree_final_tokens;s->token_capacity=512;s->scalar=tree_workspace;s->scalar_capacity=8192;s->drops=null_drops;s->drop_capacity=512;
+}
+static int validation_empty(const pangu_pi_validation_result *r,pangu_i32 rc)
+{
+ return !r->arguments.input.data && !r->arguments.input.length && !r->arguments.json.tokens && !r->arguments.json.count && r->arguments.json.status==rc && !r->reserved;
+}
+static int validation_corpus(void)
+{
+ pangu_pi_validation_storage storage;validation_storage(&storage);pangu_json_limits limits={8192,64,0};
+ for(pangu_u64 i=0;i<sizeof(tree_cases)/sizeof(tree_cases[0]);i++) {
+  const tree_case *c=&tree_cases[i];if(!c->tool) continue;test_case=i;
+  if(null_parse(0,c->schema,c->sn)) return 196;pangu_pi_tree_schema schema;tree_schema_init(&schema,c->kinds,c->kn);
+  pangu_pi_validation_result out;pangu_text_slice input={c->raw,c->rn};
+  pangu_i32 rc=pangu_pi_arguments_validate(&schema,input,1,&storage,limits,null_limits,&out);
+  if(rc!=(c->accepted ? 0 : 15)) return 197;
+  if(!rc) {
+   if(out.stage!=PANGU_PI_VALIDATE_READY || !out.arguments.json.tokens || out.arguments.json.status || !out.work) return 198;
+   pangu_schema_view v;v.input.data=out.arguments.input.data;v.input.length=out.arguments.input.length;v.result=&out.arguments.json;v.root=0;
+   if(null_parse(2,c->public_value,c->en) || !null_equal(&v,0,&null_views[2],0,1)) return 199;
+  } else if(!validation_empty(&out,rc) || out.stage!=PANGU_PI_VALIDATE_SCHEMA) return 200;
+  fill(tree_final_scratch,8192,0x5a);fill(tree_output[0],8192,0x5a);fill(tree_output[1],8192,0x5a);fill(tree_workspace,8192,0x5a);fill((unsigned char *)tree_final_tokens,sizeof(tree_final_tokens),0x5a);fill((unsigned char *)null_drops,sizeof(null_drops),0x5a);fill((unsigned char *)&out,112,0xa5);
+  if(pangu_pi_arguments_validate(&schema,input,0,&storage,limits,null_limits,&out)!=13 || !validation_empty(&out,13) || out.stage || out.work) return 201;
+  if(!tree_untouched(tree_final_scratch,8192) || !tree_untouched(tree_output[0],8192) || !tree_untouched(tree_output[1],8192) || !tree_untouched(tree_workspace,8192) || !tree_untouched((const unsigned char *)tree_final_tokens,sizeof(tree_final_tokens)) || !tree_untouched((const unsigned char *)null_drops,sizeof(null_drops))) return 202;
+ }
+ return 0;
+}
+static int validation_text_corpus(void)
+{
+ pangu_pi_validation_storage storage;validation_storage(&storage);pangu_json_limits limits={8192,64,0};
+ for(pangu_u64 i=0;i<sizeof(validation_text_cases)/sizeof(validation_text_cases[0]);i++) {
+  const validation_text_case *c=&validation_text_cases[i];const tree_case *t=&tree_cases[c->index];test_case=i;
+  if(null_parse(0,t->schema,t->sn)) return 203;pangu_pi_tree_schema schema;tree_schema_init(&schema,t->kinds,t->kn);
+  pangu_pi_validation_result out;pangu_text_slice input={c->text,c->n};pangu_i32 rc=pangu_pi_arguments_validate(&schema,input,1,&storage,limits,null_limits,&out);
+  if(c->accepted) {
+   if(rc || out.stage!=PANGU_PI_VALIDATE_READY) return 204;pangu_schema_view v;v.input.data=out.arguments.input.data;v.input.length=out.arguments.input.length;v.result=&out.arguments.json;v.root=0;
+   if(null_parse(2,c->expected,c->en) || !null_equal(&v,0,&null_views[2],0,1)) return 205;
+  } else {
+   if(!rc || !validation_empty(&out,rc)) return 206;
+   if(c->parse_error) { if(out.stage!=PANGU_PI_VALIDATE_PARSE || (rc!=9 && rc!=12 && rc!=13 && rc!=14)) return 207; }
+   else if(rc!=15 || out.stage!=PANGU_PI_VALIDATE_SCHEMA) return 208;
+  }
+ }
+ return 0;
+}
+static int validation_boundaries(void)
+{
+ if(tree_setup()) return 209;pangu_pi_tree_schema schema;tree_schema_init(&schema,tree_kind_workspace,null_results[0].count);
+ pangu_pi_validation_storage storage;validation_storage(&storage);pangu_json_limits json_limits={8192,64,0};pangu_pi_validation_result out;pangu_text_slice input=null_views[1].input;
+ if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out)) return 210;
+ pangu_u64 total=out.work;pangu_schema_limits limits=null_limits;
+ for(pangu_u64 work=1;work<total;work++) { test_capacity=work;limits.max_work=work;
+  if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,limits,&out)!=2 || !validation_empty(&out,2) || out.work>work) return 211;
+ }
+ limits.max_work=total;if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,limits,&out) || out.work!=total) return 212;
+ for(pangu_u32 slot=0;slot<2;slot++) {
+  for(pangu_u64 capacity=1;capacity<32;capacity++) { storage.byte_capacity[slot]=capacity;pangu_i32 rc=pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out);if(rc!=0 && (rc!=2 || !validation_empty(&out,2))) return 213; }
+  storage.byte_capacity[slot]=8192;
+ }
+ for(pangu_u64 capacity=1;capacity<8;capacity++) { storage.token_capacity=capacity;pangu_i32 rc=pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out);if(rc!=0 && (rc!=2 || !validation_empty(&out,2))) return 214; }storage.token_capacity=512;
+ for(pangu_u64 bytes=1;bytes<input.length;bytes++) { json_limits.max_bytes=bytes;if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out)!=2 || !validation_empty(&out,2)) return 215; }json_limits.max_bytes=8192;
+ fill((unsigned char *)&out,112,0xa5);storage.bytes[1]=storage.bytes[0];
+ if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out)!=1) return 216;
+ for(pangu_u64 i=0;i<112;i++) if(((unsigned char *)&out)[i]!=0xa5) return 217;
+ storage.bytes[1]=tree_output[1];null_results[0].status=13;
+ if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out)!=10) return 218;
+ for(pangu_u64 i=0;i<112;i++) if(((unsigned char *)&out)[i]!=0xa5) return 219;
+ null_results[0].status=0;
+ if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,(pangu_pi_validation_result *)tree_output[0])!=1) return 220;
+ static const unsigned char invalid[]={0xff};input.data=invalid;input.length=1;
+ if(pangu_pi_arguments_validate(&schema,input,1,&storage,json_limits,null_limits,&out)!=12 || !validation_empty(&out,12)) return 221;
+ return 0;
+}
+static int validation_pages(const pangu_memory_api *memory)
+{
+ if(tree_setup()) return 222;pangu_pi_tree_schema schema;tree_schema_init(&schema,tree_kind_workspace,null_results[0].count);
+ pangu_mapping maps[9];for(pangu_u32 i=0;i<9;i++) { maps[i].address=(void *)0;maps[i].length=0;if(memory->map(memory->context,4096,&maps[i])) return 223; }
+ pangu_pi_validation_storage *storage=(pangu_pi_validation_storage *)((unsigned char *)maps[0].address+4096-96);
+ pangu_pi_validation_result *out=(pangu_pi_validation_result *)((unsigned char *)maps[1].address+4096-112);
+ storage->repair=(unsigned char *)maps[2].address+4096-32;storage->repair_capacity=32;
+ storage->bytes[0]=(unsigned char *)maps[3].address+4096-9;storage->byte_capacity[0]=9;
+ storage->bytes[1]=(unsigned char *)maps[4].address+4096-9;storage->byte_capacity[1]=9;
+ storage->tokens=(pangu_json_token *)((unsigned char *)maps[5].address+4096-3*48);storage->token_capacity=3;
+ storage->scalar=(unsigned char *)maps[6].address+4096-32;storage->scalar_capacity=32;
+ storage->drops=(pangu_u64 *)((unsigned char *)maps[7].address+4096-8);storage->drop_capacity=1;
+ static const unsigned char text[]="{\"x\":\"2\"}";unsigned char *bytes=(unsigned char *)maps[8].address+4096-(sizeof(text)-1);for(pangu_u64 i=0;i<sizeof(text)-1;i++) bytes[i]=text[i];
+ pangu_text_slice input={bytes,sizeof(text)-1};pangu_json_limits limits={32,64,0};
+ if(pangu_pi_arguments_validate(&schema,input,1,storage,limits,null_limits,out) || out->stage!=PANGU_PI_VALIDATE_READY || out->arguments.input.length!=7) return 224;
+ storage->byte_capacity[1]=6;
+ if(pangu_pi_arguments_validate(&schema,input,1,storage,limits,null_limits,out)!=2 || !validation_empty(out,2)) return 225;
+ for(pangu_u32 i=0;i<9;i++) if(memory->unmap(memory->context,&maps[i])) return 226;return 0;
+}
+int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+{
+ if(shard) return 247;int rc=repair_tree_test(memory,0);if(rc) return rc;
+ rc=validation_corpus();if(rc) return rc;rc=validation_text_corpus();if(rc) return rc;rc=validation_boundaries();if(rc) return rc;return validation_pages(memory);
 }

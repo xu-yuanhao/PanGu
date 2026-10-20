@@ -1942,7 +1942,8 @@
         "src/pi-arguments/normalize.c",
         "src/pi-arguments/numeric.c",
         "src/pi-arguments/scalar.c",
-        "src/pi-arguments/coerce.c"
+        "src/pi-arguments/coerce.c",
+        "src/pi-arguments/validate.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1952,7 +1953,7 @@
         "schema"
       ],
       "source_root": "src/pi-arguments",
-      "responsibility": "bounded Pi parsing, optional-null, primitive rules and explicit-kind object/array/literal/enum tree conversion stages; no full Pi validation/execution",
+      "responsibility": "bounded Pi argument stages and Object-text unified parse/normalize/coerce/validate entry; no tool execution",
       "non_responsibilities": [
         "no union/regexp coercion, complete validateToolArguments root semantics or tool execution"
       ],
@@ -1971,7 +1972,8 @@
         "pangu_pi_optional_nulls",
         "pangu_pi_number_string",
         "pangu_pi_scalar_convert",
-        "pangu_pi_tree_convert"
+        "pangu_pi_tree_convert",
+        "pangu_pi_arguments_validate"
       ],
       "targets": [
         "linux-x86_64"
@@ -1988,7 +1990,7 @@
         "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
         "threading": "single-thread",
         "callbacks": "none",
-        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch; scalar rules preserve result on failure and return original-token or replacement representation with borrowed static/workspace string; tree conversion uses caller Kind map/scratch, fixed64 traversal and failure-atomic destination/length; requires reparsing and final Schema validation"
+        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch; scalar rules preserve result on failure and return original-token or replacement representation with borrowed static/workspace string; tree conversion uses caller Kind map/scratch, fixed64 traversal and failure-atomic destination/length; requires reparsing and final Schema validation; unified entry requires disjoint caller storage, total Schema work and final validation before publication; runtime failures unpublish, preconditions preserve result"
       },
       "provides": [
         {

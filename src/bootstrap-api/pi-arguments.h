@@ -119,5 +119,31 @@ typedef struct pangu_pi_tree_schema {
 } pangu_pi_tree_schema;
 _Static_assert(sizeof(pangu_pi_tree_schema)==48,"tree schema layout");
 pangu_i32 pangu_pi_tree_convert(const pangu_pi_tree_schema *,const pangu_schema_view *,pangu_u32,pangu_schema_limits,unsigned char *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *,pangu_schema_report *);
+/* Experimental Object-text pipeline; no execution authority. No full Pi root
+ * primitive/array or error-message parity; typed Array root is unsupported9.
+ * Caller storage is disposable and mutually disjoint, also disjoint from all
+ * immutable schema/input/storage-description ranges. Buffer capacities >0 and
+ * token capacity >0 required; optional scratch/drop capacities may be zero.
+ * Success publishes borrowed normalized JSON and tokens ONLY after strict final
+ * Schema validation. Runtime failures clear publication; precondition1/10 leaves
+ * result unchanged. final0 returns13 with no parsing/conversion/validation.
+ * JSON bytes/depth and total Schema work across all transformation/validation
+ * phases bounded independently. No allocations, product recursion or auth.
+ */
+typedef struct pangu_pi_validation_storage {
+ unsigned char *repair;pangu_u64 repair_capacity;
+ unsigned char *bytes[2];pangu_u64 byte_capacity[2];
+ pangu_json_token *tokens;pangu_u64 token_capacity;
+ unsigned char *scalar;pangu_u64 scalar_capacity;
+ pangu_u64 *drops;pangu_u64 drop_capacity;
+} pangu_pi_validation_storage;
+typedef struct pangu_pi_validation_result {
+ pangu_pi_arguments_result arguments;pangu_schema_report report;
+ pangu_u32 stage,reserved;pangu_u64 work;
+} pangu_pi_validation_result;
+_Static_assert(sizeof(pangu_pi_validation_storage)==96,"validation storage layout");
+_Static_assert(sizeof(pangu_pi_validation_result)==112,"validation result layout");
+enum {PANGU_PI_VALIDATE_PARSE=1,PANGU_PI_VALIDATE_OPTIONAL,PANGU_PI_VALIDATE_TYPED,PANGU_PI_VALIDATE_PLAIN,PANGU_PI_VALIDATE_SCHEMA,PANGU_PI_VALIDATE_READY};
+pangu_i32 pangu_pi_arguments_validate(const pangu_pi_tree_schema *,pangu_text_slice,pangu_u32,const pangu_pi_validation_storage *,pangu_json_limits,pangu_schema_limits,pangu_pi_validation_result *);
 #endif
 #endif
