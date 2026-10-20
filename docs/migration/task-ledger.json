@@ -766,7 +766,19 @@
         "scenario_groups": 6,
         "native_module_admitted": false,
         "full_stage_inputs_accepted": false,
-        "async_cleanup": "NOT_IMPLEMENTED"
+        "async_cleanup": "NOT_IMPLEMENTED",
+        "coordinator": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-wip-hx57uc73",
+          "scenario_groups_per_optimization": 7,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "evidence_sha256": "77ce08feb7c908d172c54d096c1bb7a6e2ee4ae23e30b943ee22bbe4465d9690",
+          "t13_plan_adapter": false,
+          "async_disposer": false
+        }
       }
     },
     {
