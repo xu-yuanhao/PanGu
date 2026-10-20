@@ -640,6 +640,16 @@
         "runtime_failure_unpublishes_views": true,
         "real_entry_table": "NOT_IMPLEMENTED",
         "production_module_admitted": false
+      },
+      "pre_admission_static_entry_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-entry-wip-l4pvarmi",
+        "entry_table_permutations": 6,
+        "insufficient_work_checks": 1247,
+        "callbacks_during_binding": 0,
+        "real_C_fixture_mapping": true,
+        "unified_integration": "NOT_IMPLEMENTED",
+        "production_module_admitted": false
       }
     },
     {
