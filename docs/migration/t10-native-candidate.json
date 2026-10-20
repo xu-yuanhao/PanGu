@@ -18,7 +18,8 @@
         "src/bootstrap-api/text.h",
         "src/bootstrap-api/json.h",
         "src/bootstrap-api/schema.h",
-        "src/bootstrap-api/pi-arguments.h"
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
       ],
       "public_headers": [
         "src/bootstrap-api/bootstrap.h",
@@ -30,7 +31,8 @@
         "src/bootstrap-api/text.h",
         "src/bootstrap-api/json.h",
         "src/bootstrap-api/schema.h",
-        "src/bootstrap-api/pi-arguments.h"
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
       ],
       "dependencies": [],
       "source_root": "src/bootstrap-api",
@@ -70,7 +72,9 @@
         "schema-probe",
         "schema-guard",
         "repair-probe",
-        "repair-guard"
+        "repair-guard",
+        "host-plan-probe",
+        "host-plan-guard"
       ],
       "activation_condition": "definition-only",
       "lifecycle": {
@@ -143,7 +147,9 @@
         "schema-probe",
         "schema-guard",
         "repair-probe",
-        "repair-guard"
+        "repair-guard",
+        "host-plan-probe",
+        "host-plan-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -341,7 +347,8 @@
         "region-arena",
         "json-probe",
         "schema-probe",
-        "repair-probe"
+        "repair-probe",
+        "host-plan-probe"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1248,7 +1255,8 @@
         "text-guard",
         "json-guard",
         "schema-guard",
-        "repair-guard"
+        "repair-guard",
+        "host-plan-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -2136,6 +2144,156 @@
         },
         "measurement_plan": "fixture only; production budget remains unbaselined"
       }
+    },
+    {
+      "id": "host-plan",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/host-plan/host-plan.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/host-plan",
+      "responsibility": "bounded static native plugin planning: entry/canonical metadata, scopes, required/optional graph and Pending; no execution",
+      "non_responsibilities": [
+        "no activation, configuration-schema/permission execution or OS isolation"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_discover_prepare"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "host-plan-probe",
+        "host-plan-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "stateless, caller-owned immutable tables and disjoint scratch/output; runtime failures unpublish views and preserve final arrays; no allocation or callbacks"
+      },
+      "provides": [
+        {
+          "service": "host.plan",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "host-plan-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/host-plan-probe/main.c",
+        "src/host-plan-probe/entry.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "platform-linux",
+        "platform-memory",
+        "test-guard"
+      ],
+      "source_root": "src/host-plan-probe",
+      "responsibility": "independent consumer: plan semantics, fuel, aliases, compiled callback identities and page ends",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_host_plan_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "host-plan-probe",
+        "host-plan-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "host.plan",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "platform-linux"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
     }
   ],
   "service_definitions": [
@@ -2186,6 +2344,11 @@
     },
     {
       "id": "compat.pi-arguments",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "host.plan",
       "version": 1,
       "definition_module": "bootstrap-api"
     }
@@ -2806,6 +2969,68 @@
         "compat.pi-arguments": "pi-arguments",
         "foundation.json": "json",
         "foundation.schema": "schema"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "host-plan-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "platform-memory",
+        "host-plan",
+        "host-plan-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "host-plan-probe",
+        "symbol": "pangu_host_plan_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "platform-memory",
+        "host.plan": "host-plan"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "host-plan-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-guard",
+        "host-plan",
+        "host-plan-probe"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "host-plan-probe",
+        "symbol": "pangu_host_plan_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "platform.memory": "test-guard",
+        "host.plan": "host-plan"
       },
       "budgets": {
         "artifact_bytes": {
