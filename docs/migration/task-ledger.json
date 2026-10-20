@@ -650,6 +650,16 @@
         "real_C_fixture_mapping": true,
         "unified_integration": "NOT_IMPLEMENTED",
         "production_module_admitted": false
+      },
+      "pre_admission_canonical_metadata_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-canonical-wip-pna0k01j",
+        "ordering_cases": 18,
+        "insufficient_work_checks": 3167,
+        "refusal_cases": 7,
+        "manual_bind_canonical_prepare": true,
+        "callbacks_invoked": 0,
+        "single_native_integrated_entry": "NOT_IMPLEMENTED"
       }
     },
     {
