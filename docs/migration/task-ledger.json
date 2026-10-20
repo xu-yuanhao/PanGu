@@ -616,6 +616,16 @@
         "versioned_catalogue_graph": true,
         "entry_lookup": "NOT_IMPLEMENTED",
         "production_module_admitted": false
+      },
+      "pre_admission_module_contract_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-contract-wip-oqkgs3d7",
+        "manifest_instances": 4,
+        "contract_refusals": 13,
+        "insufficient_work_checks": 2349,
+        "lower_contract_graph_composition": true,
+        "unskippable_host_entry": "NOT_IMPLEMENTED",
+        "production_module_admitted": false
       }
     },
     {
