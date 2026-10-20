@@ -890,6 +890,23 @@
           "supplemental_host_ubsan": true,
           "adapter_output_alias_checks": false,
           "native_admission": false
+        },
+        "adapter_transaction_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2",
+          "source_manifest_sha256": "20e9107f0c1d80701ab7021ec918e5151bdf374096f6aa39d963487bae073afa",
+          "evidence_sha256": "6d0ec7dab1cbcf8938d225e9811ee46e66010b73b406eaac099f841f94380c6d",
+          "transactions_per_optimization": 98,
+          "invalid_plans_per_optimization": 145,
+          "alias_rejections_per_optimization": 6432,
+          "insufficient_budget_values_per_optimization": 12127,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "supplemental_host_ubsan": true,
+          "host_aggregate_undefined_symbols": [],
+          "native_admission": false
         }
       }
     },
