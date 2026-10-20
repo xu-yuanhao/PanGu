@@ -104,3 +104,11 @@ scope.c是外部草稿，未登记生产文件或新服务，不属于既有固�
 实际宿主验证：10126个不足总work配额覆盖五个阶段，精确10127成功；9项明确元数据伪造、模板伪造、实例错误、图冲突、容量、跨阶段别名及间接规范records别名检查通过。配置模板与实例required同时降级、彼此保持一致的攻击样例仍被安装规范模板拒绝。所有失败保留最终entry/order/states/bindings数组、不发布图，插件回调计数0；O0/O2无libc依赖链接通过。
 
 这是统一规划路径，不是任意Native代码无法构造假安装表的安全保证。仍须收敛正式私有/公开导出、补全配置Schema/权限等清单字段、登记ABI与模块及原生构建/拒绝矩阵、保护页/UBSan和恢复验证；生命周期/owner留在T14，T13尚未验收。
+
+## 私有/公开导出收敛草稿
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t13-closed-wip-tcrvjdej`。把已验证规划实现收敛为host-plan.h/host-plan.c，私有helper按来源加内部名字前缀，阶段函数使用static，公开头只声明pangu_discover_prepare。结构与语义保持原草稿；closure-map.json记录转换关系，closed-evidence.json绑定源码和验证结果。没有为每个helper建立新模块或虚表。
+
+实际宿主验证：O0/O2分别独立编译/无libc依赖链接，动态符号表均只有pangu_discover_prepare；两模式都重跑10126个不足总work配额、五阶段失败不发布及精确配额成功，得到预期入口映射/顺序。独立消费者声明并调用原pangu_graph_plan时，链接明确以未定义符号失败，证明正常模块链接不能直接调用该私有阶段。
+
+此为链接边界，不是同进程Native内存安全或恶意代码沙箱。配置Schema/权限字段、Pending原因/循环路径明细、生命周期仍待实现；新服务/ABI/模块尚未登记或原生准入。下一步基于单导出实现建立独立原生消费者、两个测试入口、固定构建及拒绝矩阵，不能把宿主共享库测试当成完整T13。

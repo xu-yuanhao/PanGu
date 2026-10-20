@@ -677,6 +677,20 @@
         "entry_outputs_failure_atomic": true,
         "callbacks_invoked": 0,
         "production_module_admitted": false
+      },
+      "pre_admission_closed_interface_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-closed-wip-tcrvjdej",
+        "public_symbols": [
+          "pangu_discover_prepare"
+        ],
+        "quota_checks_per_host_mode": 10126,
+        "host_modes": [
+          "O0",
+          "O2"
+        ],
+        "private_helper_external_link": "REJECTED",
+        "production_module_admitted": false
       }
     },
     {
