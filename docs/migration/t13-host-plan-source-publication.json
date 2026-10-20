@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t13-native-host-plan",
+  "commit": "9ebd318a388c0c204c48936112364c1b996a4f81",
+  "parent": "37dd2ba50b03c13ba94d2747f110cae2f6c92b1e",
+  "scope": "fixed Agent self-reviewed host planner including controller and64 native source files; local experiments only",
+  "controller_sha256": "838a3a4a181b6e8e618d32564eeebec1ca5d51791dafc6e0b5dd8a07693048bd",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

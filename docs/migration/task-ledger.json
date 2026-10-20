@@ -573,7 +573,7 @@
     {
       "id": "T13",
       "title": "插件发现、服务解析与作用域",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T12"
       ],
@@ -583,9 +583,12 @@
         "HOST-01"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T13",
-      "owner_role": "unassigned module implementer and independent reviewer",
+      "owner_role": "implementing Agent; same-author self-review for fixed local experiments",
       "evidence": [
-        "docs/migration/t13-scope-boundaries.md"
+        "docs/migration/t13-scope-boundaries.md",
+        "docs/migration/t13-host-plan-progress.md",
+        "docs/migration/t13-host-plan-evidence.json",
+        "docs/migration/t13-host-plan-source-publication.json"
       ],
       "completion_approved": false,
       "pre_admission_scope_design": {
@@ -691,6 +694,18 @@
         ],
         "private_helper_external_link": "REJECTED",
         "production_module_admitted": false
+      },
+      "local_prerequisite_basis": "Fixed approved T10/T11/T12 local interfaces only; no claim of full prerequisite-stage/production acceptance, global dependencies unchanged",
+      "native_host_plan_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "838a3a4a181b6e8e618d32564eeebec1ca5d51791dafc6e0b5dd8a07693048bd",
+        "candidate_tree_sha256": "c1900ee46a466ed027d153b763895bdedf9a79b191f23cd37cc564eb23e1db39",
+        "approval_record_sha256": "ea58e4ffaa5eb7ceaad8ff18800eb66cd1892a940a4a429c8137fb6cc18ed3e3",
+        "normal_builds": 40,
+        "normal_process_runs": 52,
+        "source_commit": "9ebd318a388c0c204c48936112364c1b996a4f81",
+        "full_T13": "INCOMPLETE",
+        "release": "BLOCKED"
       }
     },
     {
