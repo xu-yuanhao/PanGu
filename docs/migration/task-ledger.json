@@ -660,6 +660,23 @@
         "manual_bind_canonical_prepare": true,
         "callbacks_invoked": 0,
         "single_native_integrated_entry": "NOT_IMPLEMENTED"
+      },
+      "pre_admission_discovery_pipeline_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-discovery-wip-tfl34ao_",
+        "insufficient_total_work_checks": 10126,
+        "failure_phases": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "explicit_controls": 9,
+        "canonical_metadata_in_native_path": true,
+        "entry_outputs_failure_atomic": true,
+        "callbacks_invoked": 0,
+        "production_module_admitted": false
       }
     },
     {
