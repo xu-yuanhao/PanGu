@@ -584,8 +584,19 @@
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T13",
       "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "evidence": [
+        "docs/migration/t13-scope-boundaries.md"
+      ],
+      "completion_approved": false,
+      "pre_admission_scope_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-scope-wip-eopzg20g",
+        "source_scope": "planning kernel only, no plugin activation or complete dependency graph",
+        "queries": 7806,
+        "Cordis_execution_conformance": "NOT_RUN",
+        "stage_inputs_accepted": false,
+        "production_module_admitted": false
+      }
     },
     {
       "id": "T14",
