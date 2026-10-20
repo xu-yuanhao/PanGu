@@ -1632,7 +1632,9 @@
         "json-probe",
         "json-guard",
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1933,17 +1935,19 @@
       "role": "foundation",
       "scope": "product",
       "files": [
-        "src/pi-arguments/repair.c"
+        "src/pi-arguments/repair.c",
+        "src/pi-arguments/final.c"
       ],
       "public_headers": [],
       "dependencies": [
         "bootstrap-api",
-        "text"
+        "text",
+        "json"
       ],
       "source_root": "src/pi-arguments",
-      "responsibility": "bounded Pi-compatible UTF8 repairJson lexical transform",
+      "responsibility": "bounded Pi repairJson and final object argument parsing; no Schema coercion or execution",
       "non_responsibilities": [
-        "no JSON completion, parsing, Schema coercion or tool execution"
+        "no partial salvage, Schema coercion or tool execution"
       ],
       "boundary": {
         "reason": "required-replacement-point",
@@ -1955,7 +1959,8 @@
         "c17"
       ],
       "exports": [
-        "pangu_pi_repair_utf8"
+        "pangu_pi_repair_utf8",
+        "pangu_pi_arguments_parse"
       ],
       "targets": [
         "linux-x86_64"
@@ -1986,12 +1991,19 @@
           "version": 1,
           "optional": false,
           "on_missing": "pending"
+        },
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
         }
       ],
       "third_party_dependencies": [],
       "required_modules": [
         "bootstrap-api",
-        "text"
+        "text",
+        "json"
       ],
       "budgets": {
         "object_bytes": {
@@ -2016,7 +2028,8 @@
         "pi-arguments",
         "platform-linux",
         "platform-memory",
-        "test-guard"
+        "test-guard",
+        "json"
       ],
       "source_root": "src/repair-probe",
       "responsibility": "Pi repair lexical byte differential and capacity/alias/UTF8 boundary probe",
@@ -2073,13 +2086,20 @@
           "version": 1,
           "optional": false,
           "on_missing": "pending"
+        },
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
         }
       ],
       "third_party_dependencies": [],
       "required_modules": [
         "bootstrap-api",
         "pi-arguments",
-        "platform-linux"
+        "platform-linux",
+        "json"
       ],
       "budgets": {
         "object_bytes": {
@@ -2696,7 +2716,8 @@
         "buffer",
         "text",
         "pi-arguments",
-        "repair-probe"
+        "repair-probe",
+        "json"
       ],
       "modes": [
         "debug",
@@ -2712,7 +2733,8 @@
         "foundation.region": "arena",
         "foundation.buffer": "buffer",
         "foundation.text": "text",
-        "compat.pi-arguments": "pi-arguments"
+        "compat.pi-arguments": "pi-arguments",
+        "foundation.json": "json"
       },
       "budgets": {
         "artifact_bytes": {
@@ -2733,7 +2755,8 @@
         "text",
         "test-guard",
         "pi-arguments",
-        "repair-probe"
+        "repair-probe",
+        "json"
       ],
       "modes": [
         "debug",
@@ -2749,7 +2772,8 @@
         "foundation.region": "arena",
         "foundation.buffer": "buffer",
         "foundation.text": "text",
-        "compat.pi-arguments": "pi-arguments"
+        "compat.pi-arguments": "pi-arguments",
+        "foundation.json": "json"
       },
       "budgets": {
         "artifact_bytes": {
