@@ -606,6 +606,16 @@
         "full_scope_graph_case": true,
         "plugin_activation": "NOT_IMPLEMENTED",
         "production_module_admitted": false
+      },
+      "pre_admission_manifest_design": {
+        "status": "WIP_HOST_NOT_ADMITTED",
+        "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t13-manifest-wip-cxr23yh4",
+        "definition_order_permutations": 6,
+        "insufficient_work_checks": 4034,
+        "invalid_manifest_controls": 13,
+        "versioned_catalogue_graph": true,
+        "entry_lookup": "NOT_IMPLEMENTED",
+        "production_module_admitted": false
       }
     },
     {
