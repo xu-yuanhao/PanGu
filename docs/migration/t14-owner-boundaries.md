@@ -1,5 +1,7 @@
 # T14 owner 生命周期启动草稿
 
+当前最新宿主候选已支持异步 setup 与 disposer 的显式完成/取消推进，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
 ## 当前草稿
@@ -49,3 +51,15 @@ setup用显式操作票据在执行前登记；重入stop等待该票据退出�
 O0/O2各执行原有675个图生命周期场景，另8个异步场景组通过：两个延迟清理串行推进、内联完成、同步失败、内联完成与返回冲突、在途操作先退出后才发起清理，以及双提供者计划下正常停止/加载失败/重入取消三种异步消费者回滚。清理错误和加载错误分别保留；5既可能表示等待，也可能是已完成回调的错误码，协调器以owner状态判别静默，不能单看返回码判断Disposed。异步完成后仍未再次stop时不声称已完成释放。
 
 同一Agent实施和自审：批准继续宿主实验，尚不批准原生ABI/模块/生产准入。参考Harness vendor第6项owner-visible-until-quiescence与Cordis fiber消费者退出前保留provider的语义；没有声称完整Cordis兼容。未实现异步setup的协调协议、跨线程/事件循环调度、完整别名检查和冻结工具链验证，分支停用当前仍保守阻塞更早无关实例。
+
+## 异步 setup 完成与取消（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl`；setup-evidence.json SHA256 `cb7c52f6ae70513cad3110da2145655747aa56c7806991ddf66cfc7af2fac17a`，源码/测试脚本摘要清单的固定SHA256为 `2904952a54507c724a2701887e675cb47b6ac93f80d1c3d3055aadd48bf85594`，同一Agent自审记录见setup-review.json。复用上一版owner104/resource24，扩展未准入的runtime草稿；未修改已批准原生ABI、门禁、预算或planner。新增defer/finish/pump，runtime由零帧进入Starting/Active/Stopping/Disposed；不得在存活票据期间清零或释放runtime。
+
+setup回调内defer取得runtime+owner操作票据后返回5，操作在异步等待期间继续计入owner.inflight；finish可内联或迟到，仅记录状态，pump消费操作并继续激活或回滚。重复defer/finish、错误runtime/epoch/generation均拒绝。defer后回调返回非5记录协议错误10，但仍等待显式完成，不能把实际异步工作当成已经退出。普通同步setup返回5是已完成的错误而非自动延期；调用者须结合phase、setup_waiting和started判断是否仍有工作。
+
+stop在setup执行/等待期间立即将当前owner置Quiescing，拒绝新的资源登记；setup操作尚存时不能清理其资源，也不会过早释放提供者。取消后迟到成功只允许回滚，不能恢复Active。setup失败后若disposer异步等待，协调器仍保留当前实例，清理完成后继续逆序回滚；加载首错与清理首错分别保留。
+
+O0/O2各1414个异步setup场景通过：在95个有效固定图的每个激活位置注入异步成功、失败、外部取消、失败后异步清理、内联完成、defer与返回值冲突、setup内部重入取消，并加app/session与MANY正反提供者顺序。原675图生命周期场景和8组异步清理场景均在新源码上两种优化重新通过。测试验证完成之前无后续setup/cleanup，完成仅记状态不自动释放，Pending不启动，消费者清理时沿真实binding核对提供者仍Active。
+
+首次回归曾发现旧异步清理夹具在stop后登记资源，新规则正确拒绝；已把该夹具改为先登记全部资源再stop，保留原释放顺序和断言，并新增stop后注册/再次defer拒绝断言。完整范围仍待：可信静态entry到setup ABI、服务新调用入口与清理调用区分、全面别名/几何验证、工作量预算、图分支独立停用、冻结原生构建及G04故障注入；单线程显式完成不等于事件循环或跨线程并发已实现。

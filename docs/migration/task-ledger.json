@@ -808,6 +808,22 @@
           "async_setup": false,
           "event_loop": false,
           "native_admission": false
+        },
+        "async_setup_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl",
+          "source_manifest_sha256": "2904952a54507c724a2701887e675cb47b6ac93f80d1c3d3055aadd48bf85594",
+          "evidence_sha256": "cb7c52f6ae70513cad3110da2145655747aa56c7806991ddf66cfc7af2fac17a",
+          "async_setup_scenarios_per_optimization": 1414,
+          "regression_plan_scenarios_per_optimization": 675,
+          "async_cleanup_groups_per_optimization": 8,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "review": "same Agent self-review; host experiment only",
+          "native_admission": false,
+          "event_loop": false
         }
       }
     },
