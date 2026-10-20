@@ -6,6 +6,7 @@ static pangu_i32 alpha(void *p) {callback_calls++;if(p) (*(pangu_u32 *)p)++;retu
 static pangu_i32 beta(void *p) {callback_calls++;if(p) (*(pangu_u32 *)p)++;return 202;}
 static pangu_i32 gamma(void *p) {callback_calls++;if(p) (*(pangu_u32 *)p)++;return 303;}
 static const pangu_plan_scope scopes[]={{0xffffffffU,0},{0,0},{0,0}};
+#include "src/host-plan-probe/graph-cases.h"
 static const pangu_manifest_definition definitions[]={ {"agent",1,1,0},{"other",1,1,0} };
 static pangu_manifest_module modules[]={MODULE("provider"),MODULE("required"),MODULE("optional")};
 static pangu_manifest_instance instances[]={ {"app","provider",1,0},{"session","provider",1,1},{"client","required",1,1},{"optional","optional",1,2} };
@@ -99,9 +100,36 @@ static int combinations(void)
  }
  if(good(&out)) return 55;return 0;
 }
+
+static pangu_plan_service corpus_services[10];static pangu_plan_instance corpus_instances[9];static pangu_plan_binding corpus_scope_bindings[10];static pangu_plan_provider corpus_providers[10];static pangu_u32 corpus_owners[10];static pangu_plan_requirement corpus_requirements[90];
+static const pangu_manifest_storage corpus_lower={corpus_services,10,corpus_instances,9,corpus_scope_bindings,10,corpus_providers,corpus_owners,10,corpus_requirements,90};
+static pangu_u32 corpus_pending[9],corpus_degree[9],corpus_queue[9],corpus_resolved[10],corpus_order[9],corpus_states[9],corpus_entry_work[9],corpus_entry_output[9];static pangu_plan_edge corpus_edges[1000],corpus_output_edges[1000];
+static const pangu_graph_scratch corpus_scratch={corpus_pending,corpus_degree,corpus_queue,corpus_resolved,corpus_edges,1000};
+static const pangu_graph_output corpus_output={corpus_order,9,corpus_states,9,corpus_output_edges,1000};
+static const pangu_discovery_storage corpus_storage={&corpus_lower,&corpus_scratch,&corpus_output,corpus_entry_work,corpus_entry_output,9};
+static volatile pangu_u64 graph_case;
+static int graph_corpus(void)
+{
+ pangu_u32 accepted=0,rejected=0;
+ for(pangu_u64 i=0;i<sizeof(host_graph_cases)/sizeof(host_graph_cases[0]);i++) {
+  graph_case=i;const host_graph_case *c=&host_graph_cases[i];pangu_prepare_result out;
+  fill(corpus_order,sizeof(corpus_order),0xa5);fill(corpus_states,sizeof(corpus_states),0xa5);fill(corpus_output_edges,sizeof(corpus_output_edges),0xa5);fill(corpus_entry_output,sizeof(corpus_entry_output),0xa5);
+  pangu_i32 rc=pangu_discover_prepare(c->manifest,c->contracts,c->count,c->installed,&corpus_storage,10000000,&out);
+  if(rc!=c->status || callback_calls) return 60;
+  if(rc) {rejected++;if(rc!=17 || out.stage!=5 || out.graph_report.reason!=8 || !empty(&out) || !bytes(corpus_order,sizeof(corpus_order),0xa5) || !bytes(corpus_states,sizeof(corpus_states),0xa5) || !bytes(corpus_output_edges,sizeof(corpus_output_edges),0xa5) || !bytes(corpus_entry_output,sizeof(corpus_entry_output),0xa5)) return 61;continue;}
+  accepted++;if(out.stage!=6 || out.graph_report.order_count!=c->order_count || out.graph_report.binding_count!=c->binding_count) return 62;
+  pangu_u32 pending_count=0;
+  for(pangu_u64 j=0;j<c->manifest->instance_count;j++) {if(corpus_states[j]!=c->states[j]) return 63;pending_count+=c->states[j];}
+  if(out.graph_report.pending_count!=pending_count) return 64;
+  for(pangu_u32 j=0;j<c->order_count;j++) if(corpus_order[j]!=c->order[j]) return 65;
+  for(pangu_u32 j=0;j<c->binding_count;j++) if(corpus_output_edges[j].requirement!=c->bindings[j].requirement || corpus_output_edges[j].provider!=c->bindings[j].provider) return 66;
+  for(pangu_u64 j=0;j<c->manifest->module_count;j++) if(corpus_entry_output[j]!=j) return 67;
+ }
+ return accepted==95 && rejected==145 ? 0 : 68;
+}
 int host_plan_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
- if(shard) return 247;int rc=semantics();if(rc) return rc;rc=pages(memory);if(rc) return rc;rc=combinations();if(rc) return rc;
+ if(shard) return 247;int rc=semantics();if(rc) return rc;rc=pages(memory);if(rc) return rc;rc=combinations();if(rc) return rc;rc=graph_corpus();if(rc) return rc;
  if(callback_calls) return 40;pangu_u32 count=0;pangu_i32 a=entries[entry_output[0]].entry(&count),b=entries[entry_output[1]].entry(&count),c=entries[entry_output[2]].entry(&count);
  return a==101 && b==202 && c==303 && count==3 && callback_calls==3 ? 0 : 41;
 }

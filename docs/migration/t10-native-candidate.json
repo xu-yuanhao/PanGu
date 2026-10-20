@@ -2215,7 +2215,8 @@
       "scope": "test",
       "files": [
         "src/host-plan-probe/main.c",
-        "src/host-plan-probe/entry.S"
+        "src/host-plan-probe/entry.S",
+        "src/host-plan-probe/graph-cases.h"
       ],
       "public_headers": [],
       "dependencies": [
@@ -2238,7 +2239,8 @@
       },
       "languages": [
         "c17",
-        "gas"
+        "gas",
+        "c-header"
       ],
       "exports": [
         "pangu_host_plan_test_start"
