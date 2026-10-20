@@ -16,7 +16,8 @@
         "src/bootstrap-api/buffer.h",
         "src/bootstrap-api/region.h",
         "src/bootstrap-api/text.h",
-        "src/bootstrap-api/json.h"
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h"
       ],
       "public_headers": [
         "src/bootstrap-api/bootstrap.h",
@@ -26,7 +27,8 @@
         "src/bootstrap-api/buffer.h",
         "src/bootstrap-api/region.h",
         "src/bootstrap-api/text.h",
-        "src/bootstrap-api/json.h"
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h"
       ],
       "dependencies": [],
       "source_root": "src/bootstrap-api",
@@ -62,7 +64,9 @@
         "region-arena",
         "region-slots",
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "definition-only",
       "lifecycle": {
@@ -131,7 +135,9 @@
         "region-arena",
         "region-slots",
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -327,7 +333,8 @@
         "buffer-probe",
         "text-probe",
         "region-arena",
-        "json-probe"
+        "json-probe",
+        "schema-probe"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -868,7 +875,9 @@
         "region-arena",
         "region-slots",
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1041,7 +1050,9 @@
         "region-arena",
         "region-slots",
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1222,7 +1233,8 @@
       "linkage": "static",
       "compositions": [
         "text-guard",
-        "json-guard"
+        "json-guard",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1288,7 +1300,9 @@
       "compositions": [
         "region-slots",
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1602,7 +1616,9 @@
       "linkage": "static",
       "compositions": [
         "json-probe",
-        "json-guard"
+        "json-guard",
+        "schema-probe",
+        "schema-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1727,6 +1743,176 @@
         },
         "measurement_plan": "fixture only; production budget remains unbaselined"
       }
+    },
+    {
+      "id": "schema",
+      "role": "foundation",
+      "scope": "product",
+      "files": [
+        "src/schema/schema.c"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "json"
+      ],
+      "source_root": "src/schema",
+      "responsibility": "bounded explicit-subset Schema definition checks and strict JSON value validation",
+      "non_responsibilities": [
+        "no coercion, Pi repair, JS prototypes, arbitrary Schema dialects, IO or tool execution"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17"
+      ],
+      "exports": [
+        "pangu_schema_check",
+        "pangu_schema_validate"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "schema-probe",
+        "schema-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller retains immutable schema/value JSON input, results and tokens; report and limits are caller storage",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "no allocation; explicit work/node/depth limits; no invocation or repair on unsupported Schema"
+      },
+      "provides": [
+        {
+          "service": "foundation.schema",
+          "version": 1
+        }
+      ],
+      "requires": [
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "json"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "id": "schema-probe",
+      "role": "client",
+      "scope": "test",
+      "files": [
+        "src/schema-probe/main.c",
+        "src/schema-probe/entry.S",
+        "src/schema-probe/cases.h"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api",
+        "schema",
+        "json",
+        "platform-linux",
+        "platform-memory",
+        "test-guard"
+      ],
+      "source_root": "src/schema-probe",
+      "responsibility": "strict bounded Schema conformance, unsupported-declaration and failure/limit fixture",
+      "non_responsibilities": [
+        "not a production agent"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas",
+        "c-header"
+      ],
+      "exports": [
+        "pangu_schema_test_start"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "schema-probe",
+        "schema-guard"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "foundation.json",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.exit",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "foundation.schema",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api",
+        "schema",
+        "json",
+        "platform-linux"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
     }
   ],
   "service_definitions": [
@@ -1767,6 +1953,11 @@
     },
     {
       "id": "foundation.json",
+      "version": 1,
+      "definition_module": "bootstrap-api"
+    },
+    {
+      "id": "foundation.schema",
       "version": 1,
       "definition_module": "bootstrap-api"
     }
@@ -2227,6 +2418,84 @@
         "foundation.text": "text",
         "foundation.json": "json",
         "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "schema-probe",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "schema-probe",
+        "platform-memory",
+        "schema"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "schema-probe",
+        "symbol": "pangu_schema_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "platform-memory",
+        "foundation.schema": "schema"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "bounded bytes correctness fixture; no product performance approval"
+      }
+    },
+    {
+      "id": "schema-guard",
+      "scope": "test",
+      "modules": [
+        "bootstrap-api",
+        "platform-linux",
+        "test-region",
+        "buffer",
+        "text",
+        "json",
+        "schema-probe",
+        "test-guard",
+        "schema"
+      ],
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "entry": {
+        "module": "schema-probe",
+        "symbol": "pangu_schema_test_start"
+      },
+      "bindings": {
+        "platform.exit": "platform-linux",
+        "foundation.region": "test-region",
+        "foundation.buffer": "buffer",
+        "foundation.text": "text",
+        "foundation.json": "json",
+        "platform.memory": "test-guard",
+        "foundation.schema": "schema"
       },
       "budgets": {
         "artifact_bytes": {
