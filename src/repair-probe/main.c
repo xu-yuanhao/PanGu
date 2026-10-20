@@ -330,8 +330,91 @@ static int numeric_pages(const pangu_memory_api *memory)
  for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 127;
  return 0;
 }
-int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+static int repair_numeric_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  if(shard) return 247;
  int rc=repair_null_test(memory,0);if(rc) return rc;rc=numeric_corpus();if(rc) return rc;rc=numeric_boundaries();if(rc) return rc;rc=numeric_refusals();if(rc) return rc;return numeric_pages(memory);
+}
+
+static pangu_json_parser scalar_parsers[2];
+static pangu_json_token scalar_tokens[2][512];
+static pangu_json_result scalar_results[2];
+static pangu_schema_view scalar_views[2];
+_Alignas(8) static unsigned char scalar_workspace[4096];
+static unsigned char scalar_expected_text[64];
+static int scalar_parse(pangu_u32 slot,const unsigned char *bytes,pangu_u64 n)
+{
+ pangu_text_slice input={bytes,n};pangu_json_limits q={2097152,64,0};
+ if(pangu_json_init(&scalar_parsers[slot],scalar_tokens[slot],512,q) || pangu_json_feed(&scalar_parsers[slot],input,1) || pangu_json_get_result(&scalar_parsers[slot],&scalar_results[slot])) return 1;
+ scalar_views[slot].input=input;scalar_views[slot].result=&scalar_results[slot];scalar_views[slot].root=0;return 0;
+}
+static int scalar_matches(const pangu_pi_scalar_result *value)
+{
+ if(value->reserved) return 0;
+ if(value->kind!=PANGU_JSON_STRING && (value->text.data || value->text.length)) return 0;
+ if(value->kind!=PANGU_JSON_NUMBER && value->number_bits) return 0;
+ if(!value->kind) return null_equal(&scalar_views[0],scalar_views[0].root,&scalar_views[1],0,1);
+ const pangu_json_token *t=&scalar_tokens[1][0];if(t->kind!=value->kind) return 0;
+ if(value->kind==PANGU_JSON_NUMBER) { pangu_u64 bits;if((value->number_bits&0x7fffffffffffffffULL)>=0x7ff0000000000000ULL) return 0;return !pangu_json_number_bits(scalar_views[1].input,&scalar_results[1],0,&bits) && bits==value->number_bits; }
+ if(value->kind==PANGU_JSON_STRING) { pangu_u64 n;if(pangu_json_string_decode(scalar_views[1].input,&scalar_results[1],0,scalar_expected_text,64,&n)) return 0;return n==value->text.length && same(scalar_expected_text,value->text.data,n); }
+ return value->kind<=PANGU_JSON_FALSE;
+}
+static int scalar_corpus(void)
+{
+ for(pangu_u64 i=0;i<sizeof(scalar_cases)/sizeof(scalar_cases[0]);i++) {
+  test_case=i;const scalar_case *c=&scalar_cases[i];pangu_pi_scalar_result result;
+  if(scalar_parse(0,c->source,c->n) || scalar_parse(1,c->expected,c->en)) return 130;
+  if(pangu_pi_scalar_convert(&scalar_views[0],c->target,c->mode,scalar_workspace,sizeof(scalar_workspace),c->n,&result) || !scalar_matches(&result)) return 131;
+  fill((unsigned char *)&result,32,0xa5);
+  pangu_i32 rc=pangu_pi_scalar_convert(&scalar_views[0],c->target,c->mode,(void *)0,0,c->n,&result);
+  if(rc) { if(rc!=2) return 132;for(pangu_u64 j=0;j<32;j++) if(((unsigned char *)&result)[j]!=0xa5) return 133; }
+  else if(!scalar_matches(&result)) return 134;
+ }
+ return 0;
+}
+static int scalar_boundaries(void)
+{
+ static const unsigned char text[]="\"9007199254740991n\"";pangu_pi_scalar_result result;
+ if(scalar_parse(0,text,sizeof(text)-1)) return 135;
+ for(pangu_u64 cap=0;cap<=sizeof(text)*2;cap++) {
+  fill((unsigned char *)&result,32,0xa5);pangu_i32 rc=pangu_pi_scalar_convert(&scalar_views[0],PANGU_PI_SCALAR_INTEGER,PANGU_PI_TYPED_BASIC,scalar_workspace,cap,128,&result);
+  if(cap<17) { if(rc!=2) return 136;for(pangu_u64 j=0;j<32;j++) if(((unsigned char *)&result)[j]!=0xa5) return 137; }
+  else if(rc || result.kind!=PANGU_JSON_NUMBER || result.number_bits!=0x433fffffffffffffULL) return 138;
+ }
+ static const unsigned char object[]="{\"x\":\"1\"}";
+ if(scalar_parse(0,object,sizeof(object)-1)) return 139;
+ scalar_views[0].root=1;fill((unsigned char *)&result,32,0xa5);
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,&result)!=1 || ((unsigned char *)&result)[0]!=0xa5) return 140;
+ scalar_views[0].root=2;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,&result) || result.kind!=PANGU_JSON_NUMBER || result.number_bits!=0x3ff0000000000000ULL) return 141;
+ scalar_views[0].root=0;fill((unsigned char *)&result,32,0xa5);
+ if(pangu_pi_scalar_convert(&scalar_views[0],0,3,scalar_workspace,4096,128,&result)!=1 || ((unsigned char *)&result)[0]!=0xa5) return 142;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,4,scalar_workspace,4096,128,&result)!=1 || ((unsigned char *)&result)[0]!=0xa5) return 143;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,1,&result)!=2 || ((unsigned char *)&result)[0]!=0xa5) return 144;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,(pangu_pi_scalar_result *)scalar_workspace)!=1) return 145;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,(unsigned char *)scalar_tokens[0],32,128,&result)!=1 || ((unsigned char *)&result)[0]!=0xa5) return 146;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,(pangu_pi_scalar_result *)&scalar_views[0])!=1) return 147;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,(pangu_pi_scalar_result *)&scalar_results[0])!=1) return 148;
+ scalar_results[0].status=13;
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,scalar_workspace,4096,128,&result)!=10 || ((unsigned char *)&result)[0]!=0xa5) return 149;
+ scalar_results[0].status=0;return 0;
+}
+static int scalar_pages(const pangu_memory_api *memory)
+{
+ pangu_mapping maps[3];for(pangu_u32 i=0;i<3;i++) { maps[i].address=(void *)0;maps[i].length=0;if(memory->map(memory->context,4096,&maps[i])) return 150; }
+ static const unsigned char text[]="\"\\u0031\"";
+ unsigned char *input=(unsigned char *)maps[0].address+4096-(sizeof(text)-1),*work=(unsigned char *)maps[1].address+4096-2;
+ for(pangu_u64 i=0;i<sizeof(text)-1;i++) input[i]=text[i];
+ if(scalar_parse(0,input,sizeof(text)-1)) return 151;
+ pangu_pi_scalar_result *out=(pangu_pi_scalar_result *)((unsigned char *)maps[2].address+4096-32);
+ if(pangu_pi_scalar_convert(&scalar_views[0],1,3,work,2,128,out) || out->kind!=PANGU_JSON_NUMBER || out->number_bits!=0x3ff0000000000000ULL) return 152;
+ fill((unsigned char *)out,32,0xa5);if(pangu_pi_scalar_convert(&scalar_views[0],1,3,work,1,128,out)!=2) return 153;
+ for(pangu_u64 j=0;j<32;j++) if(((unsigned char *)out)[j]!=0xa5) return 154;
+ for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 155;
+ return 0;
+}
+int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+{
+ if(shard) return 247;
+ int rc=repair_numeric_test(memory,0);if(rc) return rc;rc=scalar_corpus();if(rc) return rc;rc=scalar_boundaries();if(rc) return rc;return scalar_pages(memory);
 }

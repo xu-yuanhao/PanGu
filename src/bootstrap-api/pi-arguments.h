@@ -77,5 +77,33 @@ pangu_i32 pangu_pi_optional_nulls(const pangu_schema_view *,const pangu_schema_v
  * No allocation/FP arithmetic/libc or tool execution; caller owns lifetimes.
  */
 pangu_i32 pangu_pi_number_string(pangu_text_slice,unsigned char *,pangu_u64,pangu_u64,pangu_u64 *);
+enum pangu_pi_scalar_target { PANGU_PI_SCALAR_NUMBER=1,PANGU_PI_SCALAR_INTEGER,PANGU_PI_SCALAR_STRING,PANGU_PI_SCALAR_BOOLEAN,PANGU_PI_SCALAR_NULL };
+enum pangu_pi_scalar_mode { PANGU_PI_TYPEBOX_RULE=1,PANGU_PI_PLAIN_RULE,PANGU_PI_TYPED_BASIC };
+typedef struct pangu_pi_scalar_result {
+ pangu_u32 kind,reserved;pangu_u64 number_bits;pangu_text_slice text;
+} pangu_pi_scalar_result;
+_Static_assert(sizeof(pangu_pi_scalar_result)==32,"scalar result layout");
+/* One UNCONSTRAINED primitive interior-value rule, not complete Schema coercion,
+ * traversal, optional-null normalization, literal/enum/union, validation or tool
+ * authorization. Modes: TypeBox rule; Pi plain rule; fixed TypeBox1.3.27 basic
+ * typed rule THEN Pi plain rule. Caller selects origin; JSON cannot retain kind
+ * metadata. Source must be successful immutable matching JSON value (not key).
+ * Result kind0 retains original token; replacements use JSON NULL/TRUE/FALSE/
+ * NUMBER/STRING codes. Replacement numbers are finite binary64; strings borrow
+ * static ASCII or workspace (consume before reuse), with no NUL terminator.
+ * Original STRING tokens are preserved including lone escaped UTF16. A lone
+ * surrogate cannot match numeric/boolean/null syntax and is retained unchanged.
+ * max_bytes bounds selected lexeme. Caller workspace supports decoded UTF8 plus
+ * decimal scratch, or number-to-string output: max(25,2*lexeme_bytes+2) suffices
+ * subject to existing1MiB numeric cap. NULL/zero allowed where scratch unneeded.
+ * Workspace disposable; result unchanged on every failure. Source/view/result/
+ * tokens, workspace capacity and output must be disjoint (readonly contexts may
+ * overlap). 1 preconditions,2 quotas,9 unsupported kind,10 bad result; source
+ * errors propagate. Status0 may still produce a Schema-invalid retained value.
+ * Caller owns allocation, alignment, lifetime and exclusive workspace. No heap,
+ * raw-pointer authentication or JS stringify/wire serialization. Preserve -0
+ * when transporting replacement number bits between conversion stages.
+ */
+pangu_i32 pangu_pi_scalar_convert(const pangu_schema_view *,pangu_u32,pangu_u32,unsigned char *,pangu_u64,pangu_u64,pangu_pi_scalar_result *);
 #endif
 #endif

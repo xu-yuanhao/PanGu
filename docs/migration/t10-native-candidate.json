@@ -1940,7 +1940,8 @@
         "src/pi-arguments/repair.c",
         "src/pi-arguments/final.c",
         "src/pi-arguments/normalize.c",
-        "src/pi-arguments/numeric.c"
+        "src/pi-arguments/numeric.c",
+        "src/pi-arguments/scalar.c"
       ],
       "public_headers": [],
       "dependencies": [
@@ -1950,7 +1951,7 @@
         "schema"
       ],
       "source_root": "src/pi-arguments",
-      "responsibility": "bounded Pi parsing/optional-null stages and Number(string) prerequisite; no full type coercion or execution",
+      "responsibility": "bounded Pi parsing/optional-null and unconstrained primitive rules; no full traversal/constraints/validation/execution",
       "non_responsibilities": [
         "no partial salvage, Schema coercion or tool execution"
       ],
@@ -1967,7 +1968,8 @@
         "pangu_pi_repair_utf8",
         "pangu_pi_arguments_parse",
         "pangu_pi_optional_nulls",
-        "pangu_pi_number_string"
+        "pangu_pi_number_string",
+        "pangu_pi_scalar_convert"
       ],
       "targets": [
         "linux-x86_64"
@@ -1984,7 +1986,7 @@
         "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
         "threading": "single-thread",
         "callbacks": "none",
-        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch"
+        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse; Number(string) preserves bits on failure with disposable decimal scratch; scalar rules preserve result on failure and return original-token or replacement representation with borrowed static/workspace string"
       },
       "provides": [
         {
