@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选已支持异步 setup/disposer 完成取消及按真实依赖推进分支停用，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新宿主候选已支持异步 setup/disposer、依赖图停用与业务/setup/清理调用的在途守卫，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -75,3 +75,15 @@ runtime_prepare_stop_edges从同一stage6计划的resolved bindings映射消费�
 O0/O2各1010个图停用场景通过（固定95有效图逐激活位置，加app/session与MANY正反顺序），每次沿真实binding计算保留闭包并逐owner对照：548次有无关分支提前完成、224次保留至少一个提供者祖先、83次异步setup未完成时独立分支已退出、155次在另一owner等待时观察清理错误且继续清理。覆盖在途调用、异步disposer、异步setup取消、同步setup失败、清理首错；反复stop和结束后的stop不重复释放。所有消费者清理仍断言其实际提供者Active。
 
 原1414异步setup、675基础生命周期及8组异步disposer在新源码两种优化均复验通过。新边映射在每个有效固定图遍历不足预算验证完整输出不变，并核对每条映射边与原始requirement/provider owner一致。尚未实现每次调度工作量预算、服务调用阻断/清理权限区分、完整几何检查、正式entry ABI、冻结原生构建与完整G04；本地宿主结果不能放行生产。
+
+## 调用入口与清理作用域（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi`；call-evidence.json SHA256 `5579354472e1649f9440ad15469370591d7c0fc8c27fc344f71893ddc197c544`，源码/测试脚本摘要清单SHA256 `fecf6ec73f94c7ecf8efef4a7b00be0f7f308a284f1aeae794e72b762fc07531`，同一Agent自审见call-review.json。新增calls.h/c；仍未准入的owner草稿尺寸104不变，原reserved字转为cleanup_callback标记；不是已批准原生ABI变更。
+
+按已解析binding索引进入调用，同时持有消费者和提供者的操作票据；提供者配额不足时归还已取得的消费者操作，不泄漏在途计数，失败不发布调用票据。正常业务仅在runtime Active且未请求停止时准入。setup调用须有当前callback/未完成异步setup的有效作用域，消费者可为Loading；停止后同样拒绝。清理调用只在Stopping且对应消费者清理作用域仍有效时准入，并沿真实resolved binding保留提供者。完成调用先验证两个操作均存活再释放，复制票据重复完成、篡改其中一个票据不得部分扣减另一个计数。
+
+清理作用域以owner/epoch/每资源清理序号标识：同步回调返回即失效；异步disposer显式完成后即拒绝新清理调用，即使宿主尚未再次stop。已进入的调用仍可正常退出。owner新增cleanup操作入口允许在受管清理中计数；即使同步清理回调已经返回，遗留在途调用也阻止owner继续清理/Disposed，因此提供者仍可用。完成票据不声称能恢复已释放存储，所有runtime/owner/元数据必须存活。
+
+O0/O2各207个调用场景、1776次测试提供者实际调用通过，覆盖固定有效图的全部resolved bindings及app/session/MANY正反顺序；setup调用、停止后业务拒绝、跨消费者清理作用域拒绝、同步清理作用域过期、异步清理显式完成后拒绝新调用、清理回调返回仍保留调用、错误/重复完成以及消费者/提供者配额耗尽和回滚。原1010图停用、1414异步setup、675基础生命周期及8组异步disposer在新源码两种优化复验通过。
+
+这是可信原生宿主的生命周期准入接口，尚非完整服务vtable路由或参数ABI；测试函数在准入成功后才调用，错误分支验证未执行提供者。裸函数指针/owner API仍可被可信原生代码直接调用，不能把这些测试说成沙箱或对恶意插件的权限隔离保证。尚需正式entry/服务ABI、调用入口的模块边界/导出约束、全面别名与几何检查、调度预算和冻结原生验证，T14/G04未整体验收。

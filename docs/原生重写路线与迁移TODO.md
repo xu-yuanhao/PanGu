@@ -306,6 +306,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] 局部宿主调用准入：区分业务/setup/清理作用域，同时保留调用两端 owner；停止后业务拒绝，清理回调返回后仍等待在途调用。O0/O2 各 207 场景/1776 次测试提供者调用通过；完整服务 ABI、边界约束和原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
+
 - [x] 局部宿主分支停用：按 T13 真实绑定保留提供者闭包，等待 setup/disposer/调用时仍清理无关分支；O0/O2 各 1010 场景通过，含 548 次独立推进和 83 次等待 setup 时独立退出。正式 ABI、调度预算和原生 G04 待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
 - [x] 局部宿主异步 setup：defer/finish/pump、停止后迟到成功不激活、setup 完成后仍等待异步清理；O0/O2 各 1414 场景通过，原 675 生命周期与 8 组清理场景复验通过。仍需正式 ABI、原生准入和完整 G04，见 [T14 草稿](migration/t14-owner-boundaries.md)。

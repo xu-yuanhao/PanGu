@@ -839,6 +839,20 @@
           ],
           "native_admission": false,
           "scheduler_quantum_budget": false
+        },
+        "call_admission_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi",
+          "source_manifest_sha256": "fecf6ec73f94c7ecf8efef4a7b00be0f7f308a284f1aeae794e72b762fc07531",
+          "evidence_sha256": "5579354472e1649f9440ad15469370591d7c0fc8c27fc344f71893ddc197c544",
+          "call_cases_per_optimization": 207,
+          "provider_invocations_per_optimization": 1776,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "service_vtable_abi": false,
+          "native_admission": false
         }
       }
     },
