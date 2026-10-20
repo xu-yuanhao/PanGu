@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-pi-tree-conversion",
+  "commit": "887e3edc5a8d930f01270543c9afe9ad2b29583d",
+  "parent": "e7a794157a85cbfba78fe8c9016e6acdbab5ee84",
+  "scope": "fixed Agent self-reviewed bounded tree conversion including controller and 59 native source files; local experiments only",
+  "controller_sha256": "5757e70720c733a84229b875d3ebe6170996a3044d705104bb144c292e984f6c",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

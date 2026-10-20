@@ -110,3 +110,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## 标量规则局部更新
 
 [基础标量规则](t12-scalar-progress.md)已完成2562条三模式、五目标语义验证，包括typed fallback和typed→plain基础组合；不能代替literal/enum/union或整个树遍历。替换数值始终有限，失败的转换保留原值而不把NaN序列化为null；完整参数转换和最终验证仍未完成。
+
+## 有界树转换局部更新
+
+[对象/数组转换](t12-tree-progress.md)已验证独立typed/plain阶段与286条四工具Object根完整参数链路。Kind表须保留真实TypeBox来源；阶段返回值不等同于Pi整个函数的根值返回语义。union和typed正则属性仍显式不支持。完整公共参数校验、Provider最终事件及完整T12尚未完成。

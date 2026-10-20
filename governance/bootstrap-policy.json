@@ -161,6 +161,10 @@
     "docs/migration/t12-scalar-progress.md": "document",
     "docs/migration/t12-scalar-evidence.json": "control",
     "docs/migration/t12-scalar-candidate.json": "control",
-    "docs/migration/t12-scalar-source-publication.json": "control"
+    "docs/migration/t12-scalar-source-publication.json": "control",
+    "docs/migration/t12-tree-progress.md": "document",
+    "docs/migration/t12-tree-evidence.json": "control",
+    "docs/migration/t12-tree-candidate.json": "control",
+    "docs/migration/t12-tree-source-publication.json": "control"
   }
 }

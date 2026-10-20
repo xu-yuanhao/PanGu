@@ -1,0 +1,417 @@
+{
+  "schema": "pangu.t12-tree-progress.v1",
+  "date": "2026-10-20",
+  "task_status": "IN_PROGRESS",
+  "approval": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+  "scope": "explicit-kind typed/plain bounded tree conversion and four Object-root tool chains; not complete Pi coercion",
+  "request": {
+    "image": "/home/xu-yuanhao/Documents/PanGu-artifacts/toolchain/frozen-gas-9sf3ohft/image",
+    "image_sha256": "9765bb42bfca5bce3787c83801b9201563d59f758b61a327bfb644c3737c1dc4",
+    "controller": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/controller",
+    "candidate": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate",
+    "policy_sha256": "b1dc97049f4af47cc2e30b87afdcb9a0c737a221e0b2415a66fca1cdb849a9e0",
+    "controller_sha256": "5757e70720c733a84229b875d3ebe6170996a3044d705104bb144c292e984f6c",
+    "output": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/build",
+    "job": "native-admission",
+    "registry": "docs/migration/t10-native-candidate.json"
+  },
+  "controller_sha256": "5757e70720c733a84229b875d3ebe6170996a3044d705104bb144c292e984f6c",
+  "candidate_tree_sha256": "d8e8a861cba35dac997e6a4a02e9c8f81ec274ef379c708353b574061feeea63",
+  "registry_sha256": "2f4419e0a342fe3abe1923a495e9e794f49f07efa7ecf91d013f89807adc2dfe",
+  "registry_file_sha256": "6a9449efe8bea76fb6b11426c7d658d18bbfd268b9a6549bf86ee332274f8d21",
+  "sources": {
+    "src/arena-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/arena-probe/entry.S",
+      "sha256": "ad04ae776effee000dcd5602dac1dd892a66def163f7abd334284bf1fe593302",
+      "mode": 420
+    },
+    "src/arena-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/arena-probe/main.c",
+      "sha256": "c5ca1f9877ec9cfcc95af5dd14f9c6e5cd02ab15421af7a8637b3296b260e6b0",
+      "mode": 420
+    },
+    "src/arena/arena.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/arena/arena.c",
+      "sha256": "25e437967daa6966f2de7e54a33d103cb0a46036ac9bbff18233cb1f49e8ab3d",
+      "mode": 420
+    },
+    "src/bootstrap-api/arena.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/arena.h",
+      "sha256": "ba87ef550885b15afb56a2756213656d2371d38acfffeade7bc091c6468b3836",
+      "mode": 420
+    },
+    "src/bootstrap-api/bootstrap.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/bootstrap.h",
+      "sha256": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49",
+      "mode": 420
+    },
+    "src/bootstrap-api/buffer.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/buffer.h",
+      "sha256": "d9aa4bd28e1b5f5475a4c380069051aa8c8ca8e6a61e6fd449eb170749638f2a",
+      "mode": 420
+    },
+    "src/bootstrap-api/io.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/io.h",
+      "sha256": "ee95800ab902c8d2a846c5560741ac6a2a73e942b529b888811c6079a63b0a50",
+      "mode": 420
+    },
+    "src/bootstrap-api/json.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/json.h",
+      "sha256": "dcc170cd3ec610df28deb02a1a5f3ed6da362e700607ba813769bdfb681d1495",
+      "mode": 420
+    },
+    "src/bootstrap-api/memory.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/memory.h",
+      "sha256": "8b7ad0f9dabced293dfb16087582f05e15ed31da9246b2c93bdc8eef0b1bbacc",
+      "mode": 420
+    },
+    "src/bootstrap-api/pi-arguments.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/pi-arguments.h",
+      "sha256": "a78d5e7234f73ab88478026bc5d99521363befb64c4b1b0359d3eae38be80f5b",
+      "mode": 420
+    },
+    "src/bootstrap-api/region.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/region.h",
+      "sha256": "6cbb788af6d3fc027f314e9532cc6a93294e9b0505a04c40b35c09e3ffac0526",
+      "mode": 420
+    },
+    "src/bootstrap-api/schema.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/schema.h",
+      "sha256": "03cdc8df0a9f021b6eae28e6291085510caff7113492fe289b933e86dff9c587",
+      "mode": 420
+    },
+    "src/bootstrap-api/text.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap-api/text.h",
+      "sha256": "733b5f8097a295e5ca71ab94900fa95011d51b4fb1b24a3667a930c318b80d1a",
+      "mode": 420
+    },
+    "src/bootstrap/bootstrap.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/bootstrap/bootstrap.c",
+      "sha256": "1742a636bdf75555adba2fdc8635a90ef75c56c56c8788a2bdd0fbfb951c045b",
+      "mode": 420
+    },
+    "src/buffer-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/buffer-probe/entry.S",
+      "sha256": "f06ad23c0ce1a1465251b850a619d9398a26e507615145bd8b92b067c9d2a3e7",
+      "mode": 420
+    },
+    "src/buffer-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/buffer-probe/main.c",
+      "sha256": "778c8997f7eff50b6a762ffb1b71c8503819080e3fac5a8053b4100c9253f635",
+      "mode": 420
+    },
+    "src/buffer/buffer.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/buffer/buffer.c",
+      "sha256": "b721c52b6d1626213e51b8bca60fcde6758a3b7ee1cc0d7693d28dcf46a93ccf",
+      "mode": 420
+    },
+    "src/buffer/move.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/buffer/move.S",
+      "sha256": "9166e581c0922ff82c88644b608c7d8a6b55c600381fca320d627790ecac9f40",
+      "mode": 420
+    },
+    "src/composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/composition/entry.S",
+      "sha256": "60ef87604de62123eead8b5f544a907b6d0ecb717cab885ffa2981903381c0e7",
+      "mode": 420
+    },
+    "src/io-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/io-probe/entry.S",
+      "sha256": "533021c8d17b976fe42173c553faa86e08eebb522b5392ea70cd7c17992a76e3",
+      "mode": 420
+    },
+    "src/io-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/io-probe/main.c",
+      "sha256": "dd242ec44e15d0a7f3e9c59c095540565064f45d741c6d7b5c85abf6c518fc74",
+      "mode": 420
+    },
+    "src/json-probe/cases.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json-probe/cases.h",
+      "sha256": "ead34edf373935adf652976919f252ba2213841dc3efe6ec9a9091a6f6aa9bfe",
+      "mode": 420
+    },
+    "src/json-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json-probe/entry.S",
+      "sha256": "0e1e8b0b302ec993a71bba9c22bd72dd11f15abd37c8e20fb6091cde41cbd368",
+      "mode": 420
+    },
+    "src/json-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json-probe/main.c",
+      "sha256": "e04b9efc3b120ec715d769a9dfd03a60475b8e101e7e2ee63a07ec2d6f5a08d4",
+      "mode": 420
+    },
+    "src/json/json.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json/json.c",
+      "sha256": "5bf7d7b829d967b53700a46b418265cbfc5f450b5b3ac1a11176c88587b92e46",
+      "mode": 420
+    },
+    "src/json/number.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json/number.c",
+      "sha256": "352a2c27d7b7cba581ab3f03a1ee3e8c8593ea7fbb2ead280fe4530d32587eb7",
+      "mode": 420
+    },
+    "src/json/quote.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json/quote.c",
+      "sha256": "ce854f9a0942bf9cdbc6e78ad6d2986ba592c64b31ecace3a1219375ceeaf6f6",
+      "mode": 420
+    },
+    "src/json/read.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json/read.c",
+      "sha256": "bd164a5cc8aa8eea27d3e0e0787052485572b40f7a86070e3347db60c8beb534",
+      "mode": 420
+    },
+    "src/json/write.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/json/write.c",
+      "sha256": "3fafe9428b2275433b9dd623642a0985d027efdfe5213d960be535a8ae15c024",
+      "mode": 420
+    },
+    "src/memory-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/memory-probe/entry.S",
+      "sha256": "02cca72fe4110b95944c9927c22dd54305e337819fca778604e0c227d3599b7e",
+      "mode": 420
+    },
+    "src/memory-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/memory-probe/main.c",
+      "sha256": "2b1d37ab97f8e05a738481ab1fbbf0f5824cc676770b6ef0c161143e0f2ee2f4",
+      "mode": 420
+    },
+    "src/pi-arguments/coerce.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/coerce.c",
+      "sha256": "12193139a7d0fd68bcd5510136f40457cb8df096619b70ea5f392b789a7ab87a",
+      "mode": 420
+    },
+    "src/pi-arguments/final.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/final.c",
+      "sha256": "da7a063a131876fbb0a99ce3d20a9d578f8523a8da4d36d1f70235d0f0c392a4",
+      "mode": 420
+    },
+    "src/pi-arguments/normalize.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/normalize.c",
+      "sha256": "a0815945fd211f8d9bb6e33847f4d5797387220d7dfa50ea2890e54488681591",
+      "mode": 420
+    },
+    "src/pi-arguments/numeric.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/numeric.c",
+      "sha256": "26f24c9b0c2550608ff4a93f581615e30e76588762dabeccd21d11135c488806",
+      "mode": 420
+    },
+    "src/pi-arguments/repair.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/repair.c",
+      "sha256": "cbdecc85b3a194e80d5c95afddad3836acba53270f4b83d57f9fc4ad63f9a220",
+      "mode": 420
+    },
+    "src/pi-arguments/scalar.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/pi-arguments/scalar.c",
+      "sha256": "ca826c9562d78de49a2cde9a5ef69f395e3b65f01886985e798ae5d4cbf9a2dd",
+      "mode": 420
+    },
+    "src/platform-io/io.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/platform-io/io.S",
+      "sha256": "0869b4f281a940dd5ab907403cddce2c1eca300f7b298e6b7e032c2faa1396c1",
+      "mode": 420
+    },
+    "src/platform-linux/platform.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/platform-linux/platform.S",
+      "sha256": "2c670c835796d529114fc72e0dec01a9837dfc6c92dfbc58aacdb9b1d5c4a761",
+      "mode": 420
+    },
+    "src/platform-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/platform-memory/memory.S",
+      "sha256": "82711047f0047f7cb273d014ab3116e00adadf454925758b7b6adcecac044605",
+      "mode": 420
+    },
+    "src/region-arena-composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/region-arena-composition/entry.S",
+      "sha256": "b52a606808a4c35e7f7a9c0f37646afc6f4c186b9974c49f0b1da78ec370f210",
+      "mode": 420
+    },
+    "src/region-arena-composition/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/region-arena-composition/main.c",
+      "sha256": "0fbf4fa5bd99c100f0e56d4c59aee9590fccc8c6cf38391bd2b636dc5e135514",
+      "mode": 420
+    },
+    "src/region-consumer/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/region-consumer/main.c",
+      "sha256": "525c56d3e9f88193a00825cdac81e6b2db7bb6a198ae90af99609a456b9a7651",
+      "mode": 420
+    },
+    "src/region-slots-composition/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/region-slots-composition/entry.S",
+      "sha256": "f1df626cfc111246d85c23f4edc5eafba23bb2978bc39f7b8d6bea9fa7e4e4ad",
+      "mode": 420
+    },
+    "src/repair-probe/cases.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/repair-probe/cases.h",
+      "sha256": "b334af40f0faf62a378a19f3ef92f2bfd20f4ba246145bd0e2eecb4d909e1b54",
+      "mode": 420
+    },
+    "src/repair-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/repair-probe/entry.S",
+      "sha256": "9b38b98e756a0d0b0de32bb8735adfd316b19080844755a6a833559adde8ab4d",
+      "mode": 420
+    },
+    "src/repair-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/repair-probe/main.c",
+      "sha256": "0f411c31f7da9820278debd61c7830645b8e9ff900052ea5731e919d3312b9fc",
+      "mode": 420
+    },
+    "src/schema-probe/cases.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/schema-probe/cases.h",
+      "sha256": "a0adb655c863a20f7c2a0ea83f41be3eea5942eb833e9b076affd1860c3d5242",
+      "mode": 420
+    },
+    "src/schema-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/schema-probe/entry.S",
+      "sha256": "a73a633ad0f0b042eb20ba8cf4762cdf35b2cdcca65bf15f8abe3566bc4f239e",
+      "mode": 420
+    },
+    "src/schema-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/schema-probe/main.c",
+      "sha256": "370f1a655f3eaaa44d39a814b70384da478b0389465860ae1761fea00777b181",
+      "mode": 420
+    },
+    "src/schema/schema.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/schema/schema.c",
+      "sha256": "c8df320436a843d504dc433e6577752c90c86a9c37ad30ae55d45edcddb3091e",
+      "mode": 420
+    },
+    "src/test-guard/memory.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/test-guard/memory.c",
+      "sha256": "5d23b965a03579e473fc68a8867607952b20a7e8fd4c89a566c79ee41a2e32f9",
+      "mode": 420
+    },
+    "src/test-guard/syscall.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/test-guard/syscall.S",
+      "sha256": "3b35f24599fe31d7f75b938046a760dade5f3b2e91ad50a7a7f4bda408b401f6",
+      "mode": 420
+    },
+    "src/test-memory/memory.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/test-memory/memory.S",
+      "sha256": "896f3e6fba0b46d945b416c54aa51ae9e0210fe9f86a0209ede2b0d87c9c3851",
+      "mode": 420
+    },
+    "src/test-region/slots.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/test-region/slots.c",
+      "sha256": "5cf982a703789399c74927ccef466a437b06e2a2ce5ab886e60e619b3545b91f",
+      "mode": 420
+    },
+    "src/text-probe/cases.h": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/text-probe/cases.h",
+      "sha256": "e4641b5d6dcad30bbb11044c2ec29e963032ab90445ea2cf32e3e898acace804",
+      "mode": 420
+    },
+    "src/text-probe/entry.S": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/text-probe/entry.S",
+      "sha256": "73336e156b93397945425c594d4435fed388d4f02c9817be853045aefda94587",
+      "mode": 420
+    },
+    "src/text-probe/main.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/text-probe/main.c",
+      "sha256": "f242c734f6d6ecd9261140558b1bb8aad330a9d3635e3e5d5f32bece4fff9097",
+      "mode": 420
+    },
+    "src/text/text.c": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/candidate/src/text/text.c",
+      "sha256": "35629e3ef3d07435edc26774c9df9b333bbefc2e520db750ecec9237ed660f08",
+      "mode": 420
+    }
+  },
+  "historical_failures": {
+    "host_quote": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-wip-20261020/host-results-initial-failed.json",
+      "sha256": "2b6f201d7666828a1b716c2589d6393c305e723f9473a55e5cc8081ba9ef89ae"
+    },
+    "host_quote_source": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-wip-20261020/coerce-initial-failed.c",
+      "sha256": "ba62d5aff9cef45a5c62c107251321f4acdafb7c6ae30d578b64fe3cefd9a901"
+    },
+    "native_missing_dependency": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/prior-failure.json",
+      "sha256": "47edacbf1cf71115db2347a9a2cb4a1e3057b5dc7be0e870bac53856cf7d0a7c"
+    }
+  },
+  "existing_source_changes": [
+    "src/bootstrap-api/pi-arguments.h",
+    "src/repair-probe/cases.h",
+    "src/repair-probe/main.c"
+  ],
+  "new_sources": [
+    "src/pi-arguments/coerce.c"
+  ],
+  "control_delta": [
+    "docs/migration/t10-native-candidate.json"
+  ],
+  "ubsan_source_delta": [
+    "src/text-probe/main.c"
+  ],
+  "receipts": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/request.json": "c16f5a082fde4085d9d54065e83848c525fefbd2c011c3b3cf3f0e6b142b1855",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/execute.py": "e330fe07acb0d55a7968bf18212584dd946f13712fc3da6e66758b55dfa96474",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/executions.json": "58eee6ec32c304209acd9a1f3c9ac1b38c43c0635960074fb53352eb9d9b0270",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/check-shards.py": "9e93cdd9f0a375b386c489ee3b55258a0b4fb9129d82e5bc84a1afe4c6e5a16e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/shard-controls.json": "c7d227cdbb245f03dfd8552d8e4e9778882ddb582ff3380f3ac41bebf78a7e03",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/oracle.json": "bf36da52659ef88bd4102bb1e74df7dbc0899339d0cd97f1a129ebda6e8b02e7",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/oracle.mjs": "ce469a1e89af4d845abd99d26ece7252b2c137229ce9115b3697f356aced0946",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/oracle-runtime.json": "1bb622afc0c563c5b11d9219abfa14024b33a9f93a62538e44f9fb23f9f23a0b",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/host-build.json": "636b1ffe33f75ea45c113eb201fd980bed7cb9545b3a41dbaaf5d3fe73fc87f5",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/host-results.json": "a55a1ea6f51b2e0a878d8c9a9ada0b08b292ca66d37e177c47c7b7c9575d1bd0",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/host-probe.py": "a195ff8dbbe329506fb6df4309a8229e2f500d4c797887bdcff5ce58493a3e23",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/chain-probe.py": "30a769fd2df803a822caa32442810201b40375ccaf82f74a7e4efbfee6609823",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/chain-results.json": "9abd146fcf52906c3d0810072b61b2400b64ce15d01aa5761d573a4de53c91a2",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/boundary-probe.py": "28baf001c49bcd1653f5b87512af106546e72602bf71aa2211c05f3a5cd458c4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/boundary-results.json": "3ce8eb361602bd9ceaac46b34497d03109189f7f5504f4ae5a2e4e4ac9cdc29f",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/reference-binding.json": "a7b0d93ac74cab31d51e8477bb7d4f94ab0b96b44280082b84e696b1e7ce25f9",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/tool-schemas.json": "098e7efcadcebfe8a3a00cdc18fd3cf1f0d4d53aa8b147599125a8ef05bfe0ae",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/validation-export.ts": "4126826a04aa0f9c79d14ad2db3359cc1039db699df9c66a15333b0c9d74a648",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/design-review.md": "e108a0f95eed0a5ad496ce6541d1528e2642f89667e721e221179570a942fdb1",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/source.tar": "b3ee379a452b4fa7d082b8dfe050720761617c23caccde7fc3fd3bbcc8515c8b",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/restored-verify.json": "6391cc7ed88a0bd9fc84e90177c409324c0965ab100f492d9fcb297d48aeb18d",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/prior-failure.json": "47edacbf1cf71115db2347a9a2cb4a1e3057b5dc7be0e870bac53856cf7d0a7c",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/closure-script-failure.json": "39bb3fe764a86b0cb5c72e4c4d91f4a4a6c330406a0eeb0eded1e877af875b00",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/build/native/admission.json": "f386990e49fe0f565f37587d8002ac77b9c3cf0ad9eeb8c299bb354b71848e21",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/request.json": "8882e71c9d20f0f8e70adb816da4a329a2a75d571ffb2b7d7f75da573cd9a140",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/build.py": "a046ab2462036847b4a6b913adada9fec10acd7615967bcd4ff5fc71668ef922",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/run-build.py": "db939987f003e9505a6784afdbb523ab35d0f4b70394295c34db97624b20ae86",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/execute.py": "67302b55d7c529591290218fb7be0a61ce9cb0cb0e7727da211ed068e417fdf4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/executions.json": "10f800033324ff73d913045c6d69e6e1ba830eb76aa5f48051b720453ddab40e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/build/build-report.json": "33870a9b505958a316e86f3b2aa8c5ff3ba173092eebaaf65a3bf0a94805d0fe",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-tree-v2-ubsan-9xhs8857/build/isolation.json": "26a6fa16fcc9a3201c1a3530b4c0f49d976d92ca64462804a73a876713616f62"
+  },
+  "verified": {
+    "native_matrix": "PASS",
+    "release": "BLOCKED",
+    "normal_builds": 36,
+    "normal_process_runs": 48,
+    "guard_controls": 4,
+    "invalid_shard_controls": 12,
+    "reference_cases": 606,
+    "tree_stage_calls": 1212,
+    "explicit_unsupported_stages": 84,
+    "supported_stages": 1128,
+    "four_tool_chain_cases": 286,
+    "host_insufficient_capacity_checks": 22230,
+    "host_boundary_controls": 13,
+    "native_boundary_controls": 12,
+    "extra_native_decoded_duplicate_case": true,
+    "new_page_end_slots": 6,
+    "prior_tests_and_four_format_shards_retained": true,
+    "restored_inputs_match": true,
+    "ubsan_builds": 36,
+    "ubsan_normal_process_runs": 48,
+    "ubsan_guard_controls": 4,
+    "ubsan_shift_controls": 6
+  },
+  "not_verified": [
+    "union/advanced Schema and typed regexp-name conversion",
+    "complete public validateToolArguments including primitive/array root return-discard semantics and error text",
+    "provider/wire/session integration",
+    "formal performance/stack/RSS/size budgets/full G07",
+    "full T12",
+    "formal sanitizer profile",
+    "protected server release"
+  ],
+  "approval_record": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t12-pi-tree-v2-wl9o2lyy/approval.json",
+    "sha256": "0f0995cf92b4a6f4821baaff67fdaf25bd6f7a659bf3a2bfa65bd3a7f41aeb23"
+  }
+}
