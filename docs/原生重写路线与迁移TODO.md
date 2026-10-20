@@ -306,6 +306,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。异步 setup、事件循环及原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
+
 - [x] 局部宿主接入：T13 固定 240 图经真实 planner 输出进入 owner 协调器；O0/O2 各 675 场景验证 Pending、解析绑定顺序及逐实例失败/取消/在途等待。静态 entry ABI、异步与原生准入仍未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
 - [x] 局部宿主实验：同步 owner 与预验证列表协调器已验证 LIFO、setup 重入取消、部分失败逆序回滚和在途消费者保留提供者；见 [T14 草稿](migration/t14-owner-boundaries.md)。未接入 T13 计划、异步 disposer 或原生门禁，不代表阶段完成。

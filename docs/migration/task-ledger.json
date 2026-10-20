@@ -766,7 +766,7 @@
         "scenario_groups": 6,
         "native_module_admitted": false,
         "full_stage_inputs_accepted": false,
-        "async_cleanup": "NOT_IMPLEMENTED",
+        "async_cleanup": "WIP_HOST_NOT_ADMITTED",
         "coordinator": {
           "status": "WIP_HOST_NOT_ADMITTED",
           "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-wip-hx57uc73",
@@ -792,6 +792,22 @@
           ],
           "static_entry_setup_abi_finalized": false,
           "async_disposer": false
+        },
+        "async_disposer_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-cleanup-wip-zn5snc8s",
+          "evidence_sha256": "524b4bcded601442a22d6bcd461829701fcee0c457c86a160e7cf119bd5e6526",
+          "owner_size": 104,
+          "resource_size": 24,
+          "async_scenario_groups_per_optimization": 8,
+          "regression_plan_scenarios_per_optimization": 675,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "async_setup": false,
+          "event_loop": false,
+          "native_admission": false
         }
       }
     },
