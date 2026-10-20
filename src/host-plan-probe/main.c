@@ -65,9 +65,43 @@ static int pages(const pangu_memory_api *memory)
  fill(mapping,12,0xa5);desc->entry_capacity=2;if(pangu_discover_prepare(&manifest,source_contracts,4,&installed,desc,1000000,out)!=2 || !empty(out) || !bytes(mapping,12,0xa5)) return 32;
  for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 33;return 0;
 }
+
+static const pangu_plan_scope multi_scopes[]={{0xffffffffU,0}};
+static const pangu_manifest_definition multi_definitions[]={{"agent",1,2,0},{"other",1,1,0}};
+static const pangu_manifest_instance multi_instances[]={{"app","provider",1,0},{"session","provider",1,0},{"client","required",1,0},{"optional","optional",1,0}};
+static const pangu_manifest_binding multi_bindings[]={{"agent",0,1,1}};
+static const pangu_manifest_provision reverse_provisions[]={{"agent","session",1,2},{"agent","app",1,1}};
+static pangu_static_manifest multi_manifest={multi_scopes,1,multi_definitions,2,modules,3,multi_instances,4,multi_bindings,1,provisions,2,requirements,3};
+#define CYCLE_CONTRACTS(flag) {{"provider","agent",1,1,1,0},{"provider","agent",1,1,2,flag},{"required","agent",1,1,2,1},{"required","other",1,1,2,0},{"optional","agent",1,1,2,0}}
+static const pangu_module_contract cycle_contracts[]=CYCLE_CONTRACTS(1),optional_cycle_contracts[]=CYCLE_CONTRACTS(0);
+static const pangu_installed_contract_set cycle_sets[]={{cycle_contracts,2},{cycle_contracts+2,2},{cycle_contracts+4,1}};
+static const pangu_installed_contract_set optional_cycle_sets[]={{optional_cycle_contracts,2},{optional_cycle_contracts+2,2},{optional_cycle_contracts+4,1}};
+static const pangu_installed_table cycle_installed={entries,cycle_sets,3},optional_cycle_installed={entries,optional_cycle_sets,3};
+static const pangu_manifest_requirement cycle_declarations[]={{"agent","client",1,1},{"agent","optional",1,0},{"other","client",1,0},{"agent","app",1,1},{"agent","session",1,1}};
+static const pangu_manifest_requirement optional_cycle_declarations[]={{"agent","client",1,1},{"agent","optional",1,0},{"other","client",1,0},{"agent","app",1,0},{"agent","session",1,0}};
+static pangu_plan_requirement lowered_cycle_requirements[5];
+static const pangu_manifest_storage cycle_lower={lowered_services,2,lowered_instances,4,lowered_bindings,3,lowered_providers,lowered_owners,2,lowered_cycle_requirements,5};
+static const pangu_discovery_storage cycle_storage={&cycle_lower,&scratch,&output,entry_work,entry_output,3};
+static pangu_static_manifest cycle_manifest={scopes,3,definitions,2,modules,3,instances,4,bindings,3,provisions,2,cycle_declarations,5};
+static int combinations(void)
+{
+ pangu_prepare_result out;
+ for(pangu_u32 reverse=0;reverse<2;reverse++) {
+  multi_manifest.provisions=reverse ? reverse_provisions : provisions;
+  if(pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,1000000,&out) || out.stage!=6 || out.graph_report.order_count!=4 || out.graph_report.binding_count!=4 || callback_calls) return 50;
+  for(pangu_u32 i=0;i<4;i++) if(output_order[i]!=i || output_states[i]) return 51;
+  if(output_bindings[0].requirement!=0 || output_bindings[0].provider!=0 || output_bindings[1].requirement!=0 || output_bindings[1].provider!=1 || output_bindings[2].requirement!=1 || output_bindings[2].provider!=0 || output_bindings[3].requirement!=1 || output_bindings[3].provider!=1) return 52;
+  if(out.lowered.registry.providers[0].instance!=(reverse ? 2U : 1U) || out.lowered.graph.provider_owners[0]!=(reverse ? 1U : 0U)) return 53;
+ }
+ for(pangu_u32 optional=0;optional<2;optional++) {
+  poison();cycle_manifest.requirements=optional ? optional_cycle_declarations : cycle_declarations;
+  if(pangu_discover_prepare(&cycle_manifest,optional ? optional_cycle_contracts : cycle_contracts,5,optional ? &optional_cycle_installed : &cycle_installed,&cycle_storage,1000000,&out)!=17 || out.stage!=5 || out.graph_report.reason!=8 || !empty(&out) || !unchanged() || callback_calls) return 54;
+ }
+ if(good(&out)) return 55;return 0;
+}
 int host_plan_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
- if(shard) return 247;int rc=semantics();if(rc) return rc;rc=pages(memory);if(rc) return rc;
+ if(shard) return 247;int rc=semantics();if(rc) return rc;rc=pages(memory);if(rc) return rc;rc=combinations();if(rc) return rc;
  if(callback_calls) return 40;pangu_u32 count=0;pangu_i32 a=entries[entry_output[0]].entry(&count),b=entries[entry_output[1]].entry(&count),c=entries[entry_output[2]].entry(&count);
  return a==101 && b==202 && c==303 && count==3 && callback_calls==3 ? 0 : 41;
 }
