@@ -102,3 +102,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## optional-null局部更新
 
 [归一化阶段](t12-null-progress.md)已对499条私有函数访问插桩语料完成原生语义验证，包括可选false子Schema因Pi缓存行为而保留null的边界。它输出仍可能不符合Schema；类型转换和最终validateToolArguments校验未完成，不能凭此执行工具。前述optional-null未实现是历史阶段状态。
+
+## Number(string)基础与转换组合更新
+
+[字符串数值基础](t12-number-string-progress.md)已验证2987条Number语义，但不是TypeBox TryNumber或完整coercion。另2250条完整Pi参考确认：TypeBox1.3.27使用不可枚举`~kind`，冻结Pi旧Symbol检查未命中，typed Value.Convert之后仍执行额外JSON coercion。后续不能误实现成互斥的typed/plain单遍；完整原生转换及最终校验仍未完成。

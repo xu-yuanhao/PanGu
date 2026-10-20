@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-pi-number-string",
+  "commit": "76fb8232b090396e5e2a6a1933f188153b309010",
+  "parent": "50914fc8f7fbcca9fbff1287b2661913cd373b85",
+  "scope": "fixed Agent self-reviewed Number string prerequisite including controller and 57 native source files; local experiments only",
+  "controller_sha256": "fe1fb1b835742a84297178438594b00213050aac2ced3297569335ad425ff3ce",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

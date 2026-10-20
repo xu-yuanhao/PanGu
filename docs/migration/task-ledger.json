@@ -364,7 +364,10 @@
         "docs/migration/t12-final-source-publication.json",
         "docs/migration/t12-null-progress.md",
         "docs/migration/t12-null-evidence.json",
-        "docs/migration/t12-null-source-publication.json"
+        "docs/migration/t12-null-source-publication.json",
+        "docs/migration/t12-number-string-progress.md",
+        "docs/migration/t12-number-string-evidence.json",
+        "docs/migration/t12-number-string-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -495,6 +498,22 @@
         "full_validateToolArguments": "INCOMPLETE",
         "full_T12": "INCOMPLETE",
         "source_commit": "50914fc8f7fbcca9fbff1287b2661913cd373b85"
+      },
+      "number_string_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "fe1fb1b835742a84297178438594b00213050aac2ced3297569335ad425ff3ce",
+        "candidate_tree_sha256": "18016f3bfff8b751fa4daba837e357407f702749fc772fd36a0faed8c1d7cdd2",
+        "approval_record_sha256": "a8fd367af7209e5b2759dfabcd6a91f7ecbef9804a286856012128c95aa5bf03",
+        "Node_cases": 2987,
+        "host_capacity_variants": 9978,
+        "Node_Python_consensus_cases": 1760,
+        "normal_builds": 36,
+        "normal_process_runs": 48,
+        "supplemental_runtime": "one inherited timeout retained; identical-ELF single and full replay passed at unchanged timeout; cause unknown",
+        "full_Pi_conversion_reference_only_cases": 2250,
+        "complete_type_coercion": "NOT_IMPLEMENTED",
+        "full_T12": "INCOMPLETE",
+        "source_commit": "76fb8232b090396e5e2a6a1933f188153b309010"
       }
     },
     {
