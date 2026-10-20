@@ -98,3 +98,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## 最终参数对象解析局部更新
 
 [最终参数解析](t12-final-progress.md)已验证严格优先、有界词法修复后完整解析、全空白映射、根对象限制和nonfinal不发布；3443条真实Pi对照有原生证据。前述“最终参数解析未实现”为历史包状态；当前仍未完成Schema optional-null/强制转换及Provider完成事件实际接线，不授权工具执行，也不代表完整T12。
+
+## optional-null局部更新
+
+[归一化阶段](t12-null-progress.md)已对499条私有函数访问插桩语料完成原生语义验证，包括可选false子Schema因Pi缓存行为而保留null的边界。它输出仍可能不符合Schema；类型转换和最终validateToolArguments校验未完成，不能凭此执行工具。前述optional-null未实现是历史阶段状态。

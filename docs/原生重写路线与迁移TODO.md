@@ -272,6 +272,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] ~~Pi 最终参数对象解析本地实验：3443条真实Pi接受/拒绝和语义对照、逐条nonfinal拒绝、严格优先/有界修复/空白及根对象、配额/页尾、36项构建与48次正常执行及补充UBSan通过。~~ [候选与证据](migration/t12-final-progress.md)，不代表Schema转换、Provider事件接线、工具执行或完整T12。
 
+- [x] ~~Pi optional-null归一化本地实验：499条函数体未改动的访问插桩对照、required/nullable/布尔缓存边界、重复名称删除、逐容量/配额/页尾、36项构建和48次正常执行及补充UBSan通过。~~ [候选与证据](migration/t12-null-progress.md)，不代表类型转换、最终校验或完整T12。
+
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。
 - [ ] 产物：JSON/Schema 服务、协议边界 fuzz/差分语料和准确的限制错误。

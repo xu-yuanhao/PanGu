@@ -149,6 +149,10 @@
     "docs/migration/t12-final-progress.md": "document",
     "docs/migration/t12-final-evidence.json": "control",
     "docs/migration/t12-final-candidate.json": "control",
-    "docs/migration/t12-final-source-publication.json": "control"
+    "docs/migration/t12-final-source-publication.json": "control",
+    "docs/migration/t12-null-progress.md": "document",
+    "docs/migration/t12-null-evidence.json": "control",
+    "docs/migration/t12-null-candidate.json": "control",
+    "docs/migration/t12-null-source-publication.json": "control"
   }
 }
