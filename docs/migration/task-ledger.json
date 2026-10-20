@@ -588,7 +588,10 @@
         "docs/migration/t13-scope-boundaries.md",
         "docs/migration/t13-host-plan-progress.md",
         "docs/migration/t13-host-plan-evidence.json",
-        "docs/migration/t13-host-plan-source-publication.json"
+        "docs/migration/t13-host-plan-source-publication.json",
+        "docs/migration/t13-combinations-progress.md",
+        "docs/migration/t13-combinations-evidence.json",
+        "docs/migration/t13-combinations-source-publication.json"
       ],
       "completion_approved": false,
       "pre_admission_scope_design": {
@@ -704,6 +707,17 @@
         "normal_builds": 40,
         "normal_process_runs": 52,
         "source_commit": "9ebd318a388c0c204c48936112364c1b996a4f81",
+        "full_T13": "INCOMPLETE",
+        "release": "BLOCKED"
+      },
+      "native_combinations_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "838a3a4a181b6e8e618d32564eeebec1ca5d51791dafc6e0b5dd8a07693048bd",
+        "candidate_tree_sha256": "1738e1e51db53139dd6394ee6def0c3c978e7077f34a751727d9931d56becfa6",
+        "approval_record_sha256": "0e668be0d90f367e38125bbcabf2c27af56fa13843bbcae060905ac7756d15e9",
+        "normal_builds": 40,
+        "normal_process_runs": 52,
+        "source_commit": "bfb6bc85b925f1be63cec477f41fd98a2e8e185c",
         "full_T13": "INCOMPLETE",
         "release": "BLOCKED"
       }

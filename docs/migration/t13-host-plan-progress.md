@@ -25,3 +25,5 @@
 完整G05配置/替换矩阵、原生循环/多提供者全面语料、Pending/循环明细、配置Schema/权限、T14激活/owner/回滚、正式资源预算/完整G07、完整T13和服务器受保护发布未完成。native_matrix=PASS与release=BLOCKED同时成立。
 
 源码发布至 [`codex/t13-native-host-plan`](https://github.com/xu-yuanhao/PanGu/tree/9ebd318a388c0c204c48936112364c1b996a4f81)，固定提交 `9ebd318a388c0c204c48936112364c1b996a4f81`，全部preflight输入与固定候选一致，远端ref已回读。
+
+后续测试增量：[原生循环/多提供者组合](t13-combinations-progress.md)补充了正/逆提供者顺序及两类自依赖循环；更大原生语料和完整T13仍未完成。

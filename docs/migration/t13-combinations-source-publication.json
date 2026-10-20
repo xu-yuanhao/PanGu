@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t13-native-combinations",
+  "commit": "bfb6bc85b925f1be63cec477f41fd98a2e8e185c",
+  "parent": "9ebd318a388c0c204c48936112364c1b996a4f81",
+  "scope": "fixed Agent self-reviewed test-only combination extension,64 native sources, unchanged planner/controller; local experiments only",
+  "controller_sha256": "838a3a4a181b6e8e618d32564eeebec1ca5d51791dafc6e0b5dd8a07693048bd",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}
