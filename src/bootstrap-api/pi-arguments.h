@@ -41,5 +41,27 @@ enum { PANGU_PI_ARGUMENTS_STRICT=1,PANGU_PI_ARGUMENTS_REPAIRED=2,PANGU_PI_ARGUME
  * validity/alignment/lifetime is the caller's responsibility, not authenticated.
  */
 pangu_i32 pangu_pi_arguments_parse(pangu_text_slice,pangu_u32,unsigned char *,pangu_u64,pangu_json_token *,pangu_u64,pangu_json_limits,pangu_pi_arguments_result *);
+#include "src/bootstrap-api/schema.h"
+/* Pi normalizeOptionalNulls stage ONLY; does not coerce/validate parameters or
+ * authorize execution. Supported Schema profile is foundation.schema's subset.
+ * Drops optional own properties whose cached child validator rejects null;
+ * boolean child Schemas preserve null, matching Pi primitive WeakMap failure.
+ * Traverses
+ * properties/items regardless of declared type. Required/nullable nulls remain.
+ * Duplicate decoded names use last-wins; deleting a logical field removes every
+ * raw duplicate so shadowed values cannot reappear. Escaped UTF16/raw numeric
+ * lexemes survive. Output is equivalent JSON, not JS stringify/wire byte parity.
+ * Caller supplies immutable matching successful schema/value views and mutable
+ * drops workspace (u64 indices), destination, written and report; all mutable
+ * ranges mutually disjoint and disjoint from BOTH views/results/inputs/tokens.
+ * Workspace may change on runtime failure. Output bytes/written unchanged on
+ * every failure; precondition 1/10 also preserves report. NULL/0 destination
+ * measures successfully. No NUL; caller reparses before further processing.
+ * Limits bound supported Schema/visited paths and aggregate abstract work;
+ * unchanged subtrees may be copied raw without visiting their descendants.
+ * 0 normalized (possibly still Schema-invalid),2 quota,9 unsupported,16 invalid
+ * Schema; source errors propagate. No allocation or raw-pointer authentication.
+ */
+pangu_i32 pangu_pi_optional_nulls(const pangu_schema_view *,const pangu_schema_view *,pangu_schema_limits,pangu_u64 *,pangu_u64,unsigned char *,pangu_u64,pangu_u64 *,pangu_schema_report *);
 #endif
 #endif

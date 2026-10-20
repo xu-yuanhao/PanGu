@@ -1796,7 +1796,9 @@
       "linkage": "static",
       "compositions": [
         "schema-probe",
-        "schema-guard"
+        "schema-guard",
+        "repair-probe",
+        "repair-guard"
       ],
       "activation_condition": "profile-selected",
       "lifecycle": {
@@ -1936,16 +1938,18 @@
       "scope": "product",
       "files": [
         "src/pi-arguments/repair.c",
-        "src/pi-arguments/final.c"
+        "src/pi-arguments/final.c",
+        "src/pi-arguments/normalize.c"
       ],
       "public_headers": [],
       "dependencies": [
         "bootstrap-api",
         "text",
-        "json"
+        "json",
+        "schema"
       ],
       "source_root": "src/pi-arguments",
-      "responsibility": "bounded Pi repairJson and final object argument parsing; no Schema coercion or execution",
+      "responsibility": "bounded Pi lexical repair, final object parsing and optional-null normalization; no type coercion or execution",
       "non_responsibilities": [
         "no partial salvage, Schema coercion or tool execution"
       ],
@@ -1960,7 +1964,8 @@
       ],
       "exports": [
         "pangu_pi_repair_utf8",
-        "pangu_pi_arguments_parse"
+        "pangu_pi_arguments_parse",
+        "pangu_pi_optional_nulls"
       ],
       "targets": [
         "linux-x86_64"
@@ -1974,10 +1979,10 @@
       "lifecycle": {
         "activate": null,
         "dispose": null,
-        "state_owner": "caller immutable source, bounded destination and length",
+        "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
         "threading": "single-thread",
         "callbacks": "none",
-        "resource_contract": "no allocation; measure before emit, failed calls preserve all output"
+        "resource_contract": "no allocation; repair preserves bytes/length on failure; final parse clears published views on runtime failure with disposable scratch/tokens; optional-null preserves destination bytes/length on failure while report/drop workspace may change; all borrowed views invalidated by caller before reuse"
       },
       "provides": [
         {
@@ -1997,13 +2002,20 @@
           "version": 1,
           "optional": false,
           "on_missing": "pending"
+        },
+        {
+          "service": "foundation.schema",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
         }
       ],
       "third_party_dependencies": [],
       "required_modules": [
         "bootstrap-api",
         "text",
-        "json"
+        "json",
+        "schema"
       ],
       "budgets": {
         "object_bytes": {
@@ -2717,7 +2729,8 @@
         "text",
         "pi-arguments",
         "repair-probe",
-        "json"
+        "json",
+        "schema"
       ],
       "modes": [
         "debug",
@@ -2734,7 +2747,8 @@
         "foundation.buffer": "buffer",
         "foundation.text": "text",
         "compat.pi-arguments": "pi-arguments",
-        "foundation.json": "json"
+        "foundation.json": "json",
+        "foundation.schema": "schema"
       },
       "budgets": {
         "artifact_bytes": {
@@ -2756,7 +2770,8 @@
         "test-guard",
         "pi-arguments",
         "repair-probe",
-        "json"
+        "json",
+        "schema"
       ],
       "modes": [
         "debug",
@@ -2773,7 +2788,8 @@
         "foundation.buffer": "buffer",
         "foundation.text": "text",
         "compat.pi-arguments": "pi-arguments",
-        "foundation.json": "json"
+        "foundation.json": "json",
+        "foundation.schema": "schema"
       },
       "budgets": {
         "artifact_bytes": {

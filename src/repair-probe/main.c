@@ -139,8 +139,140 @@ static int final_pages(const pangu_memory_api *memory)
  for(pangu_u32 i=0;i<3;i++) if(memory->unmap(memory->context,&maps[i])) return 63;
  return 0;
 }
-int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+static int repair_final_test(const pangu_memory_api *memory,pangu_u64 shard)
 {
  if(shard) return 247;
  int rc=repair_lexical_test(memory,0);if(rc) return rc;rc=final_corpus();if(rc) return rc;rc=final_limits_test();if(rc) return rc;rc=final_refusals();if(rc) return rc;return final_pages(memory);
+}
+
+static pangu_json_parser null_parsers[4];
+static pangu_json_token null_tokens[4][512];
+static pangu_json_result null_results[4];
+static pangu_schema_view null_views[4];
+static pangu_u64 null_drops[512];
+_Alignas(8) static unsigned char null_output[2048];
+static pangu_schema_limits null_limits={16777216,64,4096};
+static int null_parse(pangu_u32 slot,const unsigned char *bytes,pangu_u64 n)
+{
+ pangu_text_slice input={bytes,n};pangu_json_limits q={2097152,64,0};
+ if(pangu_json_init(&null_parsers[slot],null_tokens[slot],512,q) || pangu_json_feed(&null_parsers[slot],input,1) || pangu_json_get_result(&null_parsers[slot],&null_results[slot])) return 1;
+ null_views[slot].input=input;null_views[slot].result=&null_results[slot];null_views[slot].root=0;return 0;
+}
+static pangu_u64 null_find(const pangu_schema_view *a,pangu_u64 object,const pangu_schema_view *keydoc,pangu_u64 key)
+{
+ pangu_u64 found=~(pangu_u64)0;
+ for(pangu_u64 i=object+1;i<a->result->tokens[object].next;) {
+  pangu_u32 eq=0;if(pangu_json_string_equal(a->input,a->result,i,keydoc->input,keydoc->result,key,&eq)) return ~(pangu_u64)0;
+  if(eq) found=i+1;
+  i=a->result->tokens[i+1].next;
+ }
+ return found;
+}
+static pangu_u64 null_members(const pangu_schema_view *a,pangu_u64 object)
+{
+ pangu_u64 count=0;
+ for(pangu_u64 i=object+1;i<a->result->tokens[object].next;) { if(null_find(a,object,a,i)==i+1) count++;i=a->result->tokens[i+1].next; }
+ return count;
+}
+/* Test-only semantic equality; bounded recursion, never product code. */
+static int null_equal(const pangu_schema_view *a,pangu_u64 ia,const pangu_schema_view *b,pangu_u64 ib,pangu_u32 depth)
+{
+ if(depth>64) return 0;
+ const pangu_json_token *x=&a->result->tokens[ia],*y=&b->result->tokens[ib];if(x->kind!=y->kind) return 0;
+ if(x->kind==PANGU_JSON_STRING) { pangu_u32 eq=0;return !pangu_json_string_equal(a->input,a->result,ia,b->input,b->result,ib,&eq) && eq; }
+ if(x->kind==PANGU_JSON_NUMBER) { pangu_u64 u,v;return !pangu_json_number_bits(a->input,a->result,ia,&u) && !pangu_json_number_bits(b->input,b->result,ib,&v) && u==v; }
+ if(x->kind==PANGU_JSON_ARRAY) {
+  if(x->children!=y->children) return 0;
+  pangu_u64 i=ia+1,j=ib+1;
+  while(i<x->next && j<y->next) { if(!null_equal(a,i,b,j,depth+1)) return 0;i=a->result->tokens[i].next;j=b->result->tokens[j].next; }
+  return i==x->next && j==y->next;
+ }
+ if(x->kind==PANGU_JSON_OBJECT) {
+  if(null_members(a,ia)!=null_members(b,ib)) return 0;
+  for(pangu_u64 i=ia+1;i<x->next;) {
+   pangu_u64 value=i+1,next=a->result->tokens[value].next;
+   if(null_find(a,ia,a,i)==value) { pangu_u64 found=null_find(b,ib,a,i);if(found==~(pangu_u64)0 || !null_equal(a,value,b,found,depth+1)) return 0; }
+   i=next;
+  }
+ }
+ return 1;
+}
+static int null_corpus(void)
+{
+ for(pangu_u64 i=0;i<sizeof(null_cases)/sizeof(null_cases[0]);i++) {
+  test_case=i;const null_case *c=&null_cases[i];pangu_u64 need=99,n;pangu_schema_report report;
+  if(null_parse(0,c->schema,c->sn) || null_parse(1,c->value,c->vn) || null_parse(2,c->expected,c->en)) return 70;
+  if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,(void *)0,0,&need,&report) || report.status) return 71;
+  for(pangu_u64 cap=0;cap<=need+1;cap++) {
+   test_capacity=cap;n=99;fill(null_output,sizeof(null_output),0xa5);
+   pangu_i32 rc=pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,cap,&n,&report);
+   if(cap<need) { if(rc!=2 || report.status!=2 || n!=99) return 72;for(pangu_u64 j=0;j<sizeof(null_output);j++) if(null_output[j]!=0xa5) return 73; }
+   else {
+    if(rc || report.status || n!=need || null_parse(3,null_output,n) || !null_equal(&null_views[2],0,&null_views[3],0,1)) return 74;
+    for(pangu_u64 j=need;j<sizeof(null_output);j++) if(null_output[j]!=0xa5) return 75;
+   }
+  }
+ }
+ return 0;
+}
+static int null_boundaries(void)
+{
+ static const unsigned char schema[]="{\"properties\":{\"x\":{\"type\":\"string\"}}}";
+ static const unsigned char value[]="{\"x\":null,\"y\":null}";pangu_schema_report report;pangu_u64 n=99;
+ if(null_parse(0,schema,sizeof(schema)-1) || null_parse(1,value,sizeof(value)-1)) return 80;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,(void *)0,0,&n,&report)) return 81;
+ pangu_u64 work=report.work,need=n;
+ for(pangu_u64 budget=1;budget<=work+1;budget++) {
+  pangu_schema_limits q=null_limits;q.max_work=budget;n=99;fill(null_output,sizeof(null_output),0xa5);
+  pangu_i32 rc=pangu_pi_optional_nulls(&null_views[0],&null_views[1],q,null_drops,512,null_output,2048,&n,&report);
+  if(report.work>budget) return 82;
+  if(budget<work) { if(rc!=2 || n!=99 || report.status!=2) return 83;for(pangu_u64 j=0;j<sizeof(null_output);j++) if(null_output[j]!=0xa5) return 84; }
+  else if(rc || n!=need) return 85;
+ }
+ n=99;if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,(void *)0,0,null_output,2048,&n,&report)!=2 || n!=99) return 86;
+ /* Boolean false child must keep null: Pi's cached validator is unavailable. */
+ static const unsigned char boolean_schema[]="{\"properties\":{\"x\":false}}";
+ if(null_parse(0,boolean_schema,sizeof(boolean_schema)-1)) return 87;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,(void *)0,0,null_output,2048,&n,&report) || n!=sizeof(value)-1 || !same(null_output,value,n)) return 88;
+ static const unsigned char unsupported[]="{\"properties\":{\"x\":{\"pattern\":\"x\"}}}";
+ if(null_parse(0,unsupported,sizeof(unsupported)-1)) return 89;
+ n=99;fill(null_output,sizeof(null_output),0xa5);
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,2048,&n,&report)!=9 || n!=99 || null_output[0]!=0xa5) return 90;
+ return 0;
+}
+static int null_refusals(void)
+{
+ pangu_schema_report report;pangu_u64 n=99;
+ fill((unsigned char *)&report,32,0xa5);
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,2048,(pangu_u64 *)null_output,&report)!=1 || n!=99 || ((unsigned char *)&report)[0]!=0xa5) return 91;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,2048,&n,(pangu_schema_report *)null_drops)!=1) return 92;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,(unsigned char *)null_tokens[1],32,&n,&report)!=1 || ((unsigned char *)&report)[0]!=0xa5) return 93;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,(unsigned char *)null_views[0].input.data,null_views[0].input.length,&n,&report)!=1) return 94;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,2048,&n,(pangu_schema_report *)&null_views[1])!=1) return 95;
+ pangu_i32 saved=null_results[1].status;null_results[1].status=13;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,null_output,2048,&n,&report)!=10 || ((unsigned char *)&report)[0]!=0xa5) return 96;
+ null_results[1].status=saved;return 0;
+}
+static int null_pages(const pangu_memory_api *memory)
+{
+ pangu_mapping maps[4];for(pangu_u32 i=0;i<4;i++) { maps[i].address=(void *)0;maps[i].length=0;if(memory->map(memory->context,4096,&maps[i])) return 100; }
+ static const unsigned char schema[]="{\"properties\":{\"x\":{\"type\":\"string\"}}}";
+ static const unsigned char value[]="{\"x\":1,\"\\u0078\":null,\"keep\":\"\\ud800\"}";
+ unsigned char *s=(unsigned char *)maps[0].address+4096-(sizeof(schema)-1),*v=(unsigned char *)maps[1].address+4096-(sizeof(value)-1);
+ for(pangu_u64 i=0;i<sizeof(schema)-1;i++) s[i]=schema[i];
+ for(pangu_u64 i=0;i<sizeof(value)-1;i++) v[i]=value[i];
+ if(null_parse(0,s,sizeof(schema)-1) || null_parse(1,v,sizeof(value)-1)) return 101;
+ pangu_schema_report *report=(pangu_schema_report *)((unsigned char *)maps[3].address+4096-32);pangu_u64 need,n=99;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,(void *)0,0,&need,report)) return 102;
+ unsigned char *out=(unsigned char *)maps[2].address+4096-need;
+ if(pangu_pi_optional_nulls(&null_views[0],&null_views[1],null_limits,null_drops,512,out,need,&n,report) || n!=need) return 103;
+ static const unsigned char expected[]="{\"keep\":\"\\ud800\"}";
+ if(!same(out,expected,sizeof(expected)-1) || n!=sizeof(expected)-1) return 104;
+ for(pangu_u32 i=0;i<4;i++) if(memory->unmap(memory->context,&maps[i])) return 105;
+ return 0;
+}
+int repair_test(const pangu_memory_api *memory,pangu_u64 shard)
+{
+ if(shard) return 247;
+ int rc=repair_final_test(memory,0);if(rc) return rc;rc=null_corpus();if(rc) return rc;rc=null_boundaries();if(rc) return rc;rc=null_refusals();if(rc) return rc;return null_pages(memory);
 }
