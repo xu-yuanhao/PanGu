@@ -853,6 +853,27 @@
           ],
           "service_vtable_abi": false,
           "native_admission": false
+        },
+        "stop_budget_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199",
+          "source_manifest_sha256": "b89759a544099c63741c1110b224b7a51d1372465191e40440b7761866c1f004",
+          "evidence_sha256": "df187b83071e5ca8f135eddaa2223ccaa530f30705c32ed536fb9ba7b05d1b18",
+          "budget_cases_per_optimization": 3172,
+          "bounded_ticks_per_optimization": 47798,
+          "quanta": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "callback_time_preemption": false,
+          "startup_budget": false,
+          "native_admission": false
         }
       }
     },
