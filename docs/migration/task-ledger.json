@@ -907,6 +907,30 @@
           "supplemental_host_ubsan": true,
           "host_aggregate_undefined_symbols": [],
           "native_admission": false
+        },
+        "start_budget_candidate": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l",
+          "source_manifest_sha256": "b1ffe5daeb9f159b90a148c3a76980d1f932e67d6eb54b56328e10c5c319b9b9",
+          "evidence_sha256": "f2ab832c4beb8ce7b914b84c97f01f79dd30511e5c72ca861473f02ffb1a28aa",
+          "start_cases_per_optimization": 6056,
+          "bounded_start_ticks_per_optimization": 103692,
+          "pre_setup_cancellations": 285,
+          "invalid_before_callbacks": 114,
+          "quanta": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "supplemental_host_ubsan": true,
+          "midpass_completion_wake_fixed": true,
+          "general_call_slot_budget": false,
+          "native_admission": false
         }
       }
     },
