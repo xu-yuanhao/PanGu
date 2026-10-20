@@ -373,7 +373,10 @@
         "docs/migration/t12-scalar-source-publication.json",
         "docs/migration/t12-tree-progress.md",
         "docs/migration/t12-tree-evidence.json",
-        "docs/migration/t12-tree-source-publication.json"
+        "docs/migration/t12-tree-source-publication.json",
+        "docs/migration/t12-validation-progress.md",
+        "docs/migration/t12-validation-evidence.json",
+        "docs/migration/t12-validation-source-publication.json"
       ],
       "completion_approved": false,
       "local_prerequisite_basis": "Uses human-approved fixed T11 local foundation packages; does not claim upstream full production-stage completion.",
@@ -551,6 +554,20 @@
         "full_validateToolArguments": "INCOMPLETE",
         "full_T12": "INCOMPLETE",
         "source_commit": "887e3edc5a8d930f01270543c9afe9ad2b29583d"
+      },
+      "unified_validation_local_preview": {
+        "status": "AGENT_SELF_REVIEW_APPROVED_LOCAL_EXPERIMENTS_ONLY",
+        "controller_sha256": "a6ebf03c4735be1a83fd981bf4e656790be170afb5797d3d0a4c9685cb4e0070",
+        "candidate_tree_sha256": "bbebcafb0efd84f7077e934bf112ca3214292824a2aad63ccd5391546e8a6ef5",
+        "approval_record_sha256": "1678e1b3972d57b9ac2f9c5917e50af2db5b578b5262cd4d62fae2f81b0c8199",
+        "four_tool_cases": 286,
+        "nonfinal_untouched_controls": 286,
+        "final_text_cases": 1570,
+        "normal_builds": 36,
+        "normal_process_runs": 48,
+        "full_validateToolArguments": "INCOMPLETE",
+        "full_T12": "INCOMPLETE",
+        "source_commit": "37dd2ba50b03c13ba94d2747f110cae2f6c92b1e"
       }
     },
     {

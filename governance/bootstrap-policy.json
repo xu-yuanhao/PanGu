@@ -165,6 +165,10 @@
     "docs/migration/t12-tree-progress.md": "document",
     "docs/migration/t12-tree-evidence.json": "control",
     "docs/migration/t12-tree-candidate.json": "control",
-    "docs/migration/t12-tree-source-publication.json": "control"
+    "docs/migration/t12-tree-source-publication.json": "control",
+    "docs/migration/t12-validation-progress.md": "document",
+    "docs/migration/t12-validation-evidence.json": "control",
+    "docs/migration/t12-validation-candidate.json": "control",
+    "docs/migration/t12-validation-source-publication.json": "control"
   }
 }

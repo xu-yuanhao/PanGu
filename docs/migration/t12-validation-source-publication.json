@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-unified-validation",
+  "commit": "37dd2ba50b03c13ba94d2747f110cae2f6c92b1e",
+  "parent": "887e3edc5a8d930f01270543c9afe9ad2b29583d",
+  "scope": "fixed Agent self-reviewed unified Object-text validation including controller and60 native source files; local experiments only",
+  "controller_sha256": "a6ebf03c4735be1a83fd981bf4e656790be170afb5797d3d0a4c9685cb4e0070",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}
