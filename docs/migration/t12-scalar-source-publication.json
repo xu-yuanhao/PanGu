@@ -1,0 +1,12 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t12-pi-scalar-rules",
+  "commit": "e7a794157a85cbfba78fe8c9016e6acdbab5ee84",
+  "parent": "76fb8232b090396e5e2a6a1933f188153b309010",
+  "scope": "fixed Agent self-reviewed primitive scalar rules including controller and 58 native source files; local experiments only",
+  "controller_sha256": "385179b0166a4fd3f9f5cbaa8b109f92e2bf00363d3c6e1d53740eb5a3d293a5",
+  "validation": "all preflight inputs match approved source; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

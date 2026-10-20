@@ -106,3 +106,7 @@ Pi 适配：空/纯空白参数、修复非法反斜杠、转义 raw control、�
 ## Number(string)基础与转换组合更新
 
 [字符串数值基础](t12-number-string-progress.md)已验证2987条Number语义，但不是TypeBox TryNumber或完整coercion。另2250条完整Pi参考确认：TypeBox1.3.27使用不可枚举`~kind`，冻结Pi旧Symbol检查未命中，typed Value.Convert之后仍执行额外JSON coercion。后续不能误实现成互斥的typed/plain单遍；完整原生转换及最终校验仍未完成。
+
+## 标量规则局部更新
+
+[基础标量规则](t12-scalar-progress.md)已完成2562条三模式、五目标语义验证，包括typed fallback和typed→plain基础组合；不能代替literal/enum/union或整个树遍历。替换数值始终有限，失败的转换保留原值而不把NaN序列化为null；完整参数转换和最终验证仍未完成。

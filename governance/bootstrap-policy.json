@@ -157,6 +157,10 @@
     "docs/migration/t12-number-string-progress.md": "document",
     "docs/migration/t12-number-string-evidence.json": "control",
     "docs/migration/t12-number-string-candidate.json": "control",
-    "docs/migration/t12-number-string-source-publication.json": "control"
+    "docs/migration/t12-number-string-source-publication.json": "control",
+    "docs/migration/t12-scalar-progress.md": "document",
+    "docs/migration/t12-scalar-evidence.json": "control",
+    "docs/migration/t12-scalar-candidate.json": "control",
+    "docs/migration/t12-scalar-source-publication.json": "control"
   }
 }

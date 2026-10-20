@@ -276,6 +276,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] ~~Number(string)基础本地实验：2987条Node位对照、9978种宿主容量、1760条Python共识，进制/规范化/MiB/页尾、36项构建及48次正常执行和补充复验通过。~~ [候选与证据](migration/t12-number-string-progress.md)。一次旧分片超时及原时限复验保留；另2250条Pi转换仅是参考，尚无完整coercion通过结论。
 
+- [x] ~~基础标量规则本地实验：2562条三模式/五目标语义对照，typed fallback/安全BigInt/整数截断、原值保留、零workspace/别名/页尾，普通与UBSan各36构建和48次正常执行通过。~~ [候选与证据](migration/t12-scalar-progress.md)，未完成树遍历、约束/union或完整validateToolArguments。
+
 - [ ] 输入：T11、Pi wire/session schema。只实现当前数据模型需要的结构。
 - [ ] 操作：严格 JSON、增量帧解码、转义/Unicode、深度/长度限制、数值与缺失字段语义；有支持范围的 Schema 验证。
 - [ ] 产物：JSON/Schema 服务、协议边界 fuzz/差分语料和准确的限制错误。
