@@ -31,3 +31,11 @@ setup用显式操作票据在执行前登记；重入stop等待该票据退出�
 实际验证：O0/O2各7组场景执行通过，覆盖正常逆序/重复停止、部分setup失败及清理失败继续、setup重入停止、消费者在途阻止提供者过早释放、失败setup遗留操作后继续回滚、重复owner在回调前拒绝、空列表。清理回调逐一断言更早提供者仍Active；owner/coordinator对象以freestanding/nostdinc编译，宿主测试程序使用libc断言。不是冻结工具链或原生门禁验证。
 
 未完成：真实T13计划/依赖映射、分支图与Pending适配、公共调用分派阻断、异步setup完成协议、异步disposer及完整资源静默、恶意元数据/别名检查、工作量预算、原生冻结构建与故障注入。当前线性停止遇到BUSY会阻塞更早的无关实例；后续图协调器需要明确推进策略，不能据此声称完整图生命周期语义已实现。
+
+## T13 真实准备结果到生命周期列表（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plan-adapter-wip-a97379e9`，证据evidence.json SHA256 `5f860d650695f42e95751474cae02f664df86e001497bec2f2b22bc39be415e6`。新增adapter.h/adapter.c，将stage6准备结果、graph_output和按实例索引的可信setup/owner映射转换为激活顺序列表；复用上一版owner/coordinator源码。adapter核对Pending数量、顺序唯一性、所有解析绑定的索引和提供者先于消费者，包括optional-present和MANY；只发布非Pending实例。所有验证和整体提交预算预留成功后才写列表/数量；不足预算和拒绝保持输出。尚未把静态entry(void*)与owner-aware setup的ABI统一，不能宣称任意已绑定插件已能运行。
+
+实际宿主执行：原封不动链接已登记T13 planner源码，直接包含其固定240图测试数据，95有效图、145循环拒绝；各有效图正常启动/停止，并在每个激活位置注入setup失败、setup重入取消、额外在途操作；另验证app/session隔离、Pending跳过和两个MANY提供者正反顺序。O0/O2各675个生命周期场景通过，消费者清理回调沿真实resolved bindings断言提供者仍Active；Pending保持未启动。每个有效图遍历从1到首个可用预算，检查不足预算时输出完整不变；额外拒绝非成功stage、越界绑定、反转依赖顺序、矛盾Pending、容量不足及重复owner。准备阶段未执行安装表的entry回调。
+
+同一Agent实施和自审：继续宿主实验，不批准ABI或生产准入。首次测试编译的const描述符参数错误已修正，未修改警告级别或planner基线。当前借用的准备视图/源owner映射/目标列表须由可信调用者保证有效、互不重叠和存活；全面几何检查、服务分派入口、静态entry ABI、异步setup/disposer及原生验证仍待实现。当前逆序前缀停止保守保留所有更早实例，尚不能让无关分支在消费者BUSY时独立推进。

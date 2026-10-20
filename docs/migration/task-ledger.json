@@ -778,6 +778,20 @@
           "evidence_sha256": "77ce08feb7c908d172c54d096c1bb7a6e2ee4ae23e30b943ee22bbe4465d9690",
           "t13_plan_adapter": false,
           "async_disposer": false
+        },
+        "plan_adapter": {
+          "status": "WIP_HOST_NOT_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plan-adapter-wip-a97379e9",
+          "evidence_sha256": "5f860d650695f42e95751474cae02f664df86e001497bec2f2b22bc39be415e6",
+          "valid_graphs": 95,
+          "rejected_cycles": 145,
+          "lifecycle_scenarios_per_optimization": 675,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "static_entry_setup_abi_finalized": false,
+          "async_disposer": false
         }
       }
     },
