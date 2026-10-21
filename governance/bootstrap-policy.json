@@ -202,6 +202,13 @@
     "docs/migration/t14-abi-guard-source-publication.json": "control",
     "docs/migration/t14-sdk1-native-candidate.json": "control",
     "docs/migration/t14-sdk1-native-evidence.json": "control",
-    "docs/migration/t14-sdk1-native-source-publication.json": "control"
+    "docs/migration/t14-sdk1-native-source-publication.json": "control",
+    "tools/gates/sanitizer_audit.py": "gate",
+    "governance/native-ubsan-trap-toolchain.json": "control",
+    "tools/gates/test_native_ubsan.py": "gate-test",
+    "docs/migration/t14-ubsan-native-candidate.json": "control",
+    "tools/gates/test_admission_ubsan.py": "gate-test",
+    "docs/migration/t14-ubsan-native-evidence.json": "control",
+    "docs/migration/t14-ubsan-native-source-publication.json": "control"
   }
 }

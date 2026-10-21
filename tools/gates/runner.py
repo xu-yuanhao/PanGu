@@ -11,7 +11,7 @@ from receipt import canonical, capture, sha
 SUITES = ("test_check.py", "test_module_graph.py", "test_compile_inputs.py", "test_link_graph.py",
           "test_service_graph.py", "test_receipt.py", "test_toolchain.py", "test_runner.py", "test_vcs.py",
           "test_native_build.py", "test_toolchain_probe.py", "test_remote.py", "test_controller_probe.py", "test_toolchain_image.py",
-          "test_admission.py")
+          "test_admission.py", "test_native_cpp.py", "test_native_ubsan.py", "test_admission_ubsan.py")
 CHILD = """
 import json, pathlib, sys, unittest
 directory = pathlib.Path(sys.argv[1])
@@ -29,6 +29,11 @@ sys.exit(0 if result.wasSuccessful() and result.testsRun > 0 and not result.skip
 def run(candidate, trusted, policy_pin):
     trusted = Path(trusted).resolve(strict=True)
     before = capture(candidate, trusted, policy_pin)
+    registered = {Path(name).name for name in before["trusted_files"]
+                  if Path(name).parent.as_posix() == "tools/gates"
+                  and Path(name).name.startswith("test_") and name.endswith(".py")}
+    if len(SUITES) != len(set(SUITES)) or registered != set(SUITES):
+        raise ValueError("controller suite inventory missing, unscheduled or duplicated")
     results = []
     for suite in SUITES:
         name = "tools/gates/" + suite

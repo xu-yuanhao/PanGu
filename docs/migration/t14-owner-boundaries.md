@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新候选已补齐SDK1有效路径：56冻结构建/72目标执行通过；SDK1普通/guard八次各824场景/1794租约消费，guard四次各122627调用，bind/enter和七SDK方法成功/拒绝均覆盖，SDK2既有计数保持。原执行汇总缺文件失败保留，以独立最终校验完成验收。其他专项、正式sanitizer、完整G04/G07与生产准入仍未完成，GAP-010/T14不关闭。
+当前登记矩阵的UBSan trap候选已通过：60冻结构建/98目标执行，22真实SIGILL、430份C/C++源码审计与215隔离门禁自测；SDK1/SDK2场景及守卫计数保持。前期超时与执行器失败记录保留。其他专项及其ABI/sanitizer覆盖、完整G04/G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -377,3 +377,22 @@ guard四次各122627调用，5工厂/32宿主槽及新增18目标均覆盖。SDK
 12项登记检查（1正/11拒绝）、339文件归档恢复/字节/mode/preflight和56保留产物复核通过，未宣称归档后重建。源码实验分支 `codex/t14-native-sdk1-interop`，提交 `a73eeba68ae867a039f4b8da60774cbf4fff7d3b`，所有Git blob与固定候选匹配，远端回读一致。源归档 `513d5b92099642ce26fe1f6a74cdfb912a0c2caff55d9f8dd5d3edc747fffbd7`。
 
 最终元数据包 `aabd037e8a1963ed7ff122e147da94b9ab6e8979b88a2e24d61a2b25f9e89cd3` 与同一Agent自审在目录内final-review.json及t14-sdk1-native-evidence.json；它不替代原测试controller的固定pin。下一步为其他专项原生回归、正式sanitizer与自测、完整G04事件轨迹/故障矩阵及G07测量；T14不勾选、生产与受保护远端放行继续BLOCKED。
+
+
+## 当前登记矩阵的 UBSan trap 验证（2026-10-21）
+
+外部目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3`；登记与证据见 [t14-ubsan-native-candidate.json](t14-ubsan-native-candidate.json) 和 [t14-ubsan-native-evidence.json](t14-ubsan-native-evidence.json)。60模块/30测试组合、148份原生文件；原144份逐字节不变，只增加C/C++故障自测及其入口四文件。新增v3测试配置使用 `-fsanitize=undefined -fsanitize-trap=all -fno-sanitize-recover=all`，拒绝非test组合；v1/v2配置不改。新镜像载荷沿用固定工具链，绑定v3 profile，SHA256 `4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41`。
+
+60份debug/release冻结构建、每份保留产物复核通过；430份C/C++翻译单元审计（400 C、30 C++）与源码摘要匹配。审计完整预处理后的Clang AST，拒绝 `NoSanitizeAttr` / `DisableSanitizerInstrumentationAttr`，包括宏展开；字符串内同名文本不误判。进程内缓存仅复用固定编译器、完整选项及实际预处理内容相同的AST审计，每次仍重新预处理；头文件变化及 `__has_include` 存在性变化都会重新审计。缓存不跨进程持久化，不依据源码本身摘要跳过检查。
+
+串行完整任务三次在原180秒限制内分别留下24/42/51份回执后超时，均不计通过。剖析后对v3测试组合使用固定两路并行、私有暂存与产物目录、登记顺序汇总；每组仍完整编译/审计/即时复核，任一线程异常不写矩阵回执，v1/v2保持串行。实际60份矩阵随后在原180秒限制内完成，单工具30秒限制不变。新增自测验证并发上限、全部六份构建与复核、稳定顺序和失败关闭。
+
+98次目标执行及执行后全产物/源码/控制摘要核对通过：原72次基础/SDK运行计数保持，四次健康自探针退出0，22次真实UB探针触发SIGILL。两语言debug/release均覆盖有符号溢出、移位、越界、普通指针误对齐、空指针访问；C++另有错误间接函数类型。原操作器把PID命名空间启动器的退出132当成直接子进程-4而失败，原74条记录及FAILED状态保留。后续只复用73条实际成功记录，重测故障并完成其余自探针；只读Python监视器使用内核waitpid状态确认信号。四项监视器自测区分真实SIGILL、主动exit132、正常exit0及SIGSEGV，不能把数值132作为检测成功。最终核对全部98条预期组合、22份真实信号状态及每个ELF摘要。
+
+SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八次各1196场景/3242方法调用，guard四次各146729调用。所有原输出和守卫槽集合保持；ABI1 setup/cleanup无父授权仍各144次拒绝，不用全局phase或inflight放宽规则。
+
+隔离自测入口补齐原先遗漏的C++/UBSan套件，并拒绝已登记测试未调度或重复调度。首次整套admission在原30秒限制内超时，保留日志；将新增四项UBSan准入测试按职责移入单独登记套件，未删改用例/断言或扩大限制。最终冻结镜像内全部215项通过，admission / native UBSan / UBSan admission分别23.517 / 18.153 / 12.906秒。该自测控制树 `0ca8f813953efa0799d8d85ee62662b8baf23753c4f6bb0feedbdea7befa6cae` 与原native矩阵控制树 `97f47f7bf91f3d85c5a3271c97009f966a971810d8a8e6f6bc91ec435693705d` 分开固定；后续差异仅套件调度/测试迁移及其登记，native构建、准入、源码审计与profile字节相同，不伪称两棵全树相同。
+
+源码归档SHA256 `ca8ac9e5da305eabcbd7463f3d782f99be24d90b3dd97167ab28840d9dd92955`，349份登记文件恢复字节/清单匹配、60份保留产物复核通过；不是恢复后重新构建。固定原native候选源码已推送实验分支 `codex/t14-native-ubsan-trap`，commit `83e18f3434caec96b361c3df86724e7c63e40868`，Git清单/逐blob和远端ref回读匹配；此快照先于自测调度后续修复，根分支另行交付后续控制面，不将新控制树的证据冒充原树证据。
+
+同一Agent实施、自审并批准本地test用途；固定控制树、差异、日志摘要、风险与最终元数据审查在目录内 control-review.json / selftest-control-v2-review.json / final-review.json。UBSan undefined组不是完整内存安全证明，汇编未插桩；不声称覆盖volatile目标访问、C++vptr、ASan/泄漏/数据竞争或任意第三方插件。早期T14独立专项及对应ABI/sanitizer、完整G04轨迹/故障矩阵、G07资源/体积/性能仍待完成，完整G03、GAP-010、T14与生产/远端受保护放行仍未通过。

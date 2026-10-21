@@ -1465,6 +1465,23 @@
           "executions": 72,
           "sdk1_abi_calls_per_run": 122627,
           "production_admission": false
+        },
+        "native_ubsan_trap": {
+          "status": "REGISTERED_UBSAN_TRAP_MATRIX_AND_FAULT_DETECTION_PASS_FULL_T14_PENDING",
+          "registry": "docs/migration/t14-ubsan-native-candidate.json",
+          "evidence": "docs/migration/t14-ubsan-native-evidence.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3",
+          "native_controller_sha256": "97f47f7bf91f3d85c5a3271c97009f966a971810d8a8e6f6bc91ec435693705d",
+          "selftest_controller_sha256": "0ca8f813953efa0799d8d85ee62662b8baf23753c4f6bb0feedbdea7befa6cae",
+          "candidate_tree_sha256": "ec8f92a8368271dbfc53e1750614cf08c27c3d40ee274fcf5fec02e4ec17d3c8",
+          "summary_sha256": "35c6dd4dea2a93ff2bf561c45b749674eb3120010794a70abf867d16751e751c",
+          "builds": 60,
+          "executions": 98,
+          "native_SIGILL": 22,
+          "isolated_gate_tests": 215,
+          "reviewer": "same Agent as implementer",
+          "final_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/final-review.json",
+          "production_admission": false
         }
       }
     },

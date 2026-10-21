@@ -1,0 +1,184 @@
+{
+  "schema": "pangu.t14-ubsan-native-evidence.v1",
+  "status": "REGISTERED_UBSAN_TRAP_MATRIX_AND_FAULT_DETECTION_PASS_FULL_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3",
+  "registry": "docs/migration/t14-ubsan-native-candidate.json",
+  "registry_sha256": "64a9248a9e9c900f1acb12a203be229ff636ae5b565a91aeded76ab82962b4e7",
+  "native_controller_sha256": "97f47f7bf91f3d85c5a3271c97009f966a971810d8a8e6f6bc91ec435693705d",
+  "native_policy_sha256": "7291d3833856d5c4ef7ab4c6ee51016d7ac9f9798a21d00c21315c1bd4cb208d",
+  "candidate_tree_sha256": "ec8f92a8368271dbfc53e1750614cf08c27c3d40ee274fcf5fec02e4ec17d3c8",
+  "selftest_controller_sha256": "0ca8f813953efa0799d8d85ee62662b8baf23753c4f6bb0feedbdea7befa6cae",
+  "selftest_controller_scope": "Separately fixed suite-scheduling follow-up; native_build/admission/sanitizer_audit/profile bytes identical to native matrix controller. No transfer of exact whole-tree identity.",
+  "image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+  "profile_sha256": "a60e201a4b389ea7edeeb7a0e1e2c104ce3f8c17b78a1edd8ee407ccb007d2c2",
+  "modules": 60,
+  "compositions": 30,
+  "native_source_files": 148,
+  "unchanged_prior_native_files": 144,
+  "new_self_probe_files": 4,
+  "builds": 60,
+  "executions": 98,
+  "expected_native_SIGILL": 22,
+  "healthy_self_probe_runs": 4,
+  "native_matrix": "PASS",
+  "isolated_gate_self_tests": 215,
+  "suppression_audit": {
+    "unchanged_baseline_files": 144,
+    "additional_self_probe_files": 4,
+    "c_cpp_audit_records": 430,
+    "c_records": 400,
+    "cpp_records": 30,
+    "coverage": "Every C/C++ retained object has matching-source successful suppression audit; Assembly is not instrumented."
+  },
+  "test_mode_flags": [
+    "-fsanitize=undefined",
+    "-fsanitize-trap=all",
+    "-fno-sanitize-recover=all"
+  ],
+  "source_audit_cache": "Process-local complete-AST audit keyed by fixed compiler, full normalized flags and freshly regenerated preprocessed bytes; header and __has_include invalidation tested. No persistent cache or source-only reuse.",
+  "scheduler": "UBSan v3 only: two fixed workers, private staging/artifacts, registry-order aggregation, worker exception prevents matrix receipt. v1/v2 remain serial.",
+  "budgets": {
+    "isolated_job_seconds": 180,
+    "subprocess_seconds": 30,
+    "limits_unchanged": true
+  },
+  "suite_followup": "Runner includes every registered test_*.py and rejects unscheduled/duplicate suites. Four UBSan admission tests moved to their own registered suite; all215 tests retained.",
+  "trap_evidence": "Kernel wait status proves SIGILL, not launcher exit132. Four monitor self-tests distinguish SIGILL, exit132, exit0 and SIGSEGV. Initial failed operator receipt remains FAILED; corrected aggregate references and reuses only73 actual successful records.",
+  "sdk1": {
+    "runs": 8,
+    "scenarios_per_run": 824,
+    "lease_consumptions_per_run": 1794,
+    "guard_runs": 4,
+    "guard_calls_per_run": 122627,
+    "sdk_method_success_and_refusal_coverage": true,
+    "known_setup_refusals": 144,
+    "known_cleanup_refusals": 144,
+    "normal_stdout_exact_baseline": true
+  },
+  "sdk2": {
+    "runs": 8,
+    "scenarios_per_run": 1196,
+    "method_calls_per_run": 3242,
+    "guard_runs": 4,
+    "guard_calls_per_run": 146729,
+    "normal_stdout_exact_baseline": true
+  },
+  "archive": {
+    "scope": "SOURCE_ARCHIVE_BYTES_PREFLIGHT_AND_RETAINED_NATIVE_ARTIFACT_VERIFY_NOT_FRESH_BUILD",
+    "source_tar_sha256": "ca8ac9e5da305eabcbd7463f3d782f99be24d90b3dd97167ab28840d9dd92955",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/source-restored-o0yeu681",
+    "candidate_tree_sha256": "ec8f92a8368271dbfc53e1750614cf08c27c3d40ee274fcf5fec02e4ec17d3c8",
+    "file_count": 349,
+    "native_source_files": 148,
+    "restored_inputs_match": true,
+    "retained_native_verification": {
+      "admission_receipt_binding": "PASS",
+      "verified_builds": 60,
+      "native_matrix": "PASS",
+      "status": "BLOCKED",
+      "release": "BLOCKED"
+    },
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-21",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-native-ubsan-trap",
+    "commit": "83e18f3434caec96b361c3df86724e7c63e40868",
+    "parent": "5fcfab908867a69b21c388d95c192fa12acd875f",
+    "scope": "Fixed raw T14 native UBSan test candidate; not production. Snapshot precedes suite scheduling follow-up recorded separately in selftest-control-v2-review.json.",
+    "controller_sha256": "97f47f7bf91f3d85c5a3271c97009f966a971810d8a8e6f6bc91ec435693705d",
+    "candidate_tree_sha256": "ec8f92a8368271dbfc53e1750614cf08c27c3d40ee274fcf5fec02e4ec17d3c8",
+    "native_source_files": 148,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "failures": [
+    {
+      "scope": "native matrix",
+      "result": "TIMEOUT_NOT_PASS",
+      "build_receipts": 24,
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-5n2qbxit/build-wrapper.log",
+      "sha256": "f7b80c1b2ac560a25c26809cfb513a737cf218ad31beb2e83b9bd03e65bd1630"
+    },
+    {
+      "scope": "native matrix",
+      "result": "TIMEOUT_NOT_PASS",
+      "build_receipts": 42,
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-stream-_ewyuwbw/build-wrapper.log",
+      "sha256": "12ab52d4586364ace1e4f6aef7606fdcb15797af3fee7bdfbf5cfef79d020227"
+    },
+    {
+      "scope": "native matrix",
+      "result": "TIMEOUT_NOT_PASS",
+      "build_receipts": 51,
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-cache-fti13sdn/build-wrapper.log",
+      "sha256": "fdf6063351a3eb8eba504524f32e060e19cf0cef295861ed731f6f88b46c0359"
+    },
+    {
+      "scope": "isolated self-test attempt1",
+      "result": "test_admission.py timed out at unchanged30 seconds",
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/selftests/stdout.log",
+      "sha256": "fa7c4f789a6598ad6a448ab9133c083de4cf34d66c0689be8ce9adf389bbc18a"
+    },
+    {
+      "scope": "initial target operator",
+      "result": "FAILED after72 old runs and1 healthy self-probe: wrapper exit132 was not accepted as native SIGILL; raw receipt retained",
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/executions.json",
+      "sha256": "d357c1b0b7e5b5763e45c0cfd8af1040e8ea41f932e68c343e7e06a10d0bd157"
+    },
+    {
+      "scope": "monitor helper attempt1",
+      "result": "incorrect versioned Python image path; corrected to fixed /usr/bin/python3 before any probe ran",
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/execution-probes-wrapper.log",
+      "sha256": "aab4956dddf0fec3a77ee3ee527227d734c6625dd4c1339d5a3140eab72d2574"
+    }
+  ],
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/request.json": "6d233ff8eeb4ce5e8f3cdcceebfb6e263bd9c84c55b6506f25f43c9a92e01fa4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/control-review.json": "71583f15051dea08dda11b090474bfa04f3e8ac6129f4b3775303aedf9e439d0",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/selftest-control-v2-review.json": "723752d3337242007aa068d96636ca7f6a11e883319a047d5ab41a07d47bbbfa",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/build/native/admission.json": "06f8c80405f3dd210530977e18bfceb160bcd85d858234e8e30117189539be45",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/build/isolation.json": "6b206a4d7aea8e539f3952922cd05557c6364254ae71873a8ea02d3584debc52",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/build-wrapper.log": "eb0002a163115a86d464f62e62073855af39c88149e7acdeb57b6267930400b9",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/executions.json": "d357c1b0b7e5b5763e45c0cfd8af1040e8ea41f932e68c343e7e06a10d0bd157",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/executions-corrected.json": "1affa0867b128c9737e179166b3d257aee0115cacef3febf7580a4c31c6acc1e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/execution-wrapper.log": "870024291d4fe75529a0d6bc52346f9bad445143978d3d73adbd49cabc3faee4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/execution-probes-v2-wrapper.log": "577a4317409a7b495d35695b17a691d133b05de7c82657f2f085a4675701bd8a",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/execution-verification.json": "ab69239ae6f72d18bad086fd7d5663deac93bd538b61e14d8f909f9097f8cfa6",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/verify-executions.py": "66ffe91cd25ff4c723ef35a8c869cdd0faa08e248ef60245c630c38fc12a2ae1",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/trap-monitor.py": "598d1cd9e67f7b4c6f6b41dbab9291df7aa28ad5cf0b2bae619ea2640ad028e9",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/trap-monitor-self-tests.json": "1bf60b558d8489edd4c4a01ae318e1eb8c2686519af0ecb97ad59ee2baea1064",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/source-coverage.json": "a8bddcf8ff550d250b1c5a2299d8c685729a0861c4bd2e8aa7153fe89f6e0e60",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/selftests-v2/run.json": "c27504ba06d19b37bf1bb396d7017bd709e21902fa0d19dc6b62d16e0deeca83",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/selftests-v2/isolation.json": "d360721cab6b5ad096e1c0fbae5a871e352bf5979653ce111eed85ebfb8b4aa7",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/archive-verify.json": "34767b8837b3d40f655f9dd95c6b186c168bce1ce88e59594b9753afd24f5123",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/retained-failures.json": "32a5d7d57c52b609f6a649dc82d6f9997953c80bba4ec53800600eabaf57de9a",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/publication.json": "c808b0a981bf112f7be1a4c5a6ddeee0f41b66c85f2d4107d1ae8759964006fd"
+  },
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept fixed local test-only UBSan matrix/source-suppression/fault evidence and suite-scheduling follow-up. No production promotion, no baseline/budget relaxation.",
+    "final_metadata_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/final-review.json"
+  },
+  "remaining": [
+    "Earlier focused T14 native regressions and their ABI/sanitizer coverage beyond the SDK1/SDK2 integration matrices.",
+    "Complete G04 lifecycle event traces and failure matrix.",
+    "G07 resource/size/performance measurements and baselines.",
+    "Full G03/T14 acceptance and production/protected remote admission."
+  ],
+  "limitations": [
+    "Undefined group is not complete memory/race/leak safety; Assembly is uninstrumented.",
+    "Volatile-qualified target checks and C++vptr are not claimed; fault probes use ordinary target pointers.",
+    "Trusted native single-threaded SDK scenarios; not an untrusted-plugin sandbox.",
+    "Archive byte restoration plus retained verification is not a fresh archive build.",
+    "Local controller/image pins and same-Agent review do not establish server-side anti-bypass."
+  ],
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "summary_sha256": "35c6dd4dea2a93ff2bf561c45b749674eb3120010794a70abf867d16751e751c"
+}

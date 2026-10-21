@@ -186,9 +186,10 @@
         "t14-sdk2-candidate.json",
         "t14-native-evidence.json",
         "t14-abi-guard-evidence.json",
-        "t14-sdk1-native-evidence.json"
+        "t14-sdk1-native-evidence.json",
+        "t14-ubsan-native-evidence.json"
       ],
-      "remaining": "SDK1有效路径和守卫已补齐：56构建/72目标执行，SDK1八次各824场景、1794租约消费，四次guard各122627调用；bind/enter有效结果、七SDK方法成功/拒绝均覆盖，SDK2旧计数保持。ABI1 setup/cleanup无父授权仍各144拒绝。仍缺其他T14专项原生回归、正式sanitizer、完整G04轨迹/故障矩阵和G07；不关闭GAP或T14整体。"
+      "remaining": "当前登记矩阵的UBSan trap已通过：60冻结构建/98目标执行，22真实SIGILL、430份C/C++源码审计、215隔离门禁自测；SDK1/SDK2原计数和已知ABI1各144次缺父授权拒绝保持。仍缺其他T14专项原生回归及对应ABI/sanitizer覆盖、完整G04轨迹/故障矩阵与G07；不关闭GAP或T14整体。"
     }
   ]
 }

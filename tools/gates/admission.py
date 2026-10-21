@@ -4,6 +4,7 @@ The project's design G00 remains unchanged. This entry builds candidate matrices
 never executes candidate programs and never grants production or release approval.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -196,6 +197,9 @@ def preflight(candidate, controller, policy_pin, controller_pin, registry_path):
         raise Invalid("registry is not controller-owned control data")
     proposal = json.loads((controller / registry_path).read_text())
     manifest, modules, builds, services = registry(proposal, policy["files"])
+    profile = json.loads((controller / proposal["toolchain"]).read_text())
+    if profile.get("schema") == "pangu.native-ubsan-trap-toolchain.v3" and any(b["scope"] != "test" for b in builds.values()):
+        raise Invalid("UBSan trap builds are restricted to test compositions")
     allowed = set(policy["files"]) | {p for m in modules.values() for p in m["files"]}
     before = inventory(candidate, allowed)
     for name, kind in policy["files"].items():
@@ -241,7 +245,9 @@ def execute(candidate, controller, policy_pin, controller_pin, registry_path, ou
         output.mkdir()
         profile = json.loads((controller / proposal["toolchain"]).read_text())
         profile_pin = sha(canonical(profile))
-        for build_id, item in builds.items():
+        def run_composition(pair):
+            build_id, item = pair
+            records, unbaselined = [], []
             selected = {m: modules[m] for m in item["modules"]}
             subset, exports = project(selected)
             with tempfile.TemporaryDirectory(prefix="pangu-admission-inputs-") as temporary:
@@ -258,17 +264,30 @@ def execute(candidate, controller, policy_pin, controller_pin, registry_path, ou
                     for name, m in selected.items():
                         limit = m["budgets"]["object_bytes"][mode]
                         if limit is None:
-                            report["unbaselined_budgets"].append({"module": name, "mode": mode, "metric": "object_bytes"})
+                            unbaselined.append({"module": name, "mode": mode, "metric": "object_bytes"})
                         elif sizes[name] > limit:
                             raise Invalid("module object byte budget exceeded: " + name)
                     artifact_size = (destination / "probe.elf").stat().st_size
                     limit = item["budgets"]["artifact_bytes"][mode]
                     if limit is None:
-                        report["unbaselined_budgets"].append({"build": build_id, "mode": mode, "metric": "artifact_bytes"})
+                        unbaselined.append({"build": build_id, "mode": mode, "metric": "artifact_bytes"})
                     elif artifact_size > limit:
                         raise Invalid("final artifact byte budget exceeded: " + build_id)
-                    report["builds"].append({"id": build_id, "mode": mode, "build_receipt_sha256": receipt_pin,
+                    records.append({"id": build_id, "mode": mode, "build_receipt_sha256": receipt_pin,
                                              "artifact_binding": checked, "object_bytes": sizes, "artifact_bytes": artifact_size})
+            return records, unbaselined
+
+        # Only the sanitizer test matrix uses two bounded workers. Each composition
+        # has its own staged tree/artifacts; map preserves registry order. Exceptions
+        # propagate before the matrix receipt is written. Existing profiles stay serial.
+        if profile["schema"] == "pangu.native-ubsan-trap-toolchain.v3":
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(run_composition, builds.items()))
+        else:
+            results = [run_composition(pair) for pair in builds.items()]
+        for records, unbaselined in results:
+            report["builds"].extend(records)
+            report["unbaselined_budgets"].extend(unbaselined)
         report["native_matrix"] = "PASS"
     if inventory(candidate, allowed) != before or snapshot(controller, policy) != control:
         raise Invalid("admission inputs changed during build")

@@ -50,6 +50,23 @@ class ControllerRunnerTests(unittest.TestCase):
             runner.run(self.root, self.root, self.pin)
         process.assert_not_called()
 
+    def test_registered_unscheduled_suite_rejected_before_execution(self):
+        name = "tools/gates/test_unscheduled.py"
+        (self.root / name).write_text("raise RuntimeError('must be scheduled')\n")
+        path = self.root / "governance/bootstrap-policy.json"
+        policy = json.loads(path.read_text())
+        policy["files"][name] = "gate-test"
+        path.write_text(json.dumps(policy))
+        with patch.object(runner.subprocess, "run") as process, self.assertRaisesRegex(ValueError, "unscheduled"):
+            runner.run(self.root, self.root, sha(path.read_bytes()))
+        process.assert_not_called()
+
+    def test_duplicate_suite_cannot_inflate_test_count(self):
+        with patch.object(runner, "SUITES", runner.SUITES + runner.SUITES[:1]):
+            with patch.object(runner.subprocess, "run") as process, self.assertRaisesRegex(ValueError, "duplicated"):
+                runner.run(self.root, self.root, self.pin)
+        process.assert_not_called()
+
     def test_zero_tests_and_nonpass_rejected(self):
         for key in ("tests", "failures", "errors", "skipped", "expected_failures", "unexpected_successes"):
             summary = dict(self.summary)

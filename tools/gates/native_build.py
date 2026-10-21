@@ -38,11 +38,18 @@ CPP_ASSEMBLER_MODES = {mode: dict(languages, **{".cpp": languages[".c"][:]})
                        for mode, languages in ASSEMBLER_MODES.items()}
 
 
+UBSAN_FLAGS = ["-fsanitize=undefined", "-fsanitize-trap=all", "-fno-sanitize-recover=all"]
+UBSAN_MODES = {mode: {language: flags + (UBSAN_FLAGS if language in {".c", ".cpp"} else [])
+                      for language, flags in languages.items()} for mode, languages in CPP_MODES.items()}
+
+
 def profile_modes(profile):
     if profile["schema"] == "pangu.native-probe-toolchain.v1":
         return MODES, ASSEMBLER_MODES
     if profile["schema"] == "pangu.native-test-cpp-toolchain.v2":
         return CPP_MODES, CPP_ASSEMBLER_MODES
+    if profile["schema"] == "pangu.native-ubsan-trap-toolchain.v3":
+        return UBSAN_MODES, CPP_ASSEMBLER_MODES
     raise Invalid("unsupported native toolchain schema")
 
 
@@ -142,8 +149,11 @@ def build(root, manifest, exports, profile, profile_pin, mode, entry, destinatio
     artifacts = {}
 
     def final(objects, temporary):
-        instructions, retained, cpp = {}, {}, {}
+        instructions, retained, cpp, sanitizer = {}, {}, {}, {}
         for source, obj in objects.items():
+            if profile["schema"] == "pangu.native-ubsan-trap-toolchain.v3" and Path(source).suffix in {".c", ".cpp"}:
+                from sanitizer_audit import audit_source
+                sanitizer[source] = audit_source(root, source, tools["compiler"]["path"], flags[Path(source).suffix], tools["compiler"]["sha256"])
             if Path(source).suffix == ".cpp":
                 cpp[source] = inspect_cpp_object(obj, tools["nm"]["path"], tools["disassembler"]["path"])
             text = run([tools["disassembler"]["path"], "-d", "--no-show-raw-insn", "--x86-asm-syntax=intel", str(obj)])
@@ -166,7 +176,7 @@ def build(root, manifest, exports, profile, profile_pin, mode, entry, destinatio
             artifacts[target.name] = digest(target)
         (destination / "disassembly.json").write_bytes(canonical(instructions) + b"\n")
         artifacts["disassembly.json"] = digest(destination / "disassembly.json")
-        return {"elf": elf, "command": command, "instruction_audit": "PASS", "retained_objects": retained, "cpp_test_objects": cpp}
+        return {"elf": elf, "command": command, "instruction_audit": "PASS", "retained_objects": retained, "cpp_test_objects": cpp, "ubsan_sources": sanitizer}
 
     report = audit(root, manifest, tools["compiler"]["path"], tools["compiler"]["sha256"], link,
                    language_flags=flags, inspect_objects=final,
@@ -219,6 +229,17 @@ def verify_build(root, manifest, exports, profile, profile_pin, mode, entry, des
     for source, obj in objects.items():
         if obj.name not in artifacts or digest(obj) != report["object_sha256"][source]:
             raise Invalid("retained object does not match compilation")
+    checked_sanitizer = {}
+    if profile["schema"] == "pangu.native-ubsan-trap-toolchain.v3":
+        from sanitizer_audit import audit_source
+        mode_flags, _ = profile_modes(profile)
+        for source in objects:
+            language = Path(source).suffix
+            if language in {".c", ".cpp"}:
+                values = mode_flags[mode][language] + ["-ffile-prefix-map=" + str(root) + "=.", "-fdebug-compilation-dir=."]
+                checked_sanitizer[source] = audit_source(root, source, profile["tools"]["compiler"]["path"], values, profile["tools"]["compiler"]["sha256"])
+    if checked_sanitizer != final.get("ubsan_sources", {}):
+        raise Invalid("retained sanitizer source evidence mismatch")
     checked_cpp = {}
     for source, obj in objects.items():
         if Path(source).suffix == ".cpp":

@@ -1,0 +1,14 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-21",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-native-ubsan-trap",
+  "commit": "83e18f3434caec96b361c3df86724e7c63e40868",
+  "parent": "5fcfab908867a69b21c388d95c192fa12acd875f",
+  "scope": "Fixed raw T14 native UBSan test candidate; not production. Snapshot precedes suite scheduling follow-up recorded separately in selftest-control-v2-review.json.",
+  "controller_sha256": "97f47f7bf91f3d85c5a3271c97009f966a971810d8a8e6f6bc91ec435693705d",
+  "candidate_tree_sha256": "ec8f92a8368271dbfc53e1750614cf08c27c3d40ee274fcf5fec02e4ec17d3c8",
+  "native_source_files": 148,
+  "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+  "release": "BLOCKED"
+}
