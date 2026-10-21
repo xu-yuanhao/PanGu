@@ -1,0 +1,2530 @@
+{
+  "builds": [
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-facade-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-facade",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-lifecycle",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-facade-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "focused-facade",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-lifecycle",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.entrybridge": "t14-entry",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-entry-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-entry",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.entrybridge": "t14-entry",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-entry-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "focused-entry",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-route-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-route",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-route-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "focused-route",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-interop-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-interop",
+        "focused-interop-cpp",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "sdk1-interop-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-interop-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "focused-interop",
+        "focused-interop-cpp",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "sdk1-interop-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-parent-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-parent",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.entrybridge": "t14-entry",
+        "host.invocation": "t14-plugin-runtime",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "host.plugin-sdk": "t14-plugin-runtime",
+        "host.plugin-sdk1": "t14-plugin-runtime",
+        "host.service-route": "t14-plugin-runtime"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-parent-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "focused-parent",
+        "focused-start",
+        "focused-test-support",
+        "host-fixed-api",
+        "host-plan",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "t14-entry",
+        "t14-lifecycle",
+        "t14-plugin-runtime",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Focused correctness evidence only; product budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "focused-format-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "compiler-memory",
+        "compiler-memory-api",
+        "focused-format",
+        "focused-start",
+        "focused-test-support",
+        "t14-test-platform"
+      ],
+      "scope": "test"
+    }
+  ],
+  "modules": [
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
+      ],
+      "id": "bootstrap-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "T10: no persistent resources or allocations",
+        "state_owner": "composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "minimal platform exit contract",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/bootstrap-api",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "plugin-sdk-api"
+      ],
+      "exports": [],
+      "files": [
+        "src/t14-abi/client-abi-v1.h",
+        "src/t14-abi/client-entry-v1.h",
+        "src/t14-abi/client-route-v1.h",
+        "src/t14-abi/client-lifecycle-child-v2.h",
+        "src/t14-abi/client-invocation-v1.h",
+        "src/t14-abi/client-invocation-ext2-v2.h",
+        "src/t14-abi/client-plugin-host-v1.h",
+        "src/t14-abi/client-plugin-host2-v2.h"
+      ],
+      "id": "host-fixed-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/client-abi-v1.h",
+        "src/t14-abi/client-entry-v1.h",
+        "src/t14-abi/client-route-v1.h",
+        "src/t14-abi/client-lifecycle-child-v2.h",
+        "src/t14-abi/client-invocation-v1.h",
+        "src/t14-abi/client-invocation-ext2-v2.h",
+        "src/t14-abi/client-plugin-host-v1.h",
+        "src/t14-abi/client-plugin-host2-v2.h"
+      ],
+      "required_modules": [
+        "bootstrap-api",
+        "plugin-sdk-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 host-fixed-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "fixture only; production budget remains unbaselined",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "exports": [
+        "pangu_discover_prepare"
+      ],
+      "files": [
+        "src/host-plan/host-plan.c"
+      ],
+      "id": "host-plan",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "stateless, caller-owned immutable tables and disjoint scratch/output; runtime failures unpublish views and preserve final arrays; no allocation or callbacks",
+        "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no activation, configuration-schema/permission execution or OS isolation"
+      ],
+      "provides": [
+        {
+          "service": "host.plan",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "requires": [],
+      "responsibility": "bounded static native plugin planning: entry/canonical metadata, scopes, required/optional graph and Pending; no execution",
+      "role": "foundation",
+      "scope": "product",
+      "source_root": "src/host-plan",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "exports": [],
+      "files": [
+        "src/t14-abi/lifecycle.h",
+        "src/t14-abi/lifecycle-child.h"
+      ],
+      "id": "lifecycle-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/lifecycle.h",
+        "src/t14-abi/lifecycle-child.h"
+      ],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 lifecycle-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "lifecycle-api",
+        "plugin-sdk-api"
+      ],
+      "exports": [],
+      "files": [
+        "src/t14-abi/entry-bridge.h",
+        "src/t14-abi/service-route.h",
+        "src/t14-abi/invocation.h",
+        "src/t14-abi/invocation2.h",
+        "src/t14-abi/plugin-host.h",
+        "src/t14-abi/plugin-host2.h"
+      ],
+      "id": "plugin-host-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/entry-bridge.h",
+        "src/t14-abi/service-route.h",
+        "src/t14-abi/invocation.h",
+        "src/t14-abi/invocation2.h",
+        "src/t14-abi/plugin-host.h",
+        "src/t14-abi/plugin-host2.h"
+      ],
+      "required_modules": [
+        "bootstrap-api",
+        "lifecycle-api",
+        "plugin-sdk-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 plugin-host-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/t14-abi/plugin-sdk.h",
+        "src/t14-abi/plugin-sdk2.h",
+        "src/t14-abi/client-plugin-sdk-v1.h",
+        "src/t14-abi/client-plugin-sdk2-v2.h"
+      ],
+      "id": "plugin-sdk-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/plugin-sdk.h",
+        "src/t14-abi/plugin-sdk2.h",
+        "src/t14-abi/client-plugin-sdk-v1.h",
+        "src/t14-abi/client-plugin-sdk2-v2.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 plugin-sdk-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "lifecycle-api"
+      ],
+      "exports": [
+        "pangu_lifecycle_query"
+      ],
+      "files": [
+        "src/t14-lifecycle/lifecycle.c",
+        "src/t14-lifecycle/lifecycle-child-private.h"
+      ],
+      "id": "t14-lifecycle",
+      "languages": [
+        "c-header",
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "explicit-reentrancy",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "service": "host.lifecycle-child",
+          "version": 2
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "lifecycle-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "responsibility": "T14 t14-lifecycle candidate boundary",
+      "role": "host",
+      "scope": "test",
+      "source_root": "src/t14-lifecycle",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api"
+      ],
+      "exports": [
+        "pangu_entry_bridge_query"
+      ],
+      "files": [
+        "src/t14-entry/entry-bridge.c"
+      ],
+      "id": "t14-entry",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "host.entrybridge",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        }
+      ],
+      "responsibility": "T14 t14-entry candidate boundary",
+      "role": "host",
+      "scope": "test",
+      "source_root": "src/t14-entry",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api"
+      ],
+      "exports": [
+        "pangu_service_route_query",
+        "pangu_invocation_query",
+        "pangu_plugin_host_query"
+      ],
+      "files": [
+        "src/t14-plugin-runtime/service-route.c",
+        "src/t14-plugin-runtime/route-geometry-private.h",
+        "src/t14-plugin-runtime/route-query-private.h",
+        "src/t14-plugin-runtime/invocation.c",
+        "src/t14-plugin-runtime/plugin-sdk.c"
+      ],
+      "id": "t14-plugin-runtime",
+      "languages": [
+        "c-header",
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "explicit-reentrancy",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "host.service-route",
+          "version": 1
+        },
+        {
+          "service": "host.invocation",
+          "version": 2
+        },
+        {
+          "service": "host.plugin-sdk",
+          "version": 2
+        },
+        {
+          "service": "host.plugin-sdk1",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle-child",
+          "version": 2
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.entrybridge",
+          "version": 1
+        }
+      ],
+      "responsibility": "cohesive route/invocation/SDK implementation sharing private geometry helpers",
+      "role": "host",
+      "scope": "test",
+      "source_root": "src/t14-plugin-runtime",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate",
+        "focused-format-asm"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/compiler-memory-api/memory.h"
+      ],
+      "id": "compiler-memory-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/compiler-memory-api/memory.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 compiler-memory-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/compiler-memory-api",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-entry-asm",
+        "focused-route-asm",
+        "focused-interop-asm",
+        "focused-parent-asm",
+        "focused-format-asm"
+      ],
+      "dependencies": [
+        "compiler-memory-api"
+      ],
+      "exports": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ],
+      "files": [
+        "src/compiler-memory/memory.S"
+      ],
+      "id": "compiler-memory",
+      "languages": [
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "compiler-memory-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 compiler-memory candidate boundary",
+      "role": "foundation",
+      "scope": "product",
+      "source_root": "src/compiler-memory",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-alternate",
+        "focused-entry-alternate",
+        "focused-route-alternate",
+        "focused-interop-alternate",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "compiler-memory-api"
+      ],
+      "exports": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ],
+      "files": [
+        "src/compiler-memory-alternate/alternate.c"
+      ],
+      "id": "compiler-memory-alternate",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "compiler-memory-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 compiler-memory-alternate candidate boundary",
+      "role": "foundation",
+      "scope": "test",
+      "source_root": "src/compiler-memory-alternate",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate",
+        "focused-format-asm"
+      ],
+      "dependencies": [],
+      "exports": [
+        "probe_write",
+        "probe_exit"
+      ],
+      "files": [
+        "src/t14-test-platform/platform.h",
+        "src/t14-test-platform/platform.S"
+      ],
+      "id": "t14-test-platform",
+      "languages": [
+        "c-header",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-test-platform/platform.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 t14-test-platform candidate boundary",
+      "role": "platform",
+      "scope": "test",
+      "source_root": "src/t14-test-platform",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-interop-asm",
+        "focused-interop-alternate"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/t14-abi/interop-contract-v1.h",
+        "src/t14-abi/interop-guard.h"
+      ],
+      "id": "sdk1-interop-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "explicit-reentrancy",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/interop-contract-v1.h",
+        "src/t14-abi/interop-guard.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "SDK1 sdk1-interop-api native test boundary",
+      "role": "interface",
+      "scope": "test",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate",
+        "focused-format-asm"
+      ],
+      "dependencies": [
+        "t14-test-platform",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate"
+      ],
+      "exports": [
+        "memcmp",
+        "printf",
+        "puts",
+        "probe_assert"
+      ],
+      "files": [
+        "src/focused-test-support/assert.h",
+        "src/focused-test-support/string.h",
+        "src/focused-test-support/stdio.h",
+        "src/focused-test-support/support.c"
+      ],
+      "id": "focused-test-support",
+      "languages": [
+        "c-header",
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/focused-test-support/assert.h",
+        "src/focused-test-support/string.h",
+        "src/focused-test-support/stdio.h"
+      ],
+      "required_modules": [
+        "t14-test-platform",
+        "compiler-memory-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-test-support",
+      "role": "foundation",
+      "scope": "test",
+      "source_root": "src/focused-test-support",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-facade/main.c",
+        "src/focused-facade/plan-fixture.h",
+        "src/focused-facade/graph-cases.h",
+        "src/focused-facade/facade-asm.S"
+      ],
+      "id": "focused-facade",
+      "languages": [
+        "c-header",
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-facade",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-facade",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-entry-asm",
+        "focused-entry-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-entry/main.c",
+        "src/focused-entry/plan-fixture.h",
+        "src/focused-entry/graph-cases.h",
+        "src/focused-entry/entry-fixture.h",
+        "src/focused-entry/entry-asm.S"
+      ],
+      "id": "focused-entry",
+      "languages": [
+        "c-header",
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.entrybridge",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-entry",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-entry",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-route-asm",
+        "focused-route-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-route/main.c",
+        "src/focused-route/plan-fixture.h",
+        "src/focused-route/graph-cases.h",
+        "src/focused-route/entry-fixture.h",
+        "src/focused-route/entry-asm.S",
+        "src/focused-route/route-fixture.h"
+      ],
+      "id": "focused-route",
+      "languages": [
+        "c-header",
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.entrybridge",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.service-route",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-route",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-route",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-interop-asm",
+        "focused-interop-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime",
+        "sdk1-interop-api",
+        "focused-interop-cpp"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-interop/main.c",
+        "src/focused-interop/plan-fixture.h",
+        "src/focused-interop/graph-cases.h",
+        "src/focused-interop/entry-fixture.h",
+        "src/focused-interop/entry-asm.S",
+        "src/focused-interop/route-fixture.h",
+        "src/focused-interop/route-interop.S"
+      ],
+      "id": "focused-interop",
+      "languages": [
+        "c-header",
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime",
+        "sdk1-interop-api",
+        "focused-interop-cpp"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.entrybridge",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.service-route",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-interop",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-interop",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-parent-asm",
+        "focused-parent-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-parent/main.c",
+        "src/focused-parent/plan-fixture.h",
+        "src/focused-parent/graph-cases.h",
+        "src/focused-parent/entry-fixture.h",
+        "src/focused-parent/entry-asm.S",
+        "src/focused-parent/route-fixture.h"
+      ],
+      "id": "focused-parent",
+      "languages": [
+        "c-header",
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-plan",
+        "host-fixed-api",
+        "compiler-memory-api",
+        "lifecycle-api",
+        "plugin-host-api",
+        "plugin-sdk-api",
+        "focused-test-support",
+        "t14-lifecycle",
+        "t14-entry",
+        "t14-plugin-runtime"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.entrybridge",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.service-route",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.invocation",
+          "version": 2
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle-child",
+          "version": 2
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-parent",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-parent",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-interop-asm",
+        "focused-interop-alternate"
+      ],
+      "dependencies": [
+        "sdk1-interop-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate"
+      ],
+      "exports": [
+        "pangu_route_cpp_invoke",
+        "pangu_route_cpp_evaluate",
+        "pangu_route_cpp_set_observer"
+      ],
+      "files": [
+        "src/focused-interop-cpp/provider.cpp",
+        "src/focused-interop-cpp/observer.h"
+      ],
+      "id": "focused-interop-cpp",
+      "languages": [
+        "c++20",
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/focused-interop-cpp/observer.h"
+      ],
+      "required_modules": [
+        "sdk1-interop-api",
+        "compiler-memory-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-interop-cpp",
+      "role": "plugin",
+      "scope": "test",
+      "source_root": "src/focused-interop-cpp",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-format-asm"
+      ],
+      "dependencies": [
+        "focused-test-support"
+      ],
+      "exports": [
+        "main"
+      ],
+      "files": [
+        "src/focused-format/main.c"
+      ],
+      "id": "focused-format",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "focused-test-support"
+      ],
+      "requires": [],
+      "responsibility": "Test-only focused regression: focused-format",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-format",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "focused-facade-asm",
+        "focused-facade-alternate",
+        "focused-entry-asm",
+        "focused-entry-alternate",
+        "focused-route-asm",
+        "focused-route-alternate",
+        "focused-interop-asm",
+        "focused-interop-alternate",
+        "focused-parent-asm",
+        "focused-parent-alternate",
+        "focused-format-asm"
+      ],
+      "dependencies": [
+        "focused-facade",
+        "focused-entry",
+        "focused-route",
+        "focused-interop",
+        "focused-parent",
+        "focused-format",
+        "t14-test-platform"
+      ],
+      "exports": [
+        "pangu_focused_start"
+      ],
+      "files": [
+        "src/focused-start/start.S"
+      ],
+      "id": "focused-start",
+      "languages": [
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "t14-test-platform"
+      ],
+      "requires": [],
+      "responsibility": "Test-only focused regression: focused-start",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-start",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    }
+  ],
+  "phase": "CANDIDATE_NOT_APPROVED",
+  "schema": "pangu.native-admission.v1",
+  "service_definitions": [
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.exit",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.memory",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.file",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.clock",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.region",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.buffer",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.text",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.json",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.schema",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "compat.pi-arguments",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "host.plan",
+      "version": 1
+    },
+    {
+      "definition_module": "compiler-memory-api",
+      "id": "compiler.memory",
+      "version": 1
+    },
+    {
+      "definition_module": "lifecycle-api",
+      "id": "host.lifecycle",
+      "version": 1
+    },
+    {
+      "definition_module": "lifecycle-api",
+      "id": "host.lifecycle-child",
+      "version": 2
+    },
+    {
+      "definition_module": "plugin-host-api",
+      "id": "host.entrybridge",
+      "version": 1
+    },
+    {
+      "definition_module": "plugin-host-api",
+      "id": "host.service-route",
+      "version": 1
+    },
+    {
+      "definition_module": "plugin-host-api",
+      "id": "host.invocation",
+      "version": 2
+    },
+    {
+      "definition_module": "plugin-sdk-api",
+      "id": "host.plugin-sdk",
+      "version": 2
+    },
+    {
+      "definition_module": "plugin-sdk-api",
+      "id": "host.plugin-sdk1",
+      "version": 1
+    }
+  ],
+  "target": "linux-x86_64",
+  "toolchain": "governance/native-ubsan-trap-toolchain.json"
+}

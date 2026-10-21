@@ -187,9 +187,11 @@
         "t14-native-evidence.json",
         "t14-abi-guard-evidence.json",
         "t14-sdk1-native-evidence.json",
-        "t14-ubsan-native-evidence.json"
+        "t14-ubsan-native-evidence.json",
+        "t14-focused-native-evidence.json",
+        "t14-focused-inventory.json"
       ],
-      "remaining": "当前登记矩阵的UBSan trap已通过：60冻结构建/98目标执行，22真实SIGILL、430份C/C++源码审计、215隔离门禁自测；SDK1/SDK2原计数和已知ABI1各144次缺父授权拒绝保持。仍缺其他T14专项原生回归及对应ABI/sanitizer覆盖、完整G04轨迹/故障矩阵与G07；不关闭GAP或T14整体。"
+      "remaining": "五套公开ABI专项已补齐：同一固定树44普通/UBSan构建及44执行，旧输出和284断言保持；72私有链接拒绝/8公开query链接通过。最新宿主快照仍有11项私有helper用例待迁移，更早owner独立语料仍待审计；还缺对应专项ABI守卫、完整G04轨迹/故障矩阵及G07，不关闭GAP或T14。"
     }
   ]
 }

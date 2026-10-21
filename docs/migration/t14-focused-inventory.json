@@ -1,0 +1,171 @@
+{
+  "schema": "pangu.t14-focused-inventory.v1",
+  "scope": "Latest t14-sdk2 host snapshot:18 C test entry files plus private-link fixture; not an exhaustive inventory of every earlier standalone owner artifact.",
+  "historical_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h",
+  "items": [
+    {
+      "id": "T14-F01",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/adapter-test.c",
+      "source_sha256": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F02",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/async-test.c",
+      "source_sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F03",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/budget-test.c",
+      "source_sha256": "2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F04",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-budget-test.c",
+      "source_sha256": "81e40f70a618ce599eb112330ef6f44265979c3f543242f0b03c8f2c37b12112",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F05",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-test.c",
+      "source_sha256": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F06",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/entry-test.c",
+      "source_sha256": "05b089264a0045f736f242e76b335f1a07a5242523340b3d6944247dc86ee50c",
+      "status": "PASS_CURRENT_NATIVE",
+      "next_action": "Complete corresponding ABI guard/G04/G07 scope; this row alone does not complete T14.",
+      "suite": "entry",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-focused-native-evidence.json"
+    },
+    {
+      "id": "T14-F07",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/facade-test.c",
+      "source_sha256": "3e5673d5c0e0f0efa6658cea65be117cf59023ccc924cc4a1bec4dbadec2e3c0",
+      "status": "PASS_CURRENT_NATIVE",
+      "next_action": "Complete corresponding ABI guard/G04/G07 scope; this row alone does not complete T14.",
+      "suite": "facade",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-focused-native-evidence.json"
+    },
+    {
+      "id": "T14-F08",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/geometry-test.c",
+      "source_sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F09",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/graph-test.c",
+      "source_sha256": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F10",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/interop-test.c",
+      "source_sha256": "2dd1e0b2b2da6a3f713ff94fd82a4e1242023995a9f2e3b853216bd4f63282a4",
+      "status": "PASS_CURRENT_NATIVE",
+      "next_action": "Complete corresponding ABI guard/G04/G07 scope; this row alone does not complete T14.",
+      "suite": "interop",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-focused-native-evidence.json"
+    },
+    {
+      "id": "T14-F11",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/invocation-test.c",
+      "source_sha256": "95643248cf7196d4d57547c62623f34286475c67595e90ab63a017b036b10c12",
+      "status": "PASS_CURRENT_NATIVE",
+      "next_action": "Complete corresponding ABI guard/G04/G07 scope; this row alone does not complete T14.",
+      "suite": "parent",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-focused-native-evidence.json"
+    },
+    {
+      "id": "T14-F12",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/private-link.c",
+      "source_sha256": "092d573b409e8a75b4a8ee49dd6261e086ca710646f0316678aa5e6d45ce420b",
+      "status": "PASS_LINK_BOUNDARY_ONLY",
+      "next_action": "Retain static visibility refusals; not a runtime/lifecycle conformance claim.",
+      "evidence": "docs/migration/t14-focused-native-evidence.json",
+      "expected_private_link_refusals": 72,
+      "public_query_positive_links": 8,
+      "programs_executed": false
+    },
+    {
+      "id": "T14-F13",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/route-test.c",
+      "source_sha256": "21e981006fb0166153ed4b4269f65b4b3cbed5343e5fa7f3c9768d00c7e2411d",
+      "status": "PASS_CURRENT_NATIVE",
+      "next_action": "Complete corresponding ABI guard/G04/G07 scope; this row alone does not complete T14.",
+      "suite": "route",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-focused-native-evidence.json"
+    },
+    {
+      "id": "T14-F14",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/sdk-test.c",
+      "source_sha256": "9dfbba1f659836b79dbda53b55dc5c473869bf06d651f6877c4b4f9080ba32b8",
+      "status": "PASS_PREVIOUS_NATIVE",
+      "next_action": "Keep prior fixed evidence; not rerun in this focused candidate.",
+      "evidence": "docs/migration/t14-sdk1-native-evidence.json",
+      "ubsan_evidence": "docs/migration/t14-ubsan-native-evidence.json"
+    },
+    {
+      "id": "T14-F15",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/sdk2-test.c",
+      "source_sha256": "ba1b0195984b22657c8af8da82e1cdc15c5e574da1d4069b46b0c5ce0cbe200c",
+      "status": "PASS_PREVIOUS_NATIVE",
+      "next_action": "Keep prior fixed evidence; not rerun in this focused candidate.",
+      "evidence": "docs/migration/t14-native-evidence.json",
+      "ubsan_evidence": "docs/migration/t14-ubsan-native-evidence.json"
+    },
+    {
+      "id": "T14-F16",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
+      "source_sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F17",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/start-test.c",
+      "source_sha256": "6dbd67cf32d33e244271aa61f5aefc34203abae957539d3c04e2289d98db7103",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F18",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/test.c",
+      "source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    },
+    {
+      "id": "T14-F19",
+      "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/transaction-test.c",
+      "source_sha256": "d08c01d9bce4b8b0c06f9cc2e42c372a348402529d62e2fe68d8ecb745fe6463",
+      "status": "NOT_RUN_CURRENT_ABI",
+      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+    }
+  ],
+  "pending_current_abi_ports": 11,
+  "earlier_standalone_owner_corpus_audit": "PENDING",
+  "full_T14": "NOT_COMPLETED"
+}

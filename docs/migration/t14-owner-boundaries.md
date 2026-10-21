@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前登记矩阵的UBSan trap候选已通过：60冻结构建/98目标执行，22真实SIGILL、430份C/C++源码审计与215隔离门禁自测；SDK1/SDK2场景及守卫计数保持。前期超时与执行器失败记录保留。其他专项及其ABI/sanitizer覆盖、完整G04/G07与生产准入仍未完成，GAP-010/T14不关闭。
+五套公开ABI专项现已补齐：同一固定树44普通/UBSan构建与44执行、284原始断言及旧输出保持，72私有链接拒绝/8公开query链接通过。此前SDK1/SDK2守卫与登记矩阵UBSan证据保留。最新宿主快照仍有11项私有helper入口待迁移，更早owner语料审计、对应专项ABI守卫、完整G04/G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -396,3 +396,24 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 源码归档SHA256 `ca8ac9e5da305eabcbd7463f3d782f99be24d90b3dd97167ab28840d9dd92955`，349份登记文件恢复字节/清单匹配、60份保留产物复核通过；不是恢复后重新构建。固定原native候选源码已推送实验分支 `codex/t14-native-ubsan-trap`，commit `83e18f3434caec96b361c3df86724e7c63e40868`，Git清单/逐blob和远端ref回读匹配；此快照先于自测调度后续修复，根分支另行交付后续控制面，不将新控制树的证据冒充原树证据。
 
 同一Agent实施、自审并批准本地test用途；固定控制树、差异、日志摘要、风险与最终元数据审查在目录内 control-review.json / selftest-control-v2-review.json / final-review.json。UBSan undefined组不是完整内存安全证明，汇编未插桩；不声称覆盖volatile目标访问、C++vptr、ASan/泄漏/数据竞争或任意第三方插件。早期T14独立专项及对应ABI/sanitizer、完整G04轨迹/故障矩阵、G07资源/体积/性能仍待完成，完整G03、GAP-010、T14与生产/远端受保护放行仍未通过。
+
+
+## 公开 ABI 专项原生迁移（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4`，两份登记 [normal](t14-focused-normal-candidate.json) / [UBSan](t14-focused-ubsan-candidate.json)，结果见 [专项证据](t14-focused-native-evidence.json)，剩余入口见 [固定盘点](t14-focused-inventory.json)。SDK入口之前只包含entry/route夹具而未执行专项main，本轮单独执行facade、entry、route、interop和parent，不以被编译函数代替运行覆盖。
+
+23模块/11组合、83份原生文件；47份复用文件与已验证候选逐字节相同，36份新增文件全为测试适配。五套专项分别用GAS/C两种compiler.memory、debug/release、普通v2/UBSan v3组合，每套实际8次；另有四次格式器边界自测。两模式同一源码树 `a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38`、控制树 `0c06561628462d8e9ee661b3186c9220f1edd8347526a14d55c8f2fafc0e6575`，合计44冻结构建/44隔离执行。150份UBSan C/C++源码审计覆盖全部相应对象；所有运行退出0且无stderr。每份专项stdout逐字节等于原宿主O0/O2共识，不从新实现输出生成期望。
+
+每次facade为1152场景/1924提供者调用/5772登记拒绝；entry为4108场景/6688依赖检查/90346不足预算/6555别名拒绝及24汇编入口；route为390场景/888调用、两实现各444调用；interop为1188场景/34128调用，九矩阵单元各3792，C++观察计数11376；parent为809场景/2248调用，setup/cleanup/业务嵌套分别214/208/156，深度3。五份直接测试文件的284个原始assert表达式逐条文本匹配，实际差异与摘要在 assertion-retention.json 和逐套test-port.diff；这不是全生命周期语义的形式化证明。
+
+新测试支持库只承担固定%d/%s/puts输出、memcmp与断言；边界自测验证INT_MIN/MAX/零、空字符串、换行与返回长度，不进入产品。C++测试提供者的观察函数由测试main显式设置，避免插件反向导入client形成依赖环；没有把原11376观察计数改成空回调。此setter是进程内可信测试桩，不作为生产服务或线程安全机制。
+
+旧私有链接夹具的九个符号在普通/UBSan、两内存提供者、debug/release中共72次被真实ld拒绝；八次同环境公开pangu_lifecycle_query链接成功。所有被检lifecycle对象的全局定义仅此一个工厂；链接出的额外测试程序未执行，不能计为生命周期运行测试。输入/对象/工具链只读挂载且断网，检查源与结果摘要保留在 private-check-*/ 下，仍不宣称服务器侧防绕过。
+
+失败历史完整保留：第一次被Clang拒绝旧interop_async只写不读；随后发现parent_budgets同类死计数，移除它们而保留真正异步控制、根/子预算计数和所有断言。第二次封闭链接审计拒绝外部函数地址引入的_GLOBAL_OFFSET_TABLE_，按既有SDK1惯例明确静态测试导入hidden，不放宽链接器。第三次普通22构建/执行通过，UBSan预处理AST因for闭块后贴着assert的排版产生误导缩进诊断；只调整换行后，最终同一v4源码重新完成两模式。各失败/部分回执未改为PASS；外部生成器bindings键顺序差异也已记录并改为排序JSON，未覆写运行中的控制目录。
+
+289份文件源码归档SHA256 `eba1345295bee5e0dd7d37ae40d875af64bfd0b71f9066a428355c0d1d95b384`，恢复字节/登记匹配；使用恢复出的源码再次核对两模式全部44份保留构建，未执行恢复后的重新构建。实验源码分支 `codex/t14-native-focused-public-abi` commit `42bd58cfe1fa1f9243f79d8f737c4345b8b4322d` 已逐blob核对并远端ref回读匹配。
+
+门禁、测试和instructions字节与前次215项隔离自测的固定控制器一致，本轮没有冒称又执行了215项；本轮新矩阵、运行/负链接及G00等收尾检查单独记录。同一Agent实施、自审批准本地测试登记与证据，固定摘要/差异/风险在 control-review-*.json / final-review.json。参考Cordis等待dependent再清理，以及Harness vendor旧epoch/完成期间等待的代码，本轮是原生行为验证，未宣称JS框架兼容。
+
+盘点覆盖最新宿主快照18份C测试入口及private-link夹具，共19项：5项本轮运行通过、2项SDK已有固定原生证据、1项仅链接边界通过、11项当前ABI未运行。还须审计更早独立owner语料。旧私有helper部分已从公开面删除，后续应通过现有公开ABI重表达约束并记录差异，不能重新导出私有函数以迁就测试。对应专项ABI守卫、完整G04事件轨迹/故障注入、G07资源/体积/性能和生产准入仍待完成，T14/GAP-010保持未关闭。

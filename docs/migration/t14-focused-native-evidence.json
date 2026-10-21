@@ -1,0 +1,267 @@
+{
+  "schema": "pangu.t14-focused-native-evidence.v1",
+  "status": "FIVE_PUBLIC_ABI_FOCUSED_SUITES_AND_PRIVATE_LINK_BOUNDARY_PASS_FULL_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4",
+  "registries": {
+    "normal": "docs/migration/t14-focused-normal-candidate.json",
+    "ubsan": "docs/migration/t14-focused-ubsan-candidate.json"
+  },
+  "controller_sha256": "0c06561628462d8e9ee661b3186c9220f1edd8347526a14d55c8f2fafc0e6575",
+  "policy_sha256": "2fb3e92214c714fefece30e9188e32af0a38532eae9d3127ab18909b7d5ea0fc",
+  "candidate_tree_sha256": "a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38",
+  "same_fixed_candidate_for_both_profiles": true,
+  "images": {
+    "normal": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+  },
+  "modules": 23,
+  "compositions": 11,
+  "native_source_files": 83,
+  "unchanged_reused_files": 47,
+  "test_only_additional_files": 36,
+  "builds": 44,
+  "builds_per_profile": 22,
+  "executions": 44,
+  "focused_test_executions": 40,
+  "formatter_self_test_executions": 4,
+  "original_direct_assert_expressions_preserved": 284,
+  "assertion_retention": {
+    "scope": "Every original assert expression in these five direct test files preserved byte-for-byte; not by itself a complete semantic equivalence proof",
+    "records": [
+      {
+        "suite": "facade",
+        "historical_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/facade-test.c",
+        "ported_file": "src/focused-facade/main.c",
+        "assertions": 45,
+        "assertion_texts_exact_equal": true,
+        "assertion_list_sha256": "7816c817d28b75fff956c3d123c270f1634ab2f19077adb8741efd8ba71a5a30",
+        "diff_file": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/facade-test-port.diff"
+      },
+      {
+        "suite": "entry",
+        "historical_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/entry-test.c",
+        "ported_file": "src/focused-entry/entry-fixture.h",
+        "assertions": 66,
+        "assertion_texts_exact_equal": true,
+        "assertion_list_sha256": "71aad0f3a647d62069c9ca4a9d167a38081c55f3c33a0dca245eecda0e03c6bf",
+        "diff_file": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/entry-test-port.diff"
+      },
+      {
+        "suite": "route",
+        "historical_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/route-test.c",
+        "ported_file": "src/focused-route/route-fixture.h",
+        "assertions": 52,
+        "assertion_texts_exact_equal": true,
+        "assertion_list_sha256": "f1dff9ef287050915256e1df609080bb5b57c73456b6c8805f3c864c57a7ea09",
+        "diff_file": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/route-test-port.diff"
+      },
+      {
+        "suite": "interop",
+        "historical_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/interop-test.c",
+        "ported_file": "src/focused-interop/main.c",
+        "assertions": 40,
+        "assertion_texts_exact_equal": true,
+        "assertion_list_sha256": "8e75d3138e65e3cbf187152223bc26fd230e9e419220127de4a8b925562a3cfc",
+        "diff_file": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/interop-test-port.diff"
+      },
+      {
+        "suite": "parent",
+        "historical_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/invocation-test.c",
+        "ported_file": "src/focused-parent/main.c",
+        "assertions": 81,
+        "assertion_texts_exact_equal": true,
+        "assertion_list_sha256": "3f048846fb1759ef815e734a169120e15cddfc3c0b769c4e6039d61eff927d90",
+        "diff_file": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/parent-test-port.diff"
+      }
+    ]
+  },
+  "suite_counters_per_run": {
+    "facade": {
+      "cases": 1152,
+      "provider_calls": 1924,
+      "registration_refusals": 5772
+    },
+    "entry": {
+      "cases": 4108,
+      "dependency_probes": 6688,
+      "insufficient_fuel": 90346,
+      "alias_refusals": 6555,
+      "assembly_entries": 24
+    },
+    "route": {
+      "cases": 390,
+      "service_calls": 888,
+      "insufficient_fuel": 16518,
+      "alias_refusals": 4884
+    },
+    "interop": {
+      "cases": 1188,
+      "actual_service_calls": 34128,
+      "cpp_provider_calls": 11376,
+      "matrix_per_cell": 3792,
+      "matrix_cells": 9
+    },
+    "parent": {
+      "cases": 809,
+      "actual_service_calls": 2248,
+      "nested_setup": 214,
+      "nested_cleanup": 208,
+      "nested_business": 156,
+      "max_depth": 3
+    }
+  },
+  "runs_per_suite": 8,
+  "stdout_all_exact_historical_oracles": true,
+  "ubsan_source_audit_records": 150,
+  "private_link_refusals": 72,
+  "public_query_link_controls": 8,
+  "private_check_programs_executed": false,
+  "shared_lifecycle_global_exports": [
+    "pangu_lifecycle_query"
+  ],
+  "gate_code_changed": false,
+  "gate_self_tests": {
+    "rerun_this_round": false,
+    "reference": "docs/migration/t14-ubsan-native-evidence.json",
+    "prior_isolated_tests": 215,
+    "current_gate_test_instruction_bytes_match_prior_frozen_controller": true
+  },
+  "adapter_changes": [
+    "Separate test-only formatter supports only the fixed old %d/%s/puts outputs; four formatter boundary executions verify INT_MIN/MAX/zero and return length.",
+    "C++ fixture observer set explicitly by the test main; no reverse import from plugin to client, no test callback count lost. Observer setter is process-local trusted test instrumentation.",
+    "Remove write-only interop_async and parent_budgets bookkeeping; real deferred control/root-child counters and all284 assertions unchanged.",
+    "Explicit hidden imports for static closed-world interop function addresses; linker/flags untouched.",
+    "Clarify parent for/assert indentation only; original assertions match byte-for-byte."
+  ],
+  "archive": {
+    "status": "PASS",
+    "scope": "Archive bytes and registration restored; all44 retained builds verified against restored source. Not a fresh archive rebuild.",
+    "source_tar_sha256": "eba1345295bee5e0dd7d37ae40d875af64bfd0b71f9066a428355c0d1d95b384",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/source-restored-l5qzpqij",
+    "files": 289,
+    "native_source_files": 83,
+    "candidate_tree_sha256": "a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38",
+    "restored_inputs_match": true,
+    "retained_checks": {
+      "normal": {
+        "admission_receipt_binding": "PASS",
+        "verified_builds": 22,
+        "native_matrix": "PASS",
+        "status": "BLOCKED",
+        "release": "BLOCKED"
+      },
+      "ubsan": {
+        "admission_receipt_binding": "PASS",
+        "verified_builds": 22,
+        "native_matrix": "PASS",
+        "status": "BLOCKED",
+        "release": "BLOCKED"
+      }
+    },
+    "executions_checked": 44,
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-21",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-native-focused-public-abi",
+    "commit": "42bd58cfe1fa1f9243f79d8f737c4345b8b4322d",
+    "parent": "d2be74809c9179c6029e761758c9fb21ae246646",
+    "scope": "Fixed additional T14 public ABI focused test candidate, normal/UBSan validation; no production/release admission or full T14 acceptance.",
+    "controller_sha256": "0c06561628462d8e9ee661b3186c9220f1edd8347526a14d55c8f2fafc0e6575",
+    "candidate_tree_sha256": "a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38",
+    "native_source_files": 83,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "inventory": "docs/migration/t14-focused-inventory.json",
+  "failed_attempts": [
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-tvbjbzk6",
+      "detail": "Clang rejected historical interop_async write-only state.",
+      "native_admission_files": {
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-tvbjbzk6/build-normal/stdout.log": "9f82c896a9900ba0a03d9ef1c97575ade5e517628ade47d26cd462a0d63cbcf0"
+      },
+      "retained_partial_build_receipts": {
+        "normal": 12
+      }
+    },
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v2-ctdsvq6w",
+      "detail": "Closed-world link rejected _GLOBAL_OFFSET_TABLE_ from default-visible external function address; native fixture imports made explicitly hidden, no gate/flag waiver.",
+      "native_admission_files": {
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v2-ctdsvq6w/build-normal/stdout.log": "8a91efb55661d240c275e00d648e3974ea257e376cdc33c1da16ccabd304b69d"
+      },
+      "retained_partial_build_receipts": {
+        "normal": 12
+      }
+    },
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v3-q0b182tp",
+      "detail": "Normal22 builds/executions passed; UBSan failed on full-preprocessed AST misleading indentation. Whitespace-only layout correction; final v4 reran both profiles.",
+      "native_admission_files": {
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v3-q0b182tp/build-normal/stdout.log": "06ca78a24830b66602728c1b91122458fdddbe4682572d6a20a34d6861ae2b4a",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v3-q0b182tp/build-ubsan/stdout.log": "42d26d9cabea267d5761f5cd694ea7c611cd1324b28aaa795868fa7e0bccfdb1"
+      },
+      "retained_partial_build_receipts": {
+        "normal": 22,
+        "ubsan": 18
+      }
+    }
+  ],
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/request-normal.json": "e5750158f9fcccf99dcfc63f6d3d5e0d02bc68e6d9ceba6975fc5977a0f67b61",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/request-ubsan.json": "baa9faf63141c71bf3bd68affd685224d919d42ffcea78d7548072f41c901a9d",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/control-review-normal.json": "76a4367db195bd3c9e6e0acb8cb8a5de5d4a91d85e7ce8fa0aa4f5bf935da373",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/control-review-ubsan.json": "7cccd375febc4ab3d7d385c7be0e8b4b245eb0a5a3cb54fb25e9321b74a4b2b2",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/assertion-retention.json": "a8a8876770ca5b287b9aa6fdd63231b24b9773d632dddfb9336fe476938c238c",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/source-provenance.json": "94eba4ae14f2ab550e7ff221f4ad6d7e192a141a5bd0c62429f310e53de2603b",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/new-unit-ast-preflight.json": "c40f124d204bff8529ffa8dc073dfa81fa2f3ec96c2e395f795990e98b076ccc",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/oracles-normal.json": "72a1df5b54b7a8f27323d8983c319e0a44a96e94880856a9a62120d86b83a4aa",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/oracles-ubsan.json": "72a1df5b54b7a8f27323d8983c319e0a44a96e94880856a9a62120d86b83a4aa",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/executions-normal.json": "7cea164a2877f94f33d8baf6418289507e47556357e1da6a33f53acae019c639",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/executions-ubsan.json": "d8d32dbce4d4517a348b97242c4b13144ad03e28bcdff57265598da703caf71a",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/build-normal/isolation.json": "bbca761125e0ff5c8f3f18fbf014d7444e54a3bf4e4f0a87e6c6773907cc15f0",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/build-ubsan/isolation.json": "719a6ca7506658651897fdcc332d011a85d77fde88429b13b29cdd2908c93310",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/build-normal/native/admission.json": "c697833bae62da3dd9f3e53a87212c6230bc123db50401b097459c0046bb3c27",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/build-ubsan/native/admission.json": "46257b36ea7921882f095de5f7f64e1f21d3d50fa9ad2fd2c7dd771aef505b33",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/private-check-normal/results.json": "5e9784da71ef0c4720933929e2e4d3cc92c74760cebc3044ab52d8ebe86cceb5",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/private-check-normal/isolation.json": "d0aed416d54d904b6ef116722b34d05fffdb5ce036251f88a295c69365004611",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/private-check-ubsan/results.json": "7c6c65eed878e2a68638ecedb51615bc745133ae72d3720a6f1a53acaa9120f0",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/private-check-ubsan/isolation.json": "c2e854b761145e57e76af2639e0529e529ed9b27e3f24646055e23d932d99499",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/archive-verify.json": "0c47dad6382f7d94d10087db8b3e65652d3ca31b1c93d00a892d35b33675c431",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/retained-attempts.json": "b18b2d38109757f75e86a6c2a7a5f1856f8ffa4f6fe6e160b0abc68edec0e802",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/publication.json": "00f860afb0f52b44a6f89039a3280774b6c944ea4119e4acbeb92aecee07b690",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/prepare.py": "5013d8ee98bec1ee20c9ab6206cebf13298f3a44bc407af8e816d2ed17b4a57d",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/execute.py": "6481e2001a1af2dd32eda22319e884023a5b72ea1e7a806a17132d1cf47ac816",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/private-check.py": "0fea84caa734f9eecf326b593c591497f539e5d3ec72e023d65ef40a2665f715",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/run-private-check.py": "a8201fc5ca0900715f7b6e077b7e1d16b575a681f12697688a663b6f2b1c4f11",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/archive-verify.py": "1a0632ecb9083d43ab6f287ad75e137a487cfba187b03a64a6b3a67e7cadb026"
+  },
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept fixed additional local test-only public ABI focused results and private link boundary evidence. No production promotion, no full T14 completion.",
+    "final_metadata_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/final-review.json"
+  },
+  "remaining": [
+    "Eleven latest-host private-helper test entry ports plus audit of earlier standalone owner corpora.",
+    "Corresponding focused ABI guard coverage beyond existing SDK1/SDK2 guards.",
+    "Complete G04 lifecycle event traces/failure matrix and G07 resource/size/performance baselines.",
+    "Full G03/T14 and production/protected remote admission."
+  ],
+  "limitations": [
+    "284 matched assertion expressions and exact old outputs support this fixed corpus, not a proof of all lifecycle behavior.",
+    "Private-link probes link but do not execute the extra test programs.",
+    "UBSan does not instrument Assembly or prove complete memory/leak/race safety.",
+    "Restored-source retained verification is not a fresh archive rebuild.",
+    "Unchanged gate bytes refer to prior215 tests; no new215-test execution is claimed.",
+    "Local same-Agent review and image/controller pins do not provide server-side anti-bypass."
+  ],
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "summary_sha256": "898597f39bb0ea5210c070a35e98f25975ec7c795473e7be7609472680bad233"
+}

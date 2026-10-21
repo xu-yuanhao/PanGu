@@ -209,6 +209,11 @@
     "docs/migration/t14-ubsan-native-candidate.json": "control",
     "tools/gates/test_admission_ubsan.py": "gate-test",
     "docs/migration/t14-ubsan-native-evidence.json": "control",
-    "docs/migration/t14-ubsan-native-source-publication.json": "control"
+    "docs/migration/t14-ubsan-native-source-publication.json": "control",
+    "docs/migration/t14-focused-normal-candidate.json": "control",
+    "docs/migration/t14-focused-ubsan-candidate.json": "control",
+    "docs/migration/t14-focused-inventory.json": "control",
+    "docs/migration/t14-focused-native-evidence.json": "control",
+    "docs/migration/t14-focused-native-source-publication.json": "control"
   }
 }

@@ -1,0 +1,14 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-21",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-native-focused-public-abi",
+  "commit": "42bd58cfe1fa1f9243f79d8f737c4345b8b4322d",
+  "parent": "d2be74809c9179c6029e761758c9fb21ae246646",
+  "scope": "Fixed additional T14 public ABI focused test candidate, normal/UBSan validation; no production/release admission or full T14 acceptance.",
+  "controller_sha256": "0c06561628462d8e9ee661b3186c9220f1edd8347526a14d55c8f2fafc0e6575",
+  "candidate_tree_sha256": "a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38",
+  "native_source_files": 83,
+  "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

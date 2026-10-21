@@ -306,6 +306,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] 五套公开ABI专项进入冻结原生矩阵：facade/entry/route/interop/parent在同一树下44普通/UBSan构建及44运行通过，原输出和284断言保持；72私有链接拒绝/8公开query链接通过，源码恢复及44保留构建核对、实验源码远端回读完成。只完成此范围，见 [证据](migration/t14-focused-native-evidence.json) 与 [19项盘点](migration/t14-focused-inventory.json)。
+
 - [x] 当前登记矩阵的UBSan trap：60冻结构建/98目标执行，22真实SIGILL、四项信号监视器自测、430份C/C++源码审计及215隔离门禁自测通过；SDK1/SDK2原场景/ABI守卫计数保持。测试两路并行和套件拆分保留原180/30秒限制，超时/执行器失败原记录保留。源码归档恢复、保留产物核对及实验源码远端回读通过；仅此登记矩阵，不代替其余T14专项，见 [证据](migration/t14-ubsan-native-evidence.json)。
 
 - [x] SDK1有效路径原生回归：56冻结构建/72目标执行，SDK1八次各824场景/1794租约消费、四次guard各122627调用；bind/enter及七SDK方法成功/拒绝覆盖，原全部计数保持。原汇总失败保留，独立最终校验完成；完整G03/T14仍未完成。
@@ -318,7 +320,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] SDK2 冻结静态补充：只读原场景在 Clang→GAS→ld 无 libc 链路下 O0/O2/Oz 各 1196 场景、3242 调用通过；静态 ELF/无未定义符号与断言失败负例通过。仅测试适配器，未登记原生矩阵，见 T14 草稿。
 - [x] 明确 compiler.memory v1 构建/链接替换边界：GAS 与测试 C 提供者通过原 native_build debug/release 共四组、页边界/重叠/寄存器/DF、8 项依赖拒绝与四组产物复核；原 SDK2 冻结对象不变、两提供者 O0/Oz 四次完整场景通过。仅候选，详见 t14-compiler-memory-candidate.json。
 - [x] SDK2原生模块/组合登记：compiler.memory、宿主、调用管理器、独立C/C++插件进入45模块/22组合（保留T13原20组合），44冻结构建、60隔离执行通过；新增T14实现和stdio/PAL仍为test范围，不构成生产准入。
-- [ ] 完成其他T14专项原生回归及对应ABI/sanitizer覆盖、完整G04事件轨迹/故障矩阵与G07资源测量；已通过的SDK1/SDK2守卫不能代替这些剩余验收。
+- [ ] 完成盘点中11项当前ABI未运行的私有helper专项及更早owner语料审计、对应ABI/sanitizer覆盖、完整G04事件轨迹/故障矩阵与G07资源测量；已通过的SDK1/SDK2守卫不能代替这些剩余验收。
 
 - [x] SDK2本地端到端：版本化方法显式父参数，C/C++插件与双runtime完成真实调用；O0/O2各1196场景/3242方法调用，本地SDK2准入、8项失败关闭自测、18份回归及宿主UBSan通过。GAP-010仅部分解决，冻结原生/G04/G07待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
@@ -326,7 +328,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] 局部插件SDK基础候选：独立固定消费头、不透明租约/完成、自动实例作用域与声明清理；C/C++插件O0/O2各824场景、1794次服务调用、预算/别名及补充宿主UBSan通过。GAP-010嵌套setup/cleanup准入实际BLOCKED，完整SDK与原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
-- [ ] 完成GAP-010剩余验收：固定模块/组合和冻结clang/GAS集成已通过；SDK1有效路径也已通过；仍需其他专项及对应ABI/sanitizer和完整G04/G07，之后才判断关闭；不能只按inflight计数放宽停止门闩。
+- [ ] 完成GAP-010剩余验收：固定模块/组合和冻结clang/GAS集成已通过；SDK1有效路径也已通过；仍需11项旧helper专项/更早owner审计、对应ABI/sanitizer和完整G04/G07，之后才判断关闭；不能只按inflight计数放宽停止门闩。
 
 - [x] 局部宿主服务跨语言消费：独立固定契约下C/汇编/C++消费两种C提供者及C++提供者，O0/O2各1188场景/34128调用，9组合各3792次；callee-saved、错误边界、补充宿主UBSan与源归档恢复通过。完整SDK与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

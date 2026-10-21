@@ -1482,6 +1482,24 @@
           "reviewer": "same Agent as implementer",
           "final_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-ubsan-parallel-rjctw9_3/final-review.json",
           "production_admission": false
+        },
+        "native_focused_public_abi": {
+          "status": "FIVE_PUBLIC_ABI_FOCUSED_SUITES_AND_PRIVATE_LINK_BOUNDARY_PASS_FULL_T14_PENDING",
+          "evidence": "docs/migration/t14-focused-native-evidence.json",
+          "inventory": "docs/migration/t14-focused-inventory.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4",
+          "controller_sha256": "0c06561628462d8e9ee661b3186c9220f1edd8347526a14d55c8f2fafc0e6575",
+          "candidate_tree_sha256": "a9a5ac9fe6791582863c7aaa17ea45d4ad0a585529371e010144ddc6e376ba38",
+          "summary_sha256": "898597f39bb0ea5210c070a35e98f25975ec7c795473e7be7609472680bad233",
+          "builds": 44,
+          "executions": 44,
+          "private_link_refusals": 72,
+          "public_query_link_controls": 8,
+          "original_assert_expressions": 284,
+          "latest_host_pending_ports": 11,
+          "reviewer": "same Agent as implementer",
+          "final_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/final-review.json",
+          "production_admission": false
         }
       }
     },
