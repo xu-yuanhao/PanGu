@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选已有独立插件SDK基础接口与C/C++插件验证，但setup/cleanup嵌套作用域GAP-010尚未实现，本地嵌套准入明确BLOCKED，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新宿主候选已有显式父子调用后端，但尚未接入插件SDK及版本化服务方法，GAP-010仍OPEN，SDK嵌套准入仍BLOCKED，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -247,3 +247,26 @@ O0/O2各824场景通过：T13固定240图中成功图的C/C++插件/安装顺序
 下一步优先实现显式父调用凭据与作用域传播：证明父票据的提供者就是当前插件owner，核对runtime/epoch/代际和真实在途状态，传播setup/cleanup根作用域，继续遵守停止门闩及依赖方向；不能仅凭inflight非零或放宽全局phase取得权限。须覆盖多跳真实调用、错误/过期/跨runtime/重复父凭据、取消和失败释放，再让嵌套准入由BLOCKED转为通过。随后才推进完整SDK及冻结原生G03/G04/G07。
 
 首轮别名测试把未发布表当成宿主元数据，count16字节输出在那里合法；保留sdk-initial-test-failure.json，将测试目标改为实际已发布表，未放宽实现。最终16份常规脚本退出0、源码未变；17份源码绑定回执（含SDK UBSan）与同一最终清单一致。UBSan同824场景退出0无诊断，SHA256 `6a25670f6d579d187b44af5f5087ff619fc61186e0cbccab21262ebdcff817dd`；本地嵌套准入仍退出2。64份源码的确定性tar SHA256 `35a6a910a771ac6391b1532b96eae6979cfa146b7ea2493a345b970bab0076c6`，另目录恢复字节一致，不是恢复后重新构建或原生放行。
+
+
+## 显式父子调用宿主后端候选（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao`；源码/测试清单SHA256 `be2f73b85116a512f7228beca501c45d92db78fa6fd20ed6bc35156f8d92e01b`，parent-evidence.json SHA256 `511bb883952eecddec43be5422132a027bfe2dda71bcb27cf59716c7934320b2`。根候选 [t14-parent-call-candidate.json](t14-parent-call-candidate.json) 固定证据与同一Agent自审。该候选JSON、policy新增登记及GAP-010剩余要求更新三个控制文件的固定包SHA256 `5fc7c6e6c14e5fea051c06c344eccd42281284b0ea1acf45b2714344a8df275d`，不是控制器全树或完整T14批准。未放宽门禁/预算/基线；只允许继续本地可信宿主实验。
+
+保留生命周期ABI1/152字节表与旧头、17方法原语义，通过同一query增加ABI2/32字节扩展视图，显式转换返回指针到新类型。扩展含原ABI1表指针与enter_child。旧.call在startup或stop后的业务拒绝不变；扩展仅供可信调用管理器，不能直接作为插件SDK。内核核对父/根runtime、绑定、两端活操作票据、父提供者等于当前子调用消费者、根setup/cleanup真实票据、状态与停止门闩；仍要求子调用两端Active，按原有owner槽逻辑原子计费/取得票据，沿真实解析边向提供者走。
+
+新pangu_invocation_query ABI1/48字节表，bind/open_root/open_child/close；caller提供56字节bank、每活调用168字节slot，无堆分配。80字节不透明公开句柄含bank身份/epoch、索引/代际和两端epoch，table/state须与已签发记录一致。根作用域只在原始合法route acquire成功时保存在宿主slot；子调用只能从活父记录继承根，不能由调用方替换mode。不可变parent/root索引与代际在签发时建立链，管理器证明来源，内核再次核对真实owner票据。此注册表保存原有票据及父子关系，不另造一套owner或在途操作。
+
+父节点有子节点时close返回2且不修改状态；子节点排空后才能逐层关闭。子操作取得的原有owner票据继续保留两端资源，停止后的新普通业务、取消setup根、已完成cleanup根不因父票据仍在途而获得权限；先前合法取得的子调用可完成并释放。句柄复制不增加引用，调用者仍须等真实异步工作退出再close，未登记外部任务不是这套接口已管理的操作。host bank首次全零，复用需无活节点且epoch递增；slot代际饱和退休不回绕。
+
+服务名称/版本/尺寸、作用域/MANY及输出几何检查从旧route acquire逐字节抽出为私有route-query-private.h，根与子查询复用；旧route场景/预算计数保持通过。固定client-lifecycle-child-v2.h SHA256 `725b2d8252538bf9526e79689635a38c3d1a72c4e3d73c9409b8365bff4c03d7`、client-invocation-v1.h SHA256 `bf370e97fe050f14c90ca3ead7577ec1798f7e980f164832177ecb829c387380`独立编译。O0/O2 lifecycle/invocation/route对象各只有自己的query导出且无未解析符号。SDK1源码与O0/O2提供者对象逐字节等于上一包，未绕过旧scope检查。
+
+O0/O2各809场景、2248次实际服务函数调用：214次setup、208次cleanup、156次业务嵌套，最大descendant depth3（4层实际服务调用）。固定240图成功图遍历安装顺序及同步/deferred/完成/取消组合，另有app/session/Pending/MANY、反序provision、初始化失败、退休slot与单slot资源拒绝。父/子调用由测试宿主provider包装器显式传入incoming句柄；实际叶服务仍为原测试方法，这不是插件方法ABI已接线的证据。
+
+12234次错误/过期/重复/receiver不符/绑定与runtime字段拒绝，596别名拒绝；609根及399子不足fuel，逐字节验证owner/操作池/资源池/元数据及bank/slots未变。620次父节点尚有子时拒绝提前释放，234次async disposer回调返回后持根调用，14次setup取消后新子拒绝，56次完成作用域后新子拒绝；同时验证已取得子调用在完成后排空、父资源仍被保留。8次代际退休场景、4次操作池或管理器容量耗尽拒绝。并发扇出允许多个子调用，但不超过原3个操作槽；测试保留配额并验证拒绝不消耗代际。
+
+首次测试辅助函数与planner fixture重名，改测试命名并保留parent-initial-compile-failure.json。首轮把所有sibling获取都期望为成功，诊断显示cleanup时consumer已3/3；修正成功路径fixture只同时延后持有一个根，原操作容量不增，并单独强制满额/单slot拒绝及不变快照。保留parent-initial-runtime-failure.json与parent-quota-diagnostic.json，不把失败运行写成通过。
+
+最终17份常规脚本退出0、源码未变；18份源码绑定回执（含parent UBSan）与同一最终清单一致。补充UBSan同809场景退出0、无诊断，SHA256 `d2608c10863fa9141d6c43faed41acb2c30fd12e0819535b79223d202840db5a`。73份源码确定性tar SHA256 `52b32cf7eed7a12eccaddc6d8d9e4ea1966566d368b3670302c4d1a4f9fa1306`，另目录恢复字节一致，没有据此声称重建或冻结原生准入。
+
+**GAP-010继续OPEN：** SDK1没有传入父句柄的参数，仍实际复现setup/cleanup各144次拒绝；check-sdk-nested-admission.py本轮退出2，sdk-nested-admission.json为BLOCKED，SHA256 `38094c2a7c1c649ff1490e0e74a994ed5bbdb67d37ff18f8270eb8cfdef0df2d`。这恰好说明旧业务门闩未被放宽。下一步需保留SDK1兼容面，在新版本插件服务方法中显式传递incoming调用上下文，再由SDK从canonical实例身份调用受管root/child/close。不能靠全局current-parent或inflight计数隐式取得权限。SDK构造与所有输出接口也须保护受管bank/slots，构造失败不得降级到无凭据路径；还需实际双runtime、C/C++插件调用及冻结原生G03/G04/G07，才能判断完整缺口关闭。

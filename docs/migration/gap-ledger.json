@@ -169,7 +169,7 @@
     {
       "id": "GAP-010",
       "severity": "high",
-      "title": "被调用提供者的嵌套服务调用尚不能继承 setup/cleanup 父作用域",
+      "title": "插件SDK尚未接入父调用凭据与setup/cleanup作用域传播",
       "steps": [
         "T14"
       ],
@@ -181,9 +181,10 @@
       "waiver": null,
       "evidence": [
         "t14-plugin-sdk-candidate.json",
-        "t14-owner-boundaries.md"
+        "t14-owner-boundaries.md",
+        "t14-parent-call-candidate.json"
       ],
-      "remaining": "当前业务期168次嵌套实际调用成功；setup与cleanup各144次拒绝，check-sdk-nested-admission.py实际退出2。SDK基础正常回归不等于此项完成。"
+      "remaining": "宿主后端O0/O2各809场景已验证父/根句柄、214次setup/208次cleanup嵌套调用、4层实际服务调用与取消/完成/额度拒绝；SDK1源码和对象保持不变，其嵌套准入仍退出2。仍需版本化插件方法显式携带父调用参数、SDK受管root/child/release接线及真实多runtime隔离、冻结原生验证；不得用宿主包装器通过代替插件需求完成。"
     }
   ]
 }
