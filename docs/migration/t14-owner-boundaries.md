@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新 SDK2 已接入45模块/22组合的冻结原生矩阵：44构建、60次隔离运行通过，独立C/C++插件和GAS/C内存替换均实际运行。完整ABI guard/sanitizer/G04/G07及旧SDK专项原生回归待完成，GAP-010仍部分解决，T14整体与生产准入未完成。前文保留各历史候选范围，最新证据见末节。
+当前最新 SDK2 原生 ABI 守卫候选已完成48构建/64次隔离执行；四次guard各146729调用，覆盖5工厂/52目标并通过10破坏负例及2转发自测。原SDK2计数不变。SDK1有效路径、正式sanitizer、完整G04/G07和生产准入待完成；GAP-010仍部分解决，T14整体不勾选。历史候选范围保留，最新证据见末节。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -349,3 +349,17 @@ O0、O2、Oz 各运行 1196 场景、3242 次真实方法调用；完整 stdout 
 44组保留产物由admission.verify重跑绑定、ELF与闭世界符号核对；完整301文件源码归档 `24909a9935444acbf1945c3fcc121b5048db34fba1a24e730a01fd42d394afcb` 恢复到新目录后，字节/mode及preflight输入一致。未声称归档恢复后重新构建。原生源码已发布实验分支 `codex/t14-native-sdk2-matrix`，提交 `0d045531e284eb74abbe3111b9965f8084951c58`；Git树清单与每份blob匹配固定候选，远端回读一致。初次Git行模式引用中文路径导致清单比较拒绝，改为NUL机器格式后通过，保留失败记录；不降低文件核对。
 
 结果见 `t14-native-evidence.json`；测试前固定控制器审查和测试后元数据包分开记录，同一Agent实施、自审。最终元数据控制包 `95c05a069af6a5ad2a5595ea830f2631145c4da7ab688dcf0247a884dceb521d` 不冒充原controller树pin。尚缺各宿主工厂/表的正式原生ABI guard、sanitizer、完整G04轨迹/故障矩阵与G07测量，以及旧SDK1/其他T14专项的原生回归。GAP-010保持PARTIALLY_RESOLVED，T14不勾选，生产/远端受保护放行继续BLOCKED。
+
+## SDK2 原生 SysV ABI 守卫（2026-10-21）
+
+固定候选 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme`，48模块/24组合/122原生文件，保留先前组合并增加两种内存提供者的guard组合。冻结controller `6a1ffa103d5ae1c7b423d507ef075e1daf227741d4d73e07075ef3da7e0e6bc0`，candidate `b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064`，image `23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616`。48构建和64隔离执行通过；四次guard各保留原1196场景/3242服务方法调用完整输出，另检查146729次ABI调用、5工厂和52登记目标。32个宿主方法表槽以固定消费声明转发真实函数；SDK2的9方法及服务evaluate、两语言5个公开回调经测试config/独立适配器进入守卫，不替换canonical SDK表，不改变真实context。生产实现/公开及独立固定消费头逐字节未改。
+
+守卫只适用于本阶段SysV x86_64整数/指针参数、最多13参数；保留完整RAX，再由i32适配器按低32位解释。不声称支持浮点/向量/variadic/聚合返回。汇编用完整64位模式核对rbx/rbp/r12～r15、DF、RSP恢复及六个栈哨兵；发现错位栈时在目标调用之前拒绝。每次实际调用都有独立显式frame；测试专用active-frame链支持同步重入恢复，单线程，不是运行时父调用权限或线程安全沙箱。
+
+10个真实破坏自测：六寄存器分别破坏、DF置位、RSP改变、写栈哨兵、错误栈对齐（确认目标未调用）；两项转发自测验证目标入口RSP%16=8以及13个不同64位参数的正确传递/求和。工厂覆盖ABI0～3、尺寸0～159及支持元组的错误target/flags；并非枚举全部32位输入。每次运行57个报告槽（5工厂+52目标）均非零调用，详细零/非零返回数在证据JSON；非零不等于错误，例如life.start的量子1推进正常返回未完成。SDK1 host.bind仅空参拒绝、host.enter只涵盖错误版本；不能把这些当SDK1有效路径已验收。
+
+首次debug探针在原别名负例实际退出125：新转发表被误用作原host只读表。修正为通过getter继续使用原工厂canonical host descriptor，不跳过断言或改拒绝状态；正常调用仍使用转发表。新/旧main均93个assert，原全部计数一致。后续debug/release与GAS/C提供者四次均通过。固定前两版目录和失败/成功探针回执保留。未改门禁、工具链、预算或超时。
+
+12项登记检查（1正/11拒绝）通过；48组保留产物绑定/符号/ELF复核通过；完整314文件归档 `6090efb3ef41d9a027e7089aa00c756f9d82027be986bbd3b2c006db2c3070bf` 恢复后字节/mode与preflight一致，未据此宣称归档后重建。源码已发布 `codex/t14-native-sdk2-abi-guard`，提交 `731b316d8054635374d96128648c66951f5f13c9`，Git树每份blob与固定候选一致、远端回读一致。源码分支为实验快照，不是生产放行。
+
+最终本地元数据控制包 `260a4e3c142dfd47e0c4ca5543f981985003e4fa1e612a694fba0970b24f5878`、原固定controller、源摘要、逐槽覆盖和同一Agent自审在 `t14-abi-guard-evidence.json` 与目录内final-review.json中分别记录。SDK1有效路径和其他T14专项原生回归、正式sanitizer、完整G04轨迹/故障矩阵、G07资源/体积/性能仍未完成；本结果不关闭完整G03、GAP-010或T14。

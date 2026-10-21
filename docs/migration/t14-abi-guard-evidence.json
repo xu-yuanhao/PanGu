@@ -1,0 +1,1434 @@
+{
+  "schema": "pangu.t14-native-abi-guard-evidence.v1",
+  "status": "SDK2_NATIVE_ABI_GUARD_SCENARIOS_PASS_FULL_G03_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme",
+  "registry": "docs/migration/t14-abi-guard-candidate.json",
+  "registry_sha256": "88d27a4d888d3d6a2a578568a13d3e88f0a623ecdc8efef7b9035e1d2d2d7c9c",
+  "controller_sha256": "6a1ffa103d5ae1c7b423d507ef075e1daf227741d4d73e07075ef3da7e0e6bc0",
+  "policy_sha256": "b3a38e644d9a709730593d44da20f858ea5d85749e1e9f9bf2a60e0723d120cc",
+  "candidate_tree_sha256": "b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064",
+  "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+  "modules": 48,
+  "compositions": 24,
+  "native_source_files": 122,
+  "native_matrix": "PASS",
+  "build_count": 48,
+  "execution_count": 64,
+  "guarded_execution_count": 4,
+  "guarded_per_run": {
+    "sdk2_scenarios": 1196,
+    "actual_service_methods": 3242,
+    "abi_calls": 146729,
+    "factory_slots": 5,
+    "target_slots": 52,
+    "corruption_self_tests": 10,
+    "forwarding_self_tests": 2,
+    "assertions_in_main": 93
+  },
+  "factory_scope": "Five factory selectors; both supported lifecycle/invocation/host ABI tables, entry and route. ABI0..3/size0..159, supported tuples and invalid target/flags checked.",
+  "target_slot_map": {
+    "life.owner_init": 10,
+    "life.register_resource": 11,
+    "life.register_async": 12,
+    "life.prepare": 13,
+    "life.bind_geometry": 14,
+    "life.start": 15,
+    "life.pump": 16,
+    "life.stop": 17,
+    "life.setup_scope": 18,
+    "life.setup_defer": 19,
+    "life.setup_finish": 20,
+    "life.cleanup_scope": 21,
+    "life.disposer_finish": 22,
+    "life.call": 23,
+    "life.setup_call": 24,
+    "life.cleanup_call": 25,
+    "life.call_finish": 26,
+    "child.enter_child": 27,
+    "entry.prepare": 28,
+    "route.publish": 29,
+    "route.acquire": 30,
+    "route.release": 31,
+    "inv1.bind": 32,
+    "inv1.open_root": 33,
+    "inv1.open_child": 34,
+    "inv1.close": 35,
+    "inv.prepare_bind": 36,
+    "inv.accept": 37,
+    "host1.bind": 38,
+    "host1.enter": 39,
+    "host.bind": 40,
+    "host.enter": 41,
+    "sdk.provide": 64,
+    "sdk.count": 65,
+    "sdk.acquire": 66,
+    "sdk.release": 67,
+    "sdk.defer": 68,
+    "sdk.finish_setup": 69,
+    "sdk.finish_dispose": 70,
+    "sdk.acquire_child": 71,
+    "sdk.accept": 72,
+    "c.entry": 80,
+    "c.load": 81,
+    "c.dispose": 82,
+    "c.drain": 83,
+    "c.use": 84,
+    "cpp.entry": 85,
+    "cpp.load": 86,
+    "cpp.dispose": 87,
+    "cpp.drain": 88,
+    "cpp.use": 89,
+    "service.evaluate": 73
+  },
+  "coverage": {
+    "sdk2-abi-guard-asm-debug": {
+      "0": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "10": {
+        "calls": 4701,
+        "zero_returns": 4700,
+        "other_returns": 1
+      },
+      "11": {
+        "calls": 1771,
+        "zero_returns": 1770,
+        "other_returns": 1
+      },
+      "12": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "13": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "14": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "15": {
+        "calls": 1197,
+        "zero_returns": 0,
+        "other_returns": 1197
+      },
+      "16": {
+        "calls": 20635,
+        "zero_returns": 1006,
+        "other_returns": 19629
+      },
+      "17": {
+        "calls": 19373,
+        "zero_returns": 1006,
+        "other_returns": 18367
+      },
+      "18": {
+        "calls": 4213,
+        "zero_returns": 4212,
+        "other_returns": 1
+      },
+      "19": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "20": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "21": {
+        "calls": 895,
+        "zero_returns": 846,
+        "other_returns": 49
+      },
+      "22": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "23": {
+        "calls": 815,
+        "zero_returns": 809,
+        "other_returns": 6
+      },
+      "24": {
+        "calls": 971,
+        "zero_returns": 970,
+        "other_returns": 1
+      },
+      "25": {
+        "calls": 847,
+        "zero_returns": 846,
+        "other_returns": 1
+      },
+      "26": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "27": {
+        "calls": 895,
+        "zero_returns": 857,
+        "other_returns": 38
+      },
+      "28": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "29": {
+        "calls": 2337,
+        "zero_returns": 2336,
+        "other_returns": 1
+      },
+      "30": {
+        "calls": 2842,
+        "zero_returns": 2625,
+        "other_returns": 217
+      },
+      "31": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "32": {
+        "calls": 1199,
+        "zero_returns": 1196,
+        "other_returns": 3
+      },
+      "33": {
+        "calls": 3231,
+        "zero_returns": 2625,
+        "other_returns": 606
+      },
+      "34": {
+        "calls": 1330,
+        "zero_returns": 857,
+        "other_returns": 473
+      },
+      "35": {
+        "calls": 4502,
+        "zero_returns": 3482,
+        "other_returns": 1020
+      },
+      "36": {
+        "calls": 3647,
+        "zero_returns": 1702,
+        "other_returns": 1945
+      },
+      "37": {
+        "calls": 3892,
+        "zero_returns": 3287,
+        "other_returns": 605
+      },
+      "38": {
+        "calls": 1,
+        "zero_returns": 0,
+        "other_returns": 1
+      },
+      "39": {
+        "calls": 2491,
+        "zero_returns": 0,
+        "other_returns": 2491
+      },
+      "40": {
+        "calls": 4203,
+        "zero_returns": 1196,
+        "other_returns": 3007
+      },
+      "41": {
+        "calls": 4981,
+        "zero_returns": 1754,
+        "other_returns": 3227
+      },
+      "64": {
+        "calls": 2336,
+        "zero_returns": 2336,
+        "other_returns": 0
+      },
+      "65": {
+        "calls": 7884,
+        "zero_returns": 4790,
+        "other_returns": 3094
+      },
+      "66": {
+        "calls": 6926,
+        "zero_returns": 2625,
+        "other_returns": 4301
+      },
+      "67": {
+        "calls": 4529,
+        "zero_returns": 3482,
+        "other_returns": 1047
+      },
+      "68": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "69": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "70": {
+        "calls": 12,
+        "zero_returns": 12,
+        "other_returns": 0
+      },
+      "71": {
+        "calls": 1614,
+        "zero_returns": 857,
+        "other_returns": 757
+      },
+      "72": {
+        "calls": 3726,
+        "zero_returns": 3286,
+        "other_returns": 440
+      },
+      "73": {
+        "calls": 3242,
+        "zero_returns": 3224,
+        "other_returns": 18
+      },
+      "80": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "81": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "82": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "83": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "84": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      },
+      "85": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "86": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "87": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "88": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "89": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      }
+    },
+    "sdk2-abi-guard-asm-release": {
+      "0": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "10": {
+        "calls": 4701,
+        "zero_returns": 4700,
+        "other_returns": 1
+      },
+      "11": {
+        "calls": 1771,
+        "zero_returns": 1770,
+        "other_returns": 1
+      },
+      "12": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "13": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "14": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "15": {
+        "calls": 1197,
+        "zero_returns": 0,
+        "other_returns": 1197
+      },
+      "16": {
+        "calls": 20635,
+        "zero_returns": 1006,
+        "other_returns": 19629
+      },
+      "17": {
+        "calls": 19373,
+        "zero_returns": 1006,
+        "other_returns": 18367
+      },
+      "18": {
+        "calls": 4213,
+        "zero_returns": 4212,
+        "other_returns": 1
+      },
+      "19": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "20": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "21": {
+        "calls": 895,
+        "zero_returns": 846,
+        "other_returns": 49
+      },
+      "22": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "23": {
+        "calls": 815,
+        "zero_returns": 809,
+        "other_returns": 6
+      },
+      "24": {
+        "calls": 971,
+        "zero_returns": 970,
+        "other_returns": 1
+      },
+      "25": {
+        "calls": 847,
+        "zero_returns": 846,
+        "other_returns": 1
+      },
+      "26": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "27": {
+        "calls": 895,
+        "zero_returns": 857,
+        "other_returns": 38
+      },
+      "28": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "29": {
+        "calls": 2337,
+        "zero_returns": 2336,
+        "other_returns": 1
+      },
+      "30": {
+        "calls": 2842,
+        "zero_returns": 2625,
+        "other_returns": 217
+      },
+      "31": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "32": {
+        "calls": 1199,
+        "zero_returns": 1196,
+        "other_returns": 3
+      },
+      "33": {
+        "calls": 3231,
+        "zero_returns": 2625,
+        "other_returns": 606
+      },
+      "34": {
+        "calls": 1330,
+        "zero_returns": 857,
+        "other_returns": 473
+      },
+      "35": {
+        "calls": 4502,
+        "zero_returns": 3482,
+        "other_returns": 1020
+      },
+      "36": {
+        "calls": 3647,
+        "zero_returns": 1702,
+        "other_returns": 1945
+      },
+      "37": {
+        "calls": 3892,
+        "zero_returns": 3287,
+        "other_returns": 605
+      },
+      "38": {
+        "calls": 1,
+        "zero_returns": 0,
+        "other_returns": 1
+      },
+      "39": {
+        "calls": 2491,
+        "zero_returns": 0,
+        "other_returns": 2491
+      },
+      "40": {
+        "calls": 4203,
+        "zero_returns": 1196,
+        "other_returns": 3007
+      },
+      "41": {
+        "calls": 4981,
+        "zero_returns": 1754,
+        "other_returns": 3227
+      },
+      "64": {
+        "calls": 2336,
+        "zero_returns": 2336,
+        "other_returns": 0
+      },
+      "65": {
+        "calls": 7884,
+        "zero_returns": 4790,
+        "other_returns": 3094
+      },
+      "66": {
+        "calls": 6926,
+        "zero_returns": 2625,
+        "other_returns": 4301
+      },
+      "67": {
+        "calls": 4529,
+        "zero_returns": 3482,
+        "other_returns": 1047
+      },
+      "68": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "69": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "70": {
+        "calls": 12,
+        "zero_returns": 12,
+        "other_returns": 0
+      },
+      "71": {
+        "calls": 1614,
+        "zero_returns": 857,
+        "other_returns": 757
+      },
+      "72": {
+        "calls": 3726,
+        "zero_returns": 3286,
+        "other_returns": 440
+      },
+      "73": {
+        "calls": 3242,
+        "zero_returns": 3224,
+        "other_returns": 18
+      },
+      "80": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "81": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "82": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "83": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "84": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      },
+      "85": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "86": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "87": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "88": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "89": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      }
+    },
+    "sdk2-abi-guard-alternate-debug": {
+      "0": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "10": {
+        "calls": 4701,
+        "zero_returns": 4700,
+        "other_returns": 1
+      },
+      "11": {
+        "calls": 1771,
+        "zero_returns": 1770,
+        "other_returns": 1
+      },
+      "12": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "13": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "14": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "15": {
+        "calls": 1197,
+        "zero_returns": 0,
+        "other_returns": 1197
+      },
+      "16": {
+        "calls": 20635,
+        "zero_returns": 1006,
+        "other_returns": 19629
+      },
+      "17": {
+        "calls": 19373,
+        "zero_returns": 1006,
+        "other_returns": 18367
+      },
+      "18": {
+        "calls": 4213,
+        "zero_returns": 4212,
+        "other_returns": 1
+      },
+      "19": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "20": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "21": {
+        "calls": 895,
+        "zero_returns": 846,
+        "other_returns": 49
+      },
+      "22": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "23": {
+        "calls": 815,
+        "zero_returns": 809,
+        "other_returns": 6
+      },
+      "24": {
+        "calls": 971,
+        "zero_returns": 970,
+        "other_returns": 1
+      },
+      "25": {
+        "calls": 847,
+        "zero_returns": 846,
+        "other_returns": 1
+      },
+      "26": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "27": {
+        "calls": 895,
+        "zero_returns": 857,
+        "other_returns": 38
+      },
+      "28": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "29": {
+        "calls": 2337,
+        "zero_returns": 2336,
+        "other_returns": 1
+      },
+      "30": {
+        "calls": 2842,
+        "zero_returns": 2625,
+        "other_returns": 217
+      },
+      "31": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "32": {
+        "calls": 1199,
+        "zero_returns": 1196,
+        "other_returns": 3
+      },
+      "33": {
+        "calls": 3231,
+        "zero_returns": 2625,
+        "other_returns": 606
+      },
+      "34": {
+        "calls": 1330,
+        "zero_returns": 857,
+        "other_returns": 473
+      },
+      "35": {
+        "calls": 4502,
+        "zero_returns": 3482,
+        "other_returns": 1020
+      },
+      "36": {
+        "calls": 3647,
+        "zero_returns": 1702,
+        "other_returns": 1945
+      },
+      "37": {
+        "calls": 3892,
+        "zero_returns": 3287,
+        "other_returns": 605
+      },
+      "38": {
+        "calls": 1,
+        "zero_returns": 0,
+        "other_returns": 1
+      },
+      "39": {
+        "calls": 2491,
+        "zero_returns": 0,
+        "other_returns": 2491
+      },
+      "40": {
+        "calls": 4203,
+        "zero_returns": 1196,
+        "other_returns": 3007
+      },
+      "41": {
+        "calls": 4981,
+        "zero_returns": 1754,
+        "other_returns": 3227
+      },
+      "64": {
+        "calls": 2336,
+        "zero_returns": 2336,
+        "other_returns": 0
+      },
+      "65": {
+        "calls": 7884,
+        "zero_returns": 4790,
+        "other_returns": 3094
+      },
+      "66": {
+        "calls": 6926,
+        "zero_returns": 2625,
+        "other_returns": 4301
+      },
+      "67": {
+        "calls": 4529,
+        "zero_returns": 3482,
+        "other_returns": 1047
+      },
+      "68": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "69": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "70": {
+        "calls": 12,
+        "zero_returns": 12,
+        "other_returns": 0
+      },
+      "71": {
+        "calls": 1614,
+        "zero_returns": 857,
+        "other_returns": 757
+      },
+      "72": {
+        "calls": 3726,
+        "zero_returns": 3286,
+        "other_returns": 440
+      },
+      "73": {
+        "calls": 3242,
+        "zero_returns": 3224,
+        "other_returns": 18
+      },
+      "80": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "81": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "82": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "83": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "84": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      },
+      "85": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "86": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "87": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "88": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "89": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      }
+    },
+    "sdk2-abi-guard-alternate-release": {
+      "0": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero_returns": 642,
+        "other_returns": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero_returns": 644,
+        "other_returns": 4
+      },
+      "10": {
+        "calls": 4701,
+        "zero_returns": 4700,
+        "other_returns": 1
+      },
+      "11": {
+        "calls": 1771,
+        "zero_returns": 1770,
+        "other_returns": 1
+      },
+      "12": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "13": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "14": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "15": {
+        "calls": 1197,
+        "zero_returns": 0,
+        "other_returns": 1197
+      },
+      "16": {
+        "calls": 20635,
+        "zero_returns": 1006,
+        "other_returns": 19629
+      },
+      "17": {
+        "calls": 19373,
+        "zero_returns": 1006,
+        "other_returns": 18367
+      },
+      "18": {
+        "calls": 4213,
+        "zero_returns": 4212,
+        "other_returns": 1
+      },
+      "19": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "20": {
+        "calls": 729,
+        "zero_returns": 728,
+        "other_returns": 1
+      },
+      "21": {
+        "calls": 895,
+        "zero_returns": 846,
+        "other_returns": 49
+      },
+      "22": {
+        "calls": 721,
+        "zero_returns": 720,
+        "other_returns": 1
+      },
+      "23": {
+        "calls": 815,
+        "zero_returns": 809,
+        "other_returns": 6
+      },
+      "24": {
+        "calls": 971,
+        "zero_returns": 970,
+        "other_returns": 1
+      },
+      "25": {
+        "calls": 847,
+        "zero_returns": 846,
+        "other_returns": 1
+      },
+      "26": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "27": {
+        "calls": 895,
+        "zero_returns": 857,
+        "other_returns": 38
+      },
+      "28": {
+        "calls": 1197,
+        "zero_returns": 1196,
+        "other_returns": 1
+      },
+      "29": {
+        "calls": 2337,
+        "zero_returns": 2336,
+        "other_returns": 1
+      },
+      "30": {
+        "calls": 2842,
+        "zero_returns": 2625,
+        "other_returns": 217
+      },
+      "31": {
+        "calls": 3483,
+        "zero_returns": 3482,
+        "other_returns": 1
+      },
+      "32": {
+        "calls": 1199,
+        "zero_returns": 1196,
+        "other_returns": 3
+      },
+      "33": {
+        "calls": 3231,
+        "zero_returns": 2625,
+        "other_returns": 606
+      },
+      "34": {
+        "calls": 1330,
+        "zero_returns": 857,
+        "other_returns": 473
+      },
+      "35": {
+        "calls": 4502,
+        "zero_returns": 3482,
+        "other_returns": 1020
+      },
+      "36": {
+        "calls": 3647,
+        "zero_returns": 1702,
+        "other_returns": 1945
+      },
+      "37": {
+        "calls": 3892,
+        "zero_returns": 3287,
+        "other_returns": 605
+      },
+      "38": {
+        "calls": 1,
+        "zero_returns": 0,
+        "other_returns": 1
+      },
+      "39": {
+        "calls": 2491,
+        "zero_returns": 0,
+        "other_returns": 2491
+      },
+      "40": {
+        "calls": 4203,
+        "zero_returns": 1196,
+        "other_returns": 3007
+      },
+      "41": {
+        "calls": 4981,
+        "zero_returns": 1754,
+        "other_returns": 3227
+      },
+      "64": {
+        "calls": 2336,
+        "zero_returns": 2336,
+        "other_returns": 0
+      },
+      "65": {
+        "calls": 7884,
+        "zero_returns": 4790,
+        "other_returns": 3094
+      },
+      "66": {
+        "calls": 6926,
+        "zero_returns": 2625,
+        "other_returns": 4301
+      },
+      "67": {
+        "calls": 4529,
+        "zero_returns": 3482,
+        "other_returns": 1047
+      },
+      "68": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "69": {
+        "calls": 728,
+        "zero_returns": 728,
+        "other_returns": 0
+      },
+      "70": {
+        "calls": 12,
+        "zero_returns": 12,
+        "other_returns": 0
+      },
+      "71": {
+        "calls": 1614,
+        "zero_returns": 857,
+        "other_returns": 757
+      },
+      "72": {
+        "calls": 3726,
+        "zero_returns": 3286,
+        "other_returns": 440
+      },
+      "73": {
+        "calls": 3242,
+        "zero_returns": 3224,
+        "other_returns": 18
+      },
+      "80": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "81": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "82": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "83": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "84": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      },
+      "85": {
+        "calls": 1245,
+        "zero_returns": 877,
+        "other_returns": 368
+      },
+      "86": {
+        "calls": 182,
+        "zero_returns": 182,
+        "other_returns": 0
+      },
+      "87": {
+        "calls": 1245,
+        "zero_returns": 881,
+        "other_returns": 364
+      },
+      "88": {
+        "calls": 166,
+        "zero_returns": 158,
+        "other_returns": 8
+      },
+      "89": {
+        "calls": 835,
+        "zero_returns": 835,
+        "other_returns": 0
+      }
+    }
+  },
+  "guard_contract": {
+    "target": "SysV Linux x86_64",
+    "argument_classes": "integer/pointer machine words only; up to13 args, no vector/floating/variadic/aggregate-return claim",
+    "return": "preserve full RAX; typed i32 adapters interpret only low32 as required",
+    "checks": [
+      "64-bit rbx/rbp/r12/r13/r14/r15 patterns",
+      "DF clear on return",
+      "RSP restoration using test-only active frame chain",
+      "six stack canaries outside outgoing argument area",
+      "reject misaligned outgoing stack before calling target"
+    ],
+    "self_faults": [
+      "six individual callee-saved corruptions",
+      "DF set",
+      "RSP changed",
+      "stack canary write",
+      "misaligned guard entry (target not called)"
+    ],
+    "forwarding": [
+      "target observes entry RSP%16==8",
+      "all13 distinct64-bit arguments sum correctly"
+    ],
+    "reentrancy": "explicit frame per call, linked test-instrumentation active frame; single-thread only",
+    "sdk_identity": "real canonical SDK table and contexts unchanged; config injects raw call guard rather than replacing SDK table",
+    "not_a_sandbox": true
+  },
+  "original_sdk2_counters_exactly_preserved": true,
+  "main_assert_counts": {
+    "sdk2-probe": 93,
+    "sdk2-guard-probe": 93
+  },
+  "unchanged_production_implementation_and_public_headers_sha256": {
+    "src/t14-abi/lifecycle.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+    "src/t14-abi/lifecycle-child.h": "3e3e421a3aeb53b4bef169bd64bb3d43b6fd0ce0fa8c8f229ae48d27fe3bda18",
+    "src/t14-abi/entry-bridge.h": "aa14f90f03d031c29405c997ead526ca06845f796c7798d95ec187162497504f",
+    "src/t14-abi/service-route.h": "8644771453a1e64b5ab8309ce3d6c6ea4fe61d61bcfa9acaa32396b0ba5643ef",
+    "src/t14-abi/invocation.h": "0963ab9aad63d1c0220405b672b96f3d0122ab92c69a8458ccf70bfe6a4f4cd3",
+    "src/t14-abi/invocation2.h": "51429efe341b5a88f78b31c00f516097ed3423643e2804799c1d51ffa1371ce1",
+    "src/t14-abi/plugin-host.h": "8478ce6cc69a924492dd453fe1b6c96bc0f3b4a29040640de043788f46fa8ecc",
+    "src/t14-abi/plugin-host2.h": "3a1dba8cdf878b1e9890676d9b642d62fee11ae74a04bd6217cad5d15224dc34",
+    "src/t14-abi/plugin-sdk.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "src/t14-abi/plugin-sdk2.h": "858865c90130564d8a5369325bcec5d8821c8c52491f9d7efbb009c48252e86a",
+    "src/t14-abi/client-plugin-sdk-v1.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "src/t14-abi/client-plugin-sdk2-v2.h": "53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e",
+    "src/t14-abi/client-abi-v1.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+    "src/t14-abi/client-entry-v1.h": "43d3d326f5124409622fd019d91c3361cd776ae391ea39fd4e15994fc86e0bc1",
+    "src/t14-abi/client-route-v1.h": "fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71",
+    "src/t14-abi/client-lifecycle-child-v2.h": "725b2d8252538bf9526e79689635a38c3d1a72c4e3d73c9409b8365bff4c03d7",
+    "src/t14-abi/client-invocation-v1.h": "bf370e97fe050f14c90ca3ead7577ec1798f7e980f164832177ecb829c387380",
+    "src/t14-abi/client-invocation-ext2-v2.h": "f7ebb6a5299ac50eee334240689382fa7005164b4cb893d6f9c1b51c7731aab0",
+    "src/t14-abi/client-plugin-host-v1.h": "f863ca97220db14ece58ecabb930a0816b4589135d6d69787ea6d2cf450e4c39",
+    "src/t14-abi/client-plugin-host2-v2.h": "31632eba6da861d48dfb60facb42588af1e52047c11e2cf9a03189804b3ac328",
+    "src/t14-lifecycle/lifecycle.c": "b1a65fbf302b99a03208137e05a46351ef4e387380b0c529bb1acd1a5a8a2edb",
+    "src/t14-lifecycle/lifecycle-child-private.h": "4c2522d2d1c1cff1facfd509e229c9c4d1df7d7dabc2cc4a617de23202c7d065",
+    "src/t14-entry/entry-bridge.c": "c4159e4051d2323ebb32d56c2bc354ac642610a25c19970d2b45dff3f6c6bfdb",
+    "src/t14-plugin-runtime/service-route.c": "c4c1e35d40d1995ef8da598356cec1e37d267edd2e59bed882617328af18aefe",
+    "src/t14-plugin-runtime/route-geometry-private.h": "90294709e8db6fee7306a71c10a38b80c0f4a6f945f405b58d0ad275517f10e5",
+    "src/t14-plugin-runtime/route-query-private.h": "daac0f624e680dcd5b53744a39c6b677a9a60840af615c5a635509deae52bfc9",
+    "src/t14-plugin-runtime/invocation.c": "5408d9bf2d495d1a5b63b65ab2c17b0e1ae6e2290ceaef09be33a6bdc9d996d8",
+    "src/t14-plugin-runtime/plugin-sdk.c": "a9ff403be2c3adbde0e54cc365daca570ab4d26ab564d9e8a5e82e8522cce226",
+    "src/compiler-memory/memory.S": "cd7d54167fd60be77ac0dfade0488e80a9e549105075f6e4690fb53b5f5ec1fb",
+    "src/compiler-memory-alternate/alternate.c": "d16492557aa568aac87620a694d3c1a3d79071a9ad9577262ecdab861cd512fe"
+  },
+  "legacy_scope_limits": [
+    "SDK1 host.bind guarded only on invalid null input; SDK1 host.enter observed wrong-version refusals, not valid SDK1 startup.",
+    "SDK1 public client valid-path and remaining earlier T14 focused native regressions are not claimed complete.",
+    "life.start nonzero returns are expected partial-budget progress, not classified as failures. Raw zero/other counts do not define operation success."
+  ],
+  "first_failure": {
+    "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-4hxou44r",
+    "exit": 125,
+    "cause": "Alias test targeted newly introduced test forwarding table instead of original factory canonical host table. Fixed probe to use canonical original descriptor, preserving expected refusal and every assertion; no guard relaxed."
+  },
+  "source_archive": {
+    "scope": "SOURCE_ARCHIVE_BYTES_PREFLIGHT_AND_RETAINED_NATIVE_ARTIFACT_VERIFY_NOT_FRESH_BUILD",
+    "source_tar_sha256": "6090efb3ef41d9a027e7089aa00c756f9d82027be986bbd3b2c006db2c3070bf",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/source-restored-bnl63tgn",
+    "candidate_tree_sha256": "b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064",
+    "file_count": 314,
+    "native_source_files": 122,
+    "restored_inputs_match": true,
+    "retained_native_verification": {
+      "admission_receipt_binding": "PASS",
+      "verified_builds": 48,
+      "native_matrix": "PASS",
+      "status": "BLOCKED",
+      "release": "BLOCKED"
+    },
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-21",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-native-sdk2-abi-guard",
+    "commit": "731b316d8054635374d96128648c66951f5f13c9",
+    "parent": "82c886e5d8f9778f8e2fadfb0a6342e1bbf160ca",
+    "scope": "Fixed raw T14 native test candidate; no production/release admission",
+    "controller_sha256": "6a1ffa103d5ae1c7b423d507ef075e1daf227741d4d73e07075ef3da7e0e6bc0",
+    "candidate_tree_sha256": "b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064",
+    "native_source_files": 122,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "negative_registry_checks": [
+    {
+      "case": "fixed-registry",
+      "result": "PASS"
+    },
+    {
+      "case": "missing-release-mode",
+      "result": "REJECTED",
+      "reason": "unknown modules or incomplete required build modes"
+    },
+    {
+      "case": "missing-cpp-plugin",
+      "result": "REJECTED",
+      "reason": "selected build is not dependency-closed"
+    },
+    {
+      "case": "missing-memory-provider",
+      "result": "REJECTED",
+      "reason": "required service missing from build composition"
+    },
+    {
+      "case": "two-memory-providers",
+      "result": "REJECTED",
+      "reason": "multiple providers in root scope; deselect alternatives"
+    },
+    {
+      "case": "unselected-memory-binding",
+      "result": "REJECTED",
+      "reason": "binding provider does not offer selected service"
+    },
+    {
+      "case": "missing-sdk-definition-dependency",
+      "result": "REJECTED",
+      "reason": "required modules must be declared allowed dependencies"
+    },
+    {
+      "case": "cpp-development-scope",
+      "result": "REJECTED",
+      "reason": "C++ native probe is restricted to test modules"
+    },
+    {
+      "case": "wrong-sdk-version",
+      "result": "REJECTED",
+      "reason": "service ABI version conflict"
+    },
+    {
+      "case": "unregistered-boundary-review",
+      "result": "REJECTED",
+      "reason": "boundary requires registered review evidence"
+    },
+    {
+      "case": "client-host-header",
+      "result": "REJECTED",
+      "reason": "undeclared include dependency"
+    },
+    {
+      "case": "client-private-runtime-header",
+      "result": "REJECTED",
+      "reason": "private header dependency"
+    }
+  ],
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/build/native/admission.json": "ccd7d191b4ea0d9aeb5c6d63b0120de79860e850871aa5ab0d9682bfe8ceeaa2",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/build/isolation.json": "16ced59ea2f537c6c307ad11f53fd6c9f62b58804576b53f62e5e47c66e28cbb",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/executions.json": "de2a9950e2e4f3870fcb26207f59c92a29108c8f17ac10649199af3d71281025",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/archive-verify.json": "67fc83f7e32ea2fa482834104925fc5699ad8e4a0e3dd9615d1eaaab0ced013a",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/negative-checks/results.json": "af67a513a2ae38378e219e9e9d21f2cb2f24724ab80b229ead1a7be346a69a3e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/negative-checks/isolation.json": "b4215e9eb944b467bd7415af0e8f9f941b442265de423f8a2138c1a52a4646d1",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/publication.json": "a7d7aac4e7bd62499e99acac2456b410bf51b342979b3e771087f95302e2e0a3",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/control-review.json": "b3e96f154601b5d783939707047ae963d5a2e36eb324d337a6b941fb4c8c8b42",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/design.json": "136705861399e0710f51ec828e5b9871a57135fcfcb85158012cbfd2b84fbdbe",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme/slot-map.json": "a49650afaf38a5a613ef093d9c19cc4461509da05442d073313fd8a3f842b750",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-4hxou44r/smoke/execution.json": "e4be87c336387edf0b95e2a07b3aa3a45f80ae3b2c621fd09a16cafca4a84897",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v2-hu28t87c/smoke/execution.json": "db23c2c3c8b8b3a0d8b91c46b3dd89e042480ebc6deadd873cab5b6fe15c07e7"
+  },
+  "remaining": [
+    "Valid SDK1 and other focused T14 native suites and ABI paths.",
+    "Formal native sanitizer, complete G04 event traces/fault matrix and G07 resource/size/performance measurements.",
+    "Full G03/T14 acceptance and production scope promotion; remote release remains blocked."
+  ],
+  "full_G03": "NOT_COMPLETED",
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept fixed SDK2 test-only native ABI instrumentation, self-fault tests and measured paths. Do not approve full G03/T14 or production.",
+    "risks": [
+      "Raw-call test helper is restricted to current scalar/pointer ABI and trusts native target memory/code.",
+      "Test-only active frame chain is single-threaded and not runtime parent-call authority; no OS-thread concurrency proof.",
+      "Forwarding host tables have their own test storage. Alias negatives deliberately retain the original canonical host table target, as before instrumentation.",
+      "Source restoration/retained artifact recheck does not mean archive fresh rebuild; local evidence is not server-side anti-bypass assurance."
+    ]
+  },
+  "summary_sha256": "a5dd7da6fd4365c98c5c2cd5c2f776b94abec96f153cd42d1f92f6c6764adf05"
+}

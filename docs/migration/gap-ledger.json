@@ -184,9 +184,10 @@
         "t14-owner-boundaries.md",
         "t14-parent-call-candidate.json",
         "t14-sdk2-candidate.json",
-        "t14-native-evidence.json"
+        "t14-native-evidence.json",
+        "t14-abi-guard-evidence.json"
       ],
-      "remaining": "已登记45模块/22组合，冻结clang/GAS矩阵44构建PASS；60次隔离执行通过，新增GAS/C内存提供者×debug/release四次均1196场景/3242实际方法调用且输出与原SDK2一致。独立C/C++只导入固定公开SDK/config，局部SDK2门禁退出0及8项失败关闭自测通过。仍缺正式原生ABI guard、sanitizer、完整G04事件轨迹/故障矩阵、G07与旧SDK1/其他T14专项原生回归；不得据此关闭缺口或批准T14整体。"
+      "remaining": "SDK2冻结原生与ABI守卫已通过：48构建/64隔离执行，四次guard各146729调用、5工厂/52目标、10破坏负例与2转发自测，原1196场景/3242服务调用及全部计数保持。SDK1有效路径/其他T14专项原生ABI回归、正式sanitizer、完整G04轨迹/故障矩阵和G07仍待完成；本项和T14整体不关闭。"
     }
   ]
 }

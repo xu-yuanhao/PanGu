@@ -1,0 +1,14 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-21",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-native-sdk2-abi-guard",
+  "commit": "731b316d8054635374d96128648c66951f5f13c9",
+  "parent": "82c886e5d8f9778f8e2fadfb0a6342e1bbf160ca",
+  "scope": "Fixed raw T14 native test candidate; no production/release admission",
+  "controller_sha256": "6a1ffa103d5ae1c7b423d507ef075e1daf227741d4d73e07075ef3da7e0e6bc0",
+  "candidate_tree_sha256": "b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064",
+  "native_source_files": 122,
+  "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

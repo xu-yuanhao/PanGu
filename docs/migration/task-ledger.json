@@ -1421,6 +1421,28 @@
           "builds": 44,
           "executions": 60,
           "production_admission": false
+        },
+        "native_sdk2_abi_guard": {
+          "status": "SDK2_NATIVE_ABI_GUARD_SCENARIOS_PASS_FULL_G03_T14_PENDING",
+          "registry": "docs/migration/t14-abi-guard-candidate.json",
+          "evidence": "docs/migration/t14-abi-guard-evidence.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-abi-guard-v3-6lq3cxme",
+          "tested_controller_sha256": "6a1ffa103d5ae1c7b423d507ef075e1daf227741d4d73e07075ef3da7e0e6bc0",
+          "candidate_tree_sha256": "b61576173b18d755b1f32d3f7fab7e1a6876dc8ecb09a617aa7b58012e8db064",
+          "control_metadata_package_sha256": "260a4e3c142dfd47e0c4ca5543f981985003e4fa1e612a694fba0970b24f5878",
+          "control_metadata_package_files": {
+            "docs/migration/t14-abi-guard-candidate.json": "88d27a4d888d3d6a2a578568a13d3e88f0a623ecdc8efef7b9035e1d2d2d7c9c",
+            "docs/migration/t14-abi-guard-evidence.json": "c6d1d781482a827a09b965c2023d3a05443dcfe38ceef0395141af5d7eb306b3",
+            "docs/migration/t14-abi-guard-source-publication.json": "a7d7aac4e7bd62499e99acac2456b410bf51b342979b3e771087f95302e2e0a3",
+            "docs/migration/gap-ledger.json": "6e95b63f241d819280b7d9547e9eb55042e4372435e0e6fa6de6d1fb4c1334a5",
+            "governance/bootstrap-policy.json": "a13b8f66045039ec5b3fb9b8e6dba9b55b7160868e5fe61278ab0aeed444002a"
+          },
+          "review_record_sha256": "10684876bf60cc842b166c4f6da7a677e84798e95ece82392fd18c807720064b",
+          "reviewer": "same Agent as implementer",
+          "builds": 48,
+          "executions": 64,
+          "guarded_calls_per_run": 146729,
+          "production_admission": false
         }
       }
     },
