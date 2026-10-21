@@ -165,6 +165,25 @@
         "t03-t04-review.md"
       ],
       "remaining": "Historical-only reference role must be retained on future updates; no inherited PASS."
+    },
+    {
+      "id": "GAP-010",
+      "severity": "high",
+      "title": "被调用提供者的嵌套服务调用尚不能继承 setup/cleanup 父作用域",
+      "steps": [
+        "T14"
+      ],
+      "affected_scope": "Native plugin SDK and delegated service calls during startup/teardown",
+      "reference": "t14-plugin-sdk-candidate.json",
+      "status": "OPEN",
+      "closure_evidence_required": "显式父调用凭据验证当前提供者/owner/epoch/代际、传播setup/cleanup权限和停止语义；真实多跳成功轨迹以及错误/过期/重复/跨runtime父票据拒绝，工作量与失败释放证据。本地nested admission退出0且冻结原生对应验证通过后才可判断关闭。不能按inflight计数或全局phase放宽业务门闩。",
+      "owner_role": "Agent implementer and explicitly recorded same-Agent self-review",
+      "waiver": null,
+      "evidence": [
+        "t14-plugin-sdk-candidate.json",
+        "t14-owner-boundaries.md"
+      ],
+      "remaining": "当前业务期168次嵌套实际调用成功；setup与cleanup各144次拒绝，check-sdk-nested-admission.py实际退出2。SDK基础正常回归不等于此项完成。"
     }
   ]
 }

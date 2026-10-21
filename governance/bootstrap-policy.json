@@ -186,6 +186,7 @@
     "docs/migration/t14-facade-candidate.json": "control",
     "docs/migration/t14-entry-bridge-candidate.json": "control",
     "docs/migration/t14-service-route-candidate.json": "control",
-    "docs/migration/t14-service-interop-candidate.json": "control"
+    "docs/migration/t14-service-interop-candidate.json": "control",
+    "docs/migration/t14-plugin-sdk-candidate.json": "control"
   }
 }

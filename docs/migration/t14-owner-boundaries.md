@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选已有静态 entry、真实服务路由，并完成 C/汇编/C++ 服务消费的局部互操作验证，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新宿主候选已有独立插件SDK基础接口与C/C++插件验证，但setup/cleanup嵌套作用域GAP-010尚未实现，本地嵌套准入明确BLOCKED，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -226,3 +226,24 @@ C++20对象使用-ffreestanding/-nostdinc/-nostdinc++、禁用异常/RTTI/线程
 最终15份常规脚本全部退出0且源码未变；16份源码绑定回执（含interop UBSan）逐一匹配同一最终清单。补充UBSan执行同一1188场景退出0、无诊断，SHA256 `a4c932dec331974c077a09bc51063139f3aed9b0c550be6bb2186a1f29f3bdda`；汇编指令本身不受UBSan插桩。既有route390场景/888调用及全部entry/生命周期/预算/几何套件保持通过。54份源码的确定性tar SHA256 `f52e8ea7e7cd94f97160a3f1042288558714efdf47a6fad6f7737913b0017d55`；另目录恢复逐字节一致，只是源文件恢复，不是恢复后重新构建或原生准入。
 
 下一步将插件侧SDK与宿主控制头分离：插件不直接导入owner/runtime/router帧，按自身身份及稳定服务名查询，由宿主选择setup/业务/cleanup作用域，复用现有owner与票据。优先复用不透明票据表示，避免为了SDK再引入一套所有权系统。当前固定契约仍只是服务消费测试，SDK本身尚未实现；旧C17宿主控制头也不据此声称兼容C++。之后仍须冻结原生准入、guard及完整G03/G04/G07。
+
+
+## 插件 SDK 基础候选与嵌套作用域缺口（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu`；源码/测试清单SHA256 `930c3e2c22c770b779cc3c71489523f186852100461da65d0bc103ef5b7f830e`，sdk-evidence.json SHA256 `7e8d8ca3a37941b76be26d0df41ff84e356cdba9ca6eb2bf852b3eef64c004ad`。根候选 [t14-plugin-sdk-candidate.json](t14-plugin-sdk-candidate.json) 固定证据与同一Agent自审记录。候选JSON、bootstrap-policy新增登记、GAP-010登记三个控制文件的固定包SHA256 `e9e960b33f12deda44ba66a59535a7aa5f14d72bb835e5fa51fc3512d02f1940`，不是控制器全树批准。只批准继续本地基础实验，不改变门禁/预算/工具链/基线，不新增生产模块；完整SDK/T14及原生准入未批准。
+
+插件头plugin-sdk.h不导入owner/runtime/router/entry控制声明，独立固定消费头client-plugin-sdk-v1.h SHA256 `4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607`。SDK ABI1/target1，表72、上下文32、key40、request48、不透明lease80/completion32字节。provide/count/acquire/release/defer/finish_setup/finish_dispose七方法；借用上下文由宿主按实例与epoch固定。按稳定名称/准确版本/显式ordinal查找自身声明与解析边；可选缺失count0，未声明查找拒绝；MANY保留完整顺序。上下文userdata由插件使用，opaque与完成/调用票据只能复制回传，不暴露可操作的宿主帧类型。不是内存沙箱。
+
+宿主pangu_plugin_host_query为单导出，40字节host表、32字节bank、88字节binding。先做T13/entry/lifecycle准备及几何绑定，再原子bind到每个实例；由公共host trampoline进入对应真实插件entry，SDK一次性标记在任何注册回调前置位，并在外部注册后复核取消。声明的同步或异步disposer在entry前登记，加载失败也执行部分状态清理。当前每实例一个声明disposer，不声称通用effect登记SDK全部完成。 SDK entered标记代表进入尝试已消费；若外部登记过程中发生取消，插件体可能尚未执行，已登记清理仍可能运行，所以userdata和disposer须能处理尚未进入或部分初始化状态。延后setup与异步清理使用原有真实完成票据，不另造owner/操作池；完成要求拷贝的不透明token，旧epoch、错误代际、重复和跨实例票据拒绝。
+
+宿主根据当前实例选择setup/业务/cleanup作用域；SDK输出拒绝覆盖host bank、全部binding、控制表、运行时元数据及所有已发布服务表。数值区间不能证明映射存在，opaque userdata大小与外部状态生命周期仍是调用方责任。key/request按自身自然4字节对齐检查，测试了仅4对齐成员，未强迫插件使用宿主8字节请求对齐。调用、完成与提交预留fuel后才修改状态；计数/查找为预算内原子重试，不能抢占插件函数。
+
+为复用元数据检查，从旧service-route.c逐字节抽出私有route-geometry-private.h；提取体SHA256 `9e7e8908e131772ce5219d39f2dbd58fa367fde59ef1692d8a41c5390935b7b0`。旧路由O0/O2对象与父候选逐字节相同，公开路由头未改。生命周期与entry源码/头也保持原包。SDK对象O0/O2各仅导出query、无未解析符号；C/C++插件对象各四个C名称导出，只有三个测试调用/观察符号依赖，无libstdc++/异常/RTTI/全局构造或unwind要求。C++20插件与C17插件分别编译同一独立SDK消费源，并由cc链接。
+
+O0/O2各824场景通过：T13固定240图中成功图的C/C++插件/安装顺序及四种正常异步组合，加app/session/Pending/MANY、反序provisions与八种故障/完成组合。1794次插件服务调用（setup598、cleanup608、业务588；两种插件语言各897），另168次业务期实际嵌套调用；198次延后setup、432次异步清理。6299语义/旧token/重复/跨身份拒绝、16428别名拒绝；7710次操作不足fuel、388次bind不足fuel，9803次元数据/owner/操作池/资源池/服务表/SDK帧逐字节快照检查。未把opaque配置状态当作宿主可全面保护的内存。
+
+**GAP-010仍OPEN：** 当B在setup或cleanup中调用Active提供者A，A再用自身SDK上下文调用C，当前全局setup/cleanup scope属于B，不能成为A的新调用凭据。真实探针分别复现144次setup拒绝与144次cleanup拒绝；这些是缺口证据，不能计作需求成功。业务期168次嵌套成功不能代替启动/停用期间语义。新增本地check-sdk-nested-admission.py核对源码与可执行文件摘要、重新执行探针；本次实际退出2，sdk-nested-admission.json为BLOCKED，SHA256 `c0f5e1fbe2e65cf92bdbe435d6911727c2991d697e66e35cb9e5cb9bbef08a71`。普通回归退出0只代表已实现基础路径与拒绝不变，绝不放行完整SDK或T14。
+
+下一步优先实现显式父调用凭据与作用域传播：证明父票据的提供者就是当前插件owner，核对runtime/epoch/代际和真实在途状态，传播setup/cleanup根作用域，继续遵守停止门闩及依赖方向；不能仅凭inflight非零或放宽全局phase取得权限。须覆盖多跳真实调用、错误/过期/跨runtime/重复父凭据、取消和失败释放，再让嵌套准入由BLOCKED转为通过。随后才推进完整SDK及冻结原生G03/G04/G07。
+
+首轮别名测试把未发布表当成宿主元数据，count16字节输出在那里合法；保留sdk-initial-test-failure.json，将测试目标改为实际已发布表，未放宽实现。最终16份常规脚本退出0、源码未变；17份源码绑定回执（含SDK UBSan）与同一最终清单一致。UBSan同824场景退出0无诊断，SHA256 `6a25670f6d579d187b44af5f5087ff619fc61186e0cbccab21262ebdcff817dd`；本地嵌套准入仍退出2。64份源码的确定性tar SHA256 `35a6a910a771ac6391b1532b96eae6979cfa146b7ea2493a345b970bab0076c6`，另目录恢复字节一致，不是恢复后重新构建或原生放行。

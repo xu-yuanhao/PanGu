@@ -306,6 +306,10 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] 局部插件SDK基础候选：独立固定消费头、不透明租约/完成、自动实例作用域与声明清理；C/C++插件O0/O2各824场景、1794次服务调用、预算/别名及补充宿主UBSan通过。GAP-010嵌套setup/cleanup准入实际BLOCKED，完整SDK与原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
+
+- [ ] 修复GAP-010：显式父调用凭据验证与setup/cleanup多跳作用域传播，错误/过期/跨runtime/重复票据拒绝、取消与失败释放、预算证据齐备；不能只按inflight计数放宽停止门闩。
+
 - [x] 局部宿主服务跨语言消费：独立固定契约下C/汇编/C++消费两种C提供者及C++提供者，O0/O2各1188场景/34128调用，9组合各3792次；callee-saved、错误边界、补充宿主UBSan与源归档恢复通过。完整SDK与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
 - [x] 局部宿主真实服务值路由：稳定名称/版本/尺寸、setup发布与双端租约，MANY逐边、app/session隔离和两种实现替换；O0/O2各390场景/888实际调用、16518不足fuel、4884别名拒绝及补充宿主UBSan通过。完整SDK、服务汇编/C++消费与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
