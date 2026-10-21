@@ -193,6 +193,9 @@
     "docs/migration/t14-compiler-memory-candidate.json": "control",
     "governance/native-test-cpp-toolchain.json": "control",
     "tools/gates/test_native_cpp.py": "gate-test",
-    "docs/migration/t14-cpp-admission-candidate.json": "control"
+    "docs/migration/t14-cpp-admission-candidate.json": "control",
+    "docs/migration/t14-native-candidate.json": "control",
+    "docs/migration/t14-native-evidence.json": "control",
+    "docs/migration/t14-native-source-publication.json": "control"
   }
 }

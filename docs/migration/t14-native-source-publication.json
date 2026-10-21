@@ -1,0 +1,14 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-21",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-native-sdk2-matrix",
+  "commit": "0d045531e284eb74abbe3111b9965f8084951c58",
+  "parent": "9c4f5475fa84b7a71bd023668d36f155b8759568",
+  "scope": "Fixed raw T14 native test candidate; no production/release admission",
+  "controller_sha256": "262c4b7675b820827fada3daf0129acd9acdfd7973f2a9225006b0a52ff0702a",
+  "candidate_tree_sha256": "f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc",
+  "native_source_files": 112,
+  "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

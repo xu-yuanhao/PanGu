@@ -311,7 +311,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] SDK2 冻结静态补充：只读原场景在 Clang→GAS→ld 无 libc 链路下 O0/O2/Oz 各 1196 场景、3242 调用通过；静态 ELF/无未定义符号与断言失败负例通过。仅测试适配器，未登记原生矩阵，见 T14 草稿。
 - [x] 明确 compiler.memory v1 构建/链接替换边界：GAS 与测试 C 提供者通过原 native_build debug/release 共四组、页边界/重叠/寄存器/DF、8 项依赖拒绝与四组产物复核；原 SDK2 冻结对象不变、两提供者 O0/Oz 四次完整场景通过。仅候选，详见 t14-compiler-memory-candidate.json。
-- [ ] 将 compiler.memory 与宿主、调用管理器、SDK2 的实际导入依赖登记到完整 T14 原生模块/组合矩阵；不得将测试 stdio/PAL 适配器直接当生产准入。
+- [x] SDK2原生模块/组合登记：compiler.memory、宿主、调用管理器、独立C/C++插件进入45模块/22组合（保留T13原20组合），44冻结构建、60隔离执行通过；新增T14实现和stdio/PAL仍为test范围，不构成生产准入。
+- [ ] 完成宿主工厂/方法表的原生ABI guard、正式sanitizer、完整G04事件轨迹/故障矩阵与G07资源测量，并接入旧SDK1/其他T14专项原生回归。
 
 - [x] SDK2本地端到端：版本化方法显式父参数，C/C++插件与双runtime完成真实调用；O0/O2各1196场景/3242方法调用，本地SDK2准入、8项失败关闭自测、18份回归及宿主UBSan通过。GAP-010仅部分解决，冻结原生/G04/G07待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
@@ -319,7 +320,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] 局部插件SDK基础候选：独立固定消费头、不透明租约/完成、自动实例作用域与声明清理；C/C++插件O0/O2各824场景、1794次服务调用、预算/别名及补充宿主UBSan通过。GAP-010嵌套setup/cleanup准入实际BLOCKED，完整SDK与原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
-- [ ] 完成GAP-010冻结原生验收：SDK2本地显式父参数、多跳、双runtime、取消/完成与预算已验证；仍需固定模块登记、冻结clang/GAS、ABI guard/sanitizer及G04/G07，之后才能关闭缺口；不能只按inflight计数放宽停止门闩。
+- [ ] 完成GAP-010剩余验收：固定模块/组合和冻结clang/GAS集成已通过；仍需原生ABI guard/sanitizer、完整G04/G07与旧SDK专项原生回归，之后才判断关闭；不能只按inflight计数放宽停止门闩。
 
 - [x] 局部宿主服务跨语言消费：独立固定契约下C/汇编/C++消费两种C提供者及C++提供者，O0/O2各1188场景/34128调用，9组合各3792次；callee-saved、错误边界、补充宿主UBSan与源归档恢复通过。完整SDK与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

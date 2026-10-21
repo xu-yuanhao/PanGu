@@ -1400,6 +1400,27 @@
           "gate_tests": 197,
           "test_fixture_callback_review_sha256": "33bb244a768db5c51e9b9ad44661fd83e5acd85853553fce5451c9f06f88a047",
           "test_fixture_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s"
+        },
+        "native_sdk2_matrix": {
+          "status": "FROZEN_REGISTERED_MATRIX_AND_EXECUTIONS_PASS_FULL_T14_PENDING",
+          "registry": "docs/migration/t14-native-candidate.json",
+          "evidence": "docs/migration/t14-native-evidence.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a",
+          "tested_controller_sha256": "262c4b7675b820827fada3daf0129acd9acdfd7973f2a9225006b0a52ff0702a",
+          "candidate_tree_sha256": "f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc",
+          "control_metadata_package_sha256": "95c05a069af6a5ad2a5595ea830f2631145c4da7ab688dcf0247a884dceb521d",
+          "control_metadata_package_files": {
+            "docs/migration/t14-native-candidate.json": "0c7587308c83a72f209ff055167abc9619f8994b50f314945735dcbd4365fe2f",
+            "docs/migration/t14-native-evidence.json": "f5a39b8b1d191ca826fdca19c7645a834122574cb8f47aa6f40340b152ab9a56",
+            "docs/migration/t14-native-source-publication.json": "3ecdd2841e5ee7405f55864f073d3a7da19357f153997d240b078d9c2feff58d",
+            "docs/migration/gap-ledger.json": "131521372b0f16dbf89eee32a44cc7e18cb8112d7ee87d3156cb402aa2a70fde",
+            "governance/bootstrap-policy.json": "79639b61ba91f9b42abc4260bbd870dc7e77f4e77c278eb1b51cc72275945d7f"
+          },
+          "review_record_sha256": "d2d50e613d55ec9c50255cd12519342ae7fcdc3852adef44839578a2b3f12e06",
+          "reviewer": "same Agent as implementer",
+          "builds": 44,
+          "executions": 60,
+          "production_admission": false
         }
       }
     },

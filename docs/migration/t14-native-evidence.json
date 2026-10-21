@@ -1,0 +1,528 @@
+{
+  "schema": "pangu.t14-native-sdk2-evidence.v1",
+  "status": "FROZEN_REGISTERED_MATRIX_AND_EXECUTIONS_PASS_FULL_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a",
+  "registry": "docs/migration/t14-native-candidate.json",
+  "registry_sha256": "0c7587308c83a72f209ff055167abc9619f8994b50f314945735dcbd4365fe2f",
+  "controller_sha256": "262c4b7675b820827fada3daf0129acd9acdfd7973f2a9225006b0a52ff0702a",
+  "policy_sha256": "a45dd8572abc4c26a4118c5c596bf850df0aeff9b9a0c755eb88de63b11e7210",
+  "candidate_tree_sha256": "f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc",
+  "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+  "module_count": 45,
+  "composition_count": 22,
+  "native_source_file_count": 112,
+  "old_t13_compositions_and_sources_unchanged": true,
+  "native_matrix": "PASS",
+  "build_count": 44,
+  "runtime_execution_count": 60,
+  "new_sdk2_runtime_count": 4,
+  "sdk2_per_run": {
+    "scenarios": 1196,
+    "actual_methods": 3242,
+    "nested_setup": 342,
+    "nested_cleanup": 306,
+    "nested_business": 208,
+    "cross_runtime_refusals": 130,
+    "invalid_parent_refusals": 678,
+    "aliases": 6202,
+    "no_parent_refusals": 72,
+    "parent_busy": 856,
+    "loader_version_refusals": 4980,
+    "completed_scope_refusals": 12,
+    "cancelled_child_refusals": 12,
+    "async_root_resumes": 188
+  },
+  "sdk2_stdout_exactly_matches_reference": true,
+  "fixed_consumer_sha256": {
+    "client-plugin-sdk-v1.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "client-plugin-sdk2-v2.h": "53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e",
+    "client-plugin-host-v1.h": "f863ca97220db14ece58ecabb930a0816b4589135d6d69787ea6d2cf450e4c39",
+    "client-plugin-host2-v2.h": "31632eba6da861d48dfb60facb42588af1e52047c11e2cf9a03189804b3ac328",
+    "client-invocation-v1.h": "bf370e97fe050f14c90ca3ead7577ec1798f7e980f164832177ecb829c387380",
+    "client-invocation-ext2-v2.h": "f7ebb6a5299ac50eee334240689382fa7005164b4cb893d6f9c1b51c7731aab0",
+    "client-lifecycle-child-v2.h": "725b2d8252538bf9526e79689635a38c3d1a72c4e3d73c9409b8365bff4c03d7"
+  },
+  "sdk2_compilation_evidence": {
+    "sdk2-native-asm-debug": {
+      "dependencies": {
+        "src/sdk2-client-c/client.c": [
+          "src/sdk2-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ],
+        "src/sdk2-client-cpp/client.cpp": [
+          "src/sdk2-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ]
+      },
+      "cpp_test_objects": {
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy"
+          ]
+        }
+      },
+      "symbol_link_audit": "PASS",
+      "elf": {
+        "class": "ELF64",
+        "entry": 4288222,
+        "executable_stack": false,
+        "interpreter": null,
+        "load_segments": 4,
+        "machine": "x86_64",
+        "type": "EXEC",
+        "writable_executable_segments": false
+      },
+      "artifact_bytes": 1766664,
+      "object_bytes": {
+        "bootstrap-api": 0,
+        "compiler-memory": 2600,
+        "compiler-memory-api": 0,
+        "host-fixed-api": 0,
+        "host-plan": 67696,
+        "lifecycle-api": 0,
+        "plugin-host-api": 0,
+        "plugin-sdk-api": 0,
+        "sdk2-client-c": 13248,
+        "sdk2-client-cpp": 13512,
+        "sdk2-fixture-api": 0,
+        "sdk2-probe": 1716856,
+        "sdk2-start": 2544,
+        "t14-entry": 26400,
+        "t14-lifecycle": 67008,
+        "t14-plugin-runtime": 126208,
+        "t14-test-platform": 2296,
+        "t14-test-support": 7376
+      },
+      "build_receipt_sha256": "1a35a201748a019bca0a4afb7e07db2834d9fa2d7c38e63329457b101aefa8ee"
+    },
+    "sdk2-native-asm-release": {
+      "dependencies": {
+        "src/sdk2-client-c/client.c": [
+          "src/sdk2-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ],
+        "src/sdk2-client-cpp/client.cpp": [
+          "src/sdk2-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ]
+      },
+      "cpp_test_objects": {
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": []
+        }
+      },
+      "symbol_link_audit": "PASS",
+      "elf": {
+        "class": "ELF64",
+        "entry": 4257917,
+        "executable_stack": false,
+        "interpreter": null,
+        "load_segments": 4,
+        "machine": "x86_64",
+        "type": "EXEC",
+        "writable_executable_segments": false
+      },
+      "artifact_bytes": 1325568,
+      "object_bytes": {
+        "bootstrap-api": 0,
+        "compiler-memory": 960,
+        "compiler-memory-api": 0,
+        "host-fixed-api": 0,
+        "host-plan": 23960,
+        "lifecycle-api": 0,
+        "plugin-host-api": 0,
+        "plugin-sdk-api": 0,
+        "sdk2-client-c": 3376,
+        "sdk2-client-cpp": 3520,
+        "sdk2-fixture-api": 0,
+        "sdk2-probe": 1421208,
+        "sdk2-start": 1048,
+        "t14-entry": 6864,
+        "t14-lifecycle": 22256,
+        "t14-plugin-runtime": 38752,
+        "t14-test-platform": 888,
+        "t14-test-support": 2328
+      },
+      "build_receipt_sha256": "f6ba16318a5ea6875e1b1922825004cb9885d60df40dc4450c1f87876bb4c5b9"
+    },
+    "sdk2-native-alternate-debug": {
+      "dependencies": {
+        "src/sdk2-client-c/client.c": [
+          "src/sdk2-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ],
+        "src/sdk2-client-cpp/client.cpp": [
+          "src/sdk2-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ]
+      },
+      "cpp_test_objects": {
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy"
+          ]
+        }
+      },
+      "symbol_link_audit": "PASS",
+      "elf": {
+        "class": "ELF64",
+        "entry": 4288510,
+        "executable_stack": false,
+        "interpreter": null,
+        "load_segments": 4,
+        "machine": "x86_64",
+        "type": "EXEC",
+        "writable_executable_segments": false
+      },
+      "artifact_bytes": 1767712,
+      "object_bytes": {
+        "bootstrap-api": 0,
+        "compiler-memory-alternate": 4720,
+        "compiler-memory-api": 0,
+        "host-fixed-api": 0,
+        "host-plan": 67696,
+        "lifecycle-api": 0,
+        "plugin-host-api": 0,
+        "plugin-sdk-api": 0,
+        "sdk2-client-c": 13248,
+        "sdk2-client-cpp": 13512,
+        "sdk2-fixture-api": 0,
+        "sdk2-probe": 1716856,
+        "sdk2-start": 2544,
+        "t14-entry": 26400,
+        "t14-lifecycle": 67008,
+        "t14-plugin-runtime": 126208,
+        "t14-test-platform": 2296,
+        "t14-test-support": 7376
+      },
+      "build_receipt_sha256": "93d876a039b0123b205e9b9e95225191f8e0671b65a6575a0387b5a9b1c1faf9"
+    },
+    "sdk2-native-alternate-release": {
+      "dependencies": {
+        "src/sdk2-client-c/client.c": [
+          "src/sdk2-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ],
+        "src/sdk2-client-cpp/client.cpp": [
+          "src/sdk2-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/client-plugin-sdk2-v2.h",
+          "src/t14-abi/sdk2-fixture.h"
+        ]
+      },
+      "cpp_test_objects": {
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": []
+        }
+      },
+      "symbol_link_audit": "PASS",
+      "elf": {
+        "class": "ELF64",
+        "entry": 4257959,
+        "executable_stack": false,
+        "interpreter": null,
+        "load_segments": 4,
+        "machine": "x86_64",
+        "type": "EXEC",
+        "writable_executable_segments": false
+      },
+      "artifact_bytes": 1325632,
+      "object_bytes": {
+        "bootstrap-api": 0,
+        "compiler-memory-alternate": 1168,
+        "compiler-memory-api": 0,
+        "host-fixed-api": 0,
+        "host-plan": 23960,
+        "lifecycle-api": 0,
+        "plugin-host-api": 0,
+        "plugin-sdk-api": 0,
+        "sdk2-client-c": 3376,
+        "sdk2-client-cpp": 3520,
+        "sdk2-fixture-api": 0,
+        "sdk2-probe": 1421208,
+        "sdk2-start": 1048,
+        "t14-entry": 6864,
+        "t14-lifecycle": 22256,
+        "t14-plugin-runtime": 38752,
+        "t14-test-platform": 888,
+        "t14-test-support": 2328
+      },
+      "build_receipt_sha256": "e1136e04fd0b9442081768cb0b787d8144cdca02751cdc454192b7fd30f37d4e"
+    }
+  },
+  "sdk2_fixture_local_nested_admission": "PASS",
+  "sdk2_fixture_gate_self_tests": 8,
+  "new_registry_checks": [
+    {
+      "case": "fixed-registry",
+      "result": "PASS"
+    },
+    {
+      "case": "missing-release-mode",
+      "result": "REJECTED",
+      "reason": "unknown modules or incomplete required build modes"
+    },
+    {
+      "case": "missing-cpp-plugin",
+      "result": "REJECTED",
+      "reason": "selected build is not dependency-closed"
+    },
+    {
+      "case": "missing-memory-provider",
+      "result": "REJECTED",
+      "reason": "required service missing from build composition"
+    },
+    {
+      "case": "two-memory-providers",
+      "result": "REJECTED",
+      "reason": "multiple providers in root scope; deselect alternatives"
+    },
+    {
+      "case": "unselected-memory-binding",
+      "result": "REJECTED",
+      "reason": "binding provider does not offer selected service"
+    },
+    {
+      "case": "missing-sdk-definition-dependency",
+      "result": "REJECTED",
+      "reason": "required modules must be declared allowed dependencies"
+    },
+    {
+      "case": "cpp-development-scope",
+      "result": "REJECTED",
+      "reason": "C++ native probe is restricted to test modules"
+    },
+    {
+      "case": "wrong-sdk-version",
+      "result": "REJECTED",
+      "reason": "service ABI version conflict"
+    },
+    {
+      "case": "unregistered-boundary-review",
+      "result": "REJECTED",
+      "reason": "boundary requires registered review evidence"
+    },
+    {
+      "case": "client-host-header",
+      "result": "REJECTED",
+      "reason": "undeclared include dependency"
+    },
+    {
+      "case": "client-private-runtime-header",
+      "result": "REJECTED",
+      "reason": "private header dependency"
+    }
+  ],
+  "source_archive": {
+    "scope": "SOURCE_ARCHIVE_BYTES_PREFLIGHT_AND_RETAINED_NATIVE_ARTIFACT_VERIFY_NOT_FRESH_BUILD",
+    "source_tar_sha256": "24909a9935444acbf1945c3fcc121b5048db34fba1a24e730a01fd42d394afcb",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/source-restored-8em3dusj",
+    "candidate_tree_sha256": "f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc",
+    "file_count": 301,
+    "native_source_files": 112,
+    "restored_inputs_match": true,
+    "retained_native_verification": {
+      "admission_receipt_binding": "PASS",
+      "verified_builds": 44,
+      "native_matrix": "PASS",
+      "status": "BLOCKED",
+      "release": "BLOCKED"
+    },
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-21",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-native-sdk2-matrix",
+    "commit": "0d045531e284eb74abbe3111b9965f8084951c58",
+    "parent": "9c4f5475fa84b7a71bd023668d36f155b8759568",
+    "scope": "Fixed raw T14 native test candidate; no production/release admission",
+    "controller_sha256": "262c4b7675b820827fada3daf0129acd9acdfd7973f2a9225006b0a52ff0702a",
+    "candidate_tree_sha256": "f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc",
+    "native_source_files": 112,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/build/native/admission.json": "47bf10a4f11a7d923241023db2548e5a27da0a43272d7f47bbcb5ad3bc6abe2b",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/build/isolation.json": "7971a44bee89fdcf93ebb080744438c56cd295ca17a17ebb35c8fbbde6e21a65",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/executions.json": "9d4a4542a59bd715c2d505fe01c7e68b7f77f2da5f31f52b7df92381a3d3ddc3",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/archive-verify.json": "10bccc2502c7cfa34269220ed8d4e850440fda88fca869243f9c97845cea6827",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/lineage.json": "8d3cca0c7240c4d78f5f5feefb37abcc95d0c17a11cf32de7ec64f082e1d01a9",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/negative-checks/results.json": "af67a513a2ae38378e219e9e9d21f2cb2f24724ab80b229ead1a7be346a69a3e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/negative-checks/isolation.json": "fb4faa8b0c039253f5c9f970616a0e0ae14148b6f979ad973715f30361f97cf4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/publication.json": "3ecdd2841e5ee7405f55864f073d3a7da19357f153997d240b078d9c2feff58d",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/publication-inventory-failure.json": "227f6a6b7c63ed97c4243b50b2c2ed9261b6002c87b5b8e18c7ff816cc34bba4",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/control-review.json": "1f006a70fdf73e80fd51655077b175d1b701608dbc39167db050d9b4d08b5711",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/sdk2-nested-admission.json": "2ae7c297a34a9176054bf915d7e6ad053ef82dd440506e42847414da6d43581b",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/sdk2-admission-self-tests.json": "70b4e1a28925839620c45200bb4adafd535e954679ca846a61fb940426e478c7"
+  },
+  "architecture_decisions": [
+    "Route/invocation/SDK share private geometry/query helpers and stay in one cohesive host implementation module; no private header promoted to public.",
+    "Immutable host/SDK/fixed-consumer interface files have distinct file ownership, including shared ABI source directory; implementation files remain separate/private.",
+    "Test startup and test PAL are separate from main runner; explicit injected observer callbacks prevent reverse dependency cycles.",
+    "Native implementations are test-scoped in this local matrix so test alternate provider dependencies cannot silently enter product builds. Promotion to product requires later explicit admission.",
+    "Static C/C++ fixture symbols alone have hidden declarations for PIC address-taking; public fixed SDK and host headers remain byte-identical. No GOT import exception or compile-flag change."
+  ],
+  "initial_rejections": [
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-7ronmo6e",
+      "reason": "Product implementation declaration depended on a test alternate provider; registry rejected. New implementation modules remain test-scoped, rather than making the alternate production-scoped."
+    },
+    {
+      "record": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a/publication-inventory-failure.json",
+      "reason": "Initial Git line-mode listing quoted non-ASCII names; rejected before commit/push. NUL-separated machine paths retain exact inventory/blob checks."
+    }
+  ],
+  "remaining": [
+    "Native ABI guards for lifecycle/entry/route/invocation/SDK factories and method tables, including independently compiled consumers.",
+    "Formal native sanitizer, G04 lifecycle event trace/fault matrix and G07 resource/size/performance evidence.",
+    "Native regressions for legacy SDK1 and other earlier T14 focused suites; including their private fixture fragments does not execute them.",
+    "Production module promotion, full T14 stage acceptance and protected remote release remain blocked."
+  ],
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept fixed local native matrix/runtime/archive/source publication evidence only; retain GAP-010 partial and T14 incomplete.",
+    "risks": [
+      "Raw experimental source branch includes test-scoped code; it is not production admission or a passing design-only root G00 claim.",
+      "The SDK2 registry uses explicit static construction; this is not JS/TS plugin ABI compatibility or arbitrary untrusted native isolation.",
+      "Tests and archive restoration do not establish full sanitizer/resource/performance gates; restored bytes/preflight/retained verify are not a fresh archive rebuild.",
+      "Local pinned controller/image and self-review do not provide server-side prevention of bypass."
+    ]
+  },
+  "summary_sha256": "9a3512dd5fe445d5e614348fae0c7814bb2f370e07cc73a884c411d497d2e4f9"
+}

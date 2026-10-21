@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新候选SDK2已在独立C/C++插件、显式父参数方法和双runtime中完成本地验证；GAP-010仅部分解决，冻结原生验收仍未完成，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新 SDK2 已接入45模块/22组合的冻结原生矩阵：44构建、60次隔离运行通过，独立C/C++插件和GAS/C内存替换均实际运行。完整ABI guard/sanitizer/G04/G07及旧SDK专项原生回归待完成，GAP-010仍部分解决，T14整体与生产准入未完成。前文保留各历史候选范围，最新证据见末节。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -335,3 +335,17 @@ O0、O2、Oz 各运行 1196 场景、3242 次真实方法调用；完整 stdout 
 测试观察回调已在独立候选目录完成显式注入：sdk2_fixture_config 新增 expected/entered 指针，主程序按实例设置，独立 C/C++ 插件经 config 调用；删除对观察函数的反向外部导入。只改三个测试文件，生产实现/公开 SDK/宿主头不变。原 O0/O2 各1196场景/3242实际方法调用及完整输出逐字节保持一致，四个 C/C++ 对象 nm 确认无 sdk2_fixture_* 导入。此次没有通过允许依赖环来放行；完整原生 fixture 模块布局和声明图仍需接入后检查。
 
 最终自审还补充拒绝 .init/.fini/.preinit_array 节族，并用实际 C++ 对象负例验证 preinit_array；最终完整197项测试通过，已保留先前196项测试/批准记录及最终覆盖它的固定包。不得拿先前摘要批准最终不同的文件。
+
+## SDK2 正式登记的本地原生矩阵（2026-10-21）
+
+候选 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk2-uue0e85a`，登记 `t14-native-candidate.json`。保留T13全部20组合与原源码字节，再增加SDK2的GAS/C compiler.memory提供者两组合，共45模块/22组合、112份原生源码/头。原冻结v2配置的Clang→GAS→ld完成44次构建，native_matrix=PASS；隔离控制器按设计仍退出2、status/release=BLOCKED。固定controller `262c4b7675b820827fada3daf0129acd9acdfd7973f2a9225006b0a52ff0702a`，candidate `f042672bb95469ee81e9686cbed4c5d9204c8ee904ca63d7afb0b883b81915bc`，image `23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616`。
+
+真实执行共60次通过：保留旧分片/保护页负例，新增两提供者×debug/release四次各1196场景/3242实际方法调用，342 setup/306 cleanup/208业务嵌套、双runtime及取消/完成拒绝完整输出与原SDK2一致。不能把包含但未调用的旧SDK/route/entry测试函数算成专项回归已执行；这部分仍列为待办。
+
+编译器依赖记录确认，C/C++测试插件各只包含自身TU、固定SDK1/SDK2公开消费头和测试config头。七个独立消费头移位后字节摘要不变；C++对象只有六个C-linkage入口，debug的唯一未解析导入为memcpy，由当前选定compiler.memory模块解析，不依赖观察主程序/宿主控制头/私有实现。route/invocation/SDK共享私有geometry/query辅助代码，保留一个实现模块和三个query导出，没有为拆模块把私有头改公开。启动、PAL和主程序分离；C/C++测试入口取地址使用明确hidden声明，以匹配静态PIC测试交付，不新增GOT豁免或修改生产公开头。
+
+初始product范围实现到test内存替代者的声明被拒绝，新增T14实现现在明确test scope；未来生产提升仍需新审查，不能偷偷把测试提供者改成product。冻结控制器运行12项登记检查（1项正例、11项负例）：缺模式/缺C++插件/缺内存提供者、双提供者、绑定未选提供者、丢失SDK依赖、C++错误scope、SDK版本错误、未登记审查材料，以及客户端导入宿主/私有头均拒绝。
+
+44组保留产物由admission.verify重跑绑定、ELF与闭世界符号核对；完整301文件源码归档 `24909a9935444acbf1945c3fcc121b5048db34fba1a24e730a01fd42d394afcb` 恢复到新目录后，字节/mode及preflight输入一致。未声称归档恢复后重新构建。原生源码已发布实验分支 `codex/t14-native-sdk2-matrix`，提交 `0d045531e284eb74abbe3111b9965f8084951c58`；Git树清单与每份blob匹配固定候选，远端回读一致。初次Git行模式引用中文路径导致清单比较拒绝，改为NUL机器格式后通过，保留失败记录；不降低文件核对。
+
+结果见 `t14-native-evidence.json`；测试前固定控制器审查和测试后元数据包分开记录，同一Agent实施、自审。最终元数据控制包 `95c05a069af6a5ad2a5595ea830f2631145c4da7ab688dcf0247a884dceb521d` 不冒充原controller树pin。尚缺各宿主工厂/表的正式原生ABI guard、sanitizer、完整G04轨迹/故障矩阵与G07测量，以及旧SDK1/其他T14专项的原生回归。GAP-010保持PARTIALLY_RESOLVED，T14不勾选，生产/远端受保护放行继续BLOCKED。
