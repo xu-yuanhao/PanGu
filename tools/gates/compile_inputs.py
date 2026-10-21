@@ -89,7 +89,7 @@ def audit(root, manifest, compiler, compiler_sha256, link_probe=None, *, languag
             if assembler is not None:
                 assembly_dep = Path(temporary) / f"{index}.asm.d"
                 normalization = None
-                if language == ".c":
+                if language in {".c", ".cpp"}:
                     # Clang emits an unnumbered STT_FILE basename in addition to
                     # fully qualified DWARF .file rows. GAS --MD lists that row
                     # as a dependency, even though it never opens the basename.

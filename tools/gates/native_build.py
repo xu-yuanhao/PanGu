@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 from compile_inputs import C_FLAGS, audit, digest, inventory
-from link_graph import audit_objects, run
+from link_graph import audit_objects, run, symbols
 from module_graph import Invalid, validate
 from receipt import canonical
 from toolchain import output, validate_profile
@@ -27,11 +27,42 @@ ASSEMBLER_MODES = {"debug": {".c": ["--64", "--fatal-warnings"], ".S": ["--64", 
 FINAL_FLAGS = ["--fatal-warnings", "--no-undefined", "--build-id=none", "-static", "-z", "noexecstack", "-z", "relro", "-z", "now"]
 
 
+# Version 2 adds only a restricted test-consumer dialect; version 1 stays byte-for-byte policy compatible.
+CPP_NATIVE = ["-x", "c++", "-std=c++20", "-nostdinc", "-nostdinc++", "-Wall", "-Wextra", "-Werror", "-pedantic-errors",
+              "-I", ".", "-ffreestanding", "-fno-builtin", "-fno-stack-protector", "-fvisibility=hidden", "-fPIC",
+              "-fno-integrated-as", "-fno-addrsig", "-fno-exceptions", "-fno-rtti", "-fno-threadsafe-statics",
+              "-fno-unwind-tables", "-fno-asynchronous-unwind-tables"]
+CPP_MODES = {mode: dict(languages, **{".cpp": CPP_NATIVE + (["-O0", "-g"] if mode == "debug" else ["-Oz"])})
+             for mode, languages in MODES.items()}
+CPP_ASSEMBLER_MODES = {mode: dict(languages, **{".cpp": languages[".c"][:]})
+                       for mode, languages in ASSEMBLER_MODES.items()}
+
+
+def profile_modes(profile):
+    if profile["schema"] == "pangu.native-probe-toolchain.v1":
+        return MODES, ASSEMBLER_MODES
+    if profile["schema"] == "pangu.native-test-cpp-toolchain.v2":
+        return CPP_MODES, CPP_ASSEMBLER_MODES
+    raise Invalid("unsupported native toolchain schema")
+
+
+def inspect_cpp_object(path, nm, disassembler):
+    text = run([str(disassembler), "--section-headers", str(path)])
+    sections = {m[1] for line in text.splitlines() if (m := re.match(r"\s*\d+\s+(\S+)\s+[0-9a-fA-F]+\s", line))}
+    if not sections or any(name.startswith((".init", ".fini", ".preinit_array", ".ctors", ".dtors", ".eh_frame",
+                                           ".gcc_except_table", ".tdata", ".tbss")) for name in sections):
+        raise Invalid("C++ test object has forbidden initialization, unwind or TLS section")
+    defined, undefined = symbols(nm, path)
+    if any(name.startswith("_Z") for name in defined | undefined):
+        raise Invalid("C++ test boundary requires C-linkage global symbols")
+    return {"cpp_test_object": "PASS", "sections": sorted(sections), "defined": sorted(defined), "undefined": sorted(undefined)}
+
+
 def validate_native_profile(profile):
     if not isinstance(profile, dict) or set(profile) != {"schema", "status", "host", "compiler_target", "modes", "assembler_modes", "final_flags", "tools"}:
         raise Invalid("unknown native toolchain fields")
-    if (profile["schema"] != "pangu.native-probe-toolchain.v1" or profile["modes"] != MODES
-            or profile["assembler_modes"] != ASSEMBLER_MODES or profile["final_flags"] != FINAL_FLAGS):
+    modes, assembler_modes = profile_modes(profile)
+    if (profile["modes"] != modes or profile["assembler_modes"] != assembler_modes or profile["final_flags"] != FINAL_FLAGS):
         raise Invalid("unsupported native language, mode or flags")
     if not isinstance(profile["tools"], dict) or set(profile["tools"]) != {"compiler", "assembler", "nm", "linker", "disassembler", "debugger"}:
         raise Invalid("incomplete native tools")
@@ -94,21 +125,27 @@ def build(root, manifest, exports, profile, profile_pin, mode, entry, destinatio
     if hashlib.sha256(canonical(profile)).hexdigest() != profile_pin:
         raise Invalid("native toolchain pin mismatch")
     validate_native_profile(profile)
-    if mode not in MODES or not isinstance(entry, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", entry):
+    modes, assembler_modes = profile_modes(profile)
+    if mode not in modes or not isinstance(entry, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", entry):
         raise Invalid("invalid build mode or entry symbol")
     modules, owners = validate(manifest)
+    for source, owner in owners.items():
+        if Path(source).suffix == ".cpp" and modules[owner]["scope"] != "test":
+            raise Invalid("C++ native probe is restricted to test modules")
     tools = profile["tools"]
     link = {"exports": exports}
     for name in ("nm", "linker"):
         link[name], link[name + "_sha256"] = tools[name]["path"], tools[name]["sha256"]
     flags = {language: values + ["-ffile-prefix-map=" + str(root) + "=.", "-fdebug-compilation-dir=."]
-             for language, values in MODES[mode].items()}
+             for language, values in modes[mode].items()}
     destination.mkdir()
     artifacts = {}
 
     def final(objects, temporary):
-        instructions, retained = {}, {}
+        instructions, retained, cpp = {}, {}, {}
         for source, obj in objects.items():
+            if Path(source).suffix == ".cpp":
+                cpp[source] = inspect_cpp_object(obj, tools["nm"]["path"], tools["disassembler"]["path"])
             text = run([tools["disassembler"]["path"], "-d", "--no-show-raw-insn", "--x86-asm-syntax=intel", str(obj)])
             for line in text.splitlines():
                 match = re.match(r"\s*[0-9a-f]+:\s+(syscall|sysenter|int)\b", line)
@@ -129,12 +166,12 @@ def build(root, manifest, exports, profile, profile_pin, mode, entry, destinatio
             artifacts[target.name] = digest(target)
         (destination / "disassembly.json").write_bytes(canonical(instructions) + b"\n")
         artifacts["disassembly.json"] = digest(destination / "disassembly.json")
-        return {"elf": elf, "command": command, "instruction_audit": "PASS", "retained_objects": retained}
+        return {"elf": elf, "command": command, "instruction_audit": "PASS", "retained_objects": retained, "cpp_test_objects": cpp}
 
     report = audit(root, manifest, tools["compiler"]["path"], tools["compiler"]["sha256"], link,
                    language_flags=flags, inspect_objects=final,
                    assembler_probe={"path": tools["assembler"]["path"], "sha256": tools["assembler"]["sha256"],
-                                    "flags": ASSEMBLER_MODES[mode]})
+                                    "flags": assembler_modes[mode]})
     validate_native_profile(profile)
     report.update({"schema": "pangu.native-build-probe.v1", "mode": mode, "entry_symbol": entry, "toolchain_profile_sha256": profile_pin,
                    "toolchain_profile": profile, "artifacts": artifacts, "native_static_build": "PASS",
@@ -150,7 +187,7 @@ def verify_build(root, manifest, exports, profile, profile_pin, mode, entry, des
         raise Invalid("native receipt digest mismatch")
     report = json.loads(path.read_text())
     validate_native_profile(profile)
-    _, owners = validate(manifest)
+    modules, owners = validate(manifest)
     if (report["schema"] != "pangu.native-build-probe.v1" or report["status"] != "BLOCKED"
             or report["release"] != "BLOCKED" or report["native_static_build"] != "PASS"
             or report["mode"] != mode or report["entry_symbol"] != entry
@@ -182,6 +219,14 @@ def verify_build(root, manifest, exports, profile, profile_pin, mode, entry, des
     for source, obj in objects.items():
         if obj.name not in artifacts or digest(obj) != report["object_sha256"][source]:
             raise Invalid("retained object does not match compilation")
+    checked_cpp = {}
+    for source, obj in objects.items():
+        if Path(source).suffix == ".cpp":
+            if modules[owners[source]]["scope"] != "test":
+                raise Invalid("C++ native probe is restricted to test modules")
+            checked_cpp[source] = inspect_cpp_object(obj, profile["tools"]["nm"]["path"], profile["tools"]["disassembler"]["path"])
+    if checked_cpp != final.get("cpp_test_objects", {}):
+        raise Invalid("retained C++ test object evidence mismatch")
     with tempfile.TemporaryDirectory(prefix="pangu-link-recheck-") as temporary:
         checked = audit_objects(manifest, exports, objects, profile["tools"]["nm"]["path"],
                                 profile["tools"]["linker"]["path"], Path(temporary) / "combined.o")

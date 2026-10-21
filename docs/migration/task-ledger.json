@@ -1379,6 +1379,27 @@
           "reviewer": "same Agent as implementer",
           "review_record_sha256": "b4d463221382a0790007339907e6e92162a923db5c7da892e47cf6762c4a5f28",
           "production_admission": false
+        },
+        "cpp_test_admission_candidate": {
+          "record": "docs/migration/t14-cpp-admission-candidate.json",
+          "status": "LOCAL_GATES_AND_V2_IMAGE_VERIFIED_SDK2_MATRIX_PENDING",
+          "control_package_sha256": "dd0e76769f6a1951d16a5353c111e78355a3300d3fa00f5c33b2ef0631559686",
+          "control_package_files": {
+            "tools/gates/native_build.py": "ae83d9ef6641db7380a8f5ebc212a7e6c5e4bc542011b3041a302d51930778cc",
+            "tools/gates/compile_inputs.py": "63ddc370a00c6224027323f0c0fb783a25cd660c204bc7941c7cc497e4bf1fb4",
+            "tools/gates/admission.py": "eac956476dc4309f2b1f1a8054ccc8aba14508fd2b808b1e4498c457c37ca47f",
+            "tools/gates/test_native_cpp.py": "6e4831bcab28f16e676e4af1b43a12ca453ebecfd498df08b954f091dffd7b1c",
+            "tools/gates/test_admission.py": "085b096858ff949fd383dc2305e69f3c5d1343a979f7edb02af5e5cdaf376801",
+            "governance/native-test-cpp-toolchain.json": "c37cad26e730414270f4a11e5f9b17b1f4e55c9ee2482f31b34ad2b2e57a4713",
+            "docs/migration/t14-cpp-admission-candidate.json": "35bb7a3d1a163c54bd0f962b1c73aad380d947e66f1c93032b3ab353cd762eae",
+            "governance/bootstrap-policy.json": "d4325f75767e355873bf62c0402dbe194d9f32a47b1be838e5111a9038fb6ebc"
+          },
+          "review_record_sha256": "86260685aec4185972c1f7291eadc09310b3dc3538f9734e812805cb4b26d066",
+          "reviewer": "same Agent as implementer",
+          "production_admission": false,
+          "gate_tests": 197,
+          "test_fixture_callback_review_sha256": "33bb244a768db5c51e9b9ad44661fd83e5acd85853553fce5451c9f06f88a047",
+          "test_fixture_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s"
         }
       }
     },

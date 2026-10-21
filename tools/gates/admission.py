@@ -22,7 +22,7 @@ from service_graph import resolve
 CORE = {"id", "role", "scope", "files", "public_headers", "dependencies"}
 DETAIL = {"source_root", "responsibility", "non_responsibilities", "boundary", "languages", "exports", "targets",
           "linkage", "compositions", "activation_condition", "lifecycle", "provides", "requires", "third_party_dependencies", "budgets", "required_modules"}
-LANGUAGES = {".c": "c17", ".h": "c-header", ".S": "gas"}
+LANGUAGES = {".c": "c17", ".h": "c-header", ".S": "gas", ".cpp": "c++20"}
 CONTROL_KINDS = {"control", "gate", "gate-test", "instructions"}
 MISSING = ["independent control approval", "protected status publisher", "stage-specific ABI/runtime/performance gates"]
 
@@ -91,6 +91,8 @@ def registry(value, base_files):
             raise Invalid("source ownership overlaps root or control file")
         if any(PurePosixPath(p).suffix not in LANGUAGES for p in m["files"]):
             raise Invalid("native admission language not implemented")
+        if any(PurePosixPath(p).suffix == ".cpp" for p in m["files"]) and m["scope"] != "test":
+            raise Invalid("C++ native probe is restricted to test modules")
         strings(m["languages"], "module languages")
         if set(m["languages"]) != {LANGUAGES[PurePosixPath(p).suffix] for p in m["files"]}:
             raise Invalid("declared languages do not match compilation inputs")

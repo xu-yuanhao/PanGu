@@ -321,3 +321,17 @@ O0、O2、Oz 各运行 1196 场景、3242 次真实方法调用；完整 stdout 
 保留三次失败：初始 C 测试直接取外部函数地址生成 GOT 导入，改为测试汇编显式 RIP-relative ABI 桥；初始执行错误地直接启动不可执行保留 ELF，重放按既有流程执行另存副本；guard 负例重复链接 probe_exit，改为仅引导 main 的独立启动对象。不降低告警、不新增 GOT 豁免、不改变冻结工具链或超时。
 
 固定 summary SHA256 `377862e2096b2c36510bf53d7ff435b73e6db295e8362e4a1a62be0cc4e9019e`；控制包（仅候选登记 JSON 与新增文件登记）SHA256 `fd5befdd358de140f6baa9010f959d8954f3d60ea03b386fa2b544d1a2435fd7`。本次由同一 Agent 实施、自审并批准本地后续登记用途，具体差异/摘要/证据/风险见候选 JSON 与目录内 control-review.json，不伪称独立批准。尚未接入完整 T14 的 native-admission registry 与组合矩阵，旧 ABI/SDK 回归、正式 sanitizer/G04/G07/性能验收仍待完成。GAP-010 继续部分解决；不能据此完成 T14 或生产放行。
+
+## 独立 C++ 测试插件的版本化准入（2026-10-21）
+
+原 native-admission 只实现 C17/GAS，不能把此前手工编译的 C++ 插件算作矩阵准入。本次新增独立 `pangu.native-test-cpp-toolchain.v2` 与 `governance/native-test-cpp-toolchain.json`，保留旧 v1 文件、C17/GAS 参数和 linker 参数。只准许 `.cpp`/c++20 的 test 模块，product/development 仍拒绝；没有放行 Qt、标准库、异常、RTTI、unwind、隐式初始化/TLS或跨模块 C++ mangled global。实际对象节与符号检查还会在保留产物复核时重跑，不能删掉回执里的 C++ 证据冒充通过。
+
+已有编译器输入采集仍检查每一份实际 include 和 GAS 依赖，只将原来处理 C 的精确 STT_FILE 元数据规则同样用于 C++，不丢弃真实依赖。完整门禁自测 197 项通过（原 181 项及新增 13 项 C++、3 项 admission），其中实际执行 C++ debug/release 构建/运行、两模式 admission 矩阵和保留产物复核，并验证旧 v1 仍拒绝 C++、非 test scope、危险参数/节/符号、异常/标准库、声明不符及缺失对象证据。G00 自测另运行 13 项通过。
+
+新冻结镜像 `/home/xu-yuanhao/Documents/PanGu-artifacts/toolchain/frozen-cpp-jyz6w466/image`，SHA256 `23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616`，profile SHA256 `04b3b0bef42d095cdebeff128bf0d4a76b5b2878d15a6e25511ee1f63d54eb8f`；1816 份工具/库载荷和 bwrap 身份与旧镜像逐项完全相同，只有新增配置的 profile 绑定改变，不引入 C++ 运行库。此镜像是本地工具链固定，不等于远端信任根已部署。
+
+最终控制包 SHA256 `dd0e76769f6a1951d16a5353c111e78355a3300d3fa00f5c33b2ef0631559686`，逐文件摘要、差异、测试日志、风险和同一 Agent 自审批准在 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-cpp-admission-e367lwks`；未冒充独立审核。尚未接入完整 SDK2 原生模块矩阵：原测试客户端的两个观察函数反向导入主程序，与主程序导入插件形成环；应改为测试 config 中显式注入回调，保留所有原断言/场景并验证计数一致，不能把环登记为允许。T14/GAP-010 整体状态不变。
+
+测试观察回调已在独立候选目录完成显式注入：sdk2_fixture_config 新增 expected/entered 指针，主程序按实例设置，独立 C/C++ 插件经 config 调用；删除对观察函数的反向外部导入。只改三个测试文件，生产实现/公开 SDK/宿主头不变。原 O0/O2 各1196场景/3242实际方法调用及完整输出逐字节保持一致，四个 C/C++ 对象 nm 确认无 sdk2_fixture_* 导入。此次没有通过允许依赖环来放行；完整原生 fixture 模块布局和声明图仍需接入后检查。
+
+最终自审还补充拒绝 .init/.fini/.preinit_array 节族，并用实际 C++ 对象负例验证 preinit_array；最终完整197项测试通过，已保留先前196项测试/批准记录及最终覆盖它的固定包。不得拿先前摘要批准最终不同的文件。

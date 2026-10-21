@@ -73,6 +73,37 @@ class AdmissionTests(unittest.TestCase):
         return execute(self.candidate, self.controller, policy_pin, controller_pin,
                        "governance/native-admission.json", output or self.base / "build")
 
+    def test_cpp_test_module_registry_and_real_v2_matrix(self):
+        from native_build import CPP_MODES, CPP_ASSEMBLER_MODES
+        self.proposal["modules"][1]["files"] = ["src/answer/answer.cpp"]
+        self.proposal["modules"][1]["languages"] = ["c++20"]
+        (self.candidate / "src/answer/answer.c").unlink()
+        (self.candidate / "src/answer/answer.cpp").write_text('extern "C" int answer() {return 7;}\n')
+        path = self.controller / "governance/native-probe-toolchain.json"
+        profile = json.loads(path.read_text())
+        profile.update(schema="pangu.native-test-cpp-toolchain.v2", modes=CPP_MODES, assembler_modes=CPP_ASSEMBLER_MODES)
+        path.write_bytes(canonical(profile))
+        shutil.copyfile(path, self.candidate / "governance/native-probe-toolchain.json")
+        self.save()
+        report = self.invoke()
+        self.assertEqual(report["native_matrix"], "PASS")
+        self.assertEqual(len(report["builds"]), 2)
+        self.assertEqual(self.recheck()["verified_builds"], 2)
+        self.assertEqual(report["release"], "BLOCKED")
+
+    def test_cpp_registry_non_test_module_rejected(self):
+        self.proposal["modules"][1]["files"] = ["src/answer/answer.cpp"]
+        self.proposal["modules"][1]["languages"] = ["c++20"]
+        for scope in ("product", "development"):
+            self.proposal["modules"][1]["scope"] = scope
+            with self.subTest(scope=scope), self.assertRaisesRegex(Invalid, "restricted to test"):
+                registry(self.proposal, self.policy["files"])
+
+    def test_cpp_language_declaration_mismatch_rejected(self):
+        self.proposal["modules"][1]["files"] = ["src/answer/answer.cpp"]
+        with self.assertRaisesRegex(Invalid, "declared languages"):
+            registry(self.proposal, self.policy["files"])
+
     def test_real_matrix_and_pinned_candidate_controls(self):
         report = self.invoke()
         self.assertEqual(report["native_matrix"], "PASS")
