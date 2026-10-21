@@ -1,0 +1,2199 @@
+{
+  "schema": "pangu.t14-sdk1-native-evidence.v1",
+  "status": "SDK1_NATIVE_VALID_PATH_AND_ABI_GUARDS_PASS_FULL_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx",
+  "registry": "docs/migration/t14-sdk1-native-candidate.json",
+  "registry_sha256": "12cc65b3659ec3591d1a9a3e8ec13beb502c05da4798ded62ffa8efa55a17cb6",
+  "controller_sha256": "c6bcc201a0954c630e85a826ec9a25faa3b8a02034038d580095e11c2474b3b5",
+  "policy_sha256": "3e4e928d291a3f92dddc630c52f9b3a4e2deca82012e026be642eff0237c3198",
+  "candidate_tree_sha256": "06fdeea90c951736594c538a960bbfdb2634509c8902b858eda9390f837f8214",
+  "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+  "module_count": 58,
+  "composition_count": 28,
+  "native_source_files": 144,
+  "native_matrix": "PASS",
+  "builds": 56,
+  "executions": 72,
+  "sdk1_runs": 8,
+  "sdk1_guard_runs": 4,
+  "sdk1_baseline_counters": {
+    "sdk_cases": 824,
+    "setup_calls": 598,
+    "cleanup_calls": 608,
+    "business_calls": 588,
+    "c_plugin_calls": 897,
+    "cpp_plugin_calls": 897,
+    "refusals": 6299,
+    "alias_refusals": 16428,
+    "state_snapshot_checks": 9803,
+    "operation_budget_refusals": 7710,
+    "bind_budget_refusals": 388,
+    "deferred_setups": 198,
+    "async_cleanups": 432,
+    "nested_setup_gap": 144,
+    "nested_cleanup_gap": 144,
+    "nested_business_calls": 168
+  },
+  "sdk1_normal_stdout_exact_reference": true,
+  "sdk1_guard_first_line_exact_reference": true,
+  "sdk1_guard_per_run": {
+    "abi_calls": 122627,
+    "new_target_slots": 18,
+    "host_and_factory_and_new_slots": 55,
+    "corruption_self_tests": 10,
+    "forwarding_self_tests": 2,
+    "tracked_sdk_consumptions": 1794,
+    "all_service_evaluate_calls_including_nested": 1962,
+    "nested_business_calls": 168
+  },
+  "coverage": {
+    "sdk1-abi-guard-asm-debug": {
+      "0": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "10": {
+        "calls": 3241,
+        "zero": 3240,
+        "other": 1
+      },
+      "11": {
+        "calls": 1283,
+        "zero": 1282,
+        "other": 1
+      },
+      "12": {
+        "calls": 463,
+        "zero": 462,
+        "other": 1
+      },
+      "13": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "14": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "15": {
+        "calls": 825,
+        "zero": 0,
+        "other": 825
+      },
+      "16": {
+        "calls": 11997,
+        "zero": 808,
+        "other": 11189
+      },
+      "17": {
+        "calls": 16045,
+        "zero": 808,
+        "other": 15237
+      },
+      "18": {
+        "calls": 4949,
+        "zero": 4504,
+        "other": 445
+      },
+      "19": {
+        "calls": 381,
+        "zero": 380,
+        "other": 1
+      },
+      "20": {
+        "calls": 777,
+        "zero": 380,
+        "other": 397
+      },
+      "21": {
+        "calls": 2401,
+        "zero": 2256,
+        "other": 145
+      },
+      "22": {
+        "calls": 485,
+        "zero": 462,
+        "other": 23
+      },
+      "23": {
+        "calls": 1211,
+        "zero": 1200,
+        "other": 11
+      },
+      "24": {
+        "calls": 611,
+        "zero": 598,
+        "other": 13
+      },
+      "25": {
+        "calls": 619,
+        "zero": 608,
+        "other": 11
+      },
+      "26": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "27": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "28": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "29": {
+        "calls": 2851,
+        "zero": 1734,
+        "other": 1117
+      },
+      "30": {
+        "calls": 3753,
+        "zero": 2406,
+        "other": 1347
+      },
+      "31": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "32": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "33": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "34": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "35": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "36": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "37": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "38": {
+        "calls": 1213,
+        "zero": 824,
+        "other": 389
+      },
+      "39": {
+        "calls": 3489,
+        "zero": 1356,
+        "other": 2133
+      },
+      "40": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "41": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "96": {
+        "calls": 3280,
+        "zero": 1734,
+        "other": 1546
+      },
+      "97": {
+        "calls": 12778,
+        "zero": 3772,
+        "other": 9006
+      },
+      "98": {
+        "calls": 12728,
+        "zero": 2406,
+        "other": 10322
+      },
+      "99": {
+        "calls": 5028,
+        "zero": 2406,
+        "other": 2622
+      },
+      "100": {
+        "calls": 6152,
+        "zero": 380,
+        "other": 5772
+      },
+      "101": {
+        "calls": 1311,
+        "zero": 380,
+        "other": 931
+      },
+      "102": {
+        "calls": 1038,
+        "zero": 462,
+        "other": 576
+      },
+      "104": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "105": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "106": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "107": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "108": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "109": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "110": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "111": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "112": {
+        "calls": 1794,
+        "zero": 1794,
+        "other": 0
+      },
+      "113": {
+        "calls": 466,
+        "zero": 466,
+        "other": 0
+      },
+      "114": {
+        "calls": 1962,
+        "zero": 1962,
+        "other": 0
+      }
+    },
+    "sdk1-abi-guard-asm-release": {
+      "0": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "10": {
+        "calls": 3241,
+        "zero": 3240,
+        "other": 1
+      },
+      "11": {
+        "calls": 1283,
+        "zero": 1282,
+        "other": 1
+      },
+      "12": {
+        "calls": 463,
+        "zero": 462,
+        "other": 1
+      },
+      "13": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "14": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "15": {
+        "calls": 825,
+        "zero": 0,
+        "other": 825
+      },
+      "16": {
+        "calls": 11997,
+        "zero": 808,
+        "other": 11189
+      },
+      "17": {
+        "calls": 16045,
+        "zero": 808,
+        "other": 15237
+      },
+      "18": {
+        "calls": 4949,
+        "zero": 4504,
+        "other": 445
+      },
+      "19": {
+        "calls": 381,
+        "zero": 380,
+        "other": 1
+      },
+      "20": {
+        "calls": 777,
+        "zero": 380,
+        "other": 397
+      },
+      "21": {
+        "calls": 2401,
+        "zero": 2256,
+        "other": 145
+      },
+      "22": {
+        "calls": 485,
+        "zero": 462,
+        "other": 23
+      },
+      "23": {
+        "calls": 1211,
+        "zero": 1200,
+        "other": 11
+      },
+      "24": {
+        "calls": 611,
+        "zero": 598,
+        "other": 13
+      },
+      "25": {
+        "calls": 619,
+        "zero": 608,
+        "other": 11
+      },
+      "26": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "27": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "28": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "29": {
+        "calls": 2851,
+        "zero": 1734,
+        "other": 1117
+      },
+      "30": {
+        "calls": 3753,
+        "zero": 2406,
+        "other": 1347
+      },
+      "31": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "32": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "33": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "34": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "35": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "36": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "37": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "38": {
+        "calls": 1213,
+        "zero": 824,
+        "other": 389
+      },
+      "39": {
+        "calls": 3489,
+        "zero": 1356,
+        "other": 2133
+      },
+      "40": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "41": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "96": {
+        "calls": 3280,
+        "zero": 1734,
+        "other": 1546
+      },
+      "97": {
+        "calls": 12778,
+        "zero": 3772,
+        "other": 9006
+      },
+      "98": {
+        "calls": 12728,
+        "zero": 2406,
+        "other": 10322
+      },
+      "99": {
+        "calls": 5028,
+        "zero": 2406,
+        "other": 2622
+      },
+      "100": {
+        "calls": 6152,
+        "zero": 380,
+        "other": 5772
+      },
+      "101": {
+        "calls": 1311,
+        "zero": 380,
+        "other": 931
+      },
+      "102": {
+        "calls": 1038,
+        "zero": 462,
+        "other": 576
+      },
+      "104": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "105": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "106": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "107": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "108": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "109": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "110": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "111": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "112": {
+        "calls": 1794,
+        "zero": 1794,
+        "other": 0
+      },
+      "113": {
+        "calls": 466,
+        "zero": 466,
+        "other": 0
+      },
+      "114": {
+        "calls": 1962,
+        "zero": 1962,
+        "other": 0
+      }
+    },
+    "sdk1-abi-guard-alternate-debug": {
+      "0": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "10": {
+        "calls": 3241,
+        "zero": 3240,
+        "other": 1
+      },
+      "11": {
+        "calls": 1283,
+        "zero": 1282,
+        "other": 1
+      },
+      "12": {
+        "calls": 463,
+        "zero": 462,
+        "other": 1
+      },
+      "13": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "14": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "15": {
+        "calls": 825,
+        "zero": 0,
+        "other": 825
+      },
+      "16": {
+        "calls": 11997,
+        "zero": 808,
+        "other": 11189
+      },
+      "17": {
+        "calls": 16045,
+        "zero": 808,
+        "other": 15237
+      },
+      "18": {
+        "calls": 4949,
+        "zero": 4504,
+        "other": 445
+      },
+      "19": {
+        "calls": 381,
+        "zero": 380,
+        "other": 1
+      },
+      "20": {
+        "calls": 777,
+        "zero": 380,
+        "other": 397
+      },
+      "21": {
+        "calls": 2401,
+        "zero": 2256,
+        "other": 145
+      },
+      "22": {
+        "calls": 485,
+        "zero": 462,
+        "other": 23
+      },
+      "23": {
+        "calls": 1211,
+        "zero": 1200,
+        "other": 11
+      },
+      "24": {
+        "calls": 611,
+        "zero": 598,
+        "other": 13
+      },
+      "25": {
+        "calls": 619,
+        "zero": 608,
+        "other": 11
+      },
+      "26": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "27": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "28": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "29": {
+        "calls": 2851,
+        "zero": 1734,
+        "other": 1117
+      },
+      "30": {
+        "calls": 3753,
+        "zero": 2406,
+        "other": 1347
+      },
+      "31": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "32": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "33": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "34": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "35": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "36": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "37": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "38": {
+        "calls": 1213,
+        "zero": 824,
+        "other": 389
+      },
+      "39": {
+        "calls": 3489,
+        "zero": 1356,
+        "other": 2133
+      },
+      "40": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "41": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "96": {
+        "calls": 3280,
+        "zero": 1734,
+        "other": 1546
+      },
+      "97": {
+        "calls": 12778,
+        "zero": 3772,
+        "other": 9006
+      },
+      "98": {
+        "calls": 12728,
+        "zero": 2406,
+        "other": 10322
+      },
+      "99": {
+        "calls": 5028,
+        "zero": 2406,
+        "other": 2622
+      },
+      "100": {
+        "calls": 6152,
+        "zero": 380,
+        "other": 5772
+      },
+      "101": {
+        "calls": 1311,
+        "zero": 380,
+        "other": 931
+      },
+      "102": {
+        "calls": 1038,
+        "zero": 462,
+        "other": 576
+      },
+      "104": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "105": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "106": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "107": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "108": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "109": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "110": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "111": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "112": {
+        "calls": 1794,
+        "zero": 1794,
+        "other": 0
+      },
+      "113": {
+        "calls": 466,
+        "zero": 466,
+        "other": 0
+      },
+      "114": {
+        "calls": 1962,
+        "zero": 1962,
+        "other": 0
+      }
+    },
+    "sdk1-abi-guard-alternate-release": {
+      "0": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "1": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "2": {
+        "calls": 644,
+        "zero": 642,
+        "other": 2
+      },
+      "3": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "4": {
+        "calls": 648,
+        "zero": 644,
+        "other": 4
+      },
+      "10": {
+        "calls": 3241,
+        "zero": 3240,
+        "other": 1
+      },
+      "11": {
+        "calls": 1283,
+        "zero": 1282,
+        "other": 1
+      },
+      "12": {
+        "calls": 463,
+        "zero": 462,
+        "other": 1
+      },
+      "13": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "14": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "15": {
+        "calls": 825,
+        "zero": 0,
+        "other": 825
+      },
+      "16": {
+        "calls": 11997,
+        "zero": 808,
+        "other": 11189
+      },
+      "17": {
+        "calls": 16045,
+        "zero": 808,
+        "other": 15237
+      },
+      "18": {
+        "calls": 4949,
+        "zero": 4504,
+        "other": 445
+      },
+      "19": {
+        "calls": 381,
+        "zero": 380,
+        "other": 1
+      },
+      "20": {
+        "calls": 777,
+        "zero": 380,
+        "other": 397
+      },
+      "21": {
+        "calls": 2401,
+        "zero": 2256,
+        "other": 145
+      },
+      "22": {
+        "calls": 485,
+        "zero": 462,
+        "other": 23
+      },
+      "23": {
+        "calls": 1211,
+        "zero": 1200,
+        "other": 11
+      },
+      "24": {
+        "calls": 611,
+        "zero": 598,
+        "other": 13
+      },
+      "25": {
+        "calls": 619,
+        "zero": 608,
+        "other": 11
+      },
+      "26": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "27": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "28": {
+        "calls": 825,
+        "zero": 824,
+        "other": 1
+      },
+      "29": {
+        "calls": 2851,
+        "zero": 1734,
+        "other": 1117
+      },
+      "30": {
+        "calls": 3753,
+        "zero": 2406,
+        "other": 1347
+      },
+      "31": {
+        "calls": 4201,
+        "zero": 2406,
+        "other": 1795
+      },
+      "32": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "33": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "34": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "35": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "36": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "37": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "38": {
+        "calls": 1213,
+        "zero": 824,
+        "other": 389
+      },
+      "39": {
+        "calls": 3489,
+        "zero": 1356,
+        "other": 2133
+      },
+      "40": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "41": {
+        "calls": 1,
+        "zero": 0,
+        "other": 1
+      },
+      "96": {
+        "calls": 3280,
+        "zero": 1734,
+        "other": 1546
+      },
+      "97": {
+        "calls": 12778,
+        "zero": 3772,
+        "other": 9006
+      },
+      "98": {
+        "calls": 12728,
+        "zero": 2406,
+        "other": 10322
+      },
+      "99": {
+        "calls": 5028,
+        "zero": 2406,
+        "other": 2622
+      },
+      "100": {
+        "calls": 6152,
+        "zero": 380,
+        "other": 5772
+      },
+      "101": {
+        "calls": 1311,
+        "zero": 380,
+        "other": 931
+      },
+      "102": {
+        "calls": 1038,
+        "zero": 462,
+        "other": 576
+      },
+      "104": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "105": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "106": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "107": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "108": {
+        "calls": 872,
+        "zero": 678,
+        "other": 194
+      },
+      "109": {
+        "calls": 95,
+        "zero": 95,
+        "other": 0
+      },
+      "110": {
+        "calls": 872,
+        "zero": 637,
+        "other": 235
+      },
+      "111": {
+        "calls": 850,
+        "zero": 850,
+        "other": 0
+      },
+      "112": {
+        "calls": 1794,
+        "zero": 1794,
+        "other": 0
+      },
+      "113": {
+        "calls": 466,
+        "zero": 466,
+        "other": 0
+      },
+      "114": {
+        "calls": 1962,
+        "zero": 1962,
+        "other": 0
+      }
+    }
+  },
+  "sdk1_bind_valid_results_per_run": 824,
+  "all_seven_sdk1_methods_have_zero_and_nonzero_results": true,
+  "compile_evidence": {
+    "sdk1-native-asm-debug": {
+      "receipt_sha256": "4df741d1559e789384fecde6784599c403eada4ca8d458b7ecac07b3a0d7b567",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy",
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        }
+      }
+    },
+    "sdk1-native-asm-release": {
+      "receipt_sha256": "16c0deecc5006d1ddf42a8ab366351ad08c23f3c26f47b3d18d226424594d100",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        }
+      }
+    },
+    "sdk1-native-alternate-debug": {
+      "receipt_sha256": "ca7ab767736b67dca2313935fcf7c9d39e0c34618a422cbe2921ef5c0006247d",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy",
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        }
+      }
+    },
+    "sdk1-native-alternate-release": {
+      "receipt_sha256": "268e0f8b4950a99c1db730492eff494809cf4c23a5bf7c069ad43d4de56dbb14",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        }
+      }
+    },
+    "sdk1-abi-guard-asm-debug": {
+      "receipt_sha256": "398f588d041e88aaa4ea512606b9f6f9b78307b5e771d53010a4aebd360a0a23",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy",
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        },
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy"
+          ]
+        }
+      }
+    },
+    "sdk1-abi-guard-asm-release": {
+      "receipt_sha256": "84497d0790c15ea363feeb07faa1eb39e6c59f9f3a73c6db7c0eda5bacecde7d",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        },
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": []
+        }
+      }
+    },
+    "sdk1-abi-guard-alternate-debug": {
+      "receipt_sha256": "e4612a6fa03cdab05e1e09ebf018ef42a838203c5a135a285eb568067ec24b60",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy",
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        },
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".debug_abbrev",
+            ".debug_addr",
+            ".debug_frame",
+            ".debug_info",
+            ".debug_line",
+            ".debug_line_str",
+            ".debug_str",
+            ".debug_str_offsets",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.debug_addr",
+            ".rela.debug_frame",
+            ".rela.debug_info",
+            ".rela.debug_line",
+            ".rela.debug_str_offsets",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "memcpy"
+          ]
+        }
+      }
+    },
+    "sdk1-abi-guard-alternate-release": {
+      "receipt_sha256": "bcd008e1c844fe1a98890eed80aa9422d60a1a5c880af3c84d2d792f6a052429",
+      "client_and_interop_dependencies": {
+        "src/sdk1-client-c/client.c": [
+          "src/sdk1-client-c/client.c",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-client-cpp/client.cpp": [
+          "src/sdk1-client-cpp/client.cpp",
+          "src/t14-abi/client-plugin-sdk-v1.h",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h",
+          "src/t14-abi/sdk1-fixture.h"
+        ],
+        "src/sdk1-interop/provider.cpp": [
+          "src/sdk1-interop/provider.cpp",
+          "src/t14-abi/interop-contract-v1.h",
+          "src/t14-abi/interop-guard.h"
+        ]
+      },
+      "cpp_objects": {
+        "src/sdk1-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_sdk_cpp_fixture_dispose",
+            "pangu_sdk_cpp_fixture_entry",
+            "pangu_sdk_cpp_fixture_load",
+            "pangu_sdk_cpp_fixture_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_route_cpp_invoke"
+          ]
+        },
+        "src/sdk1-interop/provider.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "pangu_route_cpp_evaluate",
+            "pangu_route_cpp_invoke",
+            "pangu_route_cpp_set_guard"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": [
+            "pangu_cpp_provider_observed"
+          ]
+        },
+        "src/sdk2-client-cpp/client.cpp": {
+          "cpp_test_object": "PASS",
+          "defined": [
+            "sdk2_cpp_dispose",
+            "sdk2_cpp_drain",
+            "sdk2_cpp_entry",
+            "sdk2_cpp_evaluate",
+            "sdk2_cpp_load",
+            "sdk2_cpp_use"
+          ],
+          "sections": [
+            ".bss",
+            ".comment",
+            ".data",
+            ".note.GNU-stack",
+            ".note.gnu.property",
+            ".rela.text",
+            ".shstrtab",
+            ".strtab",
+            ".symtab",
+            ".text",
+            "00000000"
+          ],
+          "undefined": []
+        }
+      }
+    }
+  },
+  "fixed_consumer_sha256": {
+    "client-plugin-sdk-v1.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "interop-contract-v1.h": "f2c1f98325967f959e5af7bbfea7db18540df880934a79ed138cbed86faafa0a"
+  },
+  "production_implementation_and_host_public_headers_unchanged": {
+    "src/t14-abi/lifecycle.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+    "src/t14-abi/lifecycle-child.h": "3e3e421a3aeb53b4bef169bd64bb3d43b6fd0ce0fa8c8f229ae48d27fe3bda18",
+    "src/t14-abi/entry-bridge.h": "aa14f90f03d031c29405c997ead526ca06845f796c7798d95ec187162497504f",
+    "src/t14-abi/service-route.h": "8644771453a1e64b5ab8309ce3d6c6ea4fe61d61bcfa9acaa32396b0ba5643ef",
+    "src/t14-abi/invocation.h": "0963ab9aad63d1c0220405b672b96f3d0122ab92c69a8458ccf70bfe6a4f4cd3",
+    "src/t14-abi/invocation2.h": "51429efe341b5a88f78b31c00f516097ed3423643e2804799c1d51ffa1371ce1",
+    "src/t14-abi/plugin-host.h": "8478ce6cc69a924492dd453fe1b6c96bc0f3b4a29040640de043788f46fa8ecc",
+    "src/t14-abi/plugin-host2.h": "3a1dba8cdf878b1e9890676d9b642d62fee11ae74a04bd6217cad5d15224dc34",
+    "src/t14-abi/plugin-sdk.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "src/t14-abi/plugin-sdk2.h": "858865c90130564d8a5369325bcec5d8821c8c52491f9d7efbb009c48252e86a",
+    "src/t14-abi/client-plugin-sdk-v1.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+    "src/t14-abi/client-plugin-sdk2-v2.h": "53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e",
+    "src/t14-abi/client-abi-v1.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+    "src/t14-abi/client-entry-v1.h": "43d3d326f5124409622fd019d91c3361cd776ae391ea39fd4e15994fc86e0bc1",
+    "src/t14-abi/client-route-v1.h": "fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71",
+    "src/t14-abi/client-lifecycle-child-v2.h": "725b2d8252538bf9526e79689635a38c3d1a72c4e3d73c9409b8365bff4c03d7",
+    "src/t14-abi/client-invocation-v1.h": "bf370e97fe050f14c90ca3ead7577ec1798f7e980f164832177ecb829c387380",
+    "src/t14-abi/client-invocation-ext2-v2.h": "f7ebb6a5299ac50eee334240689382fa7005164b4cb893d6f9c1b51c7731aab0",
+    "src/t14-abi/client-plugin-host-v1.h": "f863ca97220db14ece58ecabb930a0816b4589135d6d69787ea6d2cf450e4c39",
+    "src/t14-abi/client-plugin-host2-v2.h": "31632eba6da861d48dfb60facb42588af1e52047c11e2cf9a03189804b3ac328",
+    "src/t14-lifecycle/lifecycle.c": "b1a65fbf302b99a03208137e05a46351ef4e387380b0c529bb1acd1a5a8a2edb",
+    "src/t14-lifecycle/lifecycle-child-private.h": "4c2522d2d1c1cff1facfd509e229c9c4d1df7d7dabc2cc4a617de23202c7d065",
+    "src/t14-entry/entry-bridge.c": "c4159e4051d2323ebb32d56c2bc354ac642610a25c19970d2b45dff3f6c6bfdb",
+    "src/t14-plugin-runtime/service-route.c": "c4c1e35d40d1995ef8da598356cec1e37d267edd2e59bed882617328af18aefe",
+    "src/t14-plugin-runtime/route-geometry-private.h": "90294709e8db6fee7306a71c10a38b80c0f4a6f945f405b58d0ad275517f10e5",
+    "src/t14-plugin-runtime/route-query-private.h": "daac0f624e680dcd5b53744a39c6b677a9a60840af615c5a635509deae52bfc9",
+    "src/t14-plugin-runtime/invocation.c": "5408d9bf2d495d1a5b63b65ab2c17b0e1ae6e2290ceaef09be33a6bdc9d996d8",
+    "src/t14-plugin-runtime/plugin-sdk.c": "a9ff403be2c3adbde0e54cc365daca570ab4d26ab564d9e8a5e82e8522cce226",
+    "src/compiler-memory/memory.S": "cd7d54167fd60be77ac0dfade0488e80a9e549105075f6e4690fb53b5f5ec1fb",
+    "src/compiler-memory-alternate/alternate.c": "d16492557aa568aac87620a694d3c1a3d79071a9ad9577262ecdab861cd512fe"
+  },
+  "test_adaptations": [
+    "Per-instance budget and expected observer callbacks injected; no reverse imports into harness.",
+    "Pure assert(opaque) observer moved unchanged in meaning to existing test assertion support module.",
+    "C++ interop guard function explicitly injected via test-only setter; no authority or implicit parent state.",
+    "Canonical SDK1 client table/contexts unchanged; direct calls forwarded via test guard callbacks.",
+    "Guarded alias probe retains actual original host1 table target.",
+    "Explicit host.plugin-sdk1 version1 service metadata records the existing ABI1 factory/table; no production implementation changed."
+  ],
+  "assert_counts": {
+    "original_main": 69,
+    "new_mains": {
+      "sdk1-probe": 68,
+      "sdk1-guard-probe": 68
+    },
+    "moved_observer_assertion": 1
+  },
+  "sdk1_nested_setup_cleanup_refusals_preserved": {
+    "setup": 144,
+    "cleanup": 144,
+    "reason": "ABI1 lacks explicit incoming parent scope; not silently reclassified as supported"
+  },
+  "sdk2_regressions": "Original SDK2 normal/guarded runs and exact counters preserved in same72-run verification.",
+  "execution_record_scope": {
+    "raw_receipt_status": "RUNNING",
+    "raw_operator_exit": 1,
+    "raw_operator_error": "Missing external SDK2 slot-map.json after all72 target processes ran.",
+    "final_verification": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/execution-verification.json",
+    "final_verification_status": "COMPLETE",
+    "reran_target_programs": false,
+    "raw_receipt_unmodified": true,
+    "note": "Final verifier rechecks original receipts and ELF digests, all original final assertions, plus exact normal SDK1 stdout. Missing file error not hidden as an original successful operator run."
+  },
+  "source_archive": {
+    "scope": "SOURCE_ARCHIVE_BYTES_PREFLIGHT_AND_RETAINED_NATIVE_ARTIFACT_VERIFY_NOT_FRESH_BUILD",
+    "source_tar_sha256": "513d5b92099642ce26fe1f6a74cdfb912a0c2caff55d9f8dd5d3edc747fffbd7",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/source-restored-nx0zdgq2",
+    "candidate_tree_sha256": "06fdeea90c951736594c538a960bbfdb2634509c8902b858eda9390f837f8214",
+    "file_count": 339,
+    "native_source_files": 144,
+    "restored_inputs_match": true,
+    "retained_native_verification": {
+      "admission_receipt_binding": "PASS",
+      "verified_builds": 56,
+      "native_matrix": "PASS",
+      "status": "BLOCKED",
+      "release": "BLOCKED"
+    },
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-21",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-native-sdk1-interop",
+    "commit": "a73eeba68ae867a039f4b8da60774cbf4fff7d3b",
+    "parent": "4e15f401360a02ed357efd193940cc806399c7ea",
+    "scope": "Fixed raw T14 native test candidate; no production/release admission",
+    "controller_sha256": "c6bcc201a0954c630e85a826ec9a25faa3b8a02034038d580095e11c2474b3b5",
+    "candidate_tree_sha256": "06fdeea90c951736594c538a960bbfdb2634509c8902b858eda9390f837f8214",
+    "native_source_files": 144,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "registry_checks": [
+    {
+      "case": "fixed-registry",
+      "result": "PASS"
+    },
+    {
+      "case": "missing-release-mode",
+      "result": "REJECTED",
+      "reason": "unknown modules or incomplete required build modes"
+    },
+    {
+      "case": "missing-cpp-plugin",
+      "result": "REJECTED",
+      "reason": "selected build is not dependency-closed"
+    },
+    {
+      "case": "missing-memory-provider",
+      "result": "REJECTED",
+      "reason": "required service missing from build composition"
+    },
+    {
+      "case": "two-memory-providers",
+      "result": "REJECTED",
+      "reason": "multiple providers in root scope; deselect alternatives"
+    },
+    {
+      "case": "unselected-memory-binding",
+      "result": "REJECTED",
+      "reason": "binding provider does not offer selected service"
+    },
+    {
+      "case": "missing-sdk-definition-dependency",
+      "result": "REJECTED",
+      "reason": "required modules must be declared allowed dependencies"
+    },
+    {
+      "case": "cpp-development-scope",
+      "result": "REJECTED",
+      "reason": "C++ native probe is restricted to test modules"
+    },
+    {
+      "case": "wrong-sdk-version",
+      "result": "REJECTED",
+      "reason": "service ABI version conflict"
+    },
+    {
+      "case": "unregistered-boundary-review",
+      "result": "REJECTED",
+      "reason": "boundary requires registered review evidence"
+    },
+    {
+      "case": "client-host-header",
+      "result": "REJECTED",
+      "reason": "undeclared include dependency"
+    },
+    {
+      "case": "client-private-runtime-header",
+      "result": "REJECTED",
+      "reason": "private header dependency"
+    }
+  ],
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/request.json": "fede4879ce117f535b611e9193deec47c534e54b5245879f3e677eec987d164e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/control-review.json": "2c466f3f27e65e7b35668bfb7566887489c3c83bb0a4047f7b2b60b460f96410",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/build/native/admission.json": "4e10354b874e81c7886e5f5bce361e38a9c0de5b4276ee59b7cf598315d8f3b3",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/build/isolation.json": "96254758826a88091fe5db6b0150ec9e4bd0725e5deae339dd83e9f68123f13e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/executions.json": "1a0d61f05404e3c6e3660d1d7e51b884b768e0b41f461da95ad0cfd43eec5dfd",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/execution-verification.json": "06a3820d46ec94030debee3a6a43aa1a5dccd08e85f88c6f66cc3f80f57999bf",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/execution-wrapper.log": "5bed1aa722cea23415ae3bc2e82df8645088f386ded719de424c75a898d0b256",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/verify-executions.py": "f57dd9e1aca378c1db40147eab29d55b3a54dbb331d86c5317a94f10372adec3",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/archive-verify.json": "49ad3ccaf20ce6e48996e99034573841acfc549a8a747255e75ad625a0922a02",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/negative-checks/results.json": "af67a513a2ae38378e219e9e9d21f2cb2f24724ab80b229ead1a7be346a69a3e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/negative-checks/isolation.json": "86f446252ebc342e11f9b0d2e43b1891fa8827705cdbe5fd46f02de4d7517127",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/publication.json": "bb41d5e1b579197dca75ca84964085cb1f4ab40d750ba3b0f52aa26bd112f4ce",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-native-sdk1-und1qxzx/smoke/execution.json": "eef4f3dab471dadd120586b51eeadc74a36249cee5aa6dbfceeac036edbdc47e"
+  },
+  "remaining": [
+    "Earlier focused T14 native regressions beyond this SDK1 suite, including standalone route/assembly consumers and budget/rollback probes.",
+    "Formal sanitizer modes with fault self-tests and source-bound evidence.",
+    "Complete G04 lifecycle event traces/fault matrix and G07 resource/size/performance measurement.",
+    "Full G03/T14 acceptance and production promotion, protected remote release."
+  ],
+  "full_G03": "NOT_COMPLETED",
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept fixed SDK1 compatibility/ABI valid-path evidence for local test-scoped progress only; do not complete T14 or waive remaining guards.",
+    "risks": [
+      "SDK1 names refer to the earlier native PanGu ABI, not Pi/JS plugin compatibility.",
+      "Test instrumentation is single-threaded, trusted-native, scalar/pointer SysV only.",
+      "Source archive restore and retained verification are not fresh archive rebuild.",
+      "Local self-review/controller/image pinning do not establish server-side bypass protection."
+    ]
+  },
+  "summary_sha256": "a7fdffa5a830d54eb845924ddef8e42828ddfb9dbec67c7ef9f5d2dcf0e60b05"
+}

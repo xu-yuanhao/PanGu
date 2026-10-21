@@ -185,9 +185,10 @@
         "t14-parent-call-candidate.json",
         "t14-sdk2-candidate.json",
         "t14-native-evidence.json",
-        "t14-abi-guard-evidence.json"
+        "t14-abi-guard-evidence.json",
+        "t14-sdk1-native-evidence.json"
       ],
-      "remaining": "SDK2冻结原生与ABI守卫已通过：48构建/64隔离执行，四次guard各146729调用、5工厂/52目标、10破坏负例与2转发自测，原1196场景/3242服务调用及全部计数保持。SDK1有效路径/其他T14专项原生ABI回归、正式sanitizer、完整G04轨迹/故障矩阵和G07仍待完成；本项和T14整体不关闭。"
+      "remaining": "SDK1有效路径和守卫已补齐：56构建/72目标执行，SDK1八次各824场景、1794租约消费，四次guard各122627调用；bind/enter有效结果、七SDK方法成功/拒绝均覆盖，SDK2旧计数保持。ABI1 setup/cleanup无父授权仍各144拒绝。仍缺其他T14专项原生回归、正式sanitizer、完整G04轨迹/故障矩阵和G07；不关闭GAP或T14整体。"
     }
   ]
 }
