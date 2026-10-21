@@ -306,11 +306,13 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] SDK2本地端到端：版本化方法显式父参数，C/C++插件与双runtime完成真实调用；O0/O2各1196场景/3242方法调用，本地SDK2准入、8项失败关闭自测、18份回归及宿主UBSan通过。GAP-010仅部分解决，冻结原生/G04/G07待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
+
 - [x] 局部显式父子调用后端：旧ABI1不变、新扩展核对真实父/根票据，受管根作用域与父子引用；O0/O2各809场景/2248调用、4层调用、取消/完成/预算/别名与宿主UBSan通过。尚未接入版本化插件方法及SDK，GAP-010与原生准入仍未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
 - [x] 局部插件SDK基础候选：独立固定消费头、不透明租约/完成、自动实例作用域与声明清理；C/C++插件O0/O2各824场景、1794次服务调用、预算/别名及补充宿主UBSan通过。GAP-010嵌套setup/cleanup准入实际BLOCKED，完整SDK与原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
-- [ ] 修复GAP-010：显式父调用凭据验证与setup/cleanup多跳作用域传播，错误/过期/跨runtime/重复票据拒绝、取消与失败释放、预算证据齐备；不能只按inflight计数放宽停止门闩。
+- [ ] 完成GAP-010冻结原生验收：SDK2本地显式父参数、多跳、双runtime、取消/完成与预算已验证；仍需固定模块登记、冻结clang/GAS、ABI guard/sanitizer及G04/G07，之后才能关闭缺口；不能只按inflight计数放宽停止门闩。
 
 - [x] 局部宿主服务跨语言消费：独立固定契约下C/汇编/C++消费两种C提供者及C++提供者，O0/O2各1188场景/34128调用，9组合各3792次；callee-saved、错误边界、补充宿主UBSan与源归档恢复通过。完整SDK与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

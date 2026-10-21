@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选已有显式父子调用后端，但尚未接入插件SDK及版本化服务方法，GAP-010仍OPEN，SDK嵌套准入仍BLOCKED，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新候选SDK2已在独立C/C++插件、显式父参数方法和双runtime中完成本地验证；GAP-010仅部分解决，冻结原生验收仍未完成，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -270,3 +270,28 @@ O0/O2各809场景、2248次实际服务函数调用：214次setup、208次cleanu
 最终17份常规脚本退出0、源码未变；18份源码绑定回执（含parent UBSan）与同一最终清单一致。补充UBSan同809场景退出0、无诊断，SHA256 `d2608c10863fa9141d6c43faed41acb2c30fd12e0819535b79223d202840db5a`。73份源码确定性tar SHA256 `52b32cf7eed7a12eccaddc6d8d9e4ea1966566d368b3670302c4d1a4f9fa1306`，另目录恢复字节一致，没有据此声称重建或冻结原生准入。
 
 **GAP-010继续OPEN：** SDK1没有传入父句柄的参数，仍实际复现setup/cleanup各144次拒绝；check-sdk-nested-admission.py本轮退出2，sdk-nested-admission.json为BLOCKED，SHA256 `38094c2a7c1c649ff1490e0e74a994ed5bbdb67d37ff18f8270eb8cfdef0df2d`。这恰好说明旧业务门闩未被放宽。下一步需保留SDK1兼容面，在新版本插件服务方法中显式传递incoming调用上下文，再由SDK从canonical实例身份调用受管root/child/close。不能靠全局current-parent或inflight计数隐式取得权限。SDK构造与所有输出接口也须保护受管bank/slots，构造失败不得降级到无凭据路径；还需实际双runtime、C/C++插件调用及冻结原生G03/G04/G07，才能判断完整缺口关闭。
+
+
+## SDK2 版本化插件方法端到端候选（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h`；源码/测试清单SHA256 `171ccf01ea5e82b252ac79358a436ea8bef8616d4b4549c671f32763887254c3`，sdk2-evidence.json SHA256 `16ebbfff6adfc222a06c06c462051a808d0bd385f2732320271fbdaecd946acf`。根候选 [t14-sdk2-candidate.json](t14-sdk2-candidate.json) 固定证据与同一Agent自审。候选JSON、policy新增登记及GAP-010状态/剩余要求三个控制文件固定包SHA256 `5235ad123f41a7c3c3ee0f0438231fcfbf1baa541c64180e0c0c6269d59642af`，不是控制器全树批准。批准仅限本地候选实验与已实测语义，不改变生产阶段、预算、原门禁或冻结工具链；T14整体仍未验收。
+
+SDK1公开/宿主头及查询布局保持不变，固定消费回归保留。SDK2为88字节表，以真实SDK1表作为首成员，另有acquire_child/accept；canonical上下文仍32字节，header明确ABI2。新增host query ABI2/48字节，96字节bank含受管调用bank；invocation query扩展ABI2/40字节，提供纯prepare_bind和incoming校验。旧查询错误版本/尺寸用例不删除，新旧入口严格匹配上下文版本，实际callback阶段4980次错版本入口均拒绝且状态不变，不能用ABI1入口代替要求SDK2的装载。没有声称任意SDK1/SDK2插件已能在同一组合混装。
+
+公共请求仍只有稳定名称/版本/ordinal/尺寸。普通acquire从自身setup/业务/cleanup取根作用域；acquire_child必须传入被调用方法收到的父句柄，SDK推导自身实例，再由受管后端核对父提供者等于该实例。accept在服务方法效应前核对已签发操作的receiver、根与当前真实owner操作/epoch/代际；它验证已取得的操作，不再次授予新调用。count2只是声明视图，不授予权限；已在途Active提供者不带父凭据的新根请求，在startup/stop仍拒绝。父还有子时release返回2，不能提前释放。未登记外部任务和context/表/opaque状态生命周期仍是可信调用方契约，不是进程内沙箱或用户权限Policy。
+
+构造先校验bank/binding/cap存储与所有输入几何/描述，再调用纯prepare_bind得到实际bind预算，预留完整构造+发布预算后才提交。预算不足、无效descriptor、别名、同epoch重绑、预检少报1单位导致的实际bind拒绝均保持原对象字节不变；不发布半成品SDK2上下文，也没有失败降级到SDK1的代码路径。所有SDK2输出额外保护bank、调用slot、两层SDK表及受管扩展元数据。
+
+独立固定SDK2公开消费头SHA256 `53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e`，宿主消费头SHA256 `31632eba6da861d48dfb60facb42588af1e52047c11e2cf9a03189804b3ac328`；另锁定SDK1/调用扩展消费头及五份T13借用输入，运行前校验。C17与C++20插件分别编译同一源码，仅导入公开SDK头，客户端对象各六个C导出，仅有两个测试观察依赖，无宿主控制声明/查询导入或C++运行库、全局构造、unwind引用。SDK/调用管理器/生命周期对象仍各只有自己的query导出，无未解析依赖；正常测试用cc链接，不要求libstdc++。这是宿主GCC16.2.1/GNU2.47证据，不代替冻结clang构建。
+
+测试方法实际签名为evaluate(state, incoming_lease, input, output)，方法本体使用SDK2接收并转发父参数，已不是宿主包装器模拟子调用。为避免改写旧测试接口，在fixture中独立复制manifest/规范合同/安装合同，将服务版本统一映射为原版本+100，保持名称/作用域/绑定语义；不修改原T13输入或references，不声称这些测试接口已是Model/Tool产品接口。
+
+O0/O2各1196场景、3242次实际方法调用；342 setup、306 cleanup、208业务嵌套，4层调用。C与C++分别171/153/104次对应嵌套，函数指针身份也逐项核对。真实两个runtime可共享不可变T13计划，但owner/操作池/SDK bank/调用存储独立，交错持有活根时130次跨runtime accept/release/child请求拒绝，正常两端仍继续完成。678次错误父/复制上下文拒绝、6202别名拒绝、72次无父新权限拒绝、856次父有子时提前释放拒绝；12次取消后与12次完成清理后新子拒绝，已有操作仍排空。1792次构造不足预算及1200次构造语义拒绝；根897、子687、释放191、incoming校验191个不足fuel值，逐字节检查两runtime所有模型/owner/池/bank未变。188次异步清理根在callback返回后继续由实际插件方法调用。
+
+新增本地check-sdk2-nested-admission.py实际退出0，SDK2语义PASS，SHA256 `1f9b80cb3602377cc22f3ba7ed4e0cbd566bbbabab44818c0b5d7715c03f7b7f`。它核对源码、固定消费头、T13输入、双优化、二进制摘要并重新执行，要求两语言三阶段嵌套、双runtime、停止/完成、构造/预算/版本拒绝等证据；启动时先写BLOCKED，畸形回执不能沿用旧PASS。8项隔离副本自测包括正常、缺回执/源码漂移/产物漂移/缺优化/缺场景/空借用输入及畸形回执残留PASS；未改变SDK1旧检查器，其按旧无父参数契约仍退出2，这是兼容诊断，不能冒充SDK2失败或强行改为通过。新检查仍是同一Agent可审查的本地证据，不宣称服务器侧防绕过或独立认证。
+
+保留sdk2-initial-compile-failure.json（fixture命名冲突/未用字段）、sdk2-initial-runtime-failure.json（故障注入过早在cleanup callback内触发）、sdk2-initial-ubsan-failure.json（空fixture的NULL/零长度memcpy）。分别修正命名、确保post-callback触发并排空已完成但仍持有的操作、跳过空复制；未降低编译/sanitizer约束。另修正了两个printf计数参数顺序并验证错版本入口计数等于实际entry次数两倍。
+
+最终18份常规脚本退出0且源码未变；19份源码绑定回执（含SDK2 UBSan）逐一匹配最终清单。补充UBSan同1196场景退出0无诊断，SHA256 `1d9e49c93ef3c94214dee3bea9e874df285a65a0626d6c68eb624081c4558c44`。86份源码确定性tar SHA256 `fd9fdd0d6c1a705f5b734ce6214d46fe66a288c34d64365fe3f9016d2a7342b1`，另目录恢复字节一致，未据此声称恢复后重建。参考Cordis utils.createTraceable的defSite/useSite区分、reflect.locate的committed依赖视图及退休绑定等待；原生实现把实例解析与调用生命周期凭据分开，不复制JS Proxy/Promise运行时。
+
+GAP-010现为PARTIALLY_RESOLVED：本地实际SDK2方法、C/C++、双runtime和失败门禁已接通，冻结原生模块登记、clang/GAS组合、ABI guard/sanitizer及G04/G07仍待完成；不可关闭缺口或标记T14完成。

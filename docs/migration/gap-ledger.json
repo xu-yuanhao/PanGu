@@ -169,22 +169,23 @@
     {
       "id": "GAP-010",
       "severity": "high",
-      "title": "插件SDK尚未接入父调用凭据与setup/cleanup作用域传播",
+      "title": "SDK2父调用作用域已本地接通，冻结原生验收未完成",
       "steps": [
         "T14"
       ],
       "affected_scope": "Native plugin SDK and delegated service calls during startup/teardown",
-      "reference": "t14-plugin-sdk-candidate.json",
-      "status": "OPEN",
-      "closure_evidence_required": "显式父调用凭据验证当前提供者/owner/epoch/代际、传播setup/cleanup权限和停止语义；真实多跳成功轨迹以及错误/过期/重复/跨runtime父票据拒绝，工作量与失败释放证据。本地nested admission退出0且冻结原生对应验证通过后才可判断关闭。不能按inflight计数或全局phase放宽业务门闩。",
+      "reference": "t14-sdk2-candidate.json",
+      "status": "PARTIALLY_RESOLVED",
+      "closure_evidence_required": "版本化插件方法显式传入父句柄，核对canonical实例与活父/根owner/epoch/代际，保持停止/完成门闩；C/C++实际多跳及双runtime、错误/过期/重复/跨runtime凭据拒绝、构造原子性和预算证据。SDK2本地check-sdk2-nested-admission.py退出0且冻结原生对应集成验证通过后才可判断关闭；原SDK1诊断不得被改成虚假通过，不得按inflight或全局phase放宽权限。",
       "owner_role": "Agent implementer and explicitly recorded same-Agent self-review",
       "waiver": null,
       "evidence": [
         "t14-plugin-sdk-candidate.json",
         "t14-owner-boundaries.md",
-        "t14-parent-call-candidate.json"
+        "t14-parent-call-candidate.json",
+        "t14-sdk2-candidate.json"
       ],
-      "remaining": "宿主后端O0/O2各809场景已验证父/根句柄、214次setup/208次cleanup嵌套调用、4层实际服务调用与取消/完成/额度拒绝；SDK1源码和对象保持不变，其嵌套准入仍退出2。仍需版本化插件方法显式携带父调用参数、SDK受管root/child/release接线及真实多runtime隔离、冻结原生验证；不得用宿主包装器通过代替插件需求完成。"
+      "remaining": "SDK2本地O0/O2各1196场景、3242实际方法调用、342 setup/306 cleanup/208业务嵌套、4层调用及真实双runtime已验证；SDK2局部准入退出0、8项失败关闭自测通过。SDK1兼容面保留，其不支持父参数的诊断仍退出2。冻结clang/GAS原生组合、ABI guard/sanitizer/G04/G07尚未执行，本项不得关闭或批准T14整体。"
     }
   ]
 }
