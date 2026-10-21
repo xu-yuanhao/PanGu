@@ -199,6 +199,7 @@
     "docs/migration/t14-native-source-publication.json": "control",
     "docs/migration/t14-abi-guard-candidate.json": "control",
     "docs/migration/t14-abi-guard-evidence.json": "control",
-    "docs/migration/t14-abi-guard-source-publication.json": "control"
+    "docs/migration/t14-abi-guard-source-publication.json": "control",
+    "docs/migration/t14-sdk1-native-candidate.json": "control"
   }
 }
