@@ -306,6 +306,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 ### T14：资源所有权与生命周期
 
+- [x] 局部宿主真实服务值路由：稳定名称/版本/尺寸、setup发布与双端租约，MANY逐边、app/session隔离和两种实现替换；O0/O2各390场景/888实际调用、16518不足fuel、4884别名拒绝及补充宿主UBSan通过。完整SDK、服务汇编/C++消费与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
+
 - [x] 局部宿主静态 entry 桥：T13 installed/map 对应验证、owner/epoch/票据检查及一次性进入；O0/O2 各 4108 场景、24 次汇编入口、90346 不足fuel和6555别名拒绝通过，既有套件与补充宿主UBSan复验通过。真实服务值路由、插件SDK及冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
 - [x] 局部宿主 ABI 门面候选：17 方法/152 字节版本化表、单工厂导出、固定消费头，O0/O2 各 1152 场景/5772 登记拒绝、18 私有符号链接拒绝及宿主 UBSan 通过。插件 entry 桥、服务值路由和冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。

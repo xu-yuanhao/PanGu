@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选在版本化host-control函数表之上接入了静态 entry 到 owner-aware setup 的桥，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新宿主候选已接入静态 entry 桥，并在 T13 解析绑定上发布/查找真实服务值与双端租约，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -186,3 +186,24 @@ O0/O2各4108场景通过：真实T13固定240图及反序安装表、app/session
 最终13份常规脚本全部退出0，源码/测试未改变；14份源码绑定回执（含补充宿主UBSan）逐一与最终清单一致。UBSan执行同一4108场景退出0、无诊断，SHA256 `62c72e52ba29c6bfc45add98ef011011e712a62e8f927d6e19f0c78d4891a716`。保留原编译警告/超时约束，未改测试预算。参考Cordis core fiber的setup执行与dependent卸载等待、Harness vendor fiber的旧epoch加载前检查；本地显式票据/调度语义不是其运行时兼容证明，LIFO清理也不是其Promise并行清理的一比一移植。
 
 仍需真实服务值注册/查找/版本校验与替换验证、受限插件SDK边界、C++互操作、冻结原生构建/guard及G03/G04/G07。当前上下文携带完整宿主控制表和可见运行时帧，仅用于可信宿主实验，不是同进程恶意插件沙箱。T14整体保持未验收。
+
+
+## 真实服务值路由宿主候选（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj`，源码/测试清单SHA256 `fd6603392e4fe261cc5026a1d3a821e4177f316638b56e6c58692fabb6178f27`，route-evidence.json SHA256 `312988c2dbdf0c9fc7a59d970c988c1cf36c5fed49ba9f193cfa6197c263e229`。候选记录 [t14-service-route-candidate.json](t14-service-route-candidate.json) 固定证据与同一Agent自审摘要；该JSON和新增bootstrap-policy登记的固定控制对SHA256 `3a6e45fc63d8b939cef1e1d296d572164cc70070bf07f2fd13b4ebe2969463d4`。只增加候选元数据登记，不变更门禁/预算/工具链/基线，不新增生产模块。生命周期和entry提供者源码/头与上两包逐字节一致。实施与审核为同一Agent，仅批准继续本地可信宿主实验，T14整体不勾选。
+
+单查询工厂pangu_service_route_query，ABI1/target1/flags0、40字节表、publish/acquire/release三方法。服务表通用头16字节、slot56、router64、查询64、租约80字节。服务接口版本与宿主ABI分开管理；服务按manifest的32字节稳定名称、准确版本和最小表尺寸核对，不把本地service索引作为外部身份。固定消费头client-route-v1.h SHA256 `fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71`；运行前同时校验旧消费头/T13头，提供者与消费者分别编译。O0/O2对象各仅导出工厂、无未解析符号。
+
+提供者在当前同步或deferred setup中发布函数表和实例状态，核对owner/epoch、setup操作、provision归属、版本/尺寸/目标及初始全零slot。每个runtime仅发布一次，不在Active或取消后重写表；表须保持不可变，slot不拥有实例状态。调用者遍历已解析绑定，为每条边提供显式binding句柄和consumer身份，路由核对requirement/provider、稳定服务身份、激活位置和epoch，再经原生命周期表取得两端操作票据。只有准入成功才发布函数表/状态租约，实际调用结束后release；不能在release后继续缓存或使用表/状态。MANY每条边独立保留，app/session依据既有T13 realm选择，不默认取第一项。
+
+setup、正常业务和cleanup分别使用对应作用域；停止关闭新业务，cleanup仍可调用保留的Active提供者。测试持有真实服务租约跨过stop开始，确认消费者Quiescing、提供者仍Active，实际函数调用后释放，再推进清理。异步操作可保存租约到真实退出时，但这里没有事件后端或自动取消/超时，调用方负责完成。没有跨线程同步。
+
+几何预检覆盖router/manifest/plan/graph、entry记录、slot、运行时保护区间和Pending owner池；lease/report拒绝覆盖任何已发布表，包括未选中的提供者表。服务表发布也拒绝与宿主元数据/slot重叠。opaque state的大小/映射/生命周期由提供者保证，输出与它的别名不是机器可全面验证的范围。预检和表扫描、名称比较及生命周期准入共用fuel，原子重试失败不持有owner；不声称可暂停查找或性能已达标。
+
+O0/O2各390场景通过：T13固定240图中成功图的正常/反序安装与同步/deferred组合，加app/session/Pending、MANY两种顺序和取消场景。共820次发布、888次实际服务函数调用，两个相同接口实现各444次；178次deferred加载、2次取消后发布拒绝；8605语义/重复/迟到拒绝，16518不足fuel和4884别名拒绝。调用逐项断言实际state/table与绑定提供者对应并验证结果；替换指在停止并排空的独立组合中使用另一实现，不是运行中热替换。错误名称/版本/尺寸、未发布、旧epoch、错误consumer和表目标均有拒绝/输出快照。
+
+首次测试误要求跨图旧租约统一返回10；实际无对应binding可返回3。保留route-initial-failure.json，改为断言跨图必须拒绝且owner/池不变；同图重复完成仍明确要求10，未改实现错误码或放宽门禁。自审另补全“所有已发布表均受输出别名保护”，并验证延后setup可发布、停止后不可发布。
+
+最终14份常规脚本全部退出0且源码未变；15份源码绑定回执（含route UBSan）与同一最终清单逐一匹配。UBSan同一390场景退出0、无诊断，SHA256 `b3595bffe3df3fb4f70d8820932fb22afbd41f4a6e28f785ab923c1dc3b97974`。既有entry4108场景及生命周期/预算/几何/私有链接套件保留。参考Cordis Service构造时reflect.provide以及fiber所保留的依赖实现、停用等待；本实现将TS对象/Promise转换为显式C函数表/状态与票据，不是Cordis API兼容层。
+
+下一步仍需受限插件SDK/组合宿主接线、C++与汇编服务消费验证、冻结原生准入/guard及完整G03/G04/G07。当前仅可信宿主控制ABI，consumer字段与binding不是对恶意同进程插件的权限认证；没有生产放行或服务性能保证。

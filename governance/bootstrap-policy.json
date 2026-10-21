@@ -184,6 +184,7 @@
     "docs/migration/t13-corpus-source-publication.json": "control",
     "docs/migration/t14-owner-boundaries.md": "document",
     "docs/migration/t14-facade-candidate.json": "control",
-    "docs/migration/t14-entry-bridge-candidate.json": "control"
+    "docs/migration/t14-entry-bridge-candidate.json": "control",
+    "docs/migration/t14-service-route-candidate.json": "control"
   }
 }
