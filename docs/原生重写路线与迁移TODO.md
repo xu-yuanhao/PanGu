@@ -307,7 +307,8 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 ### T14：资源所有权与生命周期
 
 - [x] SDK2 冻结静态补充：只读原场景在 Clang→GAS→ld 无 libc 链路下 O0/O2/Oz 各 1196 场景、3242 调用通过；静态 ELF/无未定义符号与断言失败负例通过。仅测试适配器，未登记原生矩阵，见 T14 草稿。
-- [ ] 明确 Clang O0 隐式 memcpy/memset 的编译器支持模块归属、导入许可与替换边界，再登记 T14 原生模块/组合；不得将测试专用内存/stdio/PAL 适配器直接当生产准入。
+- [x] 明确 compiler.memory v1 构建/链接替换边界：GAS 与测试 C 提供者通过原 native_build debug/release 共四组、页边界/重叠/寄存器/DF、8 项依赖拒绝与四组产物复核；原 SDK2 冻结对象不变、两提供者 O0/Oz 四次完整场景通过。仅候选，详见 t14-compiler-memory-candidate.json。
+- [ ] 将 compiler.memory 与宿主、调用管理器、SDK2 的实际导入依赖登记到完整 T14 原生模块/组合矩阵；不得将测试 stdio/PAL 适配器直接当生产准入。
 
 - [x] SDK2本地端到端：版本化方法显式父参数，C/C++插件与双runtime完成真实调用；O0/O2各1196场景/3242方法调用，本地SDK2准入、8项失败关闭自测、18份回归及宿主UBSan通过。GAP-010仅部分解决，冻结原生/G04/G07待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

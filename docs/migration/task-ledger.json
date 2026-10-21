@@ -1364,6 +1364,21 @@
           "status": "FROZEN_STATIC_SCENARIOS_PASS_MODULE_ADMISSION_PENDING",
           "reviewer": "same Agent as implementer",
           "native_module_admitted": false
+        },
+        "compiler_memory_candidate": {
+          "record": "docs/migration/t14-compiler-memory-candidate.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-v2-t_u_9o41",
+          "status": "LOCAL_NATIVE_BUILD_AND_SDK2_REPLACEMENT_PASS_FULL_T14_PENDING",
+          "source_manifest_sha256": "5f1d4dccad5450267d48279960f7d390db6026695087aea6b92e5191fa248589",
+          "summary_sha256": "377862e2096b2c36510bf53d7ff435b73e6db295e8362e4a1a62be0cc4e9019e",
+          "control_package_sha256": "fd5befdd358de140f6baa9010f959d8954f3d60ea03b386fa2b544d1a2435fd7",
+          "control_package_files": {
+            "docs/migration/t14-compiler-memory-candidate.json": "c6a16a03786ae99d24ec77043842836e00b7d7c967174a77e95aada6b44be2e5",
+            "governance/bootstrap-policy.json": "500f351f949f5d316e34d948fde11940b21806f575c85213c7311e86967a1a60"
+          },
+          "reviewer": "same Agent as implementer",
+          "review_record_sha256": "b4d463221382a0790007339907e6e92162a923db5c7da892e47cf6762c4a5f28",
+          "production_admission": false
         }
       }
     },

@@ -307,3 +307,17 @@ O0、O2、Oz 各运行 1196 场景、3242 次真实方法调用；完整 stdout 
 保留两次真实失败：第一版补充脚本未沿用现有 external-as 兼容参数而产生 prefalign/addrsig 拒绝，修正为现有 -fno-integrated-as/-fno-addrsig；第二版在 O0 成功运行后请求镜像未包含的 readelf，改用镜像已有 llvm-objdump 和现有 ELF 解析器。冻结镜像、原门禁和预算未改，没有过滤汇编或放宽告警。
 
 该结果缩小了冻结编译/无 libc 执行的不确定性；尚未执行登记后的 native-admission 矩阵，也未完成新模块 ABI guard、正式 sanitizer、G04/G07。GAP-010 继续 PARTIALLY_RESOLVED，T14 不勾选完成。下一步先登记编译器内存支持与宿主/调用管理器/SDK/测试组合，再以受控原生构建和相同场景建立正式回执。
+
+## 编译器内存支持候选与替换验证（2026-10-21）
+
+编译器生成的结构体复制不经过插件 SDK，也不能依赖尚未启动的宿主解析器。本次明确 compiler.memory v1 为构建/链接时选择的底层模块：SysV x86_64 的 memcpy/memmove/memset，只有三项标准 ABI 导出，无 allocator、OS、业务、持久状态或运行时服务解析；同一组合必须唯一选择一个提供者。公开头只声明三个入口和 64 位 size_t，不带提供者依赖。有效借用区间和长度由调用者保证；memmove 支持重叠，memcpy 遵守标准非重叠条件。编译器标准 ABI 不能改成可失败的 fuel 接口，其工作量按 n 字节有界；受检 Buffer/配额仍由上层接口承担。
+
+候选目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-v2-t_u_9o41`，独立 GAS 实现和测试用 C volatile 循环实现。两套 manifest/export 策略分别使用相同消费测试，未放宽门禁。既有 native_build 使用原冻结 profile，debug/release 四次闭世界依赖/符号、Clang→GAS→ld、静态 ELF 和平台指令检查通过，四次执行均退出 0。每次覆盖 0～4096 全部 4097 长度、页头/尾复制与填充、65 个偏移 × 257 长度 × 双方向共 33410 个重叠移动场景，以及 5 次返回值/callee-saved/DF ABI 调用。测试 PAL 映射三页，仅中页可写；左右保护页各一次故意读取实际 SIGSEGV（-11），验证 guard 本身有效；正常用例执行后解除映射。
+
+原 SDK2 冻结对象只读、逐文件摘要锁定，不重编宿主/调用管理器/客户端/场景；仅改链接选择的内存提供者和测试输出支持。GAS/C 两提供者在 O0/Oz 共四次执行，各 1196 场景、3242 实际方法调用，完整输出与原 SDK2 证据相同。说明底层提供者可在不改消费者的情况下替换，不声称运行时热替换。
+
+8 项真实产物负例均由未修改的 link_graph 拒绝：两提供者 × 两模式下删除所需直接依赖，或撤回 memcpy 公开导出，分别触发 undeclared/private symbol dependency。四组构建的原产物按登记清单复制到干净目录，verify_build 重新核对源码/策略/所有产物/ELF/闭世界链接与符号边，均通过；这属于保留产物复核，不是源码归档后重新构建。源码归档 `a9f369b21eb0da700a2a7835da2c810e82b70a538706700a247a7e8bd392fc5d` 已逐成员验证。
+
+保留三次失败：初始 C 测试直接取外部函数地址生成 GOT 导入，改为测试汇编显式 RIP-relative ABI 桥；初始执行错误地直接启动不可执行保留 ELF，重放按既有流程执行另存副本；guard 负例重复链接 probe_exit，改为仅引导 main 的独立启动对象。不降低告警、不新增 GOT 豁免、不改变冻结工具链或超时。
+
+固定 summary SHA256 `377862e2096b2c36510bf53d7ff435b73e6db295e8362e4a1a62be0cc4e9019e`；控制包（仅候选登记 JSON 与新增文件登记）SHA256 `fd5befdd358de140f6baa9010f959d8954f3d60ea03b386fa2b544d1a2435fd7`。本次由同一 Agent 实施、自审并批准本地后续登记用途，具体差异/摘要/证据/风险见候选 JSON 与目录内 control-review.json，不伪称独立批准。尚未接入完整 T14 的 native-admission registry 与组合矩阵，旧 ABI/SDK 回归、正式 sanitizer/G04/G07/性能验收仍待完成。GAP-010 继续部分解决；不能据此完成 T14 或生产放行。

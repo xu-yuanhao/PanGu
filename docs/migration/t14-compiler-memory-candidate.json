@@ -1,0 +1,430 @@
+{
+  "schema": "pangu.compiler-memory-candidate.v1",
+  "status": "LOCAL_NATIVE_BUILD_AND_SDK2_REPLACEMENT_PASS_FULL_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-v2-t_u_9o41",
+  "contract": {
+    "name": "compiler.memory",
+    "version": 1,
+    "target": "linux-x86_64 SysV",
+    "selection": "exactly one build/link-time provider per composition; no runtime resolver/hot switch",
+    "exports": [
+      "memcpy",
+      "memmove",
+      "memset"
+    ],
+    "signatures": [
+      "void *memcpy(void *dst,const void *src,size_t n)",
+      "void *memmove(void *dst,const void *src,size_t n)",
+      "void *memset(void *dst,int value,size_t n)"
+    ],
+    "size_t_bytes": 8,
+    "ownership": "borrowed valid ranges; no allocation, ownership transfer or persistent state",
+    "overlap": "memmove supports overlap; memcpy requires non-overlap as standard C contract",
+    "bounds": "all work bounded by byte count; cannot turn standard compiler ABI into fallible fuel API",
+    "zero_length": "does not read or write memory; tests include protected page boundary pointers; no NULL-validity promise",
+    "abi": "returns dst; preserves SysV callee-saved registers and clears/preserves required DF=0 convention",
+    "non_responsibilities": [
+      "no allocator",
+      "no checked-buffer or UTF8 validation",
+      "no OS calls",
+      "no host lifecycle resolution",
+      "no user authorization or memory sandbox"
+    ],
+    "reason": "compiler-generated aggregate copies are needed before plugin host creation; module is selected statically and explicitly imported, not hidden libc dependency"
+  },
+  "candidate_manifests": {
+    "asm": {
+      "schema": "pangu.modules.v1",
+      "modules": [
+        {
+          "id": "compiler-memory-api",
+          "role": "interface",
+          "scope": "product",
+          "files": [
+            "src/compiler-memory-api/memory.h"
+          ],
+          "public_headers": [
+            "src/compiler-memory-api/memory.h"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "compiler-memory",
+          "role": "foundation",
+          "scope": "product",
+          "files": [
+            "src/compiler-memory/memory.S"
+          ],
+          "public_headers": [],
+          "dependencies": []
+        },
+        {
+          "id": "test-platform",
+          "role": "platform",
+          "scope": "test",
+          "files": [
+            "src/test-platform/platform.S",
+            "src/test-platform/platform.h"
+          ],
+          "public_headers": [
+            "src/test-platform/platform.h"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "memory-probe",
+          "role": "host",
+          "scope": "test",
+          "files": [
+            "src/memory-probe/main.c",
+            "src/memory-probe/abi.S"
+          ],
+          "public_headers": [],
+          "dependencies": [
+            "compiler-memory-api",
+            "compiler-memory",
+            "test-platform"
+          ]
+        }
+      ]
+    },
+    "alternate": {
+      "schema": "pangu.modules.v1",
+      "modules": [
+        {
+          "id": "compiler-memory-api",
+          "role": "interface",
+          "scope": "product",
+          "files": [
+            "src/compiler-memory-api/memory.h"
+          ],
+          "public_headers": [
+            "src/compiler-memory-api/memory.h"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "test-memory",
+          "role": "foundation",
+          "scope": "test",
+          "files": [
+            "src/test-memory/alternate.c"
+          ],
+          "public_headers": [],
+          "dependencies": [
+            "compiler-memory-api"
+          ]
+        },
+        {
+          "id": "test-platform",
+          "role": "platform",
+          "scope": "test",
+          "files": [
+            "src/test-platform/platform.S",
+            "src/test-platform/platform.h"
+          ],
+          "public_headers": [
+            "src/test-platform/platform.h"
+          ],
+          "dependencies": []
+        },
+        {
+          "id": "memory-probe",
+          "role": "host",
+          "scope": "test",
+          "files": [
+            "src/memory-probe/main.c",
+            "src/memory-probe/abi.S"
+          ],
+          "public_headers": [],
+          "dependencies": [
+            "compiler-memory-api",
+            "test-memory",
+            "test-platform"
+          ]
+        }
+      ]
+    }
+  },
+  "candidate_exports": {
+    "asm": {
+      "compiler-memory-api": [],
+      "compiler-memory": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ],
+      "test-platform": [
+        "probe_map",
+        "probe_unmap",
+        "probe_exit"
+      ],
+      "memory-probe": [
+        "probe_main",
+        "probe_abi",
+        "pangu_memory_probe_start",
+        "probe_copy_abi",
+        "probe_set_abi",
+        "probe_move_abi"
+      ]
+    },
+    "alternate": {
+      "compiler-memory-api": [],
+      "test-platform": [
+        "probe_map",
+        "probe_unmap",
+        "probe_exit"
+      ],
+      "memory-probe": [
+        "probe_main",
+        "probe_abi",
+        "pangu_memory_probe_start",
+        "probe_copy_abi",
+        "probe_set_abi",
+        "probe_move_abi"
+      ],
+      "test-memory": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ]
+    }
+  },
+  "source_sha256": {
+    "asm": {
+      "exports.json": "e6807696afc92d003429f0adfcad257995e1faed32250b495c7d9c822d46f5e3",
+      "manifest.json": "fdbf480a97b9615794b48b8d12ca3be59310610910b59dd2d807fbc645688758",
+      "src/compiler-memory/memory.S": "cd7d54167fd60be77ac0dfade0488e80a9e549105075f6e4690fb53b5f5ec1fb",
+      "src/compiler-memory-api/memory.h": "bea8546117c488a4f5e0c2be24d9c3d014530b7cf04b4b699c58f159640df235",
+      "src/memory-probe/abi.S": "72918694ff72067746b34b25c453607a65e75cea8e5428c8946613a7d1eb44b2",
+      "src/memory-probe/main.c": "54e4496f9df624759c973a5842cb19aa6469e84986276fa1e44d14aa0e5d7f09",
+      "src/test-platform/platform.S": "a170cdef4327c3ed343cfc6737473b4e88b13a80f21397e8a6f97ec3441d53bd",
+      "src/test-platform/platform.h": "cddad11d401b67fad20009f013262e38a8a912f50bc82e4b20696ef2137fa4bc"
+    },
+    "alternate": {
+      "exports.json": "7c03892ccb90d29b829ae3cb44d9c1d533cd56c7156f4509e412d98e1afbdda0",
+      "manifest.json": "9629ede8475ac942536e8f70fc8284e36e1291e4d89e8f424c4c688cf3fd4a3c",
+      "src/compiler-memory-api/memory.h": "bea8546117c488a4f5e0c2be24d9c3d014530b7cf04b4b699c58f159640df235",
+      "src/memory-probe/abi.S": "72918694ff72067746b34b25c453607a65e75cea8e5428c8946613a7d1eb44b2",
+      "src/memory-probe/main.c": "54e4496f9df624759c973a5842cb19aa6469e84986276fa1e44d14aa0e5d7f09",
+      "src/test-memory/alternate.c": "d16492557aa568aac87620a694d3c1a3d79071a9ad9577262ecdab861cd512fe",
+      "src/test-platform/platform.S": "a170cdef4327c3ed343cfc6737473b4e88b13a80f21397e8a6f97ec3441d53bd",
+      "src/test-platform/platform.h": "cddad11d401b67fad20009f013262e38a8a912f50bc82e4b20696ef2137fa4bc"
+    }
+  },
+  "image_sha256": "9765bb42bfca5bce3787c83801b9201563d59f758b61a327bfb644c3737c1dc4",
+  "native_build": {
+    "checker": "unchanged tools/gates/native_build.py",
+    "profile": "unchanged governance/native-probe-toolchain.json",
+    "build_count": 4,
+    "runs": [
+      {
+        "variant": "asm",
+        "mode": "debug",
+        "build_status": "PASS",
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "build_sha256": "ba03024b920ef79fafcd19c7d5128c64ba39a8a8ec3fd507f635f54a373ea08a"
+      },
+      {
+        "variant": "asm",
+        "mode": "release",
+        "build_status": "PASS",
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "build_sha256": "e7608e9e1b25d2286ee083f59ad83a7285082a722ea24989c95161cda1d11c3a"
+      },
+      {
+        "variant": "alternate",
+        "mode": "debug",
+        "build_status": "PASS",
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "build_sha256": "38c794646c7265b22348b029f0515f74c2c6ca42dd86c2a679f748ca530b741c"
+      },
+      {
+        "variant": "alternate",
+        "mode": "release",
+        "build_status": "PASS",
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "build_sha256": "ac0efe2904ef8c8ef3323387d885ee40c56ce7a2f3805f80bff7545ab6478a2b"
+      }
+    ],
+    "guarded_length_cases_per_run": 4097,
+    "overlap_direction_cases_per_run": 33410,
+    "abi_calls_per_run": 5,
+    "protected_page_fault_checks": 2,
+    "native_artifact_restore_and_symbol_verify": [
+      {
+        "variant": "asm",
+        "mode": "debug",
+        "result": {
+          "native_artifact_binding": "PASS",
+          "retained_symbol_recheck": "PASS",
+          "release": "BLOCKED",
+          "status": "BLOCKED"
+        }
+      },
+      {
+        "variant": "asm",
+        "mode": "release",
+        "result": {
+          "native_artifact_binding": "PASS",
+          "retained_symbol_recheck": "PASS",
+          "release": "BLOCKED",
+          "status": "BLOCKED"
+        }
+      },
+      {
+        "variant": "alternate",
+        "mode": "debug",
+        "result": {
+          "native_artifact_binding": "PASS",
+          "retained_symbol_recheck": "PASS",
+          "release": "BLOCKED",
+          "status": "BLOCKED"
+        }
+      },
+      {
+        "variant": "alternate",
+        "mode": "release",
+        "result": {
+          "native_artifact_binding": "PASS",
+          "retained_symbol_recheck": "PASS",
+          "release": "BLOCKED",
+          "status": "BLOCKED"
+        }
+      }
+    ],
+    "fresh_archive_rebuild": false
+  },
+  "sdk2_replacement": {
+    "unchanged_original_objects": true,
+    "providers": [
+      "asm",
+      "alternate"
+    ],
+    "optimizations": [
+      "O0",
+      "Oz"
+    ],
+    "run_count": 4,
+    "scenarios_each": 1196,
+    "actual_method_calls_each": 3242,
+    "stdout_exactly_matches_previous_sdk2": true,
+    "note": "Only compiler-memory provider and test support relinked. No fixture/client/host object edits. Supplemental composition, not registered full T14 matrix."
+  },
+  "negative_dependency_checks": [
+    {
+      "variant": "asm",
+      "mode": "debug",
+      "case": "missing-dependency",
+      "result": "REJECTED",
+      "reason": "undeclared symbol dependency: memcpy"
+    },
+    {
+      "variant": "asm",
+      "mode": "debug",
+      "case": "private-import",
+      "result": "REJECTED",
+      "reason": "private symbol dependency: memcpy"
+    },
+    {
+      "variant": "asm",
+      "mode": "release",
+      "case": "missing-dependency",
+      "result": "REJECTED",
+      "reason": "undeclared symbol dependency: memcpy"
+    },
+    {
+      "variant": "asm",
+      "mode": "release",
+      "case": "private-import",
+      "result": "REJECTED",
+      "reason": "private symbol dependency: memcpy"
+    },
+    {
+      "variant": "alternate",
+      "mode": "debug",
+      "case": "missing-dependency",
+      "result": "REJECTED",
+      "reason": "undeclared symbol dependency: memcpy"
+    },
+    {
+      "variant": "alternate",
+      "mode": "debug",
+      "case": "private-import",
+      "result": "REJECTED",
+      "reason": "private symbol dependency: memcpy"
+    },
+    {
+      "variant": "alternate",
+      "mode": "release",
+      "case": "missing-dependency",
+      "result": "REJECTED",
+      "reason": "undeclared symbol dependency: memcpy"
+    },
+    {
+      "variant": "alternate",
+      "mode": "release",
+      "case": "private-import",
+      "result": "REJECTED",
+      "reason": "private symbol dependency: memcpy"
+    }
+  ],
+  "source_archive_sha256": "a9f369b21eb0da700a2a7835da2c810e82b70a538706700a247a7e8bd392fc5d",
+  "source_archive_contents_verified": true,
+  "evidence_sha256": {
+    "build-replay/isolation.json": "7d6d8fe13529c76e9f87652da5a02c993925f7447e46da1bdd8dbb08b4428ac9",
+    "build-replay/executions.json": "368c34ad34f2db2b745f3df96b24723e96a9cbdb4d3f41285b03d7ba09430de1",
+    "sdk2-replacement-replay/evidence.json": "3b55d140cc4a28600532f7549b7933b5bf968a828857d0c12e58c3ca8d8fed7a",
+    "sdk2-replacement-replay/executions.json": "0581dfe0635bde19e83a8881e4f85a3e168d0a47467b304265f25086a5090717",
+    "link-negatives/isolation.json": "fb6480db5c15f8969fed9a2ecc1e8148a671fcb5812132c416f21e1a9b3bb16e",
+    "link-negatives/results.json": "df8bd93489058af94147e4f0ab8fc9a24a41ebef4343503d9b125c9c9933eb62",
+    "retained-verify/isolation.json": "6514f43346b6389b630eef8104dccdb384906808794a3e648663e2969e088a52",
+    "retained-verify/results.json": "c5e247f3ffc042d222be0ef771c9ff027ef628cad39bd62bf82bbe7b6126f56c",
+    "build-replay/asm-debug/build.json": "ba03024b920ef79fafcd19c7d5128c64ba39a8a8ec3fd507f635f54a373ea08a",
+    "build-replay/asm-release/build.json": "e7608e9e1b25d2286ee083f59ad83a7285082a722ea24989c95161cda1d11c3a",
+    "build-replay/alternate-debug/build.json": "38c794646c7265b22348b029f0515f74c2c6ca42dd86c2a679f748ca530b741c",
+    "build-replay/alternate-release/build.json": "ac0efe2904ef8c8ef3323387d885ee40c56ce7a2f3805f80bff7545ab6478a2b"
+  },
+  "failures_retained": [
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-0hx_bjl2/build",
+      "cause": "C test took external function addresses under fixed fPIC and introduced _GLOBAL_OFFSET_TABLE_. Gate rejected undeclared import; test uses explicit RIP-relative assembly ABI entry wrappers instead. No gate/profile change.",
+      "evidence_sha256": "fb796f00ba6e88a2262a78c1e58d80a66847753bb53e7fdcb59a807039201de0"
+    },
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-v2-t_u_9o41/build",
+      "cause": "Initial execution tried retained non-executable ELF. Replay runs copied bytes with execute permission; build artifacts remain unchanged.",
+      "evidence_sha256": "65007c71a05bc0e656db1f252ba3b06060df2682f08f674cae5f867801b4dbf7"
+    },
+    {
+      "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-compiler-memory-v2-t_u_9o41/sdk2-replacement",
+      "cause": "Guard negative test linked two probe_exit test implementations. Replay uses a dedicated startup object, preserves the sole platform implementation.",
+      "evidence_sha256": "9f1c2c12ffa0138325497c5e4679ae9d6e1198d823c62205b7fe30d860c7958a"
+    }
+  ],
+  "native_admission_matrix": "NOT_RUN",
+  "full_G03_G04_G07": "NOT_COMPLETED",
+  "production_admission": false,
+  "release": "BLOCKED",
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept compiler-memory candidate boundary, fixed sources and local evidence for subsequent module/composition registration only. Do not approve production or complete T14.",
+    "risks": [
+      "Explicit compiler support dependencies must be added to every emitted consumer in final T14 registry; unresolved future compiler intrinsics stay rejected.",
+      "Memory ABI is infallible for valid borrowed pointers and is not a checked-region API; callers remain responsible for bounds/lifetimes and length budgets.",
+      "No performance baseline or sanitizer approval is claimed by byte/guard/ABI tests.",
+      "C alternate is test-only, not a second production implementation."
+    ]
+  },
+  "summary_sha256": "377862e2096b2c36510bf53d7ff435b73e6db295e8362e4a1a62be0cc4e9019e"
+}
