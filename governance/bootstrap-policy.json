@@ -196,6 +196,7 @@
     "docs/migration/t14-cpp-admission-candidate.json": "control",
     "docs/migration/t14-native-candidate.json": "control",
     "docs/migration/t14-native-evidence.json": "control",
-    "docs/migration/t14-native-source-publication.json": "control"
+    "docs/migration/t14-native-source-publication.json": "control",
+    "docs/migration/t14-abi-guard-candidate.json": "control"
   }
 }
