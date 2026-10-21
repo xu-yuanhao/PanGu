@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-当前最新宿主候选已接入静态 entry 桥，并在 T13 解析绑定上发布/查找真实服务值与双端租约，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
+当前最新宿主候选已有静态 entry、真实服务路由，并完成 C/汇编/C++ 服务消费的局部互操作验证，见末节；前文小节保留各历史候选的实际范围。T14 整体与原生准入仍未完成。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -207,3 +207,22 @@ O0/O2各390场景通过：T13固定240图中成功图的正常/反序安装与�
 最终14份常规脚本全部退出0且源码未变；15份源码绑定回执（含route UBSan）与同一最终清单逐一匹配。UBSan同一390场景退出0、无诊断，SHA256 `b3595bffe3df3fb4f70d8820932fb22afbd41f4a6e28f785ab923c1dc3b97974`。既有entry4108场景及生命周期/预算/几何/私有链接套件保留。参考Cordis Service构造时reflect.provide以及fiber所保留的依赖实现、停用等待；本实现将TS对象/Promise转换为显式C函数表/状态与票据，不是Cordis API兼容层。
 
 下一步仍需受限插件SDK/组合宿主接线、C++与汇编服务消费验证、冻结原生准入/guard及完整G03/G04/G07。当前仅可信宿主控制ABI，consumer字段与binding不是对恶意同进程插件的权限认证；没有生产放行或服务性能保证。
+
+
+## C／汇编／C++ 服务互操作候选（2026-10-21）
+
+目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq`；源码/测试清单SHA256 `2f1b0012456f73b18a7044bab5b31c3824e8a88d67709e77c95d631de9bfa54b`，interop-evidence.json SHA256 `5032cdcf8894dcd6762824dedbaefb6eadfc96c31cf30b729ea78b6b3bee78d1`。根候选 [t14-service-interop-candidate.json](t14-service-interop-candidate.json) 固定证据与同一Agent自审记录。该JSON与bootstrap-policy新增登记的固定控制对SHA256 `b85877eda8999fda579b01f80b62219d5d792b4d1c5edc43247514f2d10ebb2c`；只批准继续本地宿主实验，不代表控制器全树、生产模块或完整T14批准。旧生命周期、entry、router的提供者源码/头与前包逐字节一致。
+
+独立固定消费契约interop-contract-v1.h SHA256 `f2c1f98325967f959e5af7bbfea7db18540df880934a79ed138cbed86faafa0a`，不导入任何宿主控制头；服务头16字节、测试服务表24字节、方法偏移16，固定宽度标量/C ABI，C++使用extern C/noexcept。C++消费端通过对象字节表示读取C所有的表/函数指针，提供者通过字节表示读写实例状态，不把宿主对象假定为C++类。汇编消费端检查版本/最小尺寸/目标/保留字段/方法指针，并尾调用服务方法；额外汇编探针设置并检查rbx/rbp/r12～r15六个callee-saved寄存器，成功与错误出口均检查。
+
+测试使用三种消费端（C、汇编、C++）与三种同接口提供者（两个既有C实现、C++实现），在真实T13输出、entry/setup、路由租约与逆序清理中执行。固定240图的95个成功图遍历提供者/安装顺序/同步与deferred组合，再加app/session、Pending、MANY和反序provisions；O0/O2各1188场景、34128次实际服务调用，9个提供者/消费端组合各3792次。包括546次deferred加载、3312次停止后或重复票据拒绝；持有租约跨过stop开始后仍实际调用受保留提供者，再释放并推进清理。每次核对返回值、实际table/state及绑定提供者；输入包含正负值和合法i32边界。
+
+30次消费端拒绝覆盖错误版本/零版本、短表、目标/保留字段、空方法、空/未对齐表和空输出，验证未执行提供者且输出保持；扩展尺寸表接受。6次提供者错误探针覆盖原样返回错误及C++数值/计数溢出拒绝；服务错误不变成异常或自动重试。此测试服务仅证明边界及生命周期接线，不是Model/Tool等产品服务实现。
+
+C++20对象使用-ffreestanding/-nostdinc/-nostdinc++、禁用异常/RTTI/线程安全静态初始化/unwind；新C++代码保持-Wall/-Wextra/-Werror，未使用缩进告警豁免。最终由cc链接，无-lstdc++；O0/O2 C++对象各只有两个C名称导出，唯一未解析符号为测试观察回调pangu_cpp_provider_observed，无C++运行库引用、.init_array/.eh_frame/.gcc_except_table。实际宿主工具为GCC16.2.1/GNU2.47，不能替代冻结clang/GAS构建或其他平台证明。
+
+首次编译的C++缩进错误以加括号/换行修复，保留interop-initial-compile-failure.json；测试复用的嵌套main宏冲突改为可命名route fixture入口，保留interop-harness-failure.json。旧route独立运行默认main与断言不变。所有外部runner仅扩展源码摘要后缀以覆盖.cpp，未放宽断言/预算/超时；独立消费头固定摘要不由生成器覆盖。
+
+最终15份常规脚本全部退出0且源码未变；16份源码绑定回执（含interop UBSan）逐一匹配同一最终清单。补充UBSan执行同一1188场景退出0、无诊断，SHA256 `a4c932dec331974c077a09bc51063139f3aed9b0c550be6bb2186a1f29f3bdda`；汇编指令本身不受UBSan插桩。既有route390场景/888调用及全部entry/生命周期/预算/几何套件保持通过。54份源码的确定性tar SHA256 `f52e8ea7e7cd94f97160a3f1042288558714efdf47a6fad6f7737913b0017d55`；另目录恢复逐字节一致，只是源文件恢复，不是恢复后重新构建或原生准入。
+
+下一步将插件侧SDK与宿主控制头分离：插件不直接导入owner/runtime/router帧，按自身身份及稳定服务名查询，由宿主选择setup/业务/cleanup作用域，复用现有owner与票据。优先复用不透明票据表示，避免为了SDK再引入一套所有权系统。当前固定契约仍只是服务消费测试，SDK本身尚未实现；旧C17宿主控制头也不据此声称兼容C++。之后仍须冻结原生准入、guard及完整G03/G04/G07。

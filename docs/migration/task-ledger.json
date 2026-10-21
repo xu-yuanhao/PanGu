@@ -1061,6 +1061,58 @@
           "control_record": "docs/migration/t14-service-route-candidate.json",
           "control_pair_sha256": "3a6e45fc63d8b939cef1e1d296d572164cc70070bf07f2fd13b4ebe2969463d4",
           "evidence_sha256": "312988c2dbdf0c9fc7a59d970c988c1cf36c5fed49ba9f193cfa6197c263e229"
+        },
+        "service_interop_candidate": {
+          "status": "HOST_SERVICE_INTEROP_CANDIDATE_NOT_NATIVE_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq",
+          "source_manifest_sha256": "2f1b0012456f73b18a7044bab5b31c3824e8a88d67709e77c95d631de9bfa54b",
+          "fixed_consumer_contract_sha256": "f2c1f98325967f959e5af7bbfea7db18540df880934a79ed138cbed86faafa0a",
+          "contract_size": 24,
+          "method_offset": 16,
+          "scope": "SysV Linux x86_64 little-endian C ABI; host GCC16.2.1 / GNU2.47",
+          "consumer_languages": [
+            "C17",
+            "Assembly",
+            "C++20"
+          ],
+          "provider_implementations": [
+            "C implementation A",
+            "C implementation B",
+            "C++20 implementation"
+          ],
+          "normal_link_driver": "cc; no -lstdc++",
+          "cpp_runtime_undefined_symbols": [],
+          "cpp_test_observer_undefined_symbol": "pangu_cpp_provider_observed",
+          "cpp_global_constructors": false,
+          "cpp_unwind_sections": false,
+          "lifecycle_entry_router_sources_unchanged": true,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "cases_per_optimization": 1188,
+          "actual_service_calls_per_optimization": 34128,
+          "calls_each_provider_consumer_pair": 3792,
+          "cpp_provider_calls_per_optimization": 11376,
+          "consumer_refusals": 30,
+          "provider_error_probes": 6,
+          "late_or_duplicate_refusals": 3312,
+          "deferred_loads": 546,
+          "callee_saved_registers_checked": 6,
+          "review_sha256": "b397465002a0226a556740eb46c7901de6ebf4c517956ff2efa3956fd6199d8f",
+          "archive_sha256": "f52e8ea7e7cd94f97160a3f1042288558714efdf47a6fad6f7737913b0017d55",
+          "archive_restored_bytes_match": true,
+          "archive_fresh_build_performed": false,
+          "supplemental_host_ubsan": true,
+          "cpp_service_consumer_verified": true,
+          "assembly_service_consumer_verified": true,
+          "cpp_host_control_headers_verified": false,
+          "plugin_sdk_complete": false,
+          "native_module_admitted": false,
+          "approval_scope": "same Agent self-review; local host interoperability experiments and metadata only",
+          "control_record": "docs/migration/t14-service-interop-candidate.json",
+          "control_pair_sha256": "b85877eda8999fda579b01f80b62219d5d792b4d1c5edc43247514f2d10ebb2c",
+          "evidence_sha256": "5032cdcf8894dcd6762824dedbaefb6eadfc96c31cf30b729ea78b6b3bee78d1"
         }
       }
     },
