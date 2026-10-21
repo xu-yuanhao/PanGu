@@ -295,3 +295,15 @@ O0/O2各1196场景、3242次实际方法调用；342 setup、306 cleanup、208�
 最终18份常规脚本退出0且源码未变；19份源码绑定回执（含SDK2 UBSan）逐一匹配最终清单。补充UBSan同1196场景退出0无诊断，SHA256 `1d9e49c93ef3c94214dee3bea9e874df285a65a0626d6c68eb624081c4558c44`。86份源码确定性tar SHA256 `fd9fdd0d6c1a705f5b734ce6214d46fe66a288c34d64365fe3f9016d2a7342b1`，另目录恢复字节一致，未据此声称恢复后重建。参考Cordis utils.createTraceable的defSite/useSite区分、reflect.locate的committed依赖视图及退休绑定等待；原生实现把实例解析与调用生命周期凭据分开，不复制JS Proxy/Promise运行时。
 
 GAP-010现为PARTIALLY_RESOLVED：本地实际SDK2方法、C/C++、双runtime和失败门禁已接通，冻结原生模块登记、clang/GAS组合、ABI guard/sanitizer及G04/G07仍待完成；不可关闭缺口或标记T14完成。
+
+## SDK2 冻结静态链路补充验证（2026-10-21）
+
+固定 SDK2 源码和 T13 输入只读挂载，在断网命名空间中使用既有冻结镜像 `9765bb42bfca5bce3787c83801b9201563d59f758b61a327bfb644c3737c1dc4`。先编译 14 个实现/C/C++ 客户端对象，再以 Clang 生成汇编、GAS 汇编、ld 静态链接原 SDK2 场景入口；没有修改任何固定实现或场景源码。补充记录目录 `/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-frozen-objects-f24d69yv`，summary.json SHA256 `dc170c043248cf975f94301403776ff5d70d21869ee207c08540aa2fc446e088`，含同一 Agent 实施/自审结论、源码/产物/工具链摘要和失败记录，不伪称独立审核。
+
+O0、O2、Oz 各运行 1196 场景、3242 次真实方法调用；完整 stdout 与原宿主 SDK2 证据逐字节相同，包括 C/C++ 的 setup/cleanup/业务嵌套和双 runtime 拒绝。三份产物通过既有 inspect_elf 检查：静态 x86_64 EXEC，无动态解释器/动态段、W+X 段或可执行栈，nm 无未定义符号。另编译 assert(0) 负例，实际退出 125 并输出断言位置，不能把失效断言当成功。
+
+发现此前 GCC 对象证据没有涵盖的移植依赖：冻结 Clang 在 O0 对结构体赋值生成 memcpy/memset 导入。此次用明确标记为测试专用的字节函数、assert/printf 和 Linux write/exit 启动适配器完成静态链接，不链接 libc/C++ 运行库。这不批准把这些符号直接引入生产，也不意味着基础内存服务已解决编译器隐式调用；正式模块登记前须明确编译器内存例程的归属、导入许可与替换边界。
+
+保留两次真实失败：第一版补充脚本未沿用现有 external-as 兼容参数而产生 prefalign/addrsig 拒绝，修正为现有 -fno-integrated-as/-fno-addrsig；第二版在 O0 成功运行后请求镜像未包含的 readelf，改用镜像已有 llvm-objdump 和现有 ELF 解析器。冻结镜像、原门禁和预算未改，没有过滤汇编或放宽告警。
+
+该结果缩小了冻结编译/无 libc 执行的不确定性；尚未执行登记后的 native-admission 矩阵，也未完成新模块 ABI guard、正式 sanitizer、G04/G07。GAP-010 继续 PARTIALLY_RESOLVED，T14 不勾选完成。下一步先登记编译器内存支持与宿主/调用管理器/SDK/测试组合，再以受控原生构建和相同场景建立正式回执。

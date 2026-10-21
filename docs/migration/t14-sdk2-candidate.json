@@ -136,5 +136,21 @@
     "Context, userdata and table lifetimes and actual async completion remain caller contracts; untracked external jobs are not made safe by opaque handles.",
     "SDK1 and SDK2 interfaces are retained and tested separately; this does not claim arbitrary SDK1/SDK2 plugins can mix in one composition.",
     "Service test uses distinct versions original+100 for the parent-bearing method ABI; no Pi/TS SDK or product Model/Tool compatibility claim."
-  ]
+  ],
+  "frozen_static_supplement": {
+    "status": "FROZEN_STATIC_SCENARIOS_PASS_MODULE_ADMISSION_PENDING",
+    "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-frozen-objects-f24d69yv",
+    "summary_sha256": "dc170c043248cf975f94301403776ff5d70d21869ee207c08540aa2fc446e088",
+    "optimizations": [
+      "O0",
+      "O2",
+      "Oz"
+    ],
+    "scenarios_per_mode": 1196,
+    "actual_calls_per_mode": 3242,
+    "assertion_negative_exit": 125,
+    "native_matrix": "NOT_RUN",
+    "module_registration": "PENDING",
+    "review": "same Agent self-review, not independent"
+  }
 }

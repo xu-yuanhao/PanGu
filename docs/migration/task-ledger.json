@@ -1355,6 +1355,15 @@
             "docs/migration/gap-ledger.json"
           ],
           "evidence_sha256": "16ebbfff6adfc222a06c06c462051a808d0bd385f2732320271fbdaecd946acf"
+        },
+        "sdk2_frozen_static_supplement": {
+          "record": "docs/migration/t14-sdk2-candidate.json",
+          "candidate_record_sha256": "e308daea73ebce745c768a418242bb5e88ffa6233d977e49973f89a73d0d94a5",
+          "summary_sha256": "dc170c043248cf975f94301403776ff5d70d21869ee207c08540aa2fc446e088",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-frozen-objects-f24d69yv",
+          "status": "FROZEN_STATIC_SCENARIOS_PASS_MODULE_ADMISSION_PENDING",
+          "reviewer": "same Agent as implementer",
+          "native_module_admitted": false
         }
       }
     },
