@@ -1,0 +1,114 @@
+{
+  "status": "HOST_ABI_CANDIDATE_NOT_NATIVE_ADMITTED",
+  "scope": "host-control C17 / SysV Linux x86_64 only",
+  "factory": "pangu_lifecycle_query",
+  "abi_version": 1,
+  "target": 1,
+  "flags": 0,
+  "table_size": 152,
+  "table_alignment": 8,
+  "methods": [
+    {
+      "name": "owner_init",
+      "offset": 16
+    },
+    {
+      "name": "register_resource",
+      "offset": 24
+    },
+    {
+      "name": "register_async",
+      "offset": 32
+    },
+    {
+      "name": "prepare",
+      "offset": 40
+    },
+    {
+      "name": "bind_geometry",
+      "offset": 48
+    },
+    {
+      "name": "start",
+      "offset": 56
+    },
+    {
+      "name": "pump",
+      "offset": 64
+    },
+    {
+      "name": "stop",
+      "offset": 72
+    },
+    {
+      "name": "setup_scope",
+      "offset": 80
+    },
+    {
+      "name": "setup_defer",
+      "offset": 88
+    },
+    {
+      "name": "setup_finish",
+      "offset": 96
+    },
+    {
+      "name": "cleanup_scope",
+      "offset": 104
+    },
+    {
+      "name": "disposer_finish",
+      "offset": 112
+    },
+    {
+      "name": "call",
+      "offset": 120
+    },
+    {
+      "name": "setup_call",
+      "offset": 128
+    },
+    {
+      "name": "cleanup_call",
+      "offset": 136
+    },
+    {
+      "name": "call_finish",
+      "offset": 144
+    }
+  ],
+  "public_type_sizes": {
+    "pangu_owner": 104,
+    "pangu_owned_resource": 24,
+    "pangu_owned_operation": 8,
+    "pangu_operation_ticket": 24,
+    "pangu_cleanup_ticket": 24,
+    "pangu_lifecycle_runtime": 192,
+    "pangu_lifecycle_item": 24,
+    "pangu_lifecycle_edge": 8,
+    "pangu_lifecycle_graph": 32,
+    "pangu_lifecycle_span": 16,
+    "pangu_lifecycle_setup_ticket": 32,
+    "pangu_lifecycle_call_ticket": 64,
+    "pangu_lifecycle_storage": 32,
+    "pangu_lifecycle_prepared": 24,
+    "pangu_lifecycle_report": 24
+  },
+  "fixed_consumer_header_sha256": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+  "dependency_header_hashes": {
+    "src/bootstrap-api/bootstrap.h": "e3d336319f9ce8087f45ac68260e212b6078db408ed462be5dbc9353d8d84c49",
+    "src/bootstrap-api/host-plan.h": "7cf966fa60cecdc4eb74d84d29a7d185b68a57c86aafafea5e70b11cf0a69300"
+  },
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp",
+  "source_manifest_sha256": "25e6b22a022cd2fdb13f227ecc4e3bacf69975e88694665ce9ed7c6a0c7f59d8",
+  "provider_header_sha256": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+  "provider_source_sha256": "2c24993db5b3da0f2a1cafce99ebdb6f87eafccf53b67cef26bb5bb37756c30b",
+  "evidence_sha256": "79848c3aa2029d97febdb335bac201c9d5b3a34bb644d73578a3b98c2f50003f",
+  "private_link_evidence_sha256": "8f80e695559f78ccdc3f46c54186b90b23e30e7cce4318cffe0f3ee38fc86257",
+  "supplemental_host_ubsan_sha256": "4a2bb5e3d4ef1c68aec8ff9321bee63706683046f9b361ff870053b01a726ab8",
+  "approval_scope": "same Agent self-review; host experiments and candidate metadata only",
+  "native_module_admitted": false,
+  "plugin_entry_bridge": false,
+  "service_value_routing": false,
+  "cpp_interop_verified": false
+}

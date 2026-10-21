@@ -948,6 +948,29 @@
           "supplemental_host_ubsan": true,
           "admission_mode": "atomic retry, no held request on failure",
           "native_admission": false
+        },
+        "facade_candidate": {
+          "status": "WIP_HOST_ABI_NOT_NATIVE_ADMITTED",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp",
+          "source_manifest_sha256": "25e6b22a022cd2fdb13f227ecc4e3bacf69975e88694665ce9ed7c6a0c7f59d8",
+          "evidence_sha256": "79848c3aa2029d97febdb335bac201c9d5b3a34bb644d73578a3b98c2f50003f",
+          "control_record": "docs/migration/t14-facade-candidate.json",
+          "control_pair_sha256": "4bcba29febf41712e8d8cc1d2bdca4e4d2e2abf7347f463a8d81607ed872d2cd",
+          "abi_version": 1,
+          "table_size": 152,
+          "method_count": 17,
+          "facade_cases_per_optimization": 1152,
+          "registration_refusals_per_optimization": 5772,
+          "private_link_refusals": 18,
+          "optimizations": [
+            "O0",
+            "O2"
+          ],
+          "fixed_consumer_header_sha256": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+          "supplemental_host_ubsan": true,
+          "plugin_entry_bridge": false,
+          "service_value_routing": false,
+          "native_admission": false
         }
       }
     },
