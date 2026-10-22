@@ -1,0 +1,83 @@
+{
+  "schema": "pangu.coordinator.trace.contract.v1",
+  "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/test.c",
+  "source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+  "cases": [
+    {
+      "id": 1,
+      "count": 3,
+      "launched": 3,
+      "fail": -1,
+      "cancel": -1,
+      "hold": -1,
+      "cleanup_fail": -1,
+      "flow": "normal"
+    },
+    {
+      "id": 2,
+      "count": 4,
+      "launched": 3,
+      "fail": 2,
+      "cancel": -1,
+      "hold": -1,
+      "cleanup_fail": 2,
+      "flow": "failure"
+    },
+    {
+      "id": 3,
+      "count": 4,
+      "launched": 2,
+      "fail": -1,
+      "cancel": 1,
+      "hold": -1,
+      "cleanup_fail": -1,
+      "flow": "cancel"
+    },
+    {
+      "id": 4,
+      "count": 3,
+      "launched": 3,
+      "fail": -1,
+      "cancel": -1,
+      "hold": 2,
+      "cleanup_fail": -1,
+      "flow": "hold-active"
+    },
+    {
+      "id": 5,
+      "count": 4,
+      "launched": 2,
+      "fail": 1,
+      "cancel": -1,
+      "hold": 1,
+      "cleanup_fail": -1,
+      "flow": "hold-failed"
+    },
+    {
+      "id": 6,
+      "count": 2,
+      "launched": 0,
+      "fail": -1,
+      "cancel": -1,
+      "hold": -1,
+      "cleanup_fail": -1,
+      "flow": "invalid"
+    },
+    {
+      "id": 7,
+      "count": 0,
+      "launched": 0,
+      "fail": -1,
+      "cancel": -1,
+      "hold": -1,
+      "cleanup_fail": -1,
+      "flow": "empty"
+    }
+  ],
+  "api_adaptations": {
+    "hold-active": "Public setup_call retains the real consumer/provider pair on explicit chain edges; replaces old private single-owner enter/leave.",
+    "hold-failed": "Same real pair remains tracked through failed setup until public call_finish.",
+    "invalid": "Duplicate owner geometry is rejected by bind before start; unbound start also refuses without callbacks."
+  },
+  "scope": "Seven old coordinator scenario groups, not all historical owner tests or complete G04."
+}

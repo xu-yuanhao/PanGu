@@ -1,0 +1,4938 @@
+{
+  "scope": "Observed positive input for parser/mutation tests; expected semantics are the separately fixed seven-group contract, not this sample.",
+  "observed_trace_sha256": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+  "records": [
+    {
+      "case": 1,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 3,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 3,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 2,
+      "event": "setup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 3,
+      "event": "setup-registered",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 4,
+      "event": "setup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 5,
+      "event": "setup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 6,
+      "event": "setup-registered",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 7,
+      "event": "setup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 8,
+      "event": "setup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 9,
+      "event": "setup-registered",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 10,
+      "event": "setup-return",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 11,
+      "event": "start-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 2,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        2,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 1,
+      "work": 15,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 12,
+      "event": "cleanup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 13,
+      "event": "stop-reentrant-cleanup",
+      "id": 2,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 1,
+      "seq": 14,
+      "event": "register-during-cleanup",
+      "id": 2,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 15,
+      "event": "cleanup-return",
+      "id": 2,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 16,
+      "event": "cleanup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 17,
+      "event": "stop-reentrant-cleanup",
+      "id": 1,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 1,
+      "seq": 18,
+      "event": "register-during-cleanup",
+      "id": 1,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 19,
+      "event": "cleanup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 20,
+      "event": "cleanup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 21,
+      "event": "stop-reentrant-cleanup",
+      "id": 0,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 1,
+      "seq": 22,
+      "event": "register-during-cleanup",
+      "id": 0,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 23,
+      "event": "cleanup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 24,
+      "event": "stop-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 3,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 12,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 25,
+      "event": "stop-again",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 3,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 1,
+      "seq": 26,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 3,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 2,
+      "event": "setup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 3,
+      "event": "setup-registered",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 4,
+      "event": "setup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 5,
+      "event": "setup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 6,
+      "event": "setup-registered",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 7,
+      "event": "setup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 8,
+      "event": "setup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 9,
+      "event": "setup-registered",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 10,
+      "event": "setup-return",
+      "id": 2,
+      "rc": -70,
+      "phase": 1,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 11,
+      "event": "cleanup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 12,
+      "event": "stop-reentrant-cleanup",
+      "id": 2,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 2,
+      "seq": 13,
+      "event": "register-during-cleanup",
+      "id": 2,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 14,
+      "event": "cleanup-return",
+      "id": 2,
+      "rc": -90,
+      "phase": 3,
+      "count": 4,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 15,
+      "event": "cleanup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 16,
+      "event": "stop-reentrant-cleanup",
+      "id": 1,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 2,
+      "seq": 17,
+      "event": "register-during-cleanup",
+      "id": 1,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 18,
+      "event": "cleanup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 19,
+      "event": "cleanup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 20,
+      "event": "stop-reentrant-cleanup",
+      "id": 0,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 2,
+      "seq": 21,
+      "event": "register-during-cleanup",
+      "id": 0,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 22,
+      "event": "cleanup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 23,
+      "event": "start-return",
+      "id": -1,
+      "rc": -70,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 30,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 24,
+      "event": "stop-again",
+      "id": -1,
+      "rc": -90,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 2,
+      "seq": 25,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": -90,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 2,
+      "event": "setup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 3,
+      "event": "setup-registered",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 4,
+      "event": "setup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 5,
+      "event": "setup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 6,
+      "event": "setup-registered",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 7,
+      "event": "stop-reentrant-setup",
+      "id": 1,
+      "rc": 5,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 1,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 3,
+      "seq": 8,
+      "event": "register-after-stop",
+      "id": 1,
+      "rc": 10,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 9,
+      "event": "setup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 10,
+      "event": "cleanup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 11,
+      "event": "stop-reentrant-cleanup",
+      "id": 1,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 3,
+      "seq": 12,
+      "event": "register-during-cleanup",
+      "id": 1,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 13,
+      "event": "cleanup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 14,
+      "event": "cleanup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 15,
+      "event": "stop-reentrant-cleanup",
+      "id": 0,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 3,
+      "seq": 16,
+      "event": "register-during-cleanup",
+      "id": 0,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 17,
+      "event": "cleanup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 18,
+      "event": "start-return",
+      "id": -1,
+      "rc": 6,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 23,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 3,
+      "seq": 19,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 2,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 3,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 3,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 2,
+      "event": "setup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 3,
+      "event": "setup-registered",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 4,
+      "event": "setup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 5,
+      "event": "setup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 6,
+      "event": "setup-registered",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 7,
+      "event": "setup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 8,
+      "event": "setup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 9,
+      "event": "setup-registered",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 10,
+      "event": "hold-acquired",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        2,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 1,
+      "work": 6,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 11,
+      "event": "setup-return",
+      "id": 2,
+      "rc": 0,
+      "phase": 1,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        2,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 12,
+      "event": "start-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 2,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        2,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 1,
+      "work": 20,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 13,
+      "event": "stop-wait",
+      "id": -1,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 1,
+      "work": 11,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 4,
+      "seq": 14,
+      "event": "start-again",
+      "id": -1,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 15,
+      "event": "business-after-stop",
+      "id": -1,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 16,
+      "event": "hold-finished",
+      "id": -1,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 17,
+      "event": "hold-finish-duplicate",
+      "id": -1,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 18,
+      "event": "cleanup-begin",
+      "id": 2,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 19,
+      "event": "stop-reentrant-cleanup",
+      "id": 2,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 4,
+      "seq": 20,
+      "event": "register-during-cleanup",
+      "id": 2,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 21,
+      "event": "cleanup-return",
+      "id": 2,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 3,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 22,
+      "event": "cleanup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 23,
+      "event": "stop-reentrant-cleanup",
+      "id": 1,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 4,
+      "seq": 24,
+      "event": "register-during-cleanup",
+      "id": 1,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 25,
+      "event": "cleanup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 2,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 26,
+      "event": "cleanup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 27,
+      "event": "stop-reentrant-cleanup",
+      "id": 0,
+      "rc": 5,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 4,
+      "seq": 28,
+      "event": "register-during-cleanup",
+      "id": 0,
+      "rc": 10,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 29,
+      "event": "cleanup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 3,
+      "started": 1,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 30,
+      "event": "stop-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 3,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 19,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 4,
+      "seq": 31,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 3,
+      "started": 0,
+      "launched": 3,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        4,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 4,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 2,
+      "event": "setup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 3,
+      "event": "setup-registered",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 4,
+      "event": "setup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 1,
+      "launched": 1,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 5,
+      "event": "setup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 6,
+      "event": "setup-registered",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 7,
+      "event": "hold-acquired",
+      "id": 1,
+      "rc": 0,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        2,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 6,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 8,
+      "event": "setup-return",
+      "id": 1,
+      "rc": -70,
+      "phase": 1,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        2,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 9,
+      "event": "start-return",
+      "id": -1,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 32,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 5,
+      "seq": 10,
+      "event": "business-after-stop",
+      "id": -1,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 11,
+      "event": "hold-finished",
+      "id": -1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 12,
+      "event": "hold-finish-duplicate",
+      "id": -1,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 13,
+      "event": "cleanup-begin",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 14,
+      "event": "stop-reentrant-cleanup",
+      "id": 1,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 5,
+      "seq": 15,
+      "event": "register-during-cleanup",
+      "id": 1,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 16,
+      "event": "cleanup-return",
+      "id": 1,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 2,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        2,
+        3,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 17,
+      "event": "cleanup-begin",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 18,
+      "event": "stop-reentrant-cleanup",
+      "id": 0,
+      "rc": 5,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 0,
+      "pending": 1,
+      "reason": 2
+    },
+    {
+      "case": 5,
+      "seq": 19,
+      "event": "register-during-cleanup",
+      "id": 0,
+      "rc": 10,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 20,
+      "event": "cleanup-return",
+      "id": 0,
+      "rc": 0,
+      "phase": 3,
+      "count": 4,
+      "started": 1,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        3,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 21,
+      "event": "stop-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 15,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 5,
+      "seq": 22,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 4,
+      "started": 0,
+      "launched": 2,
+      "stop": 1,
+      "load_error": -70,
+      "cleanup_error": 0,
+      "state": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 6,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 2,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 6,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 1,
+      "phase": 0,
+      "count": 2,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 6,
+      "seq": 2,
+      "event": "start-return",
+      "id": -1,
+      "rc": 1,
+      "phase": 0,
+      "count": 2,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 6,
+      "seq": 3,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 2,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 7,
+      "seq": 0,
+      "event": "case-begin",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 0,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 7,
+      "seq": 1,
+      "event": "bind",
+      "id": -1,
+      "rc": 0,
+      "phase": 0,
+      "count": 0,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 7,
+      "seq": 2,
+      "event": "start-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 2,
+      "count": 0,
+      "started": 0,
+      "launched": 0,
+      "stop": 0,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 3,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 7,
+      "seq": 3,
+      "event": "stop-return",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 0,
+      "started": 0,
+      "launched": 0,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 1,
+      "work": 3,
+      "pending": 0,
+      "reason": 0
+    },
+    {
+      "case": 7,
+      "seq": 4,
+      "event": "case-end",
+      "id": -1,
+      "rc": 0,
+      "phase": 4,
+      "count": 0,
+      "started": 0,
+      "launched": 0,
+      "stop": 1,
+      "load_error": 0,
+      "cleanup_error": 0,
+      "state": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "inflight": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "resources": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "has_report": 0,
+      "work": 0,
+      "pending": 0,
+      "reason": 0
+    }
+  ]
+}
