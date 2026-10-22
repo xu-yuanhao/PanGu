@@ -17,7 +17,9 @@ static model models[7];
 static const pangu_lifecycle_api *api;
 
 static void event(model *m,const char *kind,int id,int rc,const pangu_lifecycle_report *report) {
- assert(m->seq<128);
+ assert(m->seq>=0 && m->seq<128);
+ assert(m->runtime.count<=4 && m->runtime.started<=m->runtime.launched && m->runtime.launched<=m->runtime.count);
+ for(int i=0;i<4;i++) assert(m->owners[i].inflight<=3 && m->owners[i].count<=2);
  if(report) assert(report->work<=FUEL && report->reserved==0);
  printf("{\"case\":%d,\"seq\":%d,\"event\":\"%s\",\"id\":%d,\"rc\":%d,\"phase\":%d,\"count\":%d,\"started\":%d,\"launched\":%d,\"stop\":%d,\"load_error\":%d,\"cleanup_error\":%d,\"state\":[%d,%d,%d,%d],\"inflight\":[%d,%d,%d,%d],\"resources\":[%d,%d,%d,%d],\"has_report\":%d,\"work\":%d,\"pending\":%d,\"reason\":%d}\n",
  m->case_id,m->seq++,kind,id,rc,(int)m->runtime.phase,(int)m->runtime.count,(int)m->runtime.started,(int)m->runtime.launched,
