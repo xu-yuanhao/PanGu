@@ -214,6 +214,14 @@
     "docs/migration/t14-focused-ubsan-candidate.json": "control",
     "docs/migration/t14-focused-inventory.json": "control",
     "docs/migration/t14-focused-native-evidence.json": "control",
-    "docs/migration/t14-focused-native-source-publication.json": "control"
+    "docs/migration/t14-focused-native-source-publication.json": "control",
+    "docs/migration/t14-coordinator-trace-contract.json": "control",
+    "docs/migration/t14-coordinator-trace-normal-candidate.json": "control",
+    "docs/migration/t14-coordinator-trace-ubsan-candidate.json": "control",
+    "tools/gates/coordinator_trace.py": "gate",
+    "docs/migration/t14-coordinator-trace-sample.json": "control",
+    "tools/gates/test_coordinator_trace.py": "gate-test",
+    "docs/migration/t14-coordinator-trace-evidence.json": "control",
+    "docs/migration/t14-coordinator-trace-source-publication.json": "control"
   }
 }

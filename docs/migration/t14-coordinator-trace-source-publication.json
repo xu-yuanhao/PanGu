@@ -1,0 +1,14 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-22",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-coordinator-trace",
+  "commit": "32dafac4001e5f8410abfdcc414c2c8c11f17064",
+  "parent": "18233b44678b380348167efa0af8da4ca147cfea",
+  "scope": "Fixed seven-group public ABI coordinator trace candidate; no production/release admission or full G04/T14 acceptance.",
+  "controller_sha256": "23e5fcc013654fc0c35481d1447890fc8134c099c845af49f826164441cabd4c",
+  "candidate_tree_sha256": "22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209",
+  "native_source_files": 38,
+  "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+  "release": "BLOCKED"
+}

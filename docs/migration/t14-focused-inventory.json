@@ -154,8 +154,15 @@
       "id": "T14-F18",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/test.c",
       "source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "Keep documented real-call/early-geometry API adaptations; remaining async/graph/fault/G07 scope is not completed.",
+      "suite": "coordinator-seven-groups",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "groups_per_run": 7,
+      "events_per_run": 137,
+      "trace_contract": "docs/migration/t14-coordinator-trace-contract.json",
+      "evidence": "docs/migration/t14-coordinator-trace-evidence.json"
     },
     {
       "id": "T14-F19",
@@ -165,7 +172,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 11,
+  "pending_current_abi_ports": 10,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

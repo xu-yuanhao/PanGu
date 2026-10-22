@@ -189,9 +189,11 @@
         "t14-sdk1-native-evidence.json",
         "t14-ubsan-native-evidence.json",
         "t14-focused-native-evidence.json",
-        "t14-focused-inventory.json"
+        "t14-focused-inventory.json",
+        "t14-coordinator-trace-contract.json",
+        "t14-coordinator-trace-evidence.json"
       ],
-      "remaining": "五套公开ABI专项已补齐：同一固定树44普通/UBSan构建及44执行，旧输出和284断言保持；72私有链接拒绝/8公开query链接通过。最新宿主快照仍有11项私有helper用例待迁移，更早owner独立语料仍待审计；还缺对应专项ABI守卫、完整G04轨迹/故障矩阵及G07，不关闭GAP或T14。"
+      "remaining": "协调器七组已通过公开ABI适配与固定轨迹守卫：8普通/UBSan构建和执行、56组次/1096事件、223隔离门禁自测；真实受管调用票据保留双方owner，私有导出未恢复。最新快照仍有10项入口待迁移、更早owner语料待审计；异步/分支/预算等完整G04轨迹、其余ABI守卫和G07仍缺，不关闭GAP或T14。"
     }
   ]
 }

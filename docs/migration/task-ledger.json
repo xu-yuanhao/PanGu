@@ -1500,6 +1500,23 @@
           "reviewer": "same Agent as implementer",
           "final_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-focused-native-v4-79sc9bn4/final-review.json",
           "production_admission": false
+        },
+        "coordinator_public_trace": {
+          "status": "SEVEN_COORDINATOR_GROUPS_PUBLIC_ABI_TRACE_PASS_FULL_G04_T14_PENDING",
+          "contract": "docs/migration/t14-coordinator-trace-contract.json",
+          "evidence": "docs/migration/t14-coordinator-trace-evidence.json",
+          "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded",
+          "controller_sha256": "23e5fcc013654fc0c35481d1447890fc8134c099c845af49f826164441cabd4c",
+          "candidate_tree_sha256": "22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209",
+          "summary_sha256": "c43bb85c1592f459478c3a0b7bbae817960e28d3c8ef3b775b4f7dd6d2734dfc",
+          "builds": 8,
+          "executions": 8,
+          "group_executions": 56,
+          "events": 1096,
+          "isolated_gate_tests": 223,
+          "reviewer": "same Agent as implementer",
+          "final_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/final-review.json",
+          "production_admission": false
         }
       }
     },

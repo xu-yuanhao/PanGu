@@ -1,0 +1,250 @@
+{
+  "schema": "pangu.t14-coordinator-trace-evidence.v1",
+  "status": "SEVEN_COORDINATOR_GROUPS_PUBLIC_ABI_TRACE_PASS_FULL_G04_T14_PENDING",
+  "external_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded",
+  "preview_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh",
+  "contract": "docs/migration/t14-coordinator-trace-contract.json",
+  "contract_sha256": "ac0a448d240a6c14b15deea19fed1e7ce599cbf34726c53081c39eae0e7812ed",
+  "registries": {
+    "normal": "docs/migration/t14-coordinator-trace-normal-candidate.json",
+    "ubsan": "docs/migration/t14-coordinator-trace-ubsan-candidate.json"
+  },
+  "controller_sha256": "23e5fcc013654fc0c35481d1447890fc8134c099c845af49f826164441cabd4c",
+  "policy_sha256": "821c275761bebbd9d134daadfffbeccb90882e0006eeb8d7626fca6c7474db66",
+  "candidate_tree_sha256": "22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209",
+  "same_controller_for_native_and_selftests": true,
+  "same_candidate_for_both_profiles": true,
+  "images": {
+    "normal": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+  },
+  "modules": 12,
+  "compositions": 2,
+  "native_source_files": 38,
+  "unchanged_reused_sources": 37,
+  "new_test_only_sources": 1,
+  "builds": 8,
+  "executions": 8,
+  "groups_per_execution": 7,
+  "events_per_execution": 137,
+  "group_executions": 56,
+  "events_verified": 1096,
+  "all_trace_bytes_equal": true,
+  "trace_sha256": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+  "ubsan_source_audit_records": 14,
+  "isolated_gate_tests": 223,
+  "new_gate_self_tests": 8,
+  "new_gate": "tools/gates/coordinator_trace.py",
+  "old_coordinator_source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+  "migration_map": {
+    "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/test.c",
+    "source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+    "groups": [
+      {
+        "case": 1,
+        "old_source_line": 27,
+        "old_group_text_sha256": "3ac6b3d253d56ec7fca1978b1dbbd6287864824130460441db3c6fc4ebf8dbc6",
+        "preserved_obligation": "Startup prefix and reverse cleanup; repeat stop does not repeat callbacks.",
+        "intentional_api_adaptation": "Private helpers replaced by the corresponding existing public table methods; no new host export.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 2,
+        "old_source_line": 28,
+        "old_group_text_sha256": "f0adbefbc9fe70fa8264640744600b87e189365746b6fee8affd7665970d0217",
+        "preserved_obligation": "First setup failure and cleanup failure are separately preserved; cleanup continues, later owner remains Loading.",
+        "intentional_api_adaptation": "Private helpers replaced by the corresponding existing public table methods; no new host export.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 3,
+        "old_source_line": 29,
+        "old_group_text_sha256": "d1ebe08ee626005e3d101194bc5b0a9bdcc6076d892ac45ba6d10d246e888f86",
+        "preserved_obligation": "Reentrant cancellation prevents later setup and rolls back the actual prefix.",
+        "intentional_api_adaptation": "Private helpers replaced by the corresponding existing public table methods; no new host export.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 4,
+        "old_source_line": 30,
+        "old_group_text_sha256": "cc0b904854e145da3bb861ce135b0672fb289277b6c070414464d7beff22cd5c",
+        "preserved_obligation": "Tracked consumer/provider call retains the dependent chain through stop; start/new business denied; finish enables cleanup.",
+        "intentional_api_adaptation": "Public setup_call retains the real consumer/provider pair on explicit chain edges; replaces old private single-owner enter/leave.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 5,
+        "old_source_line": 31,
+        "old_group_text_sha256": "a903402ee9e66d97390622e6df68fa6f44316962f78fcfa17d66a7a21bdc904a",
+        "preserved_obligation": "Failed setup keeps its outstanding call visible until finish; load error survives successful cleanup.",
+        "intentional_api_adaptation": "Same real pair remains tracked through failed setup until public call_finish.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 6,
+        "old_source_line": 32,
+        "old_group_text_sha256": "03b7d7a35a4eacba446415e67717d57c44c00dac14958ad39cdfac80d082fb0f",
+        "preserved_obligation": "Duplicate owner storage is rejected before callbacks; geometry refusal precedes activation.",
+        "intentional_api_adaptation": "Duplicate owner geometry is rejected by bind before start; unbound start also refuses without callbacks.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      },
+      {
+        "case": 7,
+        "old_source_line": 33,
+        "old_group_text_sha256": "6a7a3bfd885beee42ceea5c6ecb343835d12d23655c2dda888a13421b2b95845",
+        "preserved_obligation": "Empty runtime starts/stops without callbacks.",
+        "intentional_api_adaptation": "Private helpers replaced by the corresponding existing public table methods; no new host export.",
+        "normal_runs": 4,
+        "ubsan_runs": 4
+      }
+    ],
+    "scope": "Seven semantic group migrations with explicit API changes, not byte-identical old assertion text."
+  },
+  "checker_evolution": {
+    "contract_and_preview_reference_fixed_before_first_native_capture": true,
+    "preview_checker_sha256": "ed1a89378e7c34fc87c7305aa27e163e03f32627f153d5e9435b3ca667b76136",
+    "final_gate_sha256": "5290be27c35aee4a120797f520552f03841b6a99f6c256eedf9563031536d706",
+    "changes": "Final checker tightens bounded file reads, malformed JSON error handling and contract scalar types. Mandatory event grammar and state transitions remain unchanged; final controller reruns all8 native builds/executions and223 self-tests."
+  },
+  "counterexamples": [
+    "missing/extra/reordered events",
+    "early provider disposal",
+    "lost in-flight reference",
+    "swallowed setup/cleanup error",
+    "registration accepted after stop",
+    "resource count leak",
+    "start accepted during stop",
+    "wrong pending reason",
+    "work cap exceeded",
+    "unknown/missing fields or malformed arrays",
+    "booleans/floats in integer fields",
+    "duplicate JSON keys/nonfinite numbers/UTF-8 or JSON errors",
+    "changed/dropped/retyped mandatory contract rows",
+    "wrong contract SHA leaves BLOCKED receipt",
+    "file reader bounded before parsing"
+  ],
+  "budgets": {
+    "native_or_isolated_job_seconds": 180,
+    "subprocess_seconds": 30,
+    "trace_max_bytes": 1048576,
+    "max_events_per_group": 128,
+    "logical_work_bound": 1000000,
+    "previous_limits_unchanged": true
+  },
+  "archive": {
+    "status": "PASS",
+    "scope": "Archive bytes and registration restored; all8 retained builds verified against restored source. Not a fresh archive rebuild.",
+    "source_tar_sha256": "d62ec75b0c1e0f4cfb38ac177c6e5562b14d2257d3c359abdbb06c1251ee9075",
+    "restored_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/source-restored-_jc2p4mj",
+    "files": 253,
+    "native_source_files": 38,
+    "candidate_tree_sha256": "22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209",
+    "restored_inputs_match": true,
+    "retained_checks": {
+      "normal": {
+        "admission_receipt_binding": "PASS",
+        "verified_builds": 4,
+        "native_matrix": "PASS",
+        "status": "BLOCKED",
+        "release": "BLOCKED"
+      },
+      "ubsan": {
+        "admission_receipt_binding": "PASS",
+        "verified_builds": 4,
+        "native_matrix": "PASS",
+        "status": "BLOCKED",
+        "release": "BLOCKED"
+      }
+    },
+    "executions_checked": 8,
+    "fresh_archive_build": false,
+    "release": "BLOCKED"
+  },
+  "publication": {
+    "schema": "pangu.experimental-source-publication.v1",
+    "date": "2026-10-22",
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-coordinator-trace",
+    "commit": "32dafac4001e5f8410abfdcc414c2c8c11f17064",
+    "parent": "18233b44678b380348167efa0af8da4ca147cfea",
+    "scope": "Fixed seven-group public ABI coordinator trace candidate; no production/release admission or full G04/T14 acceptance.",
+    "controller_sha256": "23e5fcc013654fc0c35481d1447890fc8134c099c845af49f826164441cabd4c",
+    "candidate_tree_sha256": "22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209",
+    "native_source_files": 38,
+    "validation": "Git tree inventory and every blob match fixed candidate; remote ref readback matches commit",
+    "release": "BLOCKED"
+  },
+  "evidence_sha256": {
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-normal-coordinator-trace-asm-debug.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-normal-coordinator-trace-asm-release.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-normal-coordinator-trace-alternate-debug.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-normal-coordinator-trace-alternate-release.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-ubsan-coordinator-trace-asm-debug.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-ubsan-coordinator-trace-asm-release.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-ubsan-coordinator-trace-alternate-debug.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/trace-ubsan-coordinator-trace-alternate-release.jsonl": "501187ab8fe49c2881e0732f2b0b5d50f0a9baa11ff95f7d6f3afcf18d2e4a95",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/request-normal.json": "614db19e815e95e3bb987d412e642386ab6191c969ee140b647efa47c7dd8c56",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/request-ubsan.json": "3a00bc0a754e7a7eb03fd2bab9bd62330e059fa08c05c4f93d30b7e2c1dc997e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/control-review-normal.json": "0625a4ab6ac444708c737edfc68c3790baafbfc2fc6ad108c7371021df5e9a5e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/control-review-ubsan.json": "9c07301759c59994af13591cea9c6d59f8225f77021b96eca2a3ad9b06589e75",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/build-normal/native/admission.json": "0bb4dddcdb7afd1e7561d05c1d6134532a1cabd8cf1faab266c5c859e5707d93",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/build-normal/isolation.json": "8879849d96d20c1bc60d358156ee29c2a998d6a6a4144ec48a28339bfede7a42",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/build-ubsan/native/admission.json": "dd3b21380575e99f170edcb55796ea83609001da9a18be3fe5f6793a0a6305f1",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/build-ubsan/isolation.json": "949d528f946db7898a6bc2ee78a6a44669cc6630255727be2dbee4375dc4a124",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/executions-normal.json": "00e4d5dc64524804c82ae851e145d1c8cfd245489cd6dac4ae55585c672ca8bd",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/executions-ubsan.json": "b09d11de8eebe580e661c54555e818bf5908f9d10e8853dc34129db04ae06148",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final/selftests/run.json": "77f229a559e9c0a41bed90c99ede3c8fd758f6d63f39e8cd8537ac08209a2974",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final/selftests/isolation.json": "a0c00af6659156058d00070421f6faa49e30d5fabcff85eec5f6b22919ba6033",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/migration-map.json": "60e433c553f88284c253fa337246da4605c71c34eee1db79d9c13bade9ccbc2e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/archive-verify.json": "98a6edf146cfd63f02790caae639f3a2be9c832ec0113e16e63af2091b501411",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/publication.json": "24b8313f55527cec21bd431a2646404089e8ed02786f7fb31d4006d6d04b1485",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/execute.py": "297b75a5561d77dae0d882c0bc2b629b1f0f2885eba114beb3fa4e97cdf1635f",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/checker-pin.json": "596c691544407366173a29c59d724f75b0ef39d92ed053b7c618ddfe41b58b2e",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/coordinator_trace.py": "ed1a89378e7c34fc87c7305aa27e163e03f32627f153d5e9435b3ca667b76136",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/checker-hardening.diff": "4d200bc96c2c01b3b4dd1b0982b6cf20259a2ee217cc88f720b3a68af4f88ef1",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/trace-gate-self-tests.log": "8c58054cecf0cecb272f8f8bce2825f76354be682d83b7fa0114853fa939a555",
+    "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/observer-hardening.json": "8af199accb384d7c3a38e470b6381e923b297baf01d8a6f26d91008666ff9f9f"
+  },
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept only the documented seven coordinator semantic migrations, local trace checker and fixed native evidence. No private export restored and no full G04/T14 or production promotion.",
+    "final_metadata_review": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/final-review.json"
+  },
+  "remaining": [
+    "Ten latest-host private-helper entry ports and audit of earlier standalone owner corpora.",
+    "Async setup/disposer, branch, fault and bounded-quantum trace matrices beyond these seven coordinator groups.",
+    "Remaining focused ABI guards and G07 resource/size/performance baselines.",
+    "Full G03/G04/T14 and production/protected remote admission."
+  ],
+  "limitations": [
+    "The trace checker covers a fixed seven-group contract; it is not a general proof of lifecycle correctness.",
+    "API adaptation retains real lifecycle call pairs, not the old private single-owner helper surface; no provider business method is invoked by these hold tests.",
+    "Observed fixture data supplies valid inputs for mutation tests; separately fixed grammar/state model defines expected behavior.",
+    "Trace work is a logical bound, not callback wall-clock or peak-memory proof.",
+    "UBSan does not instrument Assembly or prove complete memory/leak/race safety.",
+    "Archive restored-source retained verification is not a fresh archive rebuild.",
+    "Same-Agent local review and controller/image pins do not establish server-side anti-bypass."
+  ],
+  "full_G04": "NOT_COMPLETED",
+  "full_T14": "NOT_COMPLETED",
+  "release": "BLOCKED",
+  "observer_hardening": {
+    "record": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final-bounded/observer-hardening.json",
+    "pre_conversion_assertions": "runtime count<=4 and started<=launched<=count; owner inflight<=3/resource rows<=2 before int serialization. Existing report.work cap remains.",
+    "previous_passed_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-coordinator-trace-qbufh1wh/final",
+    "previous_candidate_tree_sha256": "507e4d1ba66cc5efbe405d69ed1d8c1fd4ab5daf9508f1fffe437dd812872073",
+    "previous_publication": "18233b44678b380348167efa0af8da4ca147cfea",
+    "all8_native_programs_rebuilt_and_rerun": true,
+    "same223_test_controller_reused": true,
+    "trace_bytes_unchanged": true
+  },
+  "summary_sha256": "c43bb85c1592f459478c3a0b7bbae817960e28d3c8ef3b775b4f7dd6d2734dfc"
+}
