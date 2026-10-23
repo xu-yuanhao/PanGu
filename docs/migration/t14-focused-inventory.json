@@ -153,8 +153,26 @@
       "id": "T14-F08",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/geometry-test.c",
       "source_sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "记录旧standalone owner enter/stop几何拒绝断言没有公开ABI等价物；继续F09、F17/F19、完整G04/G07与更早owner语料审计。",
+      "suite": "geometry-public-98",
+      "evidence": "docs/migration/t14-geometry-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "37577bf1d6019afbc28a9d1b27cbb307bfa68c6a0b8703c6044020d86798cdfb",
+      "candidate_commit": "c9ffa57e84f89046ec583249ddfe1d744a70cc90",
+      "geometry_cases_per_run": 98,
+      "protected_span_matrices_per_run": 600,
+      "geometry_refusals_per_run": 143961,
+      "adaptation": "将runtime_bind_geometry及runtime/start/pump/stop/setup/cleanup/call/disposer外部指针几何拒绝改用公开生命周期表验证；每个protected span首地址测试输出/输入重叠，验证完整protected内容和输出哨兵不变。builder覆盖runtime/resource别名、错位span、owner/resource冲突、超大容量、fuel不足和重复绑定。旧standalone pangu_owner_enter/stop_budget/enter_cleanup为私有函数，当前公开ABI无等价入口，明确记录为差异。fuel不足时runtime保持不变，但调用者span scratch可能写入部分中间数据；测试按现有实现契约保留，不声称scratch具有回滚保证。",
+      "validation": {
+        "normal_builds_and_runs": 4,
+        "ubsan_builds_and_runs": 4,
+        "outputs_identical": true,
+        "native_matrix": "PASS",
+        "release": "BLOCKED"
+      }
     },
     {
       "id": "T14-F09",
@@ -277,7 +295,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 4,
+  "pending_current_abi_ports": 3,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

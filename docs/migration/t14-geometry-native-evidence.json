@@ -1,0 +1,131 @@
+{
+  "schema": "pangu.t14-geometry-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F08 historical geometry-test.c geometry and protected memory port through the current public lifecycle table; no production promotion or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/geometry-test.c",
+    "sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "c9ffa57e84f89046ec583249ddfe1d744a70cc90",
+    "parent": "455d62c4148bfc384453b01aa1637e937336d61d",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "37577bf1d6019afbc28a9d1b27cbb307bfa68c6a0b8703c6044020d86798cdfb",
+    "candidate_tree_sha256": "42e9001fbf05d31c4ea48cfe11334f50bb9a7123559c700cf187e9a4bda9a448",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "37577bf1d6019afbc28a9d1b27cbb307bfa68c6a0b8703c6044020d86798cdfb"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "4446cade78154d262315604676752b0fcf0b08fdbe0ed3cc2c7d962578d0f081",
+    "native_candidate_controller_sha256": "fc018046829044851e6e4faa0d38a0711c64ad232647612752ac79f1e30b3d34",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "73753c5bb04f4056bfae35b38ebc9a45bf2e176e59878798247663ba916f1ddb",
+    "ubsan_request_sha256": "20313ae1939f73ae9f66cfd8f374b79d802d4b3afd1afc3d247563041c2c8d6b"
+  },
+  "coverage": {
+    "geometry_cases_per_run": 98,
+    "protected_span_matrices_per_run": 600,
+    "geometry_refusals_per_run": 143961,
+    "scenarios": [
+      "95 valid fixed host graph corpus plans plus default fixed plan and two provider-order permutations",
+      "each protected span start is rejected as caller output/input for lifecycle, setup, cleanup, call, disposer and finish table methods",
+      "protected span bytes, runtime and output sentinels unchanged on all geometric rejection cases",
+      "builder rejects start before bind_geometry, runtime/resource aliases, misaligned span storage, overlapping owner resources, misaligned owner and capacity overflow",
+      "bind_geometry retries increasing fuel until commit; runtime remains byte-identical on insufficient fuel and resulting spans are sorted/non-overlapping",
+      "rebinding already protected runtime rejects without further mutation",
+      "public owner_init rejects a misaligned owner address before mutation"
+    ],
+    "fuel_shortage_output_contract": "Runtime remains unchanged; span output scratch may be partially written before fuel exhaustion and is not claimed transactional.",
+    "private_owner_geometry": "Standalone owner enter/leave/stop-budget geometry calls have no current public ABI equivalent and are not counted as passed.",
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "7861a25d43f9dd41e9beaa5c50b139b17681e571bdbc8f551a1c7dc6aa0af6e2",
+    "all_stdout_identical": true
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "bind_geometry",
+      "start",
+      "pump",
+      "stop",
+      "setup_scope",
+      "setup_defer",
+      "setup_finish",
+      "cleanup_scope",
+      "disposer_finish",
+      "call",
+      "setup_call",
+      "cleanup_call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "Old standalone pangu_owner_enter, pangu_owner_enter_cleanup and pangu_owner_stop_budget were private, so only their geometry behavior that is exposed through the current lifecycle table is tested. bind_geometry fuel shortage leaves runtime unchanged but may write caller span scratch before returning."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "7a85f6b73a003abadbadef89c467044e5231ee3e164c74b568e16d85a0a06d1c",
+      "executions_json_sha256": "b965b1374eb1d3f708e6fc592fb9024700323eba4b5db40f80b5dd05b5011183",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "9df887efea5b5c7a5f322c172cab35bfc52f7f43fafc58b89483e9c6a44dc7b1",
+      "executions_json_sha256": "13acc86ce027b0cab89c3cf9a8adf317ee31d97f2c19b80daad12e47a0afbee2",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F08 as PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS and continuing local T14 test work only; no production, release, gate, ABI, profile, or budget change.",
+    "fixed_candidate_digest": "42e9001fbf05d31c4ea48cfe11334f50bb9a7123559c700cf187e9a4bda9a448",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS"
+    ],
+    "risks": [
+      "This is same-Agent self-review, not independent approval.",
+      "Private standalone owner geometry behavior remains unmapped.",
+      "Insufficient-fuel bind_geometry may leave partial caller span output.",
+      "External trust approval and release remain blocked.",
+      "UBSan does not instrument assembly provider instructions.",
+      "F09/F17/F19 and full G04/G07/T14 remain incomplete."
+    ],
+    "control_scope_sha256": "ffff132eb24c0532b10126b4936f9607f5a0b19146ae42f82f59d46607bb3d84",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "15b8be58970cf686a0d1204317889fbc951bd65f571448c7ee087b96d40a00a6",
+      "docs/migration/t14-focused-inventory.json": "bca75b14999754174b9c80a329ba3cfcb562c6616c5076917239d0053db27a34",
+      "docs/migration/t14-owner-boundaries.md": "ab5cf7fce981b9fdff3bb9a228a4c71c6ef522f37065ecb9af88697402f38d4b",
+      "docs/原生重写路线与迁移TODO.md": "e6ba0022b7692a4fc20a9c190e267a6355a93d220f8f7f7a88c095e06b490500"
+    }
+  }
+}
