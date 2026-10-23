@@ -222,6 +222,10 @@
     "docs/migration/t14-coordinator-trace-sample.json": "control",
     "tools/gates/test_coordinator_trace.py": "gate-test",
     "docs/migration/t14-coordinator-trace-evidence.json": "control",
-    "docs/migration/t14-coordinator-trace-source-publication.json": "control"
+    "docs/migration/t14-coordinator-trace-source-publication.json": "control",
+    "docs/migration/t14-async-setup-core-normal-candidate.json": "control",
+    "docs/migration/t14-async-setup-core-ubsan-candidate.json": "control",
+    "docs/migration/t14-async-setup-core-evidence.json": "control",
+    "docs/migration/t14-async-setup-core-source-publication.json": "control"
   }
 }

@@ -1,0 +1,193 @@
+{
+  "schema": "pangu.t14-async-setup-core-evidence.v1",
+  "status": "ASYNC_SETUP_CORE_CURRENT_PUBLIC_ABI_NATIVE_PASS_OLD_INTEGRATION_PENDING",
+  "scope": "Only the 1,414 historical async setup scenarios from setup-test.c were re-expressed and run through current public lifecycle ABI. The setup-test.c wrapper first calls integration_main(), which runs the separate 675 adapter integration scenarios; that prerequisite was not run in this candidate. Do not mark the complete legacy setup-test.c row or full T14 complete.",
+  "old_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
+    "sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+    "inventory_id": "T14-F16"
+  },
+  "candidate_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-core-ymz2eqav",
+  "candidate_tree_sha256": "60be0e1cd727e7fcc9bf0eb9d4ce72637b97b432b54ca36e37a46f360888bf37",
+  "candidate_sources": {
+    "src/async-setup-core/main.c": "2f8a648123c6d1b0c50a0eef0bdb9c32a6e166711c6bd74f8203ce54a4b117b7",
+    "src/async-setup-core/plan-fixture.h": "2e20e73d16eb1f3c088dd974ba3def693def6e019423f21f135213234fb168b0",
+    "src/async-setup-core/graph-cases.h": "78a3f2141b5dc419aeb2ee0831d974f4ae0f8e580f41ae378ebcf080925f266b"
+  },
+  "controller_sha256": "b9ed9d6f8b0eca643a31a1dd54740998af9c85b795bf06e11fead9427502affe",
+  "policy_sha256": "ed5681ed6a53a36efb8e9bc2c6120bd091f0f85551bb280e702ebb37278b6c7a",
+  "registries": {
+    "normal": {
+      "path": "docs/migration/t14-async-setup-core-normal-candidate.json",
+      "sha256": "de2fcd5436bc516fbf6dde46ffc0b3f64e30407c7acc5ca2be5560189bbd90fc"
+    },
+    "ubsan": {
+      "path": "docs/migration/t14-async-setup-core-ubsan-candidate.json",
+      "sha256": "2bdb228f14ea26d25be3fca7963e8eff0e5c8ed92a41aad4f476054151435371"
+    }
+  },
+  "toolchain_images": {
+    "normal": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+  },
+  "native_matrix": {
+    "normal": {
+      "status": "PASS",
+      "build_count": 4,
+      "compositions": 2
+    },
+    "ubsan": {
+      "status": "PASS",
+      "build_count": 4,
+      "compositions": 2
+    }
+  },
+  "executions": {
+    "count": 8,
+    "all_returncode_zero": true,
+    "all_stderr_empty": true,
+    "stdout_identical": true,
+    "runs": [
+      {
+        "profile": "normal",
+        "composition": "async-setup-core-asm",
+        "optimization": "debug",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "098f0aa6d88128985be42694947d5b9f07b9fee07b172b188a61be40345f1163"
+      },
+      {
+        "profile": "normal",
+        "composition": "async-setup-core-asm",
+        "optimization": "release",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "1610426eff46fa79bfb6f7c9993c778b6a0b99927aedff5a7091e53ea9246f38"
+      },
+      {
+        "profile": "normal",
+        "composition": "async-setup-core-alternate",
+        "optimization": "debug",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "04d526ce29441b207cf135135dd264f2ddb186260639866e8e38d3800d4d2232"
+      },
+      {
+        "profile": "normal",
+        "composition": "async-setup-core-alternate",
+        "optimization": "release",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "8ea58f39d3710fb827fa8bca5a0ff9cc79f9fb8fb98878d0a8a43c16c2ddefa9"
+      },
+      {
+        "profile": "ubsan",
+        "composition": "async-setup-core-asm",
+        "optimization": "debug",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "8f9d585a17f2939e7032004b11693635bf5398c9c7c22f682a339defb9d6765e"
+      },
+      {
+        "profile": "ubsan",
+        "composition": "async-setup-core-asm",
+        "optimization": "release",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "1f2e4ed10f4e18bd49ceb5f50b3e9a551ba667ffe430a0bdbee2d8afbd615398"
+      },
+      {
+        "profile": "ubsan",
+        "composition": "async-setup-core-alternate",
+        "optimization": "debug",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "e8d17669b7ce4635ad0b2fb3361f0ed28f55d0f38fe456a489a2115dd8fc461a"
+      },
+      {
+        "profile": "ubsan",
+        "composition": "async-setup-core-alternate",
+        "optimization": "release",
+        "returncode": 0,
+        "stdout": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "d4bf5c7f0d1d5de47753a60033ffa3200b19c61fabe94b689a9c7318a4e61657",
+        "elf_sha256": "8d64cd361b30da268cd9f44cf0ed64284b6bd158fc452780c9c01f455ecb4b31"
+      }
+    ]
+  },
+  "observed_summary": "async_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+  "scenario_counts": {
+    "total": 1414,
+    "valid_plans": 95,
+    "rejected_plans": 145,
+    "per_mode": {
+      "deferred_success": 202,
+      "deferred_failure_rollback": 202,
+      "stop_waiting_cancel": 202,
+      "async_cleanup_wait_failure": 202,
+      "inline_finish": 202,
+      "return_protocol_conflict": 202,
+      "reentrant_stop_late_setup": 202
+    },
+    "invalid_ticket_refusals": 3636,
+    "inline_finishes": 202,
+    "async_cleanup_finishes": 202
+  },
+  "asserted_contracts": [
+    "Only pangu_lifecycle_query public table methods are called; no host-private lifecycle helper is imported.",
+    "Deferred completion, duplicate completion refusal, stale epoch/generation/runtime ticket rejection.",
+    "Setup failure -77 rolls back; async cleanup failure -92 remains visible and cleanup waits before continuation.",
+    "Stop while deferred prevents late activation; setup callback return conflict remains error 10.",
+    "Inline finish succeeds once; cleanup resources and provider owners remain valid through dependent async disposal."
+  ],
+  "isolation": {
+    "network": "UNSHARED",
+    "candidate_and_controller_inputs": "READ_ONLY_BINDS",
+    "host_home": "NOT_MOUNTED",
+    "kernel": "HOST_KERNEL",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "native_matrix": "PASS"
+  },
+  "attempt_history": [
+    "Initial native compilation rejected a duplicate C identifier between plan fixture edges and lifecycle storage; renamed lifecycle storage and all final builds passed.",
+    "Initial runner snapshot found generated Python __pycache__ files under the registered controller; reran with bytecode generation disabled and the fixed snapshot passed."
+  ],
+  "not_claimed": [
+    "The historical 675 integration prerequisite was not rerun under current public ABI.",
+    "No event-by-event independent trace oracle, complete old setup-test.c conformance, full G04/G07, production admission, or protected remote approval is claimed.",
+    "UBSan does not instrument assembly provider code; candidate is test-scope only."
+  ],
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "fixed_inputs": {
+      "candidate_tree_sha256": "60be0e1cd727e7fcc9bf0eb9d4ce72637b97b432b54ca36e37a46f360888bf37",
+      "controller_sha256": "b9ed9d6f8b0eca643a31a1dd54740998af9c85b795bf06e11fead9427502affe",
+      "policy_sha256": "ed5681ed6a53a36efb8e9bc2c6120bd091f0f85551bb280e702ebb37278b6c7a",
+      "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+    },
+    "decision": "Accept this bounded public-ABI async setup core evidence for continued local T14 test work only; retain full setup-test.c and T14 as incomplete.",
+    "risks": [
+      "No independent event-level oracle was added; the fixed public-ABI candidate assertions and identical output across four compositions/profile pairs are the validation scope.",
+      "The test does not cover the legacy wrapper 675-case integration prerequisite.",
+      "All product object/artifact performance budgets remain unbaselined."
+    ]
+  },
+  "full_T14": "NOT_COMPLETED",
+  "source_publication": {
+    "path": "docs/migration/t14-async-setup-core-source-publication.json",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "f7a35a2bbf853c41018a615b31bbd6c830bbcff7",
+    "remote_ref_verified": true
+  }
+}

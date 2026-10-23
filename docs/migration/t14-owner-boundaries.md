@@ -434,3 +434,10 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 盘点中的旧协调器一项现为带API适配的原生通过，剩余10项不勾选，更早owner独立语料仍待审计。本守卫只保证上述固定七组捕获的约束；异步setup/disposer、分支、量子推进/故障矩阵、完整G03/G04/G07与T14尚未完成。逻辑work上限不是回调墙钟/峰值内存证明，资源行已调用清理也不是外部副作用必然物理释放。不得据本结果宣布完整G04、插件沙箱或生产放行。
 
 观测器收尾另补转换前计数断言：拒绝runtime count超过4、started/保存的启动前缀不合法、owner在途超过3或资源行超过2，避免64位高位被截断为合法int。沿用相同223项已验证控制树，全部8份原生构建/执行重新完成，轨迹字节仍相同；原预览与首版成功记录保留，最终计数不累加重跑。
+
+
+### 2026-10-24：异步 setup 核心公开 ABI 原生专项
+
+针对旧 `setup-test.c` 的 1,414 个异步 setup 场景，新增 test-scope 公开 ABI 候选；七种模式各202例，包含 defer/finish/pump、失败回滚、停止时等待、异步 disposer、inline finish、返回协议冲突、重入停止和迟到 setup。普通与 UBSan、汇编/C 内存提供者、debug/release 共8次冻结构建与隔离执行全部通过，摘要逐字节一致。源码摘要、矩阵、逐次 ELF/输出摘要及失败尝试见 [专项证据](t14-async-setup-core-evidence.json)；测试源与双配置已发布到 `codex/t14-async-setup-core`（`f7a35a2bbf853c41018a615b31bbd6c830bbcff7`），见 [源码发布记录](t14-async-setup-core-source-publication.json)。
+
+这只是 `setup-test.c` 的异步子集。该旧入口先调用 `integration_main()`，产生675个适配器集成场景；它们没有纳入本候选，也没有在当前 ABI 复验。因此 T14-F16 标记为部分，完整入口仍待迁移；全 T14、G04/G07 和生产准入不变。候选只用于本地 test-scope 实验；隔离控制器的 external trust approval 仍为 PENDING，release 仍 BLOCKED。

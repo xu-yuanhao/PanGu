@@ -140,8 +140,17 @@
       "id": "T14-F16",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
       "source_sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PARTIAL_ASYNC_CORE_CURRENT_NATIVE",
+      "next_action": "Finish the adapter integration prerequisite under current public ABI, preserve/compare every remaining setup-test assertion and then rerun the combined entry; do not treat the 1,414 async-core subset as the full source entry.",
+      "evidence": "docs/migration/t14-async-setup-core-evidence.json",
+      "partial_current_abi": {
+        "async_setup_scenarios": 1414,
+        "normal_runs": 4,
+        "ubsan_runs": 4,
+        "all_outputs_identical": true,
+        "uncovered_wrapper_prerequisite": "675 integration scenarios through integration_main()",
+        "full_setup_test_c_complete": false
+      }
     },
     {
       "id": "T14-F17",

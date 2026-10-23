@@ -1,0 +1,20 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-24",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-async-setup-core",
+  "commit": "f7a35a2bbf853c41018a615b31bbd6c830bbcff7",
+  "parent": "47e0055ea5c8031e2aec5ad540d60d75e93ffd75",
+  "scope": "Test-only current-public-ABI async setup core candidate; no production/release admission, full setup-test.c completion, or T14 acceptance.",
+  "candidate_tree_sha256": "60be0e1cd727e7fcc9bf0eb9d4ce72637b97b432b54ca36e37a46f360888bf37",
+  "files": {
+    "src/async-setup-core/main.c": "2f8a648123c6d1b0c50a0eef0bdb9c32a6e166711c6bd74f8203ce54a4b117b7",
+    "src/async-setup-core/plan-fixture.h": "2e20e73d16eb1f3c088dd974ba3def693def6e019423f21f135213234fb168b0",
+    "src/async-setup-core/graph-cases.h": "78a3f2141b5dc419aeb2ee0831d974f4ae0f8e580f41ae378ebcf080925f266b",
+    "docs/migration/t14-async-setup-core-normal-candidate.json": "de2fcd5436bc516fbf6dde46ffc0b3f64e30407c7acc5ca2be5560189bbd90fc",
+    "docs/migration/t14-async-setup-core-ubsan-candidate.json": "2bdb228f14ea26d25be3fca7963e8eff0e5c8ed92a41aad4f476054151435371"
+  },
+  "validation": "Remote ref readback equals commit; every published file blob matches the tested candidate source or admission registry SHA256.",
+  "release": "BLOCKED",
+  "full_T14": "NOT_COMPLETED"
+}
