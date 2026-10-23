@@ -200,6 +200,161 @@ static void run_deferred(const pangu_prepare_result *plan,const pangu_graph_outp
  for(pangu_u32 i=0;i<plan->lowered.graph.instance_count;i++) if(out->states[i]) assert(owners[i].state==1);
  scenarios++;by_mode[mode]++;
 }
+
+/* T14-F02 public-ABI async-disposer regression. */
+static pangu_cleanup_ticket disposer_saved[4];
+static pangu_lifecycle_graph disposer_graph;
+static pangu_u32 disposer_disposed[9];
+static int disposer_mode,disposer_selected,disposer_resource_count,disposer_begins;
+static int disposer_groups,disposer_ticket_refusals,disposer_inline_finishes;
+static pangu_i32 disposer_begin(void *opaque,const pangu_cleanup_ticket *ticket) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;
+ assert((int)id==disposer_selected && disposer_begins<4);
+ pangu_u32 position=positions[id];pangu_owner *owner=ticket ? (pangu_owner *)ticket->owner : 0;
+ assert(owner==&owners[id] && owner->state==PANGU_OWNER_QUIESCING && owner->cleanup_waiting && owner->busy);
+ disposer_saved[disposer_begins++]=*ticket;
+ pangu_cleanup_ticket scope;assert(!api->cleanup_scope(&live,position,&scope));
+ assert(scope.owner==ticket->owner && scope.epoch==ticket->epoch && scope.serial==ticket->serial);
+ pangu_lifecycle_report report={0};assert(api->stop(&live,FUEL,&report)==5 && report.pending);
+ assert(api->register_resource(&live,position,cleanup,opaque)==10);
+ assert(api->register_async(&live,position,disposer_begin,opaque)==10);
+ for(pangu_u32 i=0;i<current->graph_report.binding_count;i++) {
+  pangu_plan_edge edge=current_output->bindings[i];
+  if(current->lowered.graph.requirements[edge.requirement].consumer==id) {
+   pangu_u32 provider=current->lowered.graph.provider_owners[edge.provider];
+   assert(owners[provider].state==PANGU_OWNER_ACTIVE);
+  }
+ }
+ if(disposer_mode==1) {
+  assert(!api->disposer_finish(&live,position,ticket,0));
+  assert(api->disposer_finish(&live,position,ticket,0)==10);disposer_inline_finishes++;
+  return 5;
+ }
+ if(disposer_mode==2) return -88;
+ if(disposer_mode==3) {
+  assert(!api->disposer_finish(&live,position,ticket,0));disposer_inline_finishes++;
+  return 0;
+ }
+ return 5;
+}
+static pangu_i32 disposer_setup(pangu_owner *owner,void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;setup_count++;
+ assert(owner==&owners[id] && owner->state==PANGU_OWNER_LOADING && owner->inflight==1);
+ if((int)id!=disposer_selected) return 0;
+ for(int i=0;i<disposer_resource_count;i++)
+  assert(!api->register_async(&live,positions[id],disposer_begin,opaque));
+ return 0;
+}
+static void prepare_disposer_runtime(const pangu_prepare_result *plan,const pangu_graph_output *out,int selected_id,int resource_count) {
+ if(live.phase) {
+  assert(live.phase==4 && !live.started && !live.setup_waiting);
+  for(pangu_u32 i=0;i<9;i++) assert(!owners[i].inflight && !owners[i].count);
+ }
+ memset(&live,0,sizeof live);setup_count=cleanup_count=cleanup_begin_count=0;epoch++;assert(epoch);
+ disposer_selected=selected_id;disposer_resource_count=resource_count;disposer_begins=0;
+ memset(disposer_saved,0,sizeof disposer_saved);memset(disposer_disposed,0,sizeof disposer_disposed);
+ assert(plan->lowered.graph.instance_count<=9);
+ for(pangu_u32 i=0;i<9;i++) {
+  if(!owners[i].abi_version || owners[i].state==PANGU_OWNER_LOADING) memset(&owners[i],0,sizeof owners[i]);
+  assert(!api->owner_init(&owners[i],resources[i],2,operations[i],3,epoch,4));
+  source_items[i]=(pangu_lifecycle_item){&owners[i],disposer_setup,(void *)(pangu_u64)i};
+ }
+ pangu_lifecycle_storage storage_view={activation,9,lifecycle_edges,1000};pangu_lifecycle_prepared prepared;
+ assert(!api->prepare(plan,out,source_items,plan->lowered.graph.instance_count,&storage_view,FUEL,&prepared));
+ assert(prepared.item_count==plan->graph_report.order_count);
+ for(pangu_u32 i=0;i<prepared.item_count;i++) positions[out->order[i]]=i;
+ live.items=activation;live.count=prepared.item_count;
+ disposer_graph=(pangu_lifecycle_graph){lifecycle_edges,prepared.edge_count,disposer_disposed,9};
+ live.stop_graph=&disposer_graph;current=plan;current_output=out;
+ assert(!api->bind_geometry(&live,spans,64,FUEL));
+}
+static int disposer_start(void) {
+ pangu_lifecycle_report report={0};int rc=api->start(&live,FUEL,&report);
+ assert(!rc && !report.pending && report.work<=FUEL && setup_count==(int)live.count);return rc;
+}
+static void test_disposer_deferred_tickets(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ disposer_mode=0;prepare_disposer_runtime(plan,out,0,2);disposer_start();
+ assert(api->stop(&live,FUEL,&(pangu_lifecycle_report){0})==5 && disposer_begins==1);
+ pangu_lifecycle_report report={0};assert(api->stop(&live,FUEL,&report)==5 && report.pending && disposer_begins==1);
+ pangu_owner pending_owner=owners[0];assert(api->owner_init(&owners[0],resources[0],2,operations[0],3,epoch+1,4)==10);assert(!memcmp(&owners[0],&pending_owner,sizeof pending_owner));
+ pangu_cleanup_ticket bad=disposer_saved[0];bad.epoch++;assert(api->disposer_finish(&live,positions[0],&bad,0)==10);disposer_ticket_refusals++;
+ bad=disposer_saved[0];bad.serial++;assert(api->disposer_finish(&live,positions[0],&bad,0)==10);disposer_ticket_refusals++;
+ bad=disposer_saved[0];bad.owner=&owners[1];assert(api->disposer_finish(&live,positions[0],&bad,0)==10);disposer_ticket_refusals++;
+ assert(api->disposer_finish(&live,positions[0],(const pangu_cleanup_ticket *)(const void *)&owners[0],0)==1);disposer_ticket_refusals++;
+ assert(!api->disposer_finish(&live,positions[0],&disposer_saved[0],0));
+ assert(api->disposer_finish(&live,positions[0],&disposer_saved[0],0)==10);disposer_ticket_refusals++;
+ report=(pangu_lifecycle_report){0};assert(api->stop(&live,FUEL,&report)==5 && report.pending && disposer_begins==2);
+ assert(disposer_saved[0].serial!=disposer_saved[1].serial);
+ assert(api->disposer_finish(&live,positions[0],&disposer_saved[0],0)==10);disposer_ticket_refusals++;
+ assert(!api->disposer_finish(&live,positions[0],&disposer_saved[1],-22));
+ report=(pangu_lifecycle_report){0};assert(api->stop(&live,FUEL,&report)==-22 && !report.pending && live.phase==4);
+ assert(owners[0].state==PANGU_OWNER_DISPOSED && owners[0].cleanup_error==-22);
+ assert(api->disposer_finish(&live,positions[0],&disposer_saved[1],0)==10);disposer_ticket_refusals++;
+ disposer_groups++;
+}
+static void test_disposer_inline_modes(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ for(int mode=1;mode<=3;mode++) {
+  disposer_mode=mode;prepare_disposer_runtime(plan,out,0,1);disposer_start();
+  pangu_lifecycle_report report={0};int rc=api->stop(&live,FUEL,&report);
+  pangu_i32 expected=mode==1 ? 0 : mode==2 ? -88 : 10;
+  assert(rc==expected && !report.pending && live.phase==4 && disposer_begins==1);
+  assert(owners[0].state==PANGU_OWNER_DISPOSED && owners[0].cleanup_error==(mode==1 ? 0 : expected));
+  assert(api->stop(&live,FUEL,&report)==expected && disposer_begins==1);
+  disposer_groups++;
+ }
+ disposer_mode=0;
+}
+static void test_disposer_epoch_and_call_drain(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ disposer_mode=0;prepare_disposer_runtime(plan,out,0,1);disposer_start();
+ assert(api->stop(&live,FUEL,&(pangu_lifecycle_report){0})==5 && disposer_begins==1);
+ pangu_cleanup_ticket old=disposer_saved[0];pangu_lifecycle_report report={0};
+ assert(!api->disposer_finish(&live,positions[0],&old,0));assert(api->stop(&live,FUEL,&report)==0 && !report.pending);
+ prepare_disposer_runtime(plan,out,0,1);disposer_start();
+ assert(api->stop(&live,FUEL,&report)==5 && disposer_begins==1);
+ assert(api->disposer_finish(&live,positions[0],&old,0)==10);disposer_ticket_refusals++;
+ assert(!api->disposer_finish(&live,positions[0],&disposer_saved[0],0));
+ assert(api->stop(&live,FUEL,&report)==0 && !report.pending);disposer_groups++;
+
+ /* A public dependency call keeps its consumer/provider pair alive until finish. */
+ pangu_plan_edge edge=out->bindings[0];
+ int consumer=(int)plan->lowered.graph.requirements[edge.requirement].consumer;
+ prepare_disposer_runtime(plan,out,consumer,1);disposer_start();
+ pangu_lifecycle_call_ticket call={0};report=(pangu_lifecycle_report){0};
+ assert(!api->call(&live,0,FUEL,&call,&report) && report.work<=FUEL);
+ assert(api->stop(&live,FUEL,&report)==5 && report.pending && disposer_begins==0);
+ assert(!api->call_finish(&live,&call));
+ assert(api->stop(&live,FUEL,&report)==5 && report.pending && disposer_begins==1);
+ assert(!api->disposer_finish(&live,positions[consumer],&disposer_saved[0],0));
+ assert(api->stop(&live,FUEL,&report)==0 && !report.pending);
+ disposer_groups++;
+}
+static void test_disposer_provider_retention(void) {
+ pangu_prepare_result plan;multi_manifest.provisions=provisions;
+ assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,FUEL,&plan));
+ int consumer=(int)plan.lowered.graph.requirements[output.bindings[0].requirement].consumer;
+ prepare_disposer_runtime(&plan,&output,consumer,1);disposer_start();
+ pangu_lifecycle_report report={0};assert(api->stop(&live,FUEL,&report)==5 && report.pending && disposer_begins==1);
+ for(pangu_u32 i=0;i<disposer_graph.edge_count;i++) {
+  pangu_plan_edge edge=output.bindings[i];
+  if(plan.lowered.graph.requirements[edge.requirement].consumer==(pangu_u32)consumer) {
+   pangu_u32 provider=plan.lowered.graph.provider_owners[edge.provider];
+   assert(owners[provider].state==PANGU_OWNER_ACTIVE);
+  }
+ }
+ assert(!api->disposer_finish(&live,positions[consumer],&disposer_saved[0],0));
+ assert(api->stop(&live,FUEL,&report)==0 && !report.pending);
+ for(pangu_u32 i=0;i<plan.lowered.graph.instance_count;i++) if(!output.states[i]) assert(owners[i].state==PANGU_OWNER_DISPOSED);
+ disposer_groups++;
+}
+static void async_disposer_public_core(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ test_disposer_deferred_tickets(plan,out);
+ test_disposer_inline_modes(plan,out);
+ test_disposer_epoch_and_call_drain(plan,out);
+ test_disposer_provider_retention();
+ assert(disposer_groups==7 && disposer_ticket_refusals==8 && disposer_inline_finishes==2);
+
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -226,6 +381,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes);
+ async_disposer_public_core(&plan,&output);
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes);
  return 0;
 }
