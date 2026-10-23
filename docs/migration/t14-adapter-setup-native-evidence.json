@@ -1,0 +1,261 @@
+{
+  "schema": "pangu.t14-adapter-setup-native-evidence.v1",
+  "status": "PASS_CURRENT_NATIVE_WITH_DOCUMENTED_PUBLIC_API_ADAPTATIONS_FULL_T14_PENDING",
+  "scope": "Combined port of adapter-test.c integration_main() and setup-test.c async setup body through the current public lifecycle API. The source runner and registries are retained on a test-only experiment branch. No production admission.",
+  "historical_sources": {
+    "adapter_test": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/adapter-test.c",
+      "sha256": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
+      "inventory_id": "T14-F01"
+    },
+    "setup_test": {
+      "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
+      "sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+      "inventory_id": "T14-F16"
+    }
+  },
+  "candidate_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-setup-public-abi-final-0a0a061e",
+  "candidate_tree_sha256": "dd2e0e57778396256a00867da003d3f867a26b1aaf2ab3ddfda375cf656078bd",
+  "candidate_sources": {
+    "src/async-setup-core/main.c": "21d9422e601781c40d1792faf94b2f8f74720854afa254f0f444df16bc1c83e7",
+    "src/async-setup-core/plan-fixture.h": "2e20e73d16eb1f3c088dd974ba3def693def6e019423f21f135213234fb168b0",
+    "src/async-setup-core/graph-cases.h": "78a3f2141b5dc419aeb2ee0831d974f4ae0f8e580f41ae378ebcf080925f266b"
+  },
+  "controller_sha256": "26fae6ffc61687ca43bdfddbf8792a949965739d9c6c078ee7816743597770b9",
+  "policy_sha256": "55fc46b66becdc79a75468a9ba261571b8436b8a47f2491e4ccb7cf83d12945f",
+  "registries": {
+    "normal": {
+      "path": "docs/migration/t14-async-setup-core-normal-candidate.json",
+      "sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e"
+    },
+    "ubsan": {
+      "path": "docs/migration/t14-async-setup-core-ubsan-candidate.json",
+      "sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718"
+    }
+  },
+  "toolchain_images": {
+    "normal": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+  },
+  "native_builds": {
+    "status": "PASS",
+    "count": 8,
+    "builds": [
+      {
+        "profile": "normal",
+        "id": "async-setup-core-asm",
+        "mode": "debug",
+        "receipt_sha256": "d065606d5ee469e705b3c307fdae964f61ed5a62c542194cdd39046373b35553",
+        "artifact_bytes": 1527696
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-asm",
+        "mode": "release",
+        "receipt_sha256": "f996c82cfd851092cf25f474e706e286de64f5189cc94bada818f641a8405a0f",
+        "artifact_bytes": 1244184
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-alternate",
+        "mode": "debug",
+        "receipt_sha256": "89498b57e29a161b2e348ccdcc163fb8a04529438e208beb71139f0d6ab97e2e",
+        "artifact_bytes": 1528760
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-alternate",
+        "mode": "release",
+        "receipt_sha256": "523f489b06a8dc927c843bdf1fa40aebc1654dd57454c50aa21741acdf688914",
+        "artifact_bytes": 1244248
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-asm",
+        "mode": "debug",
+        "receipt_sha256": "7a16c5eb534f9bdf79cab382436e25572771263c39345c4d5965ac01b9cd881b",
+        "artifact_bytes": 2027912
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-asm",
+        "mode": "release",
+        "receipt_sha256": "7e63d7a8fdf7934a3da03e937fab6737be30220037e08d5b6b7a4cd648239efe",
+        "artifact_bytes": 1273224
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-alternate",
+        "mode": "debug",
+        "receipt_sha256": "46878b315a3322070f5920af749e22ff41d54b5806e647d7f94926e7dfabb6a8",
+        "artifact_bytes": 2029168
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-alternate",
+        "mode": "release",
+        "receipt_sha256": "084d89362cefe3960f5f7624878cefa9645a596da17c25de251c8015accc4f1a",
+        "artifact_bytes": 1273288
+      }
+    ]
+  },
+  "executions": {
+    "status": "PASS",
+    "count": 8,
+    "all_exit_zero": true,
+    "all_outputs_identical": true,
+    "records": [
+      {
+        "profile": "normal",
+        "id": "async-setup-core-asm",
+        "mode": "debug",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "2350017dc09dab3a80c81c2aaa75a0627788dd688d91021a7c3364d30983cde6"
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-asm",
+        "mode": "release",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "4298d350e658cb531c0ed560fec17801a2471489ef772d1006980944050306c0"
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-alternate",
+        "mode": "debug",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "c6885a63e3e64d70bc1a67409fce90f6a689677f52fe2759a5b632f96ba33e42"
+      },
+      {
+        "profile": "normal",
+        "id": "async-setup-core-alternate",
+        "mode": "release",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "f74ed8e24ee9cb6fbe4c4fe672f8b9fade375c4bcf145d585f4554de9bdf2883"
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-asm",
+        "mode": "debug",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "27bf0803f3e9d81efcadb267c4ca16dfd1a0e995909914618ade99d37710c7cc"
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-asm",
+        "mode": "release",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "82ffc8f9add28365b0a26ca04e53f1089703a5a8fc4fcc5ef603f2e04894c7da"
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-alternate",
+        "mode": "debug",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "e4deb720ad7cdd20742ff964fa6ffe9db97e7976f534376e0c536583cce59455"
+      },
+      {
+        "profile": "ubsan",
+        "id": "async-setup-core-alternate",
+        "mode": "release",
+        "returncode": 0,
+        "stdout": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+        "stdout_sha256": "fb8b73f157f94c132fd3a46c1fa7e07c0242d159777c98aa5e0c273c8786a9f4",
+        "elf_sha256": "5c7290d8e9203b98e9a5b98d0b209730c861a41e912368e1b1f5367583969f74"
+      }
+    ]
+  },
+  "observed_summary": "adapter_public_scenarios=675 valid_plans=95 rejected_plans=145 public_dependency_calls=86 no_edge_owner_only_holds=106\nasync_setup_core_scenarios=1414 valid_plans=95 rejected_plans=145 invalid_ticket_refusals=3636 inline_finishes=202 async_cleanup_finishes=202",
+  "scenario_counts_per_execution": {
+    "adapter_public_scenarios": 675,
+    "valid_plans": 95,
+    "rejected_plans": 145,
+    "async_setup_core_scenarios": 1414,
+    "async_modes": {
+      "deferred_success": 202,
+      "deferred_failure_rollback": 202,
+      "stop_waiting_cancel": 202,
+      "async_cleanup_wait_failure": 202,
+      "inline_finish": 202,
+      "return_protocol_conflict": 202,
+      "reentrant_stop_late_setup": 202
+    },
+    "invalid_ticket_refusals": 3636,
+    "inline_finishes": 202,
+    "async_cleanup_finishes": 202,
+    "public_dependency_call_waits": 86,
+    "legacy_owner_only_waits_without_public_dependency_edge": 106,
+    "combined_scenario_count": 2089
+  },
+  "preserved_current_public_contracts": [
+    "Current pangu_lifecycle_api table is queried at its exact ABI version/size; no private runtime_prepare_items or pangu_owner_enter/leave helper is imported.",
+    "Public prepare checks cover budget refusal with unchanged output/count, invalid planner views, invalid bindings/order/state, short storage and duplicate owner frames.",
+    "Startup success, -71 setup failure with prefix rollback, reentrant stop, reverse cleanup and provider retention checks run against 95 valid /145 rejected plans.",
+    "86 actual public dependency calls hold both owners during stop and release through call_finish.",
+    "All 1,414 async cases preserve seven modes, each 202: deferred success/failure, cancellation, async disposer, inline finish, protocol conflict and reentrant stop/late setup."
+  ],
+  "documented_api_adaptation": {
+    "old_private_behavior": "The old test entered one arbitrary owner without a service binding and released it later.",
+    "current_public_behavior": "The public call API requires a real resolved dependency binding and retains both consumer and provider.",
+    "observed_difference": "86 hold scenarios had a real edge and exercised the public call ticket; 106 had no incident edge and therefore exercised ordinary stop without an artificial in-flight ticket.",
+    "decision": "Do not re-export the removed single-owner private helper. Record the 106 cases as intentionally unsupported old-only semantics."
+  },
+  "isolation": {
+    "normal_native_matrix": "PASS",
+    "ubsan_native_matrix": "PASS",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "network": "UNSHARED",
+    "host_home": "NOT_MOUNTED",
+    "kernel": "HOST_KERNEL"
+  },
+  "attempt_history": [
+    "Strict compilation initially rejected an unused local and an unused ticket variable; both were removed.",
+    "A test-only owner reset initially attempted to initialize a still-LOADING frame; it now follows the established epoch/reinitialization rule.",
+    "An initial assertion incorrectly expected never-started owners to be DISPOSED; final assertions require only the actually started prefix to be disposed and leave untouched tail owners LOADING."
+  ],
+  "not_claimed": [
+    "Legacy private owner-only in-flight semantics for 106 cases are not claimed as covered.",
+    "No byte-identical legacy assertion suite, independent event-by-event trace oracle, complete G04/G07, production admission, protected remote approval, or performance budget is claimed.",
+    "UBSan does not instrument assembly memory provider code."
+  ],
+  "source_publication": {
+    "path": "docs/migration/t14-adapter-setup-source-publication.json",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "21ac9493dc58cf2b1a4446aef92d00dba386bd44",
+    "remote_ref_verified": true
+  },
+  "review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Accept F01/F16 current-public-ABI regression coverage with documented adaptation; preserve the 106 old-only cases as an explicit difference. Full T14 remains incomplete.",
+    "fixed_inputs": {
+      "candidate_tree_sha256": "dd2e0e57778396256a00867da003d3f867a26b1aaf2ab3ddfda375cf656078bd",
+      "controller_sha256": "26fae6ffc61687ca43bdfddbf8792a949965739d9c6c078ee7816743597770b9",
+      "policy_sha256": "55fc46b66becdc79a75468a9ba261571b8436b8a47f2491e4ccb7cf83d12945f",
+      "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
+    },
+    "risks": [
+      "106 legacy waits were private owner-only holds without a matching public dependency edge.",
+      "The runner is an isolated candidate; external trust approval remains pending.",
+      "The test validates lifecycle contracts, not product memory safety or performance."
+    ]
+  },
+  "full_T14": "NOT_COMPLETED"
+}

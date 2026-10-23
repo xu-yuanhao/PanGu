@@ -1,0 +1,24 @@
+{
+  "schema": "pangu.experimental-source-publication.v1",
+  "date": "2026-10-24",
+  "repository": "https://github.com/xu-yuanhao/PanGu",
+  "branch": "codex/t14-async-setup-core",
+  "commit": "21ac9493dc58cf2b1a4446aef92d00dba386bd44",
+  "parent": "f7a35a2bbf853c41018a615b31bbd6c830bbcff7",
+  "scope": "Combined test-only public-ABI adapter/setup candidate; no production/release admission or full T14 acceptance.",
+  "candidate_tree_sha256": "dd2e0e57778396256a00867da003d3f867a26b1aaf2ab3ddfda375cf656078bd",
+  "controller_sha256": "26fae6ffc61687ca43bdfddbf8792a949965739d9c6c078ee7816743597770b9",
+  "policy_sha256": "55fc46b66becdc79a75468a9ba261571b8436b8a47f2491e4ccb7cf83d12945f",
+  "files": {
+    "src/async-setup-core/main.c": "21d9422e601781c40d1792faf94b2f8f74720854afa254f0f444df16bc1c83e7",
+    "src/async-setup-core/plan-fixture.h": "2e20e73d16eb1f3c088dd974ba3def693def6e019423f21f135213234fb168b0",
+    "src/async-setup-core/graph-cases.h": "78a3f2141b5dc419aeb2ee0831d974f4ae0f8e580f41ae378ebcf080925f266b"
+  },
+  "registries": {
+    "docs/migration/t14-async-setup-core-normal-candidate.json": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "docs/migration/t14-async-setup-core-ubsan-candidate.json": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718"
+  },
+  "validation": "Remote ref readback matched the pushed commit. Published source and both registry blobs match the final tested candidate SHA256 values.",
+  "release": "BLOCKED",
+  "full_T14": "NOT_COMPLETED"
+}

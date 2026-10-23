@@ -7,8 +7,13 @@
       "id": "T14-F01",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/adapter-test.c",
       "source_sha256": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "Keep the no-edge private operation excluded; full T14/G04/G07 and earlier standalone owner corpus audit remain pending.",
+      "suite": "adapter-public-675",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "adaptation": "Replaced private runtime_prepare_items/owner enter calls with current pangu_lifecycle_api::prepare and dependency call tickets. 86 real-edge hold scenarios are exercised; 106 old owner-only holds with no edge are explicitly excluded as removed private semantics."
     },
     {
       "id": "T14-F02",
@@ -140,16 +145,21 @@
       "id": "T14-F16",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
       "source_sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
-      "status": "PARTIAL_ASYNC_CORE_CURRENT_NATIVE",
-      "next_action": "Finish the adapter integration prerequisite under current public ABI, preserve/compare every remaining setup-test assertion and then rerun the combined entry; do not treat the 1,414 async-core subset as the full source entry.",
-      "evidence": "docs/migration/t14-async-setup-core-evidence.json",
-      "partial_current_abi": {
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "Retain this documented public API difference; remaining T14 rows, G04/G07 and earlier standalone owner corpus audit remain pending.",
+      "evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "suite": "adapter-public-675-plus-async-setup-1414",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "combined_scenarios_per_run": 2089,
+      "adaptation": "The wrapper integration_main() 675 cases and async setup 1,414 cases run in one current-public-ABI candidate. 106 no-edge owner-only wait cases are intentionally not modeled because the removed private API has no public equivalent.",
+      "current_abi_coverage": {
+        "adapter_scenarios": 675,
         "async_setup_scenarios": 1414,
         "normal_runs": 4,
         "ubsan_runs": 4,
-        "all_outputs_identical": true,
-        "uncovered_wrapper_prerequisite": "675 integration scenarios through integration_main()",
-        "full_setup_test_c_complete": false
+        "outputs_identical": true,
+        "documented_no_edge_private_hold_cases": 106
       }
     },
     {
@@ -181,7 +191,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 10,
+  "pending_current_abi_ports": 8,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

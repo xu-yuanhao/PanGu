@@ -12,7 +12,7 @@
           "debug": null,
           "release": null
         },
-        "measurement_plan": "Local lifecycle trace correctness; product resource budgets not baselined."
+        "measurement_plan": "Local public-ABI adapter/setup regression correctness only; product object/artifact/performance budgets remain unbaselined."
       },
       "entry": {
         "module": "focused-start",
@@ -51,7 +51,7 @@
           "debug": null,
           "release": null
         },
-        "measurement_plan": "Local lifecycle trace correctness; product resource budgets not baselined."
+        "measurement_plan": "Local public-ABI adapter/setup regression correctness only; product object/artifact/performance budgets remain unbaselined."
       },
       "entry": {
         "module": "focused-start",
@@ -974,7 +974,7 @@
           "on_missing": "pending"
         }
       ],
-      "responsibility": "1414 public-ABI async setup core scenarios; historical675 prerequisite remains excluded and pending",
+      "responsibility": "Public-ABI adapter and async setup regression: 675 adapter integration scenarios plus 1,414 async setup scenarios; 106 legacy owner-only holds without a resolved public dependency edge are documented as an intentional API difference.",
       "role": "client",
       "scope": "test",
       "source_root": "src/async-setup-core",

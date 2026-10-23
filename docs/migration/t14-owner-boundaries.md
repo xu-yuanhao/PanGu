@@ -431,7 +431,7 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 
 最终候选树 `22c38306b68898b195c709e26e0c5910d3ec93095a3ca8eefdd1d9bca2d12209`；253份文件归档SHA256 `d62ec75b0c1e0f4cfb38ac177c6e5562b14d2257d3c359abdbb06c1251ee9075`，恢复字节/登记匹配，并使用恢复出的源码复核两模式全部8份保留构建；不是恢复后重新构建。实验源码分支 `codex/t14-coordinator-trace` commit `32dafac4001e5f8410abfdcc414c2c8c11f17064` 已核对清单/逐blob并远端回读。最终本地控制/元数据由同一Agent实施、自审，固定摘要、差异、证据和风险在 final-review.json；不伪称独立审核或服务器侧防绕过。
 
-盘点中的旧协调器一项现为带API适配的原生通过，剩余10项不勾选，更早owner独立语料仍待审计。本守卫只保证上述固定七组捕获的约束；异步setup/disposer、分支、量子推进/故障矩阵、完整G03/G04/G07与T14尚未完成。逻辑work上限不是回调墙钟/峰值内存证明，资源行已调用清理也不是外部副作用必然物理释放。不得据本结果宣布完整G04、插件沙箱或生产放行。
+盘点中的旧协调器、F01适配器测试与F16 setup测试现均有带API适配的原生证据；剩余8项当前ABI端口待完成，更早owner独立语料仍待审计。本守卫只保证上述固定七组捕获的约束；异步 disposer 完整矩阵、分支、量子推进/故障矩阵、完整G03/G04/G07与T14尚未完成。逻辑work上限不是回调墙钟/峰值内存证明，资源行已调用清理也不是外部副作用必然物理释放。不得据本结果宣布完整G04、插件沙箱或生产放行。
 
 观测器收尾另补转换前计数断言：拒绝runtime count超过4、started/保存的启动前缀不合法、owner在途超过3或资源行超过2，避免64位高位被截断为合法int。沿用相同223项已验证控制树，全部8份原生构建/执行重新完成，轨迹字节仍相同；原预览与首版成功记录保留，最终计数不累加重跑。
 
@@ -440,4 +440,11 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 
 针对旧 `setup-test.c` 的 1,414 个异步 setup 场景，新增 test-scope 公开 ABI 候选；七种模式各202例，包含 defer/finish/pump、失败回滚、停止时等待、异步 disposer、inline finish、返回协议冲突、重入停止和迟到 setup。普通与 UBSan、汇编/C 内存提供者、debug/release 共8次冻结构建与隔离执行全部通过，摘要逐字节一致。源码摘要、矩阵、逐次 ELF/输出摘要及失败尝试见 [专项证据](t14-async-setup-core-evidence.json)；测试源与双配置已发布到 `codex/t14-async-setup-core`（`f7a35a2bbf853c41018a615b31bbd6c830bbcff7`），见 [源码发布记录](t14-async-setup-core-source-publication.json)。
 
-这只是 `setup-test.c` 的异步子集。该旧入口先调用 `integration_main()`，产生675个适配器集成场景；它们没有纳入本候选，也没有在当前 ABI 复验。因此 T14-F16 标记为部分，完整入口仍待迁移；全 T14、G04/G07 和生产准入不变。候选只用于本地 test-scope 实验；隔离控制器的 external trust approval 仍为 PENDING，release 仍 BLOCKED。
+初版候选只覆盖 `setup-test.c` 的异步子集；后续合并候选已补入其675个 `integration_main()` 场景，见下方更新。初版 evidence 文件保留为历史记录。
+
+
+### 2026-10-24：适配器集成与异步 setup 合并复验
+
+将旧 `adapter-test.c` 的 `integration_main()` 与 `setup-test.c` 的 1,414 个异步 setup 用例合并到同一当前公开 ABI 候选。普通/UBSan × 两个内存提供者 × debug/release 共8次构建和隔离执行全部通过；每次输出均为675个 adapter 场景、1414个 async 场景，七个 async 模式各202例。86个真实依赖边调用等待通过公开 call ticket 覆盖。
+
+旧 helper 还能在没有服务依赖边时单独 enter owner；当前插件公开 API 没有该操作。106个这类用例执行了正常 stop，但没有伪造 in-flight lease；这是明确记录的 API 差异，也没有重新导出旧私有 helper。F01/F16 标记为 `PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS`，证据见 [合并测试结果](t14-adapter-setup-native-evidence.json)，测试源码与登记见 [发布记录](t14-adapter-setup-source-publication.json)。完整T14、G04/G07、生产准入仍未通过；隔离控制器external trust approval仍待定。
