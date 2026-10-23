@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩5项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
+协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩4项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -469,3 +469,10 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 将旧预算调用测试的三个私有入口分别映射到公开 `call`、`setup_call`、`cleanup_call` 和 `call_finish`。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过且输出摘要一致；每次覆盖207个有真实解析依赖边的调用场景，1,191次逐fuel不足重试，30次配额拒绝、30次无效binding拒绝、345次输出或scope重叠拒绝，并在202个setup及202个cleanup上下文里验证scope阶段约束。
 
 预算不足时逐字节核对runtime、owner、资源、operation、span和edge存储及输出票据；配额测试通过三个公开依赖票据同时占满两端operation槽位，不能模拟旧私有接口分别耗尽单个owner槽位的情况，该差异明确保留。F03的零预算测试在合并候选中也补充了资源和operation数组快照。F04源码、冻结输入、运行摘要和同一Agent自审记录见 [F04原生证据](t14-call-budget-native-evidence.json)。F03的UBSan镜像摘要转录更正也记录在该证据及[F03证据](t14-budget-native-evidence.json)。这只关闭F04当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除外部信任审批和生产准入阻塞。
+
+
+### 2026-10-24：旧 call-test.c 当前公开 ABI 原生专项
+
+将旧 call/setup/cleanup 生命周期测试迁移到公开 `call`、`setup_call`、`cleanup_call`、`call_finish` 与 `disposer_finish`。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过且输出摘要一致；每次执行207个生命周期场景：69个实际binding分别跑直接调用、setup callback调用和cleanup callback调用。合并轨迹累计819次setup_call、819次cleanup_call、1,776次provider调用及7,212次预期拒绝；69次异步清理会持有调用票据直到清理完成，再排空调用后释放provider。
+
+轨迹还验证停止开始后拒绝新业务调用、setup scope过期、cleanup callback外scope失效、伪造和重复finish拒绝以及consumer清理期间provider保持活动。旧 `quotas()` 通过私有owner helper只耗尽provider槽位的场景不能由公开call单端复刻；公开ticket始终同时保活两端，F04/F05均把这一差异明示而不声称兼容。固定候选、矩阵回执和同一Agent自审记录见 [F05原生证据](t14-call-lifecycle-native-evidence.json)。这只关闭F05当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除外部信任审批与生产准入阻塞。

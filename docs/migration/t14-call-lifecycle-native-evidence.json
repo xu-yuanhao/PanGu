@@ -1,0 +1,129 @@
+{
+  "schema": "pangu.t14-call-lifecycle-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F05 historical call-test.c public lifecycle API port in the test-only async-setup candidate; no production promotion or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-test.c",
+    "sha256": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "455d62c4148bfc384453b01aa1637e937336d61d",
+    "parent": "8beffbac0483d00d6d2843443d86492bee0933ec",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "c5d4606d745866c4fe906d28efd00d6060102b37e6a8d7d9788b3317f619a349",
+    "candidate_tree_sha256": "cd2ec0fb2b9b4d05204b63945fd3f219508339cbfa1f28eb535d95fe87a7b305",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "c5d4606d745866c4fe906d28efd00d6060102b37e6a8d7d9788b3317f619a349"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "ad50208f4b8d87b2a8523547901bf358cb4c87df1689b49579ccdfa88d2fd35e",
+    "native_candidate_controller_sha256": "17925bfcb5f4c51d2a5855b1426f9b0ef5ce9f8e42612dd6f032c68a6d0fa846",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "a615711fe6653a11509b6506761977503460b69fb6b94de8442e789e62a9c0cc",
+    "ubsan_request_sha256": "dffc9296f60ad72f8f1f9f537268c8e059c1ba536766ed048f50e5d9d0b50721"
+  },
+  "coverage": {
+    "call_lifecycle_cases_per_run": 207,
+    "direct_calls_per_run": 69,
+    "setup_call_invocations_per_run": 819,
+    "cleanup_call_invocations_per_run": 819,
+    "provider_invocations_per_run": 1776,
+    "rejected_calls_per_run": 7212,
+    "async_cleanup_begins_per_run": 69,
+    "modes": [
+      "direct call held across stop",
+      "setup_call inside the matching setup callback",
+      "cleanup_call inside the matching cleanup callback with both synchronous and asynchronous disposer paths"
+    ],
+    "scenarios": [
+      "all 95 valid host graph plans in the fixed corpus and fixed multi-provider graph in both provider input orders",
+      "stop rejects new business calls while consumer/provider held references remain live",
+      "setup scope outside callback and stale setup ticket rejected without changing output ticket",
+      "cleanup scope outside callback and calls against non-consumer bindings rejected",
+      "forged and duplicate call_finish tickets rejected without changing either owner inflight count",
+      "asynchronous disposer holds dependency call until disposer_finish and call_finish; provider remains active until consumer drain",
+      "public dependency tickets always hold both endpoint operation slots; private single-provider-only quota scenario is recorded as unmappable"
+    ],
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "e2ec71cf05a2c4cf47a06e051b8705ffb66aa85747eb23a0d474ff8e075c5af9",
+    "all_stdout_identical": true
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "call",
+      "setup_call",
+      "cleanup_call",
+      "call_finish",
+      "disposer_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "The old quota fixture can enter a provider owner directly and exhaust its slots independently from consumer calls. The public ABI admits only resolved dependency tickets and atomically retains both consumer and provider; the single-endpoint private quota assertion remains an explicit compatibility gap."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "717a158ffa99dbeabb96f0630cd61a37fa4da38b28f76b636f35633d752e05b6",
+      "executions_json_sha256": "051dfdcb9aeeaf8f370d7c7470f02a32d601a5f40eb9db2997dc211869af4f02",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "d4553731f81ae4fd13e851d228c568bbcd09f6356f7040df59ae900c9c6afff0",
+      "executions_json_sha256": "182df41f04ca73cd7051da531168e81801cc2348d91f30dcf6c85d4b95442b2a",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F05 as PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS and continuing local T14 test work only; no production, release, gate, ABI, profile, or budget change.",
+    "fixed_candidate_digest": "cd2ec0fb2b9b4d05204b63945fd3f219508339cbfa1f28eb535d95fe87a7b305",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS",
+      "F03 UBSan image digest transcription corrected against its fixed request and image manifest; run receipts unchanged"
+    ],
+    "risks": [
+      "This is same-Agent self-review, not independent approval.",
+      "Private single-endpoint owner quota behavior remains an explicit public ABI compatibility gap.",
+      "External trust approval and release remain blocked.",
+      "UBSan does not instrument assembly provider instructions.",
+      "F08/F09/F17/F19 and full G04/G07/T14 remain incomplete."
+    ],
+    "control_scope_sha256": "94c58ff0d1e86b9a15829b5a4b6bdf9fa68702401a050a153677812a842eef76",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "4446cade78154d262315604676752b0fcf0b08fdbe0ed3cc2c7d962578d0f081",
+      "docs/migration/t14-focused-inventory.json": "9f2e0a3be61d0ac43678cc2387c11e553fa5f0006ae9e6f9f5232e8eedde436f",
+      "docs/migration/t14-owner-boundaries.md": "d64e64bedee83d446e4999e8ca31b6eade2149d4ce558d3edee899375784449a",
+      "docs/原生重写路线与迁移TODO.md": "cc3e536c6e7d590ef88933773003216a5e82da4b9a29520edd7ba6ab8ae7731c"
+    }
+  }
+}

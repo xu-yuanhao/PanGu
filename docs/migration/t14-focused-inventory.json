@@ -102,8 +102,30 @@
       "id": "T14-F05",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-test.c",
       "source_sha256": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "保留旧单端私有owner配额断言与公开双端dependency call的差异；继续F08-F09/F17/F19、完整G04/G07与更早owner语料审计。",
+      "suite": "call-lifecycle-public-207",
+      "evidence": "docs/migration/t14-call-lifecycle-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "c5d4606d745866c4fe906d28efd00d6060102b37e6a8d7d9788b3317f619a349",
+      "candidate_commit": "455d62c4148bfc384453b01aa1637e937336d61d",
+      "call_lifecycle_cases_per_run": 207,
+      "direct_calls_per_run": 69,
+      "setup_call_invocations_per_run": 819,
+      "cleanup_call_invocations_per_run": 819,
+      "provider_invocations_per_run": 1776,
+      "rejected_calls_per_run": 7212,
+      "async_cleanup_begins_per_run": 69,
+      "adaptation": "旧runtime_call_enter/setup/cleanup与finish私有入口改为公开call/setup_call/cleanup_call/call_finish/disposer_finish。每个实际binding跑直接调用、setup callback调用、cleanup callback调用三种模式；覆盖停止期间拒绝新业务调用、setup和cleanup scope过期、异步清理票据、清理期间provider保活、伪造/重复finish拒绝。旧配额用例单独占满一个provider的私有owner槽位无法通过公开API构造；公开票据始终同时占用consumer/provider，不能将该旧断言伪装成等价覆盖。",
+      "validation": {
+        "normal_builds_and_runs": 4,
+        "ubsan_builds_and_runs": 4,
+        "outputs_identical": true,
+        "native_matrix": "PASS",
+        "release": "BLOCKED"
+      }
     },
     {
       "id": "T14-F06",
@@ -255,7 +277,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 5,
+  "pending_current_abi_ports": 4,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }
