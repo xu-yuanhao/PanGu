@@ -433,10 +433,14 @@ static int budget_case_public(const pangu_prepare_result *plan,const pangu_graph
   assert(!api->call(&live,budget_binding,FUEL,&budget_call_ticket,&report) && report.work<=FUEL);
  }
  pangu_lifecycle_runtime before=live;pangu_owner owner_before[9];memcpy(owner_before,owners,sizeof owners);
+ pangu_owned_resource resource_before[9][2];pangu_owned_operation operation_before[9][3];
+ memcpy(resource_before,resources,sizeof resources);memcpy(operation_before,operations,sizeof operations);
  int callbacks_before_zero=budget_callbacks;
  report=(pangu_lifecycle_report){0};
  assert(api->stop(&live,0,&report)==2 && !report.work && report.reason==1 && report.pending && !report.reserved);
- assert(!memcmp(&before,&live,sizeof live) && !memcmp(owner_before,owners,sizeof owners) && budget_callbacks==callbacks_before_zero);
+ assert(!memcmp(&before,&live,sizeof live) && !memcmp(owner_before,owners,sizeof owners) &&
+        !memcmp(resource_before,resources,sizeof resources) && !memcmp(operation_before,operations,sizeof operations) &&
+        budget_callbacks==callbacks_before_zero);
  int ticks=0,completed=mode<2;pangu_i32 expected=mode==1 ? budget_error_status : 0;
  for(;ticks<100000;ticks++) {
   int callbacks=budget_callbacks;pangu_i32 rc=api->stop(&live,quantum,&report);
@@ -525,6 +529,178 @@ static void budget_public_core(void) {
  assert(budget_call_skips>=4 && budget_prefix_cases==16 && budget_cases>1000);
 }
 
+
+/* T14-F04 public-ABI call-budget regression. */
+static int call_budget_scenarios,call_budget_admissions,call_budget_retries;
+static int call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals;
+static int call_budget_setup_contexts,call_budget_cleanup_contexts;
+static pangu_lifecycle_graph call_budget_graph;
+static pangu_u32 call_budget_disposed[9];
+
+typedef struct {
+ pangu_lifecycle_runtime runtime;
+ pangu_owner owner[9];
+ pangu_owned_resource resource[9][2];
+ pangu_owned_operation operation[9][3];
+ pangu_lifecycle_span span[64];
+ pangu_lifecycle_edge edge[1000];
+ pangu_u32 disposed[9];
+} call_budget_snapshot;
+static void call_budget_capture(call_budget_snapshot *s) {
+ s->runtime=live;memcpy(s->owner,owners,sizeof owners);memcpy(s->resource,resources,sizeof resources);
+ memcpy(s->operation,operations,sizeof operations);memcpy(s->span,spans,sizeof spans);
+ memcpy(s->edge,lifecycle_edges,sizeof lifecycle_edges);memcpy(s->disposed,call_budget_disposed,sizeof call_budget_disposed);
+}
+static int call_budget_same(const call_budget_snapshot *s) {
+ return !memcmp(&s->runtime,&live,sizeof live) && !memcmp(s->owner,owners,sizeof owners) &&
+  !memcmp(s->resource,resources,sizeof resources) && !memcmp(s->operation,operations,sizeof operations) &&
+  !memcmp(s->span,spans,sizeof spans) && !memcmp(s->edge,lifecycle_edges,sizeof lifecycle_edges) &&
+  !memcmp(s->disposed,call_budget_disposed,sizeof call_budget_disposed);
+}
+static pangu_i32 call_budget_enter(pangu_u32 binding,int kind,const void *scope,pangu_u64 fuel,
+                                   pangu_lifecycle_call_ticket *ticket,pangu_lifecycle_report *report) {
+ if(kind==1) return api->setup_call(&live,binding,(const pangu_lifecycle_setup_ticket *)scope,fuel,ticket,report);
+ if(kind==2) return api->cleanup_call(&live,binding,(const pangu_cleanup_ticket *)scope,fuel,ticket,report);
+ return api->call(&live,binding,fuel,ticket,report);
+}
+static int call_budget_invoke(pangu_u32 binding) {
+ pangu_u32 id=current->lowered.graph.provider_owners[current_output->bindings[binding].provider];
+ assert(owners[id].state==PANGU_OWNER_ACTIVE);return (int)id;
+}
+static void call_budget_exercise(pangu_u32 binding,int kind,const void *scope) {
+ pangu_lifecycle_call_ticket ticket,poison;memset(&poison,0xa5,sizeof poison);pangu_lifecycle_report report={0};
+ call_budget_snapshot before;call_budget_capture(&before);int calls=call_budget_admissions;pangu_u64 fuel=0;
+ for(;fuel<10000;fuel++) {
+  ticket=poison;report=(pangu_lifecycle_report){0};
+  pangu_i32 rc=call_budget_enter(binding,kind,scope,fuel,&ticket,&report);
+  assert(report.work<=fuel && !report.reserved);
+  if(!rc) {assert(!report.reason && !report.pending);break;}
+  assert(rc==2 && report.reason==1 && report.pending && call_budget_same(&before));
+  assert(!memcmp(&ticket,&poison,sizeof ticket) && call_budget_admissions==calls);call_budget_retries++;
+ }
+ assert(fuel<10000);
+ pangu_plan_edge edge=current_output->bindings[binding];
+ pangu_u32 consumer=current->lowered.graph.requirements[edge.requirement].consumer;
+ pangu_u32 provider=current->lowered.graph.provider_owners[edge.provider];
+ assert(owners[consumer].inflight==before.owner[consumer].inflight+1);
+ assert(owners[provider].inflight==before.owner[provider].inflight+1);
+ assert(call_budget_invoke(binding)==(int)provider);call_budget_admissions++;
+ pangu_lifecycle_call_ticket bad=ticket;bad.provider.generation++;
+ call_budget_snapshot during;call_budget_capture(&during);
+ assert(api->call_finish(&live,&bad)==10 && call_budget_same(&during));
+ assert(!api->call_finish(&live,&ticket));assert(api->call_finish(&live,&ticket)==10);
+ assert(owners[consumer].inflight==before.owner[consumer].inflight && owners[provider].inflight==before.owner[provider].inflight);
+
+ /* Invalid output/output aliasing is rejected before writing either object. */
+ union {pangu_lifecycle_call_ticket ticket;pangu_lifecycle_report report;unsigned char bytes[64];} overlap;
+ memset(&overlap,0x5a,sizeof overlap);unsigned char saved[sizeof overlap];memcpy(saved,&overlap,sizeof overlap);
+ call_budget_capture(&before);
+ assert(call_budget_enter(binding,kind,scope,100,(pangu_lifecycle_call_ticket *)(void *)&overlap,
+                          (pangu_lifecycle_report *)(void *)&overlap)==1);
+ assert(!memcmp(saved,&overlap,sizeof overlap) && call_budget_same(&before));call_budget_overlap_refusals++;
+ if(kind) {
+  unsigned char scope_copy[sizeof(pangu_lifecycle_setup_ticket)];
+  pangu_u64 bytes=kind==1 ? sizeof(pangu_lifecycle_setup_ticket) : sizeof(pangu_cleanup_ticket);
+  memcpy(scope_copy,scope,bytes);memset(&ticket,0xa5,sizeof ticket);pangu_lifecycle_call_ticket output_before=ticket;
+  call_budget_capture(&before);
+  assert(call_budget_enter(binding,kind,scope,100,&ticket,(pangu_lifecycle_report *)(void *)scope)==1);
+  assert(!memcmp(scope_copy,scope,bytes) && !memcmp(&ticket,&output_before,sizeof ticket) && call_budget_same(&before));
+  call_budget_overlap_refusals++;
+ }
+ call_budget_scenarios++;
+}
+static pangu_i32 call_budget_release(void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;call_budget_cleanup_contexts++;
+ pangu_cleanup_ticket scope;assert(!api->cleanup_scope(&live,positions[id],&scope));
+ for(pangu_u32 b=0;b<current->graph_report.binding_count;b++) {
+  pangu_plan_edge edge=current_output->bindings[b];
+  if(current->lowered.graph.requirements[edge.requirement].consumer==id) call_budget_exercise(b,2,&scope);
+ }
+ return 0;
+}
+static pangu_i32 call_budget_setup(pangu_owner *owner,void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;setup_count++;
+ assert(owner==&owners[id] && owner->inflight==1);
+ assert(!api->register_resource(&live,positions[id],call_budget_release,opaque));
+ pangu_lifecycle_setup_ticket scope;assert(!api->setup_scope(&live,&scope));
+ for(pangu_u32 b=0;b<current->graph_report.binding_count;b++) {
+  pangu_plan_edge edge=current_output->bindings[b];
+  if(current->lowered.graph.requirements[edge.requirement].consumer==id) call_budget_exercise(b,1,&scope);
+ }
+ call_budget_setup_contexts++;return 0;
+}
+static void call_budget_prepare(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ if(live.phase) {
+  assert(live.phase==4 && !live.started && !live.setup_waiting);
+  for(pangu_u32 i=0;i<9;i++) assert(!owners[i].inflight && !owners[i].count);
+ }
+ memset(&live,0,sizeof live);setup_count=cleanup_count=cleanup_begin_count=0;epoch++;
+ assert(epoch && plan->lowered.graph.instance_count<=9);
+ for(pangu_u32 i=0;i<9;i++) {
+  if(!owners[i].abi_version || owners[i].state==PANGU_OWNER_LOADING) memset(&owners[i],0,sizeof owners[i]);
+  assert(!api->owner_init(&owners[i],resources[i],2,operations[i],3,epoch,4));
+  source_items[i]=(pangu_lifecycle_item){&owners[i],call_budget_setup,(void *)(pangu_u64)i};
+ }
+ pangu_lifecycle_storage storage_view={activation,9,lifecycle_edges,1000};pangu_lifecycle_prepared prepared;
+ assert(!api->prepare(plan,out,source_items,plan->lowered.graph.instance_count,&storage_view,FUEL,&prepared));
+ assert(prepared.item_count==plan->graph_report.order_count);prepared_edge_count=prepared.edge_count;
+ for(pangu_u32 i=0;i<prepared.item_count;i++) positions[out->order[i]]=i;
+ live.items=activation;live.count=prepared.item_count;
+ call_budget_graph=(pangu_lifecycle_graph){lifecycle_edges,prepared.edge_count,call_budget_disposed,9};live.stop_graph=&call_budget_graph;
+ memset(call_budget_disposed,0,sizeof call_budget_disposed);current=plan;current_output=out;
+ assert(!api->bind_geometry(&live,spans,64,FUEL));
+}
+static void call_budget_refusal_cases(pangu_u32 binding) {
+ pangu_lifecycle_call_ticket holds[3];pangu_lifecycle_report report={0};
+ for(pangu_u32 i=0;i<3;i++) {memset(&holds[i],0xa5,sizeof holds[i]);report=(pangu_lifecycle_report){0};assert(!api->call(&live,binding,FUEL,&holds[i],&report));assert(!report.reason&&!report.pending&&report.work<=FUEL);}
+ call_budget_snapshot before;call_budget_capture(&before);pangu_lifecycle_call_ticket poison;memset(&poison,0xa5,sizeof poison);pangu_lifecycle_call_ticket poison_before=poison;
+ report=(pangu_lifecycle_report){0};assert(api->call(&live,binding,FUEL,&poison,&report)==2);
+ assert(!report.reason&&!report.pending&&report.work<=FUEL&&!report.reserved);
+ assert(call_budget_same(&before) && !memcmp(&poison,&poison_before,sizeof poison));
+ for(pangu_i32 i=2;i>=0;i--) assert(!api->call_finish(&live,&holds[i]));call_budget_quota_refusals++;
+}
+static void call_budget_generation_case(pangu_u32 binding) {
+ pangu_plan_edge edge=current_output->bindings[binding];pangu_u32 consumer=current->lowered.graph.requirements[edge.requirement].consumer;
+ pangu_u32 provider=current->lowered.graph.provider_owners[edge.provider];
+ operations[consumer][0].generation=0xffffffffU;operations[provider][0].generation=0xffffffffU;
+ pangu_lifecycle_call_ticket ticket={0};pangu_lifecycle_report report={0};
+ assert(!api->call(&live,binding,FUEL,&ticket,&report)&&!report.reason&&!report.pending);
+ assert(ticket.consumer.index==1 && ticket.provider.index==1);assert(!api->call_finish(&live,&ticket));
+}
+static void call_budget_invalid_case(pangu_u32 binding_count) {
+ pangu_lifecycle_call_ticket ticket;memset(&ticket,0xa5,sizeof ticket);pangu_lifecycle_call_ticket poison=ticket;
+ call_budget_snapshot before;call_budget_capture(&before);pangu_lifecycle_report report={0};
+ assert(api->call(&live,binding_count,FUEL,&ticket,&report)==3 && !report.reason&&!report.pending&&!report.work);
+ assert(!memcmp(&ticket,&poison,sizeof ticket) && call_budget_same(&before));call_budget_invalid_bindings++;
+}
+static void call_budget_run_plan(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ int setup_before=call_budget_setup_contexts,cleanup_before=call_budget_cleanup_contexts;
+ call_budget_prepare(plan,out);pangu_lifecycle_report report={0};
+ assert(!api->start(&live,FUEL,&report) && !report.reason&&!report.pending);
+ assert(setup_count==(int)live.count && call_budget_setup_contexts-setup_before==(int)live.count);
+ for(pangu_u32 b=0;b<plan->graph_report.binding_count;b++) call_budget_exercise(b,0,0);
+ if(plan->graph_report.binding_count) {
+  call_budget_refusal_cases(0);call_budget_generation_case(0);call_budget_invalid_case((pangu_u32)plan->graph_report.binding_count);
+ }
+ assert(!api->stop(&live,FUEL,&report)&&!report.pending&&report.state==4);
+ assert(cleanup_count==0 && call_budget_cleanup_contexts-cleanup_before==(int)live.count);
+}
+static void call_budget_public_core(void) {
+ pangu_prepare_result plan;int valid=0,rejected=0;
+ for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
+  const host_graph_case *c=&host_graph_cases[i];
+  assert(pangu_discover_prepare(c->manifest,c->contracts,c->count,c->installed,&corpus_storage,FUEL,&plan)==c->status);
+  if(c->status){rejected++;continue;}valid++;call_budget_run_plan(&plan,&corpus_output);
+ }
+ assert(!prepare(FUEL,&plan));call_budget_run_plan(&plan,&output);
+ for(int reverse=0;reverse<2;reverse++) {
+  multi_manifest.provisions=reverse?reverse_provisions:provisions;
+  assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,FUEL,&plan));
+  call_budget_run_plan(&plan,&output);
+ }
+ assert(valid==95&&rejected==145&&call_budget_scenarios>100);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -551,7 +727,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- async_disposer_public_core(&plan,&output);budget_public_core();
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases);
+ async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts);
  return 0;
 }
