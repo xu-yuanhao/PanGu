@@ -45,8 +45,28 @@
       "id": "T14-F03",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/budget-test.c",
       "source_sha256": "2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "保留436个私有owner hold无公开依赖call映射的记录；继续F04-F05/F08-F09/F17/F19、完整G04/G07与更早owner语料审计。",
+      "suite": "budget-public-2736",
+      "evidence": "docs/migration/t14-budget-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "31dc0f11548f34e409ed585eb6aa1d4f0e9d6df121b4f423be55ffad0cf1b9a1",
+      "candidate_commit": "08387cb28cdaf3186cb39fefe3c35aa5ea796758",
+      "budget_cases_per_run": 2736,
+      "bounded_stop_ticks_per_run": 44904,
+      "owner_runtime_work_units": 9,
+      "public_call_unmappable_cases_per_run": 436,
+      "prefix_cases_per_run": 16,
+      "adaptation": "旧私有 runtime_stop_budget 与 owner_stop_budget 路径通过公开 start/stop/report 重表达；零预算前后 runtime/owner/resources/operations逐字节不变，量子1-4续跑、回调成本不超report.work、终态重停零工作量。旧任意owner enter改用真实依赖边的公开call/call_finish；无边或prefix场景不伪称可映射。",
+      "validation": {
+        "normal_builds_and_runs": 4,
+        "ubsan_builds_and_runs": 4,
+        "outputs_identical": true,
+        "native_matrix": "PASS",
+        "release": "BLOCKED"
+      }
     },
     {
       "id": "T14-F04",
@@ -212,7 +232,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 7,
+  "pending_current_abi_ports": 6,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

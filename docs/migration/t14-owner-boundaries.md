@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩7项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
+协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩6项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -455,3 +455,10 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 将旧 `async-test.c` 的异步清理行为映射到现有公开 `pangu_lifecycle_api`，未重新导出 `pangu_owner_cleanup_finish`、`pangu_owner_enter/leave` 或 runtime 私有helper。新增7组补充轨迹：两个异步disposer的延迟完成/重复停止/票据拒绝与错误继续；待完成期间拒绝 owner 重初始化；内联成功、同步失败和完成/返回值冲突；旧 epoch 票据在重用后拒绝；公开依赖调用排空后才触发异步清理；以及真实多 provider 图中 consumer 等待清理时保留 providers。
 
 普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过，输出摘要一致；同一候选还复验675个 adapter 与1414个 async setup 场景。8次运行均为7个清理组、8次坏/重复/迟到票据拒绝、2次内联finish。旧测试依赖的无依赖边任意owner操作没有公开ABI等价物，本次不伪造覆盖；完整 T14、G04/G07、生产准入及隔离控制器 external trust approval 仍未通过。固定树、构建/执行回执、风险和同一 Agent 自审记录见 [F02 原生证据](t14-async-disposer-native-evidence.json)。
+
+
+### 2026-10-24：旧 budget-test.c 当前公开 ABI 原生专项
+
+将私有 `runtime_stop_budget` / `pangu_owner_stop_budget` 断言改为公开 `start`、`stop` 与生命周期报告。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过，输出摘要一致；每次跑2,736个预算场景、44,904个有界 stop 推进，涵盖固定240图的有效组合、四档 quantum（1–4）、同步清理错误码、异步 disposer、异步 setup、prefix teardown，以及零预算状态快照和终态零工作量重停。单 owner 释放经公开 runtime 路径在9个工作单位内完成4个disposer；所有 stop 回调增量均不超过本次报告work。
+
+旧测试在任意位置直接 enter owner；公开 API 只允许依赖边上的 call ticket。本次对无可用依赖边或prefix上下文的436个场景跳过这项持有断言，不记作通过；有边场景用公开call/call_finish保留consumer/provider并等待。源码与回执固定在 [F03原生证据](t14-budget-native-evidence.json)。这只关闭F03当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除隔离控制器 external trust approval 与生产准入阻塞。
