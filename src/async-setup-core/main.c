@@ -844,6 +844,156 @@ static void call_lifecycle_public_core(void) {
  assert(call_lifecycle_direct_calls==call_lifecycle_cases/3 && call_lifecycle_async_begin_total==call_lifecycle_cases/3);
 }
 
+
+/* T14-F08 public-ABI protected geometry regression. */
+static int geometry_refused,geometry_matrices,geometry_cases;
+typedef struct {
+ pangu_lifecycle_span ranges[64];pangu_u64 count,used;unsigned char bytes[32768];
+} public_geometry_snapshot;
+static void geometry_capture(pangu_lifecycle_runtime *r,public_geometry_snapshot *s) {
+ assert(r->protected_count<=64);s->count=r->protected_count;s->used=0;
+ memcpy(s->ranges,r->protected_spans,s->count*sizeof(pangu_lifecycle_span));
+ for(pangu_u64 i=0;i<s->count;i++) {
+  pangu_u64 n=s->ranges[i].end-s->ranges[i].begin;assert(n<=sizeof(s->bytes)-s->used);
+  memcpy(s->bytes+s->used,(const void *)s->ranges[i].begin,n);s->used+=n;
+ }
+}
+static int geometry_unchanged(const public_geometry_snapshot *s) {
+ pangu_u64 offset=0;
+ for(pangu_u64 i=0;i<s->count;i++) {
+  pangu_u64 n=s->ranges[i].end-s->ranges[i].begin;
+  if(memcmp(s->bytes+offset,(const void *)s->ranges[i].begin,n))return 0;offset+=n;
+ }
+ return 1;
+}
+static void geometry_refuse_matrix(pangu_lifecycle_runtime *r,const pangu_lifecycle_setup_ticket *setup,
+                                   const pangu_cleanup_ticket *cleanup_scope_value) {
+ geometry_matrices++;public_geometry_snapshot before;geometry_capture(r,&before);
+ for(pangu_u64 i=0;i<r->protected_count;i++) {
+  void *bad=(void *)r->protected_spans[i].begin;
+  pangu_lifecycle_call_ticket call,call_before;pangu_lifecycle_report report,report_before;
+  pangu_lifecycle_setup_ticket setup_out,setup_out_before;pangu_cleanup_ticket cleanup_out,cleanup_out_before;
+  #define GEO_PREP() do { memset(&call,0xa5,sizeof call);call_before=call;memset(&report,0xa5,sizeof report);report_before=report;memset(&setup_out,0xa5,sizeof setup_out);setup_out_before=setup_out;memset(&cleanup_out,0xa5,sizeof cleanup_out);cleanup_out_before=cleanup_out;} while(0)
+  #define GEO_REFUSE(expr) do { GEO_PREP();assert((expr)==1);geometry_refused++;assert(!memcmp(&call,&call_before,sizeof call)&&!memcmp(&report,&report_before,sizeof report)&&!memcmp(&setup_out,&setup_out_before,sizeof setup_out)&&!memcmp(&cleanup_out,&cleanup_out_before,sizeof cleanup_out));assert(geometry_unchanged(&before));} while(0)
+  GEO_REFUSE(api->setup_scope(r,(pangu_lifecycle_setup_ticket *)bad));
+  GEO_REFUSE(api->setup_defer(r,(pangu_lifecycle_setup_ticket *)bad));
+  GEO_REFUSE(api->setup_finish(r,(const pangu_lifecycle_setup_ticket *)bad,0));
+  GEO_REFUSE(api->cleanup_scope(r,0,(pangu_cleanup_ticket *)bad));
+  GEO_REFUSE(api->stop(r,1,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->start(r,1,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->pump(r,1,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->disposer_finish(r,0,(const pangu_cleanup_ticket *)bad,0));
+  GEO_REFUSE(api->call(r,0,1,(pangu_lifecycle_call_ticket *)bad,&report));
+  GEO_REFUSE(api->call(r,0,1,&call,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->setup_call(r,0,setup,1,(pangu_lifecycle_call_ticket *)bad,&report));
+  GEO_REFUSE(api->setup_call(r,0,setup,1,&call,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->cleanup_call(r,0,cleanup_scope_value,1,(pangu_lifecycle_call_ticket *)bad,&report));
+  GEO_REFUSE(api->cleanup_call(r,0,cleanup_scope_value,1,&call,(pangu_lifecycle_report *)bad));
+  GEO_REFUSE(api->call_finish(r,(const pangu_lifecycle_call_ticket *)bad));
+  GEO_REFUSE(api->setup_call(r,0,setup,1,(pangu_lifecycle_call_ticket *)((pangu_u64)~(pangu_u64)0-7U),&report));
+  GEO_REFUSE(api->call_finish(r,(const pangu_lifecycle_call_ticket *)((const unsigned char *)&call+1)));
+  #undef GEO_REFUSE
+  #undef GEO_PREP
+ }
+ assert(geometry_unchanged(&before));
+}
+static pangu_i32 geometry_public_cleanup(void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;cleanup_count++;
+ pangu_cleanup_ticket scope;assert(!api->cleanup_scope(&live,positions[id],&scope));
+ pangu_lifecycle_setup_ticket stale={0};geometry_refuse_matrix(&live,&stale,&scope);
+ union {pangu_u64 alignment;pangu_cleanup_ticket cleanup;pangu_lifecycle_call_ticket call;unsigned char bytes[96];} overlap;
+ memset(&overlap,0xa5,sizeof overlap);overlap.cleanup=scope;unsigned char saved[96];memcpy(saved,overlap.bytes,sizeof saved);
+ public_geometry_snapshot before;geometry_capture(&live,&before);pangu_lifecycle_report report={0};
+ assert(api->cleanup_call(&live,0,&overlap.cleanup,FUEL,&overlap.call,&report)==1);
+ assert(!memcmp(saved,overlap.bytes,sizeof saved)&&geometry_unchanged(&before));geometry_refused++;
+ return 0;
+}
+static pangu_i32 geometry_public_setup(pangu_owner *owner,void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;setup_count++;
+ assert(owner==&owners[id]&&owner->inflight==1);
+ assert(!api->register_resource(&live,positions[id],geometry_public_cleanup,opaque));
+ pangu_lifecycle_setup_ticket scope;assert(!api->setup_scope(&live,&scope));pangu_cleanup_ticket no_cleanup={0};
+ geometry_refuse_matrix(&live,&scope,&no_cleanup);
+ union {pangu_u64 alignment;pangu_lifecycle_setup_ticket setup;pangu_lifecycle_call_ticket call;unsigned char bytes[96];} overlap;
+ memset(&overlap,0xa5,sizeof overlap);overlap.setup=scope;unsigned char saved[96];memcpy(saved,overlap.bytes,sizeof saved);
+ public_geometry_snapshot before;geometry_capture(&live,&before);pangu_lifecycle_report report={0};
+ assert(api->setup_call(&live,0,&overlap.setup,FUEL,&overlap.call,&report)==1);
+ assert(!memcmp(saved,overlap.bytes,sizeof saved)&&geometry_unchanged(&before));geometry_refused++;
+ return 0;
+}
+static void geometry_public_prepare(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ if(live.phase) {assert(live.phase==4&&!live.started&&!live.setup_waiting);for(pangu_u32 i=0;i<9;i++)assert(!owners[i].inflight&&!owners[i].count);}
+ memset(&live,0,sizeof live);setup_count=cleanup_count=cleanup_begin_count=0;epoch++;
+ assert(epoch&&plan->lowered.graph.instance_count<=9);
+ for(pangu_u32 i=0;i<9;i++) {
+  if(!owners[i].abi_version||owners[i].state==PANGU_OWNER_LOADING)memset(&owners[i],0,sizeof owners[i]);
+  assert(!api->owner_init(&owners[i],resources[i],2,operations[i],3,epoch,4));
+  source_items[i]=(pangu_lifecycle_item){&owners[i],geometry_public_setup,(void *)(pangu_u64)i};
+ }
+ pangu_lifecycle_storage storage_view={activation,9,lifecycle_edges,1000};pangu_lifecycle_prepared prepared;
+ assert(!api->prepare(plan,out,source_items,plan->lowered.graph.instance_count,&storage_view,FUEL,&prepared));
+ assert(prepared.item_count==plan->graph_report.order_count);prepared_edge_count=prepared.edge_count;
+ for(pangu_u32 i=0;i<prepared.item_count;i++)positions[out->order[i]]=i;
+ live.items=activation;live.count=prepared.item_count;budget_graph=(pangu_lifecycle_graph){lifecycle_edges,prepared.edge_count,budget_disposed,9};
+ memset(budget_disposed,0,sizeof budget_disposed);live.stop_graph=&budget_graph;current=plan;current_output=out;
+}
+static void geometry_public_case(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ geometry_public_prepare(plan,out);pangu_lifecycle_report report={0};
+ assert(!api->bind_geometry(&live,spans,64,FUEL));
+ assert(!api->start(&live,FUEL,&report)&&!report.reason&&!report.pending);
+ pangu_lifecycle_setup_ticket stale={0};pangu_cleanup_ticket no_cleanup={0};
+ geometry_refuse_matrix(&live,&stale,&no_cleanup);
+ assert(!api->stop(&live,FUEL,&report)&&!report.pending&&!report.reason);
+ geometry_refuse_matrix(&live,&stale,&no_cleanup);geometry_cases++;
+}
+static void geometry_public_builder_tests(const pangu_prepare_result *plan,const pangu_graph_output *out) {
+ pangu_lifecycle_runtime test={0},before; pangu_lifecycle_item items[9];pangu_lifecycle_storage storage_view={activation,9,lifecycle_edges,1000};
+ pangu_lifecycle_prepared prepared; pangu_u64 n=plan->lowered.graph.instance_count;assert(n<=9);epoch++;
+ for(pangu_u32 i=0;i<n;i++) {
+  if(!owners[i].abi_version||owners[i].state==PANGU_OWNER_LOADING)memset(&owners[i],0,sizeof owners[i]);
+  assert(!api->owner_init(&owners[i],resources[i],2,operations[i],3,epoch,4));
+  items[i]=(pangu_lifecycle_item){&owners[i],geometry_public_setup,(void *)(pangu_u64)i};
+ }
+ assert(!api->prepare(plan,out,items,n,&storage_view,FUEL,&prepared));
+ test.items=activation;test.count=prepared.item_count;
+ pangu_lifecycle_graph graph={lifecycle_edges,prepared.edge_count,budget_disposed,9};test.stop_graph=&graph;
+ before=test;pangu_lifecycle_report report={0};assert(api->start(&test,FUEL,&report)==1&&!memcmp(&test,&before,sizeof test));geometry_refused++;
+ assert(api->bind_geometry(&test,(pangu_lifecycle_span *)(void *)&test,64,FUEL)==1&&!memcmp(&test,&before,sizeof test));geometry_refused++;
+ assert(api->bind_geometry(&test,(pangu_lifecycle_span *)(void *)resources,64,FUEL)==1&&!memcmp(&test,&before,sizeof test));geometry_refused++;
+ assert(api->bind_geometry(&test,(pangu_lifecycle_span *)((unsigned char *)spans+1),63,FUEL)==1&&!memcmp(&test,&before,sizeof test));geometry_refused++;
+ if(n>1) {owners[1].resources=owners[0].resources;assert(api->bind_geometry(&test,spans,64,FUEL)==1&&!memcmp(&test,&before,sizeof test));owners[1].resources=resources[1];geometry_refused++;}
+ pangu_owner *owner_ptr=activation[0].owner;activation[0].owner=(pangu_owner *)((unsigned char *)owner_ptr+1);
+ assert(api->bind_geometry(&test,spans,64,FUEL)==1&&!memcmp(&test,&before,sizeof test));activation[0].owner=owner_ptr;geometry_refused++;
+ pangu_u64 cap=owners[0].capacity;owners[0].capacity=(pangu_u64)~(pangu_u64)0/24+1;
+ assert(api->bind_geometry(&test,spans,64,FUEL)==1&&!memcmp(&test,&before,sizeof test));owners[0].capacity=cap;geometry_refused++;
+ pangu_u64 fuel=0;
+ for(;fuel<100000;fuel++) {int rc=api->bind_geometry(&test,spans,64,fuel);if(!rc)break;assert(rc==2&&!memcmp(&test,&before,sizeof test));}
+ assert(fuel<100000&&test.protected_count>0);
+ for(pangu_u64 i=1;i<test.protected_count;i++)assert(spans[i-1].end<=spans[i].begin);
+ pangu_lifecycle_runtime bound=test;pangu_lifecycle_span bound_spans[64];memcpy(bound_spans,spans,sizeof spans);
+ assert(api->bind_geometry(&test,spans,64,FUEL)==10&&!memcmp(&test,&bound,sizeof test)&&!memcmp(spans,bound_spans,sizeof spans));geometry_refused++;
+ /* Public owner_init must reject misaligned frames and backing arrays before mutation. */
+ union {pangu_u64 alignment;unsigned char bytes[256];} raw;memset(&raw,0,sizeof raw);
+ pangu_owner *aligned=(pangu_owner *)(void *)raw.bytes;pangu_owned_resource local_resources[2];pangu_owned_operation local_ops[2];
+ pangu_owner copy=*aligned;assert(api->owner_init((pangu_owner *)((unsigned char *)aligned+1),local_resources,2,local_ops,2,1,FUEL)==1&&!memcmp(aligned,&copy,sizeof copy));geometry_refused++;
+}
+static void geometry_public_core(void) {
+ pangu_prepare_result plan;int valid=0,rejected=0;
+ assert(!prepare(FUEL,&plan));geometry_public_builder_tests(&plan,&output);
+ for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
+  const host_graph_case *c=&host_graph_cases[i];
+  assert(pangu_discover_prepare(c->manifest,c->contracts,c->count,c->installed,&corpus_storage,FUEL,&plan)==c->status);
+  if(c->status){rejected++;continue;}valid++;geometry_public_case(&plan,&corpus_output);
+ }
+ assert(!prepare(FUEL,&plan));geometry_public_case(&plan,&output);
+ for(int reverse=0;reverse<2;reverse++) {
+  multi_manifest.provisions=reverse?reverse_provisions:provisions;
+  assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,FUEL,&plan));
+  geometry_public_case(&plan,&output);
+ }
+ assert(valid==95&&rejected==145&&geometry_cases==98&&geometry_matrices>0&&geometry_refused>0);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -870,7 +1020,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total);
+ async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused);
  return 0;
 }
