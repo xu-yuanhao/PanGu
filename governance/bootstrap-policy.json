@@ -228,6 +228,7 @@
     "docs/migration/t14-async-setup-core-evidence.json": "control",
     "docs/migration/t14-async-setup-core-source-publication.json": "control",
     "docs/migration/t14-adapter-setup-native-evidence.json": "control",
-    "docs/migration/t14-adapter-setup-source-publication.json": "control"
+    "docs/migration/t14-adapter-setup-source-publication.json": "control",
+    "docs/migration/t14-async-disposer-native-evidence.json": "control"
   }
 }

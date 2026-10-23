@@ -13,14 +13,33 @@
       "normal_runs": 4,
       "ubsan_runs": 4,
       "evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
-      "adaptation": "Replaced private runtime_prepare_items/owner enter calls with current pangu_lifecycle_api::prepare and dependency call tickets. 86 real-edge hold scenarios are exercised; 106 old owner-only holds with no edge are explicitly excluded as removed private semantics."
+      "adaptation": "Replaced private runtime_prepare_items/owner enter calls with current pangu_lifecycle_api::prepare and dependency call tickets. 86 real-edge hold scenarios are exercised; 106 old owner-only holds with no edge are explicitly excluded as removed private semantics.",
+      "supplemental_evidence": "docs/migration/t14-async-disposer-native-evidence.json"
     },
     {
       "id": "T14-F02",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/async-test.c",
       "source_sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "保留无边任意owner操作的公开ABI差异；继续F03-F05/F08-F09/F17/F19、完整G04/G07与更早owner语料审计。",
+      "suite": "async-disposer-public-7",
+      "evidence": "docs/migration/t14-async-disposer-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "8c782d5d4888fe28df2f5f82e30a04d03c2d321690fb1121e8e4c5e16d5c7898",
+      "candidate_commit": "f949547e255a112d8c2929fd5fee3a31cc173952",
+      "public_cleanup_groups": 7,
+      "rejected_cleanup_tickets_per_run": 8,
+      "inline_cleanup_finishes_per_run": 2,
+      "adaptation": "旧异步清理私有helper语义改用现有生命周期表的cleanup_scope/disposer_finish、公开依赖call/call_finish、start/stop与owner_init验证；不恢复私有导出。真实绑定上的consumer/provider保活覆盖；没有依赖边的任意owner enter不伪装成公开调用。",
+      "validation": {
+        "normal_builds_and_runs": 4,
+        "ubsan_builds_and_runs": 4,
+        "outputs_identical": true,
+        "native_matrix": "PASS",
+        "release": "BLOCKED"
+      }
     },
     {
       "id": "T14-F03",
@@ -160,7 +179,9 @@
         "ubsan_runs": 4,
         "outputs_identical": true,
         "documented_no_edge_private_hold_cases": 106
-      }
+      },
+      "supplemental_evidence": "docs/migration/t14-async-disposer-native-evidence.json",
+      "supplemental_public_abi_cleanup_groups": 7
     },
     {
       "id": "T14-F17",
@@ -191,7 +212,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 8,
+  "pending_current_abi_ports": 7,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

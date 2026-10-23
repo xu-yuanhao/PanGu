@@ -1,0 +1,128 @@
+{
+  "schema": "pangu.t14-async-disposer-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F02 focused current-public-ABI port, run in the already tested adapter/setup candidate; test-scope only, not production promotion or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/async-test.c",
+    "sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "f949547e255a112d8c2929fd5fee3a31cc173952",
+    "parent": "21ac9493dc58cf2b1a4446aef92d00dba386bd44",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "8c782d5d4888fe28df2f5f82e30a04d03c2d321690fb1121e8e4c5e16d5c7898",
+    "candidate_tree_sha256": "13386111bb42ce9f7cb2f3d3bdc255a9e300a65b43e3cdbe4b61aa3499eacb61",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "8c782d5d4888fe28df2f5f82e30a04d03c2d321690fb1121e8e4c5e16d5c7898"
+  },
+  "fixed_inputs": {
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904b23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "native_candidate_policy_sha256": "7a29318ff28d30f46d59f7d95f2675080d097cbbbc2f814b9147312d0fa6bae3",
+    "native_candidate_controller_sha256": "310e38aa109ff44b467e8251305a89153b8b83cade06501b4d254dfdd6ec0417",
+    "registered_result_policy_sha256": "f21277f9123c50b606df3362d99f198258f87601ca63eb57b744760e9f7186ef"
+  },
+  "coverage": {
+    "adapter_scenarios_per_run": 675,
+    "async_setup_scenarios_per_run": 1414,
+    "async_disposer_groups_per_run": 7,
+    "async_disposer_assertions": [
+      "deferred completion across two async resources and repeated stop while waiting",
+      "wrong epoch/serial/owner and invalid-address ticket refusal",
+      "duplicate, late, and prior-epoch ticket refusal",
+      "owner reinitialization refusal while completion is pending",
+      "inline completion, synchronous disposer failure, and completion/return protocol conflict",
+      "completion failure reported after the final resource completes",
+      "public dependency call drains before disposer starts",
+      "consumer async cleanup keeps graph-bound provider owners active"
+    ],
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "4e019dd5bc4cd96ca8b51c9cba9ab85d718ab04c0bda056629010aeea743cae1",
+    "all_stdout_identical": true,
+    "rejected_cleanup_tickets_per_run": 8,
+    "inline_cleanup_finishes_per_run": 2
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "register_resource",
+      "register_async",
+      "prepare",
+      "bind_geometry",
+      "start",
+      "stop",
+      "cleanup_scope",
+      "disposer_finish",
+      "call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "The legacy private test can hold an arbitrary owner without a dependency edge. The public API only retains owners through a resolved dependency call; that semantic is explicitly not claimed for no-edge arbitrary owner holds.",
+    "existing_F01_difference": "The separate 106 no-edge owner-only adapter holds retain their earlier recorded status as intentional removed-private semantics."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "dd9483ec0be0abec82a618f436be8562227f1c1d93e94abf19bd6d3542cb1d15",
+      "executions_json_sha256": "0e22698d43ac6ef057d8663bd4b1f721c69a229ddc216ba54dbb62482b0b5f31",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "7311e6388768f4364bf9330f753b0f1c36ed1d9bae0f778b65a2f1a5ce958408",
+      "executions_json_sha256": "83ef39352a45ba0597dbe1d1d690e25e8efed72a6abff226ee3a53e61b6eead4",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider code"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; native execution was performed in bwrap with network unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F02 as PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS and continuing local T14 test work only. Do not approve production code, release, full T14/G04/G07, or any gate/ABI/budget/profile change.",
+    "fixed_candidate_digest": "13386111bb42ce9f7cb2f3d3bdc255a9e300a65b43e3cdbe4b61aa3499eacb61",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "frozen normal native matrix: 4 builds and 4 executions PASS",
+      "frozen UBSan native matrix: 4 builds and 4 executions PASS",
+      "identical stdout digest across all eight runs",
+      "GitHub branch ref and source blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "python3 -B -m unittest discover -s tools/gates -p test_*.py: 223 tests PASS"
+    ],
+    "risks": [
+      "This is same-Agent self-review, not independent approval.",
+      "The test port does not reproduce private arbitrary owner holds without a public dependency edge.",
+      "The controller cannot attest its caller-provided execution environment; external trust approval and release remain blocked.",
+      "UBSan does not instrument assembly provider instructions.",
+      "The native suite does not complete F03-F05/F08-F09/F17/F19, full G04/G07, or T14."
+    ],
+    "control_scope_sha256": "7c0fd324bb5d1c9a597018fbb515b7f3b9642709af776a8f0eee06fa4a29f650",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "f21277f9123c50b606df3362d99f198258f87601ca63eb57b744760e9f7186ef",
+      "docs/migration/t14-focused-inventory.json": "7af19181e2733016ce92ffa3ef8823ff07e3d5c408cc13770f0cba2a60241c9c",
+      "docs/migration/t14-owner-boundaries.md": "482f7361acc001a946255a11a1e81baf041b2fa5669d2abc9610d874d9f8c872",
+      "docs/原生重写路线与迁移TODO.md": "3033f6343b4b7797f39bd42df0861e592b17cb0fe7c583c95fc682e39b2e0357"
+    }
+  }
+}

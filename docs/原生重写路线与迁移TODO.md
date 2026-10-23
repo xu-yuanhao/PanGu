@@ -357,6 +357,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 局部宿主异步 setup：defer/finish/pump、停止后迟到成功不激活、setup 完成后仍等待异步清理；O0/O2 各 1414 场景通过，原 675 生命周期与 8 组清理场景复验通过。仍需正式 ABI、原生准入和完整 G04，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 - [x] 异步 setup 核心公开 ABI 原生专项：初版覆盖旧 `setup-test.c` 的 1414 个异步 setup 场景，七模式各202例；随后通过合并候选补测其 675 个 `integration_main()` 场景。当前范围与 API 差异见 [合并证据](migration/t14-adapter-setup-native-evidence.json)；此行保留初版专项记录。
 - [x] 旧 `adapter-test.c` / `setup-test.c` 当前公开 ABI 合并专项：675 个适配器集成场景与 1414 个异步 setup 场景，普通/UBSan × 汇编/C内存实现 × debug/release 共8次构建和执行，全部结果一致。86个有真实依赖边的调用等待通过公开租约覆盖；106个无边 owner-only 等待是已移除的私有语义，明确记录为差异，未重新导出 helper。F01/F16 按带 API 适配通过，完整 T14 仍待完成，见 [证据](migration/t14-adapter-setup-native-evidence.json)。
+- [x] 旧 `async-test.c` 当前公开 ABI 清理专项：追加7组公开票据、重复/迟到拒绝、内联/同步失败、epoch重用、依赖调用排空和provider保活轨迹；同一8构建矩阵全部通过，并复验上方675个 adapter/1414个 setup 场景。F02 按带 API 适配通过；无边任意owner操作未伪称覆盖，完整T14/G04/G07仍待完成，见 [F02证据](migration/t14-async-disposer-native-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
