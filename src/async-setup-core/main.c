@@ -701,6 +701,149 @@ static void call_budget_public_core(void) {
  assert(valid==95&&rejected==145&&call_budget_scenarios>100);
 }
 
+
+/* T14-F05 public-ABI call and lease lifecycle regression. */
+static pangu_u32 call_lifecycle_target;
+static pangu_lifecycle_graph call_lifecycle_graph;
+static pangu_u32 call_lifecycle_disposed[9];
+static int call_lifecycle_mode,call_lifecycle_held,call_lifecycle_cases;
+static int call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls;
+static int call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begins,call_lifecycle_async_begin_total;
+static pangu_lifecycle_call_ticket call_lifecycle_retained;
+static pangu_lifecycle_setup_ticket call_lifecycle_expired_setup;
+static pangu_cleanup_ticket call_lifecycle_retained_scope,call_lifecycle_async_ticket;
+static pangu_cleanup_ticket call_lifecycle_async_scope;
+static pangu_i32 call_lifecycle_cleanup(void *opaque);
+static int call_lifecycle_provider(pangu_u32 binding) {
+ pangu_u32 id=current->lowered.graph.provider_owners[current_output->bindings[binding].provider];
+ assert(owners[id].state==PANGU_OWNER_ACTIVE);call_lifecycle_provider_calls++;return (int)id;
+}
+static pangu_u32 call_lifecycle_consumer(pangu_u32 binding) {
+ return current->lowered.graph.requirements[current_output->bindings[binding].requirement].consumer;
+}
+static pangu_u32 call_lifecycle_provider_id(pangu_u32 binding) {
+ return current->lowered.graph.provider_owners[current_output->bindings[binding].provider];
+}
+static void call_lifecycle_rejected(pangu_u32 binding,int kind,const void *scope) {
+ pangu_lifecycle_call_ticket ticket,poison;memset(&poison,0xa5,sizeof poison);ticket=poison;
+ pangu_lifecycle_report report={0};pangu_i32 rc;
+ if(kind==0) rc=api->call(&live,binding,FUEL,&ticket,&report);
+ else if(kind==1) rc=api->setup_call(&live,binding,(const pangu_lifecycle_setup_ticket *)scope,FUEL,&ticket,&report);
+ else rc=api->cleanup_call(&live,binding,(const pangu_cleanup_ticket *)scope,FUEL,&ticket,&report);
+ assert(rc==10 && !memcmp(&ticket,&poison,sizeof ticket));call_lifecycle_rejected_calls++;
+}
+static pangu_i32 call_lifecycle_async_begin(void *opaque,const pangu_cleanup_ticket *ticket) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;call_lifecycle_async_begins++;call_lifecycle_async_begin_total++;
+ call_lifecycle_async_ticket=*ticket;assert(!api->cleanup_scope(&live,positions[id],&call_lifecycle_async_scope));
+ assert(!api->cleanup_call(&live,call_lifecycle_target,&call_lifecycle_async_scope,FUEL,&call_lifecycle_retained,
+                           &(pangu_lifecycle_report){0}));
+ assert(call_lifecycle_provider(call_lifecycle_target)==(int)call_lifecycle_provider_id(call_lifecycle_target));
+ call_lifecycle_held=1;return 5;
+}
+static pangu_i32 call_lifecycle_cleanup(void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;cleanup_count++;
+ pangu_cleanup_ticket scope;assert(!api->cleanup_scope(&live,positions[id],&scope));
+ for(pangu_u32 b=0;b<current->graph_report.binding_count;b++) {
+  if(call_lifecycle_consumer(b)!=id) {call_lifecycle_rejected(b,2,&scope);continue;}
+  call_lifecycle_rejected(b,0,0);call_lifecycle_rejected(b,1,&call_lifecycle_expired_setup);
+  pangu_lifecycle_call_ticket ticket={0};pangu_lifecycle_report report={0};
+  assert(!api->cleanup_call(&live,b,&scope,FUEL,&ticket,&report)&&!report.reason&&!report.pending);
+  assert(call_lifecycle_provider(b)==(int)call_lifecycle_provider_id(b));call_lifecycle_cleanup_calls++;
+  if(call_lifecycle_mode==1 && b==call_lifecycle_target && !call_lifecycle_held) {
+   call_lifecycle_retained=ticket;call_lifecycle_retained_scope=scope;call_lifecycle_held=1;
+  } else {
+   assert(!api->call_finish(&live,&ticket));assert(api->call_finish(&live,&ticket)==10);
+  }
+ }
+ return 0;
+}
+static pangu_i32 call_lifecycle_setup(pangu_owner *owner,void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;setup_count++;
+ assert(owner==&owners[id] && owner->inflight==1);
+ assert(!api->register_resource(&live,positions[id],call_lifecycle_cleanup,opaque));
+ pangu_lifecycle_setup_ticket scope;assert(!api->setup_scope(&live,&scope));call_lifecycle_expired_setup=scope;
+ for(pangu_u32 b=0;b<current->graph_report.binding_count;b++) if(call_lifecycle_consumer(b)==id) {
+  call_lifecycle_rejected(b,0,0);
+  pangu_lifecycle_call_ticket ticket={0};pangu_lifecycle_report report={0};
+  assert(!api->setup_call(&live,b,&scope,FUEL,&ticket,&report)&&!report.reason&&!report.pending);
+  assert(call_lifecycle_provider(b)==(int)call_lifecycle_provider_id(b));call_lifecycle_setup_calls++;
+  assert(!api->call_finish(&live,&ticket));assert(api->call_finish(&live,&ticket)==10);
+ }
+ if(call_lifecycle_mode==2 && current->graph_report.binding_count && call_lifecycle_consumer(call_lifecycle_target)==id)
+  assert(!api->register_async(&live,positions[id],call_lifecycle_async_begin,opaque));
+ return 0;
+}
+static void call_lifecycle_prepare(const pangu_prepare_result *plan,const pangu_graph_output *out,pangu_u32 binding,int mode) {
+ if(live.phase) {assert(live.phase==4&&!live.started&&!live.setup_waiting);for(pangu_u32 i=0;i<9;i++)assert(!owners[i].inflight&&!owners[i].count);}
+ memset(&live,0,sizeof live);setup_count=cleanup_count=cleanup_begin_count=0;epoch++;
+ assert(epoch&&plan->lowered.graph.instance_count<=9);
+ for(pangu_u32 i=0;i<9;i++) {
+  if(!owners[i].abi_version||owners[i].state==PANGU_OWNER_LOADING)memset(&owners[i],0,sizeof owners[i]);
+  assert(!api->owner_init(&owners[i],resources[i],2,operations[i],3,epoch,4));
+  source_items[i]=(pangu_lifecycle_item){&owners[i],call_lifecycle_setup,(void *)(pangu_u64)i};
+ }
+ pangu_lifecycle_storage storage_view={activation,9,lifecycle_edges,1000};pangu_lifecycle_prepared prepared;
+ assert(!api->prepare(plan,out,source_items,plan->lowered.graph.instance_count,&storage_view,FUEL,&prepared));
+ assert(prepared.item_count==plan->graph_report.order_count);prepared_edge_count=prepared.edge_count;
+ for(pangu_u32 i=0;i<prepared.item_count;i++)positions[out->order[i]]=i;
+ live.items=activation;live.count=prepared.item_count;call_lifecycle_graph=(pangu_lifecycle_graph){lifecycle_edges,prepared.edge_count,call_lifecycle_disposed,9};
+ memset(call_lifecycle_disposed,0,sizeof call_lifecycle_disposed);live.stop_graph=&call_lifecycle_graph;
+ current=plan;current_output=out;call_lifecycle_target=binding;call_lifecycle_mode=mode;call_lifecycle_held=0;
+ call_lifecycle_async_begins=0;memset(&call_lifecycle_retained,0,sizeof call_lifecycle_retained);
+ memset(&call_lifecycle_retained_scope,0,sizeof call_lifecycle_retained_scope);memset(&call_lifecycle_async_ticket,0,sizeof call_lifecycle_async_ticket);
+ memset(&call_lifecycle_async_scope,0,sizeof call_lifecycle_async_scope);
+ assert(!api->bind_geometry(&live,spans,64,FUEL));
+}
+static void call_lifecycle_case(const pangu_prepare_result *plan,const pangu_graph_output *out,pangu_u32 binding,int mode) {
+ call_lifecycle_prepare(plan,out,binding,mode);pangu_lifecycle_report report={0};
+ assert(!api->start(&live,FUEL,&report)&&!report.reason&&!report.pending&&setup_count==(int)live.count);
+ pangu_u32 consumer=call_lifecycle_consumer(binding),provider=call_lifecycle_provider_id(binding);
+ pangu_lifecycle_setup_ticket ended;assert(api->setup_scope(&live,&ended)==10);
+ call_lifecycle_rejected(binding,1,&call_lifecycle_expired_setup);
+ if(!mode) {
+  assert(!api->call(&live,binding,FUEL,&call_lifecycle_retained,&report));
+  assert(call_lifecycle_provider(binding)==(int)provider);call_lifecycle_direct_calls++;call_lifecycle_held=1;
+ }
+ report=(pangu_lifecycle_report){0};assert(api->stop(&live,FUEL,&report)==5&&report.pending);
+ assert(owners[consumer].state==PANGU_OWNER_QUIESCING&&owners[provider].state==PANGU_OWNER_ACTIVE);
+ call_lifecycle_rejected(binding,0,0);
+ if(mode==1) {
+  assert(call_lifecycle_held);pangu_cleanup_ticket expired;
+  assert(api->cleanup_scope(&live,positions[consumer],&expired)==10);
+  call_lifecycle_rejected(binding,2,&call_lifecycle_retained_scope);
+ } else if(mode==2) {
+  assert(call_lifecycle_held&&call_lifecycle_async_begins==1);
+  assert(!api->disposer_finish(&live,positions[consumer],&call_lifecycle_async_ticket,0));
+  call_lifecycle_rejected(binding,2,&call_lifecycle_async_scope);
+  report=(pangu_lifecycle_report){0};assert(api->stop(&live,FUEL,&report)==5&&report.pending);
+  assert(owners[provider].state==PANGU_OWNER_ACTIVE);
+ }
+ pangu_lifecycle_call_ticket forged=call_lifecycle_retained;forged.provider.generation++;
+ pangu_u32 ci=owners[consumer].inflight,pi=owners[provider].inflight;
+ assert(api->call_finish(&live,&forged)==10&&owners[consumer].inflight==ci&&owners[provider].inflight==pi);
+ assert(!api->call_finish(&live,&call_lifecycle_retained));assert(api->call_finish(&live,&call_lifecycle_retained)==10);
+ assert(!api->stop(&live,FUEL,&report)&&!report.pending&&report.state==4);
+ assert(!live.started&&owners[consumer].state==PANGU_OWNER_DISPOSED&&owners[provider].state==PANGU_OWNER_DISPOSED);
+ call_lifecycle_cases++;
+}
+static void call_lifecycle_public_core(void) {
+ pangu_prepare_result plan;int valid=0,rejected=0;
+ for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
+  const host_graph_case *c=&host_graph_cases[i];
+  assert(pangu_discover_prepare(c->manifest,c->contracts,c->count,c->installed,&corpus_storage,FUEL,&plan)==c->status);
+  if(c->status){rejected++;continue;}valid++;
+  for(pangu_u32 b=0;b<plan.graph_report.binding_count;b++) for(int mode=0;mode<3;mode++) call_lifecycle_case(&plan,&corpus_output,b,mode);
+ }
+ assert(!prepare(FUEL,&plan));for(int mode=0;mode<3;mode++) call_lifecycle_case(&plan,&output,0,mode);
+ for(int reverse=0;reverse<2;reverse++) {
+  multi_manifest.provisions=reverse?reverse_provisions:provisions;
+  assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,FUEL,&plan));
+  for(pangu_u32 b=0;b<plan.graph_report.binding_count;b++) for(int mode=0;mode<3;mode++) call_lifecycle_case(&plan,&output,b,mode);
+ }
+ assert(valid==95&&rejected==145&&call_lifecycle_cases>0);
+ assert(call_lifecycle_direct_calls==call_lifecycle_cases/3 && call_lifecycle_async_begin_total==call_lifecycle_cases/3);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -727,7 +870,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts);
+ async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total);
  return 0;
 }
