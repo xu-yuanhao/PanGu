@@ -1,0 +1,126 @@
+{
+  "schema": "pangu.t14-call-budget-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F04 historical call-budget-test.c public lifecycle API port, in the test-only async-setup candidate; no production promotion or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-budget-test.c",
+    "sha256": "81e40f70a618ce599eb112330ef6f44265979c3f543242f0b03c8f2c37b12112"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "8beffbac0483d00d6d2843443d86492bee0933ec",
+    "parent": "08387cb28cdaf3186cb39fefe3c35aa5ea796758",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "572ee6efbb3dfd03d3108aeac6144c9728c0828336c62f9eb111a5ca4fc611c9",
+    "candidate_tree_sha256": "9a314798a37ab2322429ac8ff99c06c32c142bf37d56b09917177e5bba032e29",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "572ee6efbb3dfd03d3108aeac6144c9728c0828336c62f9eb111a5ca4fc611c9"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "58094a4f83bee3fab260556e45b9e1018802fae57e66119dcfbdf3ea467f17c0",
+    "native_candidate_controller_sha256": "c7e4beae5af1ccf7e90dab7b8dc2c09a4b5ac367f1c8fc4756d3cb5d230c6a39",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "b61fe49785e40815f5ec20c783f1c73331b94b27fa03748c4b8963c37ff3e174",
+    "ubsan_request_sha256": "4d7c5a72d92aab37cadb2221c2f112d30b3847547f04e85fb48f8aaa51014aa2"
+  },
+  "coverage": {
+    "budget_call_cases_per_run": 207,
+    "admitted_calls_per_run": 207,
+    "insufficient_budget_retries_per_run": 1191,
+    "quota_refusals_per_run": 30,
+    "invalid_binding_refusals_per_run": 30,
+    "overlap_refusals_per_run": 345,
+    "setup_contexts_per_run": 202,
+    "cleanup_contexts_per_run": 202,
+    "scenarios": [
+      "every discovered host-graph valid plan and fixed multi-provider provider-order permutations",
+      "public call admission with increasing fuel; insufficient budget preserves all snapshots and output ticket",
+      "setup_call and cleanup_call exercised only in their owning callback scopes",
+      "three live public call tickets exhaust both endpoint operation pools; next admission refuses without mutation",
+      "generation-exhausted slot is skipped in favor of the next operation slot",
+      "invalid binding, ticket/report overlap and scope/report overlap reject before output mutation",
+      "stale and duplicate call_finish tickets reject without changing runtime state",
+      "F03 zero-budget runtime stop now snapshots backing resource and operation arrays in the combined candidate"
+    ],
+    "public_call_endpoint_quota": "One public dependency ticket occupies both consumer and provider slots; independent single-endpoint owner quota exhaustion from the private helper cannot be reproduced through the public API.",
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "397fb123b34a99b11230f72a4711694cff17c04e5d2b6f15dee564aa8f023584",
+    "all_stdout_identical": true
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "call",
+      "setup_call",
+      "cleanup_call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "The old private test could fill consumer and provider operation pools independently through owner-only helpers. Public calls always hold both endpoints through an actual resolved dependency edge, so the migration tests combined endpoint quota refusal and preserves the independent private quota as an explicit compatibility gap."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "82ddcca7d2a3fd7cb221ede689fb683b7df1b9f86dd94a4a855af34d74331c09",
+      "executions_json_sha256": "3070f2c53edecde15055fdc9c2813a0000f74f694a555ce0a5a2f0bfd4ade5a4",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "e3ec9448edf0457aab81d5cfd985ac431941d56f37206e38c1f541d1edebd2ff",
+      "executions_json_sha256": "e2066d3c3a00be7cf7ea7e51ffcb83d4dd9b5de59e2d9f72f7804eb1c82c320a",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F04 as PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS and continuing local T14 test work only; no production, release, gate, ABI, profile, or budget change.",
+    "fixed_candidate_digest": "9a314798a37ab2322429ac8ff99c06c32c142bf37d56b09917177e5bba032e29",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS",
+      "F03 UBSan image digest transcription corrected against its fixed request and image manifest; run receipts unchanged"
+    ],
+    "risks": [
+      "This is same-Agent self-review, not independent approval.",
+      "Independent consumer-only and provider-only quota exhaustion remain private-API compatibility gaps.",
+      "External trust approval and release remain blocked.",
+      "UBSan does not instrument assembly provider instructions.",
+      "F05/F08/F09/F17/F19 and full G04/G07/T14 remain incomplete."
+    ],
+    "control_scope_sha256": "b5bfd6f1d8f2ad62828b4c428798ec62fcd904e04523372d2d83562210247673",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "ad50208f4b8d87b2a8523547901bf358cb4c87df1689b49579ccdfa88d2fd35e",
+      "docs/migration/t14-focused-inventory.json": "ea9e3ea81515b8bcf73bb1b9e427f47b498c641b77f6791e2b7aea5b39fa1f8e",
+      "docs/migration/t14-owner-boundaries.md": "52a1cf8d57933f738d193bdc281efbb0f8c80879afac147de1936a086832dbfd",
+      "docs/原生重写路线与迁移TODO.md": "6437523ab33457083f7fece0490aa8bbfe2024053f43339d9ea3b89b4be704d7"
+    }
+  }
+}

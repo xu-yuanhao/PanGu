@@ -24,7 +24,7 @@
     "native_candidate_policy_sha256": "f21277f9123c50b606df3362d99f198258f87601ca63eb57b744760e9f7186ef",
     "native_candidate_controller_sha256": "a739dbc33c59560daf2c14a6cd3d7cda4a4bc9eb40ce68d3ccb9bcdc6bf68609",
     "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
-    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904b23c2903855deb7aa50fa9b4271d2f4f41b41"
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41"
   },
   "coverage": {
     "budget_cases_per_run": 2736,
@@ -122,7 +122,8 @@
       "identical stdout digest across all eight runs",
       "GitHub branch ref and source blob readback match commit/source SHA256",
       "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
-      "git diff --check: PASS"
+      "git diff --check: PASS",
+      "F03 UBSan image manifest digest cross-checked against frozen request and image.json; corrected evidence transcription."
     ],
     "risks": [
       "This is same-Agent self-review, not independent review.",

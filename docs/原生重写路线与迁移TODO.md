@@ -359,6 +359,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 旧 `adapter-test.c` / `setup-test.c` 当前公开 ABI 合并专项：675 个适配器集成场景与 1414 个异步 setup 场景，普通/UBSan × 汇编/C内存实现 × debug/release 共8次构建和执行，全部结果一致。86个有真实依赖边的调用等待通过公开租约覆盖；106个无边 owner-only 等待是已移除的私有语义，明确记录为差异，未重新导出 helper。F01/F16 按带 API 适配通过，完整 T14 仍待完成，见 [证据](migration/t14-adapter-setup-native-evidence.json)。
 - [x] 旧 `async-test.c` 当前公开 ABI 清理专项：追加7组公开票据、重复/迟到拒绝、内联/同步失败、epoch重用、依赖调用排空和provider保活轨迹；同一8构建矩阵全部通过，并复验上方675个 adapter/1414个 setup 场景。F02 按带 API 适配通过；无边任意owner操作未伪称覆盖，完整T14/G04/G07仍待完成，见 [F02证据](migration/t14-async-disposer-native-evidence.json)。
 - [x] 旧 `budget-test.c` 当前公开 ABI 预算专项：2,736个场景/44,904次有界推进，量子1–4、零预算逐字节不变、清理失败/异步等待/终态重停；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。436个无公开依赖call映射的私有owner hold明确跳过；F03按API适配通过，完整T14/G04/G07仍待完成，见 [F03证据](migration/t14-budget-native-evidence.json)。
+- [x] 旧 `call-budget-test.c` 当前公开 ABI 调用预算专项：207个公开调用场景、1,191次fuel不足重试，验证配额拒绝、无效binding、输出/scope重叠拒绝以及同步setup/cleanup scope；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。公开依赖call一次占用consumer/provider两端，无法分别模拟旧私有owner单端配额耗尽，差异已记录；F04按API适配通过，完整T14/G04/G07仍待完成，见 [F04证据](migration/t14-call-budget-native-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

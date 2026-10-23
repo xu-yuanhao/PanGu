@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩6项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
+协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩5项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -461,4 +461,11 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 
 将私有 `runtime_stop_budget` / `pangu_owner_stop_budget` 断言改为公开 `start`、`stop` 与生命周期报告。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过，输出摘要一致；每次跑2,736个预算场景、44,904个有界 stop 推进，涵盖固定240图的有效组合、四档 quantum（1–4）、同步清理错误码、异步 disposer、异步 setup、prefix teardown，以及零预算状态快照和终态零工作量重停。单 owner 释放经公开 runtime 路径在9个工作单位内完成4个disposer；所有 stop 回调增量均不超过本次报告work。
 
-旧测试在任意位置直接 enter owner；公开 API 只允许依赖边上的 call ticket。本次对无可用依赖边或prefix上下文的436个场景跳过这项持有断言，不记作通过；有边场景用公开call/call_finish保留consumer/provider并等待。源码与回执固定在 [F03原生证据](t14-budget-native-evidence.json)。这只关闭F03当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除隔离控制器 external trust approval 与生产准入阻塞。
+旧测试在任意位置直接 enter owner；公开 API 只允许依赖边上的 call ticket。本次对无可用依赖边或prefix上下文的436个场景跳过这项持有断言，不记作通过；有边场景用公开call/call_finish保留consumer/provider并等待。源码与回执固定在 [F03原生证据](t14-budget-native-evidence.json)。随后对固定请求及镜像清单复核时发现该证据中的 UBSan image SHA256 曾误抄为62位；已更正为请求与冻结镜像清单一致的64位摘要，构建和执行回执未变化。这只关闭F03当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除隔离控制器 external trust approval 与生产准入阻塞。
+
+
+### 2026-10-24：旧 call-budget-test.c 当前公开 ABI 原生专项
+
+将旧预算调用测试的三个私有入口分别映射到公开 `call`、`setup_call`、`cleanup_call` 和 `call_finish`。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过且输出摘要一致；每次覆盖207个有真实解析依赖边的调用场景，1,191次逐fuel不足重试，30次配额拒绝、30次无效binding拒绝、345次输出或scope重叠拒绝，并在202个setup及202个cleanup上下文里验证scope阶段约束。
+
+预算不足时逐字节核对runtime、owner、资源、operation、span和edge存储及输出票据；配额测试通过三个公开依赖票据同时占满两端operation槽位，不能模拟旧私有接口分别耗尽单个owner槽位的情况，该差异明确保留。F03的零预算测试在合并候选中也补充了资源和operation数组快照。F04源码、冻结输入、运行摘要和同一Agent自审记录见 [F04原生证据](t14-call-budget-native-evidence.json)。F03的UBSan镜像摘要转录更正也记录在该证据及[F03证据](t14-budget-native-evidence.json)。这只关闭F04当前公开ABI迁移证据，不代表完整T14/G04/G07，也不解除外部信任审批和生产准入阻塞。

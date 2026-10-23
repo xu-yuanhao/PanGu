@@ -72,8 +72,31 @@
       "id": "T14-F04",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-budget-test.c",
       "source_sha256": "81e40f70a618ce599eb112330ef6f44265979c3f543242f0b03c8f2c37b12112",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "保留公开依赖 call 对双端operation槽位的配额覆盖边界；继续F05、F08-F09、F17/F19、完整G04/G07与更早owner语料审计。",
+      "suite": "call-budget-public-207",
+      "evidence": "docs/migration/t14-call-budget-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "572ee6efbb3dfd03d3108aeac6144c9728c0828336c62f9eb111a5ca4fc611c9",
+      "candidate_commit": "8beffbac0483d00d6d2843443d86492bee0933ec",
+      "budget_call_cases_per_run": 207,
+      "admitted_calls_per_run": 207,
+      "insufficient_budget_retries_per_run": 1191,
+      "quota_refusals_per_run": 30,
+      "invalid_binding_refusals_per_run": 30,
+      "overlap_refusals_per_run": 345,
+      "setup_contexts_per_run": 202,
+      "cleanup_contexts_per_run": 202,
+      "adaptation": "旧runtime_call_enter_budget/setup_budget/cleanup_budget通过公开call/setup_call/cleanup_call与call_finish重表达；覆盖真实解析依赖binding、fuel不足时不改变完整runtime/owner/resource/operation/span/edge状态、票据保持原样、端点operation槽位配额拒绝、代数耗尽后跳过槽位、无效binding及输出和scope重叠拒绝。通过同步setup和cleanup callback中的实际scope测试阶段约束。公开call只同时占用consumer/provider槽位，无法单独制造旧私有API的单端owner配额耗尽，保留为兼容差异。",
+      "validation": {
+        "normal_builds_and_runs": 4,
+        "ubsan_builds_and_runs": 4,
+        "outputs_identical": true,
+        "native_matrix": "PASS",
+        "release": "BLOCKED"
+      }
     },
     {
       "id": "T14-F05",
@@ -232,7 +255,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 6,
+  "pending_current_abi_ports": 5,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }
