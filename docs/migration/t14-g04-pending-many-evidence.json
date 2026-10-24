@@ -1,0 +1,170 @@
+{
+  "schema": "pangu.t14-g04-pending-many-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_LOCAL_PENDING_MANY_PHASE_SNAPSHOTS_NOT_FULL_G04",
+  "scope": "Eight Pending/MANY compositions with real discovery/prepare and quantum1-4; phase snapshots plus per-stop C budget assertions, not complete per-tick G04 traces.",
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "aad835ea0983ea83fd638f6aa89b214ca700b8dc",
+    "parent": "417579671e3f5edc92b53f9d3530a7d1e8bd1b31",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "dc2c8a2ff11d5bdb9667e53564b047c1e35912e12dc9ac31ad0d9595966087ea",
+    "candidate_tree_sha256": "d365406f3e5efefcba38a1b3201314f175feff5a6c7489afeeaa7b96dabb4edd",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "dc2c8a2ff11d5bdb9667e53564b047c1e35912e12dc9ac31ad0d9595966087ea"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "6944391776f74710c0083dd9c198c17d34a8e96a96406eae68e4cb3bbc3081fe",
+    "native_candidate_controller_sha256": "0f5ef9cfb5f713323aba7e38d229e0c54f57d47948ebbeb3fd61ca9ad21ec5a4",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "fc324b7a099354f4fdce31dec12e60e3fbc8ac23c01294a82b7c737590ee310f",
+    "ubsan_request_sha256": "696d0ac963e09ecf04068d62623757a4da603d8a2a92b86c2141c9dee93970df"
+  },
+  "coverage": {
+    "cases_per_run": 8,
+    "phase_snapshots_per_run": 24,
+    "snapshots_verified_across_matrix": 192,
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "quantum_values": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "all_stdout_identical": true,
+    "all_stdout_sha256": "68fea54df04dba39d5aa6337590a093ccb98ab4250deb9ee180164c7b0a14e36",
+    "pending_cases_per_run": 4,
+    "many_cases_per_run": 4,
+    "pending_activation_count": 3,
+    "pending_instance": 2,
+    "pending_binding_count": 0,
+    "many_binding_count": 4,
+    "many_held_consumer": 2,
+    "many_held_providers": [
+      0,
+      1
+    ],
+    "independent_cleanup_consumer": 3,
+    "budget_check": "Every stop invocation asserts report.work<=quantum in C; snapshots expose accumulated ticks/work/max_work.",
+    "prior_async_events_per_run": 50,
+    "prior_branch_events_per_run": 228,
+    "full_G04": false
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "prepare",
+      "register_resource",
+      "bind_geometry",
+      "start",
+      "stop",
+      "call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "d20b9f68b0d2fdffc3f9d86422853232579b8f072235b1db02b71785d779f24c",
+      "executions_json_sha256": "8ac77137e790bb5a6889f23e2330458a6106e0840b3bdf4fbc5ba9dda61aa7d2",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "bf132da25f4726a1ceb58279f059125527c1d838d41679ef38433c529689fd63",
+      "executions_json_sha256": "d99e742918dd7030cb6d881d3ea7211de3ec8be9d734f36c339864729924b577",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve local Pending/MANY phase checker and fixed native evidence for continued experiments only; same-Agent review.",
+    "fixed_candidate_digest": "d365406f3e5efefcba38a1b3201314f175feff5a6c7489afeeaa7b96dabb4edd",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md",
+      "tools/migration/g04_composition.py",
+      "tools/migration/test_g04_composition.py",
+      "docs/migration/t14-g04-composition-fixture.json"
+    ],
+    "validation": [
+      "Eight native builds/isolated executions PASS;192 composition snapshots plus prior traces validated.",
+      "All eight stdout hashes identical; GitHub source blob matches.",
+      "New phase checker seven test groups PASS.",
+      "G00 PASS; production admission BLOCKED; test_check.py 13 tests PASS; git diff --check PASS."
+    ],
+    "risks": [
+      "Same-Agent self-review, not independent attestation.",
+      "Phase snapshots do not prove every interleaving or every tick state.",
+      "Public call holds both endpoints; removed arbitrary owner-only APIs remain explicit earlier gaps.",
+      "Full G04/async branch faults/G07/T14 and production trust incomplete.",
+      "UBSan does not instrument assembly."
+    ],
+    "control_scope_sha256": "c821cd5f6c4c2cdb92ef8443dd52d6fb2a0326bdc55523555f2224636527ee16",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "99f86db0cf33fd1a1c5b6d6d5ba4a95a58b0d80fd47d782518198dfd40cb386c",
+      "docs/migration/t14-focused-inventory.json": "a0d2af5ba9ac133ca3a34cbe8cfa8d60be56773c76056daeebdc7c5c5c7469a5",
+      "docs/migration/t14-owner-boundaries.md": "4dd44f1b80864166b2b18af9343abf2d804180652b968c5746abab156ee9f562",
+      "docs/原生重写路线与迁移TODO.md": "2536bd39f8aad55abd6675ce77df5fc2f8292f042337bd19f840c8c9d983bfff",
+      "tools/migration/g04_composition.py": "945265f32320bcad86e36d042469f1328648945fa9d694eddafedd9967becb3c",
+      "tools/migration/test_g04_composition.py": "0c396652763d0373b1d323bb6c3faf6614b578a8956a40f9a8dafb8d6256351f",
+      "docs/migration/t14-g04-composition-fixture.json": "3eecaf279d9521a00df57324e454afedbce475203d49f5f46c47b3c46f381d02"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": [],
+  "trace_checker": {
+    "path": "tools/migration/g04_composition.py",
+    "sha256": "945265f32320bcad86e36d042469f1328648945fa9d694eddafedd9967becb3c",
+    "external_checker_bytes_match": true,
+    "fixture": "docs/migration/t14-g04-composition-fixture.json",
+    "fixture_sha256": "3eecaf279d9521a00df57324e454afedbce475203d49f5f46c47b3c46f381d02",
+    "self_test_path": "tools/migration/test_g04_composition.py",
+    "self_test_sha256": "0c396652763d0373b1d323bb6c3faf6614b578a8956a40f9a8dafb8d6256351f",
+    "self_test_groups": 7,
+    "mandatory_G04_integration": false,
+    "authority": "Same-Agent local phase oracle; does not observe each tick."
+  },
+  "review_adjustments": [],
+  "baseline_checker_extension": {
+    "scope": "Four previously reviewed local trace checker/test files explicitly pinned; all other gate/instruction bytes equal prior coordinator baseline.",
+    "pins": {
+      "tools/migration/g04_async_trace.py": "966ffc19409b7e8979053c728024628cce18c9ff69055574bbb613e1df0203ac",
+      "tools/migration/test_g04_async_trace.py": "241f368d2543b936f64c5899d4ed668eb227ac56ed4092c52a07f845fe9884ff",
+      "tools/migration/g04_branch_trace.py": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+      "tools/migration/test_g04_branch_trace.py": "d4f292e4d9bfffc87803264fa2f7ec4c52ac2751eefec5afe37eb7b5a7090c52"
+    },
+    "authorization": "Previous fixed same-Agent control registration, no gate/budget relaxation."
+  },
+  "planner_contract": {
+    "input": "existing scoped manifest with instances[2].scope=2 for Pending, restored after case; existing multi_manifest/provisions for MANY",
+    "verified": [
+      "Pending: order3, pending1, bindings0, output.states[2]==1",
+      "MANY:order4,pending0,bindings4",
+      "public prepare activation and edge counts",
+      "two actual consumer2 bindings located by resolved requirement/provider identity",
+      "partial completion keeps both providers active while consumer2 retains second reference"
+    ],
+    "scope": "These two fixed manifest families; no full graph corpus trace claim"
+  }
+}

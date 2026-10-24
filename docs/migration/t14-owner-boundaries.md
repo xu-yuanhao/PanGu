@@ -543,3 +543,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 将上轮手填生命周期图替换为真实discovery与prepare组合：四实例分别位于两子作用域，每域agent服务SINGLE绑定、一个provider和一个required consumer，另声明可缺失的other需求；复用固定服务/模块/installed契约。pangu_discover_prepare验证stage6、4激活/2真实binding/零Pending/无entry回调；公开prepare复制激活项和停用边，逐边与planner requirement/provider映射核对，通过position表处理实例序号与激活顺序差异，公开call使用找到的真实binding。
 
 普通/UBSan × 双内存实现 × debug/release共8构建运行通过；每次8场景、228分支事件、148次有界推进。1824事件通过当前加固后的检查器，分支JSONL与先前固定图夹具逐字节相同；旧异步50事件及既有计数套件复验。planner临时views只借用到prepare结束，运行时借用自身复制的激活项/边。此组合只覆盖该固定scoped拓扑，不证明所有planner图、Pending/MANY或异步交错完整矩阵；T14/G04/G07仍未完成。见 [planner分支证据](t14-g04-planner-branch-evidence.json)。
+
+## G04 Pending与MANY阶段组合（2026-10-24）
+
+复用原有manifest和MANY变体，经真实discovery与公开prepare：Pending实例2切到不可满足的子scope，验证3个激活/1个Pending/零binding，实例2全程Loading、无setup/cleanup、资源与在途始终零；MANY四实例解析4条边，对consumer2的两个真实provider绑定分别取得call票据，等待时先清理consumer3，保留consumer2及两个provider。释放第一票据后另一个票据仍活，两个provider仍Active，consumer2仍Quiescing；全部释放后才排空。
+
+量子1–4各Pending/MANY两种组合，共8场景/24阶段快照。每步stop在原生断言中核对work<=quantum，输出累计ticks/work/max_work；阶段快照不是每次推进的完整G04轨迹。普通/UBSan × 双内存实现 × debug/release共8构建运行一致，192个新快照及旧50/228事件轨迹全部复验。局部组合检查器7组变异/解析自测通过，未接入必需G04。完整异步分支交错/故障矩阵、G07/T14仍未完成，见 [Pending/MANY证据](t14-g04-pending-many-evidence.json)。
