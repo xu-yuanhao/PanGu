@@ -29,12 +29,13 @@
       "id": "agent.runtime.v0",
       "sources": [
         "src/runtime/agent.h",
-        "src/runtime/agent.c"
+        "src/runtime/agent_layout.h",
+        "src/runtime/agent.S"
       ],
       "dependencies": [
         "client.contract.v0"
       ],
-      "role": "bounded multi-run memory session, idle-only system/reset controls, injected model/tools and cooperative loop",
+      "role": "handwritten SysV AMD64 bounded Loop and memory session; injected model/tools; C ABI declarations only",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",

@@ -280,7 +280,6 @@
     "docs/migration/2026-10-24-development-reset.md": "document",
     "src/contracts/client.h": "native-source",
     "src/runtime/agent.h": "native-source",
-    "src/runtime/agent.c": "native-source",
     "tests/runtime/test_agent.c": "native-test",
     "tools/runtime/build_test.py": "development-tool",
     "governance/runtime-local-modules.json": "control",
@@ -524,6 +523,10 @@
     "docs/并行开发任务提示词-汇编优先TUI重构.md": "document",
     "governance/assembly-first.json": "control",
     "tools/gates/assembly_first.py": "gate",
-    "tools/gates/test_assembly_first.py": "gate-test"
+    "tools/gates/test_assembly_first.py": "gate-test",
+    "src/runtime/agent.S": "native-source",
+    "src/runtime/agent_layout.h": "native-source",
+    "tests/runtime/agent_abi.S": "native-test",
+    "tests/runtime/test_agent_asm.c": "native-test"
   }
 }

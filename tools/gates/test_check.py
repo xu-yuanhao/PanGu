@@ -38,6 +38,9 @@ class AdmissionTests(unittest.TestCase):
         (self.root / "src/client/tui").mkdir(parents=True)
         (self.root / "src/client/tui/input.S").write_text(".text\n")
         self.policy["files"]["src/client/tui/input.S"] = "client-source"
+        (self.root / "tests/runtime").mkdir(parents=True)
+        (self.root / "tests/runtime/guard.S").write_text(".text\n")
+        self.policy["files"]["tests/runtime/guard.S"] = "native-test"
         self.assertEqual(inspect(self.root, self.policy), [])
         self.policy["files"]["outside.c"] = "native-source"
         self.assertTrue(any("invalid source scope" in e for e in inspect(self.root, self.policy)))

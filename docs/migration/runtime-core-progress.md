@@ -201,3 +201,41 @@ d207e2246149e6e114239735ce0ed079e1e04ed0304097b5fcc1e418365161c6  tools/runtime/
 ```
 
 并行状态补充：上述G00通过是本轮检查时的结果。提交前另一Agent新增 `src/client/tui/tui_layout.h`，最终复核G00实际exit1：该头文件未登记。只提交本Agent负责的13个入口/控制/脚本文件，没有暂存、修改或登记TUI进行中产物；等待其交接。此状态不应被报告为最终全仓G00通过。
+
+## 2026-10-25：Agent Loop和内存会话原地汇编重写
+
+`src/runtime/agent.S`为手写GAS实现，删除`src/runtime/agent.c`及其有效构建/模块登记；没有另留C版本。公开C ABI未改，布局/枚举常量由编译期sizeof/offsetof断言验证。仅必要的append提交时序注释；没有编译器生成实现或调用旧C核心的壳。
+
+开工参考：固定Pi `2ec55d808d455b1a64a2bf7888198207a096120a` 的 `packages/agent/src/agent-loop.ts` 内层流→工具结果→续接及error/aborted终结，`packages/agent/test/agent-loop.test.ts` 的tool calls/results用例。采用其工具结果加入历史再请求模型的基本语义；保留当前有界、单工具/轮与简化事件契约，不声称移植Pi全部队列/钩子/并发功能。
+
+实现涵盖初始化、客户端动作、有限poll、模型/工具调用、文本容量、取消/错误终结、系统提示和会话清空。消息内容写完再提交count。模型/工具由函数表注入；ASM对象没有未解析的外部符号，四个公开导出保持原名。`size`观察到对象text合计2690字节、data/bss为0（含只读数据的对象统计，不是整个Agent部署体积或性能基线）。
+
+实际验证：
+
+- 核心七组程序O0/O2 UBSan构建执行全部通过：原Loop/SSE/registry/read/projection/bridge，以及新增ASM专项。UBSan不证明汇编访存安全，另做下列直接测试。
+- 新ABI测试检查RBX/RBP/R12–R15、DF与栈哨兵；回调主动破坏caller-saved寄存器，入口验证栈对齐；execute覆盖经栈传递的容量和结果长度地址。故意破坏RBX/DF的正对照返回预期mask65。
+- Agent存储分别贴左右保护页；验证初始化、完整工具往返、精确事件顺序、4095字节消息/系统提示、重叠系统提示、reset及取消，输出结构前后哨兵不变。
+- 真实MiMo使用当前ASM Loop读取临时sample.c：HTTP200、工具执行1次、累计模型输出标记正确、exit0。连续会话五步（记忆、回忆、清空、流中取消、取消后再输入）均符合预期，live_session_exit0。
+
+库存仅新增测试`.S`类型支持，维持精确路径/后缀和原预算；16项库存自测通过，语言准入测试沿用。当前工作区G00因另一Agent正在删除/新增的TUI源码未交接登记而失败；本次不修改或暂存其文件。提交树验证另见后续实际结果，不把当前工作区失败说成全仓通过。
+
+语言清单把本模块改为assembly-core，余下待迁移C逐项保留未完成状态。T19/T23仍IN_PROGRESS，单工具子集不是完整Pi/阶段认证。下一项继续工具注册/参数流程等核心原地汇编迁移。
+
+同一Agent按用户授权自审本次实现、模块/文件登记及测试类型扩展，不是独立审核；没有调整参考基线、行为断言或预算。固定内容摘要如下（记录自身排除）：
+
+```text
+6bbcf85b74e94d5e72716d230de2d2a5daa303b9b7ea4660552b40d23318e8cd  src/runtime/agent.S
+0c9a2d92228b80e134ac58c01d237b37238fc649b14fe81e83d7fcf18d10f982  src/runtime/agent_layout.h
+95c04acea441618e90a36fa0800cc8d7bf6fb724a04411771dd07fad0558f1ce  tests/runtime/agent_abi.S
+ff1a0796674d8c585edfeeb38bbf580098e739c6d004247c60dea43e49e812fb  tests/runtime/test_agent_asm.c
+8f50c5c1c11760132785790c7c99416aac40f797d9a1d90580842d53272d430f  tools/gates/check.py
+90e809c72d78d76cd48a77ed7eefe5151a49449941c52695dcd4db7a746b013c  tools/gates/test_check.py
+a169e502fbf32659b2ae6b5a79bb842b2d70c1c52783769b1c4fe606a2682979  tools/runtime/build_test.py
+59cbff77343e9b70804cfbd7a3aa0e4b7ef1a52bafb5e31e5ee4e8179c2f11de  governance/assembly-first.json
+e6b8178c5e566194ffac802a7b8bba28e5e50e341d2f390f8865bddba078636c  governance/bootstrap-policy.json
+326f4ae7ec8c0b08cbce7ab56c3fca36ee7330573c7dc392dd85807e329893c7  governance/runtime-local-modules.json
+9b6fd75bd4c449dc77d7fc028fae34d31c125decefc8d37d2fa0c525ee0cfae3  docs/migration/task-ledger.json
+37684c92702035ed34672d889ce99ccb4c924ba42f4d3ce4900d4a1b155e0b4e  docs/原生重写路线与迁移TODO.md
+```
+
+提交候选复验：仅用本Agent暂存内容检验，未包含另一Agent未交接的TUI改动；该提交树G00、核心七组O0/O2测试、无网络PTY及真实MiMo PTY（read续答、收到文本后取消、终端恢复）全部通过。检验目录完成后自动删除。当前共享工作区的TUI改动仍由另一Agent负责，不据此声称其汇编版本已验收。

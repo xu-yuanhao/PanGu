@@ -53,6 +53,11 @@ def main():
                             implementation('src/client/tui/runtime_bridge'), str(ROOT / 'tests/client/tui/test_runtime_bridge.c'),
                             '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'),
+                            str(ROOT / 'tests/runtime/agent_abi.S'), str(ROOT / 'tests/runtime/test_agent_asm.c'),
+                            '-o', output], check=True)
+            subprocess.run([output], check=True, timeout=10)
     return 0
 if __name__ == '__main__':
     raise SystemExit(main())

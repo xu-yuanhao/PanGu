@@ -1613,7 +1613,8 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded linear in-memory session and idle reset; no session tree/persistence"
+      "local_subset_scope": "bounded linear in-memory session and idle reset; no session tree/persistence",
+      "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
     },
     {
       "id": "T20",
@@ -1694,7 +1695,8 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded sequential single-tool loop, real continuation/cancellation; no full Pi event lifecycle"
+      "local_subset_scope": "bounded sequential single-tool loop, real continuation/cancellation; no full Pi event lifecycle",
+      "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
     },
     {
       "id": "T24",
@@ -2217,7 +2219,7 @@
       "c",
       "cpp"
     ],
-    "next_work": "in-place handwritten assembly replacement of current core and TUI logic before expanding C core",
+    "next_work": "Agent Loop and bounded memory session now handwritten ASM; continue in-place tool/protocol migration; TUI migration in separate Agent scope",
     "ownership": "main Agent owns Runtime/contracts/bridge/composition/shared controls; second Agent owns TUI files listed in docs/并行开发任务提示词-汇编优先TUI重构.md",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
     "status": "plan and admission only; assembly implementation not completed",
