@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # tools/client/tui/build.sh — 构建 TUI 演示程序与单元测试（仅本模块，不接全局构建）。
+# 核心（tui_utf8/input/state/view/app + term 组合原语）为手写 .S；
+# tui_term.c 仅保留 termios/ioctl 平台结构胶水（c-bridge/platform-layout）。
 # 用法: build.sh [run-tests]
 set -euo pipefail
 cd "$(dirname "$0")/../../.."   # 仓库根 (tools/client/tui → 仓库根)
@@ -12,20 +14,24 @@ INC="-I$SRC"
 
 mkdir -p "$OUT"
 
-CORE_SRC="$SRC/tui_utf8.c $SRC/tui_term.c $SRC/tui_input.c $SRC/tui_view.c $SRC/tui_state.c $SRC/tui_app.c"
+ASM_SRC="$SRC/tui_utf8.S $SRC/tui_term.S $SRC/tui_input.S $SRC/tui_view.S $SRC/tui_state.S $SRC/tui_app.S"
+C_SRC="$SRC/tui_term.c"
 
-echo "== 编译核心（产品客户端，仅 libc 依赖） =="
+echo "== 组装/编译核心（产品客户端，仅 libc 依赖） =="
 # shellcheck disable=SC2086
-$CC $CFLAGS $INC -c $CORE_SRC
-mv tui_utf8.o tui_term.o tui_input.o tui_view.o tui_state.o tui_app.o "$OUT/"
+for assembly in $ASM_SRC; do
+	$CC $CFLAGS $INC -c "$assembly" -o "$OUT/$(basename "${assembly%.S}").o"
+done
+$CC $CFLAGS $INC -c $C_SRC -o "$OUT/tui_term_cglue.o"
 
 echo "== 编译演示程序（核心 + 假 Runtime + demo main） =="
 # shellcheck disable=SC2086
-$CC $CFLAGS $INC -c "$TST/fake_runtime.c" "$TST/demo_main.c"
-mv fake_runtime.o demo_main.o "$OUT/"
-$CC "$OUT"/tui_utf8.o "$OUT"/tui_term.o "$OUT"/tui_input.o "$OUT"/tui_view.o \
-	"$OUT"/tui_state.o "$OUT"/tui_app.o "$OUT"/fake_runtime.o "$OUT"/demo_main.o \
-	-o "$OUT/pangu-tui-demo"
+for fixture in fake_runtime demo_main; do
+	$CC $CFLAGS $INC -c "$TST/$fixture.c" -o "$OUT/$fixture.o"
+done
+$CC "$OUT"/tui_utf8.o "$OUT"/tui_term.o "$OUT"/tui_term_cglue.o "$OUT"/tui_input.o \
+	"$OUT"/tui_view.o "$OUT"/tui_state.o "$OUT"/tui_app.o "$OUT"/fake_runtime.o \
+	"$OUT"/demo_main.o -o "$OUT/pangu-tui-demo"
 
 echo "== 编译单元测试 =="
 # shellcheck disable=SC2086
@@ -35,9 +41,14 @@ $CC $CFLAGS $INC -o "$OUT/test_tui_input" "$TST/test_tui_input.c" "$OUT/tui_inpu
 # shellcheck disable=SC2086
 $CC $CFLAGS $INC -o "$OUT/test_tui_view" "$TST/test_tui_view.c" "$OUT/tui_view.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
 # shellcheck disable=SC2086
-$CC $CFLAGS $INC -o "$OUT/test_tui_state" "$TST/test_tui_state.c" "$OUT/tui_state.o" "$OUT/tui_view.o" "$OUT/tui_utf8.o"
+$CC $CFLAGS $INC -o "$OUT/test_tui_state" "$TST/test_tui_state.c" "$OUT/tui_state.o" "$OUT/tui_view.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
 # shellcheck disable=SC2086
 $CC $CFLAGS $INC -o "$OUT/test_fake_runtime" "$TST/test_fake_runtime.c" "$OUT/fake_runtime.o"
+# ABI/边界/哨兵专项：寄存器保存与破坏、栈金丝雀、保护页边界、平台结构断言
+# shellcheck disable=SC2086
+$CC -D_POSIX_C_SOURCE=200809L -Wno-cast-function-type $CFLAGS $INC -I"$TST" -o "$OUT/test_tui_abi" \
+	"$TST/test_tui_abi.c" "$OUT/tui_utf8.o" "$OUT/tui_input.o" "$OUT/tui_state.o" \
+	"$OUT/tui_view.o" "$OUT/tui_app.o" "$OUT/tui_term.o" "$OUT/tui_term_cglue.o"
 
 echo "构建完成: $OUT/"
 echo "  $OUT/pangu-tui-demo --demo <no_tool|tool_roundtrip|model_error|user_cancel|busy_reject>"
@@ -46,5 +57,6 @@ if [ "${1:-}" = "run-tests" ]; then
 		"$OUT/test_tui_input" && \
 		"$OUT/test_tui_view" && \
 		"$OUT/test_tui_state" && \
-		"$OUT/test_fake_runtime"
+		"$OUT/test_fake_runtime" && \
+		"$OUT/test_tui_abi"
 fi

@@ -1812,7 +1812,8 @@
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
       "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
-      "local_subset_scope": "interactive read-only TUI plus real Runtime; PTY tool continuation/cancel/termios restore verified; no full P1"
+      "local_subset_scope": "interactive read-only TUI plus real Runtime; PTY tool continuation/cancel/termios restore verified; no full P1",
+      "local_implementation": "handwritten TUI UTF-8/input/state/view/app/terminal logic integrated; termios C layout glue and runtime_bridge.c remain; six client groups and real MiMo PTY verified, full stage incomplete"
     },
     {
       "id": "T29",

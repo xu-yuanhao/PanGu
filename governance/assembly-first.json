@@ -30,35 +30,10 @@
       "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
       "sha256": "daae5ffaa8f88c1f5dfd774f0682e0a687f2c2c64d0dcad60b0c9a024fda991d"
     },
-    "src/client/tui/tui_utf8.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "d45f83bb24212e622f6c9391bd5b557a28a9bfb9a98e564bbf9f96c00d573474"
-    },
     "src/client/tui/tui_term.c": {
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "termios/ioctl等平台结构与系统库适配"
-    },
-    "src/client/tui/tui_input.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "1d9bd8653ed1cf93fcdd7b3e22a839672bfd217c082d54868cbb8856c5cd1245"
-    },
-    "src/client/tui/tui_view.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "b5ed42a28f7169ff75d7af1832911ed88471a744324ff10928ba9eb1e11d65db"
-    },
-    "src/client/tui/tui_state.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "47c10f03debdd0f836e03736a2eb1dbf8a51c0dcbabf4eec5fd27d4960cdde7c"
-    },
-    "src/client/tui/tui_app.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "91d70fc34939f637015ad3f0867e8f372d801823eff62e724993f303d743aca7"
     },
     "src/client/tui/runtime_bridge.c": {
       "role": "pending-inplace-assembly",
@@ -68,6 +43,30 @@
     "src/runtime/session.S": {
       "role": "assembly-core",
       "reason": "手写有界事务分离、Storage确认后采纳、序号与不确定失败隔离"
+    },
+    "src/client/tui/tui_utf8.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/client/tui/tui_input.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/client/tui/tui_view.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/client/tui/tui_state.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/client/tui/tui_app.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/client/tui/tui_term.S": {
+      "role": "assembly-core",
+      "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
     }
   }
 }

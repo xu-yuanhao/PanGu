@@ -38,8 +38,9 @@ int tui_state_cancel(tui_state *s);
 /* 推进有限工作量并渲染事件；终态后回到闲置。 */
 void tui_state_poll(tui_state *s);
 
-static inline int tui_state_running(const tui_state *s) { return s->running; }
-static inline int tui_state_fatal(const tui_state *s) { return s->fatal; }
+/* 查询 helper 为 tui_state.S 的汇编导出（与实现同源，不在头内留第二份）。 */
+int tui_state_running(const tui_state *s);
+int tui_state_fatal(const tui_state *s);
 
 #ifdef __cplusplus
 }

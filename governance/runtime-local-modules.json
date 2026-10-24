@@ -215,21 +215,23 @@
     {
       "id": "client.tui.local.v0",
       "sources": [
-        "src/client/tui/tui_app.c",
+        "src/client/tui/tui_app.S",
         "src/client/tui/tui_app.h",
-        "src/client/tui/tui_input.c",
+        "src/client/tui/tui_input.S",
         "src/client/tui/tui_input.h",
         "src/client/tui/tui_term.c",
         "src/client/tui/tui_term.h",
-        "src/client/tui/tui_utf8.c",
+        "src/client/tui/tui_utf8.S",
         "src/client/tui/tui_utf8.h",
-        "src/client/tui/tui_view.c",
+        "src/client/tui/tui_view.S",
         "src/client/tui/tui_view.h",
-        "src/client/tui/tui_state.c",
+        "src/client/tui/tui_state.S",
         "src/client/tui/tui_state.h",
         "src/client/tui/tui_runtime_adapter.h",
         "src/client/tui/runtime_bridge.c",
-        "src/client/tui/runtime_bridge.h"
+        "src/client/tui/runtime_bridge.h",
+        "src/client/tui/tui_term.S",
+        "src/client/tui/tui_layout.h"
       ],
       "dependencies": [
         "client.contract.v0",

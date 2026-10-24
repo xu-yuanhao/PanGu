@@ -1,0 +1,796 @@
+/* tui_view.S — 展示渲染，手写汇编原地替换 tui_view.c。
+ *
+ * 契约见 tui_view.h：主屏滚动回显；事件输出前挂起编辑行；有界展示按 code point
+ * 截断并带标记；text_delta 的跨事件拆断序列用 ≤3 字节 carry 拼接。
+ * libc 只用 strlen/memcpy/snprintf（登记依赖），渲染算法全部在本文件内。
+ *
+ * 与被替换 C 版的已知行为差异（记录于交接报告）：
+ *  1. carry “吸收”路径（本段全部并入 carry）不再提前写出已并入的字节——
+ *     C 版在该路径会把不完整前缀写给终端并重复一次（4 字节序列按 1+2+1 拆分
+ *     可复现），违反头文件声明的“绝不向终端写出半个序列”；本版遵守该契约。
+ *  2. banner/截断标记的 snprintf 返回值截断到缓冲区长度内再交给 sink——
+ *     C 版直接用返回长度读栈缓冲，超长 runtime 名会越界读。
+ */
+#include "tui_layout.h"
+.intel_syntax noprefix
+
+.section .rodata
+.Lcrlf:             .asciz "\r\n"
+.Lcleartail:        .asciz "\r\033[J"
+.Lprompt:           .asciz "> "
+.Lqmark:            .asciz "?"
+.Ltool_pfx:         .asciz "[tool] "
+.Lhash_paren:       .asciz " (#"
+.Lparen_started:    .asciz ") started\n"
+.Lfin_ok:           .asciz ") finished ok: "
+.Lfin_err:          .asciz ") finished error: "
+.Lnl:               .asciz "\n"
+.Lrun_started:      .asciz "[run] started\n"
+.Lrun_fin_ok:       .asciz "[run] finished: success\n"
+.Lrun_fin_err:      .asciz "[run] finished: error: "
+.Lrun_fin_cancel:   .asciz "[run] finished: cancelled\n"
+.Lrun_fin_unknown:  .asciz "[run] finished: unknown\n"
+.Lbusy:             .asciz "[tui] 忙：当前 run 进行中，提交被拒绝，输入已保留\n"
+.Lsubmit_err:       .asciz "[tui] 提交失败（Runtime 拒绝），输入已保留\n"
+.Linput_limit:      .asciz "[tui] 输入已达长度上限，继续输入被拒绝\n"
+.Lcancel_note:      .asciz "[tui] 已请求取消，等待终态（期间继续显示实际到达的事件）\n"
+.Lpoll_err:         .asciz "[tui] Runtime poll 错误；客户端未自行补造终态，退出\n"
+.Lproto_violation:  .asciz "[tui] 协议违约：终态后仍收到事件，已丢弃该事件\n"
+.Lfmt_banner:       .asciz "[tui] 盘古薄客户端（事件源: %s）\n"
+.Lfmt_exit:         .asciz "[tui] 退出（%s），终端已恢复\n"
+.Lfmt_marker:       .asciz "…[+%zu 字节截断]"
+
+.section .text
+
+/* ---- 内部：sink.write(ctx, data, len)，返回值忽略。rbx=view，rsi/rdx=数据 ---- */
+.type li_sink_write,@function
+li_sink_write:
+ mov rax, qword ptr [rbx + TUI_LI_VIEW_SINK_WRITE]
+ mov rdi, qword ptr [rbx + TUI_LI_VIEW_SINK_CTX]
+ jmp rax
+.size li_sink_write, .-li_sink_write
+
+/* ---- 内部：vput(tui_view *v, const char *data, size_t len)
+ * ANSI 模式把 '\n' 翻译为 "\r\n"；降级模式原样写出。 ---- */
+.type li_vput,@function
+li_vput:
+ test rdx, rdx
+ jz .Lvput_done
+ cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
+ je .Lvput_plain
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13, rdx
+ xor r14d, r14d /* i */
+ xor r15d, r15d /* off */
+.Lvput_scan:
+ cmp r14, r13
+ jae .Lvput_tail
+ cmp byte ptr [r12 + r14], 10 /* '\n' */
+ jne .Lvput_next
+ cmp r14, r15
+ jbe .Lvput_no_pre
+ mov rdi, rbx
+ lea rsi, [r12 + r15]
+ mov rdx, r14
+ sub rdx, r15
+ call li_sink_write
+.Lvput_no_pre:
+ mov rdi, rbx
+ lea rsi, [rip + .Lcrlf]
+ mov edx, 2
+ call li_sink_write
+ lea r15, [r14 + 1]
+.Lvput_next:
+ inc r14
+ jmp .Lvput_scan
+.Lvput_tail:
+ cmp r13, r15
+ jbe .Lvput_fin
+ mov rdi, rbx
+ lea rsi, [r12 + r15]
+ mov rdx, r13
+ sub rdx, r15
+ call li_sink_write
+.Lvput_fin:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+.Lvput_done:
+ ret
+.Lvput_plain:
+ mov rax, qword ptr [rdi + TUI_LI_VIEW_SINK_WRITE]
+ mov rdi, qword ptr [rdi + TUI_LI_VIEW_SINK_CTX]
+ jmp rax
+.size li_vput, .-li_vput
+
+/* ---- 内部：vputs(tui_view *v, const char *s) ---- */
+.type li_vputs,@function
+li_vputs:
+ push rbx
+ push r12
+ push rax /* 16 字节对齐占位 */
+ mov rbx, rdi
+ mov r12, rsi
+ mov rdi, rsi
+ call strlen@PLT
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, rax
+ call li_vput
+ pop rax
+ pop r12
+ pop rbx
+ ret
+.size li_vputs, .-li_vputs
+
+/* ---- 内部：event_suspend(v)：事件输出前结束编辑行 ---- */
+.type li_event_suspend,@function
+li_event_suspend:
+ cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
+ je .Lsusp_ret
+ cmp dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ je .Lsusp_ret
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ lea rsi, [rip + .Lcrlf]
+ call li_vputs
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ pop rax
+ pop r12
+ pop rbx
+.Lsusp_ret:
+ ret
+.size li_event_suspend, .-li_event_suspend
+
+/* ---- 内部：event_resume_editor(v)：编辑缓冲非空则重绘编辑行 ---- */
+.type li_event_resume,@function
+li_event_resume:
+ mov rax, qword ptr [rdi + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lres_ret
+ cmp qword ptr [rax + TUI_LI_INPUT_LEN], 0
+ je .Lres_ret
+ jmp tui_view_redraw_editor@PLT
+.Lres_ret:
+ ret
+.size li_event_resume, .-li_event_resume
+
+/* ---- 内部：put_bounded(v, data, len, cap)：有界展示 + 截断标记 ---- */
+.type li_put_bounded,@function
+li_put_bounded:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx, rdi
+ mov r12, rsi /* data */
+ mov r13, rdx /* len */
+ mov r14, rcx /* cap */
+ mov rdi, r12
+ mov rsi, r13
+ mov rdx, r14
+ call tui_utf8_truncate_len@PLT /* rax = keep */
+ mov r15, rax
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r15
+ call li_vput
+ cmp r13, r15
+ jbe .Lpb_done /* 未截断 */
+ sub rsp, 64 /* char marker[64]，保持 16 对齐 */
+ mov rdi, rsp
+ mov esi, 64
+ lea rdx, [rip + .Lfmt_marker]
+ mov rcx, r13
+ sub rcx, r15
+ xor eax, eax /* varargs：无 SSE 参数 */
+ call snprintf@PLT
+ test eax, eax
+ jle .Lpb_pop /* n <= 0 不写 */
+ cmp eax, 63
+ jle .Lpb_len_ok
+ mov eax, 63 /* snprintf 返回“应有长度”时按实际缓冲截断 */
+.Lpb_len_ok:
+ mov edx, eax
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vput
+.Lpb_pop:
+ add rsp, 64
+.Lpb_done:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_put_bounded, .-li_put_bounded
+
+/* ---- 内部：put_field(v, s, cap)：事件内字符串字段（NULL 显示 "?"） ---- */
+.type li_put_field,@function
+li_put_field:
+ test rsi, rsi
+ jnz .Lpf_have
+ lea rsi, [rip + .Lqmark]
+ jmp li_vputs
+.Lpf_have:
+ push rbx
+ push r12
+ push r13
+ mov rbx, rdi
+ mov r12, rsi /* s */
+ mov r13, rdx /* cap */
+ mov rdi, r12
+ call strlen@PLT
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, rax
+ mov rcx, r13
+ call li_put_bounded
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_put_field, .-li_put_field
+
+/* void tui_view_init(tui_view *v, tui_out_sink sink, int ansi, tui_input *editor)
+ * rdi=v rsi=sink.ctx rdx=sink.write ecx=ansi r8=editor */
+.globl tui_view_init
+.type tui_view_init,@function
+tui_view_init:
+ .cfi_startproc
+ mov qword ptr [rdi + TUI_LI_VIEW_SINK_CTX], rsi
+ mov qword ptr [rdi + TUI_LI_VIEW_SINK_WRITE], rdx
+ mov dword ptr [rdi + TUI_LI_VIEW_ANSI], ecx
+ mov qword ptr [rdi + TUI_LI_VIEW_EDITOR], r8
+ mov dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_CARRY_LEN], 0
+ ret
+ .cfi_endproc
+.size tui_view_init, .-tui_view_init
+
+/* void tui_view_redraw_editor(tui_view *v) — 整行重绘（"\r"+清行尾+提示符+缓冲） */
+.globl tui_view_redraw_editor
+.type tui_view_redraw_editor,@function
+tui_view_redraw_editor:
+ .cfi_startproc
+ cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
+ je .Lred_ret
+ mov rax, qword ptr [rdi + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lred_ret
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov r12, rax /* editor（buf 偏移 0） */
+ cmp dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ je .Lred_no_clear
+ mov rdi, rbx
+ lea rsi, [rip + .Lcleartail]
+ call li_vputs
+.Lred_no_clear:
+ mov rdi, rbx
+ lea rsi, [rip + .Lprompt]
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, qword ptr [r12 + TUI_LI_INPUT_LEN]
+ call li_vput
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 1
+ pop rax
+ pop r12
+ pop rbx
+.Lred_ret:
+ ret
+ .cfi_endproc
+.size tui_view_redraw_editor, .-tui_view_redraw_editor
+
+/* void tui_view_finalize_editor(tui_view *v) */
+.globl tui_view_finalize_editor
+.type tui_view_finalize_editor,@function
+tui_view_finalize_editor:
+ .cfi_startproc
+ cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
+ je .Lfin_ret
+ cmp dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ je .Lfin_ret
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ lea rsi, [rip + .Lcrlf]
+ call li_vputs
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ pop rax
+ pop r12
+ pop rbx
+.Lfin_ret:
+ ret
+ .cfi_endproc
+.size tui_view_finalize_editor, .-tui_view_finalize_editor
+
+/* void tui_view_banner(tui_view *v, const char *runtime_name) */
+.globl tui_view_banner
+.type tui_view_banner,@function
+tui_view_banner:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ sub rsp, 128 /* char line[128] */
+ mov rbx, rdi
+ mov r12, rsi
+ mov rdi, rsp
+ mov esi, 128
+ lea rdx, [rip + .Lfmt_banner]
+ mov rcx, r12
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jle .Lbanner_skip
+ cmp eax, 127
+ jle .Lbanner_len
+ mov eax, 127
+.Lbanner_len:
+ mov edx, eax
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vput
+.Lbanner_skip:
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ add rsp, 128
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_banner, .-tui_view_banner
+
+/* void tui_view_exit_note(tui_view *v, const char *reason) */
+.globl tui_view_exit_note
+.type tui_view_exit_note,@function
+tui_view_exit_note:
+ .cfi_startproc
+ push rbx
+ push r12
+ push r13
+ sub rsp, 160 /* char line[160] */
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13d, eax /* snprintf 返回值暂存（先格式化，与 C 版顺序一致） */
+ mov rdi, rsp
+ mov esi, 160
+ lea rdx, [rip + .Lfmt_exit]
+ mov rcx, r12
+ xor eax, eax
+ call snprintf@PLT
+ mov r13d, eax
+ cmp dword ptr [rbx + TUI_LI_VIEW_ANSI], 0
+ je .Lexit_no_susp
+ cmp dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ je .Lexit_no_susp
+ mov rdi, rbx
+ lea rsi, [rip + .Lcrlf]
+ call li_vputs
+.Lexit_no_susp:
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ test r13d, r13d
+ jle .Lexit_done
+ cmp r13d, 159
+ jle .Lexit_len
+ mov r13d, 159
+.Lexit_len:
+ mov edx, r13d
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vput
+.Lexit_done:
+ add rsp, 160
+ pop r13
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_exit_note, .-tui_view_exit_note
+
+/* 运行态提示：统一 suspend → 消息 →（poll_error 无 resume）resume ---- */
+
+/* void tui_view_busy_rejected(tui_view *v) 等：逐个显式实现，避免宏藏控制流 */
+.globl tui_view_busy_rejected
+.type tui_view_busy_rejected,@function
+tui_view_busy_rejected:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lbusy]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ call li_event_resume
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_busy_rejected, .-tui_view_busy_rejected
+
+.globl tui_view_submit_error
+.type tui_view_submit_error,@function
+tui_view_submit_error:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lsubmit_err]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ call li_event_resume
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_submit_error, .-tui_view_submit_error
+
+.globl tui_view_input_limit
+.type tui_view_input_limit,@function
+tui_view_input_limit:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Linput_limit]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ call li_event_resume
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_input_limit, .-tui_view_input_limit
+
+.globl tui_view_cancel_requested
+.type tui_view_cancel_requested,@function
+tui_view_cancel_requested:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lcancel_note]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ call li_event_resume
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_cancel_requested, .-tui_view_cancel_requested
+
+/* poll 错误后客户端退出：只挂起，不重绘编辑行 */
+.globl tui_view_poll_error
+.type tui_view_poll_error,@function
+tui_view_poll_error:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lpoll_err]
+ mov rdi, rbx
+ call li_vputs
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_poll_error, .-tui_view_poll_error
+
+.globl tui_view_protocol_violation
+.type tui_view_protocol_violation,@function
+tui_view_protocol_violation:
+ .cfi_startproc
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lproto_violation]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ call li_event_resume
+ pop rax
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_protocol_violation, .-tui_view_protocol_violation
+
+/* void tui_view_event(tui_view *v, const tui_event *ev) */
+.globl tui_view_event
+.type tui_view_event,@function
+tui_view_event:
+ .cfi_startproc
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx, rdi /* v */
+ mov r12, rsi /* ev */
+ mov eax, dword ptr [r12 + TUI_LI_EVENT_KIND]
+ cmp eax, TUI_LI_EV_RUN_STARTED
+ je .Lev_started
+ cmp eax, TUI_LI_EV_TEXT_DELTA
+ je .Lev_delta
+ cmp eax, TUI_LI_EV_TOOL_STARTED
+ je .Lev_tool_started
+ cmp eax, TUI_LI_EV_TOOL_FINISHED
+ je .Lev_tool_finished
+ cmp eax, TUI_LI_EV_RUN_FINISHED
+ je .Lev_finished
+ jmp .Lev_out
+
+.Lev_started:
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Lrun_started]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lev_out
+
+/* ---- text_delta：carry 拼接 + 尾部不完整序列留存 ---- */
+.Lev_delta:
+ sub rsp, 16 /* [rsp] = tail */
+ mov qword ptr [rsp], 0
+ xor r13d, r13d /* off */
+ xor r14d, r14d /* flush_carry */
+ xor r15d, r15d /* written */
+ mov rcx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
+ test rcx, rcx
+ jz .Ldelta_scan
+ movzx edi, byte ptr [rbx + TUI_LI_VIEW_CARRY]
+ call tui_utf8_seq_len@PLT /* rax = cl0 */
+ mov rcx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
+ cmp rax, rcx
+ jbe .Lcarry_ready /* cl0 <= carry_len：need=0，直接冲掉 */
+ mov rdx, rax
+ sub rdx, rcx /* rdx = need */
+ cmp qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN], rdx
+ jb .Lcarry_absorb
+ mov r13, rdx /* off = need：本段前缀补全 carry */
+ mov r14d, 1
+ jmp .Ldelta_scan
+.Lcarry_ready:
+ mov r14d, 1
+ jmp .Ldelta_scan
+.Lcarry_absorb:
+ /* 本段全部并入 carry；不提前写出（遵守“绝不写出半个序列”） */
+ lea rdi, [rbx + TUI_LI_VIEW_CARRY]
+ add rdi, rcx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ call memcpy@PLT
+ mov rax, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ add qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], rax
+ mov r13, rax /* off = text_len：本段无输出 */
+.Ldelta_scan:
+ /* tail = incomplete_tail(text+off, text_len-off) */
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ add rsi, r13
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ sub rdx, r13
+ mov rdi, rsi
+ mov rsi, rdx
+ call tui_utf8_incomplete_tail@PLT
+ mov [rsp], rax /* tail */
+ mov r15, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ sub r15, r13
+ sub r15, rax /* written = rem - tail */
+ test r14d, r14d
+ jz .Ldelta_no_flush
+ mov rdi, rbx
+ call li_event_suspend
+ mov rdi, rbx
+ lea rsi, [rbx + TUI_LI_VIEW_CARRY]
+ mov rdx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
+ call li_vput
+ mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
+ lea rdx, [r13 + r15]
+ test rdx, rdx
+ jz .Ldelta_tailcopy
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ call li_vput
+ jmp .Ldelta_tailcopy
+.Ldelta_no_flush:
+ test r15, r15
+ jz .Ldelta_tailcopy
+ mov rdi, rbx
+ call li_event_suspend
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ add rsi, r13
+ mov rdx, r15
+ call li_vput
+.Ldelta_tailcopy:
+ mov rax, [rsp]
+ test rax, rax
+ jz .Ldelta_resume_chk
+ lea rdi, [rbx + TUI_LI_VIEW_CARRY]
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ add rsi, r13
+ add rsi, r15
+ mov rdx, rax
+ call memcpy@PLT
+ mov rax, [rsp]
+ mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], rax
+.Ldelta_resume_chk:
+ mov rdi, rbx
+ test r14d, r14d
+ jnz .Ldelta_resume
+ test r15, r15
+ jz .Ldelta_out16
+.Ldelta_resume:
+ call li_event_resume
+.Ldelta_out16:
+ add rsp, 16
+ jmp .Lev_out
+
+.Lev_tool_started:
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Ltool_pfx]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TOOL_NAME]
+ mov edx, 48
+ call li_put_field
+ lea rsi, [rip + .Lhash_paren]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
+ mov edx, 48
+ call li_put_field
+ lea rsi, [rip + .Lparen_started]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lev_out
+
+.Lev_tool_finished:
+ mov rdi, rbx
+ call li_event_suspend
+ lea rsi, [rip + .Ltool_pfx]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TOOL_NAME]
+ mov edx, 48
+ call li_put_field
+ lea rsi, [rip + .Lhash_paren]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
+ mov edx, 48
+ call li_put_field
+ mov r13d, dword ptr [r12 + TUI_LI_EVENT_TOOL_OK]
+ lea rsi, [rip + .Lfin_ok]
+ test r13d, r13d
+ jnz .Ltoolf_ok
+ lea rsi, [rip + .Lfin_err]
+.Ltoolf_ok:
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_DETAIL]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN]
+ mov rcx, TUI_LI_VIEW_TOOL_SNIPPET
+ call li_put_bounded
+ lea rsi, [rip + .Lnl]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lev_out
+
+.Lev_finished:
+ /* 终态前冲掉遗留 carry（不完整序列按原样放出） */
+ cmp qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
+ je .Lfin_no_carry
+ mov rdi, rbx
+ call li_event_suspend
+ mov rdi, rbx
+ lea rsi, [rbx + TUI_LI_VIEW_CARRY]
+ mov rdx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
+ call li_vput
+ mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
+.Lfin_no_carry:
+ mov rdi, rbx
+ call li_event_suspend
+ mov eax, dword ptr [r12 + TUI_LI_EVENT_RUN_STATUS]
+ cmp eax, TUI_LI_RUN_SUCCESS
+ je .Lfin_success
+ cmp eax, TUI_LI_RUN_ERROR
+ je .Lfin_error
+ cmp eax, TUI_LI_RUN_CANCELLED
+ je .Lfin_cancelled
+ lea rsi, [rip + .Lrun_fin_unknown]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lfin_redraw
+.Lfin_success:
+ lea rsi, [rip + .Lrun_fin_ok]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lfin_redraw
+.Lfin_error:
+ lea rsi, [rip + .Lrun_fin_err]
+ mov rdi, rbx
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_DETAIL]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN]
+ mov rcx, TUI_LI_VIEW_ERROR_DETAIL
+ call li_put_bounded
+ lea rsi, [rip + .Lnl]
+ mov rdi, rbx
+ call li_vputs
+ jmp .Lfin_redraw
+.Lfin_cancelled:
+ lea rsi, [rip + .Lrun_fin_cancel]
+ mov rdi, rbx
+ call li_vputs
+.Lfin_redraw:
+ /* 唯一终态后编辑行重新可用（含空缓冲） */
+ mov rax, qword ptr [rbx + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lev_out
+ cmp dword ptr [rbx + TUI_LI_VIEW_ANSI], 0
+ je .Lev_out
+ mov rdi, rbx
+ call tui_view_redraw_editor@PLT
+.Lev_out:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+ .cfi_endproc
+.size tui_view_event, .-tui_view_event
+
+.section .note.GNU-stack,"",@progbits

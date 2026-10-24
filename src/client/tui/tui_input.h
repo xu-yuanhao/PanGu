@@ -39,12 +39,13 @@ typedef struct tui_input {
 	unsigned esc_count;
 } tui_input;
 
+/* 查询 helper 为 tui_input.S 的汇编导出（不再以 static inline 留在头文件，
+ * 避免同一模块出现第二份实现）。 */
 void tui_input_init(tui_input *in);
 void tui_input_reset(tui_input *in);
-
-static inline const char *tui_input_text(const tui_input *in) { return in->buf; }
-static inline size_t tui_input_len(const tui_input *in) { return in->len; }
-static inline int tui_input_empty(const tui_input *in) { return in->len == 0; }
+const char *tui_input_text(const tui_input *in);
+size_t tui_input_len(const tui_input *in);
+int tui_input_empty(const tui_input *in);
 
 /* 喂入一个输入字节，返回一个按键事件。
  * TUI_KEY_OVERFLOW 带节流：内容未变（仍满）期间只报一次，删除后恢复。 */

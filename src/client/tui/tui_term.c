@@ -1,9 +1,9 @@
+/* Linux termios/winsize adapters for the terminal service. */
 #define _POSIX_C_SOURCE 200809L
 
 #include "tui_term.h"
 
 #include <errno.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -59,61 +59,9 @@ static int linux_query_size(tui_term *t)
 	return -1;
 }
 
-static const tui_term_platform linux_platform = {
-	.name = "linux-termios",
-	.enter_raw = linux_enter_raw,
-	.restore = linux_restore,
-	.query_size = linux_query_size,
+const tui_term_platform tui_term_linux_platform = {
+	"linux-termios",
+	linux_enter_raw,
+	linux_restore,
+	linux_query_size,
 };
-
-void tui_term_init(tui_term *t, int in_fd, int out_fd)
-{
-	memset(t, 0, sizeof(*t));
-	t->in_fd = in_fd;
-	t->out_fd = out_fd;
-	t->in_is_tty = isatty(in_fd) == 1;
-	t->out_is_tty = isatty(out_fd) == 1;
-	t->platform = &linux_platform;
-	t->cols = 80;
-	t->rows = 24;
-	(void)t->platform->query_size(t);
-}
-
-int tui_term_enter_interactive(tui_term *t)
-{
-	if (!t->in_is_tty || !t->out_is_tty)
-		return -1;
-	if (t->platform->enter_raw(t) != 0)
-		return -1;
-	(void)t->platform->query_size(t);
-	return 0;
-}
-
-void tui_term_restore(tui_term *t)
-{
-	if (t->raw_active || t->saved_valid)
-		t->platform->restore(t);
-}
-
-int tui_term_write(tui_term *t, const char *data, size_t len)
-{
-	size_t off = 0;
-
-	while (off < len) {
-		ssize_t n = write(t->out_fd, data + off, len - off);
-		if (n < 0) {
-			if (errno == EINTR)
-				continue;
-			return -1;
-		}
-		if (n == 0)
-			return -1;
-		off += (size_t)n;
-	}
-	return 0;
-}
-
-int tui_term_is_interactive(const tui_term *t)
-{
-	return t->raw_active;
-}

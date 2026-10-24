@@ -107,6 +107,41 @@ static void test_utf8_split_join(void)
 	T_RUN("utf8_split_join");
 }
 
+static void test_utf8_absorb_split(void)
+{
+	tstr out;
+	tui_view v;
+	tui_input in;
+	tui_event ev;
+
+	/* 4 字节 emoji F0 9F 98 80 按 1+2+1 跨事件到达：中段整体并入 carry，
+	 * 不得提前写出半个序列（被替换 C 版在此路径会把已并入的字节写两遍，
+	 * 本用例固定修正后的契约）。 */
+	tstr_clear(&out);
+	tui_input_init(&in);
+	tui_view_init(&v, tstr_sink(&out), 0, &in);
+
+	memset(&ev, 0, sizeof(ev));
+	ev.kind = TUI_EV_TEXT_DELTA;
+	ev.text = "\xf0";
+	ev.text_len = 1;
+	tui_view_event(&v, &ev);
+	T_CHECK(out.len == 0);
+	T_CHECK(v.carry_len == 1);
+	ev.text = "\x9f\x98";
+	ev.text_len = 2;
+	tui_view_event(&v, &ev);
+	T_CHECK(out.len == 0); /* 吸收段不产生输出 */
+	T_CHECK(v.carry_len == 3);
+	ev.text = "\x80";
+	ev.text_len = 1;
+	tui_view_event(&v, &ev);
+	T_CHECK(out.len == 4);
+	T_CHECK(memcmp(out.buf, "\xf0\x9f\x98\x80", 4) == 0); /* 恰好一次、连续完整 */
+	T_CHECK(v.carry_len == 0);
+	T_RUN("utf8_absorb_split");
+}
+
 static void test_truncation_marker(void)
 {
 	tstr out;
@@ -219,6 +254,7 @@ int main(void)
 	test_editor_redraw_ansi();
 	test_event_lines_ansi();
 	test_utf8_split_join();
+	test_utf8_absorb_split();
 	test_truncation_marker();
 	test_plain_mode();
 	test_error_and_cancel_lines();
