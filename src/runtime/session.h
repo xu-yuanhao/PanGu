@@ -16,12 +16,25 @@ typedef struct {
 typedef struct { pg_message messages[PG_MESSAGE_LIMIT]; size_t count;
     char system_prompt[PG_TEXT_LIMIT]; size_t system_size;
 } pg_session;
-typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET } pg_session_change_kind;
+#define PG_RUN_TURN_LIMIT 16
+#define PG_RUN_RESTART_LIMIT 5
+typedef enum { PG_RUN_MODEL=1, PG_RUN_TOOL, PG_RUN_TERMINAL, PG_RUN_ABORTING } pg_run_phase;
+typedef struct {
+    uint64_t id;
+    pg_run_phase phase;
+    unsigned turns;
+    uint64_t call_index;
+    pg_outcome outcome;
+    unsigned restarts;
+    uint64_t input_index;
+} pg_run_checkpoint;
+typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET, PG_SESSION_CHECKPOINT } pg_session_change_kind;
 typedef struct {
     pg_session_change_kind kind;
     const pg_message *messages;
     size_t count;
     pg_slice text;
+    const pg_run_checkpoint *checkpoint;
 } pg_session_change;
 typedef enum { PG_STORE_OK, PG_STORE_REJECTED, PG_STORE_UNCERTAIN } pg_store_result;
 /* Synchronous, single-owner storage seam. The borrowed detached batch expires on return.
@@ -36,6 +49,7 @@ typedef struct {
     pg_storage storage;
     uint64_t sequence;
     unsigned busy, failed;
+    pg_run_checkpoint run;
 } pg_session_control;
 /* Caller owns view/control, initialized to zero with an explicit storage binding. */
 int pg_session_commit(pg_session *, pg_session_control *, const pg_session_change *);

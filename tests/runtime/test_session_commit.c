@@ -6,12 +6,15 @@
 #include <string.h>
 _Static_assert(sizeof(pg_session)==PG_S_BYTES,"session layout");
 _Static_assert(sizeof(pg_session_control)==PG_SC_BYTES,"control layout");
+_Static_assert(sizeof(pg_run_checkpoint)==PG_CP_BYTES,"checkpoint layout");
+_Static_assert(offsetof(pg_run_checkpoint,input_index)==PG_CP_INPUT,"checkpoint input");
 _Static_assert(sizeof(pg_session_change)==PG_CHANGE_BYTES,"change layout");
 _Static_assert(offsetof(pg_session_control,sequence)==PG_SC_SEQ,"sequence");
 _Static_assert(offsetof(pg_session_control,busy)==PG_SC_BUSY,"busy");
 _Static_assert(offsetof(pg_session_control,failed)==PG_SC_FAILED,"failed");
 typedef struct {
  pg_session saved;
+ pg_run_checkpoint saved_run;
  pg_session *visible;
  pg_session_control *control;
  unsigned calls,fail_at,mode,reenter;
@@ -22,13 +25,15 @@ static pg_store_result write_batch(void *ctx,const pg_session_change *change,uin
  store *s=ctx;++s->calls;assert(s->control->busy==1);
  assert(previous==s->sequence&&s->control->sequence==previous);
  assert(!memcmp(s->visible,&s->saved,sizeof(s->saved)));
+ assert(!memcmp(&s->control->run,&s->saved_run,sizeof(s->saved_run)));
  if(s->source){assert(change->messages!=s->source);memset(s->source,0,2*sizeof(pg_message));s->source=0;}
  if(s->reenter){s->reenter=0;assert(pg_session_commit(s->visible,s->control,change));}
  if(s->calls==s->fail_at)return s->mode==2?PG_STORE_UNCERTAIN:PG_STORE_REJECTED;
  if(s->mode==3){*next=previous+2;return PG_STORE_OK;}
  if(change->kind==PG_SESSION_APPEND){assert(change->count<=2);memcpy(s->saved.messages+s->saved.count,change->messages,change->count*sizeof(pg_message));s->saved.count+=change->count;}
  else if(change->kind==PG_SESSION_SYSTEM){memcpy(s->saved.system_prompt,change->text.data,change->text.size);s->saved.system_prompt[change->text.size]=0;s->saved.system_size=change->text.size;}
- else{memset(s->saved.messages,0,s->saved.count*sizeof(pg_message));s->saved.count=0;}
+ else if(change->kind==PG_SESSION_RESET){memset(s->saved.messages,0,s->saved.count*sizeof(pg_message));s->saved.count=0;}
+ if(change->checkpoint)s->saved_run=*change->checkpoint;else if(change->kind==PG_SESSION_RESET)memset(&s->saved_run,0,sizeof(s->saved_run));
  *next=++s->sequence;return PG_STORE_OK;
 }
 static pg_session view;
@@ -62,7 +67,7 @@ static void close_model(void *ctx){++((model_state*)ctx)->closes;}
 static int authorize(void *ctx,pg_slice name,pg_slice args){(void)ctx;(void)name;(void)args;return 1;}
 static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)name;(void)args;assert(cap>2);++((model_state*)ctx)->executed;memcpy(out,"ok",2);*size=2;return 0;}
 static pg_agent agent;
-static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=fail;assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);
+static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=(unsigned[]){0,1,3,4,6}[fail];assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);
  if(fail==1){assert(client.submit(client.context,(pg_slice){"input",5}));pg_event e;assert(!client.poll(client.context,&e));assert(!agent.session.count&&!m.starts);storage.fail_at=0;}
  assert(!client.submit(client.context,(pg_slice){"input",5}));assert(pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));unsigned begins=0,results=0,finished=0;
  for(unsigned i=0;i<40;++i){pg_event e;if(!client.poll(client.context,&e))continue;
@@ -71,16 +76,25 @@ static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};
   if(e.kind==PG_RUN_FINISHED){++finished;assert(e.outcome==((fail>=2)?PG_ERROR:PG_SUCCESS));break;}
  }
  assert(finished==1&&!memcmp(&storage.saved,&agent.session,sizeof(storage.saved)));
+ assert(!memcmp(&storage.saved_run,&agent.commits.run,sizeof(storage.saved_run)));
  if(fail==2)assert(!begins&&!results&&!m.executed&&agent.session.count==1);
  if(fail==3)assert(begins==1&&!results&&m.executed==1&&agent.session.count==3);
  if(fail==4)assert(begins==1&&results==1&&agent.session.count==4);
  if(fail>=2){assert(agent.commits.failed);assert(client.submit(client.context,(pg_slice){"retry",5}));}
  else assert(begins==1&&results==1&&m.closes==2);
  }}
-static void cancelled_result_failure(void){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=3;assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){"cancel",6}));pg_event e={0};
+static void cancelled_result_failure(void){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=5;assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){"cancel",6}));pg_event e={0};
  for(unsigned i=0;i<16;++i)if(client.poll(client.context,&e)&&e.kind==PG_TOOL_STARTED)break;
  assert(e.kind==PG_TOOL_STARTED);client.cancel(client.context);unsigned finished=0;
  for(unsigned i=0;i<8;++i)if(client.poll(client.context,&e)){assert(e.kind!=PG_TOOL_FINISHED);if(e.kind==PG_RUN_FINISHED){assert(e.outcome==PG_ERROR);finished=1;break;}}
  assert(finished&&agent.commits.failed&&!m.executed&&agent.session.count==3);
 }
-int main(void){transactions();runtime();cancelled_result_failure();puts("PASS: detached atomic session batches, storage replacement, reject/uncertain/sequence/reentry, and runtime publication order");return 0;}
+static void checkpoints(void){fresh();control.storage=(pg_storage){0,pg_session_volatile_commit};pg_message input={.role=PG_USER,.size=1,.text="u"};pg_run_checkpoint cp={.id=1,.phase=PG_RUN_MODEL,.call_index=UINT64_MAX};pg_session_change c={.kind=PG_SESSION_APPEND,.messages=&input,.count=1,.checkpoint=&cp};
+ assert(!pg_session_commit(&view,&control,&c));assert(control.run.id==1&&control.sequence==1);
+ pg_session_change boundary={.kind=PG_SESSION_RESET};assert(pg_session_commit(&view,&control,&boundary));boundary.kind=PG_SESSION_SYSTEM;boundary.text=(pg_slice){"s",1};assert(pg_session_commit(&view,&control,&boundary));
+ c=(pg_session_change){.kind=PG_SESSION_CHECKPOINT,.checkpoint=&cp};
+ for(unsigned field=0;field<6;++field){pg_run_checkpoint invalid=cp;if(field==0)invalid.phase=(pg_run_phase)0;if(field==1)invalid.turns=17;if(field==2)invalid.restarts=6;if(field==3)invalid.input_index=1;if(field==4){invalid.phase=PG_RUN_TOOL;invalid.call_index=0;}if(field==5)invalid.outcome=PG_ERROR;c.checkpoint=&invalid;assert(pg_session_commit(&view,&control,&c));assert(control.sequence==1&&control.run.phase==PG_RUN_MODEL);}
+ cp.phase=PG_RUN_TERMINAL;cp.outcome=PG_CANCELLED;c.checkpoint=&cp;assert(!pg_session_commit(&view,&control,&c));uint64_t sequence=control.sequence;cp.phase=PG_RUN_MODEL;cp.outcome=PG_SUCCESS;assert(pg_session_commit(&view,&control,&c)&&control.sequence==sequence);
+ boundary.kind=PG_SESSION_RESET;assert(!pg_session_commit(&view,&control,&boundary));assert(!view.count&&!control.run.id);
+}
+int main(void){transactions();checkpoints();runtime();cancelled_result_failure();puts("PASS: detached atomic session batches, storage replacement, reject/uncertain/sequence/reentry, and runtime publication order");return 0;}

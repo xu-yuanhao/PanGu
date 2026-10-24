@@ -1613,7 +1613,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded memory projection with detached atomic batches and replaceable synchronous Storage confirmation; no persistent entries/fork/task recovery",
+      "local_subset_scope": "bounded memory projection plus atomic run checkpoints, immutable settled messages and reset boundary; no fork/general task graph",
       "local_implementation": "src/runtime/session.S and agent.S; handwritten SysV AMD64; volatile default, transactional storage seam and failure isolation"
     },
     {
@@ -1636,7 +1636,7 @@
         "docs/migration/native-journal-format.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "handwritten native framed journal; transaction-level reopen, exclusive lock, torn tail and corrupt frame handling; task recovery and interactive persistence pending"
+      "local_subset_scope": "native journal v1/v2 and single-run model/tool/abort recovery with persisted attempt/restart budgets; original configuration supplied explicitly; requestId dedup and interactive configuration binding pending"
     },
     {
       "id": "T21",
@@ -1699,7 +1699,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded sequential single-tool loop, draft/settled separation, storage-confirmed input/call/result/answer publication; no durable task scheduler or full Pi lifecycle",
+      "local_subset_scope": "durable single sequential read-only run, explicit resume/suspend, persisted abort and terminal outcome, model/tool continuation; no general scheduler, requestId dedup, or side-effect reconciliation",
       "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
     },
     {

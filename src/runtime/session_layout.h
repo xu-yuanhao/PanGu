@@ -13,7 +13,17 @@
 #define PG_SC_SEQ 16
 #define PG_SC_BUSY 24
 #define PG_SC_FAILED 28
-#define PG_SC_BYTES 32
-#define PG_CHANGE_BYTES 40
-#define PG_SESSION_STACK 8552
+#define PG_SC_RUN 32
+#define PG_SC_BYTES 72
+#define PG_CP_BYTES 40
+#define PG_CP_PHASE 8
+#define PG_CP_TURNS 12
+#define PG_CP_CALL 16
+#define PG_CP_OUTCOME 24
+#define PG_CP_RESTARTS 28
+#define PG_CP_INPUT 32
+#define PG_CHANGE_BYTES 48
+#define PG_SESSION_STACK 8600
+#define PG_SESSION_DATA 56
+#define PG_SESSION_CP 8552
 #endif

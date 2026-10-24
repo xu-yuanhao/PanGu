@@ -543,6 +543,7 @@
     "tests/runtime/test_journal.c": "native-test",
     "docs/migration/native-journal-format.md": "document",
     "tests/runtime/live_journal.c": "native-test",
-    "tests/runtime/journal_abi.S": "native-test"
+    "tests/runtime/journal_abi.S": "native-test",
+    "tests/runtime/test_agent_resume.c": "native-test"
   }
 }

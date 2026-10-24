@@ -42,5 +42,7 @@
 #define PG_A_DRAFT 280440
 #define PG_A_PENDING 284688
 #define PG_A_COMMITS 288936
-#define PG_A_BYTES 288968
+#define PG_A_NEXT 289008
+#define PG_A_BYTES 289048
+#define PG_ST_RECOVER_TOOL 7
 #endif

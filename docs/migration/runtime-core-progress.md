@@ -394,3 +394,47 @@ c58d343e5bb9183c62668dea8e13f90490efb13b1d3b34ec6e8960502129f352  src/runtime/jo
 57a71d56ccddac8818ddec761777eedf4335de6313fbc4b30ba704b8a8d5d588  tests/runtime/test_journal.c
 578c8a6e986fbb0dcd40e6b0a1cf4432c3f4e0f2bb3c72bea5774d891a8f1488  tools/runtime/build_test.py
 ```
+
+## 2026-10-25：单运行检查点、暂停与在途恢复
+
+继续主Agent独占的Durable核心任务，没有修改第二Agent的tools/read文件。参考固定Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7：GenerationTask.prepare提交request checkpoint及model/thinking/options/cutoff再执行；TaskScheduler.open将未完成任务置回pending并保留恢复计数；harness-tasks-recovery.test.ts的“resumes abort work after close at every direct-task abort stage”“crash after the mark before the run joins”等用例。采用消息与阶段同事务、取消意图先提交、已终结不重跑与恢复预算，不声称移植通用Scheduler/任务图。
+
+新增40字节pg_run_checkpoint（id/phase/turns/call_index/outcome/restarts/input_index），Session提交可附检查点或单独提交检查点。事务先校验输入引用/待处理call引用/阶段/预算/终态不复活/活动上下文冻结，再分离数据并提交；回调中可见的view和run仍是旧值，确认后一起采纳。reset仅在非活动时清空当前视图/检查点，日志历史保留。内部change/control/agent尺寸分别48/72/289048，模型、工具定义、pg_tools和pg_client布局不变，所有消费者重编译。
+
+agent.S新增显式pg_agent_resume(agent,retry)和pg_agent_suspend：准入将user与MODEL检查点原子提交；每次模型调用前持久化轮次，assistant+call与TOOL检查点同提交，工具结果交回MODEL，最终answer与TERMINAL成功同提交。cancel先提交ABORTING；取消待工具时补取消结果后终结，恢复ABORTING不执行工具。suspend释放本地请求并丢弃未提交草稿，保持工作待恢复，不伪造终态。16轮/5次连续恢复预算跨进程，显式retry只恢复恢复预算、不清轮次；普通暂停后再恢复也计一次，与上游仅统计crash不同，已明示。
+
+日志读取v1/v2，旧v1保留；有检查点的append或checkpoint-only写v2，尾前增加40字节。v1原有8544缓冲/8530有效帧上限未放宽；v2为新协议字段分配8592缓冲，实际最大8570，文本/消息/文件容量不变。补v2最大帧、检查点区域截断与重算校验的非法字段验证。格式与限制详见native-journal-format.md。
+
+实际验证：十组核心O0/O2 UBSan均通过；11个跨进程中断/完成/取消/暂停位置，含模型开始/partial、待工具、工具已执行但结果未存、结果已存、已终结、取消意图及终态帧已写但未发布。只读工具未记结果时可重读，已记结果不会重复；不承诺写副作用exactly-once。错误注入按新增模型检查点事务调整位置，保留原调用/发布/拒绝断言；新增checkpoint旧值可见性与非法字段断言。ABI/保护页原用例仍通过，新增resume/suspend ABI探针。
+
+真实MiMo三进程：interrupt HTTP200/seq3/messages1/MODEL；resume HTTP200/verified1/seq6/messages2/TERMINAL；recall HTTP200/verified1/seq9/messages4/TERMINAL。候选最终G00、十组测试、无网络PTY Ctrl-D/SIGTERM/resize及termios恢复、真实PTY read/续答/取消/termios恢复全部通过；生产准入仍BLOCKED。共享工作树G00因第二Agent正在替换的tools/read缺旧C/未登记新S而失败，因此候选只取本Agent暂存树，不覆盖/暂存其工作，不声称新工具实现通过。
+
+汇编对象核对：agent text4160、session1287、journal2694字节，data/bss均0，未添加C核心；导入仅既有Session接口、公开libc IO和stat薄胶水。一次失败测试遗留的自有临时journal夹具目录已删除；验证目录均自动清理。
+
+尚未完成：requestId/跨历史幂等、通用任务图、可替换完整调度服务、保存partial、持久化并验证原model/tools/workspace配置身份与TUI恢复入口。resume要求调用者显式提供原配置，当前自动交互持久化仍未启用；不能把这个子集称完整Durable。Goal保持active，继续配置身份与客户端恢复接入。
+
+同一Agent按用户授权自审自批接口/模块登记、v2格式及测试/计划差异，不伪称独立审核。风险为内部ABI变化、配置身份尚由调用者保证、只读可重放范围、同步IO和不确定结果必须重开；未放宽原消息/轮次/文件预算或更改检查器。固定摘要（不含本记录）：
+
+```text
+e8b9057fbddf1c5b397cbbc756cadde50bacbc13cff0f2f624808d870ac79c44  docs/migration/native-journal-format.md
+2a3115d78662f6702b6cf7da3e108c503c444f545dc69ca6432f1a9097a81bf0  docs/migration/task-ledger.json
+e6a1dce459bc0a8e324ebaf9528cf0e988612abfb78d2f552cfc4d0ed0f9ff24  docs/原生重写路线与迁移TODO.md
+25b8da7ee6f0d4d984a5def67dfac5ccf810409d7face797650bf4f904e2637c  governance/bootstrap-policy.json
+2e746bacd8be3f5313eb43098001ee9bbf396f89e67582d10d669e5fcc55dafe  governance/runtime-local-modules.json
+a0edc280cb7cfee4388eb6e95993362d010b0331fd0507d5a35f208301b0edf0  src/runtime/agent.S
+5038c515435dc1aea4ae78343a2e87d10129ae0a9f3c1fecd9976d272c8f6521  src/runtime/agent.h
+becc56e5707bd8eac0ab9470950d4729ee0530f4eefa9977c1a9660595a95fcb  src/runtime/agent_layout.h
+b23be8bf798d710ad95ce902eb3b57b089c8709a0440a5d94c69c85fcee8d48c  src/runtime/journal.S
+9ecb1c09a6c8781c26985e8d480a7eefaccb6bd236848a50fd820c1a2abb59e2  src/runtime/journal.h
+b446fdb957cceb6f016d903c35085838d36ff4fd030254ec52716072d11b7a39  src/runtime/journal_layout.h
+470c44f9d1dca0f71dc3e8d946cee9c129b139a5056d96f9f6e55bde4ea68c31  src/runtime/session.S
+7c1d7be8b698493edbfb4933868d2bf6737fd59462bc3c7647575abcf7a47cef  src/runtime/session.h
+b33b65e01c4b661d607eedf42caaae4152a32b2e4a57f6d7a0d799478bac381d  src/runtime/session_layout.h
+9c0e765122c807a114c63c294d5bacfc1b70ad7932c919d9771bb5a042f006ea  tests/runtime/live_journal.c
+44aa8c5982070c33e585e498f61b61ed72619874862ec7d6919f1c9f7a79bf5a  tests/runtime/test_agent_asm.c
+e9bcf2d52c0894bea98e4b137c363816bef033b34a568d96e5d093ad980781b2  tests/runtime/test_agent_resume.c
+8ec6f7e176aff36e6d195677f79e765c89ce3777ccde1e2e7d4309dbcc13987f  tests/runtime/test_journal.c
+68b64596ec5ce86513a1a9697f7c5b97ff950e7128ad4999378cfea6b0a58ed7  tests/runtime/test_session_commit.c
+7344ecb89007024ca154933b741d185a3f69254e5c3b5b1676b6bf5fb40c7508  tools/runtime/build_test.py
+eb770cf38be442de27b84b626588125099f55ecdb9821b23c09ce8419400e4e5  盘古 Pangu 项目完整文档.md
+```

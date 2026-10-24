@@ -81,6 +81,7 @@ pg_agent_set_system:
     jne .Lsystem_bad
     sub rsp,56
     mov dword ptr [rsp],1
+    mov qword ptr [rsp+40],0
     mov [rsp+24],rsi
     mov [rsp+32],rdx
     mov rdx,rsp
@@ -102,6 +103,7 @@ pg_agent_reset_session:
     jne .Lreset_bad
     sub rsp,56
     mov dword ptr [rsp],2
+    mov qword ptr [rsp+40],0
     mov rdx,rsp
     lea rsi,[rdi+PG_A_COMMITS]
     call pg_session_commit
@@ -120,6 +122,8 @@ pg_agent_reset_session:
     mov dword ptr [rsp],0
     mov [rsp+8],rsi
     mov [rsp+16],rdx
+    lea rax,[rdi+PG_A_NEXT]
+    mov [rsp+40],rax
     mov rdx,rsp
     lea rsi,[rdi+PG_A_COMMITS]
     call pg_session_commit
@@ -136,6 +140,132 @@ pg_agent_reset_session:
     add rsp,48
     pop rbx
     ret
+
+# next(owner, phase, outcome, call_index)
+.Lnext_checkpoint:
+    mov r8,rdi
+    mov r9d,esi
+    mov r10d,edx
+    mov r11,rcx
+    lea rsi,[r8+PG_A_COMMITS+PG_SC_RUN]
+    lea rdi,[r8+PG_A_NEXT]
+    mov ecx,5
+    rep movsq
+    cmp [r8+PG_A_NEXT+PG_CP_PHASE],r9d
+    je .Lnext_same_phase
+    mov dword ptr [r8+PG_A_NEXT+PG_CP_RESTARTS],0
+.Lnext_same_phase:
+    mov [r8+PG_A_NEXT+PG_CP_PHASE],r9d
+    mov [r8+PG_A_NEXT+PG_CP_OUTCOME],r10d
+    mov [r8+PG_A_NEXT+PG_CP_CALL],r11
+    mov eax,[r8+PG_A_TURNS]
+    mov [r8+PG_A_NEXT+PG_CP_TURNS],eax
+    ret
+
+.Lcommit_checkpoint:
+    sub rsp,56
+    mov dword ptr [rsp],3
+    lea rax,[rdi+PG_A_NEXT]
+    mov [rsp+40],rax
+    mov rdx,rsp
+    lea rsi,[rdi+PG_A_COMMITS]
+    call pg_session_commit
+    add rsp,56
+    ret
+
+.globl pg_agent_resume
+.type pg_agent_resume,@function
+pg_agent_resume:
+    test rdi,rdi
+    jz .Lresume_bad
+    cmp esi,1
+    ja .Lresume_bad
+    cmp dword ptr [rdi+PG_A_STATE],0
+    jne .Lresume_bad
+    cmp dword ptr [rdi+PG_A_OPEN],0
+    jne .Lresume_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+PG_SC_BUSY],0
+    jne .Lresume_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+PG_SC_RUN],0
+    je .Lresume_none
+    mov eax,[rdi+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE]
+    cmp eax,3
+    je .Lresume_none
+    test esi,esi
+    jnz .Lresume_allowed
+    cmp dword ptr [rdi+PG_A_COMMITS+PG_SC_RUN+PG_CP_RESTARTS],5
+    jae .Lresume_parked
+.Lresume_allowed:
+    push rbx
+    push r12
+    sub rsp,8
+    mov rbx,rdi
+    mov r12d,esi
+    mov ecx,[rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_TURNS]
+    mov [rbx+PG_A_TURNS],ecx
+    mov esi,eax
+    xor edx,edx
+    mov rcx,[rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_CALL]
+    call .Lnext_checkpoint
+    xor eax,eax
+    test r12d,r12d
+    jnz .Lresume_counter
+    mov eax,[rbx+PG_A_NEXT+PG_CP_RESTARTS]
+.Lresume_counter:
+    inc eax
+    mov [rbx+PG_A_NEXT+PG_CP_RESTARTS],eax
+    mov rdi,rbx
+    call .Lcommit_checkpoint
+    test eax,eax
+    jnz .Lresume_pop_bad
+    mov rax,[rbx+PG_A_NEXT+PG_CP_CALL]
+    mov [rbx+PG_A_CALL],rax
+    mov dword ptr [rbx+PG_A_CANCEL],0
+    mov byte ptr [rbx+PG_A_ERROR],0
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_BEGIN
+    xor eax,eax
+    jmp .Lresume_pop
+.Lresume_pop_bad:
+    mov eax,1
+.Lresume_pop:
+    add rsp,8
+    pop r12
+    pop rbx
+    ret
+.Lresume_parked:
+    mov eax,2
+    ret
+.Lresume_bad:
+    mov eax,1
+    ret
+.Lresume_none:
+    xor eax,eax
+    ret
+.size pg_agent_resume,.-pg_agent_resume
+
+.globl pg_agent_suspend
+.type pg_agent_suspend,@function
+pg_agent_suspend:
+    test rdi,rdi
+    jz .Lsuspend_bad
+    cmp dword ptr [rdi+PG_A_COMMITS+PG_SC_BUSY],0
+    jne .Lsuspend_bad
+    push rbx
+    mov rbx,rdi
+    call .Lclose
+    lea rdi,[rbx+PG_A_DRAFT]
+    xor eax,eax
+    mov ecx,PG_MSG_BYTES/8
+    rep stosq
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_IDLE
+    mov dword ptr [rbx+PG_A_CANCEL],0
+    pop rbx
+    xor eax,eax
+    ret
+.Lsuspend_bad:
+    mov eax,1
+    ret
+.size pg_agent_suspend,.-pg_agent_suspend
 
 .Lcopy:
     mov rcx,rdx
@@ -226,6 +356,28 @@ pg_agent_reset_session:
     sub rsp,8
     mov rbx,rdi
     mov r12d,esi
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_FAILED],0
+    jne .Lfinish_close
+    cmp qword ptr [rbx+PG_A_COMMITS+PG_SC_RUN],0
+    je .Lfinish_close
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],3
+    je .Lfinish_close
+    mov esi,3
+    mov edx,r12d
+    mov rcx,-1
+    call .Lnext_checkpoint
+    mov rdi,rbx
+    call .Lcommit_checkpoint
+    test eax,eax
+    jz .Lfinish_close
+    mov dword ptr [rbx+PG_A_COMMITS+PG_SC_FAILED],1
+    mov r12d,1
+    lea rdi,[rbx+PG_A_ERROR]
+    lea rsi,[rip+.Lerror_storage_text]
+    mov edx,46
+    call .Lcopy
+.Lfinish_close:
+    mov rdi,rbx
     call .Lclose
     lea rdi,[rbx+PG_A_DRAFT]
     xor eax,eax
@@ -238,6 +390,9 @@ pg_agent_reset_session:
     pop rbx
     ret
 
+.Lstorage_fail:
+    mov dword ptr [rdi+PG_A_COMMITS+PG_SC_FAILED],1
+    lea rsi,[rip+.Lerror_storage_text]
 .Lfail:
     mov r8,rdi
     xor ecx,ecx
@@ -275,8 +430,17 @@ pg_agent_reset_session:
     call .Lprepare
     test rax,rax
     jz .Lsubmit_pop_bad
+    mov rax,[rbx+PG_A_COMMITS+PG_SC_SEQ]
+    inc rax
+    mov [rbx+PG_A_NEXT],rax
+    mov dword ptr [rbx+PG_A_NEXT+PG_CP_PHASE],1
+    mov dword ptr [rbx+PG_A_NEXT+PG_CP_TURNS],0
+    mov qword ptr [rbx+PG_A_NEXT+PG_CP_CALL],-1
+    mov qword ptr [rbx+PG_A_NEXT+PG_CP_OUTCOME],0
+    mov rax,[rbx+PG_A_COUNT]
+    mov [rbx+PG_A_NEXT+PG_CP_INPUT],rax
     mov rdi,rbx
-    mov rsi,rax
+    lea rsi,[rbx+PG_A_PENDING]
     mov edx,1
     call .Lcommit_records
     test rax,rax
@@ -296,11 +460,18 @@ pg_agent_reset_session:
 
 # rbx owns the run. Only settled text enters model-visible history.
 .Lsettle_draft:
+    sub rsp,8
     mov rax,[rbx+PG_A_COUNT]
     mov [rbx+PG_A_ASSISTANT],rax
     mov rdi,rbx
+    mov esi,3
+    xor edx,edx
+    mov rcx,-1
+    call .Lnext_checkpoint
+    mov rdi,rbx
     lea rsi,[rbx+PG_A_DRAFT]
     mov edx,1
+    add rsp,8
     jmp .Lcommit_records
 
 .Lcancel:
@@ -309,7 +480,27 @@ pg_agent_reset_session:
     jz .Lcancel_end
     cmp eax,6
     je .Lcancel_end
-    mov dword ptr [rdi+PG_A_CANCEL],1
+    cmp dword ptr [rdi+PG_A_CANCEL],0
+    jne .Lcancel_end
+    cmp dword ptr [rdi+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],3
+    je .Lcancel_end
+    push rbx
+    mov rbx,rdi
+    mov esi,4
+    xor edx,edx
+    mov rcx,[rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_CALL]
+    call .Lnext_checkpoint
+    mov rdi,rbx
+    call .Lcommit_checkpoint
+    test eax,eax
+    jnz .Lcancel_store_failed
+    mov dword ptr [rbx+PG_A_CANCEL],1
+    pop rbx
+    ret
+.Lcancel_store_failed:
+    mov rdi,rbx
+    call .Lstorage_fail
+    pop rbx
 .Lcancel_end:
     ret
 
@@ -360,6 +551,8 @@ pg_agent_reset_session:
     je .Ldispatch
     cmp eax,6
     je .Ldispatch
+    cmp eax,7
+    je .Ldispatch
     cmp dword ptr [rbx+PG_A_OPEN],0
     je .Lcancel_operation
     mov rdi,[rbx+PG_A_MODEL]
@@ -384,6 +577,11 @@ pg_agent_reset_session:
     lea rdi,[r13+PG_MSG_ID]
     call .Lcopy
     mov dword ptr [r13+PG_MSG_ERROR],1
+    mov rdi,rbx
+    mov esi,3
+    mov edx,2
+    mov rcx,-1
+    call .Lnext_checkpoint
     mov rdi,rbx
     mov rsi,r13
     mov edx,1
@@ -418,15 +616,53 @@ pg_agent_reset_session:
     je .Ltool_end
     cmp eax,PG_ST_FINISH
     je .Lterminal
+    cmp eax,PG_ST_RECOVER_TOOL
+    je .Lrecover_tool
     lea rsi,[rip+.Lerror_state]
     jmp .Lpoll_fail
 .Lbegin:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_START
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],2
+    je .Lbegin_tool
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],4
+    jne .Lpoll_one
+    cmp qword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_CALL],-1
+    jne .Lbegin_tool
+    mov dword ptr [rbx+PG_A_CANCEL],1
+    jmp .Lpoll_one
+.Lbegin_tool:
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_TOOL
+    jmp .Lpoll_one
+.Lrecover_tool:
+    imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
+    add r13,rbx
+    mov dword ptr [r12],PG_EV_TOOL_BEGIN
+    lea rdi,[r13+PG_MSG_ID]
+    mov [r12+24],rdi
+    call .Llength
+    mov [r12+32],rax
+    lea rdi,[r13+PG_MSG_NAME]
+    mov [r12+40],rdi
+    call .Llength
+    mov [r12+48],rax
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],4
+    jne .Lpoll_one
+    mov dword ptr [rbx+PG_A_CANCEL],1
     jmp .Lpoll_one
 .Lstart:
-    inc dword ptr [rbx+PG_A_TURNS]
     cmp dword ptr [rbx+PG_A_TURNS],16
-    ja .Lerror_turns
+    jae .Lerror_turns
+    inc dword ptr [rbx+PG_A_TURNS]
+    mov rdi,rbx
+    mov esi,1
+    xor edx,edx
+    mov rcx,-1
+    call .Lnext_checkpoint
+    mov rdi,rbx
+    call .Lcommit_checkpoint
+    test eax,eax
+    jnz .Lerror_storage
     mov dword ptr [rbx+PG_A_OPEN],1
     mov rdi,[rbx+PG_A_MODEL]
     mov rsi,rbx
@@ -542,6 +778,11 @@ pg_agent_reset_session:
     mov rdx,[rsp+48]
     call .Lcopy
     mov rdi,rbx
+    mov esi,2
+    xor edx,edx
+    mov rcx,[rbx+PG_A_CALL]
+    call .Lnext_checkpoint
+    mov rdi,rbx
     lea rsi,[rbx+PG_A_DRAFT]
     mov edx,2
     call .Lcommit_records
@@ -625,6 +866,11 @@ pg_agent_reset_session:
     setne al
     mov [r14+PG_MSG_ERROR],eax
     mov rdi,rbx
+    mov esi,1
+    xor edx,edx
+    mov rcx,-1
+    call .Lnext_checkpoint
+    mov rdi,rbx
     mov rsi,r14
     mov edx,1
     call .Lcommit_records
@@ -669,9 +915,9 @@ pg_agent_reset_session:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_IDLE
     jmp .Lpoll_one
 .Lerror_storage:
-    mov dword ptr [rbx+PG_A_COMMITS+28],1
-    lea rsi,[rip+.Lerror_storage_text]
-    jmp .Lpoll_fail
+    mov rdi,rbx
+    call .Lstorage_fail
+    jmp .Lpoll_zero
 .Lerror_turns:
     lea rsi,[rip+.Lerror_turns_text]
     jmp .Lpoll_fail

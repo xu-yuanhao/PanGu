@@ -18,7 +18,7 @@ OFFSET(pg_session,count,PG_A_COUNT);OFFSET(pg_session,system_prompt,PG_A_SYSTEM)
 OFFSET(pg_agent,model,PG_A_MODEL);OFFSET(pg_agent,tools,PG_A_TOOLS);OFFSET(pg_agent,state,PG_A_STATE);
 OFFSET(pg_agent,turns,PG_A_TURNS);OFFSET(pg_agent,cancelled,PG_A_CANCEL);OFFSET(pg_agent,request_open,PG_A_OPEN);
 OFFSET(pg_agent,outcome,PG_A_OUTCOME);OFFSET(pg_agent,assistant_index,PG_A_ASSISTANT);OFFSET(pg_agent,call_index,PG_A_CALL);
-OFFSET(pg_agent,draft,PG_A_DRAFT);OFFSET(pg_agent,pending,PG_A_PENDING);OFFSET(pg_agent,commits,PG_A_COMMITS);
+OFFSET(pg_agent,draft,PG_A_DRAFT);OFFSET(pg_agent,pending,PG_A_PENDING);OFFSET(pg_agent,commits,PG_A_COMMITS);OFFSET(pg_agent,next_checkpoint,PG_A_NEXT);
 OFFSET(pg_agent,event_text,PG_A_TEXT);OFFSET(pg_agent,error_text,PG_A_ERROR);
 OFFSET(pg_event,text,8);OFFSET(pg_event,call_id,24);OFFSET(pg_event,tool_name,40);
 OFFSET(pg_model_event,text,8);OFFSET(pg_model_event,call_id,24);OFFSET(pg_model_event,tool_name,40);
@@ -38,7 +38,7 @@ unsigned pg_abi_probe(probe_fn,void *,const void *,size_t);
 void pg_abi_corrupt(void);
 static char full[PG_TEXT_LIMIT];
 pg_store_result pg_test_storage(void *,const pg_session_change *,uint64_t,uint64_t *);
-pg_store_result pg_fixture_storage(void *ctx,const pg_session_change *change,uint64_t previous,uint64_t *sequence){(void)ctx;assert(change->kind<=PG_SESSION_RESET);*sequence=previous+1;return PG_STORE_OK;}
+pg_store_result pg_fixture_storage(void *ctx,const pg_session_change *change,uint64_t previous,uint64_t *sequence){(void)ctx;assert(change->kind<=PG_SESSION_CHECKPOINT);*sequence=previous+1;return PG_STORE_OK;}
 int pg_fixture_start(void *ctx,const pg_session *session){fixture *f=ctx;++f->requests;f->step=0;assert(session->count);return 0;}
 int pg_fixture_next(void *ctx,pg_model_event *event){fixture *f=ctx;*event=(pg_model_event){0};
  if(f->large){event->kind=f->step++?PG_MODEL_DONE:PG_MODEL_TEXT;event->text=(pg_slice){full,sizeof(full)-1};return 0;}
@@ -65,6 +65,8 @@ static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_s
  memset(full,'x',sizeof(full)-1);full[sizeof(full)-1]=0;
  assert(!pg_agent_set_system(agent,(pg_slice){full,sizeof(full)-1}));
  assert(!pg_agent_set_system(agent,(pg_slice){agent->session.system_prompt+1,sizeof(full)-2}));assert(agent->session.system_size==sizeof(full)-2);
+ assert(!pg_abi_probe((probe_fn)pg_agent_suspend,agent,0,0));
+ assert(!pg_abi_probe((probe_fn)pg_agent_resume,agent,0,0));
  assert(!pg_abi_probe((probe_fn)pg_agent_reset_session,agent,0,0));assert(!agent->session.count&&agent->session.system_size==sizeof(full)-2);
  f=(fixture){.large=1};assert(!client.submit(client.context,(pg_slice){full,sizeof(full)-1}));terminal=0;
  for(unsigned i=0;i<12;++i){pg_event event;if(client.poll(client.context,&event)&&event.kind==PG_RUN_FINISHED){assert(event.outcome==PG_SUCCESS);terminal=1;break;}}

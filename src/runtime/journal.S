@@ -44,7 +44,7 @@
     mov dword ptr [r12+8],1
     mov [r12+16],rsi
     mov eax,[rbx]
-    cmp eax,2
+    cmp eax,3
     ja .Lencode_bad
     mov [r12+24],eax
     mov dword ptr [r12+28],0
@@ -52,7 +52,7 @@
     test eax,eax
     jz .Lencode_messages
     cmp eax,1
-    jne .Lencode_finish
+    jne .Lencode_checkpoint_only
     mov rcx,[rbx+32]
     cmp rcx,4096
     jae .Lencode_bad
@@ -116,7 +116,22 @@
     add r15,PG_MSG_BYTES
     dec r14
     jnz .Lencode_one
+    jmp .Lencode_finish
+.Lencode_checkpoint_only:
+    cmp dword ptr [rbx],3
+    jne .Lencode_finish
+    cmp qword ptr [rbx+40],0
+    je .Lencode_bad
 .Lencode_finish:
+    mov rsi,[rbx+40]
+    test rsi,rsi
+    jz .Lencode_no_checkpoint
+    mov dword ptr [r12+8],2
+    mov rdi,r13
+    mov ecx,5
+    rep movsq
+    mov r13,rdi
+.Lencode_no_checkpoint:
     mov rsi,r13
     sub rsi,r12
     lea eax,[rsi+16]
@@ -160,6 +175,7 @@
     mov r12,rsi
     mov r13,rcx
     mov r14,r8
+    mov [rsp+16],r9
     cmp r12,56
     jb .Ldecode_bad
     cmp r12,PG_J_RECORD_MAX
@@ -168,7 +184,9 @@
     cmp [rbx],rax
     jne .Ldecode_bad
     cmp dword ptr [rbx+8],1
-    jne .Ldecode_bad
+    jb .Ldecode_bad
+    cmp dword ptr [rbx+8],2
+    ja .Ldecode_bad
     cmp [rbx+12],r12d
     jne .Ldecode_bad
     cmp [rbx+16],rdx
@@ -190,10 +208,23 @@
     mov [rsp],rax
     mov rdi,r13
     xor eax,eax
-    mov ecx,5
+    mov ecx,6
     rep stosq
+    cmp dword ptr [rbx+8],2
+    jne .Ldecode_no_checkpoint
+    cmp r12,96
+    jb .Ldecode_bad
+    sub qword ptr [rsp],40
+    mov rsi,[rsp]
+    mov rdi,[rsp+16]
+    test rdi,rdi
+    jz .Ldecode_bad
+    mov [r13+40],rdi
+    mov ecx,5
+    rep movsq
+.Ldecode_no_checkpoint:
     mov eax,[rbx+24]
-    cmp eax,2
+    cmp eax,3
     ja .Ldecode_bad
     mov [r13],eax
     lea r15,[rbx+40]
@@ -203,6 +234,11 @@
     jne .Ldecode_bad
     cmp eax,1
     je .Ldecode_system
+    cmp eax,3
+    jne .Ldecode_reset
+    cmp dword ptr [rbx+8],2
+    jne .Ldecode_bad
+.Ldecode_reset:
     cmp r15,[rsp]
     jne .Ldecode_bad
     jmp .Ldecode_good
@@ -455,6 +491,8 @@ pg_journal_open:
     jne .Lopen_reject
     cmp qword ptr [r13+PG_SC_BUSY],0
     jne .Lopen_reject
+    cmp qword ptr [r13+PG_SC_RUN],0
+    jne .Lopen_reject
     xor ecx,ecx
 .Lname_loop:
     movzx eax,byte ptr [r15+rcx]
@@ -512,35 +550,35 @@ pg_journal_open:
     test eax,eax
     jnz .Lopen_fail
     mov edi,[rbx+PG_J_FILE]
-    lea rsi,[rsp+17112]
+    lea rsi,[rsp+PG_JO_SIZE]
     call pg_journal_file_size@PLT
     test eax,eax
     jnz .Lopen_fail
-    cmp qword ptr [rsp+17112],PG_J_LIMIT
+    cmp qword ptr [rsp+PG_JO_SIZE],PG_J_LIMIT
     ja .Lopen_fail
     mov rdi,rbx
     add rdi,8
     xor eax,eax
     mov ecx,3
     rep stosq
-    lea rdi,[rsp+17080]
-    mov ecx,4
+    lea rdi,[rsp+PG_JO_CONTROL]
+    mov ecx,PG_SC_BYTES/8
     rep stosq
     lea rax,[rip+pg_session_volatile_commit]
-    mov [rsp+17088],rax
+    mov [rsp+PG_JO_CONTROL+8],rax
     xor ebp,ebp
 .Lrecover_loop:
-    mov rax,[rsp+17112]
+    mov rax,[rsp+PG_JO_SIZE]
     sub rax,rbp
     jz .Lrecover_synced
     cmp rax,40
     jb .Ltorn_tail
     xor r14d,r14d
-    mov qword ptr [rsp+17120],40
+    mov qword ptr [rsp+PG_JO_READ],40
 .Lread_frame:
     mov edi,[rbx+PG_J_FILE]
     lea rsi,[rsp+r14]
-    mov rdx,[rsp+17120]
+    mov rdx,[rsp+PG_JO_READ]
     sub rdx,r14
     lea rcx,[rbp+r14]
     call pread@PLT
@@ -553,27 +591,46 @@ pg_journal_open:
     jmp .Lopen_fail
 .Lread_progress:
     add r14,rax
-    cmp r14,[rsp+17120]
+    cmp r14,[rsp+PG_JO_READ]
     jb .Lread_frame
-    cmp qword ptr [rsp+17120],40
+    cmp qword ptr [rsp+PG_JO_READ],40
     jne .Lread_complete
     mov rax,PG_J_MAGIC
     cmp [rsp],rax
     jne .Lopen_fail
     cmp dword ptr [rsp+8],1
-    jne .Lopen_fail
+    jb .Lopen_fail
+    cmp dword ptr [rsp+8],2
+    ja .Lopen_fail
     mov rdi,rsp
     mov esi,32
     call .Lhash
     cmp [rsp+32],rax
     jne .Lopen_fail
-    cmp dword ptr [rsp+24],2
+    cmp dword ptr [rsp+24],3
     ja .Lopen_fail
     mov eax,[rsp+12]
     cmp eax,56
     jb .Lopen_fail
     cmp eax,PG_J_RECORD_MAX
     ja .Lopen_fail
+    mov edx,56
+    cmp dword ptr [rsp+8],2
+    je .Lheader_v2
+    cmp eax,PG_J_V1_RECORD_MAX
+    ja .Lopen_fail
+    cmp dword ptr [rsp+24],3
+    je .Lopen_fail
+    jmp .Lheader_size_known
+.Lheader_v2:
+    cmp dword ptr [rsp+24],1
+    je .Lopen_fail
+    cmp dword ptr [rsp+24],2
+    je .Lopen_fail
+    add edx,40
+.Lheader_size_known:
+    sub eax,edx
+    jc .Lopen_fail
     mov edx,[rsp+24]
     test edx,edx
     jz .Lheader_append
@@ -581,11 +638,11 @@ pg_journal_open:
     jne .Lopen_fail
     cmp edx,1
     je .Lheader_system
-    cmp eax,56
+    test eax,eax
     jne .Lopen_fail
     jmp .Lheader_valid
 .Lheader_system:
-    cmp eax,4151
+    cmp eax,4095
     ja .Lopen_fail
     jmp .Lheader_valid
 .Lheader_append:
@@ -595,37 +652,38 @@ pg_journal_open:
     cmp edx,2
     ja .Lopen_fail
     shl edx,4
-    add edx,56
     cmp eax,edx
     jb .Lopen_fail
 .Lheader_valid:
-    mov rdx,[rsp+17096]
+    mov eax,[rsp+12]
+    mov rdx,[rsp+PG_JO_CONTROL+PG_SC_SEQ]
     inc rdx
     cmp [rsp+16],rdx
     jne .Lopen_fail
-    mov rdx,[rsp+17112]
+    mov rdx,[rsp+PG_JO_SIZE]
     sub rdx,rbp
     cmp rax,rdx
     ja .Ltorn_tail
-    mov [rsp+17120],rax
+    mov [rsp+PG_JO_READ],rax
     jmp .Lread_frame
 .Lread_complete:
     mov rdi,rsp
-    mov rsi,[rsp+17120]
-    mov rdx,[rsp+17096]
+    mov rsi,[rsp+PG_JO_READ]
+    mov rdx,[rsp+PG_JO_CONTROL+PG_SC_SEQ]
     inc rdx
-    lea rcx,[rsp+17040]
-    lea r8,[rsp+8544]
+    lea rcx,[rsp+PG_JO_CHANGE]
+    lea r8,[rsp+PG_JO_MESSAGES]
+    lea r9,[rsp+PG_JO_CHECKPOINT]
     call .Ldecode
     test eax,eax
     jnz .Lopen_fail
     mov rdi,r12
-    lea rsi,[rsp+17080]
-    lea rdx,[rsp+17040]
+    lea rsi,[rsp+PG_JO_CONTROL]
+    lea rdx,[rsp+PG_JO_CHANGE]
     call pg_session_commit@PLT
     test eax,eax
     jnz .Lopen_fail
-    add rbp,[rsp+17120]
+    add rbp,[rsp+PG_JO_READ]
     jmp .Lrecover_loop
 .Ltorn_tail:
     mov edi,[rbx+PG_J_FILE]
@@ -642,10 +700,14 @@ pg_journal_open:
     call fsync@PLT
     test eax,eax
     jnz .Lopen_fail
-    mov rax,[rsp+17096]
+    mov rax,[rsp+PG_JO_CONTROL+PG_SC_SEQ]
     mov [rbx+PG_J_SEQUENCE],rax
     mov [rbx+PG_J_END],rbp
     mov [r13+PG_SC_SEQ],rax
+    lea rsi,[rsp+PG_JO_CONTROL+PG_SC_RUN]
+    lea rdi,[r13+PG_SC_RUN]
+    mov ecx,5
+    rep movsq
     mov [r13],rbx
     lea rax,[rip+pg_journal_commit]
     mov [r13+8],rax

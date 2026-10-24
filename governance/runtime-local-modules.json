@@ -35,7 +35,7 @@
       "dependencies": [
         "client.contract.v0"
       ],
-      "role": "bounded synchronous transaction/storage seam; detached batch, acknowledged sequence before adoption; explicit volatile mode has no disk durability",
+      "role": "bounded atomic message/checkpoint transaction; validate run references and counters, detach batch plus checkpoint, adopt only after Storage confirms",
       "exports": [
         "pg_session_commit",
         "pg_session_volatile_commit"
@@ -67,13 +67,15 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten SysV Loop; volatile default or explicitly bound synchronous Storage; settled transcript changes only after acknowledged commit; no task/restart recovery yet",
+      "role": "handwritten SysV single-run executor with durable model/tool/aborting/terminal checkpoints, explicit suspend/resume and bounded restart budget; current read-only tools only; no general task graph/requestId dedup or profile persistence",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
         "pg_agent_set_system",
         "pg_agent_reset_session",
-        "pg_agent_bind_storage"
+        "pg_agent_bind_storage",
+        "pg_agent_resume",
+        "pg_agent_suspend"
       ],
       "reference_basis": [
         {
@@ -82,9 +84,10 @@
           "paths": [
             "packages/durable/src/harness/generation.ts",
             "packages/durable/src/session/session.ts",
-            "packages/durable/src/harness/submissions.ts"
+            "packages/durable/src/harness/submissions.ts",
+            "packages/durable/src/harness/scheduler.ts"
           ],
-          "semantics": "primary target: separate live partial from immutable assistant entry; admission/transaction/recovery pending; current transient preview and discard-on-abort are explicit bounded differences",
+          "semantics": "primary target: commit checkpoint with input/assistant/tool result, persisted abort intent, explicit resume/close separation; native single-run subset, not full Durable scheduler",
           "tests_to_read": [
             "packages/durable/test/harness-partial-changes.test.ts",
             "packages/durable/test/session-deferred-commits.test.ts",
@@ -301,7 +304,7 @@
         "system libc",
         "POSIX pread/pwrite/fsync/ftruncate/flock/openat/fcntl"
       ],
-      "role": "replaceable append-only native framed journal; full batch fsync before confirmation, exclusive writer, torn-tail repair and validated recovery into a fresh Session; not wired to interactive composition until task recovery exists",
+      "role": "native framed journal v1/v2 reader with exclusive writer and validated recovery of messages plus single-run checkpoints; interactive composition still deferred until model/tools configuration binding and client resume integration",
       "exports": [
         "pg_journal_open",
         "pg_journal_close",
@@ -316,7 +319,7 @@
             "packages/durable/src/storage/jsonl/storage.ts",
             "packages/durable/test/jsonl-storage.test.ts"
           ],
-          "semantics": "prepare/encode before IO, poison uncertain writes, committed marker recovery, incomplete tail repair versus complete corruption refusal; custom binary format, synchronous fsync and no sidecars in this bounded subset",
+          "semantics": "prepare/encode before IO, poison uncertain writes, committed marker recovery, incomplete tail repair versus complete corruption refusal; custom binary format, synchronous fsync and no sidecars in this bounded subset; v2 checkpoint suffix preserves v1 reads and whole-batch atomicity",
           "tests_to_read": [
             "packages/durable/test/jsonl-storage.test.ts"
           ]

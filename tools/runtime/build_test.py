@@ -10,25 +10,33 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
-        if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal')):
+        if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal', '--live-resume')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; never put credentials in source or arguments')
             flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
             output = str(Path(directory) / 'live-mimo')
-            live_source = 'live_journal.c' if '--live-journal' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
+            live_source = 'live_journal.c' if '--live-journal' in sys.argv or '--live-resume' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/mimo'),
                             implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime' / live_source), *flags, '-o', output], check=True)
-            if '--live-journal' in sys.argv:
+            if '--live-journal' in sys.argv or '--live-resume' in sys.argv:
                 storage_dir = Path(directory) / 'storage'
                 storage_dir.mkdir()
-                for phase in ('store', 'recall'):
+                phases = ('interrupt', 'resume', 'recall') if '--live-resume' in sys.argv else ('store', 'recall')
+                for phase in phases:
                     subprocess.run([output, phase, str(storage_dir)], check=True, timeout=350)
             else:
                 subprocess.run([output], check=True, timeout=350)
             return 0
         for mode in ('-O0', '-O2'):
+            resume_test = str(Path(directory) / 'test-resume')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'),
+                            implementation('src/runtime/session'), implementation('src/runtime/journal'),
+                            implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime/test_agent_resume.c'),
+                            '-Wl,--wrap=pwrite', '-o', resume_test], check=True)
+            subprocess.run([resume_test], check=True, timeout=30)
             journal_test = str(Path(directory) / 'test-journal')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/journal'),
