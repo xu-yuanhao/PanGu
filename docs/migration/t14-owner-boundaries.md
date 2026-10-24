@@ -549,3 +549,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 复用原有manifest和MANY变体，经真实discovery与公开prepare：Pending实例2切到不可满足的子scope，验证3个激活/1个Pending/零binding，实例2全程Loading、无setup/cleanup、资源与在途始终零；MANY四实例解析4条边，对consumer2的两个真实provider绑定分别取得call票据，等待时先清理consumer3，保留consumer2及两个provider。释放第一票据后另一个票据仍活，两个provider仍Active，consumer2仍Quiescing；全部释放后才排空。
 
 量子1–4各Pending/MANY两种组合，共8场景/24阶段快照。每步stop在原生断言中核对work<=quantum，输出累计ticks/work/max_work；阶段快照不是每次推进的完整G04轨迹。普通/UBSan × 双内存实现 × debug/release共8构建运行一致，192个新快照及旧50/228事件轨迹全部复验。局部组合检查器7组变异/解析自测通过，未接入必需G04。完整异步分支交错/故障矩阵、G07/T14仍未完成，见 [Pending/MANY证据](t14-g04-pending-many-evidence.json)。
+
+## G04调用/两分支异步清理完成顺序（2026-10-24）
+
+沿用真实scoped planner/prepare结果，consumer1/provider0持有公开调用，consumer3先开始异步清理，provider2保活。以A=call_finish、B=consumer3 cleanup_finish(-33)、C=consumer1 cleanup_finish(-11)，覆盖ABC、ACB、BAC三种合法顺序，量子1–4共12场景/72阶段快照；C只在A之后且对应清理已begin时完成。每次stop报告work<=量子，所有完成后providers才随消费者依赖释放。伪造serial/重复完成拒绝；每个异步begin只一次，提供者同步清理时消费者已Disposed。
+
+8个普通/UBSan构建运行通过且输出一致，576个新阶段快照通过局部状态模型；首个cleanup错误按真实处理顺序保留，ABC/BAC为-33、ACB为-11。此前异步/分支/组合轨迹与全部计数套件均复验。新检查器7组变异/解析自测通过。此处是三个合法完成顺序的阶段快照，不是所有故障、线程竞争或完整逐tick状态空间，也未接入必需G04；完整T14/G04/G07仍未验收，见 [交错证据](t14-g04-interleave-evidence.json)。

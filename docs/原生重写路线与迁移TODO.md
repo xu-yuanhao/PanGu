@@ -373,6 +373,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] G04分支检查器失败关闭加固：非推进事件拒绝预算报告、等待/终态须有驱动事件、end身份和终态快照核对；12组检查器测试通过，保存的8份原生输出1824事件重放通过（没有新增原生构建/执行），见 [证据](migration/t14-g04-branch-checker-hardening.json)。
 - [x] G04 planner→公开prepare→分支停止组合：两子作用域四实例，真实解析2条依赖边及激活顺序映射；8个普通/UBSan构建运行通过，1824分支事件通过加固检查器，轨迹与固定图夹具逐字节一致。只覆盖固定scoped拓扑，Pending/MANY与完整异步矩阵仍待验证，见 [证据](migration/t14-g04-planner-branch-evidence.json)。
 - [x] G04 Pending/MANY阶段组合：真实discovery/prepare，Pending不激活，MANY双票据及逐个释放后的provider闭包保活；量子1–4共8场景/24阶段快照，8个普通/UBSan构建运行通过，局部检查器7组自测通过。不是逐tick完整轨迹，异步分支交错/故障矩阵仍待完成，见 [证据](migration/t14-g04-pending-many-evidence.json)。
+- [x] G04公开call与双分支异步清理完成交错：ABC/ACB/BAC三种合法顺序 × 量子1–4共12场景/72阶段快照，首个清理错误/提供者保活/一次性begin及重复完成拒绝；8个普通/UBSan构建运行、检查器7组自测通过。不是所有异步故障空间，见 [证据](migration/t14-g04-interleave-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

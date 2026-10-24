@@ -1,0 +1,223 @@
+{
+  "schema": "pangu.t14-g04-interleave-evidence.v1",
+  "status": "PASS_LOCAL_ASYNC_BRANCH_COMPLETION_SCHEDULES_NOT_FULL_G04",
+  "scope": "Phase snapshots of three legal call/disposer completion schedules on one planner-generated four-instance scoped topology; not complete per-tick/interleaving/fault or threaded verification.",
+  "candidate": {
+    "branch": "codex/t14-async-setup-core",
+    "commit": "36418a881a412b9e5512f9bed09cdea68b78fae9",
+    "parent": "aad835ea0983ea83fd638f6aa89b214ca700b8dc",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "61247c78a65a45f57d0f9ae8119aad71bfdf3ac3b60846a809c38b93115a4fca",
+    "remote_blob_readback": "PASS",
+    "candidate_tree_sha256": "a04d01cdc6a0e4ac24567b767122dcc240e24378b270e474ca4a18324c0aecef",
+    "policy_sha256": "99f86db0cf33fd1a1c5b6d6d5ba4a95a58b0d80fd47d782518198dfd40cb386c",
+    "controller_sha256": "ba368d434bc02c65a2461311397a392eb29a36d7aa387cd15143824253776131"
+  },
+  "fixed_inputs": {
+    "normal": {
+      "request_sha256": "7edf75b02ed85a4b6807e74187c731e2ecf7133c1287f825e8faa5c9867c6f5a",
+      "registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+      "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "native_admission_sha256": "627e1f470dc0b1acc4c0de160ae229c82d6f8bc3ce46e972b71544431e793932",
+      "executions_sha256": "cfdf91dd8658d5084f4582eaa7f314636fc39f61c9524eefa03b85888457ac30"
+    },
+    "ubsan": {
+      "request_sha256": "134fe722ac5754e448c97052b818f34461b9116123afef7d6e0fb6868f2cbb30",
+      "registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+      "image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+      "native_admission_sha256": "b9b4feb6be897e72fa4cd287bcae930dd930b01c6d1f78f05664962a624a0c1c",
+      "executions_sha256": "43c9cacd709688d733057b903f0705115d558313edd7cbbaf82557ca8e101118"
+    }
+  },
+  "schedules": {
+    "A": "public call_finish on consumer1/provider0",
+    "B": "async cleanup_finish consumer3 status -33",
+    "C": "async cleanup_finish consumer1 status -11, only after A and cleanup begin",
+    "orders": [
+      "ABC",
+      "ACB",
+      "BAC"
+    ],
+    "first_cleanup_errors": [
+      -33,
+      -11,
+      -33
+    ]
+  },
+  "coverage": {
+    "cases_per_run": 12,
+    "snapshots_per_run": 72,
+    "quantum_values": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "native_builds": 8,
+    "native_executions": 8,
+    "snapshots_verified": 576,
+    "prior_trace_suites": [
+      "async50",
+      "branch228",
+      "Pending/MANY24"
+    ],
+    "all_stdout_identical": true,
+    "all_stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+    "per_stop_work_limit_asserted_in_C": true,
+    "forged_and_duplicate_completions_rejected": true,
+    "each_async_begin_once": true
+  },
+  "runs": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "7dd5dd9226937061577cc7d8c405849c538440b26c6499cda99eca6fb431a2f6",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "7b701fb1b664729eaec91563cc0a985e8574586d95b85b1e1af9edf8362a562f",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "f393bc6b866acfc3cc456a54f28d88bdb1d4979edee5721f7b347dfda9cc9f12",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "4066b0e9bf4e41ae1d75554b9002128a4b0fdcc59ea0086a055acb28c52643fe",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "6348be0647dd4edf72245727d3d982345672633cd3a839e5f248d65ccd138a39",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "aec984ef83bba1228edf4487d352f1839f55217f29ced26fb53b9f96ee14152a",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "43840999ccf346765c440cfd11cd06cca0d6dc4681ef9d7fa3237eb85515ef32",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "28e7a2a516d258b159f53659b36a55c205b053d664dcc3a8d40c76d341bcc8bb",
+      "trace_sha256": "53b89a7b81f7dab962a29644ab47e0c50bcf185564fc48753a3582d5e4906e44",
+      "result": {
+        "status": "PASS",
+        "cases": 12,
+        "snapshots": 72,
+        "legal_completion_orders": 3
+      }
+    }
+  ],
+  "checker": {
+    "path": "tools/migration/g04_interleave.py",
+    "sha256": "c76396692d0da572d0f5a1d8ce26a9596175fa85d8c043d58c14b03c9f994637",
+    "external_bytes_match": true,
+    "self_test_path": "tools/migration/test_g04_interleave.py",
+    "self_test_groups": 7,
+    "fixture": "docs/migration/t14-g04-interleave-fixture.json",
+    "mandatory_G04_integration": false
+  },
+  "environment": {
+    "execution": "CALLER_PROVIDED_NOT_ATTESTED; frozen toolchain, bwrap network-unshared read-only inputs",
+    "controller_status": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "release": "BLOCKED",
+    "full_T14_G04_G07": "NOT_COMPLETED",
+    "UBSan": "does not instrument assembly instructions"
+  },
+  "development_failures": [],
+  "evidence_timing": "Native controller/candidate frozen before new checker registration and evidence metadata; checker used externally byte-equal to published local checker.",
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve fixed local completion-schedule tests, phase oracle and evidence only; no production, ABI, budget or original gate relaxation.",
+    "validation": [
+      "Eight builds and isolated executions PASS;576 snapshots validated.",
+      "All stdout byte-identical; source blob read back from GitHub matches.",
+      "Seven new checker self-test groups PASS.",
+      "G00 PASS; production admission BLOCKED; test_check.py 13 tests PASS; git diff --check PASS."
+    ],
+    "risks": [
+      "Same-Agent model/review is not independent attestation.",
+      "Single topology and legal schedule set, not all faults/interleavings or thread races.",
+      "Phase snapshots and C budget assertions do not expose every intermediate state.",
+      "Local oracle not mandatory G04 integration; full T14/G07/remote trust incomplete."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "06fd2a92929d7e2e67838d06723f2c2840181a846dc1a9d34826df4f4f9f0bb0",
+      "docs/migration/t14-focused-inventory.json": "b18ed029eae2742b4daa054f870d78c6668541315ca5ae9aa1999d3559692d5f",
+      "docs/migration/t14-owner-boundaries.md": "5e4f19a75882e1e2f785964b011e67fb08f8029fb5f70d26946d9ad304b682c5",
+      "docs/原生重写路线与迁移TODO.md": "25570a56f2cd37d623e8631b778d8b4945e36af8b4305f257408580894ab8e96",
+      "tools/migration/g04_interleave.py": "c76396692d0da572d0f5a1d8ce26a9596175fa85d8c043d58c14b03c9f994637",
+      "tools/migration/test_g04_interleave.py": "719510455f9a4a08dbfb4a4d84473f750ad620db0abac9dfb806b509ca6b352a",
+      "docs/migration/t14-g04-interleave-fixture.json": "d18bccabecbcca8ad72c54be85e505145bf345d079bdea43c1e3da0aaefcaa0d"
+    },
+    "control_scope_sha256": "3596c2dcdd1acaf6ba099dd2b4ec1edbfd1c074511dac37d61c3f0d0057e0aab"
+  }
+}

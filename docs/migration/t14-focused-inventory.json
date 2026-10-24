@@ -347,5 +347,6 @@
   "g04_branch_trace_evidence": "docs/migration/t14-g04-branch-trace-evidence.json",
   "g04_branch_checker_hardening": "docs/migration/t14-g04-branch-checker-hardening.json",
   "g04_planner_branch_evidence": "docs/migration/t14-g04-planner-branch-evidence.json",
-  "g04_pending_many_evidence": "docs/migration/t14-g04-pending-many-evidence.json"
+  "g04_pending_many_evidence": "docs/migration/t14-g04-pending-many-evidence.json",
+  "g04_interleave_evidence": "docs/migration/t14-g04-interleave-evidence.json"
 }

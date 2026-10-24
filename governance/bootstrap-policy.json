@@ -254,6 +254,10 @@
     "docs/migration/t14-g04-composition-fixture.json": "control",
     "tools/migration/g04_composition.py": "gate",
     "tools/migration/test_g04_composition.py": "gate-test",
-    "docs/migration/t14-g04-pending-many-evidence.json": "control"
+    "docs/migration/t14-g04-pending-many-evidence.json": "control",
+    "docs/migration/t14-g04-interleave-fixture.json": "control",
+    "tools/migration/g04_interleave.py": "gate",
+    "tools/migration/test_g04_interleave.py": "gate-test",
+    "docs/migration/t14-g04-interleave-evidence.json": "control"
   }
 }
