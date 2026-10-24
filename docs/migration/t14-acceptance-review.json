@@ -1,0 +1,104 @@
+{
+  "schema": "pangu.t14-acceptance-review.v1",
+  "status": "NOT_ACCEPTED; CURRENT_EVIDENCE_AND_GAPS_RECONCILED",
+  "requirements": [
+    {
+      "requirement": "T14输入：T13与Harness生命周期修正语义",
+      "status": "PARTIAL_LOCAL_COMPOSITIONS",
+      "evidence": [
+        "t13-corpus-progress.md",
+        "t14-g04-planner-branch-evidence.json"
+      ],
+      "remaining": "T13 full stage/config scope is not accepted; local planner inputs are fixed only."
+    },
+    {
+      "requirement": "Loading/Active/Quiescing/Disposed与失败回滚",
+      "status": "LOCAL_TEST_EVIDENCE_PRESENT",
+      "evidence": [
+        "t14-adapter-setup-native-evidence.json",
+        "t14-g04-async-trace-evidence.json"
+      ],
+      "limit": "Not full product admission."
+    },
+    {
+      "requirement": "disposer、重入停止、取消后迟到完成、消费者先于提供者、重复dispose",
+      "status": "LOCAL_TEST_EVIDENCE_PRESENT",
+      "evidence": [
+        "t14-async-disposer-native-evidence.json",
+        "t14-graph-native-evidence.json",
+        "t14-g04-interleave-evidence.json"
+      ]
+    },
+    {
+      "requirement": "G04状态轨迹/故障注入套件",
+      "status": "PARTIAL_FIXED_SUITE_BUNDLE",
+      "evidence": [
+        "t14-g04-bundle-evidence.json"
+      ],
+      "remaining": "Fixed four-suite local bundle, not an approved complete stage denominator or required protected execution."
+    },
+    {
+      "requirement": "在途可追踪、错误不饿死其余清理、停后拒绝注册",
+      "status": "LOCAL_TEST_EVIDENCE_PRESENT",
+      "evidence": [
+        "t14-call-lifecycle-native-evidence.json",
+        "t14-g04-branch-trace-evidence.json",
+        "t14-g04-pending-many-evidence.json"
+      ],
+      "limit": "Native caller may bypass borrowed-frame contracts; not an OS sandbox."
+    },
+    {
+      "requirement": "当前focused与更早语料迁移",
+      "status": "FOCUSED_ROWS_SCOPED_COMPLETE_EARLIER_DISCOVERY_PENDING",
+      "evidence": [
+        "t14-focused-inventory.json",
+        "t14-earlier-owner-content-audit.json",
+        "t14-earlier-runner-audit.json"
+      ],
+      "remaining": "19 entries have scoped evidence; removed private APIs are explicit gaps; historical discovery completeness not proved."
+    },
+    {
+      "requirement": "对应ABI路径与sanitizer",
+      "status": "SDK_GUARDS_PLUS_ZERO_START_SUPPLEMENT",
+      "evidence": [
+        "t14-abi-guard-evidence.json",
+        "t14-sdk1-native-evidence.json",
+        "t14-ubsan-native-evidence.json",
+        "t14-start-abi-evidence.json"
+      ],
+      "remaining": "Full T14 public-path guard denominator and final unified acceptance still need a coverage decision; do not infer all paths from slot presence."
+    },
+    {
+      "requirement": "G07存储/资源验证",
+      "status": "GUARD_STRESS_AND_POSITIVE_CONTROLS_PRESENT_NOT_FULL_ACCEPTANCE",
+      "evidence": [
+        "t14-owner-guard-evidence.json",
+        "t14-guard-fault-evidence.json"
+      ],
+      "remaining": "Guard/redzone/epoch pressure and UBSan are scoped; no unrestricted UAF/leak/race proof."
+    },
+    {
+      "requirement": "G10资源预算",
+      "status": "MEASURED_UNBASELINED",
+      "evidence": [
+        "t14-resource-observations.json"
+      ],
+      "remaining": "Actual test metrics are not approved product limits or Agent startup/Idle baselines."
+    }
+  ],
+  "not_a_blocker_anymore": [
+    "Ten NOT_RUN_CURRENT_ABI focused entries: current count is zero.",
+    "Fresh left/right fault controls for the reused guard provider: now executed."
+  ],
+  "next_required_decisions": [
+    "Define a finite versioned local T14 acceptance denominator from declared single-thread/static-host contract and map every required path to current evidence.",
+    "Resolve historical private API exclusions explicitly rather than silently counting them as passes.",
+    "Bind required acceptance evidence into one fixed candidate/controller run; retain production/remote trust separation."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Correct stale status and identify real remaining acceptance requirements; no completion approval."
+  }
+}

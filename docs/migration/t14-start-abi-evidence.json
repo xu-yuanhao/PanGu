@@ -1,0 +1,154 @@
+{
+  "schema": "pangu.t14-start-zero-abi-evidence.v1",
+  "status": "PASS_LOCAL_START_ZERO_RETURN_ABI_SUPPLEMENT",
+  "scope": "Closes observed SDK1/SDK2 start slot zero-return guard coverage hole only; not full G03/T14 acceptance.",
+  "source_branch": "codex/t14-async-setup-core",
+  "source_commit": "875b60dea6273d98f9eb851747593bf2e454623d",
+  "source_pins": {
+    "src/async-setup-core/main.c": "02069d210bd456e3641b32b1bbe6fc3aa916692cbe6c4ac23b3c87bba0f6febc",
+    "src/async-setup-core/start-abi.S": "75665698b6c61f0248f299ff67a5ecbfecd6d0bb388f2fab2bef8f87da670f14"
+  },
+  "remote_blob_readback": "PASS",
+  "reused_guard_prefix_sha256": "a6ffb820f0ebaa94b4bc45f015167088fdc35b7fdfe087eff2bd266900865286",
+  "reused_prefix_exact": true,
+  "fixed_inputs": {
+    "normal": {
+      "request_sha256": "8dd47a70a565de14405cadd1cff255c5f74236aa8fb13887580a7180baac84f5",
+      "registry_sha256": "dac89a50c82d5c9e63e53123e9511187d71c3e4d8c3f0346fa5e049aef1683b0",
+      "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "admission_sha256": "feae16692c3c3262e79c5447a62bd418986f20e9e4b9191b80e8ed101716a1b5",
+      "executions_sha256": "2cdb1ee3f55549983bc59bf64788eaa811536c8f237c5acc224edbb8421de71c",
+      "candidate_tree_sha256": "0bfe82801a14af4deae6487b2849261108228a0e29a1cf00f22cf4c77c2e7a37"
+    },
+    "ubsan": {
+      "request_sha256": "6f5fd8a02e872a2b88c810a2a8e9c9c83b879c71489c191f0e118c3d25f0085e",
+      "registry_sha256": "c83e17726f04f8ce27d4efbeb71611e099f910fb0bfdb781b1f301ff9d6d8824",
+      "image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+      "admission_sha256": "88eca2da8bdd019b3e9cdc22e2f93da4e69e95bc9c5a6a03015e846493a693f9",
+      "executions_sha256": "7cb382d7f65508d5c630632c2a27d7af9f5827b8ce92eae6418663e11a36518a",
+      "candidate_tree_sha256": "0bfe82801a14af4deae6487b2849261108228a0e29a1cf00f22cf4c77c2e7a37"
+    }
+  },
+  "coverage": {
+    "native_builds": 8,
+    "native_executions": 8,
+    "guarded_start_calls_per_run": 6,
+    "zero_start_results_per_run": 2,
+    "corruption_controls_per_run": 3,
+    "negative_masks": [
+      1,
+      64,
+      256
+    ],
+    "total_guarded_calls": 48,
+    "total_zero_returns": 16,
+    "total_corruption_controls": 24,
+    "paths": [
+      "empty success",
+      "sync success",
+      "failed load/cleanup",
+      "async waiting",
+      "zero fuel",
+      "invalid initial owner refusal"
+    ],
+    "all_stdout_identical": true
+  },
+  "runs": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "b5537e958a4e696029a8e7af34d20581b20409dd4ba163ed361e8669f6474dab",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "9b4b3f020f6a33cbac9c1e00dfdb0e704bf30a708692ca79f3c52d832a9dbc31",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "7842c48f616a5374b38433a5fcf35b0768bd154dbd8f527f4d6c6468887fe7f0",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "e42f0b7b65600762111f209f4084a4aa044ba99e20c735f0869a832c80de31eb",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "77a5e5f4b8faccc51368311f8a8294da44da54e9080f5e88bcdb4fc75ee00da8",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "74cf1bc732aa6fbdf3295ff5783f2606b23af8ef1ede9d50671b7f9a1e43823c",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "82142a433f5cbc1c781e6b487d425e84a3e532d72c6d17fec8e1aea95d5ec3d7",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "a20d3bb56ea50eaa243781e001022dd4ad9efc2f4e53db4231bee9df7c4f6f6f",
+      "stdout_sha256": "9c0ad98c2f044b9a761e642421a2fd4047e9f87353e954b765f00b9c9ed58d78",
+      "result": "PASS_6_CALLS_2_ZERO_3_CONTROLS"
+    }
+  ],
+  "development_failures": [
+    "Initial execute.py used r02 output path but this build was r01; failed opening receipt before native execution. Final execute-final.py corrects only artifact path."
+  ],
+  "execution_wrapper_sha256": "25117aaaa077adc0162e2c34b6474cb6ff4ed0a32ccc508cabe969c814e73ae5",
+  "validation": [
+    "8 frozen builds/isolated runs PASS; exact 6/2/3 start summary per run.",
+    "Three deliberate ABI corruptions detected on every run.",
+    "Guard pressure and all prior trace/count suites also executed.",
+    "Remote source hashes match; G00 PASS, production admission BLOCKED; git diff --check PASS."
+  ],
+  "limitations": [
+    "Six selected start paths, not all possible argument combinations or all ABI surfaces.",
+    "Same-Agent test oracle/review, not independent attestation.",
+    "UBSan does not instrument assembly; production release remains blocked."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve test-only guard assembly/export/registry extension, fixed start supplement, and stale-status corrections. No product ABI/gate/budget weakening.",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "e13587833a9f137257b043b7e68912e1cad32df6d75776afb8a88e76a1a9265e",
+      "docs/migration/t14-focused-inventory.json": "d80292c7c5ca56490f2f0dd749ff0b222351bf80ccad391a18c97e96c1f3f87d",
+      "docs/migration/gap-ledger.json": "7f61172ca2511539dd1ed69eb2c97058ab841344edf77e4fdb70a455ffb7f1b2",
+      "docs/migration/t14-owner-boundaries.md": "c08736915e5f72e07bcc55f81666d7cac06e74b92c490a149dea8b4a6c6a16cd",
+      "docs/原生重写路线与迁移TODO.md": "fc8a2bc73629ac623f2c80d0c094fe5938cd2c8c56eeb91ee3ed4d256c4435fe",
+      "docs/migration/t14-start-abi-normal-candidate.json": "dac89a50c82d5c9e63e53123e9511187d71c3e4d8c3f0346fa5e049aef1683b0",
+      "docs/migration/t14-start-abi-ubsan-candidate.json": "c83e17726f04f8ce27d4efbeb71611e099f910fb0bfdb781b1f301ff9d6d8824",
+      "docs/migration/t14-acceptance-review.json": "95a577ae0ee21bfcb3989e7320ab067c8d896d248dc6c030ff7dac1cd4193b5d"
+    },
+    "control_scope_sha256": "b7a669319a71999918201314e3cfd1b5c3ee1eae622d65bb2c05f5a7693e4d55"
+  }
+}

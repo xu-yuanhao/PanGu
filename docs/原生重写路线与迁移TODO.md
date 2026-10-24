@@ -322,7 +322,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] SDK2 冻结静态补充：只读原场景在 Clang→GAS→ld 无 libc 链路下 O0/O2/Oz 各 1196 场景、3242 调用通过；静态 ELF/无未定义符号与断言失败负例通过。仅测试适配器，未登记原生矩阵，见 T14 草稿。
 - [x] 明确 compiler.memory v1 构建/链接替换边界：GAS 与测试 C 提供者通过原 native_build debug/release 共四组、页边界/重叠/寄存器/DF、8 项依赖拒绝与四组产物复核；原 SDK2 冻结对象不变、两提供者 O0/Oz 四次完整场景通过。仅候选，详见 t14-compiler-memory-candidate.json。
 - [x] SDK2原生模块/组合登记：compiler.memory、宿主、调用管理器、独立C/C++插件进入45模块/22组合（保留T13原20组合），44冻结构建、60隔离执行通过；新增T14实现和stdio/PAL仍为test范围，不构成生产准入。
-- [ ] 完成盘点中10项当前ABI未运行的私有helper专项及更早owner语料审计、对应ABI/sanitizer覆盖、完整G04事件轨迹/故障矩阵与G07资源测量；已通过的SDK1/SDK2守卫不能代替这些剩余验收。
+- [ ] 完成T14整体验收：最新19项focused入口已有范围内证据；仍需早期语料发现完整性/私有API差异结论、完整G04与对应ABI/G07验收分母及统一受控组合。局部证据不能代替阶段验收，见 [当前审核](migration/t14-acceptance-review.json)。
 
 - [x] SDK2本地端到端：版本化方法显式父参数，C/C++插件与双runtime完成真实调用；O0/O2各1196场景/3242方法调用，本地SDK2准入、8项失败关闭自测、18份回归及宿主UBSan通过。GAP-010仅部分解决，冻结原生/G04/G07待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
@@ -330,7 +330,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 
 - [x] 局部插件SDK基础候选：独立固定消费头、不透明租约/完成、自动实例作用域与声明清理；C/C++插件O0/O2各824场景、1794次服务调用、预算/别名及补充宿主UBSan通过。GAP-010嵌套setup/cleanup准入实际BLOCKED，完整SDK与原生准入未完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
-- [ ] 完成GAP-010剩余验收：固定模块/组合和冻结clang/GAS集成已通过；SDK1有效路径也已通过；仍需10项旧helper专项/更早owner审计、对应ABI/sanitizer和完整G04/G07，之后才判断关闭；不能只按inflight计数放宽停止门闩。
+- [ ] 完成GAP-010剩余验收：固定模块/组合和冻结clang/GAS集成已通过；SDK1有效路径也已通过；最新focused入口迁移已完成；仍需早期发现完整性/私有API差异、对应ABI与完整G04/G07验收，之后才判断关闭；不能只按inflight计数放宽停止门闩。
 
 - [x] 局部宿主服务跨语言消费：独立固定契约下C/汇编/C++消费两种C提供者及C++提供者，O0/O2各1188场景/34128调用，9组合各3792次；callee-saved、错误边界、补充宿主UBSan与源归档恢复通过。完整SDK与冻结原生准入待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
@@ -378,6 +378,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] T14测试产物资源观察：8产物×3重复共24次隔离执行，bundle8976记录通过；ELF/生命周期对象节大小与8项readelf交叉核对、直接/proc RSS/HWM采样。仅MEASURED_UNBASELINED，无预算批准或G07/G10通过，见 [观察](migration/t14-resource-observations.json)。
 - [x] T14 guard存储压力：runtime/owner/资源池/operation池页首与页尾，256场景/2048哨兵检查，成功/双错误/取消与128 epoch重用、8映射释放；8普通/UBSan构建及最终8次controller-bundle隔离执行通过。新故障正对照与完整G07仍待完成，见 [证据](migration/t14-owner-guard-evidence.json)。
 - [x] T14 guard新故障正对照：同一提供者，成功映射/可访问端点写入/就绪标记后读取左右保护页；普通/UBSan × debug/release × 两侧共8构建执行均为预期SIGSEGV139。补齐局部保护页生效证据，不关闭完整G07，见 [证据](migration/t14-guard-fault-evidence.json)。
+- [x] 同步成功start ABI补测：每次6个受守卫调用（2个零返回），RBX/DF/栈哨兵3个真实破坏正对照；8普通/UBSan构建运行通过，修复既有SDK守卫没有同步start零返回覆盖的缺口，见 [证据](migration/t14-start-abi-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

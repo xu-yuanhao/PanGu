@@ -354,5 +354,7 @@
   "resource_budget_status": "UNBASELINED",
   "guarded_owner_pressure_evidence": "docs/migration/t14-owner-guard-evidence.json",
   "full_G07": "NOT_COMPLETED",
-  "guard_fault_positive_evidence": "docs/migration/t14-guard-fault-evidence.json"
+  "guard_fault_positive_evidence": "docs/migration/t14-guard-fault-evidence.json",
+  "successful_start_abi_evidence": "docs/migration/t14-start-abi-evidence.json",
+  "acceptance_review": "docs/migration/t14-acceptance-review.json"
 }

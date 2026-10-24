@@ -191,9 +191,14 @@
         "t14-focused-native-evidence.json",
         "t14-focused-inventory.json",
         "t14-coordinator-trace-contract.json",
-        "t14-coordinator-trace-evidence.json"
+        "t14-coordinator-trace-evidence.json",
+        "t14-acceptance-review.json",
+        "t14-start-abi-evidence.json",
+        "t14-g04-bundle-evidence.json",
+        "t14-owner-guard-evidence.json",
+        "t14-guard-fault-evidence.json"
       ],
-      "remaining": "协调器七组已通过公开ABI适配与固定轨迹守卫：8普通/UBSan构建和执行、56组次/1096事件、223隔离门禁自测；真实受管调用票据保留双方owner，私有导出未恢复。最新快照仍有10项入口待迁移、更早owner语料待审计；异步/分支/预算等完整G04轨迹、其余ABI守卫和G07仍缺，不关闭GAP或T14。"
+      "remaining": "最新19项focused入口均已有各自范围内证据，无NOT_RUN_CURRENT_ABI入口；30份早期测试内容和44份运行器已在固定发现范围内审计，但发现穷尽性与删除的私有API差异未整体关闭。G04四局部套件、Pending/MANY/异步分支交错、guard压力/故障正对照及同步start ABI补测已有证据；仍需明确完整G04/对应ABI和G07阶段验收分母及统一受控组合，不能据局部通过关闭GAP或T14。详见t14-acceptance-review.json。"
     }
   ]
 }
