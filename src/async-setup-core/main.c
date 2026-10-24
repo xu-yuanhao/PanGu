@@ -1499,6 +1499,29 @@ static void interleave_public_trace(void){static const int schedule[3][3]={{0,1,
  }
 }
 
+
+/* Static test composition: provider definitions already have hidden visibility. */
+pangu_i32 pangu_memory_map(void *,pangu_u64,pangu_mapping *) __attribute__((visibility("hidden")));
+pangu_i32 pangu_memory_unmap(void *,pangu_mapping *) __attribute__((visibility("hidden")));
+static pangu_lifecycle_runtime *guard_runtime;static pangu_owner *guard_owner;static pangu_lifecycle_setup_ticket guard_ticket;static int guard_mode,guard_releases,guard_cases,guard_checks,guard_maps,guard_unmaps;
+static pangu_i32 guard_release(void *context){(void)context;guard_releases++;return guard_mode==1?-9:0;}
+static pangu_i32 guard_setup(pangu_owner *owner,void *context){(void)context;assert(owner==guard_owner&&owner->inflight==1);assert(!api->register_resource(guard_runtime,0,guard_release,0));if(guard_mode==2){assert(!api->setup_defer(guard_runtime,&guard_ticket));return 5;}return guard_mode==1?-7:0;}
+static void guard_canary(pangu_mapping *map,void *payload,pangu_u64 size){unsigned char *base=map->address;for(pangu_u64 i=0;i<4096;i++)if(base+i<(unsigned char *)payload||base+i>=(unsigned char *)payload+size)assert(base[i]==0xa5);guard_checks++;}
+static void guarded_owner_pressure(void){const pangu_memory_api memory={1,40,0,pangu_memory_map,pangu_memory_unmap,0};
+ for(int end=0;end<2;end++){pangu_mapping maps[4]={{0}};pangu_u64 sizes[4]={sizeof(pangu_lifecycle_runtime),sizeof(pangu_owner),2*sizeof(pangu_owned_resource),3*sizeof(pangu_owned_operation)};void *payload[4];
+  for(int i=0;i<4;i++){assert(!memory.map(memory.context,4096,&maps[i]));guard_maps++;memset(maps[i].address,0xa5,4096);payload[i]=(unsigned char *)maps[i].address+(end?4096-sizes[i]:0);}
+  guard_runtime=payload[0];guard_owner=payload[1];memset(guard_owner,0,sizeof *guard_owner);
+  pangu_lifecycle_item item={guard_owner,guard_setup,0};pangu_lifecycle_span protected[32];
+  for(pangu_u64 epoch=1;epoch<=128;epoch++){guard_mode=(int)(epoch%3);guard_releases=0;assert(!api->owner_init(guard_owner,payload[2],2,payload[3],3,epoch,FUEL));memset(guard_runtime,0,sizeof *guard_runtime);guard_runtime->items=&item;guard_runtime->count=1;assert(!api->bind_geometry(guard_runtime,protected,32,FUEL));for(int i=0;i<4;i++)guard_canary(&maps[i],payload[i],sizes[i]);
+   pangu_lifecycle_report report;int rc=api->start(guard_runtime,FUEL,&report);assert(rc==(guard_mode==1?-7:guard_mode==2?5:0));
+   if(guard_mode==2){pangu_lifecycle_setup_ticket old=guard_ticket;assert(api->stop(guard_runtime,FUEL,&report)==5&&!guard_releases);assert(!api->setup_finish(guard_runtime,&guard_ticket,0));assert(api->setup_finish(guard_runtime,&old,0)==10);assert(api->pump(guard_runtime,FUEL,&report)==6);}
+   assert(api->stop(guard_runtime,FUEL,&report)==(guard_mode==1?-9:0));assert(guard_releases==1&&guard_owner->state==PANGU_OWNER_DISPOSED&&!guard_owner->inflight&&!guard_owner->count&&!guard_runtime->started);for(int i=0;i<4;i++)guard_canary(&maps[i],payload[i],sizes[i]);guard_cases++;
+  }
+  for(int i=0;i<4;i++){assert(!memory.unmap(memory.context,&maps[i]));assert(!maps[i].address&&!maps[i].length);guard_unmaps++;}
+ }
+ assert(guard_cases==256&&guard_checks==2048&&guard_maps==8&&guard_unmaps==8);printf("guard_owner_cases=%d guard_canary_checks=%d guard_maps=%d guard_unmaps=%d\n",guard_cases,guard_checks,guard_maps,guard_unmaps);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -1527,6 +1550,6 @@ int main(void) {
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
  async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();early_owner_public_core();
  printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d earlier_owner_groups=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections,early_groups);
- g04_async_trace();branch_public_trace();composition_public_trace();interleave_public_trace();
+ g04_async_trace();branch_public_trace();composition_public_trace();interleave_public_trace();guarded_owner_pressure();
  return 0;
 }
