@@ -1,0 +1,822 @@
+{
+  "schema": "pangu.t14-earlier-owner-content-audit.v1",
+  "status": "DISCOVERED_30_CONTENTS_REVIEWED_WITH_EXPLICIT_GAPS",
+  "scope": "Static content/provenance audit of the fixed discovery list only. Does not establish exhaustive historical artifact discovery, execution of old variants, full T14, G04/G07, or production admission.",
+  "discovery_sha256": "c6838dd994851c39f4cb0ea98a6513d7e4f5e9c6f17259337070202ae92604d2",
+  "records": [
+    {
+      "id": "T14-E01",
+      "source_sha256": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/adapter-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F01",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E02",
+      "source_sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/async-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F02",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-async-disposer-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E03",
+      "source_sha256": "2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/budget-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F03",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-budget-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E04",
+      "source_sha256": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/call-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F05",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-call-lifecycle-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E05",
+      "source_sha256": "f2cb2a99c75b12b6ba6c3f281d952c4da60394f65c1a64f60afcf61dbc3cf955",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/geometry-test.c",
+      "identical_paths_count": 2,
+      "classification": "GEOMETRY_MATRIX_EXTENDED",
+      "focused_id": "T14-F08",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/geometry-test.c",
+      "comparison_source_sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
+      "existing_evidence": "docs/migration/t14-geometry-native-evidence.json",
+      "review": "Later test retains existing geometry calls and adds start/pump/disposer/budget-call output overlaps; F08 keeps private-owner gaps.",
+      "diff_sha256": "49d5dd577e60189d1bac14454dbf701cdb8b2de9c5d30536bc6e64c37e4e1c46",
+      "complete_text_diff": "--- f2cb2a99c75b12b6ba6c3f281d952c4da60394f65c1a64f60afcf61dbc3cf955\n\n+++ 95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027\n\n@@ -18,5 +18,5 @@\n\n   #define GEO_REFUSE(expr) do {assert((expr)==1);refused++;assert(unchanged_snapshot(&before));} while(0)\n   GEO_REFUSE(runtime_setup_scope(r,(runtime_setup_ticket *)bad));GEO_REFUSE(runtime_setup_defer(r,(runtime_setup_ticket *)bad));GEO_REFUSE(runtime_setup_finish(r,(runtime_setup_ticket *)bad,0));\n-  GEO_REFUSE(runtime_stop_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_enter(r,0,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_finish(r,(runtime_call_ticket *)bad));\n+  GEO_REFUSE(runtime_stop_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_start_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_pump_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_disposer_finish(r,0,(pangu_cleanup_ticket *)bad,0));GEO_REFUSE(runtime_call_enter(r,0,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_enter_budget(r,0,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_budget(r,0,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_enter_setup_budget(r,0,scope,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_setup_budget(r,0,scope,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_enter_cleanup_budget(r,0,(pangu_cleanup_ticket *)scope,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_cleanup_budget(r,0,(pangu_cleanup_ticket *)scope,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_finish(r,(runtime_call_ticket *)bad));\n   GEO_REFUSE(runtime_call_enter_setup(r,0,scope,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_enter_setup(r,0,(runtime_setup_ticket *)bad,&call));\n   GEO_REFUSE(runtime_call_enter_cleanup(r,0,(pangu_cleanup_ticket *)bad,&call));\n"
+    },
+    {
+      "id": "T14-E06",
+      "source_sha256": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/graph-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F09",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-graph-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E07",
+      "source_sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/setup-test.c",
+      "identical_paths_count": 23,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F16",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E08",
+      "source_sha256": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/test.c",
+      "identical_paths_count": 30,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F18",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-coordinator-trace-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E09",
+      "source_sha256": "d08c01d9bce4b8b0c06f9cc2e42c372a348402529d62e2fe68d8ecb745fe6463",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/transaction-test.c",
+      "identical_paths_count": 22,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F19",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-transaction-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E10",
+      "source_sha256": "f56c8c1d78ae863ea1d7dfbc48981bba00629403d79e267aeb79ffc2033a066d",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-cleanup-wip-zn5snc8s/adapter-test.c",
+      "identical_paths_count": 6,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F01",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/adapter-test.c",
+      "comparison_source_sha256": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
+      "existing_evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "review": "Adds start_with_geometry helper and replaces runtime_start invocation; surrounding assertions unchanged.",
+      "diff_sha256": "397425c0c21b1c432114a1751c66c9a5e91f128704a767aa507a3fcc6ef4e8b7",
+      "complete_text_diff": "--- f56c8c1d78ae863ea1d7dfbc48981bba00629403d79e267aeb79ffc2033a066d\n\n+++ 2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599\n\n@@ -6,4 +6,9 @@\n\n static pangu_owner life[9];static pangu_owned_resource rs[9][2];static pangu_owned_operation os[9][3];\n static runtime_item source_items[9],activation[9];static runtime live;\n+static runtime_span protected_storage[64];\n+static pangu_i32 start_with_geometry(runtime *r) {\n+ if(!r->protected_spans) {pangu_i32 rc=runtime_bind_geometry(r,protected_storage,64,100000);if(rc) return rc;}\n+ return runtime_start(r);\n+}\n static const pangu_prepare_result *current;static const pangu_graph_output *current_output;\n static int events[32],ne,fail_index,cancel_index,hold_index;static pangu_operation_ticket held;\n@@ -37,5 +42,5 @@\n\n  int target=fault<0 ? -1 : (int)o->order[fault];\n  if(mode==1) fail_index=target;if(mode==2) cancel_index=target;if(mode==3) hold_index=target;\n- int rc=runtime_start(&live);\n+ int rc=start_with_geometry(&live);\n  pangu_u64 started=fault<0 || mode==3 ? count : (pangu_u64)fault+1;\n  if(mode==1) assert(rc==-71);else if(mode==2) assert(rc==6);else assert(!rc);\n"
+    },
+    {
+      "id": "T14-E11",
+      "source_sha256": "07a891eb16539ef99ce86ce121270402b43e55ca16acf1c48e1a0f339abef630",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-cleanup-wip-zn5snc8s/async-test.c",
+      "identical_paths_count": 1,
+      "classification": "ASYNC_CANCEL_REGISTRATION_ORDER_FIX",
+      "focused_id": "T14-F02",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/async-test.c",
+      "comparison_source_sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
+      "existing_evidence": "docs/migration/t14-async-disposer-native-evidence.json",
+      "review": "Later setup registers async cleanup before reentrant cancellation; temporarily suppresses inherited cancellation during setup_owner. Terminal/waiting assertions retained, callback ordering intentionally corrected.",
+      "diff_sha256": "404f1c20c6725bb39dc3f0c98383b3d27d29c0526440a22bed6269e7265c4f8c",
+      "complete_text_diff": "--- 07a891eb16539ef99ce86ce121270402b43e55ca16acf1c48e1a0f339abef630\n\n+++ d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c\n\n@@ -15,5 +15,7 @@\n\n }\n static pangu_i32 setup_async(pangu_owner *o,void *ctx) {\n- int rc=setup_owner(o,ctx);if((pangu_u64)ctx==2) assert(!pangu_owner_register_async(o,async_begin,ctx));return rc;\n+ int cancel=cancel_index;cancel_index=-1;int rc=setup_owner(o,ctx);cancel_index=cancel;\n+ if((pangu_u64)ctx==2) assert(!pangu_owner_register_async(o,async_begin,ctx));\n+ if((int)(pangu_u64)ctx==cancel) assert(runtime_stop(&live)==5);return rc;\n }\n static void local_owner(pangu_owner *o,pangu_owned_resource *r,pangu_owned_operation *ops) {\n@@ -44,5 +46,5 @@\n\n   pangu_u64 count=0;assert(!runtime_prepare_items(&plan,&output,source_items,4,activation,9,100000,&count));live.items=activation;live.count=count;\n   if(mode==1) fail_index=2;if(mode==2) cancel_index=2;\n-  int rc=runtime_start(&live);assert(rc==(mode ? 5 : 0));if(!mode) assert(runtime_stop(&live)==5);\n+  int rc=start_with_geometry(&live);assert(rc==(mode ? 5 : 0));if(!mode) assert(runtime_stop(&live)==5);\n   assert(begins==1 && life[2].state==3 && life[0].state==2 && life[1].state==2 && live.started==3);\n   assert(runtime_stop(&live)==5 && begins==1);assert(!pangu_owner_cleanup_finish(&life[2],&saved[0],-91));\n"
+    },
+    {
+      "id": "T14-E12",
+      "source_sha256": "2f836c2c970a2e6fcdc9aa7395db2d889c0ed62d17c86bd7e13984b45479fa88",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl/async-test.c",
+      "identical_paths_count": 4,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F02",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/async-test.c",
+      "comparison_source_sha256": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
+      "existing_evidence": "docs/migration/t14-async-disposer-native-evidence.json",
+      "review": "Only start call uses start_with_geometry; assertions unchanged.",
+      "diff_sha256": "31eaf12495a88c34f52a74b70ee8cfd18994635c0fc49801f4a7327c48664212",
+      "complete_text_diff": "--- 2f836c2c970a2e6fcdc9aa7395db2d889c0ed62d17c86bd7e13984b45479fa88\n\n+++ d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c\n\n@@ -46,5 +46,5 @@\n\n   pangu_u64 count=0;assert(!runtime_prepare_items(&plan,&output,source_items,4,activation,9,100000,&count));live.items=activation;live.count=count;\n   if(mode==1) fail_index=2;if(mode==2) cancel_index=2;\n-  int rc=runtime_start(&live);assert(rc==(mode ? 5 : 0));if(!mode) assert(runtime_stop(&live)==5);\n+  int rc=start_with_geometry(&live);assert(rc==(mode ? 5 : 0));if(!mode) assert(runtime_stop(&live)==5);\n   assert(begins==1 && life[2].state==3 && life[0].state==2 && life[1].state==2 && live.started==3);\n   assert(runtime_stop(&live)==5 && begins==1);assert(!pangu_owner_cleanup_finish(&life[2],&saved[0],-91));\n"
+    },
+    {
+      "id": "T14-E13",
+      "source_sha256": "1d01c8fe8b5fa8240bccf73f612bc5b7b4d91708fad5edf4ac942f5dd7cbbbf8",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl/setup-test.c",
+      "identical_paths_count": 4,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F16",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/setup-test.c",
+      "comparison_source_sha256": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+      "existing_evidence": "docs/migration/t14-adapter-setup-native-evidence.json",
+      "review": "Only start call uses start_with_geometry; assertions unchanged.",
+      "diff_sha256": "cf34fc80bb48dc589e2f98d57400ac704e5642b802c3fdd1802a7ec4e3923910",
+      "complete_text_diff": "--- 1d01c8fe8b5fa8240bccf73f612bc5b7b4d91708fad5edf4ac942f5dd7cbbbf8\n\n+++ b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c\n\n@@ -19,5 +19,5 @@\n\n  for(pangu_u64 i=0;i<n;i++) source_items[i].setup=deferred_setup;\n  assert(!runtime_prepare_items(p,out,source_items,n,activation,9,100000,&count));live.items=activation;live.count=count;\n- int rc=runtime_start(&live);\n+ int rc=start_with_geometry(&live);\n  if(mode==4) {assert(!rc && setup_count==(int)count);assert(!runtime_stop(&live));return;}\n  assert(rc==5 && setup_count==(int)pos+1 && live.started==pos+1 && life[defer_id].inflight==1 && !cleanup_count);\n"
+    },
+    {
+      "id": "T14-E14",
+      "source_sha256": "319e79575d54753ed44832ee99fe9b3922a87008c9d604641d6c4a6bde42ddc7",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/call-test.c",
+      "identical_paths_count": 2,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F05",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/call-test.c",
+      "comparison_source_sha256": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1",
+      "existing_evidence": "docs/migration/t14-call-lifecycle-native-evidence.json",
+      "review": "Two start calls use start_with_geometry; private single-provider quota gap remains explicitly documented in F05.",
+      "diff_sha256": "19fabff22829ad1a33506bc8f8a0f8b164a57e43248212b324d81546e9bfda54",
+      "complete_text_diff": "--- 319e79575d54753ed44832ee99fe9b3922a87008c9d604641d6c4a6bde42ddc7\n\n+++ 71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1\n\n@@ -37,5 +37,5 @@\n\n  for(pangu_u64 i=0;i<n;i++) source_items[i].setup=setup_calls;\n  assert(!runtime_prepare_stop_edges(p,out,es,1000,100000,&ec));assert(!runtime_prepare_items(p,out,source_items,n,activation,9,100000,&count));runtime_stop_graph graph={es,ec,disposed,9};live.items=activation;live.count=count;live.stop_graph=&graph;\n- assert(!runtime_start(&live));pangu_u32 c=consumer_id(b),provider=provider_id(b);runtime_call_ticket poison,t;memset(&poison,0xa5,sizeof poison);t=poison;\n+ assert(!start_with_geometry(&live));pangu_u32 c=consumer_id(b),provider=provider_id(b);runtime_call_ticket poison,t;memset(&poison,0xa5,sizeof poison);t=poison;\n  assert(runtime_call_enter(&live,(pangu_u32)ec,&t)==3 && !memcmp(&t,&poison,sizeof t));runtime_setup_ticket ended;assert(runtime_setup_scope(&live,&ended)==10);assert(runtime_call_enter_setup(&live,b,&expired_setup_scope,&t)==10);\n  if(!mode) {assert(!runtime_call_enter(&live,b,&retained));assert(invoke(provider)==(int)provider);}\n@@ -52,5 +52,5 @@\n\n static void quotas(const pangu_prepare_result *p,const pangu_graph_output *out) {\n  runtime_stop_edge es[1000];pangu_u32 disposed[9]={0};pangu_u64 ec=0,count=0,n=p->lowered.graph.instance_count;fresh_life(n);current=p;current_output=out;call_mode=0;\n- assert(!runtime_prepare_stop_edges(p,out,es,1000,100000,&ec));assert(ec);assert(!runtime_prepare_items(p,out,source_items,n,activation,9,100000,&count));runtime_stop_graph graph={es,ec,disposed,9};live.items=activation;live.count=count;live.stop_graph=&graph;assert(!runtime_start(&live));\n+ assert(!runtime_prepare_stop_edges(p,out,es,1000,100000,&ec));assert(ec);assert(!runtime_prepare_items(p,out,source_items,n,activation,9,100000,&count));runtime_stop_graph graph={es,ec,disposed,9};live.items=activation;live.count=count;live.stop_graph=&graph;assert(!start_with_geometry(&live));\n  pangu_u32 c=consumer_id(0),provider=provider_id(0);pangu_operation_ticket full[3];for(int i=0;i<3;i++) assert(!pangu_owner_enter(&life[provider],0,&full[i]));\n  runtime_call_ticket t,poison;memset(&poison,0xa5,sizeof poison);t=poison;assert(runtime_call_enter(&live,0,&t)==2 && !memcmp(&t,&poison,sizeof t) && !life[c].inflight && life[provider].inflight==3);\n"
+    },
+    {
+      "id": "T14-E15",
+      "source_sha256": "c7b0366cca01c8611f4d2caa0ec05ed5b83cd718a541152e7d5e0afcee50a32a",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/graph-test.c",
+      "identical_paths_count": 3,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F09",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/graph-test.c",
+      "comparison_source_sha256": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c",
+      "existing_evidence": "docs/migration/t14-graph-native-evidence.json",
+      "review": "Valid and malformed graph startup use start_with_geometry; assertions otherwise unchanged; private arbitrary owner holds remain F09 gaps.",
+      "diff_sha256": "b25ce5a68661b3a897a5b14821b21f987cf905dab9fd8007ef38dc765f7c5bd5",
+      "complete_text_diff": "--- c7b0366cca01c8611f4d2caa0ec05ed5b83cd718a541152e7d5e0afcee50a32a\n\n+++ fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c\n\n@@ -32,5 +32,5 @@\n\n  for(pangu_u64 pass=0;pass<launched;pass++) for(pangu_u64 i=0;i<ec;i++) if(es[i].consumer<launched && protected[es[i].consumer]) protected[es[i].provider]=1;\n  if(mode==4) for(pangu_u64 i=0;i<launched;i++) if(!protected[i]) {error_id=(int)o->order[i];break;}\n- int rc=runtime_start(&live);\n+ int rc=start_with_geometry(&live);\n  if(mode==3) {assert(rc==-72 && !live.started && cleanup_count==(int)launched);return;}\n  assert(rc==(mode==2 ? 5 : 0));assert(runtime_stop(&live)==5);\n@@ -62,5 +62,5 @@\n\n  assert(!prepare(1000000,&p));for(pangu_u32 pos=0;pos<p.graph_report.order_count;pos++) for(int mode=0;mode<5;mode++) {drive_graph(&p,&output,pos,mode);scenarios++;}\n  for(int rev=0;rev<2;rev++) {multi_manifest.provisions=rev ? reverse_provisions : provisions;assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,1000000,&p));for(pangu_u32 pos=0;pos<p.graph_report.order_count;pos++) for(int mode=0;mode<5;mode++) {drive_graph(&p,&output,pos,mode);scenarios++;}}\n- fresh_life(2);live.items=source_items;live.count=2;pangu_u32 disposed[2]={0};runtime_stop_edge invalid[]={{0,1}};runtime_stop_graph graph={invalid,1,disposed,2};live.stop_graph=&graph;assert(runtime_start(&live)==16 && !setup_count);invalid[0]=(runtime_stop_edge){1,0};disposed[0]=1;assert(runtime_start(&live)==10 && !setup_count);\n+ fresh_life(2);live.items=source_items;live.count=2;pangu_u32 disposed[2]={0};runtime_stop_edge invalid[]={{0,1}};runtime_stop_graph graph={invalid,1,disposed,2};live.stop_graph=&graph;assert(start_with_geometry(&live)==16 && !setup_count);invalid[0]=(runtime_stop_edge){1,0};disposed[0]=1;assert(start_with_geometry(&live)==10 && !setup_count);\n  assert(independent_cases>0 && ancestor_cases>0 && independent_setup_cases>0 && error_while_waiting>0);\n  printf(\"graph_stop_scenarios=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d\\n\",scenarios,independent_cases,ancestor_cases,independent_setup_cases,error_while_waiting);return 0;\n"
+    },
+    {
+      "id": "T14-E16",
+      "source_sha256": "81e40f70a618ce599eb112330ef6f44265979c3f543242f0b03c8f2c37b12112",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/call-budget-test.c",
+      "identical_paths_count": 20,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F04",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-call-budget-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E17",
+      "source_sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/geometry-test.c",
+      "identical_paths_count": 20,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F08",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-geometry-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E18",
+      "source_sha256": "6dbd67cf32d33e244271aa61f5aefc34203abae957539d3c04e2289d98db7103",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/start-test.c",
+      "identical_paths_count": 21,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F17",
+      "existing_status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "existing_evidence": "docs/migration/t14-start-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E19",
+      "source_sha256": "05b089264a0045f736f242e76b335f1a07a5242523340b3d6944247dc86ee50c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/entry-test.c",
+      "identical_paths_count": 11,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F06",
+      "existing_status": "PASS_CURRENT_NATIVE",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E20",
+      "source_sha256": "3e5673d5c0e0f0efa6658cea65be117cf59023ccc924cc4a1bec4dbadec2e3c0",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/facade-test.c",
+      "identical_paths_count": 12,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F07",
+      "existing_status": "PASS_CURRENT_NATIVE",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E21",
+      "source_sha256": "2dd1e0b2b2da6a3f713ff94fd82a4e1242023995a9f2e3b853216bd4f63282a4",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/interop-test.c",
+      "identical_paths_count": 9,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F10",
+      "existing_status": "PASS_CURRENT_NATIVE",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E22",
+      "source_sha256": "21e981006fb0166153ed4b4269f65b4b3cbed5343e5fa7f3c9768d00c7e2411d",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/route-test.c",
+      "identical_paths_count": 9,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F13",
+      "existing_status": "PASS_CURRENT_NATIVE",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E23",
+      "source_sha256": "67eb5ead1520093a4bd957e508e4d236d78063ed5237ed5eb20093fb43ca43fd",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-owner-wip-5stexo34/probe.py",
+      "identical_paths_count": 1,
+      "classification": "EARLIEST_OWNER_SIX_GROUPS_PARTIAL_PUBLIC_MAPPING",
+      "existing_evidence": "docs/migration/t14-earliest-owner-native-evidence.json",
+      "review": "Four supplemental groups executed; private owner-only enter/leave/finish_load gaps remain per group. Not a six-group exact ABI pass."
+    },
+    {
+      "id": "T14-E24",
+      "source_sha256": "95643248cf7196d4d57547c62623f34286475c67595e90ab63a017b036b10c12",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/invocation-test.c",
+      "identical_paths_count": 5,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F11",
+      "existing_status": "PASS_CURRENT_NATIVE",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E25",
+      "source_sha256": "9dfbba1f659836b79dbda53b55dc5c473869bf06d651f6877c4b4f9080ba32b8",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/sdk-test.c",
+      "identical_paths_count": 7,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F14",
+      "existing_status": "PASS_PREVIOUS_NATIVE",
+      "existing_evidence": "docs/migration/t14-sdk1-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E26",
+      "source_sha256": "3c858c143ddeef5e225b3ea8808fca3e48a04d0665ee7709d7bac4550610b736",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/sdk2-test.c",
+      "identical_paths_count": 1,
+      "classification": "SDK2_OBSERVER_INJECTION_VARIANT",
+      "focused_id": "T14-F15",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/sdk2-test.c",
+      "comparison_source_sha256": "ba1b0195984b22657c8af8da82e1cdc15c5e574da1d4069b46b0c5ce0cbe200c",
+      "existing_evidence": "docs/migration/t14-native-evidence.json",
+      "review": "This native fixture injects expected/entered observation function pointers through config; historical latest snapshot has direct linkage. This is test composition, not runtime behavioral equivalence proof; SDK2 native evidence is authoritative for its own composition.",
+      "diff_sha256": "a3c13d1edfb110c031adc9cb25cddb87710fc542b3fcdc047212ca275ad503bf",
+      "complete_text_diff": "--- 3c858c143ddeef5e225b3ea8808fca3e48a04d0665ee7709d7bac4550610b736\n\n+++ ba1b0195984b22657c8af8da82e1cdc15c5e574da1d4069b46b0c5ce0cbe200c\n\n@@ -65,5 +65,5 @@\n\n static void models_same(void) {assert(!memcmp(snapshot,models,model_bytes()));}\n static void populate(model *m) {\n- memset(m->config,0,sizeof m->config);memset(m->defs,0,sizeof m->defs);for(pangu_u32 i=0;i<vmanifest.instance_count;i++) {m->userdata[i]=&m->config[i];m->config[i].expected=sdk2_fixture_expected;m->config[i].entered=sdk2_fixture_entered;m->defs[i].entry=m->language ? sdk2_cpp_entry : sdk2_c_entry;m->defs[i].dispose=m->language ? sdk2_cpp_dispose : sdk2_c_dispose;}\n+ memset(m->config,0,sizeof m->config);memset(m->defs,0,sizeof m->defs);for(pangu_u32 i=0;i<vmanifest.instance_count;i++) {m->userdata[i]=&m->config[i];m->defs[i].entry=m->language ? sdk2_cpp_entry : sdk2_c_entry;m->defs[i].dispose=m->language ? sdk2_cpp_dispose : sdk2_c_dispose;}\n  if(m->chosen>=0) {sdk2_fixture_config *cfg=&m->config[m->chosen];if(m->profile==1 || m->profile==2 || m->profile==5) cfg->flags=1;if(m->profile==3) cfg->flags=3;if(m->profile==4) cfg->flags=8|16;if(m->profile==1 || m->profile==2 || m->profile==6) m->defs[m->chosen].cleanup_mode=1;}\n  for(pangu_u32 i=0;i<plan_view->lowered.registry.provider_count;i++) {pangu_u32 id=plan_view->lowered.graph.provider_owners[i];sdk2_fixture_config *cfg=&m->config[id];assert(cfg->provision_count<16);sdk2_provision *p=&cfg->provisions[cfg->provision_count++];pangu_u32 service=plan_view->lowered.registry.providers[i].service;memcpy(p->request.key.name,vdefs[service].name,32);p->request.key.version=plan_view->lowered.registry.providers[i].version;p->request.minimum_size=16;for(pangu_u32 j=0;j+1<cfg->provision_count;j++) if(!memcmp(&cfg->provisions[j].request.key,&p->request.key,sizeof p->request.key)) p->request.ordinal++;p->table=&m->tables[i];p->state=&m->states[i];m->tables[i]=(sdk2_test_service){p->request.key.version,24,1,0,m->language ? sdk2_cpp_evaluate : sdk2_c_evaluate};m->states[i].value=(int)plan_view->lowered.registry.providers[i].instance*11+3;}\n"
+    },
+    {
+      "id": "T14-E27",
+      "source_sha256": "ba1b0195984b22657c8af8da82e1cdc15c5e574da1d4069b46b0c5ce0cbe200c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/sdk2-test.c",
+      "identical_paths_count": 2,
+      "classification": "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY",
+      "focused_id": "T14-F15",
+      "existing_status": "PASS_PREVIOUS_NATIVE",
+      "existing_evidence": "docs/migration/t14-native-evidence.json",
+      "review": "Byte identity proves source deduplication only. Inherit existing evidence scope and explicit API gaps; no additional execution claimed."
+    },
+    {
+      "id": "T14-E28",
+      "source_sha256": "2680f7acc75e589ef81b739d7c81c9aac227fa27bed87deb5852803962ee59cb",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/route-test.c",
+      "identical_paths_count": 1,
+      "classification": "TEST_MAIN_NAMING_ONLY",
+      "focused_id": "T14-F13",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/route-test.c",
+      "comparison_source_sha256": "21e981006fb0166153ed4b4269f65b4b3cbed5343e5fa7f3c9768d00c7e2411d",
+      "existing_evidence": "docs/migration/t14-focused-native-evidence.json",
+      "review": "Adds PANGU_ROUTE_TEST_MAIN override around entry name; test body/behavior assertions unchanged.",
+      "diff_sha256": "5b902e2d9d8eddb2a07893f6a810f4a5c26f5e95765f471622ce06f89c9776af",
+      "complete_text_diff": "--- 2680f7acc75e589ef81b739d7c81c9aac227fa27bed87deb5852803962ee59cb\n\n+++ 21e981006fb0166153ed4b4269f65b4b3cbed5343e5fa7f3c9768d00c7e2411d\n\n@@ -88,5 +88,8 @@\n\n  route_cases++;\n }\n-int main(void) {\n+#ifndef PANGU_ROUTE_TEST_MAIN\n+#define PANGU_ROUTE_TEST_MAIN main\n+#endif\n+int PANGU_ROUTE_TEST_MAIN(void) {\n  real_life=life=pangu_lifecycle_query(1,152,1,0);bridge=pangu_entry_bridge_query(1,24,1,0);route=pangu_service_route_query(1,40,1,0);assert(route && route->abi_version==1 && route->struct_size==40 && route->target==1 && !route->reserved);assert(!pangu_service_route_query(2,40,1,0) && !pangu_service_route_query(1,39,1,0) && !pangu_service_route_query(1,40,2,0) && !pangu_service_route_query(1,40,1,1));pangu_prepare_result plan;\n  for(pangu_u64 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {const host_graph_case *c=&host_graph_cases[i];for(int variant=0;variant<4;variant++) {async_mode=variant>=2;install(c->installed,variant&1);for(pangu_u64 j=0;j<compiled.count;j++) compiled_entries[j].entry=route_entry;assert(pangu_discover_prepare(c->manifest,c->contracts,c->count,&compiled,&corpus_storage,10000000,&plan)==c->status);if(c->status) continue;hold_mode=1;route_drive(c->manifest,&plan,&corpus_output,corpus_entry_output,variant&1,0);}}\n"
+    },
+    {
+      "id": "T14-E29",
+      "source_sha256": "4312777cf6987980efa7817729d9d4697ac3a5f528dd6985c29b0339716bc900",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/geometry-test.c",
+      "identical_paths_count": 1,
+      "classification": "GEOMETRY_MATRIX_EXTENDED",
+      "focused_id": "T14-F08",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/geometry-test.c",
+      "comparison_source_sha256": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
+      "existing_evidence": "docs/migration/t14-geometry-native-evidence.json",
+      "review": "Later test adds budget call output/scope/report overlap checks, retaining preceding geometry assertions.",
+      "diff_sha256": "5d17bd2ae8c8e3a1bfa271fff27cad9627eb395144ad931808239f9eba565ad1",
+      "complete_text_diff": "--- 4312777cf6987980efa7817729d9d4697ac3a5f528dd6985c29b0339716bc900\n\n+++ 95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027\n\n@@ -18,5 +18,5 @@\n\n   #define GEO_REFUSE(expr) do {assert((expr)==1);refused++;assert(unchanged_snapshot(&before));} while(0)\n   GEO_REFUSE(runtime_setup_scope(r,(runtime_setup_ticket *)bad));GEO_REFUSE(runtime_setup_defer(r,(runtime_setup_ticket *)bad));GEO_REFUSE(runtime_setup_finish(r,(runtime_setup_ticket *)bad,0));\n-  GEO_REFUSE(runtime_stop_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_start_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_pump_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_disposer_finish(r,0,(pangu_cleanup_ticket *)bad,0));GEO_REFUSE(runtime_call_enter(r,0,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_finish(r,(runtime_call_ticket *)bad));\n+  GEO_REFUSE(runtime_stop_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_start_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_pump_budget(r,1,(pangu_stop_report *)bad));GEO_REFUSE(runtime_disposer_finish(r,0,(pangu_cleanup_ticket *)bad,0));GEO_REFUSE(runtime_call_enter(r,0,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_enter_budget(r,0,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_budget(r,0,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_enter_setup_budget(r,0,scope,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_setup_budget(r,0,scope,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_enter_cleanup_budget(r,0,(pangu_cleanup_ticket *)scope,1,(runtime_call_ticket *)bad,&report));GEO_REFUSE(runtime_call_enter_cleanup_budget(r,0,(pangu_cleanup_ticket *)scope,1,&call,(pangu_stop_report *)bad));GEO_REFUSE(runtime_call_finish(r,(runtime_call_ticket *)bad));\n   GEO_REFUSE(runtime_call_enter_setup(r,0,scope,(runtime_call_ticket *)bad));GEO_REFUSE(runtime_call_enter_setup(r,0,(runtime_setup_ticket *)bad,&call));\n   GEO_REFUSE(runtime_call_enter_cleanup(r,0,(pangu_cleanup_ticket *)bad,&call));\n"
+    },
+    {
+      "id": "T14-E30",
+      "source_sha256": "8000468776e4a22c4930322d641281a4fc1351730169d82e52f3040f2fee4904",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/budget-test.c",
+      "identical_paths_count": 1,
+      "classification": "GEOMETRY_BINDING_PREREQUISITE",
+      "focused_id": "T14-F03",
+      "comparison_source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/budget-test.c",
+      "comparison_source_sha256": "2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369",
+      "existing_evidence": "docs/migration/t14-budget-native-evidence.json",
+      "review": "Only startup routes through start_with_geometry; budget/zero-work assertions unchanged.",
+      "diff_sha256": "fec0c2a9f91e1db97b31392e943324afb7262089115a512c36d98b427c0a52ea",
+      "complete_text_diff": "--- 8000468776e4a22c4930322d641281a4fc1351730169d82e52f3040f2fee4904\n\n+++ 2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369\n\n@@ -17,5 +17,5 @@\n\n  for(pangu_u64 i=0;i<n;i++) source_items[i].setup=setup_budget;\n  assert(!runtime_prepare_stop_edges(p,out,es,1000,100000,&ec));assert(!runtime_prepare_items(p,out,source_items,n,activation,9,100000,&count));runtime_stop_graph graph={es,ec,disposed,9};live.items=activation;live.count=count;live.stop_graph=prefix_mode ? 0 : &graph;\n- assert(runtime_start(&live)==(mode==4 ? 5 : 0));runtime before=live;pangu_owner owner_before[9];memcpy(owner_before,life,sizeof life);pangu_stop_report rep;\n+ assert(start_with_geometry(&live)==(mode==4 ? 5 : 0));runtime before=live;pangu_owner owner_before[9];memcpy(owner_before,life,sizeof life);pangu_stop_report rep;\n  assert(runtime_stop_budget(&live,0,&rep)==2 && rep.work==0 && rep.reason==1 && rep.pending);assert(!memcmp(&before,&live,sizeof live) && !memcmp(owner_before,life,sizeof life));\n  int ticks=0,completed=mode<2;\n"
+    }
+  ],
+  "classification_counts": {
+    "ASYNC_CANCEL_REGISTRATION_ORDER_FIX": 1,
+    "BYTE_IDENTICAL_TO_FOCUSED_INVENTORY": 18,
+    "EARLIEST_OWNER_SIX_GROUPS_PARTIAL_PUBLIC_MAPPING": 1,
+    "GEOMETRY_BINDING_PREREQUISITE": 6,
+    "GEOMETRY_MATRIX_EXTENDED": 2,
+    "SDK2_OBSERVER_INJECTION_VARIANT": 1,
+    "TEST_MAIN_NAMING_ONLY": 1
+  },
+  "validation": {
+    "all_discovered_paths_match_recorded_content_sha256": true,
+    "all_records_classified": true,
+    "new_native_executions": 0
+  },
+  "remaining_work": [
+    "Review 44 additional assert-bearing Python runner/generator contents; determine whether they embed untracked test source or independent assertions.",
+    "Audit discovery completeness beyond owner.c-bearing t14 directories and probe.py/test.c/*-test.c naming filter.",
+    "Keep removed private owner-only operations and single-end quota gaps explicit; assess required product semantics against public API.",
+    "Complete outstanding ABI guard coverage, full G04 event/fault matrix and G07 resource measurements."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve static deduplication and textual lineage recording only; no gate, budget, API, compatibility baseline, production or release change.",
+    "risks": [
+      "Content comparison is not execution evidence.",
+      "SDK2 injected test composition must use native evidence for that exact composition.",
+      "Async cancellation registration order changed intentionally; old call ordering is not claimed executed.",
+      "Discovery is bounded and earlier corpus audit remains incomplete."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "cc21e59e79ad8bd6e98c8cea1f3245c48402e11ef880f30968ad1465b99b14c4",
+      "docs/migration/t14-focused-inventory.json": "927aa3fa55908c0ea4af939c9bdeac32de2597ba8c461a576f48b3aa738736b6",
+      "docs/migration/t14-owner-boundaries.md": "7b3892919800a79081f0d326ad0aabf15db0ed049e181fb6fc9c465791bc3976",
+      "docs/原生重写路线与迁移TODO.md": "28d00c7e415ec00a9ab906381e59405f12132f342f6545846e6e3f14cdf14150"
+    },
+    "control_scope_sha256": "5b3963dc1a8254f4f18da174f8f67f3fc31e63addf8ae2b80f4da29814941c40"
+  },
+  "discovery_boundary_probe": {
+    "scope": "Top-level assert-bearing C/Python files in t14-* directories containing owner.c",
+    "additional_unique_contents": 44,
+    "all_additional_files_are_python": true,
+    "status": "RUNNER_AND_GENERATOR_ASSERTIONS_PENDING_REVIEW",
+    "files": {
+      "95f8b2fb1ce2fdfa1c0f162cde4857e94652e7a604c8f4dc0a3f9761b0bda0ae": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-cleanup-wip-zn5snc8s/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-graph-stop-wip-240i7pzv/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-async-tests.py"
+      ],
+      "4ca863090ebe7a6bdcf74b7a397accd0873289fc570bc41fcc6667f71c09ed91": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-budget-tests.py"
+      ],
+      "ba25fd1eca5df77b98179e54692127739833ace56877044304379b7224580397": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-call-tests.py"
+      ],
+      "26e9a7d207c2f7550286ba52fc36925539d934298f40a0e9e40f7f5793b3e132": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-geometry-tests.py"
+      ],
+      "5b5a665aba42a453f75a05c008e582d04efc1dd8b604c690b6025f3b942f0c66": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-graph-stop-wip-240i7pzv/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-graph-tests.py"
+      ],
+      "ebcbe5ac0feadd030b57c94105368948a59c6b6ebd9a7c2f44de3e47ed1c8698": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-cleanup-wip-zn5snc8s/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-graph-stop-wip-240i7pzv/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plan-adapter-wip-a97379e9/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-host-tests.py"
+      ],
+      "a1abe1de061e4a215161d05dd870144ca207bf9ee93ec0bd1d3809d8d532f9de": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-async-setup-wip-wuur71bl/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-admission-wip-ufub_1qi/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-graph-stop-wip-240i7pzv/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runtime-geometry-wip-6uz0z8ah/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-stop-budget-wip-9mb6a199/run-setup-tests.py"
+      ],
+      "ba86f5d78edc3bc2295cd2070a61dcf1c5c016235d53e2099e8ea5062e7bd024": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-transaction-tests.py"
+      ],
+      "c8ae746acac92861aa91307fb242993a070bbcbf20af9b6557d0315d51d91b04": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-call-budget-tests.py"
+      ],
+      "57d219bafbf1128aee883fdaf793060c727d0a1f696f4405597be36610a80228": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-host-tests.py"
+      ],
+      "e4dc48a742b7d2239ef5a34af1ea6a4a0fd0eb6ceebf1ff3c79d7e4e9936522b": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-confirm-3rcfglae/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-final-replay-6vxhi61b/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-confirm-em5j6zqk/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-layout-xzlfnqbf/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-v2-gi62dejm/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-rrec5xmo/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-start-budget-wip-u515221l/run-start-tests.py"
+      ],
+      "8dd2ce66631ade9c0183aeabe1281b1fb90dd018ba4ec43dc9f59371e958d048": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-async-tests.py"
+      ],
+      "50a6b52927b107eab28e6eb023dea812b0a5cee124d6f7075137ed8e739fdd5f": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-budget-tests.py"
+      ],
+      "e57ddf9cd0fd115b8a40921958b27b6fdbe41ee39ff204fdf46c08f0ec710d15": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-call-budget-tests.py"
+      ],
+      "5347a3afcf35f48ba322102033d4628a9ca28039f75531c213fda4a86f5a232a": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-call-tests.py"
+      ],
+      "79a65e5a026e7ee58fd143057abf631821b94b53695d3377d3ad98f6d96e76c1": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-entry-tests.py"
+      ],
+      "243332da266f539b47f55e4bf27df7cecec4068baeb94debe6271bae7d13a926": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-facade-tests.py"
+      ],
+      "4a128e0c6bd3e1c874b3f30fc2ef3249e59735e8e748d939c45b35953051c99a": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-geometry-tests.py"
+      ],
+      "9b83c5cbdc6e34d6dae637ac95fe1bee86ad35eb99d12ad37088ef3f85d3420e": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-graph-tests.py"
+      ],
+      "5dc263b7136d0b3dd2a14d73b963b57642c69a74ff80237d2a7d0bb032282060": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-host-tests.py"
+      ],
+      "32c413febddfcbc81b4b9d127a8bc69addc18a065bdea2f876eecc50ba8d4d08": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-private-link-tests.py"
+      ],
+      "1e42b9f7615ff372d82b5f2bd09c4e2d6ed829628b32354d0128787a5b03d5d8": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-setup-tests.py"
+      ],
+      "024f2558c974de84340837078c526afbc2225e6d621942204ad56784761240b9": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-start-tests.py"
+      ],
+      "4f04ba8dc0db984da9fe63fed288d03fd95b291612a9cf041c86729aad776a0b": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-replay-eev1et0r/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-facade-wip-xgs4cmgp/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-transaction-tests.py"
+      ],
+      "e90a5d1a89f3a80ec5c4c96f05d932bff9d8762de0f4358a2bf240ba84130545": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-async-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-async-tests.py"
+      ],
+      "6d51058bd2d15e148fbd3acfba412663b34e6ae02ec7f8dfd9606dd2b3abd2bf": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-budget-tests.py"
+      ],
+      "e1a7fbbaee1df5f4dde0e66b21039c13dd5f75b29102a2fe39740b26a7a266bf": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-call-budget-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-call-budget-tests.py"
+      ],
+      "080318ebe891ee0bbf1594fd13a2097672ad947a768614a4855a0c8c24573fdb": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-call-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-call-tests.py"
+      ],
+      "b7e5f8998b861d59e01bf68164a32ec8f700e24c1a1e58dbad3daf06c74ff25c": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-entry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-entry-tests.py"
+      ],
+      "4a1fc90f841b885aea41a5c8037ee176491d78fb2d6d4fce9ba7652a1f12509d": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-facade-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-facade-tests.py"
+      ],
+      "bdbdd12036db2162adad8f8be2b589c03853464b476945a96b240ba183ebbe0e": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-geometry-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-geometry-tests.py"
+      ],
+      "cfdf48a901a1d326b31006136484499f146c2a78273a31e1a79626d2848f5802": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-graph-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-graph-tests.py"
+      ],
+      "5e48b59ea584fdd69fbf7165cb3bf9c9d25f9b4f340783a2d0bd5fa9d2f76665": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-host-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-host-tests.py"
+      ],
+      "5ff58d1b179c809e37d9a7e1df07371e3824875cdaf18201c66e5acb9b56e2f8": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-interop-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-interop-tests.py"
+      ],
+      "4239c2c2a806c47562d102d33fb2e2dbcdd60fa042cffc9a4019ecf5ffbfdd30": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-private-link-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-private-link-tests.py"
+      ],
+      "ce295b804625176999e4ed3cd30deebf975c11733d66d95abe3017c69ae7e576": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-route-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-route-tests.py"
+      ],
+      "5b01dee89bf4ef043c320de541d726a5aa380443e583d711ead4e4066e324ea1": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-setup-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-setup-tests.py"
+      ],
+      "a2955a9c7d3261ab6b24580a7dc22c9448924622687454f5d1e350613fb5ff73": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-start-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-start-tests.py"
+      ],
+      "b18d2171bf1c49a15be03284660a102f76d4a73f1dfe87b233cb945ee55e05a0": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-transaction-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-interop-wip-6wdt8lfq/run-transaction-tests.py"
+      ],
+      "dbeceeb109c10df5a3ef53bd756b2ae81890a98ada9d95efa6f417638c2f2b41": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-parent-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-parent-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-parent-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-parent-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-parent-tests.py"
+      ],
+      "7ff7102ae735415456c76dcef942fa022efb8501828a9286c90f5ee936bc088c": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-source-restore-gv2e6mgr/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-plugin-sdk-wip-mv4bwxnu/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk-source-restore-dmcu4_ua/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-sdk-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-sdk-tests.py"
+      ],
+      "9435f10f37398430cad0181cc0572021ac09e9f17bbc932be3d051a408d46d70": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-sdk2-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/run-sdk2-tests.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/run-sdk2-tests.py"
+      ],
+      "3db358080c05b7e4277f94cffad312b27095e000d6204b66d799f9e86bf88ebc": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/test-sdk2-nested-admission.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-source-restore-sk6cku6c/test-sdk2-nested-admission.py",
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/test-sdk2-nested-admission.py"
+      ],
+      "487f74b58d9e81c38623bae7ded236e28841862ea7da3cc9727cd7e948726542": [
+        "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-route-tests.py"
+      ]
+    },
+    "new_C_test_contents_found": 0
+  }
+}

@@ -336,8 +336,9 @@
     }
   ],
   "pending_current_abi_ports": 0,
-  "earlier_standalone_owner_corpus_audit": "PARTIAL_EARLIEST_SIX_GROUPS_REVIEWED_REMAINDER_PENDING",
+  "earlier_standalone_owner_corpus_audit": "DISCOVERED_30_CONTENTS_REVIEWED_WITH_GAPS_COMPLETENESS_PENDING",
   "full_T14": "NOT_COMPLETED",
   "earlier_owner_audit_evidence": "docs/migration/t14-earliest-owner-native-evidence.json",
-  "earlier_owner_discovery": "docs/migration/t14-earlier-owner-discovery.json"
+  "earlier_owner_discovery": "docs/migration/t14-earlier-owner-discovery.json",
+  "earlier_owner_content_audit": "docs/migration/t14-earlier-owner-content-audit.json"
 }
