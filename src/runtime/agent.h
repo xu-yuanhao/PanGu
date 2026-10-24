@@ -1,6 +1,7 @@
 #ifndef PANGU_AGENT_H
 #define PANGU_AGENT_H
 #include "session.h"
+#include "submissions.h"
 #define PG_TURN_LIMIT PG_RUN_TURN_LIMIT
 typedef enum { PG_MODEL_WAIT, PG_MODEL_TEXT, PG_MODEL_CALL, PG_MODEL_DONE, PG_MODEL_ERROR } pg_model_kind;
 typedef struct { pg_model_kind kind; pg_slice text, call_id, tool_name; } pg_model_event;
@@ -37,6 +38,7 @@ typedef struct {
 } pg_agent;
 int pg_agent_init(pg_agent *, pg_model, pg_tools);
 pg_client pg_agent_client(pg_agent *);
+pg_submissions pg_agent_submissions(pg_agent *);
 /* Fresh idle agents only: bind before the first system/input/reset commit. */
 int pg_agent_bind_storage(pg_agent *, pg_storage);
 /* Compare loaded identity; replacing it is allowed only when no run is active. */

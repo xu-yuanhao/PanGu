@@ -44,11 +44,13 @@
     mov dword ptr [r12+8],1
     mov [r12+16],rsi
     mov eax,[rbx]
-    cmp eax,4
+    cmp eax,5
     ja .Lencode_bad
     mov [r12+24],eax
     mov dword ptr [r12+28],0
     lea r13,[r12+40]
+    cmp eax,5
+    je .Lencode_submission
     test eax,eax
     jz .Lencode_messages
     cmp eax,4
@@ -83,6 +85,30 @@
     rep movsb
     mov r13,rdi
     jmp .Lencode_finish
+.Lencode_submission:
+    cmp qword ptr [rbx+16],1
+    jne .Lencode_bad
+    cmp qword ptr [rbx+40],0
+    je .Lencode_bad
+    mov rcx,[rbx+32]
+    test rcx,rcx
+    jz .Lencode_bad
+    cmp rcx,63
+    ja .Lencode_bad
+    mov rsi,[rbx+24]
+    test rsi,rsi
+    jz .Lencode_bad
+    mov dword ptr [r12+8],4
+    mov [r13],ecx
+    lea rdi,[r13+4]
+.Lencode_key:
+    lodsb
+    test al,al
+    jz .Lencode_bad
+    stosb
+    dec rcx
+    jnz .Lencode_key
+    mov r13,rdi
 .Lencode_messages:
     mov r14,[rbx+16]
     test r14,r14
@@ -144,7 +170,10 @@
     mov rsi,[rbx+40]
     test rsi,rsi
     jz .Lencode_no_checkpoint
+    cmp dword ptr [r12+8],4
+    je .Lencode_checkpoint
     mov dword ptr [r12+8],2
+.Lencode_checkpoint:
     mov rdi,r13
     mov ecx,5
     rep movsq
@@ -203,7 +232,7 @@
     jne .Ldecode_bad
     cmp dword ptr [rbx+8],1
     jb .Ldecode_bad
-    cmp dword ptr [rbx+8],3
+    cmp dword ptr [rbx+8],4
     ja .Ldecode_bad
     cmp [rbx+12],r12d
     jne .Ldecode_bad
@@ -228,8 +257,11 @@
     xor eax,eax
     mov ecx,6
     rep stosq
+    cmp dword ptr [rbx+8],4
+    je .Ldecode_checkpoint
     cmp dword ptr [rbx+8],2
     jne .Ldecode_no_checkpoint
+.Ldecode_checkpoint:
     cmp r12,96
     jb .Ldecode_bad
     sub qword ptr [rsp],40
@@ -242,10 +274,12 @@
     rep movsq
 .Ldecode_no_checkpoint:
     mov eax,[rbx+24]
-    cmp eax,4
+    cmp eax,5
     ja .Ldecode_bad
     mov [r13],eax
     lea r15,[rbx+40]
+    cmp eax,5
+    je .Ldecode_submission
     test eax,eax
     jz .Ldecode_messages
     cmp dword ptr [rbx+28],0
@@ -282,6 +316,25 @@
     mov [r13+24],r15
     mov [r13+32],rax
     jmp .Ldecode_good
+.Ldecode_submission:
+    cmp dword ptr [rbx+8],4
+    jne .Ldecode_bad
+    cmp dword ptr [rbx+28],1
+    jne .Ldecode_bad
+    lea rax,[r15+4]
+    cmp rax,[rsp]
+    ja .Ldecode_bad
+    mov edx,[r15]
+    test edx,edx
+    jz .Ldecode_bad
+    cmp edx,63
+    ja .Ldecode_bad
+    mov [r13+24],rax
+    mov [r13+32],rdx
+    add rax,rdx
+    cmp rax,[rsp]
+    ja .Ldecode_bad
+    mov r15,rax
 .Ldecode_messages:
     mov ebp,[rbx+28]
     test ebp,ebp
@@ -525,6 +578,8 @@ pg_journal_open:
     jne .Lopen_reject
     cmp qword ptr [r13+PG_SC_RUN],0
     jne .Lopen_reject
+    cmp qword ptr [r13+PG_SC_SUB_COUNT],0
+    jne .Lopen_reject
     cmp qword ptr [r13+PG_SC_PROFILE_SIZE],0
     jne .Lopen_reject
     xor ecx,ecx
@@ -634,14 +689,14 @@ pg_journal_open:
     jne .Lopen_fail
     cmp dword ptr [rsp+8],1
     jb .Lopen_fail
-    cmp dword ptr [rsp+8],3
+    cmp dword ptr [rsp+8],4
     ja .Lopen_fail
     mov rdi,rsp
     mov esi,32
     call .Lhash
     cmp [rsp+32],rax
     jne .Lopen_fail
-    cmp dword ptr [rsp+24],4
+    cmp dword ptr [rsp+24],5
     ja .Lopen_fail
     mov eax,[rsp+12]
     cmp eax,56
@@ -649,6 +704,8 @@ pg_journal_open:
     cmp eax,PG_J_RECORD_MAX
     ja .Lopen_fail
     mov edx,56
+    cmp dword ptr [rsp+8],4
+    je .Lheader_v4
     cmp dword ptr [rsp+8],2
     je .Lheader_v2
     cmp dword ptr [rsp+8],3
@@ -662,9 +719,14 @@ pg_journal_open:
     cmp dword ptr [rsp+24],4
     jne .Lopen_fail
     jmp .Lheader_size_known
+.Lheader_v4:
+    cmp dword ptr [rsp+24],5
+    jne .Lopen_fail
+    add edx,40
+    jmp .Lheader_size_known
 .Lheader_v2:
     cmp dword ptr [rsp+24],4
-    je .Lopen_fail
+    jae .Lopen_fail
     cmp dword ptr [rsp+24],1
     je .Lopen_fail
     cmp dword ptr [rsp+24],2
@@ -674,6 +736,8 @@ pg_journal_open:
     sub eax,edx
     jc .Lopen_fail
     mov edx,[rsp+24]
+    cmp edx,5
+    je .Lheader_submission
     test edx,edx
     jz .Lheader_append
     cmp dword ptr [rsp+28],0
@@ -684,6 +748,12 @@ pg_journal_open:
     je .Lheader_system
     test eax,eax
     jne .Lopen_fail
+    jmp .Lheader_valid
+.Lheader_submission:
+    cmp dword ptr [rsp+28],1
+    jne .Lopen_fail
+    cmp eax,21
+    jb .Lopen_fail
     jmp .Lheader_valid
 .Lheader_profile:
     test eax,eax
@@ -763,6 +833,10 @@ pg_journal_open:
     lea rsi,[rsp+PG_JO_CONTROL+PG_SC_PROFILE]
     lea rdi,[r13+PG_SC_PROFILE]
     mov ecx,512
+    rep movsq
+    lea rsi,[rsp+PG_JO_CONTROL+PG_SC_SUB_COUNT]
+    lea rdi,[r13+PG_SC_SUB_COUNT]
+    mov ecx,(PG_SC_BYTES-PG_SC_SUB_COUNT)/8
     rep movsq
     mov [r13],rbx
     lea rax,[rip+pg_journal_commit]

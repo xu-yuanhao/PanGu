@@ -37,6 +37,7 @@ int pg_test_execute(void *,pg_slice,pg_slice,char *,size_t,size_t *);
 typedef void (*probe_fn)(void);
 unsigned pg_abi_probe(probe_fn,void *,const void *,size_t);
 unsigned pg_abi_probe4(probe_fn,void *,void *,size_t,void *);
+unsigned pg_abi_probe6(probe_fn,void *,const void *,size_t,const void *,size_t,void *);
 void pg_abi_corrupt(void);
 static char full[PG_TEXT_LIMIT];
 pg_store_result pg_test_storage(void *,const pg_session_change *,uint64_t,uint64_t *);
@@ -84,8 +85,13 @@ static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_s
  pg_session_change change={.kind=PG_SESSION_SYSTEM,.text={"probe",5}};
  assert(!pg_abi_probe((probe_fn)pg_session_commit,&agent->session,&local,(size_t)&change));
  assert(local.sequence==1&&!local.busy&&!strcmp(agent->session.system_prompt,"probe"));
+ pg_submissions submissions;pg_submission_record record;assert(!pg_abi_probe4((probe_fn)pg_agent_submissions,&submissions,agent,0,0));
+ assert(!pg_abi_probe6((probe_fn)submissions.submit,agent,"abi-key",7,"input",5,&record));assert(record.id&&agent->commits.submission_count==1);uint64_t seq=agent->commits.sequence;
+ assert(!pg_abi_probe6((probe_fn)submissions.submit,agent,"abi-key",7,0,0,&record)&&agent->commits.sequence==seq);
+ assert(!pg_abi_probe4((probe_fn)submissions.find,agent,(void*)"abi-key",7,&record)&&record.id);
+
 }
-int main(void){assert(pg_abi_probe(pg_abi_corrupt,0,0,0)==65);assert(pg_abi_probe4(pg_abi_corrupt,0,0,0,0)==65);
+int main(void){assert(pg_abi_probe(pg_abi_corrupt,0,0,0)==65);assert(pg_abi_probe4(pg_abi_corrupt,0,0,0,0)==65);assert(pg_abi_probe6(pg_abi_corrupt,0,0,0,0,0,0)==65);
  pg_profile_spec profile={.provider={"a",1},.model={"b",1},.workspace={"c",1},.implementation={"d",1}};unsigned char bytes[52];size_t length=0;
  assert(!pg_abi_probe4((probe_fn)pg_profile_encode,&profile,bytes,sizeof(bytes),&length)&&length==sizeof(bytes));
 long page=sysconf(_SC_PAGESIZE);assert(page>0);size_t accessible=((sizeof(pg_agent)+(size_t)page-1)/(size_t)page)*(size_t)page,total=accessible+2*(size_t)page;

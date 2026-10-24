@@ -16,7 +16,11 @@
 #define PG_SC_RUN 32
 #define PG_SC_PROFILE_SIZE 72
 #define PG_SC_PROFILE 80
-#define PG_SC_BYTES 4176
+#define PG_SC_SUB_COUNT 4176
+#define PG_SC_SUBS 4184
+#define PG_SUB_BYTES 80
+#define PG_SUB_KEY 16
+#define PG_SC_BYTES 9304
 #define PG_CP_BYTES 40
 #define PG_CP_PHASE 8
 #define PG_CP_TURNS 12
@@ -25,7 +29,8 @@
 #define PG_CP_RESTARTS 28
 #define PG_CP_INPUT 32
 #define PG_CHANGE_BYTES 48
-#define PG_SESSION_STACK 8600
+#define PG_SESSION_STACK 8664
+#define PG_SESSION_REQUEST 8592
 #define PG_SESSION_DATA 56
 #define PG_SESSION_CP 8552
 #endif

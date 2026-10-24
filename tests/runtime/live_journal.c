@@ -11,8 +11,9 @@ static pg_mimo provider;
 static pg_journal journal={.file=-1,.directory=-1};
 int main(int argc,char **argv){
  if(argc!=3)return 2;
- int recall=!strcmp(argv[1],"recall"),resume=!strcmp(argv[1],"resume"),interrupt=!strcmp(argv[1],"interrupt");
- if(!recall&&!resume&&!interrupt&&strcmp(argv[1],"store"))return 2;
+ int keyed=!strncmp(argv[1],"key-",4);const char *phase=keyed?argv[1]+4:argv[1];
+ int recall=!strcmp(phase,"recall"),resume=!strcmp(phase,"resume"),interrupt=!strcmp(phase,"interrupt");
+ if(!recall&&!resume&&!interrupt&&strcmp(phase,"store"))return 2;
  if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
  int result=2,dir=open(argv[2],O_RDONLY|O_DIRECTORY|O_CLOEXEC);if(dir<0)goto finish;
  if(pg_agent_init(&agent,pg_mimo_model(&provider),(pg_tools){0}))goto cleanup;
@@ -24,20 +25,34 @@ int main(int argc,char **argv){
  const char *prompt=recall?"What was the exact marker? Reply with only that marker.":"Remember the marker PANGU_DISK_8264. Reply only ACK.";
  const char *expected=recall?"PANGU_DISK_8264":"ACK";
  pg_client client=pg_agent_client(&agent);size_t first=agent.session.count;
+ pg_submissions submissions=pg_agent_submissions(&agent);pg_submission_record record;
+ if(keyed&&(resume||recall)){
+  uint64_t sequence=agent.commits.sequence;unsigned expected_settled=recall?1u:0u;
+  if(submissions.find(submissions.context,(pg_slice){"primary",7},&record)||record.settled!=expected_settled)goto cleanup;
+  uint64_t id=record.id;
+  if(submissions.submit(submissions.context,(pg_slice){"primary",7},(pg_slice){"ignored duplicate",17},&record)||record.id!=id||agent.commits.sequence!=sequence||agent.session.count!=first||provider.http)goto cleanup;
+ }
+
  if(resume){if(pg_agent_resume(&agent,0))goto cleanup;}
- else if(client.submit(client.context,(pg_slice){prompt,strlen(prompt)}))goto cleanup;
+ else if(keyed){
+  const char *key=recall?"recall":"primary";
+  if(submissions.submit(submissions.context,(pg_slice){key,strlen(key)},(pg_slice){prompt,strlen(prompt)},&record))goto cleanup;
+  uint64_t id=record.id,sequence=agent.commits.sequence;
+  if(submissions.submit(submissions.context,(pg_slice){key,strlen(key)},(pg_slice){0,0},&record)||record.id!=id||agent.commits.sequence!=sequence)goto cleanup;
+ }else if(client.submit(client.context,(pg_slice){prompt,strlen(prompt)}))goto cleanup;
  for(unsigned i=0;i<7000;++i){pg_event event;if(client.poll(client.context,&event)){
   if(interrupt&&event.kind==PG_TEXT_DELTA){if(pg_agent_suspend(&agent)||agent.request_open||agent.commits.run.phase!=PG_RUN_MODEL||agent.session.count!=1)goto cleanup;
    printf("live_journal phase=interrupt http=%ld verified=1 sequence=%llu messages=%zu checkpoint=%d\n",provider.http,(unsigned long long)agent.commits.sequence,agent.session.count,agent.commits.run.phase);result=0;goto cleanup;}
   if(event.kind==PG_RUN_FINISHED){int found=0;for(size_t j=first;j<agent.session.count;++j)if(agent.session.messages[j].role==PG_ASSISTANT&&strstr(agent.session.messages[j].text,expected))found=1;
    result=event.outcome!=PG_SUCCESS||!found||agent.commits.sequence!=before+3||agent.commits.run.phase!=PG_RUN_TERMINAL;
+   if(keyed){const char *key=recall?"recall":"primary";if(submissions.find(submissions.context,(pg_slice){key,strlen(key)},&record)||!record.settled||record.outcome!=PG_SUCCESS)result=1;}
    printf("live_journal phase=%s outcome=%d http=%ld verified=%d sequence=%llu messages=%zu checkpoint=%d\n",argv[1],event.outcome,provider.http,found,(unsigned long long)agent.commits.sequence,agent.session.count,agent.commits.run.phase);goto cleanup;}
  }
  struct timespec pause={0,10000000};nanosleep(&pause,0);
  }
  client.cancel(client.context);for(unsigned i=0;i<8;++i){pg_event event;if(client.poll(client.context,&event)&&event.kind==PG_RUN_FINISHED)break;}
 cleanup:
- pg_journal_close(&journal);close(dir);
+ pg_agent_suspend(&agent);pg_journal_close(&journal);close(dir);
 finish:
  curl_global_cleanup();return result;
 }

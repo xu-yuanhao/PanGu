@@ -37,6 +37,8 @@ pg_session_commit:
     je .Lreject
     cmp qword ptr [r12+PG_SC_SEQ],-1
     je .Lreject
+    cmp qword ptr [r12+PG_SC_SUB_COUNT],64
+    ja .Lreject
     cmp qword ptr [rbx+PG_S_COUNT],64
     ja .Lreject
     xor eax,eax
@@ -55,6 +57,8 @@ pg_session_commit:
     cmp qword ptr [r13+40],0
     jne .Lreject
 .Lboundary_checked:
+    cmp eax,5
+    je .Lsubmission
     cmp eax,0
     je .Lappend
     cmp eax,1
@@ -64,6 +68,31 @@ pg_session_commit:
     cmp eax,3
     ja .Lreject
     jmp .Lcheckpoint
+.Lsubmission:
+    cmp qword ptr [r13+16],1
+    jne .Lreject
+    cmp qword ptr [r13+40],0
+    je .Lreject
+    mov rcx,[r13+32]
+    test rcx,rcx
+    jz .Lreject
+    cmp rcx,63
+    ja .Lreject
+    mov rsi,[r13+24]
+    test rsi,rsi
+    jz .Lreject
+    mov [rsp+32],rcx
+    lea rdi,[rsp+PG_SESSION_REQUEST]
+    mov [rsp+24],rdi
+.Lrequest_copy:
+    lodsb
+    test al,al
+    jz .Lreject
+    stosb
+    dec rcx
+    jnz .Lrequest_copy
+    mov byte ptr [rdi],0
+    jmp .Lappend
 .Lprofile:
     cmp qword ptr [r13+32],0
     je .Lreject
@@ -166,8 +195,11 @@ pg_session_commit:
     jne .Lreject
 .Lcheckpoint_outcome:
     mov r14,[rbx+PG_S_COUNT]
+    cmp dword ptr [rsp],5
+    je .Lcheckpoint_added
     cmp dword ptr [rsp],0
     jne .Lcheckpoint_count
+.Lcheckpoint_added:
     add r14,[rsp+16]
 .Lcheckpoint_count:
     mov rax,[r15+PG_CP_INPUT]
@@ -209,8 +241,43 @@ pg_session_commit:
     cmp dword ptr [r12+PG_SC_RUN+PG_CP_PHASE],3
     jne .Lreject
 .Lnew_run:
+    mov rax,[r12+PG_SC_SUB_COUNT]
+    test rax,rax
+    jz .Lnew_kind
+    dec rax
+    imul rax,PG_SUB_BYTES
+    mov rax,[r12+PG_SC_SUBS+rax]
+    cmp [r15],rax
+    jbe .Lreject
+.Lnew_kind:
+    cmp dword ptr [rsp],5
+    je .Lnew_submission
     cmp dword ptr [rsp],0
     jne .Lreject
+    jmp .Lnew_checkpoint
+.Lnew_submission:
+    cmp qword ptr [r12+PG_SC_SUB_COUNT],64
+    jae .Lreject
+    mov rax,[r12+PG_SC_SEQ]
+    inc rax
+    cmp [r15],rax
+    jne .Lreject
+    mov rax,[rsp+8]
+    cmp dword ptr [rax],0
+    jne .Lreject
+    cmp dword ptr [rax+PG_MSG_ERROR],0
+    jne .Lreject
+    cmp byte ptr [rax+PG_MSG_ID],0
+    jne .Lreject
+    cmp byte ptr [rax+PG_MSG_NAME],0
+    jne .Lreject
+    mov rdi,r12
+    mov rsi,[rsp+24]
+    mov rdx,[rsp+32]
+    call pg_submission_find
+    test rax,rax
+    jnz .Lreject
+.Lnew_checkpoint:
     cmp dword ptr [r15+PG_CP_PHASE],1
     jne .Lreject
     cmp qword ptr [rsp+16],1
@@ -224,6 +291,8 @@ pg_session_commit:
     jne .Lreject
     jmp .Lstore
 .Lsame_run:
+    cmp dword ptr [rsp],5
+    je .Lreject
     cmp dword ptr [r12+PG_SC_RUN+PG_CP_PHASE],3
     jne .Lsame_active
     cmp dword ptr [r15+PG_CP_PHASE],3
@@ -240,6 +309,8 @@ pg_session_commit:
     jb .Lreject
     jmp .Lstore
 .Lno_checkpoint:
+    cmp dword ptr [rsp],5
+    je .Lreject
     cmp dword ptr [rsp],3
     je .Lreject
     cmp qword ptr [r12+PG_SC_RUN],0
@@ -262,6 +333,8 @@ pg_session_commit:
     inc rax
     cmp [rsp+48],rax
     jne .Luncertain
+    cmp dword ptr [rsp],5
+    je .Ladopt_append
     cmp dword ptr [rsp],0
     je .Ladopt_append
     cmp dword ptr [rsp],1
@@ -308,6 +381,22 @@ pg_session_commit:
     rep movsb
     mov rax,[rsp+16]
     add [rbx+PG_S_COUNT],rax
+    cmp dword ptr [rsp],5
+    jne .Ladopted
+    imul rdi,[r12+PG_SC_SUB_COUNT],PG_SUB_BYTES
+    lea rdi,[r12+PG_SC_SUBS+rdi]
+    mov r14,rdi
+    xor eax,eax
+    mov ecx,PG_SUB_BYTES/8
+    rep stosq
+    mov rax,[rsp+40]
+    mov rax,[rax]
+    mov [r14],rax
+    lea rdi,[r14+PG_SUB_KEY]
+    mov rsi,[rsp+24]
+    mov rcx,[rsp+32]
+    rep movsb
+    inc qword ptr [r12+PG_SC_SUB_COUNT]
 .Ladopted:
     mov rsi,[rsp+40]
     test rsi,rsi
@@ -315,6 +404,24 @@ pg_session_commit:
     lea rdi,[r12+PG_SC_RUN]
     mov ecx,5
     rep movsq
+    mov rcx,[r12+PG_SC_SUB_COUNT]
+    lea rdi,[r12+PG_SC_SUBS]
+    mov rax,[r12+PG_SC_RUN]
+.Lupdate_submission:
+    test rcx,rcx
+    jz .Ladopt_sequence
+    cmp [rdi],rax
+    je .Lupdate_found
+    add rdi,PG_SUB_BYTES
+    dec rcx
+    jmp .Lupdate_submission
+.Lupdate_found:
+    xor eax,eax
+    cmp dword ptr [r12+PG_SC_RUN+PG_CP_PHASE],3
+    sete al
+    mov [rdi+8],eax
+    mov eax,[r12+PG_SC_RUN+PG_CP_OUTCOME]
+    mov [rdi+12],eax
 .Ladopt_sequence:
     mov rax,[rsp+48]
     mov [r12+PG_SC_SEQ],rax

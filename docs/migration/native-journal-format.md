@@ -1,6 +1,6 @@
-# 盘古原生事务日志 v1/v2/v3（本地开发）
+# 盘古原生事务日志 v1/v2/v3/v4（本地开发）
 
-实现：`src/runtime/journal.S`。这是盘古自己的格式，不是 Pi Durable JSONL，也不导入/覆盖 Pi 数据。参考 Durable 的全批次提交、提交前序列化、失败隔离和尾部恢复语义；选用显式二进制帧，使汇编可直接处理长度与字段，不增加JSON编码依赖，不保存C结构布局或指针。版本尚未稳定，读取v1/v2/v3；未知版本拒绝，不改写已有v1帧。检查点使用v2记录，配置身份使用v3，旧消息/system/reset仍用v1。
+实现：`src/runtime/journal.S`。这是盘古自己的格式，不是 Pi Durable JSONL，也不导入/覆盖 Pi 数据。参考 Durable 的全批次提交、提交前序列化、失败隔离和尾部恢复语义；选用显式二进制帧，使汇编可直接处理长度与字段，不增加JSON编码依赖，不保存C结构布局或指针。版本尚未稳定，读取v1/v2/v3/v4；未知版本拒绝，不改写已有v1帧。检查点使用v2记录，配置身份使用v3，带requestId的输入准入使用v4，旧消息/system/reset仍用v1。
 
 ## 文件与所有权
 
@@ -15,10 +15,10 @@
 | 偏移 | 长度 | 含义 |
 |---|---:|---|
 | 0 | 8 | magic：`PGJRNL1`后跟NUL |
-| 8 | 4 | 格式版本1、2或3 |
+| 8 | 4 | 格式版本1、2、3或4 |
 | 12 | 4 | 包含头部与尾部的总长度 |
 | 16 | 8 | 提交序号，从1开始、逐次加1 |
-| 24 | 4 | 操作：0 append、1 system、2 reset、3 checkpoint（仅v2）、4 profile（仅v3） |
+| 24 | 4 | 操作：0 append、1 system、2 reset、3 checkpoint（仅v2）、4 profile（仅v3）、5 submission（仅v4） |
 | 28 | 4 | append消息数1～2；其他为0 |
 | 32 | 8 | 前32字节的FNV-1a 64校验值 |
 | 40 | 可变 | 消息payload；v2其后追加40字节检查点 |
@@ -37,11 +37,11 @@ open只接受新鲜空Session/control，顺序回放连续序号。成功后才�
 
 最后不足完整头，或头校验有效但记录尾不完整时，仅截断到上一完整提交并刷盘。完整帧的头/内容校验错误、尾标记错误、非法字段、序号跳跃、未知版本均拒绝，不能当作“可修复尾部”静默删除。IO读取或尾部截断失败也拒绝。
 
-完整帧可能在“已写入、尚未确认给调用者”时随进程退出而留下。重开会接受有效帧，不能假定调用者没收到成功就等于没提交；后续Submission/requestId与任务状态负责消除重复提交和处理在途工作。
+完整帧可能在“已写入、尚未确认给调用者”时随进程退出而留下。重开会接受有效帧，不能假定调用者没收到成功就等于没提交；带requestId的输入准入可在重开后去重，任务检查点处理在途工作；没有requestId的调用仍由调用者避免重复提交。
 
 ## 当前范围与验证
 
-已实现Session消息/system/reset及单运行检查点的文件存储和重开；不含通用Task图/Submission队列、requestId、模型流partial、压缩、自动文件格式迁移或外部副作用结算。交互入口默认易失；设置PANGU_SESSION_DIR选择现有私有目录中的session.pgj，即启用文件Storage、配置身份核对和在途恢复。
+已实现Session消息/system/reset及单运行检查点的文件存储和重开；不含通用Task图/Submission队列、模型流partial、压缩、自动文件格式迁移或外部副作用结算。交互入口默认易失；设置PANGU_SESSION_DIR选择现有私有目录中的session.pgj，即启用文件Storage、配置身份核对和在途恢复。
 
 `tests/runtime/test_journal.c`验证跨进程重开、工具双消息批次、reset、所有最终帧截断位置、完整文件逐字节损坏、带正确校验的非法字段、最大8530字节记录、独占锁、短读/短写/EINTR、写入/刷盘/截断/读取失败、半写后进程退出、路径/文件类型/配额边界。IO测试包装同时检查外部调用入口栈对齐、主动破坏caller-saved；五参数ABI探针检查open/Session提交/close的callee-saved、DF与栈哨兵。测试只在临时目录操作，不修改用户会话。主入口：`python3 -B tools/runtime/build_test.py`。
 
@@ -57,9 +57,9 @@ cancel先提交ABORTING，再停止本地模型/工具续接；取消待执行�
 
 模型轮次最多16，调用前提交，重开不清零。连续显式恢复上限5，跨进程保存，模型/工具阶段确有进展后清零；普通暂停后再resume也计一次，这是与上游仅统计crash/eviction不同的明确局部规则。达到上限返回2且不调度；显式`pg_agent_resume(agent,1)`重置恢复预算并继续，仍不能清除模型轮次预算。并非无限自动重试。
 
-恢复目前只支持原有只读/replay-safe工具契约。工具已执行但结果未提交时可能重读；结果已提交则不会重复执行。没有外部写入的exactly-once保证。profiled会话必须先以pg_agent_bind_profile核对原配置，再resume；不匹配活动运行时拒绝且不写日志。旧无身份日志仍可由显式底层调用者提供原配置处理，产品交互入口拒绝自动采用这种已有日志。运行id来自提交序号，不等于用户requestId或跨历史去重表。
+恢复目前只支持原有只读/replay-safe工具契约。工具已执行但结果未提交时可能重读；结果已提交则不会重复执行。没有外部写入的exactly-once保证。profiled会话必须先以pg_agent_bind_profile核对原配置，再resume；不匹配活动运行时拒绝且不写日志。旧无身份日志仍可由显式底层调用者提供原配置处理，产品交互入口拒绝自动采用这种已有日志。运行id来自提交序号；可选requestId由独立有界记录关联，见v4。
 
-内部ABI已变化：pg_session_control=4176、pg_session_change=48、pg_run_checkpoint=40、pg_agent=293160字节，所有消费者同批重编译；模型、pg_tools、工具定义和pg_client布局保持不变，尚无稳定ABI承诺。v1线格式及消息容量不变；v2新增40字节协议字段产生的缓冲增加，不是扩大消息/文件预算。
+内部ABI已变化：pg_session_control=9304、pg_session_change=48、pg_run_checkpoint=40、pg_agent=298288字节，所有消费者同批重编译；模型、pg_tools、工具定义和pg_client布局保持不变，尚无稳定ABI承诺。v1线格式及消息容量不变；v2新增40字节协议字段产生的缓冲增加，不是扩大消息/文件预算。
 
 在途真实验证：`python3 -B tools/runtime/build_test.py --live-resume`。三个独立进程依次收到真实流文本后暂停、重开恢复原输入、再重开回忆；不重复提交原user，不把旧partial当完成消息。纯边界/故障测试另覆盖11个中断/完成/取消/暂停位置、未发布终态但完整帧已写入、恢复上限与显式retry。
 
@@ -76,3 +76,17 @@ PANGU_SESSION_DIR需指向现有目录，最终目录不跟随符号链接；固
 持久模式通过bridge的可选detach回调绑定pg_agent_suspend：Ctrl-D/外部终止信号退出时停止本地请求、保留检查点，不调用cancel或排空伪造终态；Ctrl-C忙时仍明确abort。默认易失bridge保持原有有限取消排空。bridge尺寸240字节，stop_error记录detach失败，composition将其计入退出码。单所有者、没有后台执行器；关闭后下次进程重开才继续。不会保存流式草稿、完整TUI屏幕或补显示历史记录。
 
 专项证据在test_profile.c（身份/配额/不匹配）、test_journal.c（v3最大帧、全部小帧尾切分/逐字节损坏、合法校验的非法版本/kind/count及fsync不确定恢复）、test_runtime_bridge.c（detach不cancel/poll、失败、幂等和ABI）。实际交互验收入口为python3 -B tools/runtime/test_pangu_pty.py --live-persistent；需要环境凭据，临时目录和会话自动删除。
+
+## v4有界输入Submission
+
+`pg_agent_submissions()`返回独立的`pg_submissions`函数表（context/submit/find，24字节）。默认实现依托当前Session事务和单运行执行器；消费者可以替换整张服务表，宿主不解释请求业务。没有队列、通用任务图或阻塞wait句柄，原pg_client.submit仍是无requestId的简单输入入口。
+
+submit先核对配置/控制状态和requestId，再查询已有记录，最后才对新请求检查busy/输入并提交。相同requestId即使新文本不同也返回原id/status，不重复写入、启动模型或发布事件；已结束记录同样去重。find只读，不触发恢复/网络。输出由调用者独立拥有，失败不修改；record为id u64、settled u32、outcome u32、request_id[64]，80字节，只有settled=1时outcome有效。
+
+原生差异：当前只接收input，requestId要求1～63非NUL字节，每个Session最多64个有键记录；无键请求不占记录。记录跨reset与重开保留，满额拒绝新键，不静默淘汰，不以reset绕过去重。该上限是显式本地范围，不声称覆盖上游任意字符串/无限历史。请求键作用域是各自Session。新键准入将用户消息、运行检查点和关联记录同事务提交；确认前查询看不到新记录，不确定结果必须重开。
+
+v4只允许kind=5、count=1、40字节检查点。payload先放requestId长度u32及其原始字节（不带NUL），随后为一条与v1/v2相同的消息，最后附v2相同40字节检查点。准入必须是PG_USER和新MODEL运行，id=当前序号+1；重复键或已有运行上重放kind=5被拒绝。最大当前合法输入记录为4274字节（63字节键+4095字节文本），帧缓冲8592、消息/文件预算不变。后续进度/终态仍用v2检查点；回放时按run id更新对应记录的settled/outcome，旧记录不被后续运行覆盖。未知版本拒绝，不提供降级写入或自动格式转换。
+
+Session控制尾部增加submission_count及64个记录；checkpoint仍40、change仍48、模型可见Session/pg_client/pg_model布局不变，所有内部消费者同批重编译。新增lookup无IO/分配，提交与结果发布仍由原事务边界保证。
+
+验证入口：`python3 -B tools/runtime/build_test.py`包含test_submissions.c及ABI探针；`--live-submission`使用真实MiMo三进程中断/去重恢复/已结束去重与新输入回忆。仅输入去重，不等于外部工具副作用的exactly-once。

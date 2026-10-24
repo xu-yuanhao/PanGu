@@ -1613,7 +1613,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded memory projection plus atomic run checkpoints, immutable settled messages and reset boundary; no fork/general task graph",
+      "local_subset_scope": "bounded projection, atomic run/profile/input-submission facts, settled messages and reset retaining keyed submission records; no fork/general task graph",
       "local_implementation": "session.S and agent.S handwritten SysV; volatile default or explicitly bound journal; atomic message/checkpoint/profile transactions"
     },
     {
@@ -1636,7 +1636,7 @@
         "docs/migration/native-journal-format.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "native journal v1/v2/v3, exact credential-free profile identity, opt-in persistent TUI and single-run model/tool/abort recovery with bounded restarts; requestId dedup/general scheduler pending"
+      "local_subset_scope": "journal v1-v4; profile-verified persistent TUI, input requestId dedup across reset/reopen, single-run model/tool/abort recovery; no general scheduler or external side-effect exactly-once"
     },
     {
       "id": "T21",
@@ -1699,7 +1699,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "durable single sequential read-only run, explicit resume/suspend, persisted abort and terminal outcome, model/tool continuation; no general scheduler, requestId dedup, or side-effect reconciliation",
+      "local_subset_scope": "single sequential read-only run; replaceable input submission service, bounded key dedup, explicit resume/suspend, persisted outcome; no general scheduler/queue",
       "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {
@@ -2228,8 +2228,8 @@
       "c",
       "cpp"
     ],
-    "next_work": "Tools/read and TUI handwritten ASM integrated; main Agent continues Durable profile identity and persistent entry; second Agent replaces MiMo protocol/transport core in place with handwritten ASM",
-    "ownership": "main Agent owns Durable profile/storage/tasks/recovery/composition/client/shared controls; second Agent owns MiMo modules and protocol/projection dedicated tests in docs/并行开发任务提示词-MiMo协议汇编重构.md; model ABI and configuration semantics frozen",
+    "next_work": "main Agent implements bounded native Durable submission/task behavior; second Agent replaces MiMo core in place with handwritten ASM",
+    "ownership": "main Agent owns Durable submissions/session/storage/profile/agent/client/composition/shared controls; second Agent exclusively owns MiMo modules and protocol/projection dedicated tests under docs/并行开发任务提示词-MiMo协议汇编重构.md; model ABI/configuration semantics frozen",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
     "status": "tools/read and TUI subsets integrated; MiMo assembly task assigned by document, not yet implemented or verified",
     "reference_workflow": "Read pinned functions, direct callers and related tests before implementation; record adopted semantics/native differences and verification in existing handoff/progress. runtime-local-modules.reference_basis is a locator, never reading/compliance proof."

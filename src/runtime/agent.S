@@ -53,6 +53,123 @@ pg_agent_client:
     ret
 .size pg_agent_client,.-pg_agent_client
 
+.globl pg_agent_submissions
+.type pg_agent_submissions,@function
+pg_agent_submissions:
+    mov [rdi],rsi
+    lea rax,[rip+.Lsubmission_submit]
+    mov [rdi+8],rax
+    lea rax,[rip+.Lsubmission_find]
+    mov [rdi+16],rax
+    mov rax,rdi
+    ret
+.size pg_agent_submissions,.-pg_agent_submissions
+
+.Lrequest_valid:
+    test rsi,rsi
+    jz .Lrequest_bad
+    test rdx,rdx
+    jz .Lrequest_bad
+    cmp rdx,63
+    ja .Lrequest_bad
+    xor r10d,r10d
+.Lrequest_byte:
+    cmp byte ptr [rsi+r10],0
+    je .Lrequest_bad
+    inc r10
+    cmp r10,rdx
+    jb .Lrequest_byte
+    xor eax,eax
+    ret
+.Lrequest_bad:
+    mov eax,2
+    ret
+
+.Lsubmission_find:
+    test rdi,rdi
+    jz .Lrequest_bad
+    test rcx,rcx
+    jz .Lrequest_bad
+    push rbx
+    mov rbx,rcx
+    call .Lrequest_valid
+    test eax,eax
+    jnz .Lsubmission_find_return
+    add rdi,PG_A_COMMITS
+    call pg_submission_find
+    test rax,rax
+    jz .Lsubmission_missing
+    mov rsi,rax
+    mov rdi,rbx
+    mov ecx,PG_SUB_BYTES/8
+    rep movsq
+    xor eax,eax
+    jmp .Lsubmission_find_return
+.Lsubmission_missing:
+    mov eax,1
+.Lsubmission_find_return:
+    pop rbx
+    ret
+
+.Lsubmission_submit:
+    test rdi,rdi
+    jz .Lrequest_bad
+    test r9,r9
+    jz .Lrequest_bad
+    PROFILE_GUARD rdi,.Lrequest_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+PG_SC_BUSY],0
+    jne .Lrequest_bad
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp,16
+    mov rbx,rdi
+    mov r12,rcx
+    mov r13,r8
+    mov r14,r9
+    mov r15,rsi
+    mov [rsp],rdx
+    call .Lrequest_valid
+    test eax,eax
+    jnz .Lsubmission_submit_return
+    lea rdi,[rbx+PG_A_COMMITS]
+    call pg_submission_find
+    test rax,rax
+    jnz .Lsubmission_result
+    mov rdi,rbx
+    mov rsi,r12
+    mov rdx,r13
+    mov rcx,r15
+    mov r8,[rsp]
+    call .Ladmit
+    test eax,eax
+    jnz .Lsubmission_submit_return
+    mov rax,[rbx+PG_A_COMMITS+PG_SC_SUB_COUNT]
+    test rax,rax
+    jz .Lsubmission_internal_error
+    dec rax
+    imul rax,PG_SUB_BYTES
+    lea rax,[rbx+PG_A_COMMITS+PG_SC_SUBS+rax]
+.Lsubmission_result:
+    mov rdi,r14
+    mov rsi,rax
+    mov ecx,PG_SUB_BYTES/8
+    rep movsq
+    xor eax,eax
+    jmp .Lsubmission_submit_return
+.Lsubmission_internal_error:
+    mov eax,2
+.Lsubmission_submit_return:
+    add rsp,16
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
 .globl pg_agent_bind_storage
 .type pg_agent_bind_storage,@function
 pg_agent_bind_storage:
@@ -474,6 +591,11 @@ pg_agent_suspend:
     jmp .Lfinish
 
 .Lsubmit:
+    xor ecx,ecx
+    xor r8d,r8d
+.Ladmit:
+    test rdi,rdi
+    jz .Lsubmit_bad
     PROFILE_GUARD rdi,.Lsubmit_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lsubmit_bad
@@ -486,7 +608,10 @@ pg_agent_suspend:
     cmp qword ptr [rdi+PG_A_COUNT],60
     ja .Lsubmit_bad
     push rbx
+    sub rsp,64
     mov rbx,rdi
+    mov [rsp+48],rcx
+    mov [rsp+56],r8
     mov rcx,rdx
     mov rdx,rsi
     xor esi,esi
@@ -502,20 +627,36 @@ pg_agent_suspend:
     mov qword ptr [rbx+PG_A_NEXT+PG_CP_OUTCOME],0
     mov rax,[rbx+PG_A_COUNT]
     mov [rbx+PG_A_NEXT+PG_CP_INPUT],rax
+    mov dword ptr [rsp],0
+    cmp qword ptr [rsp+56],0
+    je .Ladmit_kind
+    mov dword ptr [rsp],5
+.Ladmit_kind:
+    lea rax,[rbx+PG_A_PENDING]
+    mov [rsp+8],rax
+    mov qword ptr [rsp+16],1
+    mov rax,[rsp+48]
+    mov [rsp+24],rax
+    mov rax,[rsp+56]
+    mov [rsp+32],rax
+    lea rax,[rbx+PG_A_NEXT]
+    mov [rsp+40],rax
     mov rdi,rbx
-    lea rsi,[rbx+PG_A_PENDING]
-    mov edx,1
-    call .Lcommit_records
-    test rax,rax
-    jz .Lsubmit_pop_bad
+    lea rsi,[rbx+PG_A_COMMITS]
+    mov rdx,rsp
+    call pg_session_commit
+    test eax,eax
+    jnz .Lsubmit_pop_bad
     mov dword ptr [rbx+PG_A_CANCEL],0
     mov dword ptr [rbx+PG_A_TURNS],0
     mov byte ptr [rbx+PG_A_ERROR],0
     mov dword ptr [rbx+PG_A_STATE],PG_ST_BEGIN
+    add rsp,64
     pop rbx
     xor eax,eax
     ret
 .Lsubmit_pop_bad:
+    add rsp,64
     pop rbx
 .Lsubmit_bad:
     mov eax,1

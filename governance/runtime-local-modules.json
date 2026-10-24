@@ -33,9 +33,10 @@
         "src/runtime/session.S"
       ],
       "dependencies": [
-        "client.contract.v0"
+        "client.contract.v0",
+        "submissions.ledger.local.v1"
       ],
-      "role": "bounded atomic message/checkpoint/profile transaction; active runtime identity immutable, detach then adopt only after Storage confirms",
+      "role": "atomic message/checkpoint/profile/input-submission transactions; detached request key and data, bounded dedup ledger adopted after Storage confirms; settled outcomes retained across reset",
       "exports": [
         "pg_session_commit",
         "pg_session_volatile_commit"
@@ -67,7 +68,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten SysV single-run executor with durable model/tool/abort/terminal checkpoints, explicit suspend/resume, bounded restart budget and exact credential-free profile verification; current read-only tools, no general task graph/requestId dedup",
+      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -76,7 +77,8 @@
         "pg_agent_bind_storage",
         "pg_agent_resume",
         "pg_agent_suspend",
-        "pg_agent_bind_profile"
+        "pg_agent_bind_profile",
+        "pg_agent_submissions"
       ],
       "reference_basis": [
         {
@@ -339,7 +341,7 @@
         "system libc",
         "POSIX pread/pwrite/fsync/ftruncate/flock/openat/fcntl"
       ],
-      "role": "native framed journal v1/v2/v3 reader: messages, single-run checkpoints and credential-free profiles; exclusive writer, fsync and validated recovery",
+      "role": "framed journal v1-v4: messages, checkpoints, profiles and atomic keyed input admission; recovery reconstructs bounded submission records/outcomes, exclusive writer and fsync",
       "exports": [
         "pg_journal_open",
         "pg_journal_close",
@@ -386,6 +388,34 @@
           "semantics": "pin prepared model/options across recovery; native exact public configuration identity rejects active mismatch rather than silently replacing original context",
           "tests_to_read": [
             "packages/durable/test/harness-generation-recovery.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "submissions.ledger.local.v1",
+      "sources": [
+        "src/runtime/submissions.h",
+        "src/runtime/submissions.S"
+      ],
+      "dependencies": [
+        "client.contract.v0"
+      ],
+      "role": "pure bounded request key lookup in Session-owned submission ledger; default service adapter belongs to Agent, consumers may replace whole pg_submissions function table",
+      "exports": [
+        "pg_submission_find"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/harness/submissions.ts",
+            "packages/durable/src/harness/types.ts"
+          ],
+          "semantics": "admitSubmission dedup before busy/write; status retained across reopen; native input-only 64-record ledger, no queue/writes/wait handles",
+          "tests_to_read": [
+            "packages/durable/test/harness-submissions.test.ts"
           ]
         }
       ]

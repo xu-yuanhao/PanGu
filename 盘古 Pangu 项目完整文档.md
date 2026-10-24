@@ -35,7 +35,7 @@ TUI 以 Grok Build 为主要 UI/UX 参考，Pi 为简洁性基线，结合 Codex
 
 ## 当前开发与运行
 
-已有手写汇编的 Agent/Session、原生事务日志、只读 read 工具和薄 TUI，接通真实 MiMo。持久会话支持当前单运行的检查点与恢复；完整任务调度、请求去重、写工具等尚未完成。最新实际结果与限制见 [核心进展](docs/migration/runtime-core-progress.md)，不以本页代替验收证据。
+已有手写汇编的 Agent/Session、原生事务日志、只读 read 工具和薄 TUI，接通真实 MiMo。持久会话支持当前单运行的检查点、恢复及有界输入请求去重；完整任务调度、写工具等尚未完成。最新实际结果与限制见 [核心进展](docs/migration/runtime-core-progress.md)，不以本页代替验收证据。
 
 设置环境变量 `MIMO_API_KEY`（可选 `MIMO_MODEL`），构建后从终端运行：
 

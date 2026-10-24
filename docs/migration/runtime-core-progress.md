@@ -526,3 +526,25 @@ d829079cf433eb09e55aa5234523dbb3a7fab4005628f9e72197fb9f5e2a21b1  盘古 Pangu �
 ```
 
 Goal保持进行中；下一步继续以参考源码推进实际Task/Submission服务边界，MiMo协议汇编由并行Agent完成后集成。
+
+## 2026-10-25：有界输入Submission与requestId去重
+
+读取Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7的Submissions.submit→admitSubmission、SubmissionDraft/Record，以及harness-submissions.test.ts的deduplicates request IDs per conversation before any write、reacquires a submission after reopen and settles it durably。采用去重先于busy/写入、同键不同文本返回原记录、关闭重开后保留状态；原生只做当前input，不复制队列、write型submission、遥测或阻塞wait框架。
+
+新增手写submissions.S无IO/分配的键查询，pg_agent_submissions返回可替换函数表；默认准入复用现有Session原子提交。kind=5把请求键、单条user与新MODEL检查点同提交，确认前不可见；后续检查点按运行id更新settled/outcome，reset保留历史键。最大64个键、1～63非NUL字节，满额拒绝新键、不静默遗忘，无键客户端行为保留。来源缓冲先分离；回调改变原输入后仍返回已采纳记录，不再回读原键。
+
+日志新增v4仅用于kind=5，payload为u32键长+键+一条旧格式消息+旧40字节检查点，最大当前输入帧4274字节，8592帧缓冲/16MiB文件/消息预算不变。读取v1～v4，未知版本拒绝；旧二进制不能读取新帧，不自动降级。control=9304、agent=298288、record=80、服务表=24字节；checkpoint=40/change=48、模型可见Session、pg_model/pg_client/工具布局不变，内部消费者同批重编译。没有外部副作用exactly-once、通用调度或完整Durable兼容声明。
+
+实际验证：13组核心O0/O2 UBSan通过；包含忙前重复、不同内容/无效新内容同键复用、成功/错误/取消状态、reset/多键重开、满64键与无键继续、63字节保护页键/80字节页尾输出/4095字节输入、直接事务重复或非法工具字段拒绝。提交回调验证旧记录不可见/重入拒绝/源数据变化、REJECTED/UNCERTAIN无部分采纳；v4每个尾切分/逐字节损坏/正确校验的非法字段、fsync失败及确认前进程_exit重开去重通过。新增6参数/结构返回/查询ABI探针及负例自检，原Agent页尾/回调守卫保持通过。
+
+真实MiMo三进程--live-submission实际HTTP200：中断seq3/messages1/MODEL；重开先去重再resume，成功seq6/messages2/TERMINAL；第三进程已结束去重无网络/写入，再新键回忆成功seq9/messages4。完整候选树9597f2dac8720aad878b44cc862186f5203ce48e在临时归档复验G00、13组核心、6组客户端、离线PTY及真实--live-persistent全部通过；生产准入仍BLOCKED。共享工作树G00因并行Agent新增未交接MiMo文件而失败，这些文件不在本次暂存树，不提前登记或声称其通过。git diff --cached --check通过。
+
+同一主Agent按用户授权自审自批模块/源登记与v4变更，不伪称独立审核；不改检查器、不放宽既有预算/断言。风险为内部ABI增长、有界键容量、只支持input和格式单向升级，已明确范围；状态表与查找不引入C核心。对象text：lookup103/session1874/agent4932/journal3233字节，data/bss均0；导入仅既有Session/lookup/公开IO/stat胶水。主文档仅更新一处当前能力描述，未扩张其简短定义。
+
+固定变更包SHA256（不含本记录；按暂存路径排序的[path,文件SHA256]列表，以紧凑UTF-8 JSON取摘要）：
+
+```text
+549f17e24251cdd52e97ec4b345ee6a7cb8165f750c633b35da2e82e8bad1413  22个路径
+```
+
+Goal继续；MiMo重构由并行Agent完成后再集成，不重复实现或覆盖其文件。

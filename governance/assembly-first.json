@@ -77,6 +77,10 @@
     "src/runtime/profile.S": {
       "role": "assembly-core",
       "reason": "手写有界配置身份长度编码；仅存公开配置和工具定义，不含凭据或进程指针"
+    },
+    "src/runtime/submissions.S": {
+      "role": "assembly-core",
+      "reason": "手写有界Submission请求标识查询；无IO、分配或调度副作用"
     }
   }
 }

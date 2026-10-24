@@ -555,6 +555,9 @@
     "src/runtime/profile.S": "native-source",
     "src/runtime/profile.h": "native-source",
     "src/runtime/profile_layout.h": "native-source",
-    "tests/runtime/test_profile.c": "native-test"
+    "tests/runtime/test_profile.c": "native-test",
+    "src/runtime/submissions.h": "native-source",
+    "src/runtime/submissions.S": "native-source",
+    "tests/runtime/test_submissions.c": "native-test"
   }
 }
