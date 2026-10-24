@@ -527,6 +527,10 @@
     "src/runtime/agent.S": "native-source",
     "src/runtime/agent_layout.h": "native-source",
     "tests/runtime/agent_abi.S": "native-test",
-    "tests/runtime/test_agent_asm.c": "native-test"
+    "tests/runtime/test_agent_asm.c": "native-test",
+    "src/runtime/session.h": "native-source",
+    "src/runtime/session_layout.h": "native-source",
+    "src/runtime/session.S": "native-source",
+    "tests/runtime/test_session_commit.c": "native-test"
   }
 }

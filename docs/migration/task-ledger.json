@@ -1597,7 +1597,7 @@
     },
     {
       "id": "T19",
-      "title": "Session 树和消息投影",
+      "title": "Durable Conversation、Entry 与消息投影",
       "status": "IN_PROGRESS",
       "depends_on": [
         "T18"
@@ -1613,8 +1613,8 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded linear in-memory session and idle reset; no session tree/persistence",
-      "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
+      "local_subset_scope": "bounded memory projection with detached atomic batches and replaceable synchronous Storage confirmation; no persistent entries/fork/task recovery",
+      "local_implementation": "src/runtime/session.S and agent.S; handwritten SysV AMD64; volatile default, transactional storage seam and failure isolation"
     },
     {
       "id": "T20",
@@ -1695,7 +1695,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "bounded sequential single-tool loop, real continuation/cancellation; no full Pi event lifecycle",
+      "local_subset_scope": "bounded sequential single-tool loop, draft/settled separation, storage-confirmed input/call/result/answer publication; no durable task scheduler or full Pi lifecycle",
       "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
     },
     {

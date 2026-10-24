@@ -26,6 +26,37 @@
       ]
     },
     {
+      "id": "session.commit.local.v0",
+      "sources": [
+        "src/runtime/session.h",
+        "src/runtime/session_layout.h",
+        "src/runtime/session.S"
+      ],
+      "dependencies": [
+        "client.contract.v0"
+      ],
+      "role": "bounded synchronous transaction/storage seam; detached batch, acknowledged sequence before adoption; explicit volatile mode has no disk durability",
+      "exports": [
+        "pg_session_commit",
+        "pg_session_volatile_commit"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/storage/memory.ts",
+            "packages/durable/src/testing/storage-conformance.ts"
+          ],
+          "semantics": "validate/detach before store, atomic batch, adopt before publication; synchronous native acknowledgement replaces asynchronous adopt callback",
+          "tests_to_read": [
+            "packages/durable/src/testing/storage-conformance.ts"
+          ]
+        }
+      ]
+    },
+    {
       "id": "agent.runtime.v0",
       "sources": [
         "src/runtime/agent.h",
@@ -33,14 +64,16 @@
         "src/runtime/agent.S"
       ],
       "dependencies": [
-        "client.contract.v0"
+        "client.contract.v0",
+        "session.commit.local.v0"
       ],
-      "role": "handwritten SysV AMD64 bounded Loop; transient draft separate from settled memory transcript; no persistent transaction or recovery yet",
+      "role": "handwritten SysV Loop; volatile default or explicitly bound synchronous Storage; settled transcript changes only after acknowledged commit; no task/restart recovery yet",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
         "pg_agent_set_system",
-        "pg_agent_reset_session"
+        "pg_agent_reset_session",
+        "pg_agent_bind_storage"
       ],
       "reference_basis": [
         {

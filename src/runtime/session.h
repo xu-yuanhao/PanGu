@@ -1,0 +1,44 @@
+#ifndef PANGU_SESSION_H
+#define PANGU_SESSION_H
+#include "../contracts/client.h"
+#include <stdint.h>
+#define PG_MESSAGE_LIMIT 64
+#define PG_TEXT_LIMIT 4096
+#define PG_ID_LIMIT 64
+typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT } pg_role;
+typedef struct {
+    pg_role role;
+    size_t size;
+    char text[PG_TEXT_LIMIT];
+    char call_id[PG_ID_LIMIT], tool_name[PG_ID_LIMIT];
+    int is_error;
+} pg_message;
+typedef struct { pg_message messages[PG_MESSAGE_LIMIT]; size_t count;
+    char system_prompt[PG_TEXT_LIMIT]; size_t system_size;
+} pg_session;
+typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET } pg_session_change_kind;
+typedef struct {
+    pg_session_change_kind kind;
+    const pg_message *messages;
+    size_t count;
+    pg_slice text;
+} pg_session_change;
+typedef enum { PG_STORE_OK, PG_STORE_REJECTED, PG_STORE_UNCERTAIN } pg_store_result;
+/* Synchronous, single-owner storage seam. The borrowed detached batch expires on return.
+   OK means the whole batch is stored at expected_seq+1; REJECTED means no write.
+   Any ambiguous outcome must be UNCERTAIN. No reentry, retained pointers or exceptions.
+   The caller adopts after return, before any publication or subsequent commit. */
+typedef struct {
+    void *context;
+    pg_store_result (*commit)(void *, const pg_session_change *, uint64_t expected_seq, uint64_t *seq);
+} pg_storage;
+typedef struct {
+    pg_storage storage;
+    uint64_t sequence;
+    unsigned busy, failed;
+} pg_session_control;
+/* Caller owns view/control, initialized to zero with an explicit storage binding. */
+int pg_session_commit(pg_session *, pg_session_control *, const pg_session_change *);
+/* Explicit volatile mode: Session adoption is its sole in-memory state; no persistence. */
+pg_store_result pg_session_volatile_commit(void *, const pg_session_change *, uint64_t, uint64_t *);
+#endif

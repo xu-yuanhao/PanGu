@@ -64,6 +64,10 @@
       "role": "pending-inplace-assembly",
       "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
       "sha256": "804ec6dca0f42d966fba4df2293bab7026f9e7d6ae38e2116ad9ec0bfb392f19"
+    },
+    "src/runtime/session.S": {
+      "role": "assembly-core",
+      "reason": "手写有界事务分离、Storage确认后采纳、序号与不确定失败隔离"
     }
   }
 }

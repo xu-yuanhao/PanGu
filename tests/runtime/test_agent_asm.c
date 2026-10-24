@@ -18,7 +18,7 @@ OFFSET(pg_session,count,PG_A_COUNT);OFFSET(pg_session,system_prompt,PG_A_SYSTEM)
 OFFSET(pg_agent,model,PG_A_MODEL);OFFSET(pg_agent,tools,PG_A_TOOLS);OFFSET(pg_agent,state,PG_A_STATE);
 OFFSET(pg_agent,turns,PG_A_TURNS);OFFSET(pg_agent,cancelled,PG_A_CANCEL);OFFSET(pg_agent,request_open,PG_A_OPEN);
 OFFSET(pg_agent,outcome,PG_A_OUTCOME);OFFSET(pg_agent,assistant_index,PG_A_ASSISTANT);OFFSET(pg_agent,call_index,PG_A_CALL);
-OFFSET(pg_agent,draft,PG_A_DRAFT);
+OFFSET(pg_agent,draft,PG_A_DRAFT);OFFSET(pg_agent,pending,PG_A_PENDING);OFFSET(pg_agent,commits,PG_A_COMMITS);
 OFFSET(pg_agent,event_text,PG_A_TEXT);OFFSET(pg_agent,error_text,PG_A_ERROR);
 OFFSET(pg_event,text,8);OFFSET(pg_event,call_id,24);OFFSET(pg_event,tool_name,40);
 OFFSET(pg_model_event,text,8);OFFSET(pg_model_event,call_id,24);OFFSET(pg_model_event,tool_name,40);
@@ -37,6 +37,8 @@ typedef void (*probe_fn)(void);
 unsigned pg_abi_probe(probe_fn,void *,const void *,size_t);
 void pg_abi_corrupt(void);
 static char full[PG_TEXT_LIMIT];
+pg_store_result pg_test_storage(void *,const pg_session_change *,uint64_t,uint64_t *);
+pg_store_result pg_fixture_storage(void *ctx,const pg_session_change *change,uint64_t previous,uint64_t *sequence){(void)ctx;assert(change->kind<=PG_SESSION_RESET);*sequence=previous+1;return PG_STORE_OK;}
 int pg_fixture_start(void *ctx,const pg_session *session){fixture *f=ctx;++f->requests;f->step=0;assert(session->count);return 0;}
 int pg_fixture_next(void *ctx,pg_model_event *event){fixture *f=ctx;*event=(pg_model_event){0};
  if(f->large){event->kind=f->step++?PG_MODEL_DONE:PG_MODEL_TEXT;event->text=(pg_slice){full,sizeof(full)-1};return 0;}
@@ -47,7 +49,9 @@ void pg_fixture_close(void *ctx){++((fixture*)ctx)->closes;}
 int pg_fixture_authorize(void *ctx,pg_slice name,pg_slice args){(void)ctx;assert(name.size==4&&!memcmp(name.data,"echo",4));assert(args.size==2&&!memcmp(args.data,"{}",2));return 1;}
 int pg_fixture_execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t capacity,size_t *size){fixture *f=ctx;assert(name.size==4&&args.size==2&&capacity==PG_TEXT_LIMIT);memcpy(out,"ok",2);*size=2;++f->executes;return 0;}
 static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_start,pg_test_next,pg_test_cancel,pg_test_close};pg_tools tools={&f,pg_test_authorize,pg_test_execute};
- assert(!pg_agent_init(agent,model,tools));pg_client client=pg_agent_client(agent);
+ assert(!pg_agent_init(agent,model,tools));
+ assert(!pg_agent_bind_storage(agent,(pg_storage){0,pg_test_storage}));
+ pg_client client=pg_agent_client(agent);
  assert(!pg_abi_probe((probe_fn)pg_agent_set_system,agent,"test",4));assert(agent->session.system_size==4);
  assert(!pg_abi_probe((probe_fn)client.submit,client.context,"input",5));
  struct {uint64_t before;pg_event event;uint64_t after;} guarded={.before=0x148194,.after=0x832985};unsigned terminal=0,events=0;
@@ -72,6 +76,10 @@ static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_s
  const pg_event_kind expected[]={PG_RUN_STARTED,PG_TEXT_DELTA,PG_TOOL_STARTED,PG_TOOL_FINISHED,PG_TEXT_DELTA,PG_RUN_FINISHED};size_t seen=0;
  for(unsigned i=0;i<40&&seen<sizeof(expected)/sizeof(expected[0]);++i){pg_event emitted;if(client.poll(client.context,&emitted)){assert(emitted.kind==expected[seen]);++seen;}}
  assert(seen==sizeof(expected)/sizeof(expected[0]));
+ pg_session_control local={.storage={0,pg_test_storage}};
+ pg_session_change change={.kind=PG_SESSION_SYSTEM,.text={"probe",5}};
+ assert(!pg_abi_probe((probe_fn)pg_session_commit,&agent->session,&local,(size_t)&change));
+ assert(local.sequence==1&&!local.busy&&!strcmp(agent->session.system_prompt,"probe"));
 }
 int main(void){assert(pg_abi_probe(pg_abi_corrupt,0,0,0)==65);long page=sysconf(_SC_PAGESIZE);assert(page>0);size_t accessible=((sizeof(pg_agent)+(size_t)page-1)/(size_t)page)*(size_t)page,total=accessible+2*(size_t)page;
  for(unsigned side=0;side<2;++side){char *mapping=mmap(0,total,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(mapping!=MAP_FAILED);assert(!mprotect(mapping+page,accessible,PROT_READ|PROT_WRITE));pg_agent *agent=(pg_agent*)(mapping+page+(side?accessible-sizeof(pg_agent):0));exercise(agent);assert(!munmap(mapping,total));}

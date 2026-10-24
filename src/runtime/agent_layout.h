@@ -1,5 +1,6 @@
 #ifndef PG_AGENT_LAYOUT_H
 #define PG_AGENT_LAYOUT_H
+#include "session_layout.h"
 #define PG_ST_IDLE 0
 #define PG_ST_BEGIN 1
 #define PG_ST_START 2
@@ -24,12 +25,6 @@
 #define PG_RESULT_OK 0
 #define PG_RESULT_ERROR 1
 #define PG_RESULT_CANCELLED 2
-#define PG_MSG_BYTES 4248
-#define PG_MSG_SIZE 8
-#define PG_MSG_TEXT 16
-#define PG_MSG_ID 4112
-#define PG_MSG_NAME 4176
-#define PG_MSG_ERROR 4240
 #define PG_A_COUNT 271872
 #define PG_A_SYSTEM 271880
 #define PG_A_SYSTEM_SIZE 275976
@@ -45,5 +40,7 @@
 #define PG_A_TEXT 276088
 #define PG_A_ERROR 280184
 #define PG_A_DRAFT 280440
-#define PG_A_BYTES 284688
+#define PG_A_PENDING 284688
+#define PG_A_COMMITS 288936
+#define PG_A_BYTES 288968
 #endif

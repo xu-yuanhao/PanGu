@@ -23,6 +23,8 @@ pg_agent_init:
     lea rsi,[rsp+8]
     mov ecx,8
     rep movsq
+    lea rax,[rip+pg_session_volatile_commit]
+    mov [r8+PG_A_COMMITS+8],rax
     xor eax,eax
     ret
 .Linit_bad:
@@ -44,6 +46,32 @@ pg_agent_client:
     ret
 .size pg_agent_client,.-pg_agent_client
 
+.globl pg_agent_bind_storage
+.type pg_agent_bind_storage,@function
+pg_agent_bind_storage:
+    test rdi,rdi
+    jz .Lbind_bad
+    test rdx,rdx
+    jz .Lbind_bad
+    cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
+    jne .Lbind_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+16],0
+    jne .Lbind_bad
+    cmp qword ptr [rdi+PG_A_COUNT],0
+    jne .Lbind_bad
+    cmp qword ptr [rdi+PG_A_SYSTEM_SIZE],0
+    jne .Lbind_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+24],0
+    jne .Lbind_bad
+    mov [rdi+PG_A_COMMITS],rsi
+    mov [rdi+PG_A_COMMITS+8],rdx
+    xor eax,eax
+    ret
+.Lbind_bad:
+    mov eax,1
+    ret
+.size pg_agent_bind_storage,.-pg_agent_bind_storage
+
 .globl pg_agent_set_system
 .type pg_agent_set_system,@function
 pg_agent_set_system:
@@ -51,29 +79,14 @@ pg_agent_set_system:
     jz .Lsystem_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lsystem_bad
-    cmp rdx,4096
-    jae .Lsystem_bad
-    test rdx,rdx
-    jz .Lsystem_valid
-    test rsi,rsi
-    jz .Lsystem_bad
-.Lsystem_valid:
-    push rbx
-    sub rsp,4096
-    mov rbx,rdi
-    mov r8,rdx
-    mov rdi,rsp
-    mov rcx,rdx
-    rep movsb
-    mov byte ptr [rdi],0
-    lea rdi,[rbx+PG_A_SYSTEM]
-    mov rsi,rsp
-    lea rcx,[r8+1]
-    rep movsb
-    mov [rbx+PG_A_SYSTEM_SIZE],r8
-    add rsp,4096
-    pop rbx
-    xor eax,eax
+    sub rsp,56
+    mov dword ptr [rsp],1
+    mov [rsp+24],rsi
+    mov [rsp+32],rdx
+    mov rdx,rsp
+    lea rsi,[rdi+PG_A_COMMITS]
+    call pg_session_commit
+    add rsp,56
     ret
 .Lsystem_bad:
     mov eax,1
@@ -87,19 +100,42 @@ pg_agent_reset_session:
     jz .Lreset_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lreset_bad
-    mov rcx,[rdi+PG_A_COUNT]
-    cmp rcx,64
-    ja .Lreset_bad
-    mov r8,rdi
-    imul rcx,PG_MSG_BYTES
-    xor eax,eax
-    rep stosb
-    mov qword ptr [r8+PG_A_COUNT],0
+    sub rsp,56
+    mov dword ptr [rsp],2
+    mov rdx,rsp
+    lea rsi,[rdi+PG_A_COMMITS]
+    call pg_session_commit
+    add rsp,56
     ret
 .Lreset_bad:
     mov eax,1
     ret
 .size pg_agent_reset_session,.-pg_agent_reset_session
+
+# Commit one detached batch, returning its last adopted message or NULL.
+.Lcommit_records:
+    push rbx
+    sub rsp,48
+    mov rbx,rdi
+    mov dword ptr [rsp],0
+    mov [rsp+8],rsi
+    mov [rsp+16],rdx
+    mov rdx,rsp
+    lea rsi,[rdi+PG_A_COMMITS]
+    call pg_session_commit
+    test eax,eax
+    jnz .Lrecords_bad
+    mov rax,[rbx+PG_A_COUNT]
+    dec rax
+    imul rax,PG_MSG_BYTES
+    add rax,rbx
+    jmp .Lrecords_end
+.Lrecords_bad:
+    xor eax,eax
+.Lrecords_end:
+    add rsp,48
+    pop rbx
+    ret
 
 .Lcopy:
     mov rcx,rdx
@@ -141,8 +177,8 @@ pg_agent_reset_session:
 .Lidentifier_end:
     ret
 
-# append(owner, role, bytes, length); publish count after completing the record.
-.Lappend:
+# prepare(owner, role, bytes, length); adopted only by .Lcommit_records.
+.Lprepare:
     cmp qword ptr [rdi+PG_A_COUNT],64
     jae .Lappend_bad
     cmp rcx,4096
@@ -156,8 +192,7 @@ pg_agent_reset_session:
     mov r9d,esi
     mov r10,rdx
     mov r11,rcx
-    imul rdx,[rdi+PG_A_COUNT],PG_MSG_BYTES
-    add rdx,rdi
+    lea rdx,[rdi+PG_A_PENDING]
     mov rdi,rdx
     xor eax,eax
     mov ecx,PG_MSG_BYTES/8
@@ -169,7 +204,6 @@ pg_agent_reset_session:
     mov rcx,r11
     rep movsb
     mov byte ptr [rdi],0
-    inc qword ptr [r8+PG_A_COUNT]
     mov rax,rdx
     ret
 .Lappend_bad:
@@ -238,7 +272,13 @@ pg_agent_reset_session:
     mov rcx,rdx
     mov rdx,rsi
     xor esi,esi
-    call .Lappend
+    call .Lprepare
+    test rax,rax
+    jz .Lsubmit_pop_bad
+    mov rdi,rbx
+    mov rsi,rax
+    mov edx,1
+    call .Lcommit_records
     test rax,rax
     jz .Lsubmit_pop_bad
     mov dword ptr [rbx+PG_A_CANCEL],0
@@ -259,10 +299,9 @@ pg_agent_reset_session:
     mov rax,[rbx+PG_A_COUNT]
     mov [rbx+PG_A_ASSISTANT],rax
     mov rdi,rbx
-    mov esi,PG_ROLE_ASSISTANT
-    lea rdx,[rbx+PG_A_DRAFT+PG_MSG_TEXT]
-    mov rcx,[rbx+PG_A_DRAFT+PG_MSG_SIZE]
-    jmp .Lappend
+    lea rsi,[rbx+PG_A_DRAFT]
+    mov edx,1
+    jmp .Lcommit_records
 
 .Lcancel:
     mov eax,[rdi+PG_A_STATE]
@@ -334,7 +373,7 @@ pg_agent_reset_session:
     mov esi,3
     lea rdx,[rip+.Lcancelled]
     mov ecx,9
-    call .Lappend
+    call .Lprepare
     test rax,rax
     jz .Lcancel_finish
     mov r13,rax
@@ -345,6 +384,13 @@ pg_agent_reset_session:
     lea rdi,[r13+PG_MSG_ID]
     call .Lcopy
     mov dword ptr [r13+PG_MSG_ERROR],1
+    mov rdi,rbx
+    mov rsi,r13
+    mov edx,1
+    call .Lcommit_records
+    test rax,rax
+    jz .Lerror_storage
+    mov r13,rax
     mov rdi,rbx
     mov esi,2
     call .Lfinish
@@ -421,7 +467,7 @@ pg_agent_reset_session:
 .Lstream_done:
     call .Lsettle_draft
     test rax,rax
-    jz .Lerror_capacity
+    jz .Lerror_storage
     mov rdi,rbx
     xor esi,esi
     call .Lfinish
@@ -475,16 +521,15 @@ pg_agent_reset_session:
     cmp qword ptr [rsp+8],0
     je .Lerror_arguments
 .Lcall_valid:
-    call .Lsettle_draft
-    test rax,rax
-    jz .Lerror_capacity
     mov rax,[rbx+PG_A_COUNT]
+    mov [rbx+PG_A_ASSISTANT],rax
+    inc rax
     mov [rbx+PG_A_CALL],rax
     mov rdi,rbx
     mov esi,2
     mov rdx,[rsp+8]
     mov rcx,[rsp+16]
-    call .Lappend
+    call .Lprepare
     test rax,rax
     jz .Lerror_arguments
     mov r13,rax
@@ -496,6 +541,13 @@ pg_agent_reset_session:
     mov rsi,[rsp+40]
     mov rdx,[rsp+48]
     call .Lcopy
+    mov rdi,rbx
+    lea rsi,[rbx+PG_A_DRAFT]
+    mov edx,2
+    call .Lcommit_records
+    test rax,rax
+    jz .Lerror_storage
+    mov r13,rax
     mov rdi,rbx
     call .Lclose
     mov dword ptr [r12],PG_EV_TOOL_BEGIN
@@ -558,7 +610,7 @@ pg_agent_reset_session:
     mov esi,3
     lea rdx,[rbx+PG_A_TEXT]
     mov rcx,[rsp+56]
-    call .Lappend
+    call .Lprepare
     test rax,rax
     jz .Lerror_result_capacity
     mov r14,rax
@@ -572,6 +624,12 @@ pg_agent_reset_session:
     test r15d,r15d
     setne al
     mov [r14+PG_MSG_ERROR],eax
+    mov rdi,rbx
+    mov rsi,r14
+    mov edx,1
+    call .Lcommit_records
+    test rax,rax
+    jz .Lerror_storage
     mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_END
     jmp .Lpoll_zero
 .Ltool_end:
@@ -610,6 +668,10 @@ pg_agent_reset_session:
 .Lterminal_ready:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_IDLE
     jmp .Lpoll_one
+.Lerror_storage:
+    mov dword ptr [rbx+PG_A_COMMITS+28],1
+    lea rsi,[rip+.Lerror_storage_text]
+    jmp .Lpoll_fail
 .Lerror_turns:
     lea rsi,[rip+.Lerror_turns_text]
     jmp .Lpoll_fail
@@ -658,6 +720,7 @@ pg_agent_reset_session:
 .Lcancelled: .asciz "cancelled"
 .Ltool_unavailable: .asciz "tool unavailable or denied"
 .Ltool_limit: .asciz "tool output limit exceeded"
+.Lerror_storage_text: .asciz "session storage commit failed; session stopped"
 .Lerror_state: .asciz "invalid runtime state"
 .Lerror_turns_text: .asciz "model turn limit reached"
 .Lerror_start_text: .asciz "model request initialization failed"

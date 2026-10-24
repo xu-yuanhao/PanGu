@@ -17,7 +17,7 @@ static int run(pg_client client,const char *prompt,const char *expected,int canc
  client.cancel(client.context);for(unsigned i=0;i<4;++i)if(client.poll(client.context,&event)&&event.kind==PG_RUN_FINISHED)break;return 1;
 }
 int main(void){if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;pg_model model=pg_mimo_model(&provider);if(pg_agent_init(&agent,model,(pg_tools){0}))return 2;
- const char *system="You are a C coding agent test assistant. Answer very briefly. Remember user facts within the supplied conversation only. If a requested marker is absent from the conversation, answer exactly NO_CONTEXT. Never invent a marker.";
+ const char *system="You are a native coding agent test assistant. Answer very briefly. Remember user facts within the supplied conversation only. If a requested marker is absent from the conversation, answer exactly NO_CONTEXT. Never invent a marker.";
  if(pg_agent_set_system(&agent,(pg_slice){system,strlen(system)}))return 2;pg_client client=pg_agent_client(&agent);
  int rc=run(client,"Remember the marker PANGU_SESSION_6382. Reply ACK.","ACK",0);
  if(!rc)rc=run(client,"What was the marker? Reply with only the exact marker.","PANGU_SESSION_6382",0);

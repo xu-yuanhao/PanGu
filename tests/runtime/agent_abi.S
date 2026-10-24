@@ -32,6 +32,7 @@ WRAPPER pg_test_next,pg_fixture_next
 WRAPPER pg_test_cancel,pg_fixture_cancel
 WRAPPER pg_test_close,pg_fixture_close
 WRAPPER pg_test_authorize,pg_fixture_authorize
+WRAPPER pg_test_storage,pg_fixture_storage
 .globl pg_test_execute
 .type pg_test_execute,@function
 pg_test_execute:

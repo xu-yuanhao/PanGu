@@ -1,0 +1,19 @@
+#ifndef PG_SESSION_LAYOUT_H
+#define PG_SESSION_LAYOUT_H
+#define PG_MSG_BYTES 4248
+#define PG_MSG_SIZE 8
+#define PG_MSG_TEXT 16
+#define PG_MSG_ID 4112
+#define PG_MSG_NAME 4176
+#define PG_MSG_ERROR 4240
+#define PG_S_COUNT 271872
+#define PG_S_SYSTEM 271880
+#define PG_S_SYSTEM_SIZE 275976
+#define PG_S_BYTES 275984
+#define PG_SC_SEQ 16
+#define PG_SC_BUSY 24
+#define PG_SC_FAILED 28
+#define PG_SC_BYTES 32
+#define PG_CHANGE_BYTES 40
+#define PG_SESSION_STACK 8552
+#endif

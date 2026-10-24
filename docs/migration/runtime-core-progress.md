@@ -282,3 +282,42 @@ d43c3a088b3380b975a93034b7fe5ef2a092ff7899b9626a3d6ec5f9d2d76d7a  src/runtime/ag
 9579829fb10c5a544a75c6c41941b7669db9d9e9f86630fa2460d2c3c9596b2d  tests/runtime/test_agent_asm.c
 f1bdf9dde75aa770ab23d9e0928598adb5081704e4868ba30799d56be90d833f  盘古 Pangu 项目完整文档.md
 ```
+
+## 2026-10-25：Durable提交边界——Storage确认后采纳
+
+参考Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7：读取MemoryStorage.prepareCommit→apply→adopt，session.ts事务settleSuccess→Storage.commit→adopt→publish，以及storage-conformance.ts的adoption和跨Entry/Task/Submission失败批次用例。采用先校验/分离、整批确认、再采纳/发布；本批同步原生接口用返回确认代替上游异步adopt回调，单所有者内确认与采纳之间没有await/回调或另一提交。
+
+新增session.S/session.h/session_layout.h：最多两条有界消息/一个system变更/reset，分离输入批次，校验容量/角色/文本终止符/工具标识、序号溢出；Storage返回OK且序号恰为expected+1才采纳。REJECTED表示无写入，视图与序号不变；UNCERTAIN、异常返回或错误确认序号将控制状态置failed，拒绝后续写入；busy拒绝重入。默认显式绑定pg_session_volatile_commit，Session采纳是其唯一内存状态，无独立持久副本。外部Storage必须复制/序列化借用批次，不能保留指针或抛异常，也不能把不确定结果当REJECTED。
+
+agent.S所有输入、system/reset、成功响应、工具结果改走此服务。assistant与call是单个两条消息批次，确认前不发tool_started、不执行工具；结果确认前不发tool_finished或续模型。输入拒绝不发run_started且可重新提交；运行中存储拒绝/不确定则终结为ERROR并停止后续写入（不盲目重试已执行工具）。取消产生的工具结果也必须提交，失败不能伪报取消成功。工具仍限已有只读/无副作用子集，未实现外部副作用exactly-once。
+
+无新增C核心、无旧实现副本，无生产外部依赖；Session默认实现直接由Loop调用，尚未完成完整Session/Task服务替换和通用插件宿主。pg_agent由284688增至288968字节；事务分离区固定8552字节栈空间（至多两条记录），消费者须重编译，非稳定ABI。新增接口/实现/测试均登记到现有清单，T19/T23仍IN_PROGRESS，T20未完成。
+
+本轮新增测试覆盖Storage替换、原视图在回调中仍旧值、重入拒绝、源数据独立、第二条无效时整批拒绝、system/reset失败不改变状态、容量与序号溢出、不确定结果/错误确认序号隔离；运行时分别注入输入、call批次、工具结果、最终响应、取消结果存储失败，检查事件次序/工具是否执行/失败后禁止输入。新增Storage回调汇编破坏caller-saved寄存器与栈对齐断言，并用ABI探针检查pg_session_commit；沿用Agent两侧保护页与满文本容量。首次八组O0/O2 UBSan执行通过。真实MiMo read已实际HTTP200：工具执行1次，最终marker_verified=1。最终候选和会话回执随后按实际结果追加。
+
+最终候选回执：仅归档本Agent暂存树（不含并行TUI汇编工作）。G00通过，生产准入仍BLOCKED；无网络PTY Ctrl-D/SIGTERM/resize退出及精确termios恢复通过；真实MiMo五步会话HTTP200、记忆/回忆/reset/文本后取消/再次提交通过，live_session_exit=0；真实PTY read续答与流中取消/终端恢复通过。八组核心O0/O2 UBSan测试已在当前相同核心内容完成。共享工作区G00实际仍因另一Agent的TUI源码替换未交接登记而失败，不声称该工作树完整验收。
+
+实际汇编对象检查：session.o text=718、data/bss=0，无未定义导入；agent.o text=3077、data/bss=0，仅导入pg_session_commit/pg_session_volatile_commit。没有跳回C事务核心。测试目录与对象均自动清理。
+
+同一Agent自审自批本批控制面：新增模块/文件登记、语言清单、实际构建/测试链接依赖和T19进展，不变更检查器/预算/生产准入。风险：pg_agent尺寸及内部契约变化；Storage同步且需迅速返回，不能冒充任意异步后端；默认内存仍无落盘/重启恢复；运行中失败须停止且不能重放工具；外部可信Native实现须遵守全批次确认及借用生命周期。未完成的文件Storage、Task/Submission、requestId及恢复继续保持未勾选。固定摘要（不含本记录）：
+
+```text
+cc4e76fef156e859366153d3c4433509ffb168658d36312c58d8c14519fb0b27  docs/migration/task-ledger.json
+b951540e7b4dcee562b788ba283cb182a0fa32055b61067c4d7f96b59c078638  docs/原生重写路线与迁移TODO.md
+b3c1d252289bb1f0358d93ba3fa8dc59027aa1b32886017d7faa8e0b4485a242  governance/assembly-first.json
+d30c98ea660931988d88197854deb24d33ef7318d2ebfbf1d0078eae6b9d9617  governance/bootstrap-policy.json
+472aca50fef2e269bace2ed9241cb49b947f6b1e8977b7d39ca46187aa4df78b  governance/runtime-local-modules.json
+96c605332257b6f98b128101daa8a915db1dbc8c9f7c53efc9ab949cc583f778  src/runtime/agent.S
+df23bd3805addee8641a68160b50dc3060d88fe8d23165eee2e0b68121f1e0ad  src/runtime/agent.h
+e1c3cbabfbfe547cad0f47c9d1c786f9def8d1a7489ac51f08723926ee06d1ff  src/runtime/agent_layout.h
+547a3e3053e231802a4e65476c8260645c77e6cd77533c4d95da96e0506e0840  src/runtime/session.S
+05f85fbcbd71089860177c2a0a458bd544fa391615f2e2e18f75f368abdb2c5a  src/runtime/session.h
+5f9230d919c35c700f567c4a986f1f3cb211d49ca59bf50b5ebd44435747d93c  src/runtime/session_layout.h
+f97cc402cdc0ec43170c3a2e24b9a3a89d3436edd82215c98fc0272215c775f9  tests/runtime/agent_abi.S
+0e3c5f8b177ef643031667bd1d5e723503d06ec350b2c877d3440e74bdc76923  tests/runtime/live_mimo.c
+d871cb6bab3f97436924e8b03a6fd6b3b3c404bc7b0b004498b76fa41f339005  tests/runtime/live_session.c
+f813df95443641103b5661cd7f5eb194e13f1f576446b96697575b5d7eeb5259  tests/runtime/test_agent_asm.c
+7323727ea799917f6e2d8a0e929dd5d52464e77e4fa5fa7dd81b0c1cd77d90ab  tests/runtime/test_session_commit.c
+7ec3f4d1dd2a568cc81f904c20adf4a4780543a6afccf027642bb4271dfcf7f2  tools/runtime/build_test.py
+d1bde6a535f8ead4563d9f2f3b41b56b12e366ec37eb305a5441c6e7d58df825  盘古 Pangu 项目完整文档.md
+```

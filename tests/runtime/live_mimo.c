@@ -12,8 +12,8 @@ static int read_execute(void *ctx,pg_slice args,char *out,size_t cap,size_t *siz
 static int validate(void *ctx,pg_slice args){(void)ctx;return args.size==2 && !memcmp(args.data,"{}",2);}
 static int allow(void *ctx,pg_slice args){(void)ctx;(void)args;return 1;}
 static int execute(void *ctx,pg_slice args,char *out,size_t cap,size_t *size){(void)ctx;(void)args;const char *value="PANGU_TOOL_OK_7429";*size=strlen(value);if(*size>=cap)return 1;memcpy(out,value,*size);++executions;return 0;}
-int main(int argc,char **argv){int cancel_test=getenv("PG_LIVE_CANCEL")!=0;const char *read_root=getenv("PG_LIVE_READ_ROOT");const char *expected=read_root?"PANGU_READ_OK_9137":"PANGU_TOOL_OK_7429";const char *prompt=argc>1?argv[1]:"Call echo exactly once, then reply with the exact marker returned by echo. This tests a C coding agent implementation.";
- if(read_root)prompt="Call read exactly once with path sample.c. Reply with just the PANGU marker found inside the file. This is a C agent integration test.";
+int main(int argc,char **argv){int cancel_test=getenv("PG_LIVE_CANCEL")!=0;const char *read_root=getenv("PG_LIVE_READ_ROOT");const char *expected=read_root?"PANGU_READ_OK_9137":"PANGU_TOOL_OK_7429";const char *prompt=argc>1?argv[1]:"Call echo exactly once, then reply with the exact marker returned by echo. This tests a native coding agent implementation.";
+ if(read_root)prompt="Call read exactly once with path sample.c. Reply with just the PANGU marker found inside the file. This is a native agent integration test.";
  if(cancel_test)prompt="Write a numbered explanation of C memory ownership in 40 short lines. Do not call tools.";
  if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
  pg_tool_definition definition={"echo","Return a fixed harmless verification marker","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,validate,allow,execute};
