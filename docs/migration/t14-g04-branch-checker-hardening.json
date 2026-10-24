@@ -1,0 +1,158 @@
+{
+  "schema": "pangu.t14-g04-branch-checker-hardening.v1",
+  "status": "PASS_LOCAL_CHECKER_HARDENING_AND_RETAINED_TRACE_REPLAY",
+  "scope": "Tightens local experimental checker only; no native implementation, production ABI, budget, frozen controller or full G04 admission change.",
+  "prior_evidence": "docs/migration/t14-g04-branch-trace-evidence.json",
+  "prior_checker_sha256": "bbe3cedd50a4892bea4e77c7eeda76d930de3b1cabc89c7fafd8a84851fa264a",
+  "checker_sha256": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+  "test_sha256": "d4f292e4d9bfffc87803264fa2f7ec4c52ac2751eefec5afe37eb7b5a7090c52",
+  "checker_diff": "--- previous-checker\n\n+++ hardened-checker\n\n@@ -11,7 +11,7 @@\n\n  require(type(data) is bytes and 0<len(data)<=1048576,'byte limit')\n  rows=[json.loads(x,object_pairs_hook=pairs) for x in data.decode('utf-8').splitlines()];require(len(rows)<=4096,'record limit');offset=0;total_ticks=0\n  for case in range(1,9):\n-  stage='begin';cleaned=set();previous_disposed=[0]*4;seq=0;ticks=0;held_snapshot=None\n+  stage='begin';cleaned=set();previous_disposed=[0]*4;seq=0;ticks=0;held_snapshot=None;held_wait=False;drain_done=False;terminal_snapshot=None\n   while True:\n    require(offset<len(rows),'missing event');r=rows[offset];offset+=1\n    require(type(r) is dict and set(r)==FIELDS,'fields')\n@@ -26,6 +26,8 @@\n\n    require(all(not d or (s==4 and not ref and not res) for d,s,ref,res in zip(r['disposed'],r['state'],r['refs'],r['resources'])),'disposed owner alive')\n    require(r['error'] in (0,fault) and (3 in cleaned or not r['error']),'error provenance')\n    e=r['event'];rc=r['rc']\n+   if e not in ('zero','tick-held','tick-drain'):require((r['work'],r['pending'],r['reason'])==(0,0,0),'report on non-driver event')\n+   if e!='cleanup':require(r['owner']==-1,'event owner')\n    if stage in ('begin','zero','held','independent') and r['event']!='finish':\n     require(r['refs']==[1,1,0,0],'held endpoints lost')\n     require(r['state'][0]==2 and not r['disposed'][0] and not r['disposed'][1],'provider released while held')\n@@ -42,17 +44,18 @@\n\n    elif e=='zero':\n     require(stage=='zero' and rc==2 and r['work']==0 and r['pending']==1 and r['reason']==1,'zero budget');require(all(r[k]==v for k,v in held_snapshot.items()),'zero budget mutation');stage='held'\n    elif e in ('tick-held','tick-drain'):\n-    require(stage==('held' if e=='tick-held' else 'drain'),'tick stage');ticks+=1;total_ticks+=1;require(ticks<512,'tick bound')\n+    require(stage==('held' if e=='tick-held' else 'drain') and not drain_done and not held_wait,'tick stage');ticks+=1;total_ticks+=1;require(ticks<512,'tick bound')\n     if r['pending']:require((rc==2 and r['reason']==1) or (e=='tick-held' and rc==5 and r['reason']==2),'pending status')\n-    else:require(e=='tick-drain' and rc==fault and r['reason']==0 and r['phase']==4,'terminal tick')\n+    else:\n+     require(e=='tick-drain' and rc==fault and r['reason']==0 and r['phase']==4,'terminal tick');drain_done=True;terminal_snapshot={k:r[k] for k in ('phase','started','error','state','refs','resources','disposed')}\n+    if e=='tick-held' and rc==5:held_wait=True\n    elif e=='independent-drained':\n-    require(stage=='held' and rc==5 and r['disposed']==[0,0,1,1] and cleaned=={2,3} and r['state']==[2,3,4,4] and r['error']==fault,'independent branch did not drain');stage='independent'\n+    require(stage=='held' and held_wait and rc==5 and r['disposed']==[0,0,1,1] and cleaned=={2,3} and r['state']==[2,3,4,4] and r['error']==fault,'independent branch did not drain');stage='independent'\n    elif e=='finish':require(stage=='independent' and rc==0,'finish');stage='duplicate'\n-   elif e=='duplicate':require(stage=='duplicate' and rc==10,'duplicate finish');stage='drain'\n+   elif e=='duplicate':require(stage=='duplicate' and rc==10,'duplicate finish');stage='drain';held_wait=False\n    elif e=='end':\n-    require(stage=='drain' and cleaned=={0,1,2,3} and r['disposed']==[1]*4 and r['state']==[4]*4 and r['resources']==[0]*4 and rc==fault and r['error']==fault and r['phase']==4,'final drain');break\n+    require(stage=='drain' and drain_done and all(r[k]==v for k,v in terminal_snapshot.items()) and cleaned=={0,1,2,3} and r['disposed']==[1]*4 and r['state']==[4]*4 and r['resources']==[0]*4 and rc==fault and r['error']==fault and r['phase']==4,'final drain');break\n    else:raise ValueError('unknown event')\n-   if e!='cleanup':require(r['owner']==-1,'event owner')\n   require(ticks>0,'no budget steps')\n  require(offset==len(rows),'extra event')\n  return {'status':'PASS','cases':8,'events':len(rows),'ticks':total_ticks}\n",
+  "checker_diff_sha256": "1e1dcec1840d76cad0db722fd2b3c3902ba33966c808aa469da87abcd068cf66",
+  "confirmed_prior_false_acceptances": [
+    "All end events changed to pending=1/reason=1 accepted by prior checker.",
+    "All finish events changed to work=q accepted by prior checker."
+  ],
+  "additional_hardening": [
+    "Reject any work/pending/reason on events with no driver report.",
+    "Require owner=-1 on all non-cleanup events, including end.",
+    "Require a real pending reason2 tick before independent-drained.",
+    "Require terminal tick before end and identical terminal snapshot.",
+    "Refuse further ticks after waiting or terminal publication."
+  ],
+  "validation": {
+    "checker_self_test_groups": 12,
+    "base_inventory_checker_self_tests": 13,
+    "retained_native_trace_replay": {
+      "scope": "retained-output replay only; not fresh native build/execution",
+      "checker_sha256": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+      "records": [
+        {
+          "mode": "normal",
+          "build": "async-setup-core-asm",
+          "optimization": "debug",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "normal",
+          "build": "async-setup-core-asm",
+          "optimization": "release",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "normal",
+          "build": "async-setup-core-alternate",
+          "optimization": "debug",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "normal",
+          "build": "async-setup-core-alternate",
+          "optimization": "release",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "ubsan",
+          "build": "async-setup-core-asm",
+          "optimization": "debug",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "ubsan",
+          "build": "async-setup-core-asm",
+          "optimization": "release",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "ubsan",
+          "build": "async-setup-core-alternate",
+          "optimization": "debug",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        },
+        {
+          "mode": "ubsan",
+          "build": "async-setup-core-alternate",
+          "optimization": "release",
+          "trace_sha256": "c4a7b250e03841efae0c94de79831f224f7f75fd09a7ab60b68f3447be6a1784",
+          "result": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          }
+        }
+      ]
+    },
+    "retained_replay_receipt_sha256": "e13002de6b9a8deff35ab766cefa2cff5223a639bffc6a42aaeee707a6eff5e8",
+    "new_native_builds": 0,
+    "new_native_executions": 0,
+    "G00": "PASS; production admission BLOCKED",
+    "git_diff_check": "PASS"
+  },
+  "limitations": [
+    "Replaying saved native stdout does not prove a fresh native build or attested execution.",
+    "Original evidence describes the older checker; this supplement does not rewrite history.",
+    "Fixed topology/local checker coverage is incomplete G04; full T14/G07 and production trust remain incomplete."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve strict local checker correction and retained-trace validation. No weakening or production admission.",
+    "risks": [
+      "Same-Agent checker/model review is not independent assurance.",
+      "The earlier local checker admitted inconsistent metadata; prior broad interpretation must be limited by this correction.",
+      "No complete planner/fault/interleaving coverage claim."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "71b0ec309d60177550a30535e8164e59559f44cb1e5e64e48a5a12e63ae5540e",
+      "docs/migration/t14-focused-inventory.json": "96c777a5b6e0d7042d5b961fc505a9457ec0f5b3a1e3c057c6965901ffd54d89",
+      "docs/migration/t14-owner-boundaries.md": "b713435b0bc1ec75911e6a12f6da57e88e953ade8ead2f33e9af5ab2f34479d1",
+      "docs/原生重写路线与迁移TODO.md": "075da2487966f7e6f7ada3bea5b8329858486131c2f6874bc36154744270a1d3",
+      "tools/migration/g04_branch_trace.py": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+      "tools/migration/test_g04_branch_trace.py": "d4f292e4d9bfffc87803264fa2f7ec4c52ac2751eefec5afe37eb7b5a7090c52"
+    },
+    "control_scope_sha256": "89b75a772cbda1b3998e704e4c52fcf60f1455b2472d9ea6787fc905362848ec"
+  }
+}

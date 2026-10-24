@@ -11,7 +11,7 @@ def validate(data):
  require(type(data) is bytes and 0<len(data)<=1048576,'byte limit')
  rows=[json.loads(x,object_pairs_hook=pairs) for x in data.decode('utf-8').splitlines()];require(len(rows)<=4096,'record limit');offset=0;total_ticks=0
  for case in range(1,9):
-  stage='begin';cleaned=set();previous_disposed=[0]*4;seq=0;ticks=0;held_snapshot=None
+  stage='begin';cleaned=set();previous_disposed=[0]*4;seq=0;ticks=0;held_snapshot=None;held_wait=False;drain_done=False;terminal_snapshot=None
   while True:
    require(offset<len(rows),'missing event');r=rows[offset];offset+=1
    require(type(r) is dict and set(r)==FIELDS,'fields')
@@ -26,6 +26,8 @@ def validate(data):
    require(all(not d or (s==4 and not ref and not res) for d,s,ref,res in zip(r['disposed'],r['state'],r['refs'],r['resources'])),'disposed owner alive')
    require(r['error'] in (0,fault) and (3 in cleaned or not r['error']),'error provenance')
    e=r['event'];rc=r['rc']
+   if e not in ('zero','tick-held','tick-drain'):require((r['work'],r['pending'],r['reason'])==(0,0,0),'report on non-driver event')
+   if e!='cleanup':require(r['owner']==-1,'event owner')
    if stage in ('begin','zero','held','independent') and r['event']!='finish':
     require(r['refs']==[1,1,0,0],'held endpoints lost')
     require(r['state'][0]==2 and not r['disposed'][0] and not r['disposed'][1],'provider released while held')
@@ -42,17 +44,18 @@ def validate(data):
    elif e=='zero':
     require(stage=='zero' and rc==2 and r['work']==0 and r['pending']==1 and r['reason']==1,'zero budget');require(all(r[k]==v for k,v in held_snapshot.items()),'zero budget mutation');stage='held'
    elif e in ('tick-held','tick-drain'):
-    require(stage==('held' if e=='tick-held' else 'drain'),'tick stage');ticks+=1;total_ticks+=1;require(ticks<512,'tick bound')
+    require(stage==('held' if e=='tick-held' else 'drain') and not drain_done and not held_wait,'tick stage');ticks+=1;total_ticks+=1;require(ticks<512,'tick bound')
     if r['pending']:require((rc==2 and r['reason']==1) or (e=='tick-held' and rc==5 and r['reason']==2),'pending status')
-    else:require(e=='tick-drain' and rc==fault and r['reason']==0 and r['phase']==4,'terminal tick')
+    else:
+     require(e=='tick-drain' and rc==fault and r['reason']==0 and r['phase']==4,'terminal tick');drain_done=True;terminal_snapshot={k:r[k] for k in ('phase','started','error','state','refs','resources','disposed')}
+    if e=='tick-held' and rc==5:held_wait=True
    elif e=='independent-drained':
-    require(stage=='held' and rc==5 and r['disposed']==[0,0,1,1] and cleaned=={2,3} and r['state']==[2,3,4,4] and r['error']==fault,'independent branch did not drain');stage='independent'
+    require(stage=='held' and held_wait and rc==5 and r['disposed']==[0,0,1,1] and cleaned=={2,3} and r['state']==[2,3,4,4] and r['error']==fault,'independent branch did not drain');stage='independent'
    elif e=='finish':require(stage=='independent' and rc==0,'finish');stage='duplicate'
-   elif e=='duplicate':require(stage=='duplicate' and rc==10,'duplicate finish');stage='drain'
+   elif e=='duplicate':require(stage=='duplicate' and rc==10,'duplicate finish');stage='drain';held_wait=False
    elif e=='end':
-    require(stage=='drain' and cleaned=={0,1,2,3} and r['disposed']==[1]*4 and r['state']==[4]*4 and r['resources']==[0]*4 and rc==fault and r['error']==fault and r['phase']==4,'final drain');break
+    require(stage=='drain' and drain_done and all(r[k]==v for k,v in terminal_snapshot.items()) and cleaned=={0,1,2,3} and r['disposed']==[1]*4 and r['state']==[4]*4 and r['resources']==[0]*4 and rc==fault and r['error']==fault and r['phase']==4,'final drain');break
    else:raise ValueError('unknown event')
-   if e!='cleanup':require(r['owner']==-1,'event owner')
   require(ticks>0,'no budget steps')
  require(offset==len(rows),'extra event')
  return {'status':'PASS','cases':8,'events':len(rows),'ticks':total_ticks}

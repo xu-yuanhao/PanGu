@@ -248,6 +248,7 @@
     "docs/migration/t14-g04-branch-trace-fixture.json": "control",
     "tools/migration/g04_branch_trace.py": "gate",
     "tools/migration/test_g04_branch_trace.py": "gate-test",
-    "docs/migration/t14-g04-branch-trace-evidence.json": "control"
+    "docs/migration/t14-g04-branch-trace-evidence.json": "control",
+    "docs/migration/t14-g04-branch-checker-hardening.json": "control"
   }
 }

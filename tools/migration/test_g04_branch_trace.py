@@ -37,6 +37,26 @@ class BranchTraceTests(unittest.TestCase):
   for i,row in enumerate(self.rows):
    if row['event'] in ('held','zero','independent-drained','finish','duplicate','end'):self.reject(lambda b:b.pop(i))
   self.reject(lambda b:b.append(b[-1]))
+ def test_non_driver_reports(self):
+  for i,row in enumerate(self.rows):
+   if row['event'] not in ('zero','tick-held','tick-drain'):
+    for field in ('work','pending','reason'):
+     with self.subTest(i=i,field=field):self.reject(lambda b:b[i].__setitem__(field,1))
+ def test_end_requires_terminal_driver(self):
+  bad=copy.deepcopy(self.rows)
+  bad=[r for r in bad if not (r['case']==1 and r['event']=='tick-drain' and r['pending']==0)]
+  for case in range(1,9):
+   for seq,row in enumerate(r for r in bad if r['case']==case):row['seq']=seq
+  with self.assertRaises(ValueError):checker.validate(self.encode(bad))
+ def test_independent_drain_requires_wait_driver(self):
+  bad=copy.deepcopy(self.rows)
+  bad=[r for r in bad if not (r['case']==1 and r['event']=='tick-held' and r['rc']==5)]
+  for case in range(1,9):
+   for seq,row in enumerate(r for r in bad if r['case']==case):row['seq']=seq
+  with self.assertRaises(ValueError):checker.validate(self.encode(bad))
+ def test_end_owner_is_checked(self):
+  for i,row in enumerate(self.rows):
+   if row['event']=='end':self.reject(lambda b:b[i].__setitem__('owner',0))
  def test_parser(self):
   for data in (b'',b'\xff',b'[]',b'null',b'{}',b' '*1048577):
    with self.assertRaises((ValueError,UnicodeError)):checker.validate(data)

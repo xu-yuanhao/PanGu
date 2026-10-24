@@ -344,5 +344,6 @@
   "earlier_owner_runner_audit": "docs/migration/t14-earlier-runner-audit.json",
   "g04_async_trace_evidence": "docs/migration/t14-g04-async-trace-evidence.json",
   "full_G04": "NOT_COMPLETED",
-  "g04_branch_trace_evidence": "docs/migration/t14-g04-branch-trace-evidence.json"
+  "g04_branch_trace_evidence": "docs/migration/t14-g04-branch-trace-evidence.json",
+  "g04_branch_checker_hardening": "docs/migration/t14-g04-branch-checker-hardening.json"
 }
