@@ -1234,6 +1234,70 @@ static void start_public_core(void) {pangu_prepare_result p;int cases=0,cancella
  assert(ticks>=0&&ticks<=2147483647);start_cases=cases;start_ticks=ticks;start_cancellations=cancellations;start_invalid=invalid;assert(cases==6056&&cancellations==285&&invalid==114);
 }
 
+static pangu_i32 transaction_setup(pangu_owner *owner,void *opaque) {
+ pangu_u32 id=(pangu_u32)(pangu_u64)opaque;assert(owner==&owners[id]&&owner->inflight==1);setup_count++;
+ assert(!api->register_resource(&live,positions[id],cleanup,opaque));return 0;
+}
+static int alias_rejections,quota_rejections,transactions,refused_plans;
+typedef struct {pangu_lifecycle_span spans[80];pangu_u64 count,used;unsigned char data[32768];} input_snapshot;
+static void append_snapshot(input_snapshot *s,const void *p,pangu_u64 bytes) {
+ if(!bytes) return;assert(s->count<80 && bytes<=sizeof(s->data)-s->used);s->spans[s->count++]=(pangu_lifecycle_span){(pangu_u64)p,(pangu_u64)p+bytes};memcpy(s->data+s->used,p,bytes);s->used+=bytes;
+}
+static void snapshot_inputs(input_snapshot *s,const pangu_prepare_result *p,const pangu_graph_output *g,const pangu_lifecycle_storage *storage,pangu_u64 n) {
+ s->count=s->used=0;
+ #define ADD(ptr,count,type) append_snapshot(s,ptr,(count)*sizeof(type))
+ ADD(p,1,pangu_prepare_result);ADD(g,1,pangu_graph_output);ADD(storage,1,pangu_lifecycle_storage);ADD(source_items,n,pangu_lifecycle_item);
+ const pangu_plan_registry *v=&p->lowered.registry;const pangu_graph_input *in=&p->lowered.graph;
+ ADD(v->scopes,v->scope_count,pangu_plan_scope);ADD(v->services,v->service_count,pangu_plan_service);ADD(v->bindings,v->binding_count,pangu_plan_binding);ADD(v->providers,v->provider_count,pangu_plan_provider);
+ ADD(in->instances,n,pangu_plan_instance);ADD(in->provider_owners,v->provider_count,pangu_u32);ADD(in->requirements,in->requirement_count,pangu_plan_requirement);
+ ADD(g->order,g->order_capacity,pangu_u32);ADD(g->states,g->state_capacity,pangu_u32);ADD(g->bindings,g->binding_capacity,pangu_plan_edge);
+ for(pangu_u64 i=0;i<n;i++) if(!g->states[i]) {pangu_owner *o=source_items[i].owner;ADD(o,1,pangu_owner);ADD(o->resources,o->capacity,pangu_owned_resource);ADD(o->operations,o->operation_capacity,pangu_owned_operation);}
+ #undef ADD
+}
+static int same_inputs(const input_snapshot *s) {
+ pangu_u64 offset=0;for(pangu_u64 i=0;i<s->count;i++) {pangu_u64 n=s->spans[i].end-s->spans[i].begin;if(memcmp(s->data+offset,(const void *)s->spans[i].begin,n)) return 0;offset+=n;}return 1;
+}
+static int poisoned(const void *p,pangu_u64 n) {const unsigned char *b=p;for(pangu_u64 i=0;i<n;i++) if(b[i]!=0xa5) return 0;return 1;}
+static void reject_alias(const pangu_prepare_result *p,const pangu_graph_output *g,pangu_lifecycle_storage *s,pangu_lifecycle_prepared *bad_info,pangu_lifecycle_edge *edges,pangu_lifecycle_prepared *info,pangu_u64 n) {
+ memset(activation,0xa5,sizeof activation);memset(edges,0xa5,1000*sizeof(*edges));memset(info,0xa5,sizeof(*info));input_snapshot before;snapshot_inputs(&before,p,g,s,n);
+ assert(api->prepare(p,g,source_items,n,s,100000,bad_info)==1);assert(same_inputs(&before));assert(poisoned(activation,sizeof activation) && poisoned(edges,1000*sizeof(*edges)) && poisoned(info,sizeof(*info)) && !setup_count);alias_rejections++;
+}
+static void transaction_case(const pangu_prepare_result *p,const pangu_graph_output *g) {
+ pangu_u64 n=p->lowered.graph.instance_count;graph_public_init_owners(p,g);memset(&live,0,sizeof live);setup_count=cleanup_count=cleanup_begin_count=0;
+ for(pangu_u64 i=0;i<n;i++)source_items[i].setup=transaction_setup;pangu_lifecycle_edge edges[1000];pangu_lifecycle_prepared info;pangu_lifecycle_storage storage={activation,9,edges,1000};input_snapshot before;snapshot_inputs(&before,p,g,&storage,n);
+ for(pangu_u64 i=0;i<before.count;i++) {
+  void *target=(void *)before.spans[i].begin;
+  storage.items=target;reject_alias(p,g,&storage,&info,edges,&info,n);storage.items=activation;
+  storage.edges=target;reject_alias(p,g,&storage,&info,edges,&info,n);storage.edges=edges;
+  reject_alias(p,g,&storage,target,edges,&info,n);
+ }
+ storage.edges=(pangu_lifecycle_edge *)(void *)activation;reject_alias(p,g,&storage,&info,edges,&info,n);storage.edges=edges;
+ reject_alias(p,g,&storage,(pangu_lifecycle_prepared *)(void *)activation,edges,&info,n);reject_alias(p,g,&storage,(pangu_lifecycle_prepared *)(void *)edges,edges,&info,n);
+ storage.item_capacity=~(pangu_u64)0/sizeof(pangu_lifecycle_item)+1;reject_alias(p,g,&storage,&info,edges,&info,n);storage.item_capacity=9;
+ storage.edge_capacity=~(pangu_u64)0/sizeof(pangu_lifecycle_edge)+1;reject_alias(p,g,&storage,&info,edges,&info,n);storage.edge_capacity=1000;
+ unsigned char *unaligned=(unsigned char *)&info+1;reject_alias(p,g,&storage,(pangu_lifecycle_prepared *)(void *)unaligned,edges,&info,n);
+ /* Exhaust every insufficient shared budget, including after stage1 dry-run. */
+ snapshot_inputs(&before,p,g,&storage,n);pangu_u64 fuel=1;
+ for(;fuel<100000;fuel++) {
+  memset(activation,0xa5,sizeof activation);memset(edges,0xa5,sizeof edges);memset(&info,0xa5,sizeof info);int rc=api->prepare(p,g,source_items,n,&storage,fuel,&info);
+  if(!rc) break;assert(rc==2 && same_inputs(&before) && poisoned(activation,sizeof activation) && poisoned(edges,sizeof edges) && poisoned(&info,sizeof info) && !setup_count);quota_rejections++;
+ }
+ assert(fuel<100000 && info.work==fuel && same_inputs(&before) && info.item_count==p->graph_report.order_count && info.edge_count==p->graph_report.binding_count);
+ for(pangu_u64 i=0;i<info.item_count;i++) assert(activation[i].owner==&owners[g->order[i]]);
+ for(pangu_u64 i=0;i<info.edge_count;i++) {pangu_plan_edge e=g->bindings[i];assert(g->order[edges[i].consumer]==p->lowered.graph.requirements[e.requirement].consumer && g->order[edges[i].provider]==p->lowered.graph.provider_owners[e.provider]);}
+ assert(poisoned(activation+info.item_count,(9-info.item_count)*sizeof(pangu_lifecycle_item)) && poisoned(edges+info.edge_count,(1000-info.edge_count)*sizeof(pangu_lifecycle_edge)));
+ pangu_u32 disposed[9]={0};pangu_lifecycle_graph stop={edges,info.edge_count,disposed,9};live.items=activation;live.count=info.item_count;live.stop_graph=&stop;for(pangu_u64 i=0;i<info.item_count;i++)positions[g->order[i]]=i;assert(!api->bind_geometry(&live,spans,64,FUEL));pangu_lifecycle_report report;assert(!api->start(&live,FUEL,&report));assert(!api->stop(&live,FUEL,&report));assert(setup_count==(int)info.item_count && cleanup_count==(int)info.item_count);for(pangu_u64 i=0;i<n;i++) if(g->states[i]) assert(owners[i].state==1 && !owners[i].count);transactions++;
+}
+static void transaction_public_core(void) {pangu_prepare_result p;
+ for(pangu_u64 i=0;i<sizeof(host_graph_cases)/sizeof(host_graph_cases[0]);i++) {const host_graph_case *c=&host_graph_cases[i];assert(pangu_discover_prepare(c->manifest,c->contracts,c->count,c->installed,&corpus_storage,10000000,&p)==c->status);if(c->status) {
+ pangu_lifecycle_edge edges[1000];pangu_lifecycle_prepared info;pangu_lifecycle_storage s={activation,9,edges,1000};pangu_prepare_result copy=p;memset(activation,0xa5,sizeof activation);memset(edges,0xa5,sizeof edges);memset(&info,0xa5,sizeof info);
+ assert(api->prepare(&p,&corpus_output,source_items,c->manifest->instance_count,&s,100000,&info)==10 && !memcmp(&p,&copy,sizeof p) && poisoned(activation,sizeof activation) && poisoned(edges,sizeof edges) && poisoned(&info,sizeof info));refused_plans++;continue;}
+ transaction_case(&p,&corpus_output);}
+ assert(!prepare(1000000,&p));transaction_case(&p,&output);
+ for(int rev=0;rev<2;rev++) {multi_manifest.provisions=rev ? reverse_provisions : provisions;assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,1000000,&p));transaction_case(&p,&output);}
+ assert(transactions==98&&refused_plans==145&&alias_rejections==6432&&quota_rejections==12127);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -1260,7 +1324,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid);
+ async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections);
  return 0;
 }
