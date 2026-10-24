@@ -10,18 +10,32 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
-        if '--live' in sys.argv or '--live-session' in sys.argv:
+        if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; never put credentials in source or arguments')
             flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
             output = str(Path(directory) / 'live-mimo')
+            live_source = 'live_journal.c' if '--live-journal' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/mimo'),
-                            implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), str(ROOT / ('tests/runtime/live_session.c' if '--live-session' in sys.argv else 'tests/runtime/live_mimo.c')), *flags, '-o', output], check=True)
-            subprocess.run([output], check=True, timeout=350)
+                            implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime' / live_source), *flags, '-o', output], check=True)
+            if '--live-journal' in sys.argv:
+                storage_dir = Path(directory) / 'storage'
+                storage_dir.mkdir()
+                for phase in ('store', 'recall'):
+                    subprocess.run([output, phase, str(storage_dir)], check=True, timeout=350)
+            else:
+                subprocess.run([output], check=True, timeout=350)
             return 0
         for mode in ('-O0', '-O2'):
+            journal_test = str(Path(directory) / 'test-journal')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/journal'),
+                            implementation('src/runtime/journal_posix'), implementation('src/runtime/session'),
+                            str(ROOT / 'tests/runtime/test_journal.c'), str(ROOT / 'tests/runtime/journal_abi.S'),
+                            '-Wl,--wrap=pwrite,--wrap=pread,--wrap=fsync,--wrap=ftruncate', '-o', journal_test], check=True)
+            subprocess.run([journal_test], check=True, timeout=30)
             session_test = str(Path(directory) / 'test-session')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/session'),

@@ -1618,8 +1618,8 @@
     },
     {
       "id": "T20",
-      "title": "JSONL 持久化与崩溃恢复",
-      "status": "PLANNED",
+      "title": "原生文件事务日志与崩溃恢复",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T19"
       ],
@@ -1630,9 +1630,13 @@
         "SESSION-06"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T20",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md",
+        "docs/migration/native-journal-format.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "handwritten native framed journal; transaction-level reopen, exclusive lock, torn tail and corrupt frame handling; task recovery and interactive persistence pending"
     },
     {
       "id": "T21",

@@ -535,6 +535,14 @@
     "src/client/tui/tui_layout.h": "client-source",
     "tests/client/tui/test_tui_abi.c": "client-test",
     "docs/migration/tui-assembly-handoff.md": "document",
-    "docs/并行开发任务提示词-工具核心汇编重构.md": "document"
+    "docs/并行开发任务提示词-工具核心汇编重构.md": "document",
+    "src/runtime/journal.S": "native-source",
+    "src/runtime/journal.h": "native-source",
+    "src/runtime/journal_layout.h": "native-source",
+    "src/runtime/journal_posix.c": "native-source",
+    "tests/runtime/test_journal.c": "native-test",
+    "docs/migration/native-journal-format.md": "document",
+    "tests/runtime/live_journal.c": "native-test",
+    "tests/runtime/journal_abi.S": "native-test"
   }
 }

@@ -287,6 +287,41 @@
           "semantics": "显式服务组合，原生静态入口不继承JS运行时"
         }
       ]
+    },
+    {
+      "id": "storage.journal.posix.local.v1",
+      "sources": [
+        "src/runtime/journal.h",
+        "src/runtime/journal_layout.h",
+        "src/runtime/journal.S",
+        "src/runtime/journal_posix.c"
+      ],
+      "dependencies": [
+        "session.commit.local.v0",
+        "system libc",
+        "POSIX pread/pwrite/fsync/ftruncate/flock/openat/fcntl"
+      ],
+      "role": "replaceable append-only native framed journal; full batch fsync before confirmation, exclusive writer, torn-tail repair and validated recovery into a fresh Session; not wired to interactive composition until task recovery exists",
+      "exports": [
+        "pg_journal_open",
+        "pg_journal_close",
+        "pg_journal_commit",
+        "pg_journal_file_size (internal platform seam)"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/storage/jsonl/storage.ts",
+            "packages/durable/test/jsonl-storage.test.ts"
+          ],
+          "semantics": "prepare/encode before IO, poison uncertain writes, committed marker recovery, incomplete tail repair versus complete corruption refusal; custom binary format, synchronous fsync and no sidecars in this bounded subset",
+          "tests_to_read": [
+            "packages/durable/test/jsonl-storage.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

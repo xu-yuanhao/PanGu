@@ -361,3 +361,36 @@ fd79244b76e0f5885ca85ce8d09bfa3de8d2ca9286aa1feb29845e095207cf80  tests/client/t
 d3b0a3a79c4ddc9456ec392330a34ff147e22f60a18a4f2c0849877ffbc1e5af  docs/原生重写路线与迁移TODO.md
 449acddee056db19a8687a7f1a6e2bee3cb50844d266323bf518d31dea9f6fe9  docs/migration/tui-assembly-handoff.md
 ```
+
+## 2026-10-25：Goal持续推进——原生文件Storage与事务级重开
+
+主Agent独占Durable存储/恢复，未修改第二Agent正在迁移的tools/read。参考Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7的JsonlStorage.commit/recover/readLines，以及jsonl-storage.test.ts的准备失败无IO、append前/后/短写poison、完整marker恢复与坏尾拒绝用例；采用全批次确认与故障后必须重开，有意改为原生显式帧而非JSONL。格式文档记录确切字节、版本、校验、配额和恢复策略；不复制C结构/padding/指针，不增加JSON库依赖。
+
+journal.S手写编解码、FNV头/全帧校验、文件锁/逐偏移IO/短写与EINTR推进/fsync确认/重开回放/不完整尾截断；journal_posix.c仅公开struct stat的类型/大小适配。目录fd复制、最终路径NOFOLLOW、普通文件、0600创建与初次文件/目录同步；独占协作锁，不宣称OS沙箱。任何IO后的不确定结果停止该实例；完整已写但未确认的帧可在重开时恢复，故下一步必须补Submission/requestId与任务检查点，不能重复执行副作用。
+
+默认交互组合暂未启用文件Storage，也未声称在途任务恢复；该服务已作为真实产品源码/依赖/构建输入登记，并在测试组合由Session替换绑定。新鲜Session成功打开后绑定已恢复序号，失败不发布部分回放且control未变。16MiB日志/8544字节帧/最多两条消息批次是明确局部上限，不新增压缩/数据库/侧文件框架。事务恢复的模型/工具状态与身份参数尚不在日志中，不能把它当完整Durable。
+
+验证：九组核心O0/O2 UBSan执行通过，日志测试覆盖全部最终帧切分、完整文件每字节损坏、重算校验后非法字段、8530字节最大帧、跨进程重开/独占锁、短读短写/EINTR、pwrite/fsync/pread/ftruncate失败、半写后进程_exit及路径/类型/配额；IO回调检查栈对齐并破坏caller-saved，五参数ABI探针检查callee-saved/DF/栈哨兵，故障探针负例检验其可检测性。汇编对象text=2444/data=bss=0；导入仅Session接口、公开libc IO与单个stat胶水，不回跳C日志核心。
+
+真实MiMo跨进程落盘测试实际通过：store新进程HTTP200/verified=1/sequence=3/messages=2，recall另一个新进程HTTP200/verified=1/sequence=5/messages=4。凭据仅进进程环境，日志和报告不含密钥。测试目录在结束后删除。完整候选门禁/PTY和自审摘要另追加最终回执；工作树G00当前因第二Agent未交接的新tools/read汇编文件而失败，不为此提前登记或声称其实现通过。
+
+最终候选回执：只归档本Agent暂存树，G00通过（生产准入仍BLOCKED），PTY Ctrl-D/SIGTERM/resize与精确termios恢复通过。未包含第二Agent未交接的tools/read新增汇编，未声称共享工作树G00已通过。Goal保持进行中，接下来实现任务检查点与在途恢复，文件回放不是完整目标完成。
+
+控制面由同一主Agent按用户授权自审自批：新增真实Storage实现/头/平台胶水/测试/格式文档，更新精确构建输入与T20局部状态；不修改检查器，不放宽现有预算或断言。新增16MiB本地日志边界独立于未认证的生产性能预算。风险包括同步IO延迟、FNV仅检错、协作锁、未知版本拒绝、未实现任务/幂等/副作用恢复；已记录且交互组合暂不启用日志。固定摘要（不含本记录）：
+
+```text
+da08599330e78506a6383d34feef328eb625b2769e8235c3ff2f8231ad806469  docs/migration/native-journal-format.md
+dc49afbb3c45ed72ace9773421f38d9577efe8d516d8ade7d70afa1d6f27e180  docs/migration/task-ledger.json
+9eff42515f6f867738ccddbaf2683f9142c8eb3cc4029fc2ca8d8a1edf2b9b79  docs/原生重写路线与迁移TODO.md
+6e69fda786449fd2c7a395e0f67e881c4e0140ddca590fba8d0f74cd6bc6ddf7  governance/assembly-first.json
+eaedc90d407c1c7f15f3e850b21d43405b0187db8e69b4f58f858ef9c68694c3  governance/bootstrap-policy.json
+a6edf12e9258f17ec418f375cf0e23063ca594625b732652443f515e5989455b  governance/runtime-local-modules.json
+76b6b50b1e21b454d204d99735f2ae4aecf01b9c2155d8c1b9d8e002e4d45abd  src/runtime/journal.S
+5b5443bb197ea6725c74e6777a399b7b35b43b47eef2368cc577124d41bb30b0  src/runtime/journal.h
+c58d343e5bb9183c62668dea8e13f90490efb13b1d3b34ec6e8960502129f352  src/runtime/journal_layout.h
+3fc941bbe0fe4d44742e365188f9e54ddf5caa30e694a1e4a7ccb85ea2789975  src/runtime/journal_posix.c
+2064c8bf7a9499230b577a47326cf2fa04ce6756af5574851088b461b8d56b43  tests/runtime/journal_abi.S
+77de5d0ae0a96c27f5185063b2688769844a2371bdd09692eece782a3643a656  tests/runtime/live_journal.c
+57a71d56ccddac8818ddec761777eedf4335de6313fbc4b30ba704b8a8d5d588  tests/runtime/test_journal.c
+578c8a6e986fbb0dcd40e6b0a1cf4432c3f4e0f2bb3c72bea5774d891a8f1488  tools/runtime/build_test.py
+```

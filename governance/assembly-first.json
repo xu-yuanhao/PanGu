@@ -67,6 +67,15 @@
     "src/client/tui/tui_term.S": {
       "role": "assembly-core",
       "reason": "手写终端输入/状态/渲染/生命周期；平台结构通过已登记薄胶水调用"
+    },
+    "src/runtime/journal.S": {
+      "role": "assembly-core",
+      "reason": "手写事务帧编解码、校验、追加/刷盘确认与重开恢复"
+    },
+    "src/runtime/journal_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "仅公开struct stat布局与普通文件/大小检查；日志算法和IO推进均在汇编"
     }
   }
 }
