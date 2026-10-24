@@ -48,6 +48,8 @@ pg_session_commit:
     cmp eax,1
     je .Lboundary_check
     cmp eax,2
+    je .Lboundary_check
+    cmp eax,4
     jne .Lboundary_checked
 .Lboundary_check:
     cmp qword ptr [r13+40],0
@@ -57,8 +59,24 @@ pg_session_commit:
     je .Lappend
     cmp eax,1
     je .Lsystem
+    cmp eax,4
+    je .Lprofile
     cmp eax,3
     ja .Lreject
+    jmp .Lcheckpoint
+.Lprofile:
+    cmp qword ptr [r13+32],0
+    je .Lreject
+    cmp qword ptr [r13+32],4096
+    ja .Lreject
+    mov rsi,[r13+24]
+    test rsi,rsi
+    jz .Lreject
+    mov rcx,[r13+32]
+    mov [rsp+32],rcx
+    lea rdi,[rsp+PG_SESSION_DATA]
+    mov [rsp+24],rdi
+    rep movsb
     jmp .Lcheckpoint
 .Lsystem:
     mov rcx,[r13+32]
@@ -250,6 +268,8 @@ pg_session_commit:
     je .Ladopt_system
     cmp dword ptr [rsp],3
     je .Ladopted
+    cmp dword ptr [rsp],4
+    je .Ladopt_profile
     lea rdi,[r12+PG_SC_RUN]
     xor eax,eax
     mov ecx,5
@@ -260,6 +280,17 @@ pg_session_commit:
     xor eax,eax
     rep stosb
     mov qword ptr [rbx+PG_S_COUNT],0
+    jmp .Ladopted
+.Ladopt_profile:
+    lea rdi,[r12+PG_SC_PROFILE]
+    xor eax,eax
+    mov ecx,512
+    rep stosq
+    mov rsi,[rsp+24]
+    lea rdi,[r12+PG_SC_PROFILE]
+    mov rcx,[rsp+32]
+    mov [r12+PG_SC_PROFILE_SIZE],rcx
+    rep movsb
     jmp .Ladopted
 .Ladopt_system:
     mov rsi,[rsp+24]

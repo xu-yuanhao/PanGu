@@ -532,7 +532,6 @@
     "src/client/tui/tui_layout.h": "client-source",
     "tests/client/tui/test_tui_abi.c": "client-test",
     "docs/migration/tui-assembly-handoff.md": "document",
-    "docs/并行开发任务提示词-工具核心汇编重构.md": "document",
     "src/runtime/journal.S": "native-source",
     "src/runtime/journal.h": "native-source",
     "src/runtime/journal_layout.h": "native-source",
@@ -551,6 +550,11 @@
     "src/runtime/read_tool_layout.h": "native-source",
     "tests/runtime/test_tools_asm.c": "native-test",
     "tools/runtime/test_tools_asm.py": "development-tool",
-    "docs/migration/tools-assembly-handoff.md": "document"
+    "docs/migration/tools-assembly-handoff.md": "document",
+    "docs/并行开发任务提示词-MiMo协议汇编重构.md": "document",
+    "src/runtime/profile.S": "native-source",
+    "src/runtime/profile.h": "native-source",
+    "src/runtime/profile_layout.h": "native-source",
+    "tests/runtime/test_profile.c": "native-test"
   }
 }

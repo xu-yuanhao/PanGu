@@ -7,6 +7,11 @@ typedef struct {
  tui_runtime_ops ops;
  int active, stopped;
  char id[64], name[64];
+ int (*detach)(void *);
+ void *detach_context;
+ int stop_error;
 } pg_tui_bridge;
 int pg_tui_bridge_init(pg_tui_bridge *, pg_client);
+/* Optional owner lifecycle binding: stop observing without requesting abort. */
+int pg_tui_bridge_set_detach(pg_tui_bridge *, int (*detach)(void *), void *context);
 #endif

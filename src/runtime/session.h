@@ -28,7 +28,7 @@ typedef struct {
     unsigned restarts;
     uint64_t input_index;
 } pg_run_checkpoint;
-typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET, PG_SESSION_CHECKPOINT } pg_session_change_kind;
+typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET, PG_SESSION_CHECKPOINT, PG_SESSION_PROFILE } pg_session_change_kind;
 typedef struct {
     pg_session_change_kind kind;
     const pg_message *messages;
@@ -50,6 +50,8 @@ typedef struct {
     uint64_t sequence;
     unsigned busy, failed;
     pg_run_checkpoint run;
+    size_t profile_size;
+    unsigned char profile[PG_TEXT_LIMIT];
 } pg_session_control;
 /* Caller owns view/control, initialized to zero with an explicit storage binding. */
 int pg_session_commit(pg_session *, pg_session_control *, const pg_session_change *);

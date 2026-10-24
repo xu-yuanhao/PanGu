@@ -17,6 +17,9 @@ static int source_rc=1,submit_rc,submit_calls,cancel_calls,poll_calls;
 int pg_bridge_fixture_submit(void *ctx,pg_slice text){(void)ctx;(void)text;++submit_calls;return submit_rc;}
 void pg_bridge_fixture_cancel(void *ctx){(void)ctx;++cancel_calls;}
 int pg_bridge_fixture_poll(void *ctx,pg_event *out){(void)ctx;++poll_calls;*out=source;return source_rc;}
+static int detach_calls,detach_result;
+int pg_bridge_fixture_detach(void *ctx){assert(ctx==&detach_calls);++detach_calls;return detach_result;}
+int pg_bridge_test_detach(void *);
 int pg_bridge_test_submit(void *,pg_slice);
 void pg_bridge_test_cancel(void *);
 int pg_bridge_test_poll(void *,pg_event *);
@@ -38,7 +41,14 @@ static void boundary_abi(void){long page=sysconf(_SC_PAGESIZE);assert(page>PG_B_
  assert(!pg_bridge_probe((probe_fn)b->ops.shutdown,b,0,0));assert(b->stopped&&b->active&&poll_calls==before+8);b->ops.shutdown(b);assert(poll_calls==before+8);assert(b->ops.poll(b,&guarded.event)==0&&b->ops.submit(b,"end",3)==TUI_SUBMIT_ERROR);
  assert(guarded.before==0x874192&&guarded.after==0x194582);assert(!munmap(ids,(size_t)page*3));assert(!munmap(mapping,(size_t)page*3));
 }
-int main(void){boundary_abi();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
+static void detach_lifecycle(void){
+ for(int result=0;result<2;++result){pg_tui_bridge b;pg_client client={0,pg_bridge_test_submit,pg_bridge_test_cancel,pg_bridge_test_poll};assert(!pg_tui_bridge_init(&b,client));
+ assert(pg_tui_bridge_set_detach(0,pg_bridge_test_detach,0));assert(pg_tui_bridge_set_detach(&b,0,0));
+ assert(!pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));detach_result=result;int before=detach_calls,cancels=cancel_calls,polls=poll_calls;
+ b.active=1;assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));assert(!pg_bridge_probe((probe_fn)b.ops.shutdown,&b,0,0));
+ assert(b.stopped&&b.active&&b.stop_error==result&&detach_calls==before+1&&cancel_calls==cancels&&poll_calls==polls);b.ops.shutdown(&b);assert(detach_calls==before+1);assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));}
+}
+int main(void){boundary_abi();detach_lifecycle();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
  pg_tui_bridge bridge;assert(!pg_tui_bridge_init(&bridge,pg_agent_client(&agent)));tui_runtime_ops *ops=&bridge.ops;tui_event e;unsigned starts=0,texts=0,ends=0;
  assert(ops->submit(ops->ctx,"test",4)==TUI_SUBMIT_OK);assert(ops->submit(ops->ctx,"busy",4)==TUI_SUBMIT_BUSY);
  for(unsigned i=0;i<16;++i)if(ops->poll(ops->ctx,&e)){if(e.kind==TUI_EV_RUN_STARTED)++starts;if(e.kind==TUI_EV_TEXT_DELTA){++texts;assert(e.text_len==2&&!memcmp(e.text,"ok",2));}if(e.kind==TUI_EV_RUN_FINISHED){++ends;assert(e.run_status==TUI_RUN_SUCCESS);break;}}
@@ -49,4 +59,7 @@ int main(void){boundary_abi();assert(!pg_agent_init(&agent,(pg_model){0,start,ne
  pg_client raw=pg_agent_client(&agent);assert(!raw.submit(raw.context,(pg_slice){"pending",7}));assert(raw.poll(raw.context,(pg_event[1]){{0}}));assert(!raw.poll(raw.context,(pg_event[1]){{0}}));assert(!pg_agent_suspend(&agent));assert(!pg_agent_resume(&agent,0));
  assert(!pg_tui_bridge_init(&bridge,raw));assert(!bridge.active);assert(ops->poll(ops->ctx,&e)==1&&e.kind==TUI_EV_RUN_STARTED&&bridge.active);assert(ops->submit(ops->ctx,"busy",4)==TUI_SUBMIT_BUSY);assert(ops->cancel(ops->ctx)==1);
  ends=0;for(unsigned i=0;i<8;++i)if(ops->poll(ops->ctx,&e)&&e.kind==TUI_EV_RUN_FINISHED){assert(e.run_status==TUI_RUN_CANCELLED);++ends;break;}assert(ends==1&&!bridge.active);ops->shutdown(ops->ctx);
- puts("PASS: native Runtime/TUI bridge event mapping, busy state, terminal and idempotent shutdown cancellation");return 0;}
+ assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));assert(!pg_tui_bridge_init(&bridge,pg_agent_client(&agent)));assert(!pg_tui_bridge_set_detach(&bridge,pg_agent_suspend,&agent));
+ assert(ops->submit(ops->ctx,"suspend",7)==TUI_SUBMIT_OK);assert(ops->poll(ops->ctx,&e)==1);assert(!ops->poll(ops->ctx,&e));int before_cancel=cancelled,before_close=closed;uint64_t before_sequence=agent.commits.sequence;
+ ops->shutdown(ops->ctx);assert(bridge.stopped&&!bridge.stop_error&&cancelled==before_cancel&&closed==before_close+1&&agent.commits.run.phase==PG_RUN_MODEL&&agent.commits.sequence==before_sequence);assert(!pg_agent_resume(&agent,0));assert(!pg_tui_bridge_init(&bridge,pg_agent_client(&agent)));assert(ops->poll(ops->ctx,&e)==1&&e.kind==TUI_EV_RUN_STARTED);ops->shutdown(ops->ctx);
+ puts("PASS: native Runtime/TUI bridge mapping, detach preserves work, explicit cancel and idempotent lifecycle");return 0;}

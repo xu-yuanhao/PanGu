@@ -63,6 +63,12 @@ pg_test_execute:
 .globl pg_abi_probe
 .type pg_abi_probe,@function
 pg_abi_probe:
+    xor r8d,r8d
+    jmp .Labi_entry
+.globl pg_abi_probe4
+.type pg_abi_probe4,@function
+pg_abi_probe4:
+.Labi_entry:
     push rbp
     push rbx
     push r12
@@ -74,6 +80,7 @@ pg_abi_probe:
     mov rdi,rsi
     mov rsi,rdx
     mov rdx,rcx
+    mov rcx,r8
     mov r10,0x7ec4d86101a35b29
     mov [rsp],r10
     mov rbx,0x1020304050607080
@@ -111,6 +118,7 @@ pg_abi_probe:
     pop rbp
     ret
 .size pg_abi_probe,.-pg_abi_probe
+.size pg_abi_probe4,.-pg_abi_probe4
 .globl pg_abi_corrupt
 .type pg_abi_corrupt,@function
 pg_abi_corrupt:

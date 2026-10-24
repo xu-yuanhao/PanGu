@@ -480,3 +480,49 @@ bb7c1a21e399aa8def70eeb7da47c624d894aef5e409d9e1309a7db4780248e7  tests/client/t
 69aa65a885f46f9f9c6297b8c22d4670475b8141565a0fc5ab74da4fc3e1fec3  tools/runtime/build_test.py
 09f8c75a05ef283a57136a6e9e2216d5bd580150c09430fe79f3a1baba20082f  tools/runtime/test_tools_asm.py
 ```
+
+## 2026-10-25：下一轮并行任务——MiMo协议汇编重构
+
+按用户要求删除已退役派发文档，新增 `docs/并行开发任务提示词-MiMo协议汇编重构.md`。旧TUI派发此前已删除；本次删除当前已完成的tools/read派发，历史交接报告保留。第二Agent独占MiMo协议/投影/生命周期及专项测试，主Agent继续配置身份、持久会话/恢复与共享集成；不派发或声称新实现已完成。任务固定Assembly优先、单版本删除旧C、模型ABI/配置语义、具体源码参考、故障/容量/ABI验证与交接停止条件。
+
+同一主Agent按授权自审自批任务/清单调整，不伪称独立审核。风险为共享工作树与主Agent尚在修改控制结构，因此禁止第二Agent更改主控文件或硬编码无关Agent/control尺寸；冻结provider实际消费契约。未放宽门禁、预算或产品断言。
+
+实际验证：git diff --check通过。当前共享树G00失败，原因是本轮先前尚未集成登记的profile.h/profile.S/profile_layout.h/test_profile.c四个文件；未删除或提前批准这些在途实现。用HEAD临时归档仅叠加本次任务/计划/清单四个文件并删除旧任务后，文档候选G00通过，生产准入仍BLOCKED。仅文档修改，未重复运行产品测试。
+
+固定摘要（不含本报告）：
+
+```text
+8ff7a0c71d2bc4da82c4e55f22b30cc2cc983a8574469eeb939a87d25aeeb949  docs/并行开发任务提示词-MiMo协议汇编重构.md
+bef6bac17b16efa40684498990dd2f0ee7c611b59149d02db953461221857f09  docs/原生重写路线与迁移TODO.md
+9dc4551bbd154807bdf47ff798d3ae3855fcf661b0cc07d081098820542da02e  docs/migration/task-ledger.json
+94d56b56dc48dd92f9bb9f431d6c155e0afa70172d1cb856357124c3765a50cb  governance/bootstrap-policy.json
+```
+
+## 2026-10-25：配置身份、持久TUI与主文档收敛
+
+参考固定Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7的GenerationTask.prepare/request、agent配置解析和harness-generation-recovery.test.ts中重开仍使用已准备选项、关闭后重发原消息的测试。采用原配置固定、关闭不等于abort；原生用显式公开配置身份匹配替代存储完整TS对象，当前单运行/只读工具，不声称完整Durable。
+
+profile.S手写最多4096字节的长度编码，覆盖provider/model/workspace/实现契约/dev/inode及实际工具定义，不含密钥或指针。Session/日志v3保存；活动运行不可更换，Agent重开先核对再执行。相同身份无额外提交，空闲可显式替换；已有无身份日志的自动交互采用被拒绝。control=4176、agent=293160字节，模型/工具/client ABI不变。bridge=240字节，可选detach回调暂停本地执行，不cancel或伪造终态；默认易失行为保留。C只补组合、realpath/fstat等公开平台结构适配，没有新增C核心。
+
+实际产品PANGU_SESSION_DIR选择现有目录中的session.pgj；启动核对配置、恢复未结束运行，持久退出保留任务，Ctrl-C忙时仍明确abort。保存系统提示且恢复不覆盖，达到恢复上限诊断停下。未实现TUI显式retry界面、历史屏幕回放、requestId去重、通用Task/Scheduler及外部写副作用结算；身份不是防恶意本机代码的安全认证。
+
+实际验证：核心十二组O0/O2 UBSan通过；新增4096字节配置上限、profile未核对/不匹配拒绝、v3最大帧/全部小帧尾切分与逐字节损坏/重算校验后非法字段/fsync不确定重开，编码器四参数ABI探针及探针负例、bridge detach错误/幂等/回调ABI通过。客户端六组通过。产品PTY离线退出/信号/resize/精确termios恢复及持久idle重开无重复提交通过；真实MiMo流中Ctrl-D退出保留MODEL、换模型/工作目录拒绝且日志未变、另进程自动恢复成功、已结束不重跑、第三进程回忆通过。另跑真实read→续答和流中Ctrl-C取消也通过。G00通过，生产准入仍BLOCKED，git diff --check通过。
+
+真实验证最初两次要求60条事实，恢复已收到真实文本但最终进入统一模型协议错误；第一版测试未显示错误终态而等到观察超时，随后补错误诊断。未取得该响应原始finish_reason，不能声称精确根因；当前provider对length结束的拒绝由原测试覆盖。最终完成验收改用当前请求预算内的12条短事实，成功断言、max_tokens和provider实现均未放宽；长输出/错误分类仍是MiMo适配器的限制，不计为成功恢复证据。
+
+按用户本轮决定，将主文档从2276行原地重写为51行，仅保留最小Agent定义、参考分工、Assembly优先、可替换组合、TUI方向和运行入口，不另存旧稿。AGENTS/守卫/TODO同步说明旧计划不自动成为必做产品需求，不再从早期设想扩张范围。历史技术证据保留，主文档不再复述阶段体系。新并行任务保持MiMo模块独占，主Agent不改该实现及其两个测试。
+
+同一主Agent按用户授权自审自批本次源码/模块登记、v3字段与控制变更，不伪称独立审核。检查器/预算/原测试拒绝不放宽；新增身份与ABI风险由边界和真实恢复覆盖。对象text字节：profile413/session1418/agent4501/journal2939/bridge780，data/bss均0；profile/session/bridge无未定义导入，Agent仅Session调用，journal仍为公开IO与stat薄胶水，无旧C核心回跳。
+
+固定变更包SHA256（不含本报告，按暂存差异路径排序的[path,文件SHA256]列表做紧凑UTF-8 JSON摘要，删除项为null）：
+
+```text
+334f59bf992bfecd599a06f39a682db406ba26ac4895fa9af15d4c8b6d261ee3  34个路径
+5d7091a01f2df5b8b44d9401525bb6bdb7821ba16aea1662a0fff24c9ba3f3f9  AGENTS.md
+d829079cf433eb09e55aa5234523dbb3a7fab4005628f9e72197fb9f5e2a21b1  盘古 Pangu 项目完整文档.md
+75dbd34b37215cae566e2fb546c841b61a8dab6fc56ae37aace0df2415dddef5  governance/bootstrap-policy.json
+41c1d6d42b35ccf6031bdb7aa2511f192f571f10e5d7c4850a0c25907232ca78  governance/assembly-first.json
+536bbf4a2ad9863f36fba5a74071dd3c315b4e74acd51430fe3af79e584a0f6b  governance/runtime-local-modules.json
+```
+
+Goal保持进行中；下一步继续以参考源码推进实际Task/Submission服务边界，MiMo协议汇编由并行Agent完成后集成。

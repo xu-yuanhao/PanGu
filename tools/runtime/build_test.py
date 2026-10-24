@@ -30,6 +30,15 @@ def main():
                 subprocess.run([output], check=True, timeout=350)
             return 0
         for mode in ('-O0', '-O2'):
+            profile_test = str(Path(directory) / 'test-profile')
+            profile_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/profile'),
+                            implementation('src/runtime/agent'), implementation('src/runtime/session'),
+                            implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'),
+                            implementation('src/runtime/tools'), str(ROOT / 'tests/runtime/test_profile.c'),
+                            *profile_flags, '-o', profile_test], check=True)
+            subprocess.run([profile_test], check=True, timeout=30)
             resume_test = str(Path(directory) / 'test-resume')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'),
@@ -90,7 +99,7 @@ def main():
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'), implementation('src/runtime/session'),
-                            str(ROOT / 'tests/runtime/agent_abi.S'), str(ROOT / 'tests/runtime/test_agent_asm.c'),
+                            implementation('src/runtime/profile'), str(ROOT / 'tests/runtime/agent_abi.S'), str(ROOT / 'tests/runtime/test_agent_asm.c'),
                             '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
     return 0

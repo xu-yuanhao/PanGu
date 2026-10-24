@@ -73,6 +73,10 @@
     "src/runtime/read_tool.S": {
       "role": "assembly-core",
       "reason": "手写工具注册/校验分派或目录相对只读执行；公开平台/库边界有布局断言"
+    },
+    "src/runtime/profile.S": {
+      "role": "assembly-core",
+      "reason": "手写有界配置身份长度编码；仅存公开配置和工具定义，不含凭据或进程指针"
     }
   }
 }

@@ -27,6 +27,7 @@
 WRAPPER pg_bridge_test_submit,pg_bridge_fixture_submit
 WRAPPER pg_bridge_test_cancel,pg_bridge_fixture_cancel
 WRAPPER pg_bridge_test_poll,pg_bridge_fixture_poll
+WRAPPER pg_bridge_test_detach,pg_bridge_fixture_detach
 .macro CHECK register,value,bit
     mov r10,\value
     cmp \register,r10

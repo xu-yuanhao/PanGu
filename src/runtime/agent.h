@@ -33,18 +33,21 @@ typedef struct {
     pg_message draft, pending;
     pg_session_control commits;
     pg_run_checkpoint next_checkpoint;
+    unsigned profile_verified;
 } pg_agent;
 int pg_agent_init(pg_agent *, pg_model, pg_tools);
 pg_client pg_agent_client(pg_agent *);
 /* Fresh idle agents only: bind before the first system/input/reset commit. */
 int pg_agent_bind_storage(pg_agent *, pg_storage);
+/* Compare loaded identity; replacing it is allowed only when no run is active. */
+int pg_agent_bind_profile(pg_agent *, pg_slice identity);
 /* Explicitly resume a freshly loaded run using its original model/tool configuration.
    Only the current read-only/replay-safe tool contract is supported.
    retry=1 explicitly retries a parked run. Returns 2 when restart limit parks it. */
 int pg_agent_resume(pg_agent *, unsigned retry);
 /* Stop the local executor without aborting durable work or emitting a terminal.
    Borrowed events expire; detach observers first, then explicitly resume later. */
-int pg_agent_suspend(pg_agent *);
+int pg_agent_suspend(void *agent_context);
 /* Idle-only operations; reset clears transcript but preserves system and services. */
 int pg_agent_set_system(pg_agent *, pg_slice);
 int pg_agent_reset_session(pg_agent *);

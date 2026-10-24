@@ -39,6 +39,26 @@ pg_tui_bridge_init:
     ret
 .size pg_tui_bridge_init,.-pg_tui_bridge_init
 
+.globl pg_tui_bridge_set_detach
+.type pg_tui_bridge_set_detach,@function
+pg_tui_bridge_set_detach:
+    test rdi,rdi
+    jz .Ldetach_bad
+    test rsi,rsi
+    jz .Ldetach_bad
+    cmp dword ptr [rdi+PG_B_ACTIVE],0
+    jne .Ldetach_bad
+    cmp dword ptr [rdi+PG_B_STOPPED],0
+    jne .Ldetach_bad
+    mov [rdi+PG_B_DETACH],rsi
+    mov [rdi+PG_B_DETACH_CONTEXT],rdx
+    xor eax,eax
+    ret
+.Ldetach_bad:
+    mov eax,1
+    ret
+.size pg_tui_bridge_set_detach,.-pg_tui_bridge_set_detach
+
 .Lsubmit:
     cmp dword ptr [rdi+PG_B_STOPPED],0
     jne .Lsubmit_error
@@ -210,6 +230,8 @@ pg_tui_bridge_init:
     mov rbx,rdi
     cmp dword ptr [rbx+PG_B_STOPPED],0
     jne .Lshutdown_return
+    cmp qword ptr [rbx+PG_B_DETACH],0
+    jne .Lshutdown_detach
     cmp dword ptr [rbx+PG_B_ACTIVE],0
     je .Lshutdown_stop
     mov rdi,[rbx]
@@ -227,6 +249,13 @@ pg_tui_bridge_init:
     js .Lshutdown_stop
     inc r12d
     jmp .Lshutdown_drain
+.Lshutdown_detach:
+    mov rdi,[rbx+PG_B_DETACH_CONTEXT]
+    call [rbx+PG_B_DETACH]
+    test eax,eax
+    setne al
+    movzx eax,al
+    mov [rbx+PG_B_STOP_ERROR],eax
 .Lshutdown_stop:
     mov dword ptr [rbx+PG_B_STOPPED],1
 .Lshutdown_return:

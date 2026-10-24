@@ -1614,7 +1614,7 @@
       ],
       "completion_approved": false,
       "local_subset_scope": "bounded memory projection plus atomic run checkpoints, immutable settled messages and reset boundary; no fork/general task graph",
-      "local_implementation": "src/runtime/session.S and agent.S; handwritten SysV AMD64; volatile default, transactional storage seam and failure isolation"
+      "local_implementation": "session.S and agent.S handwritten SysV; volatile default or explicitly bound journal; atomic message/checkpoint/profile transactions"
     },
     {
       "id": "T20",
@@ -1636,7 +1636,7 @@
         "docs/migration/native-journal-format.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "native journal v1/v2 and single-run model/tool/abort recovery with persisted attempt/restart budgets; original configuration supplied explicitly; requestId dedup and interactive configuration binding pending"
+      "local_subset_scope": "native journal v1/v2/v3, exact credential-free profile identity, opt-in persistent TUI and single-run model/tool/abort recovery with bounded restarts; requestId dedup/general scheduler pending"
     },
     {
       "id": "T21",
@@ -1700,7 +1700,7 @@
       ],
       "completion_approved": false,
       "local_subset_scope": "durable single sequential read-only run, explicit resume/suspend, persisted abort and terminal outcome, model/tool continuation; no general scheduler, requestId dedup, or side-effect reconciliation",
-      "local_implementation": "src/runtime/agent.S; handwritten SysV AMD64; previous C source deleted; partial memory session/Loop only"
+      "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {
       "id": "T24",
@@ -1820,8 +1820,8 @@
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
       "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
-      "local_subset_scope": "interactive read-only TUI plus real Runtime; PTY tool continuation/cancel/termios restore verified; no full P1",
-      "local_implementation": "handwritten TUI UTF-8/input/state/view/app/terminal logic integrated; termios C layout glue and runtime_bridge.c remain; six client groups and real MiMo PTY verified, full stage incomplete"
+      "local_subset_scope": "read-only TUI with optional profile-verified persistent session, startup resume and detach on exit; no full P1 or history-screen replay",
+      "local_implementation": "handwritten TUI and runtime_bridge.S; platform termios remains thin C; persisted owner detach callback; actual evidence in runtime-core-progress.md"
     },
     {
       "id": "T29",
@@ -2228,10 +2228,10 @@
       "c",
       "cpp"
     ],
-    "next_work": "Agent Loop and bounded memory session now handwritten ASM; continue in-place tool/protocol migration; TUI migration in separate Agent scope",
-    "ownership": "main Agent owns Durable storage/tasks/recovery/shared controls; second Agent owns tools/read modules and dedicated tests in docs/并行开发任务提示词-工具核心汇编重构.md; public tool ABI frozen",
+    "next_work": "Tools/read and TUI handwritten ASM integrated; main Agent continues Durable profile identity and persistent entry; second Agent replaces MiMo protocol/transport core in place with handwritten ASM",
+    "ownership": "main Agent owns Durable profile/storage/tasks/recovery/composition/client/shared controls; second Agent owns MiMo modules and protocol/projection dedicated tests in docs/并行开发任务提示词-MiMo协议汇编重构.md; model ABI and configuration semantics frozen",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
-    "status": "plan and admission only; assembly implementation not completed",
+    "status": "tools/read and TUI subsets integrated; MiMo assembly task assigned by document, not yet implemented or verified",
     "reference_workflow": "Read pinned functions, direct callers and related tests before implementation; record adopted semantics/native differences and verification in existing handoff/progress. runtime-local-modules.reference_basis is a locator, never reading/compliance proof."
   }
 }

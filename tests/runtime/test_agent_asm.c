@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "../../src/runtime/agent.h"
+#include "../../src/runtime/profile_layout.h"
 #include "../../src/runtime/agent_layout.h"
 #include <assert.h>
 #include <stdint.h>
@@ -35,6 +36,7 @@ int pg_test_authorize(void *,pg_slice,pg_slice);
 int pg_test_execute(void *,pg_slice,pg_slice,char *,size_t,size_t *);
 typedef void (*probe_fn)(void);
 unsigned pg_abi_probe(probe_fn,void *,const void *,size_t);
+unsigned pg_abi_probe4(probe_fn,void *,void *,size_t,void *);
 void pg_abi_corrupt(void);
 static char full[PG_TEXT_LIMIT];
 pg_store_result pg_test_storage(void *,const pg_session_change *,uint64_t,uint64_t *);
@@ -83,6 +85,9 @@ static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_s
  assert(!pg_abi_probe((probe_fn)pg_session_commit,&agent->session,&local,(size_t)&change));
  assert(local.sequence==1&&!local.busy&&!strcmp(agent->session.system_prompt,"probe"));
 }
-int main(void){assert(pg_abi_probe(pg_abi_corrupt,0,0,0)==65);long page=sysconf(_SC_PAGESIZE);assert(page>0);size_t accessible=((sizeof(pg_agent)+(size_t)page-1)/(size_t)page)*(size_t)page,total=accessible+2*(size_t)page;
+int main(void){assert(pg_abi_probe(pg_abi_corrupt,0,0,0)==65);assert(pg_abi_probe4(pg_abi_corrupt,0,0,0,0)==65);
+ pg_profile_spec profile={.provider={"a",1},.model={"b",1},.workspace={"c",1},.implementation={"d",1}};unsigned char bytes[52];size_t length=0;
+ assert(!pg_abi_probe4((probe_fn)pg_profile_encode,&profile,bytes,sizeof(bytes),&length)&&length==sizeof(bytes));
+long page=sysconf(_SC_PAGESIZE);assert(page>0);size_t accessible=((sizeof(pg_agent)+(size_t)page-1)/(size_t)page)*(size_t)page,total=accessible+2*(size_t)page;
  for(unsigned side=0;side<2;++side){char *mapping=mmap(0,total,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(mapping!=MAP_FAILED);assert(!mprotect(mapping+page,accessible,PROT_READ|PROT_WRITE));pg_agent *agent=(pg_agent*)(mapping+page+(side?accessible-sizeof(pg_agent):0));exercise(agent);assert(!munmap(mapping,total));}
  puts("PASS: Agent ASM layout, register/DF/stack guards, callback clobbers, two guard placements and full text capacity");return 0;}

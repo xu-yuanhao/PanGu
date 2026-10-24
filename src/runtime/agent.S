@@ -1,6 +1,13 @@
 #include "agent_layout.h"
 .intel_syntax noprefix
 .text
+.macro PROFILE_GUARD owner,bad
+    cmp qword ptr [\owner+PG_A_COMMITS+PG_SC_PROFILE_SIZE],0
+    je 1f
+    cmp dword ptr [\owner+PG_A_VERIFIED],1
+    jne \bad
+1:
+.endm
 
 .globl pg_agent_init
 .type pg_agent_init,@function
@@ -72,11 +79,64 @@ pg_agent_bind_storage:
     ret
 .size pg_agent_bind_storage,.-pg_agent_bind_storage
 
+.globl pg_agent_bind_profile
+.type pg_agent_bind_profile,@function
+pg_agent_bind_profile:
+    test rdi,rdi
+    jz .Lprofile_bad
+    cmp dword ptr [rdi+PG_A_STATE],0
+    jne .Lprofile_bad
+    cmp qword ptr [rdi+PG_A_COMMITS+PG_SC_BUSY],0
+    jne .Lprofile_bad
+    mov dword ptr [rdi+PG_A_VERIFIED],0
+    test rsi,rsi
+    jz .Lprofile_bad
+    test rdx,rdx
+    jz .Lprofile_bad
+    cmp rdx,4096
+    ja .Lprofile_bad
+    mov r8,rdi
+    mov r9,rsi
+    mov r10,rdx
+    cmp [rdi+PG_A_COMMITS+PG_SC_PROFILE_SIZE],rdx
+    jne .Lprofile_replace
+    mov rcx,rdx
+    lea rdi,[rdi+PG_A_COMMITS+PG_SC_PROFILE]
+    repe cmpsb
+    jne .Lprofile_replace
+    mov dword ptr [r8+PG_A_VERIFIED],1
+    xor eax,eax
+    ret
+.Lprofile_replace:
+    push rbx
+    sub rsp,48
+    mov rbx,r8
+    mov dword ptr [rsp],4
+    mov [rsp+24],r9
+    mov [rsp+32],r10
+    mov qword ptr [rsp+40],0
+    mov rdi,rbx
+    lea rsi,[rbx+PG_A_COMMITS]
+    mov rdx,rsp
+    call pg_session_commit
+    test eax,eax
+    jnz .Lprofile_return
+    mov dword ptr [rbx+PG_A_VERIFIED],1
+.Lprofile_return:
+    add rsp,48
+    pop rbx
+    ret
+.Lprofile_bad:
+    mov eax,1
+    ret
+.size pg_agent_bind_profile,.-pg_agent_bind_profile
+
 .globl pg_agent_set_system
 .type pg_agent_set_system,@function
 pg_agent_set_system:
     test rdi,rdi
     jz .Lsystem_bad
+    PROFILE_GUARD rdi,.Lsystem_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lsystem_bad
     sub rsp,56
@@ -99,6 +159,7 @@ pg_agent_set_system:
 pg_agent_reset_session:
     test rdi,rdi
     jz .Lreset_bad
+    PROFILE_GUARD rdi,.Lreset_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lreset_bad
     sub rsp,56
@@ -178,6 +239,7 @@ pg_agent_reset_session:
 pg_agent_resume:
     test rdi,rdi
     jz .Lresume_bad
+    PROFILE_GUARD rdi,.Lresume_bad
     cmp esi,1
     ja .Lresume_bad
     cmp dword ptr [rdi+PG_A_STATE],0
@@ -412,6 +474,7 @@ pg_agent_suspend:
     jmp .Lfinish
 
 .Lsubmit:
+    PROFILE_GUARD rdi,.Lsubmit_bad
     cmp dword ptr [rdi+PG_A_STATE],PG_ST_IDLE
     jne .Lsubmit_bad
     test rdx,rdx
@@ -651,6 +714,7 @@ pg_agent_suspend:
     mov dword ptr [rbx+PG_A_CANCEL],1
     jmp .Lpoll_one
 .Lstart:
+    PROFILE_GUARD rbx,.Lerror_profile
     cmp dword ptr [rbx+PG_A_TURNS],16
     jae .Lerror_turns
     inc dword ptr [rbx+PG_A_TURNS]
@@ -914,6 +978,9 @@ pg_agent_suspend:
 .Lterminal_ready:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_IDLE
     jmp .Lpoll_one
+.Lerror_profile:
+    lea rsi,[rip+.Lerror_profile_text]
+    jmp .Lpoll_fail
 .Lerror_storage:
     mov rdi,rbx
     call .Lstorage_fail
@@ -966,6 +1033,7 @@ pg_agent_suspend:
 .Lcancelled: .asciz "cancelled"
 .Ltool_unavailable: .asciz "tool unavailable or denied"
 .Ltool_limit: .asciz "tool output limit exceeded"
+.Lerror_profile_text: .asciz "runtime profile is not verified"
 .Lerror_storage_text: .asciz "session storage commit failed; session stopped"
 .Lerror_state: .asciz "invalid runtime state"
 .Lerror_turns_text: .asciz "model turn limit reached"

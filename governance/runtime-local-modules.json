@@ -35,7 +35,7 @@
       "dependencies": [
         "client.contract.v0"
       ],
-      "role": "bounded atomic message/checkpoint transaction; validate run references and counters, detach batch plus checkpoint, adopt only after Storage confirms",
+      "role": "bounded atomic message/checkpoint/profile transaction; active runtime identity immutable, detach then adopt only after Storage confirms",
       "exports": [
         "pg_session_commit",
         "pg_session_volatile_commit"
@@ -67,7 +67,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten SysV single-run executor with durable model/tool/aborting/terminal checkpoints, explicit suspend/resume and bounded restart budget; current read-only tools only; no general task graph/requestId dedup or profile persistence",
+      "role": "handwritten SysV single-run executor with durable model/tool/abort/terminal checkpoints, explicit suspend/resume, bounded restart budget and exact credential-free profile verification; current read-only tools, no general task graph/requestId dedup",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -75,7 +75,8 @@
         "pg_agent_reset_session",
         "pg_agent_bind_storage",
         "pg_agent_resume",
-        "pg_agent_suspend"
+        "pg_agent_suspend",
+        "pg_agent_bind_profile"
       ],
       "reference_basis": [
         {
@@ -271,11 +272,12 @@
         "system libc",
         "POSIX termios/poll/signals"
       ],
-      "role": "handwritten terminal/input/view/state/app and native client bridge; initial observer attach consumes run_started without submit; termios layout only remains C",
+      "role": "handwritten terminal/input/view/state/app and native bridge; attach existing run; optional owner detach closes observation without abort; platform termios layout remains C",
       "exports": [
         "tui_app_run",
         "pg_tui_bridge_init",
-        "tui_state_attach"
+        "tui_state_attach",
+        "pg_tui_bridge_set_detach"
       ],
       "reference_basis": [
         {
@@ -305,9 +307,11 @@
         "model.mimo.local.v0",
         "tools.registry.local.v0",
         "tools.read.posix.local.v0",
-        "system libc"
+        "system libc",
+        "storage.journal.posix.local.v1",
+        "runtime.profile.local.v1"
       ],
-      "role": "explicit static composition entry; hosted Linux executable, TUI plus MiMo plus read; no fake runtime in product build",
+      "role": "explicit static Linux composition; volatile default or opt-in PANGU_SESSION_DIR journal with profile verification and pending-run resume; no fake runtime",
       "exports": [
         "main"
       ],
@@ -335,7 +339,7 @@
         "system libc",
         "POSIX pread/pwrite/fsync/ftruncate/flock/openat/fcntl"
       ],
-      "role": "native framed journal v1/v2 reader with exclusive writer and validated recovery of messages plus single-run checkpoints; interactive composition still deferred until model/tools configuration binding and client resume integration",
+      "role": "native framed journal v1/v2/v3 reader: messages, single-run checkpoints and credential-free profiles; exclusive writer, fsync and validated recovery",
       "exports": [
         "pg_journal_open",
         "pg_journal_close",
@@ -353,6 +357,35 @@
           "semantics": "prepare/encode before IO, poison uncertain writes, committed marker recovery, incomplete tail repair versus complete corruption refusal; custom binary format, synchronous fsync and no sidecars in this bounded subset; v2 checkpoint suffix preserves v1 reads and whole-batch atomicity",
           "tests_to_read": [
             "packages/durable/test/jsonl-storage.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "runtime.profile.local.v1",
+      "sources": [
+        "src/runtime/profile.h",
+        "src/runtime/profile_layout.h",
+        "src/runtime/profile.S"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0"
+      ],
+      "role": "bounded exact encoding of provider/model/workspace/implementation/device/inode and tool definitions; no credentials or pointers; not a sandbox or cryptographic identity",
+      "exports": [
+        "pg_profile_encode"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/harness/generation.ts",
+            "packages/durable/src/harness/agent.ts"
+          ],
+          "semantics": "pin prepared model/options across recovery; native exact public configuration identity rejects active mismatch rather than silently replacing original context",
+          "tests_to_read": [
+            "packages/durable/test/harness-generation-recovery.test.ts"
           ]
         }
       ]

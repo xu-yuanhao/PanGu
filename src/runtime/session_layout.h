@@ -14,7 +14,9 @@
 #define PG_SC_BUSY 24
 #define PG_SC_FAILED 28
 #define PG_SC_RUN 32
-#define PG_SC_BYTES 72
+#define PG_SC_PROFILE_SIZE 72
+#define PG_SC_PROFILE 80
+#define PG_SC_BYTES 4176
 #define PG_CP_BYTES 40
 #define PG_CP_PHASE 8
 #define PG_CP_TURNS 12
