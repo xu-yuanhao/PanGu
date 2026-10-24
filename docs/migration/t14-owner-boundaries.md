@@ -555,3 +555,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 沿用真实scoped planner/prepare结果，consumer1/provider0持有公开调用，consumer3先开始异步清理，provider2保活。以A=call_finish、B=consumer3 cleanup_finish(-33)、C=consumer1 cleanup_finish(-11)，覆盖ABC、ACB、BAC三种合法顺序，量子1–4共12场景/72阶段快照；C只在A之后且对应清理已begin时完成。每次stop报告work<=量子，所有完成后providers才随消费者依赖释放。伪造serial/重复完成拒绝；每个异步begin只一次，提供者同步清理时消费者已Disposed。
 
 8个普通/UBSan构建运行通过且输出一致，576个新阶段快照通过局部状态模型；首个cleanup错误按真实处理顺序保留，ABC/BAC为-33、ACB为-11。此前异步/分支/组合轨迹与全部计数套件均复验。新检查器7组变异/解析自测通过。此处是三个合法完成顺序的阶段快照，不是所有故障、线程竞争或完整逐tick状态空间，也未接入必需G04；完整T14/G04/G07仍未验收，见 [交错证据](t14-g04-interleave-evidence.json)。
+
+## G04局部统一检查入口与新执行（2026-10-24）
+
+新增tools/migration/g04_bundle.py：固定两个回归摘要、总376行和四个必需局部套件，依次验证async50/branch228/Pending-MANY24/interleave72共374条JSON记录。缺套件、错序、摘要漂移、夹带日志、超限或任一语义失败均拒绝，CLI输入校验错误返回2和BLOCKED，不写可误读的PASS文件。6组入口自测通过。
+
+在新的外部目录使用原冻结二进制重执行八个组合，执行前按原admission回执复核产物，统一检查入口与其四依赖的源码摘要前后固定，每次必须调用统一验证才能写COMPLETE。8次隔离运行通过、2992条轨迹/快照记录验证，原回执不覆盖。本轮没有新增编译，旧二进制对应原candidate/controller；统一入口仍属调用方本地实验控制，未自动接入受保护服务器或完整生产G04门禁。证据见 [统一检查证据](t14-g04-bundle-evidence.json)，完整T14/G04/G07保持未完成。

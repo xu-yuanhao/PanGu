@@ -1,0 +1,372 @@
+{
+  "schema": "pangu.t14-g04-local-bundle-evidence.v1",
+  "status": "PASS_LOCAL_BUNDLE_AND_FRESH_REEXECUTION_NOT_FULL_G04",
+  "scope": "Unified fail-closed validation for four fixed local experiment suites, freshly executed retained binaries; no new compilation or production/server gate deployment.",
+  "original_native_evidence": "docs/migration/t14-g04-interleave-evidence.json",
+  "new_execution_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-g04-bundle-execution",
+  "execution_wrapper_sha256": "6d8f587838da359f2ff34d656099e09ced903c28ee3e196f8471b6690bd5389c",
+  "requests": {
+    "normal": "7edf75b02ed85a4b6807e74187c731e2ecf7133c1287f825e8faa5c9867c6f5a",
+    "ubsan": "134fe722ac5754e448c97052b818f34461b9116123afef7d6e0fb6868f2cbb30"
+  },
+  "receipts": {
+    "normal": "6b6c58c395cf593f31db147453b9c1f30714f537a702c557442b11f24eef6256",
+    "ubsan": "0ffa5125f945d8651893b1e6199aa565455b382df07305d16630c23604a64df7"
+  },
+  "coverage": {
+    "mandatory_local_suites": 4,
+    "records_per_execution": 374,
+    "total_verified_records": 2992,
+    "fresh_native_executions": 8,
+    "new_native_builds": 0,
+    "stdout_identical": true,
+    "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc"
+  },
+  "runs": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "7dd5dd9226937061577cc7d8c405849c538440b26c6499cda99eca6fb431a2f6",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "7b701fb1b664729eaec91563cc0a985e8574586d95b85b1e1af9edf8362a562f",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "f393bc6b866acfc3cc456a54f28d88bdb1d4979edee5721f7b347dfda9cc9f12",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "4066b0e9bf4e41ae1d75554b9002128a4b0fdcc59ea0086a055acb28c52643fe",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "6348be0647dd4edf72245727d3d982345672633cd3a839e5f248d65ccd138a39",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "aec984ef83bba1228edf4487d352f1839f55217f29ced26fb53b9f96ee14152a",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "43840999ccf346765c440cfd11cd06cca0d6dc4681ef9d7fa3237eb85515ef32",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "28e7a2a516d258b159f53659b36a55c205b053d664dcc3a8d40c76d341bcc8bb",
+      "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+      "bundle_result": {
+        "status": "PASS_LOCAL_BUNDLE",
+        "suite_count": 4,
+        "records": 374,
+        "suites": {
+          "async": {
+            "cases": 3,
+            "events": 50,
+            "status": "PASS"
+          },
+          "branch": {
+            "status": "PASS",
+            "cases": 8,
+            "events": 228,
+            "ticks": 148
+          },
+          "composition": {
+            "status": "PASS",
+            "cases": 8,
+            "snapshots": 24
+          },
+          "interleaving": {
+            "status": "PASS",
+            "cases": 12,
+            "snapshots": 72,
+            "legal_completion_orders": 3
+          }
+        },
+        "full_G04": "NOT_COMPLETED",
+        "production_admission": "NOT_GRANTED"
+      }
+    }
+  ],
+  "checker_pins": {
+    "g04_bundle.py": "a97b3a04cb146b087aef559ec4bda2c7cb84fbc2af64b111117ec01053739254",
+    "g04_async_trace.py": "966ffc19409b7e8979053c728024628cce18c9ff69055574bbb613e1df0203ac",
+    "g04_branch_trace.py": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+    "g04_composition.py": "945265f32320bcad86e36d042469f1328648945fa9d694eddafedd9967becb3c",
+    "g04_interleave.py": "c76396692d0da572d0f5a1d8ce26a9596175fa85d8c043d58c14b03c9f994637"
+  },
+  "validation": {
+    "bundle_self_tests": 6,
+    "inventory_checker_self_tests": 13,
+    "G00": "PASS; production admission BLOCKED",
+    "git_diff_check": "PASS"
+  },
+  "binding": "Original admission.verify confirms retained source/candidate/controller/registry/ELF bindings before each four-build matrix; final preflight confirms original candidate digest. New local bundle checker and dependencies independently pinned in wrapper, outside original frozen controller.",
+  "environment": {
+    "execution": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only executable",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14_G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve new local bundle checker registration, six self-tests and fixed fresh execution evidence; do not grant full G04 or production authority.",
+    "risks": [
+      "Local wrapper and checker are caller-provided, not server-side attestation.",
+      "Four fixed suites remain narrower than complete G04 fault/state space.",
+      "Fixed summaries are explicit experiment baselines; future scope changes require new reviewed pins.",
+      "No new native compilation; eight fresh process executions use prior frozen binaries."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "f9853eade2d26009f4fea7be3dd43ec5c25685d5d36133362c3c8e227d83e769",
+      "docs/migration/t14-focused-inventory.json": "bbf2d81bb5e34bda40b6da9f41661c9d96167697ad7bb66f7c185d66c0d7a170",
+      "docs/migration/t14-owner-boundaries.md": "9cb728c29e9a378730a3869aa277eb99ef0ebb90bd4790b3d3aa233d3e14068f",
+      "docs/原生重写路线与迁移TODO.md": "b4237485e8dd2db4166a6c09df7fdfb0df18860124723e32f1d2dfb198ab6d15",
+      "tools/migration/g04_bundle.py": "a97b3a04cb146b087aef559ec4bda2c7cb84fbc2af64b111117ec01053739254",
+      "tools/migration/test_g04_bundle.py": "6751b60d7d4ec6c45579d8aea5ca4c37b9d8401588cc41d376572d72001eaed9"
+    },
+    "control_scope_sha256": "3131ca760d0048b5c29d3ae14db80113c750c972243109c05a907785f7725dd3"
+  }
+}
