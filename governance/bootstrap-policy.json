@@ -515,6 +515,12 @@
     "src/async-setup-core/plan-fixture.h": "legacy-source",
     "src/async-setup-core/start-abi.S": "legacy-source",
     "src/guard-fault-probe/entry.S": "legacy-source",
-    "src/guard-fault-probe/main.c": "legacy-source"
+    "src/guard-fault-probe/main.c": "legacy-source",
+    "src/client/tui/runtime_bridge.h": "client-source",
+    "src/client/tui/runtime_bridge.c": "client-source",
+    "src/composition/pangu.c": "native-source",
+    "tests/client/tui/test_runtime_bridge.c": "client-test",
+    "tools/runtime/build_pangu.py": "development-tool",
+    "tools/runtime/test_pangu_pty.py": "development-tool"
   }
 }

@@ -47,6 +47,11 @@ def main():
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', str(ROOT / 'src/runtime/mimo.c'),
                             str(ROOT / 'tests/runtime/test_projection.c'), *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', str(ROOT / 'src/runtime/agent.c'),
+                            str(ROOT / 'src/client/tui/runtime_bridge.c'), str(ROOT / 'tests/client/tui/test_runtime_bridge.c'),
+                            '-o', output], check=True)
+            subprocess.run([output], check=True, timeout=10)
     return 0
 if __name__ == '__main__':
     raise SystemExit(main())

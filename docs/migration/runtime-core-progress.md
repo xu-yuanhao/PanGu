@@ -107,3 +107,40 @@ b7198e6d5a92016fd5f773615f79cf5da1c24502a30e64a3bb9ebf9d31f0187f  tools/runtime/
 002065a1447a451ae1598cea62f86ea72f9889bf9d732179d9ddf1cc1efc33b5  governance/runtime-local-modules.json
 db4eb45399b70336dcb8f4a15cc8ba9ba07d2e88d542557adc02f99ad0671e18  governance/bootstrap-policy.json
 ```
+
+## 2026-10-25：真实Runtime接入薄TUI
+
+已交付首个可交互组合 `src/composition/pangu.c`，显式选择C Loop、MiMo、工具注册表、工作区只读read和TUI。运行时客户端桥接只依赖pg_client契约，不读取或复制Session/Agent私有状态。生产组合构建清单不包含fake_runtime或测试main；原假源保留用于客户端单测和演示。
+
+参考Pi `packages/tui/src/terminal.ts` 的终端状态保存/恢复及start/stop边界，结合现有Loop取消语义，修复客户端唤醒管道EAGAIN空转，增加旧信号处理器保存/恢复、静态信号标志重置和退出时shutdown。桥接在退出时请求取消并有限推进，当前本地Loop在至多三次poll内确认取消；该桥接不承诺适配任意异步远程Runtime的关闭协议。
+
+实际构建：`python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu`。构建输出强制在checkout外，使用当前登记的clang-23/libcurl/json-c；组合是hosted C程序，不是freestanding发布物。入口仅支持workspace参数与help，不扩成全功能CLI；凭据只从环境读取，缺失凭据或非交互终端明确拒绝。
+
+PTY验证脚本 `tools/runtime/test_pangu_pty.py`：
+
+- 无网络路径：缺失密钥返回2；真实终端中Ctrl-D、SIGTERM、SIGWINCH后Ctrl-D退出均为0，逐项比较完整tcgetattr结果与启动前完全一致。SIGWINCH用例同时覆盖原唤醒管道死循环。
+- `--live`：真实MiMo经实际TUI发出read，读取临时sample.c，回填并续答；比较工具完成行之后的模型输出，确认包含 `PANGU_PTY_READ_5208`，不以工具预览代替模型续答证明。
+- `--live`：第二轮要求模型输出STREAM_BEGIN；测试先丢掉输入回显及run_started之前数据，真正收到模型标记后才发送Ctrl-C，看到cancelled，再Ctrl-D退出；终端属性完整恢复，测试exit0。没有将输入回显当作模型输出，也没有使用假模型。
+
+核心O0/O2 UBSan六组程序（Loop、SSE、registry、read、projection、bridge）通过；原TUI五组单测通过；G00及16项检查器自测通过。桥接测试覆盖忙拒绝、事件枚举映射、唯一成功终态、活跃请求shutdown取消和重复shutdown。
+
+本轮客户端输入上限仍为1023字节，Runtime消息4095字节；主动采用更小编辑上限，不隐式截断已提交消息。没有实现会话持久化/清空UI、多行编辑、完整Markdown、write/edit/bash，完整T28/P1与生产准入保持未完成。终端恢复不涵盖SIGKILL。下一步按只读体验反馈完善核心工具/会话能力。
+
+同一Agent自审自批局部组合模块、桥接及构建登记；门禁只为精确登记新增composition源码路径，没有调整旧预算或参考基线，不是独立审核。以下摘要固定本轮候选（记录自身排除）：
+
+```text
+4961e973315b78395cc2995da58a4ee81ca1c45d131db55e4ab3de0d2e13336b  AGENTS.md
+b001fbd98bdc4284c01ad1b43101b5b0d5068c494ceed754f9294a87fa72fa33  src/composition/pangu.c
+d62cd8dc42fa7699d03f4d835427b4195e8c2de2319c8f1b99fdcda7ee94719a  src/client/tui/runtime_bridge.h
+804ec6dca0f42d966fba4df2293bab7026f9e7d6ae38e2116ad9ec0bfb392f19  src/client/tui/runtime_bridge.c
+91d70fc34939f637015ad3f0867e8f372d801823eff62e724993f303d743aca7  src/client/tui/tui_app.c
+312e757a569e7f2df76a47f168f3a5fbbece63a194d85a9fc31c7538874ea34f  tests/client/tui/test_runtime_bridge.c
+fddb5890c4bfed25da63ddecd9199edd0d2cf4435dab2308381b4b3490d2f8b8  tools/runtime/build_pangu.py
+e25b2f3f32e5f98271e436286db7f09b979e99adc1138a5a616e515ee62cdaf6  tools/runtime/test_pangu_pty.py
+f012dd95484e607e2e8cd3d1cca3bfbd50264f117d1e5ceb566d96104e3bbb88  tools/runtime/build_test.py
+e130052ee891429643938800163b86cad5a981e644c22cbc2a78f1f69c2bf184  tools/gates/check.py
+5f939c88b0a261cb97545b706a383392a7b7e25e123576ea8d3f3388437d4a52  tools/gates/test_check.py
+d29c46d4f53c759bdc67194c184bdf9d18b2ee889a84841d3b49ed961e30dbf1  governance/bootstrap-policy.json
+8b56ad89109af207133fd8269e1b5144865fb724e87b6a068f8f2203df12084a  governance/runtime-local-modules.json
+904b626dd97f82439137b134178574bfc179e95e1a42d411d2975a722047739c  docs/migration/task-ledger.json
+```

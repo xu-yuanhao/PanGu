@@ -6,6 +6,17 @@
 
 按 [迁移 TODO 的近期执行队列](docs/原生重写路线与迁移TODO.md#近期执行队列2026-10-24) 推进。历史证据和未完成项保留，但完整阶段认证、远端权限分离和全平台矩阵不再作为本地核心开发的统一前置条件。产品代码仍须进入明确登记的源码和构建，不能长期藏在测试夹具或项目外实验中。
 
+## 当前可体验入口（2026-10-25）
+
+已接通Linux原生薄TUI、MiMo真实SSE、内存会话和工作目录只读工具。先在本地环境设置 `MIMO_API_KEY`（可选 `MIMO_MODEL`），然后：
+
+```sh
+python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu
+/tmp/pangu-native/pangu /path/to/workspace
+```
+
+构建需当前登记的clang-23、pkg-config、libcurl和json-c开发环境。输入后Enter发送；忙时Ctrl-C取消、闲置时Ctrl-C退出，Ctrl-D退出。可要求模型使用read读取工作目录下的小型UTF-8普通文件。此版本不支持写入、Shell、会话持久化，尚不代表完整P1/Pi兼容；验证与限制见 [核心进展](docs/migration/runtime-core-progress.md)。
+
 > Assembly-first, ultra-small, fully plugin-driven AI Agent Runtime.
 
 盘古是一个以汇编语言为核心、追求极致性能、极小体积、极快启动、完全插件化和跨设备运行的通用 AI Agent Runtime。

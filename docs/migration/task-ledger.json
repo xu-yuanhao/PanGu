@@ -1,7 +1,7 @@
 {
   "schema": "pangu.migration.task-ledger.v1",
   "status": "IMPLEMENTATION_STARTED",
-  "note": "T10-T12 native local experiments progress under recorded human or Agent self-review approvals; production gates, full stage acceptance and protected remote integration remain incomplete.",
+  "note": "Native local core development: real MiMo SSE, bounded memory session, injected tools/read and thin TUI composition verified in scoped tests; full stage acceptance and production admission remain incomplete.",
   "tasks": [
     {
       "id": "T01",
@@ -1598,7 +1598,7 @@
     {
       "id": "T19",
       "title": "Session 树和消息投影",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T18"
       ],
@@ -1608,9 +1608,12 @@
         "SESSION-02"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T19",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "bounded linear in-memory session and idle reset; no session tree/persistence"
     },
     {
       "id": "T20",
@@ -1633,7 +1636,7 @@
     {
       "id": "T21",
       "title": "Prompt、资源与 Context 基础",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T20"
       ],
@@ -1644,14 +1647,17 @@
         "RESOURCE-01"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T21",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "explicit bounded system prompt only; no resource loader or full context budget"
     },
     {
       "id": "T22",
       "title": "Model 服务与假 Provider",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T21"
       ],
@@ -1661,14 +1667,17 @@
         "AGENT-01"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T22",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "injected model contract and real MiMo SSE subset; no full provider capability matrix"
     },
     {
       "id": "T23",
       "title": "Agent Loop 原生服务",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T22"
       ],
@@ -1680,14 +1689,17 @@
         "AGENT-04"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T23",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "bounded sequential single-tool loop, real continuation/cancellation; no full Pi event lifecycle"
     },
     {
       "id": "T24",
       "title": "Tools 服务和受控执行管线",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T23"
       ],
@@ -1700,14 +1712,17 @@
         "SEC-01"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T24",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "immutable registry, per-tool argument validation and authorization; no async/parallel execution"
     },
     {
       "id": "T25",
       "title": "文件服务与 read/write/edit",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T24"
       ],
@@ -1719,9 +1734,12 @@
         "TOOL-08"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T25",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "workspace-root read-only UTF-8 regular files; no write/edit or full Pi read compatibility"
     },
     {
       "id": "T26",
@@ -1745,7 +1763,7 @@
     {
       "id": "T27",
       "title": "HTTP/TLS 和首个真实 Provider",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T26"
       ],
@@ -1756,14 +1774,17 @@
         "LLM-04"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T27",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
-      "completion_approved": false
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
+      "completion_approved": false,
+      "local_subset_scope": "hosted libcurl/json-c MiMo Token Plan CN SSE; no production packaging/full HTTP protocol matrix"
     },
     {
       "id": "T28",
       "title": "最小 TUI 与 P1 首次体验验收",
-      "status": "PLANNED",
+      "status": "IN_PROGRESS",
       "depends_on": [
         "T27"
       ],
@@ -1781,12 +1802,15 @@
         "TUI-04"
       ],
       "definition": "docs/原生重写路线与迁移TODO.md#T28",
-      "owner_role": "unassigned module implementer and independent reviewer",
-      "evidence": [],
+      "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
+      "evidence": [
+        "docs/migration/runtime-core-progress.md"
+      ],
       "completion_approved": false,
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
-      "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json"
+      "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
+      "local_subset_scope": "interactive read-only TUI plus real Runtime; PTY tool continuation/cancel/termios restore verified; no full P1"
     },
     {
       "id": "T29",

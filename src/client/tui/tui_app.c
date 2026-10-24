@@ -43,7 +43,14 @@ static void on_winch(int sig)
 	wake_main();
 }
 
-static int install_handlers(void)
+static const int handled_signals[4] = { SIGINT, SIGTERM, SIGHUP, SIGWINCH };
+
+static void restore_handlers(struct sigaction saved[4], int count)
+{
+	while (count > 0) { --count; (void)sigaction(handled_signals[count], &saved[count], NULL); }
+}
+
+static int install_handlers(struct sigaction saved[4], int *count)
 {
 	struct sigaction sa;
 
@@ -51,16 +58,12 @@ static int install_handlers(void)
 	sa.sa_handler = on_exit_signal;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0; /* 不用 SA_RESTART：让阻塞调用返回交回主循环 */
-	if (sigaction(SIGINT, &sa, NULL) != 0)
-		return -1;
-	if (sigaction(SIGTERM, &sa, NULL) != 0)
-		return -1;
-	if (sigaction(SIGHUP, &sa, NULL) != 0)
-		return -1;
-
-	sa.sa_handler = on_winch;
-	if (sigaction(SIGWINCH, &sa, NULL) != 0)
-		return -1;
+	for (int i = 0; i < 4; ++i) {
+		sa.sa_handler = i == 3 ? on_winch : on_exit_signal;
+		if (sigaction(handled_signals[i], &sa, &saved[i]) != 0)
+			return -1;
+		++*count;
+	}
 	return 0;
 }
 
@@ -76,7 +79,7 @@ static void drain_wake(int rfd)
 	for (;;) {
 		ssize_t n = read(rfd, tmp, sizeof(tmp));
 		if (n <= 0) {
-			if (n < 0 && (errno == EINTR || errno == EAGAIN))
+			if (n < 0 && (errno == EINTR))
 				continue;
 			break;
 		}
@@ -85,6 +88,10 @@ static void drain_wake(int rfd)
 
 int tui_app_run(const tui_app_config *cfg)
 {
+	if (!cfg || !cfg->ops || !cfg->ops->submit || !cfg->ops->poll || !cfg->ops->cancel) return -1;
+	struct sigaction saved_handlers[4];
+	int handler_count = 0;
+	g_exit_signum = 0; g_winch = 0;
 	tui_term term;
 	tui_input in;
 	tui_view view;
@@ -116,7 +123,7 @@ int tui_app_run(const tui_app_config *cfg)
 				goto failure;
 		}
 	}
-	if (install_handlers() != 0)
+	if (install_handlers(saved_handlers, &handler_count) != 0)
 		goto failure;
 	g_wake_wfd = wake[1];
 
@@ -223,6 +230,8 @@ pump:
 	}
 done:
 	g_wake_wfd = -1;
+	restore_handlers(saved_handlers, handler_count);
+	if (cfg->ops->shutdown) cfg->ops->shutdown(cfg->ops->ctx);
 	tui_view_exit_note(&view, tui_exit_reason_name(reason));
 	tui_term_restore(&term);
 	if (wake[0] >= 0)
@@ -233,6 +242,8 @@ done:
 
 failure:
 	g_wake_wfd = -1;
+	restore_handlers(saved_handlers, handler_count);
+	if (cfg->ops->shutdown) cfg->ops->shutdown(cfg->ops->ctx);
 	tui_term_restore(&term);
 	if (wake[0] >= 0)
 		close(wake[0]);

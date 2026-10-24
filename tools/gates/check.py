@@ -43,7 +43,7 @@ def inspect(root, policy):
                 or kind not in KINDS):
             errors.append(f"policy: invalid file registration {name!r}")
             continue
-        roots = {"native-source": ("src/runtime/", "src/contracts/"),
+        roots = {"native-source": ("src/runtime/", "src/contracts/", "src/composition/"),
                  "native-test": ("tests/runtime/",),
                  "development-tool": ("tools/runtime/",),
                  "client-source": ("src/client/tui/",),

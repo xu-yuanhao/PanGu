@@ -84,6 +84,54 @@
         "pg_read_tool_close",
         "pg_read_tool_definition"
       ]
+    },
+    {
+      "id": "client.tui.local.v0",
+      "sources": [
+        "src/client/tui/tui_app.c",
+        "src/client/tui/tui_app.h",
+        "src/client/tui/tui_input.c",
+        "src/client/tui/tui_input.h",
+        "src/client/tui/tui_term.c",
+        "src/client/tui/tui_term.h",
+        "src/client/tui/tui_utf8.c",
+        "src/client/tui/tui_utf8.h",
+        "src/client/tui/tui_view.c",
+        "src/client/tui/tui_view.h",
+        "src/client/tui/tui_state.c",
+        "src/client/tui/tui_state.h",
+        "src/client/tui/tui_runtime_adapter.h",
+        "src/client/tui/runtime_bridge.c",
+        "src/client/tui/runtime_bridge.h"
+      ],
+      "dependencies": [
+        "client.contract.v0",
+        "system libc",
+        "POSIX termios/poll/signals"
+      ],
+      "role": "thin terminal client; bridge borrows pg_client only; no model, session or tool business implementation",
+      "exports": [
+        "tui_app_run",
+        "pg_tui_bridge_init"
+      ]
+    },
+    {
+      "id": "composition.pangu.local.v0",
+      "sources": [
+        "src/composition/pangu.c"
+      ],
+      "dependencies": [
+        "client.tui.local.v0",
+        "agent.runtime.v0",
+        "model.mimo.local.v0",
+        "tools.registry.local.v0",
+        "tools.read.posix.local.v0",
+        "system libc"
+      ],
+      "role": "explicit static composition entry; hosted Linux executable, TUI plus MiMo plus read; no fake runtime in product build",
+      "exports": [
+        "main"
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
@@ -121,5 +169,7 @@
       "impact": "hosted provider only; own native JSON integration deferred; heap allocations in adapter, not loop"
     }
   ],
-  "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified"
+  "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",
+  "interactive_build": "python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu",
+  "interactive_validation": "PTY offline restoration and real MiMo tool/cancellation checks; tests/runtime and tests/client/tui are test inputs only"
 }
