@@ -362,6 +362,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 旧 `call-budget-test.c` 当前公开 ABI 调用预算专项：207个公开调用场景、1,191次fuel不足重试，验证配额拒绝、无效binding、输出/scope重叠拒绝以及同步setup/cleanup scope；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。公开依赖call一次占用consumer/provider两端，无法分别模拟旧私有owner单端配额耗尽，差异已记录；F04按API适配通过，完整T14/G04/G07仍待完成，见 [F04证据](migration/t14-call-budget-native-evidence.json)。
 - [x] 旧 `call-test.c` 当前公开 ABI 生命周期专项：每个实际binding覆盖直接call、setup_call、cleanup_call三种模式，共207个场景；验证停止期间拒绝新调用、scope过期、异步清理期间保活consumer/provider及票据拒绝。普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。旧私有helper单独耗尽provider槽位的quota断言没有公开单端等价物，差异明确保留；F05按API适配通过，完整T14/G04/G07仍待完成，见 [F05证据](migration/t14-call-lifecycle-native-evidence.json)。
 - [x] 旧 `geometry-test.c` 当前公开 ABI 几何专项：98个计划、600轮protected-span矩阵、143,961次拒绝验证；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。standalone owner私有函数无公开等价入口；fuel不足时bind_geometry只保证runtime未提交，span scratch可能已有中间写入，差异与实现契约均记录，F08按API适配通过，完整T14/G04/G07仍待完成，见 [F08证据](migration/t14-geometry-native-evidence.json)。
+- [x] 旧 `graph-test.c` 当前公开 ABI 图停止专项：98个边构建计划、516个停止场景；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。覆盖独立分支、祖先保活、异步setup/cleanup和错误传播；292个无公开依赖边的旧私有owner hold明确跳过，完整T14/G04/G07仍待完成，见 [F09证据](migration/t14-graph-native-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

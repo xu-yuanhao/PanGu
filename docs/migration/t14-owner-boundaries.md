@@ -1,6 +1,6 @@
 # T14 owner 生命周期启动草稿
 
-协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩3项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
+协调器七组已完成公开ABI适配与固定轨迹守卫：最终8普通/UBSan构建和执行、56组次/1096事件，223隔离门禁自测通过；停止后的注册/业务拒绝和双方owner在途引用可逐事件核对。最新快照剩2项入口及更早owner语料待迁移/审计，完整异步/分支/预算G04轨迹、其余ABI守卫、G07与生产准入仍未完成，GAP-010/T14不关闭。
 
 2026-10-21，外部宿主实验，未批准原生ABI/模块或T14阶段输入。使用已固定T13规划接口作为设计背景，不宣称完整T13已验收。参考Cordis fiber卸载等待dependent的语义，以及Harness vendored硬化：setup前登记所有权、重入停止等待setup/清理、停止后禁止新effect。
 
@@ -483,3 +483,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 将旧 geometry-test.c 中 runtime 外部指针检查、protected-span 守卫与几何绑定构建测试迁移到公开生命周期表。普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建和隔离执行全部通过且摘要一致；每次覆盖98个有效计划，600轮逐span拒绝矩阵，累计143,961次预期几何拒绝。矩阵覆盖生命周期报告、setup/cleanup票据、call票据、finish票据和错位输出指针；builder覆盖runtime/resource别名、错位span、重叠owner资源、错位owner、容量溢出、fuel不足及重复绑定，并检查拒绝时protected内存及runtime状态。
 
 明确保留两项API差异：standalone owner enter/stop私有函数没有公开表项，不能假称已测试；fuel不足的 `bind_geometry` 会保持runtime未提交，但调用者span scratch可含部分中间数据，旧测试没有要求其回滚，本专项也不扩大为事务性保证。固定候选和同一Agent自审证据见 [F08原生证据](t14-geometry-native-evidence.json)。F08只代表当前公开ABI专项通过，不代表完整T14/G04/G07，也不解除外部信任审批与生产准入阻塞。
+
+## F09 图停止公开 ABI 迁移（2026-10-24）
+
+普通/UBSan × 汇编/C内存提供者 × debug/release 共8次冻结构建与隔离执行通过，输出逐字节一致。每次98个图的边构建与fuel拒绝检查、516个公开停止场景，含326个独立分支、224个祖先保活、83个setup等待时独立清理、44个等待期间错误传播及112个真实依赖call保活场景。
+
+使用现有公开prepare/start/stop、setup_defer/setup_finish、异步disposer与dependency call票据。292个旧任意owner hold缺少公开依赖边，明确跳过，不计作通过。测试不恢复私有helper；候选和同一Agent自审见 [F09原生证据](t14-graph-native-evidence.json)。F17/F19、更早owner语料、完整T14/G04/G07仍待完成；生产准入和外部信任审批保持阻塞。

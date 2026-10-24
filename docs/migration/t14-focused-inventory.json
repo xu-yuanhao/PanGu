@@ -178,8 +178,24 @@
       "id": "T14-F09",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/graph-test.c",
       "source_sha256": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "继续F17/F19及更早owner语料审计；292个无公开依赖边的私有owner hold保留为差异，完整T14/G04/G07待完成。",
+      "suite": "graph-public-516",
+      "evidence": "docs/migration/t14-graph-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "b85b0a88c84390cf11446662739d6bda7d49ccf2fb94b601ed434a1714af18f4",
+      "candidate_commit": "8552f85f1c2a394e71908c28086b4dc514de49d0",
+      "graph_cases_per_run": 516,
+      "edge_prepare_cases_per_run": 98,
+      "independent_cases_per_run": 326,
+      "ancestor_cases_per_run": 224,
+      "independent_setup_cases_per_run": 83,
+      "error_while_waiting_per_run": 44,
+      "call_hold_cases_per_run": 112,
+      "private_owner_hold_skips_per_run": 292,
+      "adaptation": "通过prepare/start/stop及公开setup、disposer、dependency call票据验证图停止语义；不重新导出私有owner helper。"
     },
     {
       "id": "T14-F10",
@@ -295,7 +311,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 3,
+  "pending_current_abi_ports": 2,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

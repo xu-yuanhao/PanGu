@@ -1,0 +1,123 @@
+{
+  "schema": "pangu.t14-graph-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F09 historical graph-test.c public graph preparation and stop semantics; no production promotion or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/graph-test.c",
+    "sha256": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "8552f85f1c2a394e71908c28086b4dc514de49d0",
+    "parent": "c9ffa57e84f89046ec583249ddfe1d744a70cc90",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "b85b0a88c84390cf11446662739d6bda7d49ccf2fb94b601ed434a1714af18f4",
+    "candidate_tree_sha256": "9e58b1e284789e81db925e87f25210395617b6b6308de94b9416dc6cda640648",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "b85b0a88c84390cf11446662739d6bda7d49ccf2fb94b601ed434a1714af18f4"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "15b8be58970cf686a0d1204317889fbc951bd65f571448c7ee087b96d40a00a6",
+    "native_candidate_controller_sha256": "5072c36fe74dfa2d920e2c59e36a60c3a5ebfd9bdd883422ba5b880d8f77674f",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "e4d2dc3730c2bce30ea3ca5b4a92a3f3cee00cc2d3998839c415713387695dac",
+    "ubsan_request_sha256": "4b6d1f8c0c7d8a19ec71b551ddf15c8879024be98d9765fdbfb0ae65d2b125fc"
+  },
+  "coverage": {
+    "graph_cases_per_run": 516,
+    "edge_prepare_cases_per_run": 98,
+    "independent_cases_per_run": 326,
+    "ancestor_cases_per_run": 224,
+    "independent_setup_cases_per_run": 83,
+    "error_while_waiting_per_run": 44,
+    "call_hold_cases_per_run": 112,
+    "private_owner_hold_skips_per_run": 292,
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "ab46af2107444dceceb8e7000cc0c56369fd249fb2090e33fcbac04ded86c659",
+    "all_stdout_identical": true,
+    "skipped_cases_are_passes": false
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "prepare",
+      "start",
+      "stop",
+      "setup_scope",
+      "setup_defer",
+      "setup_finish",
+      "register_resource",
+      "register_async",
+      "setup_call",
+      "disposer_finish",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "292 private arbitrary-owner holds lack public dependency bindings and are skipped, not passed. prepare rejects zero fuel as invalid; insufficient-fuel retries begin at one."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "b92b8ee02a910a228f5257127b6b055ee62a778cc611e88adfae3fc60f81cfb5",
+      "executions_json_sha256": "dba7628493d5eb14a8e6c357eb57cdee36ad8778463a8108f4f547ee45e558f6",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "12aee2aa66ce64d9dc66536734f0517a8be2a543efe668f11612efe611c3c5b6",
+      "executions_json_sha256": "721b9d97a1c6013c5e4dbb9d72d48ace23652dbd06998f6d15a66061cb8dd2a9",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F09 as PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS and continuing local T14 tests only; same-Agent self-review, no production, gate, ABI or budget change.",
+    "fixed_candidate_digest": "9e58b1e284789e81db925e87f25210395617b6b6308de94b9416dc6cda640648",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS"
+    ],
+    "risks": [
+      "Same-Agent self-review, not independent approval.",
+      "292 old private owner holds lack public equivalents and remain explicit gaps.",
+      "F17/F19, earlier owner audit and full T14/G04/G07 incomplete.",
+      "External trust approval, production admission and release remain blocked.",
+      "UBSan does not instrument assembly instructions."
+    ],
+    "control_scope_sha256": "5d0ec568a0b1bcf10c4dd1738f38c64b2cd5947bb7a21f8c1b7ae1cb6a5f922a",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "0cf58acbc5acf6622114677a4198b9c3498f70d64b06eee529d07396559c2325",
+      "docs/migration/t14-focused-inventory.json": "d2d55d172f2981ec3db7ecf64d4e2b086c318da0dc9f6059581356eeb117f498",
+      "docs/migration/t14-owner-boundaries.md": "ee5895c6fe5c469ec739742840504be94e817c62a1d045ce0ce2e76fdc425904",
+      "docs/原生重写路线与迁移TODO.md": "e9909122655017650427863a4e3b33990454f4df441d4ccb3332b7609510c4b0"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory."
+}
