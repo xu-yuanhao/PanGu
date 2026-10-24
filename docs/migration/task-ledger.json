@@ -2209,5 +2209,17 @@
     "dependency_scope": "depends_on records whole-stage acceptance dependencies; local subsets require only directly consumed dependencies and applicable safety checks",
     "deferred": "whole-stage certification, unrelated host verification and remote release controls do not block local core implementation",
     "status_integrity": "No task completion or production admission granted by this planning change"
+  },
+  "language_execution_policy": {
+    "effective_date": "2026-10-25",
+    "priority": [
+      "assembly",
+      "c",
+      "cpp"
+    ],
+    "next_work": "in-place handwritten assembly replacement of current core and TUI logic before expanding C core",
+    "ownership": "main Agent owns Runtime/contracts/bridge/composition/shared controls; second Agent owns TUI files listed in docs/并行开发任务提示词-汇编优先TUI重构.md",
+    "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
+    "status": "plan and admission only; assembly implementation not completed"
   }
 }

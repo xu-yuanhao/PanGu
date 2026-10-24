@@ -278,7 +278,6 @@
     "tools/migration/t14_local_profile.py": "gate",
     "tools/migration/test_t14_local_profile.py": "gate-test",
     "docs/migration/2026-10-24-development-reset.md": "document",
-    "docs/并行开发任务提示词-TUI.md": "document",
     "src/contracts/client.h": "native-source",
     "src/runtime/agent.h": "native-source",
     "src/runtime/agent.c": "native-source",
@@ -521,6 +520,10 @@
     "src/composition/pangu.c": "native-source",
     "tests/client/tui/test_runtime_bridge.c": "client-test",
     "tools/runtime/build_pangu.py": "development-tool",
-    "tools/runtime/test_pangu_pty.py": "development-tool"
+    "tools/runtime/test_pangu_pty.py": "development-tool",
+    "docs/并行开发任务提示词-汇编优先TUI重构.md": "document",
+    "governance/assembly-first.json": "control",
+    "tools/gates/assembly_first.py": "gate",
+    "tools/gates/test_assembly_first.py": "gate-test"
   }
 }

@@ -4,11 +4,17 @@ import argparse
 import os
 import subprocess
 import tempfile
+import sys
 ROOT = Path(__file__).resolve().parents[2]
 UI = ['tui_utf8.c', 'tui_term.c', 'tui_input.c', 'tui_view.c', 'tui_state.c', 'tui_app.c', 'runtime_bridge.c']
 SOURCES = ['src/composition/pangu.c', 'src/runtime/agent.c', 'src/runtime/mimo.c',
            'src/runtime/tools.c', 'src/runtime/read_tool.c'] + ['src/client/tui/' + n for n in UI]
 def build(output):
+    sys.path.insert(0, str(ROOT / 'tools/gates'))
+    from assembly_first import inspect
+    violations = inspect(ROOT, SOURCES)
+    if violations:
+        raise ValueError('Assembly-first admission: ' + '; '.join(violations))
     output = Path(output).resolve()
     if output.is_relative_to(ROOT):
         raise ValueError('build output must be outside the checkout')

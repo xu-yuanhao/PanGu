@@ -144,3 +144,27 @@ d29c46d4f53c759bdc67194c184bdf9d18b2ee889a84841d3b49ed961e30dbf1  governance/boo
 8b56ad89109af207133fd8269e1b5144865fb724e87b6a068f8f2203df12084a  governance/runtime-local-modules.json
 904b626dd97f82439137b134178574bfc179e95e1a42d411d2975a722047739c  docs/migration/task-ledger.json
 ```
+
+## 2026-10-25：汇编优先与单版本原地重构决定
+
+依据用户明确纠正：Assembly第一、C第二、C++第三；不保留被替代C版本或源码对照。旧TUI派发文档已删除，旧登记/有效链接已移除；新任务为 `docs/并行开发任务提示词-汇编优先TUI重构.md`，第二Agent负责TUI UTF-8/输入/状态/渲染/事件流程的逐模块.S替换，主Agent负责Runtime、公共契约、桥接/组合和共享控制。
+
+AGENTS、主架构、门禁、总TODO和账本同步，删除“C承担主要流程”“最后按热点补汇编”的有效指令。现存9个C核心文件登记为待原地替换；内容摘要用于阻止继续扩写，没有另存源码。迁移完成在同批删除C与旧构建项，加入手写.S并更新登记，不允许C双后端/兼容层或挪到tests/legacy。回溯只用Git历史。必要C平台/外部库/静态组合胶水逐文件说明；无新增C++。
+
+新增局部语言检查及主构建输入核对：实际SOURCES必须等于语言登记，待替换C不能变更内容，C/C++桥接必须有合法类别/原因；G00调用该检查。检查不证明汇编算法、手写来源或性能，不能把当前9项待迁移算成汇编重构完成。G00精确支持登记后的.S，未放开未知文件或旧预算。
+
+实际验证：G00通过；检查器16项自测通过；语言检查5项正/反例通过；实际交互程序构建通过；无网络PTY的Ctrl-D/SIGTERM/SIGWINCH后退出及完整termios恢复通过；diff格式检查通过。此轮没有改运行核心算法，没有声称汇编实现已完成，没有为了文档变更新增真实模型调用。
+
+同一Agent按用户授权自审自批本轮语言与文件/构建控制差异，不是独立审核。风险：清单中的9个现存C核心仍待原地替换，类型登记不能自动识别伪装的C算法；新任务要求实际实现/ABI/边界/链接审查。固定摘要如下，记录自身排除：
+
+```text
+c00b6fac5eb4897ac6c8a164bc045ee6c7e48167c708b8b60182154b8921a930  AGENTS.md
+c59007ad30ee56f6e82e7f494438557480c18a4b4efd5fd8968ea5337d5667c4  docs/并行开发任务提示词-汇编优先TUI重构.md
+e96d5510a431c29973d98866e20284c552675e6e44183c7dd97d537259c2a008  governance/assembly-first.json
+2e66c1cd2c6ffb585257c38ad49decd0a0c328bc277c97cddfdd3ecd08174964  governance/bootstrap-policy.json
+2f7895a37bd5ffaf3154f515ebc5c1bc664610441d07f2615d8fd54e982465cc  tools/gates/assembly_first.py
+5f86fef5ed5ac5f6dec6bf4c7b207cb4ce04d071c1048a06718e9da5454aaad9  tools/gates/test_assembly_first.py
+6338c87767908c194a26bab5f3c5952a88105f19d6572f1aaede65da5165a88b  tools/gates/check.py
+0344b703980910d14762f0a470460d7d7349c78bfa68d0d22636c4269bf35e03  tools/gates/test_check.py
+ddf24ec1efe5be1d6e14b4f4c95c432994570134d06da53a4dfdc3064d572389  tools/runtime/build_pangu.py
+```

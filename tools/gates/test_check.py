@@ -33,6 +33,11 @@ class AdmissionTests(unittest.TestCase):
         (self.root / "src/composition").mkdir()
         (self.root / "src/composition/pangu.c").write_text("int composition;\n")
         self.policy["files"]["src/composition/pangu.c"] = "native-source"
+        (self.root / "src/runtime/agent.S").write_text(".text\n")
+        self.policy["files"]["src/runtime/agent.S"] = "native-source"
+        (self.root / "src/client/tui").mkdir(parents=True)
+        (self.root / "src/client/tui/input.S").write_text(".text\n")
+        self.policy["files"]["src/client/tui/input.S"] = "client-source"
         self.assertEqual(inspect(self.root, self.policy), [])
         self.policy["files"]["outside.c"] = "native-source"
         self.assertTrue(any("invalid source scope" in e for e in inspect(self.root, self.policy)))

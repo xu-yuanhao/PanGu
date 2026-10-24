@@ -1,6 +1,6 @@
 /* tui_runtime_adapter.h — 客户端内部 Runtime 适配接口 v0。
  *
- * 这是"并行开发任务提示词-TUI.md"第 3 节语义的客户端内部适配，不是稳定
+ * 这是已集成薄 TUI 的客户端内部适配，公共契约见 src/contracts/client.h，不是稳定
  * 插件 ABI，也不是 src/contracts/client.h 的副本：最终公共头文件与桥接由
  * 主 Agent 提供，接入方式是填一张本结构的函数表（见交接报告）。
  *
