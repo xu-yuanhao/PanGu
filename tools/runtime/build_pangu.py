@@ -1,14 +1,19 @@
 """Build the first native interactive composition, with output outside the checkout."""
 from pathlib import Path
 import argparse
-import os
+import json
 import subprocess
 import tempfile
 import sys
 ROOT = Path(__file__).resolve().parents[2]
-UI = ['tui_utf8.c', 'tui_term.c', 'tui_input.c', 'tui_view.c', 'tui_state.c', 'tui_app.c', 'runtime_bridge.c']
-SOURCES = ['src/composition/pangu.c', 'src/runtime/agent.c', 'src/runtime/mimo.c',
-           'src/runtime/tools.c', 'src/runtime/read_tool.c'] + ['src/client/tui/' + n for n in UI]
+# The approved inventory is the single product input list. No .c default/fallback.
+SOURCES = list(json.loads((ROOT / 'governance/assembly-first.json').read_text())['sources'])
+def implementation(stem):
+    matches = [name for name in SOURCES if str(Path(name).with_suffix('')) == stem]
+    if len(matches) != 1:
+        raise ValueError('exactly one registered implementation required for ' + stem)
+    return str(ROOT / matches[0])
+
 def build(output):
     sys.path.insert(0, str(ROOT / 'tools/gates'))
     from assembly_first import inspect

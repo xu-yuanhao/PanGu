@@ -2220,6 +2220,7 @@
     "next_work": "in-place handwritten assembly replacement of current core and TUI logic before expanding C core",
     "ownership": "main Agent owns Runtime/contracts/bridge/composition/shared controls; second Agent owns TUI files listed in docs/并行开发任务提示词-汇编优先TUI重构.md",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
-    "status": "plan and admission only; assembly implementation not completed"
+    "status": "plan and admission only; assembly implementation not completed",
+    "reference_workflow": "Read pinned functions, direct callers and related tests before implementation; record adopted semantics/native differences and verification in existing handoff/progress. runtime-local-modules.reference_basis is a locator, never reading/compliance proof."
   }
 }

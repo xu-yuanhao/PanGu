@@ -168,3 +168,34 @@ e96d5510a431c29973d98866e20284c552675e6e44183c7dd97d537259c2a008  governance/ass
 0344b703980910d14762f0a470460d7d7349c78bfa68d0d22636c4269bf35e03  tools/gates/test_check.py
 ddf24ec1efe5be1d6e14b4f4c95c432994570134d06da53a4dfdc3064d572389  tools/runtime/build_pangu.py
 ```
+
+## 2026-10-25：后续Agent默认行为的入口整改
+
+检查范围为根AGENTS、主架构、门禁/主路线/TUI体验与历史交接入口、当前模块/语言策略、主构建与核心测试脚本；对迁移文档作关键词复核，区分历史事实与现行指令。没有修改另一Agent独占的TUI实现/测试/本地构建脚本，也未改正在执行的新派发文档。
+
+发现并整改：
+
+1. 主文档原则/协议、门禁语言和TUI体验仍有“Assembly/C”“核心和热点”等模糊入口，现统一为手写Assembly核心、必要C胶水、批准C++桥接；可选外部插件语言能力不是默认核心用C的许可。
+2. 主路线末尾仍把design-only/独立审批及尚无原生产物当现状。现行未决项改为完整验收范围，2026-10-20旧阶段说明明确历史属性，不覆盖当前自审/核心开发。前期交接标题标明不再派发；不改写历史测试结果或批准范围。
+3. 主构建写死C文件列表、核心测试直接选C实现。现以已登记语言清单作为唯一产品输入，用无后缀模块定位唯一实现；缺少或重复实现拒绝，不按.c优先或自动fallback。汇编替换只需同批更新有效清单和删除旧源，脚本不会继续强选C。TUI本地build.sh归另一Agent此次迁移负责，未越权编辑。
+4. MiMo整个文件被列作external-library胶水，但含自身SSE/消息投影/状态算法。改列待原地汇编替换，迁移后只允许必要外部接口封装。待迁移数量从9变10，是分类纠正，不是新增一套实现。
+5. “参考Pi”没有足够明确的开工动作。AGENTS/主架构/门禁/路线现要求先读固定对应函数、直接调用、相关测试，再记录采用语义、原生差异和验证。模块表补具体提交/源码/测试入口。来源登记不等于已阅读，更不等于行为兼容；无法用机器可靠证明AI真的理解源码，不新建形式化阅读审批平台，依靠具体行为证据复核。
+
+实际验证：G00通过、16项库存检查器自测通过、6项语言检查/实现选择测试通过；核心六组O0/O2 UBSan回归通过；主程序构建通过；无网络PTY的Ctrl-D/SIGTERM/窗口变化后退出及termios完全恢复通过。另以临时手写GAS函数+C ABI测试驱动，在当前编译参数下编译链接执行成功，确认脚本参数不排斥.S；不是产品汇编迁移完成。本轮未进行真实模型调用，未改TUI源或参考仓库。
+
+同一Agent按授权自审本轮入口、语言分类、模块来源与脚本差异，不是独立审核。保留C/Cpp合理胶水和开发测试驱动，不采用行数配额。语言政策仍未证明汇编手写来源/内部委托行为，需看实际实现及链接。旧摘要属于旧版本，本轮候选摘要如下（记录自身排除）：
+
+```text
+9b1df11c48288475f81298af80ffa39501f80fe0998a6142403e3bcd5de2f1f1  AGENTS.md
+4cf2cd69130ba8a7b063f83dfa0ec8a1331fe798a2acd76aad95443d4253df40  盘古 Pangu 项目完整文档.md
+72420c91ef27434146e3bfef38eeafb7f41161630a75071ca7635dc21416df9e  docs/工程门禁与架构守卫.md
+c3f1c83655838c7fee191171d9e5dd778d7da6c2a2e67993c0976d6d6fc85f71  docs/原生重写路线与迁移TODO.md
+9fa164b0cbbafd3ec557e27cbb82fb7066fdb55580f7cfadfada374c6e0cdeb8  docs/TUI体验参考与设计原则.md
+ed5e9fb67dbaf1e6402cfceedc777258eb0cf15add194e200c614342db8ff32e  docs/前期工作交接TODO.md
+17bceaac21ab85a2f512fa99adc1272f1af25380fdad94b3efc0776290999e95  governance/assembly-first.json
+8b1a6cd7b7d8f25ba5c934efe7d5aaf98d6429dd90e3a017c1077dc0576a4b34  governance/runtime-local-modules.json
+4794c8cd942313ca4bb07d67a3cdb8155eee2d6c33bcad6a7a52da3613a54257  docs/migration/task-ledger.json
+d207e2246149e6e114239735ce0ed079e1e04ed0304097b5fcc1e418365161c6  tools/runtime/build_pangu.py
+752d812f9331919ced83ed0f87035761cd2a7f067b047e227cc8b15c9d647753  tools/runtime/build_test.py
+2bda7276b99d3de15aa89d47d6c8576c86cf3f7c9e8856f19d518ba47686d7f9  tools/gates/test_assembly_first.py
+```

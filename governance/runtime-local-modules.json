@@ -10,7 +10,20 @@
       "dependencies": [
         "C stddef.h"
       ],
-      "role": "borrowed event slices and client actions; internal source interface"
+      "role": "borrowed event slices and client actions; internal source interface",
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/agent/src/types.ts"
+          ],
+          "semantics": "事件与终态语义；内部原生协议差异须记录",
+          "tests_to_read": [
+            "packages/agent/test/agent-loop.test.ts"
+          ]
+        }
+      ]
     },
     {
       "id": "agent.runtime.v0",
@@ -27,6 +40,22 @@
         "pg_agent_client",
         "pg_agent_set_system",
         "pg_agent_reset_session"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/agent/src/agent-loop.ts",
+            "packages/agent/src/agent.ts",
+            "packages/agent/src/types.ts"
+          ],
+          "semantics": "Loop/会话事件、工具续接、取消与终结",
+          "tests_to_read": [
+            "packages/agent/test/agent-loop.test.ts",
+            "packages/agent/test/agent.test.ts"
+          ]
+        }
       ]
     },
     {
@@ -48,6 +77,20 @@
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
         "pg_mimo_bind_tools",
         "pg_mimo_encode_request (internal projection test seam)"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/ai/src/api/openai-completions.ts"
+          ],
+          "semantics": "分片文本/工具参数累积、消息投影、finish_reason；官方MiMo接口另核对",
+          "tests_to_read": [
+            "packages/ai/test/openai-completions-raw-stop-reason.test.ts",
+            "packages/ai/test/tool-call-without-result.test.ts"
+          ]
+        }
       ]
     },
     {
@@ -65,6 +108,27 @@
       "exports": [
         "pg_tool_registry_init",
         "pg_tool_registry_service"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/agent/src/agent-loop.ts"
+          ],
+          "semantics": "prepareToolCall校验/授权/执行次序",
+          "tests_to_read": [
+            "packages/agent/test/agent-loop.test.ts"
+          ]
+        },
+        {
+          "repository": "deepseek-harness",
+          "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+          "paths": [
+            "packages/core/tools/src/index.ts"
+          ],
+          "semantics": "工具服务组合与可见性/执行管线分离"
+        }
       ]
     },
     {
@@ -83,6 +147,20 @@
         "pg_read_tool_open",
         "pg_read_tool_close",
         "pg_read_tool_definition"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/coding-agent/src/core/tools/read.ts"
+          ],
+          "semantics": "路径、输出上限与读取行为；本地严格工作区限制属有意差异",
+          "tests_to_read": [
+            "packages/coding-agent/test/tools.test.ts",
+            "packages/coding-agent/test/read-line-range-display.test.ts"
+          ]
+        }
       ]
     },
     {
@@ -113,6 +191,22 @@
       "exports": [
         "tui_app_run",
         "pg_tui_bridge_init"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
+          "paths": [
+            "packages/tui/src/terminal.ts",
+            "packages/tui/src/keys.ts",
+            "packages/tui/src/utils.ts"
+          ],
+          "semantics": "终端生命周期、键盘与文本行为；TUI视觉参考另见已登记UI/UX文档",
+          "tests_to_read": [
+            "packages/tui/test/terminal.test.ts",
+            "packages/tui/test/keys.test.ts"
+          ]
+        }
       ]
     },
     {
@@ -131,11 +225,21 @@
       "role": "explicit static composition entry; hosted Linux executable, TUI plus MiMo plus read; no fake runtime in product build",
       "exports": [
         "main"
+      ],
+      "reference_basis": [
+        {
+          "repository": "deepseek-harness",
+          "commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+          "paths": [
+            "docs/architecture.md"
+          ],
+          "semantics": "显式服务组合，原生静态入口不继承JS运行时"
+        }
       ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
-  "product_runtime_dependencies": "loop has only C types; optional hosted MiMo/registry/read modules use registered libcurl/json-c/libc/POSIX",
+  "product_runtime_dependencies": "Core uses C ABI layouts, not a required C implementation; optional hosted transport/tool adapters use registered libcurl/json-c/libc/POSIX.",
   "limits": {
     "messages": 64,
     "text_bytes_including_terminator": 4096,
@@ -171,5 +275,11 @@
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",
   "interactive_build": "python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu",
-  "interactive_validation": "PTY offline restoration and real MiMo tool/cancellation checks; tests/runtime and tests/client/tui are test inputs only"
+  "interactive_validation": "PTY offline restoration and real MiMo tool/cancellation checks; tests/runtime and tests/client/tui are test inputs only",
+  "implementation_priority": [
+    "assembly",
+    "c",
+    "cpp"
+  ],
+  "reference_basis_scope": "Source locators only; read corresponding functions/callers/tests before each implementation batch, record decisions in existing progress/handoff; not proof of reading or compatibility; references never enter product build."
 }

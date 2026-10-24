@@ -29,6 +29,20 @@ class LanguageTests(unittest.TestCase):
         self.policy['sources']['src/core.c']={'role':'c-bridge','reason':'','bridge_kind':'external-library'}
         self.assertTrue(self.check())
         self.policy['priority']=['c','assembly','cpp'];self.assertTrue(self.check())
+    def test_builder_uses_one_explicit_implementation_without_c_fallback(self):
+        import runpy
+        builder=Path(__file__).resolve().parents[1]/'runtime/build_pangu.py'
+        module=runpy.run_path(str(builder))
+        resolve=module['implementation'];state=resolve.__globals__;original=state['SOURCES']
+        try:
+            state['SOURCES']=['src/core.S']
+            self.assertTrue(resolve('src/core').endswith('src/core.S'))
+            state['SOURCES']=['src/core.S','src/core.c']
+            with self.assertRaises(ValueError):resolve('src/core')
+            state['SOURCES']=[]
+            with self.assertRaises(ValueError):resolve('src/core')
+        finally:state['SOURCES']=original
+
     def test_cannot_label_c_as_assembly(self):
         self.policy['sources']['src/core.c']={'role':'assembly-core','reason':'pretend'}
         self.assertTrue(self.check())

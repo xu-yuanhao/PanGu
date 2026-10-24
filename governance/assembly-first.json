@@ -17,9 +17,9 @@
       "sha256": "27f6a07a41a948c8dc25ea24058eae0de19841e989d5925d3b85f5a303516ce5"
     },
     "src/runtime/mimo.c": {
-      "role": "c-bridge",
-      "bridge_kind": "external-library",
-      "reason": "libcurl/json-c协议桥接；后续抽出自身解析核心，不扩展成业务宿主"
+      "role": "pending-inplace-assembly",
+      "reason": "包含自身SSE解析、消息投影与请求状态逻辑，不能整文件当C胶水；原地迁移后仅保留必要libcurl/json-c调用封装",
+      "sha256": "a3242bcf5fb0c970fca6233188bf03d6056fccba182009ae1ffbbf55677fd2fa"
     },
     "src/runtime/tools.c": {
       "role": "pending-inplace-assembly",
