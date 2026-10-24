@@ -239,6 +239,7 @@
     "docs/migration/t14-transaction-native-evidence.json": "control",
     "docs/migration/t14-earliest-owner-native-evidence.json": "control",
     "docs/migration/t14-earlier-owner-discovery.json": "control",
-    "docs/migration/t14-earlier-owner-content-audit.json": "control"
+    "docs/migration/t14-earlier-owner-content-audit.json": "control",
+    "docs/migration/t14-earlier-runner-audit.json": "control"
   }
 }

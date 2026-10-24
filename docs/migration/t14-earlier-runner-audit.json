@@ -1,0 +1,1330 @@
+{
+  "schema": "pangu.t14-earlier-runner-audit.v1",
+  "status": "44_FIXED_RUNNER_CONTENTS_REVIEWED; SDK2_LOCAL_RECEIPT_REPLAY_PASS",
+  "scope": "Static AST/source review of fixed top-level Python runner contents in owner.c-bearing t14 artifact directories, plus local receipt checker replay only. Not exhaustive artifact discovery, native rebuild, full T14, G04/G07 or server-side anti-bypass.",
+  "input_content_audit_sha256": "8bcecbfb1b34bdcf40cd1ea5806a415bc6c2401c51e1f1614fb353deaebffc7a",
+  "records": [
+    {
+      "id": "T14-R01",
+      "sha256": "95f8b2fb1ce2fdfa1c0f162cde4857e94652e7a604c8f4dc0a3f9761b0bda0ae",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-async-tests.py",
+      "identical_path_count": 15,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R02",
+      "sha256": "4ca863090ebe7a6bdcf74b7a397accd0873289fc570bc41fcc6667f71c09ed91",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-budget-tests.py",
+      "identical_path_count": 11,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R03",
+      "sha256": "ba25fd1eca5df77b98179e54692127739833ace56877044304379b7224580397",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-call-tests.py",
+      "identical_path_count": 12,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R04",
+      "sha256": "26e9a7d207c2f7550286ba52fc36925539d934298f40a0e9e40f7f5793b3e132",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-geometry-tests.py",
+      "identical_path_count": 10,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R05",
+      "sha256": "5b5a665aba42a453f75a05c008e582d04efc1dd8b604c690b6025f3b942f0c66",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-graph-tests.py",
+      "identical_path_count": 13,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R06",
+      "sha256": "ebcbe5ac0feadd030b57c94105368948a59c6b6ebd9a7c2f44de3e47ed1c8698",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-host-tests.py",
+      "identical_path_count": 8,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 95,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 96,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 94,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [
+        {
+          "line": 4,
+          "sha256": "f56c8c1d78ae863ea1d7dfbc48981bba00629403d79e267aeb79ffc2033a066d",
+          "status": "IDENTICAL_TO_DISCOVERED_TEST_CONTENT"
+        }
+      ],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R07",
+      "sha256": "a1abe1de061e4a215161d05dd870144ca207bf9ee93ec0bd1d3809d8d532f9de",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-setup-tests.py",
+      "identical_path_count": 14,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R08",
+      "sha256": "ba86f5d78edc3bc2295cd2070a61dcf1c5c016235d53e2099e8ea5062e7bd024",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-adapter-geometry-wip-df1z88o2/run-transaction-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R09",
+      "sha256": "c8ae746acac92861aa91307fb242993a070bbcbf20af9b6557d0315d51d91b04",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-call-budget-tests.py",
+      "identical_path_count": 7,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R10",
+      "sha256": "57d219bafbf1128aee883fdaf793060c727d0a1f696f4405597be36610a80228",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-host-tests.py",
+      "identical_path_count": 8,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R11",
+      "sha256": "e4dc48a742b7d2239ef5a34af1ea6a4a0fd0eb6ceebf1ff3c79d7e4e9936522b",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-call-budget-wip-n3thrj9c/run-start-tests.py",
+      "identical_path_count": 8,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R12",
+      "sha256": "8dd2ce66631ade9c0183aeabe1281b1fb90dd018ba4ec43dc9f59371e958d048",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-async-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R13",
+      "sha256": "50a6b52927b107eab28e6eb023dea812b0a5cee124d6f7075137ed8e739fdd5f",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-budget-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R14",
+      "sha256": "e57ddf9cd0fd115b8a40921958b27b6fdbe41ee39ff204fdf46c08f0ec710d15",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-call-budget-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R15",
+      "sha256": "5347a3afcf35f48ba322102033d4628a9ca28039f75531c213fda4a86f5a232a",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-call-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R16",
+      "sha256": "79a65e5a026e7ee58fd143057abf631821b94b53695d3377d3ad98f6d96e76c1",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-entry-tests.py",
+      "identical_path_count": 2,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-entry-v1.h').read_bytes()).hexdigest()=='43d3d326f5124409622fd019d91c3361cd776ae391ea39fd4e15994fc86e0bc1','fixed entry consumer drift'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/'client-abi-v1.h').read_bytes()).hexdigest()=='c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07','fixed lifecycle consumer drift'"
+        },
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest,'dependency ABI drift'"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_entry_bridge_query'],p.stdout"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R17",
+      "sha256": "243332da266f539b47f55e4bf27df7cecec4068baeb94debe6271bae7d13a926",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-facade-tests.py",
+      "identical_path_count": 3,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-abi-v1.h').read_bytes()).hexdigest()=='c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07','fixed consumer ABI drift'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest,'fixed dependency ABI drift'"
+        },
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode and [line.split()[-1] for line in p.stdout.splitlines()]==['pangu_lifecycle_query'],p.stdout"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R18",
+      "sha256": "4a128e0c6bd3e1c874b3f30fc2ef3249e59735e8e748d939c45b35953051c99a",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-geometry-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R19",
+      "sha256": "9b83c5cbdc6e34d6dae637ac95fe1bee86ad35eb99d12ad37088ef3f85d3420e",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-graph-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R20",
+      "sha256": "5dc263b7136d0b3dd2a14d73b963b57642c69a74ff80237d2a7d0bb032282060",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-host-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R21",
+      "sha256": "32c413febddfcbc81b4b9d127a8bc69addc18a065bdea2f876eecc50ba8d4d08",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-private-link-tests.py",
+      "identical_path_count": 3,
+      "classification": "PRIVATE_SYMBOL_LINK_REFUSAL",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert p.returncode and name in p.stderr and ('undefined reference' in p.stderr or 'undefined symbol' in p.stderr),p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "docs/migration/t14-focused-native-evidence.json; link-only scope"
+    },
+    {
+      "id": "T14-R22",
+      "sha256": "1e42b9f7615ff372d82b5f2bd09c4e2d6ed829628b32354d0128787a5b03d5d8",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-setup-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R23",
+      "sha256": "024f2558c974de84340837078c526afbc2225e6d621942204ad56784761240b9",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-start-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R24",
+      "sha256": "4f04ba8dc0db984da9fe63fed288d03fd95b291612a9cf041c86729aad776a0b",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-entry-bridge-wip-9d3q3ded/run-transaction-tests.py",
+      "identical_path_count": 4,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R25",
+      "sha256": "e90a5d1a89f3a80ec5c4c96f05d932bff9d8762de0f4358a2bf240ba84130545",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-async-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R26",
+      "sha256": "6d51058bd2d15e148fbd3acfba412663b34e6ae02ec7f8dfd9606dd2b3abd2bf",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-budget-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R27",
+      "sha256": "e1a7fbbaee1df5f4dde0e66b21039c13dd5f75b29102a2fe39740b26a7a266bf",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-call-budget-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R28",
+      "sha256": "080318ebe891ee0bbf1594fd13a2097672ad947a768614a4855a0c8c24573fdb",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-call-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R29",
+      "sha256": "b7e5f8998b861d59e01bf68164a32ec8f700e24c1a1e58dbad3daf06c74ff25c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-entry-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-entry-v1.h').read_bytes()).hexdigest()=='43d3d326f5124409622fd019d91c3361cd776ae391ea39fd4e15994fc86e0bc1','fixed entry consumer drift'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/'client-abi-v1.h').read_bytes()).hexdigest()=='c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07','fixed lifecycle consumer drift'"
+        },
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest,'dependency ABI drift'"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_entry_bridge_query'],p.stdout"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R30",
+      "sha256": "4a1fc90f841b885aea41a5c8037ee176491d78fb2d6d4fce9ba7652a1f12509d",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-facade-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-abi-v1.h').read_bytes()).hexdigest()=='c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07','fixed consumer ABI drift'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest,'fixed dependency ABI drift'"
+        },
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode and [line.split()[-1] for line in p.stdout.splitlines()]==['pangu_lifecycle_query'],p.stdout"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R31",
+      "sha256": "bdbdd12036db2162adad8f8be2b589c03853464b476945a96b240ba183ebbe0e",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-geometry-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R32",
+      "sha256": "cfdf48a901a1d326b31006136484499f146c2a78273a31e1a79626d2848f5802",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-graph-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R33",
+      "sha256": "5e48b59ea584fdd69fbf7165cb3bf9c9d25f9b4f340783a2d0bd5fa9d2f76665",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-host-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R34",
+      "sha256": "5ff58d1b179c809e37d9a7e1df07371e3824875cdaf18201c66e5acb9b56e2f8",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-interop-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((r/'interop-contract-v1.h').read_bytes()).hexdigest()=='f2c1f98325967f959e5af7bbfea7db18540df880934a79ed138cbed86faafa0a'"
+        },
+        {
+          "line": 14,
+          "source": "assert hashes()==before"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_cpp_provider_observed'],p.stdout"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R35",
+      "sha256": "4239c2c2a806c47562d102d33fb2e2dbcdd60fa042cffc9a4019ecf5ffbfdd30",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-private-link-tests.py",
+      "identical_path_count": 9,
+      "classification": "PRIVATE_SYMBOL_LINK_REFUSAL",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert p.returncode and name in p.stderr and ('undefined reference' in p.stderr or 'undefined symbol' in p.stderr),p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "docs/migration/t14-focused-native-evidence.json; link-only scope"
+    },
+    {
+      "id": "T14-R36",
+      "sha256": "ce295b804625176999e4ed3cd30deebf975c11733d66d95abe3017c69ae7e576",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-route-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-route-v1.h').read_bytes()).hexdigest()=='fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/header).read_bytes()).hexdigest()==digest"
+        },
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_service_route_query'],p.stdout"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R37",
+      "sha256": "5b01dee89bf4ef043c320de541d726a5aa380443e583d711ead4e4066e324ea1",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-setup-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R38",
+      "sha256": "a2955a9c7d3261ab6b24580a7dc22c9448924622687454f5d1e350613fb5ff73",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-start-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R39",
+      "sha256": "b18d2171bf1c49a15be03284660a102f76d4a73f1dfe87b233cb945ee55e05a0",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-interop-source-restore-1ksp11i6/run-transaction-tests.py",
+      "identical_path_count": 9,
+      "classification": "BUILD_AND_RUNTIME_EXIT_CHECKS",
+      "python_assertions": [
+        {
+          "line": 7,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 6,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "corresponding focused native inventory row; this audit does not rerun mutable old generators"
+    },
+    {
+      "id": "T14-R40",
+      "sha256": "dbeceeb109c10df5a3ef53bd756b2ae81890a98ada9d95efa6f417638c2f2b41",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-parent-tests.py",
+      "identical_path_count": 5,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 16,
+          "source": "assert hashes()==before"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/name).read_bytes()).hexdigest()==digest,'fixed consumer drift'"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 15,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==[query],p.stdout"
+        },
+        {
+          "line": 15,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R41",
+      "sha256": "7ff7102ae735415456c76dcef942fa022efb8501828a9286c90f5ee936bc088c",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-parent-call-wip-cdogotao/run-sdk-tests.py",
+      "identical_path_count": 7,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((r/'client-plugin-sdk-v1.h').read_bytes()).hexdigest()=='4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607'"
+        },
+        {
+          "line": 20,
+          "source": "assert hashes()==before"
+        },
+        {
+          "line": 8,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 17,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 18,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_plugin_host_query'],p.stdout"
+        },
+        {
+          "line": 19,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R42",
+      "sha256": "9435f10f37398430cad0181cc0572021ac09e9f17bbc932be3d051a408d46d70",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/run-sdk2-tests.py",
+      "identical_path_count": 3,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/'client-plugin-sdk2-v2.h').read_bytes()).hexdigest()=='53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e'"
+        },
+        {
+          "line": 21,
+          "source": "assert hashes()==before"
+        },
+        {
+          "line": 7,
+          "source": "assert hashlib.sha256(Path(file).read_bytes()).hexdigest()==digest,\"borrowed frozen input drift\""
+        },
+        {
+          "line": 9,
+          "source": "assert hashlib.sha256((r/name).read_bytes()).hexdigest()==digest,\"fixed consumer drift\""
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 20,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    },
+    {
+      "id": "T14-R43",
+      "sha256": "3db358080c05b7e4277f94cffad312b27095e000d6204b66d799f9e86bf88ebc",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-native-fixture-f5mpb17s/test-sdk2-nested-admission.py",
+      "identical_path_count": 3,
+      "classification": "LOCAL_RECEIPT_FAIL_CLOSED_TESTS",
+      "python_assertions": [
+        {
+          "line": 9,
+          "source": "assert p.returncode==expected,(name,p.returncode,p.stdout,p.stderr)"
+        },
+        {
+          "line": 9,
+          "source": "assert report['status']==('PASS' if expected==0 else 'BLOCKED')"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "fresh eight-case replay in external copy"
+    },
+    {
+      "id": "T14-R44",
+      "sha256": "487f74b58d9e81c38623bae7ded236e28841862ea7da3cc9727cd7e948726542",
+      "representative": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-service-route-wip-to2c3ddj/run-route-tests.py",
+      "identical_path_count": 1,
+      "classification": "BUILD_RUN_AND_ABI_PROVENANCE_GUARDS",
+      "python_assertions": [
+        {
+          "line": 4,
+          "source": "assert hashlib.sha256((r/'client-route-v1.h').read_bytes()).hexdigest()=='fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71'"
+        },
+        {
+          "line": 5,
+          "source": "assert hashlib.sha256((r/header).read_bytes()).hexdigest()==digest"
+        },
+        {
+          "line": 6,
+          "source": "assert hashlib.sha256((base/header).read_bytes()).hexdigest()==digest"
+        },
+        {
+          "line": 10,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 11,
+          "source": "assert not p.returncode,p.stderr"
+        },
+        {
+          "line": 12,
+          "source": "assert not p.returncode and [x.split()[-1] for x in p.stdout.splitlines()]==['pangu_service_route_query'],p.stdout"
+        },
+        {
+          "line": 13,
+          "source": "assert not p.returncode and not p.stdout.strip(),p.stdout"
+        },
+        {
+          "line": 9,
+          "source": "assert not p.returncode,p.stderr"
+        }
+      ],
+      "embedded_test_sources": [],
+      "evidence_scope": "focused/native SDK evidence; this static audit does not freshly execute original scripts or certify all historical hashes against current ABI"
+    }
+  ],
+  "summary": {
+    "unique_runner_contents": 44,
+    "python_assert_nodes": 168,
+    "embedded_test_sources": 1,
+    "embedded_sources_all_already_discovered": true,
+    "new_C_scenario_sources": 0
+  },
+  "sdk2_local_replay": {
+    "directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-runner-audit/sdk2-fixture",
+    "receipt_sha256": "e05036b575dcda56518db4c31d76608022d55924bedaeb3dea2ecb62a9334d5a",
+    "checker_sha256": "b2fc411b8fb87a98b0bbcb9a08cb113825912f920466cdcc42beb250841d8cb4",
+    "test_script_sha256": "3db358080c05b7e4277f94cffad312b27095e000d6204b66d799f9e86bf88ebc",
+    "results": [
+      {
+        "case": "valid",
+        "exit": 0
+      },
+      {
+        "case": "missing-receipt",
+        "exit": 2
+      },
+      {
+        "case": "extra-source",
+        "exit": 2
+      },
+      {
+        "case": "binary-drift",
+        "exit": 2
+      },
+      {
+        "case": "missing-optimization",
+        "exit": 2
+      },
+      {
+        "case": "missing-scenario",
+        "exit": 2
+      },
+      {
+        "case": "malformed-with-stale-pass",
+        "exit": 2
+      },
+      {
+        "case": "empty-borrowed",
+        "exit": 2
+      }
+    ],
+    "source_files_match_original": {
+      "owner.h": "40c5d4c871a9bd1a57b47afbb8ed47d4b97f3f496250a14537b18258383bfda8",
+      "owner.c": "afdd3acc51f27a5023eb005106a778e801ab4d6bac3faf5b87621f95ccd1043a",
+      "coordinator.h": "cb0ec8309044b972cff388556be45230f36ed5c9360b931ba523184fdc9b8226",
+      "coordinator.c": "96b60efacbeea8e80b687c336eaed25b8692230ebda2e3b89712e21f4ae4c672",
+      "adapter.h": "04692e0148acda2eef476a72a0ae6b5e92c7c8bf605515b6cda590f80aebaeb1",
+      "adapter.c": "c7e0ceaa912f97b647a7e256b1e4a85e3eb5bc7b643380701cddc78016d50021",
+      "test.c": "6884993a4b764dbaf941568562983ae6db670b5350b55254505bf72c7ecf57e8",
+      "adapter-test.c": "2ec8a2f6646614d12c9ce7225157a311f313c6830a6818fb4c22480d55218599",
+      "run-host-tests.py": "5e48b59ea584fdd69fbf7165cb3bf9c9d25f9b4f340783a2d0bd5fa9d2f76665",
+      "async-test.c": "d0e23f721c343c9b94af2a40d765f55df5478414e7489d03a6d2be8370157d1c",
+      "run-async-tests.py": "e90a5d1a89f3a80ec5c4c96f05d932bff9d8762de0f4358a2bf240ba84130545",
+      "setup-test.c": "b200e6ac67979b87d01ebd437e8f1e10e717542127e7ce48cb002ca71766704c",
+      "run-setup-tests.py": "5b01dee89bf4ef043c320de541d726a5aa380443e583d711ead4e4066e324ea1",
+      "graph-test.c": "fd778846e164668ba4eae0998c7933cb4fa46b0484dedf8b51f94c441992e83c",
+      "run-graph-tests.py": "cfdf48a901a1d326b31006136484499f146c2a78273a31e1a79626d2848f5802",
+      "calls.h": "667e1dde6557ccb4ef4b9b96d5b813687a52a5fb1eed779f737aece4eb3ea526",
+      "calls.c": "d4e4adbb5f7ff449e03f9b588bcb310f4a46a38d782e69e1998d22f6b48ef914",
+      "call-test.c": "71379ee5000d8dad4e964a1e593a4cb36c5e3f08c198ac41cafc5a6a0a54d2d1",
+      "run-call-tests.py": "080318ebe891ee0bbf1594fd13a2097672ad947a768614a4855a0c8c24573fdb",
+      "budget-test.c": "2a73a037a9a7b88f912fda28104bfe9b05b9ecc5b6fdc71f0530039f57424369",
+      "run-budget-tests.py": "6d51058bd2d15e148fbd3acfba412663b34e6ae02ec7f8dfd9606dd2b3abd2bf",
+      "geometry.h": "985a6d01f79d849e5cfe805748110ae588394aa27c6841ef97e7156598c2ff9c",
+      "geometry-test.c": "95f62866955172a1172cf2e159b4599a6c172f4257ae797025a01c7a72fd8027",
+      "run-geometry-tests.py": "bdbdd12036db2162adad8f8be2b589c03853464b476945a96b240ba183ebbe0e",
+      "transaction-test.c": "d08c01d9bce4b8b0c06f9cc2e42c372a348402529d62e2fe68d8ecb745fe6463",
+      "run-transaction-tests.py": "b18d2171bf1c49a15be03284660a102f76d4a73f1dfe87b233cb945ee55e05a0",
+      "start-test.c": "6dbd67cf32d33e244271aa61f5aefc34203abae957539d3c04e2289d98db7103",
+      "run-start-tests.py": "a2955a9c7d3261ab6b24580a7dc22c9448924622687454f5d1e350613fb5ff73",
+      "call-budget-test.c": "81e40f70a618ce599eb112330ef6f44265979c3f543242f0b03c8f2c37b12112",
+      "run-call-budget-tests.py": "e1a7fbbaee1df5f4dde0e66b21039c13dd5f75b29102a2fe39740b26a7a266bf",
+      "lifecycle.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+      "lifecycle.c": "169962b0ce5d8b2387f18411c9b9c56184b4e5dfc93e9f6d3ecd58bf92140999",
+      "facade-test.c": "3e5673d5c0e0f0efa6658cea65be117cf59023ccc924cc4a1bec4dbadec2e3c0",
+      "facade-asm.S": "18c6679ec0564b9147d93af519c106baf0ffd0ca2ae43a770f877b0301b6f554",
+      "run-facade-tests.py": "4a1fc90f841b885aea41a5c8037ee176491d78fb2d6d4fce9ba7652a1f12509d",
+      "private-link.c": "092d573b409e8a75b4a8ee49dd6261e086ca710646f0316678aa5e6d45ce420b",
+      "run-private-link-tests.py": "4239c2c2a806c47562d102d33fb2e2dbcdd60fa042cffc9a4019ecf5ffbfdd30",
+      "client-abi-v1.h": "c09d775d49f28eebf8965188c1abebabcd0630f684458810fbe577eae6934a07",
+      "entry-bridge.h": "aa14f90f03d031c29405c997ead526ca06845f796c7798d95ec187162497504f",
+      "entry-bridge.c": "cd5112035d2e979ad4bdd5d2c70360d3c77e087cc3864ff4b1d7e13e605d8ec3",
+      "entry-test.c": "05b089264a0045f736f242e76b335f1a07a5242523340b3d6944247dc86ee50c",
+      "run-entry-tests.py": "b7e5f8998b861d59e01bf68164a32ec8f700e24c1a1e58dbad3daf06c74ff25c",
+      "client-entry-v1.h": "43d3d326f5124409622fd019d91c3361cd776ae391ea39fd4e15994fc86e0bc1",
+      "entry-asm.S": "ea52a2335389cbab3841a0dc0867d6b1f80a384f3ac54f55c2a5813f1483ac19",
+      "service-route.h": "8644771453a1e64b5ab8309ce3d6c6ea4fe61d61bcfa9acaa32396b0ba5643ef",
+      "service-route.c": "43f710124edca5567e523af092a3bc3ad4f78d329b60229a917f562aa3225eb1",
+      "client-route-v1.h": "fbe61d76765102b608b4c2d78cc3405dcf2ef206eea8e9cc5b5438125b829b71",
+      "route-test.c": "21e981006fb0166153ed4b4269f65b4b3cbed5343e5fa7f3c9768d00c7e2411d",
+      "run-route-tests.py": "ce295b804625176999e4ed3cd30deebf975c11733d66d95abe3017c69ae7e576",
+      "interop-contract-v1.h": "f2c1f98325967f959e5af7bbfea7db18540df880934a79ed138cbed86faafa0a",
+      "route-interop.cpp": "585e3425f083603d9c73e47cc9e74c76484a7fda86aaf8f400ebca271281756a",
+      "route-interop.S": "e4ab331518694f04d2f5a08ab0538cf2beed08c86778d1b41e08b4c7fcade016",
+      "interop-test.c": "2dd1e0b2b2da6a3f713ff94fd82a4e1242023995a9f2e3b853216bd4f63282a4",
+      "run-interop-tests.py": "5ff58d1b179c809e37d9a7e1df07371e3824875cdaf18201c66e5acb9b56e2f8",
+      "route-geometry-private.h": "90294709e8db6fee7306a71c10a38b80c0f4a6f945f405b58d0ad275517f10e5",
+      "plugin-sdk.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+      "plugin-host.h": "8478ce6cc69a924492dd453fe1b6c96bc0f3b4a29040640de043788f46fa8ecc",
+      "plugin-sdk.c": "82516a237e6acc6fea2a01fc8ed6c0511d6de0097948aaa15125cc80496c47b7",
+      "sdk-fixture.h": "4f8999c3fbdca0a2cfe8e055c158073b8e2c5a71be0d1f99ffc381f4a3d5e5b0",
+      "sdk-client.c": "43f2a60305ccf5c20644c514e8bad14084386867ef3eda456ec9bc21337f724a",
+      "client-plugin-sdk-v1.h": "4074828868833523526476ddb24991ee954c88722daa0f4849a8ca1968868607",
+      "sdk-test.c": "9dfbba1f659836b79dbda53b55dc5c473869bf06d651f6877c4b4f9080ba32b8",
+      "run-sdk-tests.py": "7ff7102ae735415456c76dcef942fa022efb8501828a9286c90f5ee936bc088c",
+      "check-sdk-nested-admission.py": "bf6ddc42cfc22c0dc97b42f0c8c9113101a17362d356112087b0570adf5cfa04",
+      "lifecycle-child.h": "3e3e421a3aeb53b4bef169bd64bb3d43b6fd0ce0fa8c8f229ae48d27fe3bda18",
+      "lifecycle-child-private.h": "73e486ffe263bfeab65cb0e66329f03871c16a260e5a7121bd4962ad9f17c6a7",
+      "route-query-private.h": "daac0f624e680dcd5b53744a39c6b677a9a60840af615c5a635509deae52bfc9",
+      "invocation.h": "0963ab9aad63d1c0220405b672b96f3d0122ab92c69a8458ccf70bfe6a4f4cd3",
+      "invocation.c": "687407349d6725621924ff9bd66c079d33bf8fa45345accd1618e839474593b8",
+      "invocation-test.c": "95643248cf7196d4d57547c62623f34286475c67595e90ab63a017b036b10c12",
+      "run-parent-tests.py": "dbeceeb109c10df5a3ef53bd756b2ae81890a98ada9d95efa6f417638c2f2b41",
+      "client-lifecycle-child-v2.h": "725b2d8252538bf9526e79689635a38c3d1a72c4e3d73c9409b8365bff4c03d7",
+      "client-invocation-v1.h": "bf370e97fe050f14c90ca3ead7577ec1798f7e980f164832177ecb829c387380",
+      "invocation2.h": "51429efe341b5a88f78b31c00f516097ed3423643e2804799c1d51ffa1371ce1",
+      "plugin-sdk2.h": "858865c90130564d8a5369325bcec5d8821c8c52491f9d7efbb009c48252e86a",
+      "plugin-host2.h": "3a1dba8cdf878b1e9890676d9b642d62fee11ae74a04bd6217cad5d15224dc34",
+      "client-plugin-sdk2-v2.h": "53e8a0e62c670e270974a4707dc1fc9670420b84af49f14e37b50084ef73304e",
+      "sdk2-fixture.h": "d360aaf382159c6ba44760d934d049e306818f5a61d98d3db94caccc18e954a3",
+      "sdk2-client.c": "700667b05309d2c2595be9da3f0823faa19b95191fe676081965a8d3da5e2109",
+      "sdk2-test.c": "3c858c143ddeef5e225b3ea8808fca3e48a04d0665ee7709d7bac4550610b736",
+      "run-sdk2-tests.py": "9435f10f37398430cad0181cc0572021ac09e9f17bbc932be3d051a408d46d70",
+      "check-sdk2-nested-admission.py": "b2fc411b8fb87a98b0bbcb9a08cb113825912f920466cdcc42beb250841d8cb4",
+      "test-sdk2-nested-admission.py": "3db358080c05b7e4277f94cffad312b27095e000d6204b66d799f9e86bf88ebc",
+      "client-plugin-host-v1.h": "f863ca97220db14ece58ecabb930a0816b4589135d6d69787ea6d2cf450e4c39",
+      "client-invocation-ext2-v2.h": "f7ebb6a5299ac50eee334240689382fa7005164b4cb893d6f9c1b51c7731aab0",
+      "client-plugin-host2-v2.h": "31632eba6da861d48dfb60facb42588af1e52047c11e2cf9a03189804b3ac328"
+    },
+    "scope": "Local caller-provided receipt and stale-result failure checks; not attested/native/server execution."
+  },
+  "remaining": [
+    "Complete artifact discovery outside top-level owner.c-bearing directory filter, including nested/source archive and restoration boundaries.",
+    "Assess explicit removed private API gaps; do not mark them executed.",
+    "Finish corresponding ABI guards and full G04/G07/T14 acceptance."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording fixed runner static review and local eight-case receipt replay only. No production/code/gate/budget/ABI change.",
+    "risks": [
+      "Historical runners can regenerate source; they were parsed and not run against originals.",
+      "Old fixed header assertions require the historical composition; static listing does not imply current ABI validation.",
+      "SDK2 local receipts do not establish trusted external execution.",
+      "Remaining discovery and full T14 incomplete."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "de63b69694c0558fb857038c6c7e40f5dab2bb2338f4a56c1f9f0ddba5b3bb78",
+      "docs/migration/t14-focused-inventory.json": "853815c78cf47f5b3dd7691080c4f41ad280e383fcf056c601284d4641602719",
+      "docs/migration/t14-owner-boundaries.md": "1416b680087a01f5c351e5630deb50d9a263c1da0b75db924913a54a9a3e7a75",
+      "docs/原生重写路线与迁移TODO.md": "97ebbc5ad9129c3bf14bcbfb54c8fa54d38d44ee3b0e488c8a018361721548db"
+    },
+    "control_scope_sha256": "a15b2742c4f7864e5f9bc2a9b0d2aafad9b88e424808ba6376f6e0f9d94f45cd"
+  }
+}
