@@ -126,6 +126,56 @@ tui_state_cancel:
  .cfi_endproc
 .size tui_state_cancel, .-tui_state_cancel
 
+.globl tui_state_attach
+.type tui_state_attach,@function
+tui_state_attach:
+ push rbx
+ push r12
+ push r13
+ sub rsp,80
+ mov rbx,rdi
+ cmp dword ptr [rbx+TUI_LI_STATE_FATAL],0
+ jne .Lattach_bad
+ cmp dword ptr [rbx+TUI_LI_STATE_RUNNING],0
+ jne .Lattach_idle
+ mov rax,[rbx+TUI_LI_STATE_OPS]
+ mov rdi,[rax+TUI_LI_OPS_CTX]
+ mov rsi,rsp
+ call [rax+TUI_LI_OPS_POLL]
+ test eax,eax
+ js .Lattach_poll_error
+ jz .Lattach_idle
+ cmp dword ptr [rsp+TUI_LI_EVENT_KIND],TUI_LI_EV_RUN_STARTED
+ jne .Lattach_protocol_error
+ mov dword ptr [rbx+TUI_LI_STATE_RUNNING],1
+ mov dword ptr [rbx+TUI_LI_STATE_CANCEL_SHOWN],0
+ mov rdi,[rbx+TUI_LI_STATE_VIEW]
+ mov rsi,rsp
+ call tui_view_event@PLT
+ mov eax,1
+ jmp .Lattach_return
+.Lattach_protocol_error:
+ mov rdi,[rbx+TUI_LI_STATE_VIEW]
+ call tui_view_protocol_violation@PLT
+ jmp .Lattach_failed
+.Lattach_poll_error:
+ mov rdi,[rbx+TUI_LI_STATE_VIEW]
+ call tui_view_poll_error@PLT
+.Lattach_failed:
+ mov dword ptr [rbx+TUI_LI_STATE_FATAL],1
+.Lattach_bad:
+ mov eax,-1
+ jmp .Lattach_return
+.Lattach_idle:
+ xor eax,eax
+.Lattach_return:
+ add rsp,80
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_state_attach,.-tui_state_attach
+
 /* void tui_state_poll(tui_state *s) — rdi=s */
 .globl tui_state_poll
 .type tui_state_poll,@function

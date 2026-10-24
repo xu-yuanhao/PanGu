@@ -49,6 +49,13 @@ def main():
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/session'),
                             implementation('src/runtime/agent'), str(ROOT / 'tests/runtime/test_session_commit.c'), '-o', session_test], check=True)
             subprocess.run([session_test], check=True, timeout=10)
+            tools_asm_test = str(Path(directory) / 'test-tools-asm')
+            tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                            '-pedantic', '-Wno-cast-function-type', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            '-I' + str(ROOT / 'src/runtime'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'),
+                            str(ROOT / 'tests/runtime/test_tools_asm.c'), *tool_flags, '-o', tools_asm_test], check=True)
+            subprocess.run([tools_asm_test], check=True, timeout=30)
             output = str(Path(directory) / 'test-agent')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror',
                             '-pedantic', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
@@ -78,6 +85,7 @@ def main():
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'), implementation('src/runtime/session'),
                             implementation('src/client/tui/runtime_bridge'), str(ROOT / 'tests/client/tui/test_runtime_bridge.c'),
+                            str(ROOT / 'tests/runtime/runtime_bridge_abi.S'),
                             '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

@@ -1720,10 +1720,12 @@
       "definition": "docs/原生重写路线与迁移TODO.md#T24",
       "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
       "evidence": [
-        "docs/migration/runtime-core-progress.md"
+        "docs/migration/runtime-core-progress.md",
+        "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "immutable registry, per-tool argument validation and authorization; no async/parallel execution"
+      "local_subset_scope": "immutable registry, per-tool argument validation and authorization; no async/parallel execution",
+      "local_implementation": "src/runtime/tools.S and read_tool.S integrated from parallel handoff; only bounded synchronous read subset; full stage incomplete"
     },
     {
       "id": "T25",
@@ -1742,10 +1744,12 @@
       "definition": "docs/原生重写路线与迁移TODO.md#T25",
       "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
       "evidence": [
-        "docs/migration/runtime-core-progress.md"
+        "docs/migration/runtime-core-progress.md",
+        "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "workspace-root read-only UTF-8 regular files; no write/edit or full Pi read compatibility"
+      "local_subset_scope": "workspace-root read-only UTF-8 regular files; no write/edit or full Pi read compatibility",
+      "local_implementation": "src/runtime/tools.S and read_tool.S integrated from parallel handoff; only bounded synchronous read subset; full stage incomplete"
     },
     {
       "id": "T26",

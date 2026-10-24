@@ -258,8 +258,22 @@ static void test_cancelled_terminal_stops(void)
 	T_RUN("cancelled_terminal_stops");
 }
 
+static void test_attach_existing_run(void)
+{
+ tstr out;tui_view view;tui_state state;mock_runtime mock={0};
+ tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),1,NULL);m_ops.ctx=&mock;tui_state_init(&state,&m_ops,&view);
+ T_CHECK(tui_state_attach(&state)==0&&!tui_state_running(&state));
+ m_add(&mock,mk(TUI_EV_RUN_STARTED));m_add(&mock,mk(TUI_EV_TEXT_DELTA));m_add(&mock,mk(TUI_EV_RUN_FINISHED));
+ T_CHECK(tui_state_attach(&state)==1&&tui_state_running(&state));T_CHECK(mock.submit_calls==0&&tstr_contains(&out,"[run] started"));
+ tui_state_poll(&state);T_CHECK(!tui_state_running(&state)&&!tui_state_fatal(&state));
+ mock=(mock_runtime){0};tui_state_init(&state,&m_ops,&view);m_add(&mock,mk(TUI_EV_RUN_FINISHED));
+ T_CHECK(tui_state_attach(&state)==-1&&tui_state_fatal(&state));
+ T_RUN("attach_existing_run");
+}
+
 int main(void)
 {
+	test_attach_existing_run();
 	test_submit_and_busy();
 	test_cancel_notice_once();
 	test_full_round_trip_unique_terminal();

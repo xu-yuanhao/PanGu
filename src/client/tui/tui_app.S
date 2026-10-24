@@ -311,9 +311,16 @@ tui_app_run:
  mov rdi, r14
  call tui_view_banner@PLT
  cmp dword ptr [rsp + OFF_INTERACTIVE], 0
- je .Lmain_loop
+ je .Lattach_runtime
  mov rdi, r14
  call tui_view_redraw_editor@PLT
+.Lattach_runtime:
+ mov rdi,r15
+ call tui_state_attach@PLT
+ test eax,eax
+ jns .Lmain_loop
+ mov dword ptr [rsp+OFF_REASON],TUI_LI_EXIT_POLL_ERROR
+ jmp .Ldone
 
 /* ================= 主循环 ================= */
 .Lmain_loop:

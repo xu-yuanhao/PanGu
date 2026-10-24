@@ -20,25 +20,10 @@
       "reason": "包含自身SSE解析、消息投影与请求状态逻辑，不能整文件当C胶水；原地迁移后仅保留必要libcurl/json-c调用封装",
       "sha256": "a3242bcf5fb0c970fca6233188bf03d6056fccba182009ae1ffbbf55677fd2fa"
     },
-    "src/runtime/tools.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "c24f070a75c1e4db6ecee1714ef1bed8aee1d51dbac1648b0ae405043bd072b1"
-    },
-    "src/runtime/read_tool.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "daae5ffaa8f88c1f5dfd774f0682e0a687f2c2c64d0dcad60b0c9a024fda991d"
-    },
     "src/client/tui/tui_term.c": {
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "termios/ioctl等平台结构与系统库适配"
-    },
-    "src/client/tui/runtime_bridge.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "当前有效C实现，必须原地迁到手写汇编后删除，不另留C版本",
-      "sha256": "804ec6dca0f42d966fba4df2293bab7026f9e7d6ae38e2116ad9ec0bfb392f19"
     },
     "src/runtime/session.S": {
       "role": "assembly-core",
@@ -76,6 +61,18 @@
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "仅公开struct stat布局与普通文件/大小检查；日志算法和IO推进均在汇编"
+    },
+    "src/client/tui/runtime_bridge.S": {
+      "role": "assembly-core",
+      "reason": "手写客户端事件/状态桥接与有界退出清理；仅依赖公开pg_client函数表"
+    },
+    "src/runtime/tools.S": {
+      "role": "assembly-core",
+      "reason": "手写工具注册/校验分派或目录相对只读执行；公开平台/库边界有布局断言"
+    },
+    "src/runtime/read_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写工具注册/校验分派或目录相对只读执行；公开平台/库边界有布局断言"
     }
   }
 }

@@ -149,19 +149,34 @@
       "id": "tools.registry.local.v0",
       "sources": [
         "src/runtime/tools.h",
-        "src/runtime/tools.c"
+        "src/runtime/tools.S",
+        "src/runtime/tools_layout.h"
       ],
       "dependencies": [
         "agent.runtime.v0",
         "json-c",
         "system libc"
       ],
-      "role": "bounded immutable registry; declared schema plus required per-tool semantic validation; validation then policy then execution",
+      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute",
       "exports": [
         "pg_tool_registry_init",
         "pg_tool_registry_service"
       ],
       "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/harness/tool.ts",
+            "packages/durable/src/harness/registry.ts",
+            "packages/durable/src/harness/define.ts"
+          ],
+          "semantics": "primary tool resolution/validation/execution and immutable registry reference; native sync registry leaves task scheduling to runtime",
+          "tests_to_read": [
+            "packages/durable/test/harness-tools.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
+          ]
+        },
         {
           "repository": "pi",
           "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
@@ -187,20 +202,34 @@
       "id": "tools.read.posix.local.v0",
       "sources": [
         "src/runtime/read_tool.h",
-        "src/runtime/read_tool.c"
+        "src/runtime/read_tool.S",
+        "src/runtime/read_tool_layout.h"
       ],
       "dependencies": [
         "tools.registry.local.v0",
         "json-c",
         "POSIX directory-relative file APIs"
       ],
-      "role": "caller-selected workspace-root regular UTF-8 file read; no writes, symlinks, dot paths or shell; not a native-code sandbox",
+      "role": "handwritten workspace-root UTF-8 regular-file reader; direct public POSIX/json-c calls with Linux x86-64 ABI assertions; no writes/shell/symlinks/dot paths",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
         "pg_read_tool_definition"
       ],
       "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/tools/read.ts",
+            "packages/durable/src/tools/path-utils.ts"
+          ],
+          "semantics": "primary read capability boundary; native bounded UTF-8 regular-file subset deliberately excludes image/line-range/path variants",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts",
+            "packages/durable/test/tools-read-differential.test.ts"
+          ]
+        },
         {
           "repository": "pi",
           "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
@@ -231,20 +260,22 @@
         "src/client/tui/tui_state.S",
         "src/client/tui/tui_state.h",
         "src/client/tui/tui_runtime_adapter.h",
-        "src/client/tui/runtime_bridge.c",
+        "src/client/tui/runtime_bridge.S",
         "src/client/tui/runtime_bridge.h",
         "src/client/tui/tui_term.S",
-        "src/client/tui/tui_layout.h"
+        "src/client/tui/tui_layout.h",
+        "src/client/tui/runtime_bridge_layout.h"
       ],
       "dependencies": [
         "client.contract.v0",
         "system libc",
         "POSIX termios/poll/signals"
       ],
-      "role": "thin terminal client; bridge borrows pg_client only; no model, session or tool business implementation",
+      "role": "handwritten terminal/input/view/state/app and native client bridge; initial observer attach consumes run_started without submit; termios layout only remains C",
       "exports": [
         "tui_app_run",
-        "pg_tui_bridge_init"
+        "pg_tui_bridge_init",
+        "tui_state_attach"
       ],
       "reference_basis": [
         {

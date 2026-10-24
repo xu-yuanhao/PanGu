@@ -36,6 +36,9 @@ tui_submit_result tui_state_submit(tui_state *s, const char *utf8, size_t byte_l
 int tui_state_cancel(tui_state *s);
 
 /* 推进有限工作量并渲染事件；终态后回到闲置。 */
+/* Observe one initial run_started without submitting an input; 0 idle, 1 attached, -1 error. */
+int tui_state_attach(tui_state *s);
+
 void tui_state_poll(tui_state *s);
 
 /* 查询 helper 为 tui_state.S 的汇编导出（与实现同源，不在头内留第二份）。 */

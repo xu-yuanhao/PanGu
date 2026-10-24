@@ -35,7 +35,7 @@ TUI_ASSERT_SIZE(struct sigaction, TUI_LI_SIGACTION_SIZE);
 /* ---- ABI 探针（文件级手写汇编）----
  * 约定：先保存 fn 与参数到栈槽，再以垃圾值破坏全部 caller-saved 寄存器、
  * 以哨兵装载 callee-saved，最后从栈槽装载参数发起调用；调用后把观测到的
- * callee-saved 值写入 abi_saved[] 由 C 侧核对。7 次压栈保持 16 字节对齐。 */
+ * callee-saved 值写入 abi_saved[] 由 C 侧核对。保存寄存器之外另留32字节参数区，调用点保持16字节对齐。 */
 __asm__(
 ".intel_syntax noprefix\n"
 ".text\n"
@@ -49,7 +49,7 @@ __asm__(
 ".size abi_align_sink, .-abi_align_sink\n"
 ".type abi_probe1,@function\n"   /* unsigned long abi_probe1(fn, a1) */
 "abi_probe1:\n"
-" push rbx\n push r12\n push r13\n push r14\n push r15\n push rax\n push rax\n"
+" push rbx\n push r12\n push r13\n push r14\n push r15\n sub rsp,32\n"
 " mov qword ptr [rsp], rdi\n"
 " mov qword ptr [rsp+8], rsi\n"
 " mov rbx, 0x0B0B0001\n mov r12, 0x0B0B0002\n mov r13, 0x0B0B0003\n"
@@ -64,12 +64,12 @@ __asm__(
 " mov qword ptr [rip+abi_saved+16], r13\n"
 " mov qword ptr [rip+abi_saved+24], r14\n"
 " mov qword ptr [rip+abi_saved+32], r15\n"
-" pop rcx\n pop rcx\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
+" add rsp,32\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
 " ret\n"
 ".size abi_probe1, .-abi_probe1\n"
 ".type abi_probe2,@function\n"   /* unsigned long abi_probe2(fn, a1, a2) */
 "abi_probe2:\n"
-" push rbx\n push r12\n push r13\n push r14\n push r15\n push rax\n push rax\n"
+" push rbx\n push r12\n push r13\n push r14\n push r15\n sub rsp,32\n"
 " mov qword ptr [rsp], rdi\n"
 " mov qword ptr [rsp+8], rsi\n"
 " mov qword ptr [rsp+16], rdx\n"
@@ -86,12 +86,12 @@ __asm__(
 " mov qword ptr [rip+abi_saved+16], r13\n"
 " mov qword ptr [rip+abi_saved+24], r14\n"
 " mov qword ptr [rip+abi_saved+32], r15\n"
-" pop rcx\n pop rcx\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
+" add rsp,32\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
 " ret\n"
 ".size abi_probe2, .-abi_probe2\n"
 ".type abi_probe3,@function\n"   /* unsigned long abi_probe3(fn, a1, a2, a3) */
 "abi_probe3:\n"
-" push rbx\n push r12\n push r13\n push r14\n push r15\n push rax\n push rax\n"
+" push rbx\n push r12\n push r13\n push r14\n push r15\n sub rsp,32\n"
 " mov qword ptr [rsp], rdi\n"
 " mov qword ptr [rsp+8], rsi\n"
 " mov qword ptr [rsp+16], rdx\n"
@@ -110,9 +110,64 @@ __asm__(
 " mov qword ptr [rip+abi_saved+16], r13\n"
 " mov qword ptr [rip+abi_saved+24], r14\n"
 " mov qword ptr [rip+abi_saved+32], r15\n"
-" pop rcx\n pop rcx\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
+" add rsp,32\n pop r15\n pop r14\n pop r13\n pop r12\n pop rbx\n"
 " ret\n"
 ".size abi_probe3, .-abi_probe3\n"
+".type abi_probe_identity,@function\n"
+"abi_probe_identity:\n"
+" xor eax,eax\n"
+" ret\n"
+".type abi_probe_selfcheck,@function\n"
+"abi_probe_selfcheck:\n"
+" push rbp\n"
+" push rbx\n"
+" push r12\n"
+" push r13\n"
+" push r14\n"
+" push r15\n"
+" sub rsp,8\n"
+" mov ebx,1\n"
+" mov r12d,2\n"
+" mov r13d,3\n"
+" mov r14d,4\n"
+" mov r15d,5\n"
+" mov ebp,6\n"
+" lea rdi,[rip+abi_probe_identity]\n"
+" xor esi,esi\n"
+" call abi_probe1\n"
+" lea rdi,[rip+abi_probe_identity]\n"
+" xor esi,esi\n"
+" xor edx,edx\n"
+" call abi_probe2\n"
+" lea rdi,[rip+abi_probe_identity]\n"
+" xor esi,esi\n"
+" xor edx,edx\n"
+" xor ecx,ecx\n"
+" call abi_probe3\n"
+" mov eax,1\n"
+" cmp rbx,1\n"
+" jne 1f\n"
+" cmp r12,2\n"
+" jne 1f\n"
+" cmp r13,3\n"
+" jne 1f\n"
+" cmp r14,4\n"
+" jne 1f\n"
+" cmp r15,5\n"
+" jne 1f\n"
+" cmp rbp,6\n"
+" jne 1f\n"
+" xor eax,eax\n"
+"1:\n"
+" add rsp,8\n"
+" pop r15\n"
+" pop r14\n"
+" pop r13\n"
+" pop r12\n"
+" pop rbx\n"
+" pop rbp\n"
+" ret\n"
+".size abi_probe_selfcheck,.-abi_probe_selfcheck\n"
 ".section .bss\n"
 ".align 8\n"
 "abi_saved:\n"
@@ -128,6 +183,7 @@ typedef unsigned long (*abi_fn3)(unsigned long, unsigned long, unsigned long);
 extern unsigned long abi_probe1(abi_fn1 fn, unsigned long a1);
 extern unsigned long abi_probe2(abi_fn2 fn, unsigned long a1, unsigned long a2);
 extern unsigned long abi_probe3(abi_fn3 fn, unsigned long a1, unsigned long a2, unsigned long a3);
+extern unsigned long abi_probe_selfcheck(void);
 extern void abi_align_sink(void); /* 特殊签名见上 */
 
 static const unsigned long abi_sentinels[5] = {
@@ -424,6 +480,7 @@ static void test_guard_view_text(void)
 
 int main(void)
 {
+	T_CHECK(abi_probe_selfcheck()==0);
 	test_abi_utf8();
 	test_abi_input();
 	test_abi_state();

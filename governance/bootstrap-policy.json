@@ -290,9 +290,7 @@
     "docs/migration/mimo-live-progress.md": "document",
     "tests/runtime/test_mimo_stream.c": "native-test",
     "src/runtime/tools.h": "native-source",
-    "src/runtime/tools.c": "native-source",
     "src/runtime/read_tool.h": "native-source",
-    "src/runtime/read_tool.c": "native-source",
     "tests/runtime/test_tools.c": "native-test",
     "tests/runtime/test_read_tool.c": "native-test",
     "tests/runtime/live_session.c": "native-test",
@@ -510,7 +508,6 @@
     "src/guard-fault-probe/entry.S": "legacy-source",
     "src/guard-fault-probe/main.c": "legacy-source",
     "src/client/tui/runtime_bridge.h": "client-source",
-    "src/client/tui/runtime_bridge.c": "client-source",
     "src/composition/pangu.c": "native-source",
     "tests/client/tui/test_runtime_bridge.c": "client-test",
     "tools/runtime/build_pangu.py": "development-tool",
@@ -544,6 +541,16 @@
     "docs/migration/native-journal-format.md": "document",
     "tests/runtime/live_journal.c": "native-test",
     "tests/runtime/journal_abi.S": "native-test",
-    "tests/runtime/test_agent_resume.c": "native-test"
+    "tests/runtime/test_agent_resume.c": "native-test",
+    "src/client/tui/runtime_bridge.S": "client-source",
+    "src/client/tui/runtime_bridge_layout.h": "client-source",
+    "tests/runtime/runtime_bridge_abi.S": "native-test",
+    "src/runtime/tools.S": "native-source",
+    "src/runtime/tools_layout.h": "native-source",
+    "src/runtime/read_tool.S": "native-source",
+    "src/runtime/read_tool_layout.h": "native-source",
+    "tests/runtime/test_tools_asm.c": "native-test",
+    "tools/runtime/test_tools_asm.py": "development-tool",
+    "docs/migration/tools-assembly-handoff.md": "document"
   }
 }
