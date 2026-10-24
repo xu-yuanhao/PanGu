@@ -1,0 +1,188 @@
+{
+  "schema": "pangu.t14-g04-planner-branch-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_LOCAL_SCOPED_PLANNER_BRANCH_COMPOSITION_NOT_FULL_G04",
+  "scope": "Real discovery/prepare to bounded branch teardown for one scoped four-instance topology; no complete planner corpus or full G04 acceptance.",
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "417579671e3f5edc92b53f9d3530a7d1e8bd1b31",
+    "parent": "78b8b67f7f137d3e3998034363e599bb3a4eacc1",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "cdf760e8f40adbdc7ee687090bf4e68c526ae79988b8c45dbda04df8f984ccff",
+    "candidate_tree_sha256": "35e3f272835cec31245b2c141980ea8ea2d78a73c45f76dfdafdac3fe1ab45c4",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "cdf760e8f40adbdc7ee687090bf4e68c526ae79988b8c45dbda04df8f984ccff"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "71b0ec309d60177550a30535e8164e59559f44cb1e5e64e48a5a12e63ae5540e",
+    "native_candidate_controller_sha256": "74fda4a5ba603435740a09820f21ddc41e659e972bd8e3649e0acb21d47937d8",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "3f36571fc486d7690da82034f2cf31c39137a0138362522946a649e99f616ac9",
+    "ubsan_request_sha256": "d1fc8a868f4828b6b1be9e38a7b0d7c9ec2a7f23178ddbc4352ff48183c6e8d7"
+  },
+  "coverage": {
+    "cases_per_run": 8,
+    "events_per_run": 228,
+    "budget_ticks_per_run": 148,
+    "quantum_values": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "branch_events_verified_across_matrix": 1824,
+    "prior_async_events_per_run": 50,
+    "all_stdout_identical": true,
+    "all_stdout_sha256": "6bbe19278fd204c437f0a64a27df79174de0d15721a5efbd1e172c3f6f097978",
+    "graph_edges": [
+      [
+        1,
+        0
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    "held_public_binding": 0,
+    "cleanup_fault_owner": 3,
+    "cleanup_fault_values": [
+      0,
+      -33
+    ],
+    "zero_budget_snapshots": [
+      "runtime",
+      "owners",
+      "resources",
+      "operations",
+      "disposed"
+    ],
+    "planner_integration_in_this_suite": true,
+    "full_G04": false,
+    "branch_jsonl_matches_prior_fixed_graph_fixture": true,
+    "graph_edges_are_instance_pairs": true
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "prepare",
+      "register_resource",
+      "bind_geometry",
+      "start",
+      "stop",
+      "call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "bc5ed78304ba9d60095378c9266d9735b1e540b9190d4ab22c85ab809a6ee7a8",
+      "executions_json_sha256": "87e27e2d176b7ccc3b6cdc68c746969e3f966da5822957a73d7d2c9b1610ca9d",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "ca99464ba90f404903098826e9301756a7f5f177f6a2d8e23d331f28a39ca59a",
+      "executions_json_sha256": "2c4896c2e94ba3b56891ad37ed3fe66df33a9d5ee83b48336f2a77b72eb13bcd",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording fixed scoped planner-to-lifecycle experiment and continued local work; same-Agent review, no gate/ABI/budget relaxation.",
+    "fixed_candidate_digest": "35e3f272835cec31245b2c141980ea8ea2d78a73c45f76dfdafdac3fe1ab45c4",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "Eight frozen builds/isolated executions PASS;1824 branch events plus prior async events validated.",
+      "All eight branch JSONL byte-equal to prior fixed-graph fixture.",
+      "All eight full stdout digests identical; GitHub source blob matches.",
+      "Current checker/test pins included in frozen controller snapshot.",
+      "G00 PASS; production admission BLOCKED; git diff --check PASS."
+    ],
+    "risks": [
+      "Same-Agent review and oracle are not independent attestation.",
+      "Only one scoped planner topology; no complete Pending/MANY/cycle or async-branch interleaving coverage.",
+      "New input is a dedicated manifest reusing fixed contracts, not an exhaustive existing corpus replay.",
+      "Local checker still not a mandatory full G04 gate.",
+      "T14/G07/external trust/production release incomplete.",
+      "UBSan does not instrument assembly."
+    ],
+    "control_scope_sha256": "afeae62ccf5d098f8cc05efb0bc1f030b92b6a4bf90703f6b1e3c775fb9f98f8",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "6944391776f74710c0083dd9c198c17d34a8e96a96406eae68e4cb3bbc3081fe",
+      "docs/migration/t14-focused-inventory.json": "c821f929907831d9665218b7a4232f6fdd36353d84d59b59a5155065bc3bb007",
+      "docs/migration/t14-owner-boundaries.md": "bb9cc2e1e33d71de19dc8fb0643f028865d258d40829ec7c96ffa9376601aa70",
+      "docs/原生重写路线与迁移TODO.md": "0fbaf4ee2e365113fee32a860fe13bd328eb70b6b42eedd389ac7eec8174b733"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": [],
+  "trace_checker": {
+    "path": "tools/migration/g04_branch_trace.py",
+    "sha256": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+    "external_checker_bytes_match": true,
+    "fixture": "docs/migration/t14-g04-branch-trace-fixture.json",
+    "fixture_sha256": "03dd7ccbddda7a0f185c96d53b12efe20549fdf1835e50ed887e53f77e7f2af5",
+    "self_test_path": "tools/migration/test_g04_branch_trace.py",
+    "self_test_sha256": "d4f292e4d9bfffc87803264fa2f7ec4c52ac2751eefec5afe37eb7b5a7090c52",
+    "self_test_groups": 12,
+    "mandatory_G04_integration": false,
+    "authority": "Same-Agent local invariant oracle, not independent attestation."
+  },
+  "review_adjustments": [],
+  "baseline_checker_extension": {
+    "scope": "Four previously reviewed local trace checker/test files explicitly pinned; all other gate/instruction bytes equal prior coordinator baseline.",
+    "pins": {
+      "tools/migration/g04_async_trace.py": "966ffc19409b7e8979053c728024628cce18c9ff69055574bbb613e1df0203ac",
+      "tools/migration/test_g04_async_trace.py": "241f368d2543b936f64c5899d4ed668eb227ac56ed4092c52a07f845fe9884ff",
+      "tools/migration/g04_branch_trace.py": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+      "tools/migration/test_g04_branch_trace.py": "d4f292e4d9bfffc87803264fa2f7ec4c52ac2751eefec5afe37eb7b5a7090c52"
+    },
+    "authorization": "Previous fixed same-Agent control registration, no gate/budget relaxation."
+  },
+  "planner_contract": {
+    "input": "two child scopes, each one provider and required consumer; agent SINGLE plus optional unbound other",
+    "stages": [
+      "pangu_discover_prepare",
+      "public lifecycle prepare",
+      "bind_geometry",
+      "start",
+      "public call",
+      "bounded stop/finish"
+    ],
+    "verified": [
+      "stage6, order_count4, binding_count2, pending_count0, callback_calls0",
+      "prepared item_count4 edge_count2",
+      "activation owner mapping equals graph output order",
+      "each edge equals resolved requirement consumer/provider owner",
+      "both expected instance pairs present and held binding found"
+    ],
+    "borrowed_plan_lifetime": "plan and lowered view borrowed only through synchronous prepare; runtime stores copied item/edge arrays",
+    "topology_scope": "fixed input only; not full planner graph corpus"
+  }
+}

@@ -537,3 +537,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 反例复验发现旧局部检查器会接受end仍携pending/reason、finish等非推进事件携work，以及未核对end owner等不一致记录。已要求非推进事件报告三元组全零，非cleanup事件owner=-1；independent-drained前必须已有tick-held返回等待，end前必须已有终态tick-drain且owner/runtime快照相同。检查器收紧，原生实现未改。
 
 12组检查器测试及13项G00自测通过；保存的普通/UBSan八份原生输出用新检查器重放，1824事件通过。这是已有输出重新核验，不是新构建或新原生执行。原分支证据保留当时检查器摘要，当前补充证据明确旧反例及收紧后的范围，见 [检查器加固](t14-g04-branch-checker-hardening.json)。尚未将局部检查器接入必需G04，完整T14/G04/G07仍未完成。
+
+## G04 planner到分支生命周期组合（2026-10-24）
+
+将上轮手填生命周期图替换为真实discovery与prepare组合：四实例分别位于两子作用域，每域agent服务SINGLE绑定、一个provider和一个required consumer，另声明可缺失的other需求；复用固定服务/模块/installed契约。pangu_discover_prepare验证stage6、4激活/2真实binding/零Pending/无entry回调；公开prepare复制激活项和停用边，逐边与planner requirement/provider映射核对，通过position表处理实例序号与激活顺序差异，公开call使用找到的真实binding。
+
+普通/UBSan × 双内存实现 × debug/release共8构建运行通过；每次8场景、228分支事件、148次有界推进。1824事件通过当前加固后的检查器，分支JSONL与先前固定图夹具逐字节相同；旧异步50事件及既有计数套件复验。planner临时views只借用到prepare结束，运行时借用自身复制的激活项/边。此组合只覆盖该固定scoped拓扑，不证明所有planner图、Pending/MANY或异步交错完整矩阵；T14/G04/G07仍未完成。见 [planner分支证据](t14-g04-planner-branch-evidence.json)。
