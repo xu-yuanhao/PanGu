@@ -341,5 +341,7 @@
   "earlier_owner_audit_evidence": "docs/migration/t14-earliest-owner-native-evidence.json",
   "earlier_owner_discovery": "docs/migration/t14-earlier-owner-discovery.json",
   "earlier_owner_content_audit": "docs/migration/t14-earlier-owner-content-audit.json",
-  "earlier_owner_runner_audit": "docs/migration/t14-earlier-runner-audit.json"
+  "earlier_owner_runner_audit": "docs/migration/t14-earlier-runner-audit.json",
+  "g04_async_trace_evidence": "docs/migration/t14-g04-async-trace-evidence.json",
+  "full_G04": "NOT_COMPLETED"
 }

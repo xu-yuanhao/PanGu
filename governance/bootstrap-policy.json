@@ -240,6 +240,10 @@
     "docs/migration/t14-earliest-owner-native-evidence.json": "control",
     "docs/migration/t14-earlier-owner-discovery.json": "control",
     "docs/migration/t14-earlier-owner-content-audit.json": "control",
-    "docs/migration/t14-earlier-runner-audit.json": "control"
+    "docs/migration/t14-earlier-runner-audit.json": "control",
+    "docs/migration/t14-g04-async-trace-fixture.json": "control",
+    "tools/migration/g04_async_trace.py": "gate",
+    "tools/migration/test_g04_async_trace.py": "gate-test",
+    "docs/migration/t14-g04-async-trace-evidence.json": "control"
   }
 }
