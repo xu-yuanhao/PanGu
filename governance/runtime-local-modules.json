@@ -1,0 +1,125 @@
+{
+  "scope": "local-core-development; not production certification",
+  "target": "linux-x86_64",
+  "modules": [
+    {
+      "id": "client.contract.v0",
+      "sources": [
+        "src/contracts/client.h"
+      ],
+      "dependencies": [
+        "C stddef.h"
+      ],
+      "role": "borrowed event slices and client actions; internal source interface"
+    },
+    {
+      "id": "agent.runtime.v0",
+      "sources": [
+        "src/runtime/agent.h",
+        "src/runtime/agent.c"
+      ],
+      "dependencies": [
+        "client.contract.v0"
+      ],
+      "role": "bounded multi-run memory session, idle-only system/reset controls, injected model/tools and cooperative loop",
+      "exports": [
+        "pg_agent_init",
+        "pg_agent_client",
+        "pg_agent_set_system",
+        "pg_agent_reset_session"
+      ]
+    },
+    {
+      "id": "model.mimo.local.v0",
+      "sources": [
+        "src/runtime/mimo.c",
+        "src/runtime/mimo.h"
+      ],
+      "dependencies": [
+        "agent.runtime.v0",
+        "libcurl",
+        "json-c",
+        "system libc",
+        "tools.registry.local.v0"
+      ],
+      "role": "replaceable HTTPS SSE provider using cooperative curl multi; bounded incremental text and single tool argument assembly",
+      "exports": [
+        "pg_mimo_model",
+        "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
+        "pg_mimo_bind_tools",
+        "pg_mimo_encode_request (internal projection test seam)"
+      ]
+    },
+    {
+      "id": "tools.registry.local.v0",
+      "sources": [
+        "src/runtime/tools.h",
+        "src/runtime/tools.c"
+      ],
+      "dependencies": [
+        "agent.runtime.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "bounded immutable registry; declared schema plus required per-tool semantic validation; validation then policy then execution",
+      "exports": [
+        "pg_tool_registry_init",
+        "pg_tool_registry_service"
+      ]
+    },
+    {
+      "id": "tools.read.posix.local.v0",
+      "sources": [
+        "src/runtime/read_tool.h",
+        "src/runtime/read_tool.c"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0",
+        "json-c",
+        "POSIX directory-relative file APIs"
+      ],
+      "role": "caller-selected workspace-root regular UTF-8 file read; no writes, symlinks, dot paths or shell; not a native-code sandbox",
+      "exports": [
+        "pg_read_tool_open",
+        "pg_read_tool_close",
+        "pg_read_tool_definition"
+      ]
+    }
+  ],
+  "build": "python3 -B tools/runtime/build_test.py",
+  "product_runtime_dependencies": "loop has only C types; optional hosted MiMo/registry/read modules use registered libcurl/json-c/libc/POSIX",
+  "limits": {
+    "messages": 64,
+    "text_bytes_including_terminator": 4096,
+    "id_bytes_including_terminator": 64,
+    "model_turns_per_run": 16,
+    "registered_tools": 16
+  },
+  "deferred": [
+    "stable plugin ABI",
+    "full Pi content blocks",
+    "multiple tool calls per turn",
+    "asynchronous side-effect tools",
+    "persistent session",
+    "full G01/G02 certification"
+  ],
+  "local_provider_dependencies": [
+    {
+      "name": "libcurl",
+      "version": "8.23.0",
+      "source": "system pkg-config libcurl",
+      "license": "curl license",
+      "purpose": "HTTPS/TLS and cancellable multi transport",
+      "impact": "hosted provider only; transitive TLS/compression/system libraries resolved by system libcurl, not part of dependency-free loop; packaging/size and other platforms not certified"
+    },
+    {
+      "name": "json-c",
+      "version": "0.19",
+      "source": "system pkg-config json-c",
+      "license": "MIT",
+      "purpose": "bounded-response JSON conversion in first live adapter",
+      "impact": "hosted provider only; own native JSON integration deferred; heap allocations in adapter, not loop"
+    }
+  ],
+  "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified"
+}

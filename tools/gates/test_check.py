@@ -26,6 +26,30 @@ class AdmissionTests(unittest.TestCase):
         }
         (self.root / "README.md").write_text("design\n")
 
+    def test_native_source_scope(self):
+        (self.root / "src/runtime").mkdir(parents=True)
+        (self.root / "src/runtime/agent.c").write_text("int example;\n")
+        self.policy["files"]["src/runtime/agent.c"] = "native-source"
+        self.assertEqual(inspect(self.root, self.policy), [])
+        self.policy["files"]["outside.c"] = "native-source"
+        self.assertTrue(any("invalid source scope" in e for e in inspect(self.root, self.policy)))
+
+    def test_native_source_rejects_script(self):
+        self.policy["files"]["src/runtime/hidden.py"] = "native-source"
+        self.assertTrue(any("invalid suffix" in e for e in inspect(self.root, self.policy)))
+
+    def test_legacy_and_client_scopes(self):
+        for name, kind in [("src/arena/arena.S", "legacy-source"), ("src/client/tui/view.c", "client-source"),
+                           ("tests/client/tui/check.h", "client-test"), ("tools/client/tui/build.sh", "client-build"),
+                           (".gitignore", "repository-config")]:
+            path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text("fixture\n")
+            self.policy["files"][name]=kind
+        self.assertEqual(inspect(self.root,self.policy),[])
+        for name,kind in [("src/runtime/hidden.c","legacy-source"),("src/runtime/view.c","client-source"),
+                          ("other-config","repository-config"),("tests/runtime/hidden.h","client-test")]:
+            changed=copy.deepcopy(self.policy);changed["files"][name]=kind
+            self.assertTrue(inspect(self.root,changed), (name,kind))
+
     def test_valid_inventory(self):
         self.assertEqual(inspect(self.root, self.policy), [])
 

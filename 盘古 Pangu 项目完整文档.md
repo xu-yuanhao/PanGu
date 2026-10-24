@@ -1,5 +1,11 @@
 # 盘古 Pangu
 
+## 当前执行决定（2026-10-24）
+
+当前从原生基础实验转入最小 Agent 纵向闭环开发。最终目标仍是 Assembly/C/最少量 C++ 实现、以 Pi 为行为基线、参考 deepseek-harness/Cordis 组合语义、包括基础服务在内可替换的原生 Agent。第一交互入口是 TUI；完整 CLI、GUI、多平台和 JS 插件兼容不进入首个闭环。
+
+按 [迁移 TODO 的近期执行队列](docs/原生重写路线与迁移TODO.md#近期执行队列2026-10-24) 推进。历史证据和未完成项保留，但完整阶段认证、远端权限分离和全平台矩阵不再作为本地核心开发的统一前置条件。产品代码仍须进入明确登记的源码和构建，不能长期藏在测试夹具或项目外实验中。
+
 > Assembly-first, ultra-small, fully plugin-driven AI Agent Runtime.
 
 盘古是一个以汇编语言为核心、追求极致性能、极小体积、极快启动、完全插件化和跨设备运行的通用 AI Agent Runtime。

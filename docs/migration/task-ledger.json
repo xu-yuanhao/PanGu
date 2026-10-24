@@ -2177,5 +2177,13 @@
       "evidence": [],
       "completion_approved": false
     }
-  ]
+  ],
+  "execution_policy": {
+    "effective_date": "2026-10-24",
+    "mode": "local-core-vertical-slice-first",
+    "queue": "docs/原生重写路线与迁移TODO.md#近期执行队列2026-10-24",
+    "dependency_scope": "depends_on records whole-stage acceptance dependencies; local subsets require only directly consumed dependencies and applicable safety checks",
+    "deferred": "whole-stage certification, unrelated host verification and remote release controls do not block local core implementation",
+    "status_integrity": "No task completion or production admission granted by this planning change"
+  }
 }

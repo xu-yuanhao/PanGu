@@ -10,11 +10,15 @@ from pathlib import Path, PurePosixPath
 
 
 POLICY = "governance/bootstrap-policy.json"
-KINDS = {"instructions", "document", "control", "gate", "gate-test"}
+KINDS = {"instructions", "document", "control", "gate", "gate-test", "native-source", "native-test", "development-tool", "legacy-source", "client-source", "client-test", "client-build", "repository-config"}
 # The T09 oracle runner must stay JavaScript: it imports the frozen Pi sources.
 # Only "gate" may use .mjs; documents/controls/tests stay .md/.json/.py.
 SUFFIXES = {"instructions": ".md", "document": ".md", "control": ".json",
-            "gate": (".py", ".mjs"), "gate-test": ".py"}
+            "gate": (".py", ".mjs"), "gate-test": ".py",
+            "native-source": (".c", ".h"), "native-test": ".c",
+            "development-tool": ".py", "legacy-source": (".c", ".h", ".cpp", ".S"),
+            "client-source": (".c", ".h"), "client-test": (".c", ".h"),
+            "client-build": ".sh", "repository-config": ""}
 
 
 def inspect(root, policy):
@@ -39,6 +43,18 @@ def inspect(root, policy):
                 or kind not in KINDS):
             errors.append(f"policy: invalid file registration {name!r}")
             continue
+        roots = {"native-source": ("src/runtime/", "src/contracts/"),
+                 "native-test": ("tests/runtime/",),
+                 "development-tool": ("tools/runtime/",),
+                 "client-source": ("src/client/tui/",),
+                 "client-test": ("tests/client/tui/",),
+                 "client-build": ("tools/client/tui/",)}
+        if kind in roots and not name.startswith(roots[kind]):
+            errors.append(f"policy: invalid source scope for {kind}: {name}")
+        if kind == "repository-config" and name != ".gitignore":
+            errors.append(f"policy: invalid repository config: {name}")
+        if kind == "legacy-source" and (not name.startswith("src/") or name.startswith(("src/runtime/", "src/contracts/", "src/client/"))):
+            errors.append(f"policy: invalid legacy source scope: {name}")
         expected = SUFFIXES[kind]
         if path.suffix not in (expected if isinstance(expected, tuple) else (expected,)):
             errors.append(f"policy: invalid suffix for {kind}: {name}")
@@ -96,7 +112,7 @@ def main():
         print(f"G00 FAIL: {error}")
     if errors:
         return 1
-    print("G00 PASS: design-only inventory admitted")
+    print("G00 PASS: registered inventory admitted (includes scoped local native development)")
     print("Production architecture/build/ABI/performance admission: BLOCKED; candidate probes do not grant admission")
     return 0
 

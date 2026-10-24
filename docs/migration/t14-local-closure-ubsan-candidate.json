@@ -1,0 +1,1312 @@
+{
+  "builds": [
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Local public-ABI adapter/setup regression correctness only; product object/artifact/performance budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "async-setup-core-asm",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "host-fixed-api",
+        "plugin-sdk-api",
+        "lifecycle-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "t14-lifecycle",
+        "t14-test-platform",
+        "focused-test-support",
+        "focused-start",
+        "host-plan",
+        "async-setup-core",
+        "test-guard"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory-alternate",
+        "host.lifecycle": "t14-lifecycle",
+        "host.lifecycle-child": "t14-lifecycle",
+        "host.plan": "host-plan",
+        "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Local public-ABI adapter/setup regression correctness only; product object/artifact/performance budgets remain unbaselined."
+      },
+      "entry": {
+        "module": "focused-start",
+        "symbol": "pangu_focused_start"
+      },
+      "id": "async-setup-core-alternate",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "host-fixed-api",
+        "plugin-sdk-api",
+        "lifecycle-api",
+        "compiler-memory-api",
+        "compiler-memory-alternate",
+        "t14-lifecycle",
+        "t14-test-platform",
+        "focused-test-support",
+        "focused-start",
+        "host-plan",
+        "async-setup-core",
+        "test-guard"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Guard positive fault test; expected SIGSEGV, not success-run or product budget."
+      },
+      "entry": {
+        "module": "guard-fault-probe",
+        "symbol": "pangu_guard_left_start"
+      },
+      "id": "guard-fault-left",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "test-guard",
+        "t14-test-platform",
+        "guard-fault-probe"
+      ],
+      "scope": "test"
+    },
+    {
+      "bindings": {
+        "compiler.memory": "compiler-memory",
+        "platform.memory": "test-guard"
+      },
+      "budgets": {
+        "artifact_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "Guard positive fault test; expected SIGSEGV, not success-run or product budget."
+      },
+      "entry": {
+        "module": "guard-fault-probe",
+        "symbol": "pangu_guard_right_start"
+      },
+      "id": "guard-fault-right",
+      "modes": [
+        "debug",
+        "release"
+      ],
+      "modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "test-guard",
+        "t14-test-platform",
+        "guard-fault-probe"
+      ],
+      "scope": "test"
+    }
+  ],
+  "modules": [
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "T10 record object and ELF bytes; limits remain UNBASELINED pending measurement",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate",
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
+      ],
+      "id": "bootstrap-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "T10: no persistent resources or allocations",
+        "state_owner": "composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no allocator, JSON, Agent Loop, Session, tools, network or UI"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/bootstrap-api/bootstrap.h",
+        "src/bootstrap-api/memory.h",
+        "src/bootstrap-api/io.h",
+        "src/bootstrap-api/arena.h",
+        "src/bootstrap-api/buffer.h",
+        "src/bootstrap-api/region.h",
+        "src/bootstrap-api/text.h",
+        "src/bootstrap-api/json.h",
+        "src/bootstrap-api/schema.h",
+        "src/bootstrap-api/pi-arguments.h",
+        "src/bootstrap-api/host-plan.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "minimal platform exit contract",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/bootstrap-api",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "plugin-sdk-api"
+      ],
+      "exports": [],
+      "files": [
+        "src/t14-abi/client-abi-v1.h",
+        "src/t14-abi/client-entry-v1.h",
+        "src/t14-abi/client-route-v1.h",
+        "src/t14-abi/client-lifecycle-child-v2.h",
+        "src/t14-abi/client-invocation-v1.h",
+        "src/t14-abi/client-invocation-ext2-v2.h",
+        "src/t14-abi/client-plugin-host-v1.h",
+        "src/t14-abi/client-plugin-host2-v2.h"
+      ],
+      "id": "host-fixed-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/client-abi-v1.h",
+        "src/t14-abi/client-entry-v1.h",
+        "src/t14-abi/client-route-v1.h",
+        "src/t14-abi/client-lifecycle-child-v2.h",
+        "src/t14-abi/client-invocation-v1.h",
+        "src/t14-abi/client-invocation-ext2-v2.h",
+        "src/t14-abi/client-plugin-host-v1.h",
+        "src/t14-abi/client-plugin-host2-v2.h"
+      ],
+      "required_modules": [
+        "bootstrap-api",
+        "plugin-sdk-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 host-fixed-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/t14-abi/plugin-sdk.h",
+        "src/t14-abi/plugin-sdk2.h",
+        "src/t14-abi/client-plugin-sdk-v1.h",
+        "src/t14-abi/client-plugin-sdk2-v2.h"
+      ],
+      "id": "plugin-sdk-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/plugin-sdk.h",
+        "src/t14-abi/plugin-sdk2.h",
+        "src/t14-abi/client-plugin-sdk-v1.h",
+        "src/t14-abi/client-plugin-sdk2-v2.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 plugin-sdk-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "exports": [],
+      "files": [
+        "src/t14-abi/lifecycle.h",
+        "src/t14-abi/lifecycle-child.h"
+      ],
+      "id": "lifecycle-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-abi/lifecycle.h",
+        "src/t14-abi/lifecycle-child.h"
+      ],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 lifecycle-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/t14-abi",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "definition-only",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "multiple-consumers"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate",
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "dependencies": [],
+      "exports": [],
+      "files": [
+        "src/compiler-memory-api/memory.h"
+      ],
+      "id": "compiler-memory-api",
+      "languages": [
+        "c-header"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/compiler-memory-api/memory.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 compiler-memory-api candidate boundary",
+      "role": "interface",
+      "scope": "product",
+      "source_root": "src/compiler-memory-api",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "dependencies": [
+        "compiler-memory-api"
+      ],
+      "exports": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ],
+      "files": [
+        "src/compiler-memory/memory.S"
+      ],
+      "id": "compiler-memory",
+      "languages": [
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "compiler-memory-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 compiler-memory candidate boundary",
+      "role": "foundation",
+      "scope": "product",
+      "source_root": "src/compiler-memory",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "compiler-memory-api"
+      ],
+      "exports": [
+        "memcpy",
+        "memmove",
+        "memset"
+      ],
+      "files": [
+        "src/compiler-memory-alternate/alternate.c"
+      ],
+      "id": "compiler-memory-alternate",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "compiler-memory-api"
+      ],
+      "requires": [],
+      "responsibility": "T14 compiler-memory-alternate candidate boundary",
+      "role": "foundation",
+      "scope": "test",
+      "source_root": "src/compiler-memory-alternate",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "compiler-memory-api",
+        "lifecycle-api"
+      ],
+      "exports": [
+        "pangu_lifecycle_query"
+      ],
+      "files": [
+        "src/t14-lifecycle/lifecycle.c",
+        "src/t14-lifecycle/lifecycle-child-private.h"
+      ],
+      "id": "t14-lifecycle",
+      "languages": [
+        "c-header",
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "explicit-reentrancy",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [
+        {
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "service": "host.lifecycle-child",
+          "version": 2
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "lifecycle-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "responsibility": "T14 t14-lifecycle candidate boundary",
+      "role": "host",
+      "scope": "test",
+      "source_root": "src/t14-lifecycle",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate",
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "dependencies": [],
+      "exports": [
+        "probe_write",
+        "probe_exit"
+      ],
+      "files": [
+        "src/t14-test-platform/platform.h",
+        "src/t14-test-platform/platform.S"
+      ],
+      "id": "t14-test-platform",
+      "languages": [
+        "c-header",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/t14-test-platform/platform.h"
+      ],
+      "required_modules": [],
+      "requires": [],
+      "responsibility": "T14 t14-test-platform candidate boundary",
+      "role": "platform",
+      "scope": "test",
+      "source_root": "src/t14-test-platform",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "t14-test-platform",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate"
+      ],
+      "exports": [
+        "memcmp",
+        "printf",
+        "puts",
+        "probe_assert"
+      ],
+      "files": [
+        "src/focused-test-support/assert.h",
+        "src/focused-test-support/string.h",
+        "src/focused-test-support/stdio.h",
+        "src/focused-test-support/support.c"
+      ],
+      "id": "focused-test-support",
+      "languages": [
+        "c-header",
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [
+        "src/focused-test-support/assert.h",
+        "src/focused-test-support/string.h",
+        "src/focused-test-support/stdio.h"
+      ],
+      "required_modules": [
+        "t14-test-platform",
+        "compiler-memory-api"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        }
+      ],
+      "responsibility": "Test-only focused regression: focused-test-support",
+      "role": "foundation",
+      "scope": "test",
+      "source_root": "src/focused-test-support",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "async-setup-core",
+        "t14-test-platform"
+      ],
+      "exports": [
+        "pangu_focused_start"
+      ],
+      "files": [
+        "src/focused-start/start.S"
+      ],
+      "id": "focused-start",
+      "languages": [
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "async-setup-core",
+        "t14-test-platform"
+      ],
+      "requires": [],
+      "responsibility": "Test-only focused regression: focused-start",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/focused-start",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "盘古 Pangu 项目完整文档.md"
+        ],
+        "reason": "required-replacement-point"
+      },
+      "budgets": {
+        "measurement_plan": "fixture only; production budget remains unbaselined",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "exports": [
+        "pangu_discover_prepare"
+      ],
+      "files": [
+        "src/host-plan/host-plan.c"
+      ],
+      "id": "host-plan",
+      "languages": [
+        "c17"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "stateless, caller-owned immutable tables and disjoint scratch/output; runtime failures unpublish views and preserve final arrays; no allocation or callbacks",
+        "state_owner": "caller retains immutable source/schema/value views and owns destination, token/drop workspace, length and reports",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no activation, configuration-schema/permission execution or OS isolation"
+      ],
+      "provides": [
+        {
+          "service": "host.plan",
+          "version": 1
+        }
+      ],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "requires": [],
+      "responsibility": "bounded static native plugin planning: entry/canonical metadata, scopes, required/optional graph and Pending; no execution",
+      "role": "foundation",
+      "scope": "product",
+      "source_root": "src/host-plan",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "host-fixed-api",
+        "plugin-sdk-api",
+        "lifecycle-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "compiler-memory-alternate",
+        "t14-lifecycle",
+        "focused-test-support",
+        "host-plan",
+        "test-guard"
+      ],
+      "exports": [
+        "main",
+        "pangu_abi_guard_frame",
+        "start_abi_bad_rbx",
+        "start_abi_bad_df",
+        "start_abi_bad_stack"
+      ],
+      "files": [
+        "src/async-setup-core/main.c",
+        "src/async-setup-core/plan-fixture.h",
+        "src/async-setup-core/graph-cases.h",
+        "src/async-setup-core/start-abi.S"
+      ],
+      "id": "async-setup-core",
+      "languages": [
+        "c17",
+        "c-header",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "host-fixed-api",
+        "plugin-sdk-api",
+        "lifecycle-api",
+        "compiler-memory-api",
+        "t14-lifecycle",
+        "focused-test-support",
+        "host-plan",
+        "test-guard"
+      ],
+      "requires": [
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "compiler.memory",
+          "version": 1
+        },
+        {
+          "on_missing": "pending",
+          "optional": false,
+          "service": "host.lifecycle",
+          "version": 1
+        },
+        {
+          "service": "host.plan",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "responsibility": "Public-ABI adapter and async setup regression: 675 adapter integration scenarios plus 1,414 async setup scenarios; 106 legacy owner-only holds without a resolved public dependency edge are documented as an intentional API difference.",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/async-setup-core",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    },
+    {
+      "id": "test-guard",
+      "role": "platform",
+      "scope": "test",
+      "files": [
+        "src/test-guard/memory.c",
+        "src/test-guard/syscall.S"
+      ],
+      "public_headers": [],
+      "dependencies": [
+        "bootstrap-api"
+      ],
+      "source_root": "src/test-guard",
+      "responsibility": "test-only one page mapping with inaccessible neighboring pages",
+      "non_responsibilities": [
+        "not a general memory provider; accepts at most 4096 bytes, test only"
+      ],
+      "boundary": {
+        "reason": "required-replacement-point",
+        "evidence": [
+          "docs/migration/t10-admission-package.md"
+        ]
+      },
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "exports": [
+        "pangu_memory_map",
+        "pangu_memory_unmap"
+      ],
+      "targets": [
+        "linux-x86_64"
+      ],
+      "linkage": "static",
+      "compositions": [
+        "async-setup-core-asm",
+        "async-setup-core-alternate",
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "activation_condition": "profile-selected",
+      "lifecycle": {
+        "activate": null,
+        "dispose": null,
+        "state_owner": "caller",
+        "threading": "single-thread",
+        "callbacks": "none",
+        "resource_contract": "fixture owns no persistent resources"
+      },
+      "provides": [
+        {
+          "service": "platform.memory",
+          "version": 1
+        }
+      ],
+      "requires": [],
+      "third_party_dependencies": [],
+      "required_modules": [
+        "bootstrap-api"
+      ],
+      "budgets": {
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        },
+        "measurement_plan": "fixture only; production budget remains unbaselined"
+      }
+    },
+    {
+      "activation_condition": "profile-selected",
+      "boundary": {
+        "evidence": [
+          "docs/migration/t14-owner-boundaries.md"
+        ],
+        "reason": "independent-delivery"
+      },
+      "budgets": {
+        "measurement_plan": "Record static candidate object sizes; product budgets remain unbaselined.",
+        "object_bytes": {
+          "debug": null,
+          "release": null
+        }
+      },
+      "compositions": [
+        "guard-fault-left",
+        "guard-fault-right"
+      ],
+      "dependencies": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "compiler-memory",
+        "test-guard",
+        "t14-test-platform"
+      ],
+      "exports": [
+        "pangu_guard_left_start",
+        "pangu_guard_right_start"
+      ],
+      "files": [
+        "src/guard-fault-probe/main.c",
+        "src/guard-fault-probe/entry.S"
+      ],
+      "id": "guard-fault-probe",
+      "languages": [
+        "c17",
+        "gas"
+      ],
+      "lifecycle": {
+        "activate": null,
+        "callbacks": "none",
+        "dispose": null,
+        "resource_contract": "borrowed descriptor/code lifetime through full owner drain; no hidden allocation",
+        "state_owner": "caller/composition",
+        "threading": "single-thread"
+      },
+      "linkage": "static",
+      "non_responsibilities": [
+        "no Agent Loop, Model, Tool, Session persistence or UI; not a native memory sandbox"
+      ],
+      "provides": [],
+      "public_headers": [],
+      "required_modules": [
+        "bootstrap-api",
+        "compiler-memory-api",
+        "test-guard",
+        "t14-test-platform"
+      ],
+      "requires": [
+        {
+          "service": "platform.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        },
+        {
+          "service": "compiler.memory",
+          "version": 1,
+          "optional": false,
+          "on_missing": "pending"
+        }
+      ],
+      "responsibility": "Test-only left/right guard-page fault positive controls; successful execution is a test failure.",
+      "role": "client",
+      "scope": "test",
+      "source_root": "src/guard-fault-probe",
+      "targets": [
+        "linux-x86_64"
+      ],
+      "third_party_dependencies": []
+    }
+  ],
+  "phase": "CANDIDATE_NOT_APPROVED",
+  "schema": "pangu.native-admission.v1",
+  "service_definitions": [
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.exit",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.memory",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.file",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "platform.clock",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.region",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.buffer",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.text",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.json",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "foundation.schema",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "compat.pi-arguments",
+      "version": 1
+    },
+    {
+      "definition_module": "bootstrap-api",
+      "id": "host.plan",
+      "version": 1
+    },
+    {
+      "definition_module": "compiler-memory-api",
+      "id": "compiler.memory",
+      "version": 1
+    },
+    {
+      "definition_module": "lifecycle-api",
+      "id": "host.lifecycle",
+      "version": 1
+    },
+    {
+      "definition_module": "lifecycle-api",
+      "id": "host.lifecycle-child",
+      "version": 2
+    },
+    {
+      "definition_module": "plugin-sdk-api",
+      "id": "host.plugin-sdk",
+      "version": 2
+    },
+    {
+      "definition_module": "plugin-sdk-api",
+      "id": "host.plugin-sdk1",
+      "version": 1
+    }
+  ],
+  "target": "linux-x86_64",
+  "toolchain": "governance/native-ubsan-trap-toolchain.json"
+}
