@@ -1451,6 +1451,33 @@ static void branch_public_trace(void) {
  }
 }
 
+
+static int composition_case,composition_q,composition_many,composition_ticks,composition_work,composition_max;
+static void composition_event(const char *event,int rc) {
+ printf("{\"case\":%d,\"q\":%d,\"many\":%d,\"event\":\"%s\",\"rc\":%d,\"phase\":%d,\"started\":%d,\"setups\":%d,\"cleanups\":%d,\"ticks\":%d,\"work\":%d,\"max_work\":%d,\"state\":[%d,%d,%d,%d],\"refs\":[%d,%d,%d,%d],\"resources\":[%d,%d,%d,%d]}\n",composition_case,composition_q,composition_many,event,rc,(int)live.phase,(int)live.started,setup_count,cleanup_count,composition_ticks,composition_work,composition_max,(int)owners[0].state,(int)owners[1].state,(int)owners[2].state,(int)owners[3].state,(int)owners[0].inflight,(int)owners[1].inflight,(int)owners[2].inflight,(int)owners[3].inflight,(int)owners[0].count,(int)owners[1].count,(int)owners[2].count,(int)owners[3].count);
+}
+static int composition_stop(void) {
+ pangu_lifecycle_report report;int rc,ticks=0;
+ do {rc=api->stop(&live,(pangu_u64)composition_q,&report);assert(report.work<=(pangu_u64)composition_q);composition_work+=(int)report.work;composition_ticks++;if((int)report.work>composition_max)composition_max=(int)report.work;assert(++ticks<512);}while(report.reason==1);
+ assert(!report.pending||report.reason==2);return rc;
+}
+static void composition_public_trace(void) {
+ for(composition_q=1;composition_q<=4;composition_q++)for(composition_many=0;composition_many<=1;composition_many++) {
+  composition_case++;composition_ticks=composition_work=composition_max=0;pangu_prepare_result plan;
+  if(!composition_many){instances[2].scope=2;assert(!prepare(FUEL,&plan));assert(plan.graph_report.pending_count==1&&plan.graph_report.order_count==3&&plan.graph_report.binding_count==0&&output.states[2]==1);}
+  else {multi_manifest.provisions=provisions;assert(!pangu_discover_prepare(&multi_manifest,source_contracts,4,&installed,&storage,FUEL,&plan));assert(!plan.graph_report.pending_count&&plan.graph_report.order_count==4&&plan.graph_report.binding_count==4);}
+  graph_public_selected=-1;graph_public_error_id=-1;pangu_lifecycle_prepared prepared=graph_public_prepare(&plan,&output);memset(graph_public_disposed,0,sizeof graph_public_disposed);graph_public_graph=(pangu_lifecycle_graph){lifecycle_edges,prepared.edge_count,graph_public_disposed,9};live.items=activation;live.count=prepared.item_count;live.stop_graph=&graph_public_graph;assert(!api->bind_geometry(&live,spans,64,FUEL));pangu_lifecycle_report report;assert(!api->start(&live,FUEL,&report));
+  pangu_lifecycle_call_ticket tickets[2];
+  if(composition_many){pangu_u32 binding[2]={0xffffffffU,0xffffffffU};for(pangu_u32 b=0;b<plan.graph_report.binding_count;b++){pangu_plan_edge edge=output.bindings[b];if(plan.lowered.graph.requirements[edge.requirement].consumer==2){pangu_u32 provider=plan.lowered.graph.provider_owners[edge.provider];assert(provider<2);binding[provider]=b;}}for(int i=0;i<2;i++){assert(binding[i]!=0xffffffffU);assert(!api->call(&live,binding[i],FUEL,&tickets[i],&report));}assert(owners[0].inflight==1&&owners[1].inflight==1&&owners[2].inflight==2);}
+  composition_event("active",0);
+  if(composition_many){assert(composition_stop()==5&&cleanup_count==1&&owners[3].state==4&&owners[0].state==2&&owners[1].state==2);composition_event("waiting",5);assert(!api->call_finish(&live,&tickets[0]));assert(api->call_finish(&live,&tickets[0])==10);assert(composition_stop()==5&&cleanup_count==1&&owners[0].state==2&&owners[1].state==2&&owners[2].inflight==1);composition_event("partial",5);assert(!api->call_finish(&live,&tickets[1]));}
+  assert(!composition_stop());assert(!live.started&&setup_count==(composition_many?4:3)&&cleanup_count==setup_count);
+  for(int i=0;i<4;i++){assert(!owners[i].inflight&&!owners[i].count);assert(owners[i].state==(!composition_many&&i==2?PANGU_OWNER_LOADING:PANGU_OWNER_DISPOSED));}
+  composition_event("final",0);instances[2].scope=1;
+ }
+ assert(composition_case==8);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -1479,6 +1506,6 @@ int main(void) {
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
  async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();early_owner_public_core();
  printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d earlier_owner_groups=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections,early_groups);
- g04_async_trace();branch_public_trace();
+ g04_async_trace();branch_public_trace();composition_public_trace();
  return 0;
 }
