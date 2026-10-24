@@ -1,0 +1,135 @@
+{
+  "schema": "pangu.t14-start-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F17 public bounded startup, cancellation, validation, rollback and async completion port; no production or full T14 acceptance.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/start-test.c",
+    "sha256": "6dbd67cf32d33e244271aa61f5aefc34203abae957539d3c04e2289d98db7103"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "e99a688f94d0ef701316501126d3e7c374dab4d6",
+    "parent": "8552f85f1c2a394e71908c28086b4dc514de49d0",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "3077fc0bd2b05008f6d4c4ec2ac76eaacbf5d0290c2c2af1da8bc6a00a3cecf9",
+    "candidate_tree_sha256": "56c9e797ade426f72db45fb935a4ea644e97b64fba18cff8387f9ac2964b683f",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "3077fc0bd2b05008f6d4c4ec2ac76eaacbf5d0290c2c2af1da8bc6a00a3cecf9"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "0cf58acbc5acf6622114677a4198b9c3498f70d64b06eee529d07396559c2325",
+    "native_candidate_controller_sha256": "5b4b32e2b42f85e80bf9306a679be46ad7428c10ed45107649ef75514dd7b2e5",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "c2818a60943f2979c5a9d4582531691f301cf1199852fbb19e83d51b1c248b58",
+    "ubsan_request_sha256": "b1bbf3ed399aa335926682c933949fe680d96e8a9413103b13931137808a913e"
+  },
+  "coverage": {
+    "start_cases_per_run": 6056,
+    "bounded_ticks_per_run": 103692,
+    "pre_setup_cancellations_per_run": 285,
+    "invalid_before_callbacks_per_run": 114,
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "a54ca1f9e2e063def4c552ee6df48fd15391969e71816264083d47f5bec2f909",
+    "all_stdout_identical": true,
+    "quantum_values": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "historical_tick_count_matches": true
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "prepare",
+      "bind_geometry",
+      "start",
+      "pump",
+      "stop",
+      "register_resource",
+      "register_async",
+      "setup_defer",
+      "setup_finish",
+      "disposer_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "Old separate item/edge builders replaced by public unified prepare. Existing public state frame used to observe pre-callback cancellation positions. No behavior assertion removed."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "8b24762fde07ae08bf60a361a2703cfe42ab114d1011aab383af0fcadc83ec14",
+      "executions_json_sha256": "550abbdb1249c3dfc5dba943b1b791ce52304250f6d7654fbc26fa41f0a7e5b6",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "212e9a759a01b14b52ee19cfa1c4e7572cb6ee1de26db979969a5a02fa4c22d1",
+      "executions_json_sha256": "21356e835b94c70471355270bbf9dfae48bc81ade1402a2f62932eac57737c92",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve F17 public native test evidence and continued local experiments only; same Agent implements and reviews.",
+    "fixed_candidate_digest": "56c9e797ade426f72db45fb935a4ea644e97b64fba18cff8387f9ac2964b683f",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS"
+    ],
+    "risks": [
+      "Same-Agent self-review, not independent approval.",
+      "Public state frame is observed for cancellation timing; no private symbol re-export.",
+      "Fuel bounds host work, not callback wall-clock execution.",
+      "F19, earlier owner audit, full T14/G04/G07 incomplete.",
+      "External trust and production release blocked.",
+      "UBSan does not instrument assembly instructions."
+    ],
+    "control_scope_sha256": "144a4eb66d55cc290e22596bdbf9398b3f4588e660344d64cdaaa49f852a8802",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "95e57b1ca43ee6945ed2f8effa896a0858567c4f1628949a5203d78f5e506a67",
+      "docs/migration/t14-focused-inventory.json": "5b3cbfd951edbad560e847da4ae0f22e1f2293b2ed9f9cfd4aea81636701cb81",
+      "docs/migration/t14-owner-boundaries.md": "122e020f61d67de381e744dc226d36db22c30b099f1655268d6476f4aa57f74f",
+      "docs/原生重写路线与迁移TODO.md": "5b38688d9e1704418de6119e12d9122d388a790330b72ae133a54c446aee2703"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": [
+    "r01: two unused variables rejected by -Werror; removed.",
+    "r02: deliberately invalid owner state not restored in test fixture; restored only after refusal assertions.",
+    "r03: callback replacement loop read unset runtime.count instead of returned prepared.item_count; corrected test fixture.",
+    "r04: diagnostic formatting unsupported by minimal test printf.",
+    "r05: candidate changed during build; controller rejected changed inputs; discarded.",
+    "r06: all scenario assertions reached but unsupported %ld summary caused exit123; changed to range-checked %d.",
+    "Only immutable r07 eight-run matrix is counted as passing evidence."
+  ]
+}

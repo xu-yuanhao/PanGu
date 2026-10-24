@@ -286,8 +286,20 @@
       "id": "T14-F17",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/start-test.c",
       "source_sha256": "6dbd67cf32d33e244271aa61f5aefc34203abae957539d3c04e2289d98db7103",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "继续F19、更早owner语料审计及完整T14/G04/G07。",
+      "suite": "start-budget-public-6056",
+      "evidence": "docs/migration/t14-start-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "3077fc0bd2b05008f6d4c4ec2ac76eaacbf5d0290c2c2af1da8bc6a00a3cecf9",
+      "candidate_commit": "e99a688f94d0ef701316501126d3e7c374dab4d6",
+      "start_cases_per_run": 6056,
+      "bounded_ticks_per_run": 103692,
+      "pre_setup_cancellations_per_run": 285,
+      "invalid_before_callbacks_per_run": 114,
+      "adaptation": "prepare统一产生激活项和边；start/pump/stop、setup_defer/setup_finish、register_async/disposer_finish均使用公开表项。量子1–4、零预算、同步失败、异步取消、代际槽位退休、重入停止、异步清理错误及prefix/graph停止断言保留。"
     },
     {
       "id": "T14-F18",
@@ -311,7 +323,7 @@
       "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
     }
   ],
-  "pending_current_abi_ports": 2,
+  "pending_current_abi_ports": 1,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }
