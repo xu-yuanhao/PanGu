@@ -1,0 +1,188 @@
+{
+  "schema": "pangu.t14-guard-fault-positive-evidence.v1",
+  "status": "PASS_EXPECTED_SIGSEGV_CONTROLS_NOT_FULL_G07",
+  "scope": "Left/right inaccessible neighbor pages of same test provider used in owner storage pressure. Deliberate process fault is required, not an ordinary zero-exit test.",
+  "source_branch": "codex/t14-async-setup-core",
+  "source_commit": "1ade92e422fb8fa524f8d8af89c8f5be81fb6442",
+  "source_pins": {
+    "src/guard-fault-probe/main.c": "e8729d8e147c0fe8a87b0c7358765bf2276545fd21ab6a255f7e14136205f2b9",
+    "src/guard-fault-probe/entry.S": "39ca07d9a36de362d906db4e296fbc02a5bee5963f459a448ec9b2dd7d70f128",
+    "src/test-guard/memory.c": "5d23b965a03579e473fc68a8867607952b20a7e8fd4c89a566c79ee41a2e32f9",
+    "src/test-guard/syscall.S": "3b35f24599fe31d7f75b938046a760dade5f3b2e91ad50a7a7f4bda408b401f6"
+  },
+  "remote_blob_readback": "PASS",
+  "fixed_inputs": {
+    "normal": {
+      "request_sha256": "7ac8c5579ddb253431bf4efcff845d3a314ac6d0d943db99c245a916acd7c212",
+      "registry_sha256": "63ccbcc7dbc60b5b5606cc1647fe0255d45973d61ebc4c30bbb0a0e3cca2dee2",
+      "admission_sha256": "3ef0e7318a09d090500a7d22baf018e9b7a67df1e06306e6c0ab82bd67838721",
+      "execution_sha256": "2dde36db1163fe27212c1c8b9bfacec2b1cd74600794bbd08af9239752f8d79f",
+      "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "candidate_tree_sha256": "94bf0b6571562f4e0d8d60435a4d5ae89a155a32077035d5fd2bd94250d811db"
+    },
+    "ubsan": {
+      "request_sha256": "da1b0a932dbf64464b61b880c4d5a4a560d013646b6b06ba92f4dbfb7370ac2b",
+      "registry_sha256": "97223813eaaaa063a10165eec20a29a7f67d051771b658dbcccbf5d091a9872d",
+      "admission_sha256": "29387e40c64df0bdcb5ec14cfe72db2d425c052814f67ef026270c2343f1240b",
+      "execution_sha256": "95ec44e73df25eca067bf4b66cae3696dee7032de212e1e83518954f1321aa7b",
+      "image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+      "candidate_tree_sha256": "94bf0b6571562f4e0d8d60435a4d5ae89a155a32077035d5fd2bd94250d811db"
+    }
+  },
+  "execution_wrapper_sha256": "249e2adeb80e0e0638fe9a8433a7f384d26d19fbb76ea47e2b68084ae09d2073",
+  "coverage": {
+    "native_builds": 8,
+    "expected_fault_executions": 8,
+    "sides": [
+      "left",
+      "right"
+    ],
+    "optimizations": [
+      "debug",
+      "release"
+    ],
+    "profiles": [
+      "normal",
+      "ubsan"
+    ],
+    "all_raw_exit_codes": 139,
+    "all_ready_markers_match": true,
+    "all_stderr_empty": true,
+    "core_limit": 0,
+    "same_provider_as_owner_pressure": true
+  },
+  "runs": [
+    {
+      "mode": "normal",
+      "build": "guard-fault-left",
+      "optimization": "debug",
+      "side": "left",
+      "elf_sha256": "b49c0f0ae40581e64a6c2e172eeed697c5d68ca2dbbd86a3d0a05bce04d679a6",
+      "returncode": 139,
+      "stdout": "guard-left-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "normal",
+      "build": "guard-fault-left",
+      "optimization": "release",
+      "side": "left",
+      "elf_sha256": "05049081e7ea011daf6aa52d693088c73131c88bd8070711560c26439c342537",
+      "returncode": 139,
+      "stdout": "guard-left-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "normal",
+      "build": "guard-fault-right",
+      "optimization": "debug",
+      "side": "right",
+      "elf_sha256": "85f5c94a98c7abc112e9c7ff7145eff040312c1ffaf9b69e943005ad30976c1c",
+      "returncode": 139,
+      "stdout": "guard-right-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "normal",
+      "build": "guard-fault-right",
+      "optimization": "release",
+      "side": "right",
+      "elf_sha256": "35859eec4ee1737b5d052631caf0f33590527ff65cef13365e69ff3180cce83f",
+      "returncode": 139,
+      "stdout": "guard-right-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "ubsan",
+      "build": "guard-fault-left",
+      "optimization": "debug",
+      "side": "left",
+      "elf_sha256": "a8ece9bbe889f712799e9adafdfc54dd178d2f7d0227ff84317f08f31b001782",
+      "returncode": 139,
+      "stdout": "guard-left-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "ubsan",
+      "build": "guard-fault-left",
+      "optimization": "release",
+      "side": "left",
+      "elf_sha256": "a7298617e84263bf1bd14da5b8f1f80f4f4b8f7958326f6a4f7e318c19c5528a",
+      "returncode": 139,
+      "stdout": "guard-left-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "ubsan",
+      "build": "guard-fault-right",
+      "optimization": "debug",
+      "side": "right",
+      "elf_sha256": "0324ea831f240e17d6c087e30621b3559b431ffec0ae24f28683bf4b90b98229",
+      "returncode": 139,
+      "stdout": "guard-right-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    },
+    {
+      "mode": "ubsan",
+      "build": "guard-fault-right",
+      "optimization": "release",
+      "side": "right",
+      "elf_sha256": "8e51861a38bf15a931caa1bc89a6791762e85ce6fe051fdb69a64aaa3435adbe",
+      "returncode": 139,
+      "stdout": "guard-right-ready\n",
+      "stderr": "",
+      "expected": "SIGSEGV after successful map and accessible endpoint writes",
+      "status": "PASS_EXPECTED_GUARD_FAULT"
+    }
+  ],
+  "prior_stress_evidence": "docs/migration/t14-owner-guard-evidence.json",
+  "development_failures": [
+    "Initial registry listed old modules with no coverage in dedicated fault builds; preflight rejected before build. Reduced registry/source staging to actual six-module graph; unchanged checker rules."
+  ],
+  "limitations": [
+    "Positive controls establish inaccessible neighbors in this fixed Linux x86_64 test environment only.",
+    "Not arbitrary address validity, UAF, leak or race proof.",
+    "UBSan does not instrument assembly.",
+    "Caller-provided isolated execution not server attestation; full G07/T14 and production release incomplete."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve test-only fault client/entries and minimal registry expansion, fixed SIGSEGV evidence; no production/ABI/budget/checker relaxation.",
+    "validation": [
+      "Eight frozen builds admitted; eight copied-ELF executions had exact ready marker plus SIGSEGV139.",
+      "Provider source hashes match prior pressure test.",
+      "Remote source blob hashes match.",
+      "G00 PASS; production admission BLOCKED; git diff --check PASS."
+    ],
+    "risks": [
+      "Expected fault processes terminate without normal unmap; kernel process teardown reclaims their mappings.",
+      "Negative controls are not general memory-safety acceptance.",
+      "Local same-Agent review remains untrusted for production."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "9468bd3b4b14bc0c76de13974b5f1e60f539171eb13e03b3eb90c8a8a8a1292e",
+      "docs/migration/t14-focused-inventory.json": "acb8f5f4666cffba72976ce2f48f648556156f8f9467eeb1fefc59112d4dee33",
+      "docs/migration/t14-owner-boundaries.md": "18c9d27abc3f1159880796e3b7d70c7bef5b6f0628688f8e6238085983372d96",
+      "docs/原生重写路线与迁移TODO.md": "1d3c47907ae8fbf98afc2fcc0f98ee082b54e86ef985fb203dec7001c0d483ab",
+      "docs/migration/t14-guard-fault-normal-candidate.json": "63ccbcc7dbc60b5b5606cc1647fe0255d45973d61ebc4c30bbb0a0e3cca2dee2",
+      "docs/migration/t14-guard-fault-ubsan-candidate.json": "97223813eaaaa063a10165eec20a29a7f67d051771b658dbcccbf5d091a9872d"
+    },
+    "control_scope_sha256": "e576edf37da237b4980c134e70811d4c093d5d754e80880157e8e4d55a564e4b"
+  }
+}

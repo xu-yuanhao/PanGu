@@ -265,6 +265,9 @@
     "docs/migration/t14-resource-observations.json": "control",
     "docs/migration/t14-owner-guard-normal-candidate.json": "control",
     "docs/migration/t14-owner-guard-ubsan-candidate.json": "control",
-    "docs/migration/t14-owner-guard-evidence.json": "control"
+    "docs/migration/t14-owner-guard-evidence.json": "control",
+    "docs/migration/t14-guard-fault-normal-candidate.json": "control",
+    "docs/migration/t14-guard-fault-ubsan-candidate.json": "control",
+    "docs/migration/t14-guard-fault-evidence.json": "control"
   }
 }

@@ -353,5 +353,6 @@
   "resource_observations": "docs/migration/t14-resource-observations.json",
   "resource_budget_status": "UNBASELINED",
   "guarded_owner_pressure_evidence": "docs/migration/t14-owner-guard-evidence.json",
-  "full_G07": "NOT_COMPLETED"
+  "full_G07": "NOT_COMPLETED",
+  "guard_fault_positive_evidence": "docs/migration/t14-guard-fault-evidence.json"
 }
