@@ -1386,6 +1386,46 @@ static void g04_async_trace(void) {
  }
 }
 
+
+typedef struct {
+ pangu_lifecycle_runtime runtime;pangu_owner owner[4];pangu_owned_resource resource[4][1];pangu_owned_operation operation[4][2];
+ pangu_lifecycle_item item[4];pangu_lifecycle_span spans[40];pangu_lifecycle_edge edges[2];pangu_u32 disposed[4];pangu_lifecycle_graph graph;
+ pangu_lifecycle_call_ticket hold;int id,seq,quantum,error,cleaned[4];
+} branch_model;
+static branch_model branch_models[8];
+static void branch_event(branch_model *m,const char *event,int owner,int rc,const pangu_lifecycle_report *r) {
+ assert(m->seq<512);if(r)assert(r->work<=(pangu_u64)m->quantum);
+ printf("{\"case\":%d,\"seq\":%d,\"q\":%d,\"fault\":%d,\"event\":\"%s\",\"owner\":%d,\"rc\":%d,\"phase\":%d,\"started\":%d,\"work\":%d,\"pending\":%d,\"reason\":%d,\"error\":%d,\"state\":[%d,%d,%d,%d],\"refs\":[%d,%d,%d,%d],\"resources\":[%d,%d,%d,%d],\"disposed\":[%d,%d,%d,%d]}\n",m->id,m->seq++,m->quantum,m->error,event,owner,rc,(int)m->runtime.phase,(int)m->runtime.started,r?(int)r->work:0,r?(int)r->pending:0,r?(int)r->reason:0,m->runtime.cleanup_error,
+ (int)m->owner[0].state,(int)m->owner[1].state,(int)m->owner[2].state,(int)m->owner[3].state,(int)m->owner[0].inflight,(int)m->owner[1].inflight,(int)m->owner[2].inflight,(int)m->owner[3].inflight,(int)m->owner[0].count,(int)m->owner[1].count,(int)m->owner[2].count,(int)m->owner[3].count,(int)m->disposed[0],(int)m->disposed[1],(int)m->disposed[2],(int)m->disposed[3]);
+}
+static pangu_i32 branch_release(void *opaque) {
+ pangu_lifecycle_item *item=opaque;branch_model *m=0;int id=-1;
+ for(int c=0;c<8;c++)for(int i=0;i<4;i++)if(item==&branch_models[c].item[i]){m=&branch_models[c];id=i;}
+ assert(m&&id>=0&&!m->cleaned[id]);m->cleaned[id]=1;
+ if(id==1)assert(m->owner[0].state==PANGU_OWNER_ACTIVE);if(id==3)assert(m->owner[2].state==PANGU_OWNER_ACTIVE);
+ branch_event(m,"cleanup",id,id==3?m->error:0,0);return id==3?m->error:0;
+}
+static pangu_i32 branch_setup(pangu_owner *owner,void *opaque) {
+ pangu_lifecycle_item *item=opaque;branch_model *m=0;int id=-1;
+ for(int c=0;c<8;c++)for(int i=0;i<4;i++)if(item==&branch_models[c].item[i]){m=&branch_models[c];id=i;}
+ assert(m&&owner==&m->owner[id]);assert(!api->register_resource(&m->runtime,(pangu_u32)id,branch_release,opaque));return 0;
+}
+static void branch_public_trace(void) {
+ for(int c=0;c<8;c++) {
+  branch_model *m=&branch_models[c];m->id=c+1;m->quantum=c/2+1;m->error=c%2?-33:0;
+  for(int i=0;i<4;i++){assert(!api->owner_init(&m->owner[i],m->resource[i],1,m->operation[i],2,1,FUEL));m->item[i]=(pangu_lifecycle_item){&m->owner[i],branch_setup,&m->item[i]};}
+  m->edges[0]=(pangu_lifecycle_edge){1,0};m->edges[1]=(pangu_lifecycle_edge){3,2};m->graph=(pangu_lifecycle_graph){m->edges,2,m->disposed,4};m->runtime.items=m->item;m->runtime.count=4;m->runtime.stop_graph=&m->graph;
+  assert(!api->bind_geometry(&m->runtime,m->spans,40,FUEL));pangu_lifecycle_report report;assert(!api->start(&m->runtime,FUEL,&report));assert(!api->call(&m->runtime,0,FUEL,&m->hold,&report));branch_event(m,"held",-1,0,0);
+  pangu_lifecycle_runtime before=m->runtime;pangu_owner owners_before[4];memcpy(owners_before,m->owner,sizeof owners_before);pangu_owned_resource resources_before[4][1];memcpy(resources_before,m->resource,sizeof resources_before);pangu_owned_operation ops_before[4][2];memcpy(ops_before,m->operation,sizeof ops_before);pangu_u32 disposed_before[4];memcpy(disposed_before,m->disposed,sizeof disposed_before);
+  assert(api->stop(&m->runtime,0,&report)==2&&!report.work&&!memcmp(&before,&m->runtime,sizeof before)&&!memcmp(owners_before,m->owner,sizeof owners_before)&&!memcmp(resources_before,m->resource,sizeof resources_before)&&!memcmp(ops_before,m->operation,sizeof ops_before)&&!memcmp(disposed_before,m->disposed,sizeof disposed_before));branch_event(m,"zero",-1,2,&report);
+  int rc=0,ticks=0;do{rc=api->stop(&m->runtime,(pangu_u64)m->quantum,&report);assert(rc==2||rc==5);branch_event(m,"tick-held",-1,rc,&report);assert(++ticks<256);}while(report.reason==1);
+  assert(rc==5&&m->disposed[2]&&m->disposed[3]&&!m->disposed[0]&&!m->disposed[1]&&m->owner[0].state==PANGU_OWNER_ACTIVE&&m->owner[1].state==PANGU_OWNER_QUIESCING);branch_event(m,"independent-drained",-1,5,0);
+  assert(!api->call_finish(&m->runtime,&m->hold));branch_event(m,"finish",-1,0,0);assert(api->call_finish(&m->runtime,&m->hold)==10);branch_event(m,"duplicate",-1,10,0);
+  ticks=0;do{rc=api->stop(&m->runtime,(pangu_u64)m->quantum,&report);branch_event(m,"tick-drain",-1,rc,&report);assert(++ticks<256);}while(report.pending);
+  assert(rc==m->error&&!m->runtime.started);for(int i=0;i<4;i++)assert(m->cleaned[i]&&m->disposed[i]&&m->owner[i].state==PANGU_OWNER_DISPOSED&&!m->owner[i].inflight&&!m->owner[i].count);branch_event(m,"end",-1,rc,0);
+ }
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -1414,6 +1454,6 @@ int main(void) {
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
  async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();early_owner_public_core();
  printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d earlier_owner_groups=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections,early_groups);
- g04_async_trace();
+ g04_async_trace();branch_public_trace();
  return 0;
 }
