@@ -1,0 +1,189 @@
+{
+  "schema": "pangu.t14-owner-guard-evidence.v1",
+  "status": "PASS_LOCAL_GUARDED_STORAGE_STRESS_NOT_FULL_G07",
+  "scope": "Test-only platform.memory guard binding and caller-owned lifecycle metadata page-edge/redzone stress. No production module/ABI/budget/gate relaxation.",
+  "candidate": {
+    "branch": "codex/t14-async-setup-core",
+    "commit": "ffb9f98266d64eb5a2aedcf9727dbb4b4f44bf2d",
+    "parent": "36418a881a412b9e5512f9bed09cdea68b78fae9",
+    "source_pins": {
+      "async-setup-core/main.c": "f3660086aafce6e668d517e244d7d072a68a89404b7780793956dcf4e2ed1eea",
+      "test-guard/memory.c": "5d23b965a03579e473fc68a8867607952b20a7e8fd4c89a566c79ee41a2e32f9",
+      "test-guard/syscall.S": "3b35f24599fe31d7f75b938046a760dade5f3b2e91ad50a7a7f4bda408b401f6"
+    },
+    "remote_blob_readback": "PASS",
+    "candidate_tree_sha256": "566bcbed0bf6415614e986798fe600320b08da0fc61ab467e4f8835b03c6e270",
+    "controller_sha256": "d3d42550e33ca67ad10b42a71198bcd0071eb5028c49c913070d2e1f53d7cff8",
+    "policy_sha256": "17e0f8da333dbfcfde2d59243dd34f8319e43f536ac8677f34cab41297e0c855"
+  },
+  "fixed_inputs": {
+    "normal": {
+      "request_sha256": "fc004090423def2e119d072560acd5c7474b642855e3b30f1b866883df9ac97f",
+      "registry_sha256": "36296d70b9d08817340c65f6b9f168743686867a9cb91c635c41166653869cc3",
+      "image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+      "admission_sha256": "36c34220e5d5c803ac8bd09a56643f51d25429181b95eb86225370214f159908",
+      "final_executions_sha256": "15a8270bd323625f7862900f212a710ebaf12e6c08adffa0e5d4ae0ad4d44d35"
+    },
+    "ubsan": {
+      "request_sha256": "f68a2b274312bb0ca6f9f41ab29ec4b7d6089b43dcc7c26a6f518d1da60b06f4",
+      "registry_sha256": "fe005532f32e73d27432ef6de8f255fc7aaf04dbf438d31e98e4bca6937a2438",
+      "image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+      "admission_sha256": "acd4d35725e4c6e451f741b856a1ddffa2abbfe3600eafdbcc3ff36535a23450",
+      "final_executions_sha256": "96369a7465342fb7f94b8a1fe8a1009fb958dd01615301628f9f9b4d1c3e8a22"
+    }
+  },
+  "coverage": {
+    "cases_per_execution": 256,
+    "canary_scans_per_execution": 2048,
+    "maps_per_execution": 8,
+    "unmaps_per_execution": 8,
+    "placement": [
+      "page-start",
+      "page-end"
+    ],
+    "payload_bytes": [
+      192,
+      104,
+      48,
+      24
+    ],
+    "epoch_values_per_placement": [
+      1,
+      128
+    ],
+    "behaviors": [
+      "sync success",
+      "failed start -7 and cleanup -9",
+      "async setup stop/late finish/duplicate refusal"
+    ],
+    "final_native_builds": 8,
+    "initial_native_executions": 8,
+    "final_controller_bundle_reexecutions": 8,
+    "final_pressure_cases_total": 2048,
+    "final_canary_scans_total": 16384,
+    "full_G07": false,
+    "fresh_guard_fault_positive_controls": "NOT_RUN"
+  },
+  "runs": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "a32a67168d7502ff9214180718d2e13d9849f3f799e8de5cb0986da5aaa7dcf2",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "57542386f049404916c4628253f8d1057727571f820a9b302df1d62612c4ffcf",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "4c38322f78fe56cec197af7e71eac2b8c8f43337892b217d256bf9cbab0b5a0d",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "b14eb1427fcca71a4c382b6c1732a8f17389057ef09bc5f57302a06844cb00b6",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "7b41e42eea40ed0ca516d13b9968298ab97dfbc7581e8ae6a7dbfa7ba4d5b996",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "1ef07babdfc485f50d0b884795746a9c389fbd59de6fa8416fb7fc8d90c32cd3",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "7c65b0d905cb4ad6fe4fced51845044338e8aeb7fc4052f2e83dfcde394e5e6f",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "c03f2caeae7b122b036cc4690f324d0c597d63c50b569051984a838abc25146e",
+      "stdout_sha256": "c709ace5b34e8fe0f1edd1558d27be42a316a7cf09d87bf9481f5b544565ebe2",
+      "guard_pressure": "PASS_256_CASES_2048_CANARY_CHECKS",
+      "bundle": "PASS_LOCAL_BUNDLE"
+    }
+  ],
+  "provider_reuse": {
+    "original_directory": "/home/xu-yuanhao/Documents/PanGu-artifacts/t11-git-u1dm6maa/src/test-guard",
+    "provider_bytes_identical": true,
+    "role": "platform",
+    "scope": "test",
+    "service": "platform.memory v1",
+    "required_by": "async-setup-core test client; guard-specific registry only"
+  },
+  "local_control_review_sha256": "b4df119d46357a6e625d42d424c2fe2ea328ecb3a9403862ddb6336c35131e54",
+  "final_execution_wrapper_sha256": "e145f3909b4521c6b50e7287ec98b141c131b635713555a07ab48d12d7370877",
+  "development_failures": [
+    "r01 ordinary guard matrix passed; UBSan build rejected unresolved _GLOBAL_OFFSET_TABLE_ from PAL function-pointer addresses. Added hidden declarations for static test composition matching already-hidden definitions; final r02 normal and UBSan rebuilt."
+  ],
+  "validation": [
+    "Eight final native builds PASS.",
+    "Eight final isolated executions PASS with frozen-controller G04 bundle plus exact guard summary.",
+    "All final stdout byte-identical; remote source blobs match.",
+    "Provider source exactly equals reused T11 provider.",
+    "G00 PASS; production admission BLOCKED; git diff --check PASS."
+  ],
+  "limitations": [
+    "Fresh left/right SIGSEGV positive controls for this composition still pending; old T11 proof not counted as this run.",
+    "Guard pages only cover chosen adjacent pages; canaries cover accessible region outside four payloads.",
+    "No general native-pointer sandbox, UAF/leak proof or race safety claim.",
+    "UBSan does not instrument assembly; single-thread protocol only.",
+    "Caller-provided isolated execution not server-side attestation; release/production blocked."
+  ],
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve test-only guard module/requirement/binding registration and fixed local stress evidence. Core implementation, ABI, budgets, checker rules unchanged.",
+    "risks": [
+      "Guard registry extends test composition; old profiles require their own pinned source.",
+      "Pressure is bounded fixed corpus, not full G07 acceptance.",
+      "New fault positive controls remain required."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "02649badfb4dadc56009df0864d97ceb4bb7a5c74e9aa03b628262963e4dc638",
+      "docs/migration/t14-focused-inventory.json": "5d8f2103f5cec38b6b9c90b89676f67f7c8b85e91799197de52aa8644374f226",
+      "docs/migration/t14-owner-boundaries.md": "2892082d29e28db6d01f3cf093fc293cd15c45844f44e8be841f3ee1451e1d83",
+      "docs/原生重写路线与迁移TODO.md": "6106bb17c18b4adda40d45b195b5770cd4256b77f68fa43165ea49673900d729",
+      "docs/migration/t14-owner-guard-normal-candidate.json": "36296d70b9d08817340c65f6b9f168743686867a9cb91c635c41166653869cc3",
+      "docs/migration/t14-owner-guard-ubsan-candidate.json": "fe005532f32e73d27432ef6de8f255fc7aaf04dbf438d31e98e4bca6937a2438"
+    },
+    "control_scope_sha256": "bded11200a57db2889d1408dda428cc00701d1a75d8c1919d229af9eedc83797"
+  },
+  "local_control_review_scope": "Initial r01 source review retained for history; final self_review and final source pins below supersede it for hidden-declaration correction."
+}

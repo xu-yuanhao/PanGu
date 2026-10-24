@@ -569,3 +569,11 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 /proc直接采样/probe的VmRSS与VmHWM，约5ms间隔，记录有效样本数和三个重复测量的范围；观测峰值可能漏掉短峰或最后时刻。wait4的launch-chain maxrss包含启动时继承的父Python内存，单独标注，不作为原生runtime RSS。wall/user/system是整个回归套件，含bwrap/输出/采样开销，不能解释为冷启动或Agent性能。首轮因原产物无执行位而拒绝启动，改为校验后只给副本执行位；第二轮的父进程RSS污染也明确保留为失败方法，不用于runtime判断。
 
 [资源观察](t14-resource-observations.json)包含原始24次数据、解析/交叉核对、脚本源码摘要与复现源。状态MEASURED_UNBASELINED：没有批准绝对/相对预算，不通过G10；这些观察不证明越界/UAF/泄漏/竞态安全，G07仍需生命周期存储guard/哨兵、适用sanitizer及压力证据，完整T14/G04/G07不关闭。
+
+## T14保护边界存储与重用压力（2026-10-24）
+
+新增专用owner-guard普通/UBSan测试registry，绑定platform.memory到原T11 test-guard提供者，其memory.c/syscall.S字节不变。该提供者映射三页，仅交付中间可读写页，邻页mprotect为不可访问。分别将runtime192、owner104、两资源槽48、三operation槽24字节放在中间页首/页尾，payload外可访问区域填0xa5；每次初始化后和完整停止后逐字节核对哨兵。两种边界各128个递增epoch，交替同步成功、加载-7/清理-9、异步setup取消迟到完成，共256场景/2048次哨兵检查，8次map/unmap全部清空mapping结果。
+
+最终8个普通/UBSan构建通过，初次8运行后再用本次固定controller里的G04 bundle重新隔离执行8组合；最终每次压力汇总准确且旧四套件通过。首次UBSan因测试组合对PAL函数取地址生成GOT引用被拒绝，补显式hidden声明与提供者已有可见性一致后重构建，未新增符号/重定位豁免。测试main的新源码需使用guard专用registry，旧组合保留各自旧commit/冻结快照。
+
+[guard证据](t14-owner-guard-evidence.json)固定模块扩展、源码/构建/执行摘要和同一Agent自审。此组合尚未做新的左/右故障正对照（原T11曾有，但不冒称本次已跑），未证明所有越界/UAF/泄漏/并发安全；完整G07/T14及生产准入仍未通过。

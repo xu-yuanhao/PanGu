@@ -376,6 +376,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] G04公开call与双分支异步清理完成交错：ABC/ACB/BAC三种合法顺序 × 量子1–4共12场景/72阶段快照，首个清理错误/提供者保活/一次性begin及重复完成拒绝；8个普通/UBSan构建运行、检查器7组自测通过。不是所有异步故障空间，见 [证据](migration/t14-g04-interleave-evidence.json)。
 - [x] G04局部统一检查入口：四必需套件/374条记录及固定回归摘要完整核验，缺失/调序/额外日志失败关闭；6组自测通过，新包装器对原冻结二进制8次隔离重执行共2992记录通过。无新编译，尚不代表生产/远端必需G04，见 [证据](migration/t14-g04-bundle-evidence.json)。
 - [x] T14测试产物资源观察：8产物×3重复共24次隔离执行，bundle8976记录通过；ELF/生命周期对象节大小与8项readelf交叉核对、直接/proc RSS/HWM采样。仅MEASURED_UNBASELINED，无预算批准或G07/G10通过，见 [观察](migration/t14-resource-observations.json)。
+- [x] T14 guard存储压力：runtime/owner/资源池/operation池页首与页尾，256场景/2048哨兵检查，成功/双错误/取消与128 epoch重用、8映射释放；8普通/UBSan构建及最终8次controller-bundle隔离执行通过。新故障正对照与完整G07仍待完成，见 [证据](migration/t14-owner-guard-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

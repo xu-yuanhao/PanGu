@@ -351,5 +351,7 @@
   "g04_interleave_evidence": "docs/migration/t14-g04-interleave-evidence.json",
   "g04_local_bundle_evidence": "docs/migration/t14-g04-bundle-evidence.json",
   "resource_observations": "docs/migration/t14-resource-observations.json",
-  "resource_budget_status": "UNBASELINED"
+  "resource_budget_status": "UNBASELINED",
+  "guarded_owner_pressure_evidence": "docs/migration/t14-owner-guard-evidence.json",
+  "full_G07": "NOT_COMPLETED"
 }

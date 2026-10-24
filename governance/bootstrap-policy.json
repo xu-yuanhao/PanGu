@@ -262,6 +262,9 @@
     "tools/migration/g04_bundle.py": "gate",
     "tools/migration/test_g04_bundle.py": "gate-test",
     "docs/migration/t14-g04-bundle-evidence.json": "control",
-    "docs/migration/t14-resource-observations.json": "control"
+    "docs/migration/t14-resource-observations.json": "control",
+    "docs/migration/t14-owner-guard-normal-candidate.json": "control",
+    "docs/migration/t14-owner-guard-ubsan-candidate.json": "control",
+    "docs/migration/t14-owner-guard-evidence.json": "control"
   }
 }
