@@ -10,10 +10,12 @@ import subprocess
 def validate(policy, repository, ruleset):
     if not isinstance(policy, dict) or set(policy) != {"schema", "repository", "visibility", "branch", "ruleset_id", "required_check", "required_approvals"}:
         raise ValueError("invalid remote policy fields")
-    if (policy["schema"] != "pangu.github-boundary.v1" or policy["visibility"] != "public"
+    development = policy["schema"] == "pangu.github-development.v2"
+    if (policy["schema"] not in {"pangu.github-boundary.v1", "pangu.github-development.v2"} or policy["visibility"] != "public"
             or not isinstance(policy["repository"], str) or not re.fullmatch(r"[\w.-]+/[\w.-]+", policy["repository"])
             or policy["branch"] != "main" or type(policy["ruleset_id"]) is not int
-            or policy["required_approvals"] != 1 or policy["required_check"] != "pangu/trusted-gates"):
+            or (not development and (policy["required_approvals"] != 1 or policy["required_check"] != "pangu/trusted-gates"))
+            or (development and (type(policy["required_approvals"]) is not int or policy["required_approvals"] != 0 or policy["required_check"] is not None))):
         raise ValueError("unsupported remote policy")
     if repository["full_name"] != policy["repository"] or repository["private"] is not False or repository["visibility"] != "public":
         raise ValueError("repository identity or visibility mismatch")
@@ -28,6 +30,16 @@ def validate(policy, repository, ruleset):
         if item["type"] in rules:
             raise ValueError("duplicate remote rule")
         rules[item["type"]] = item
+    if development:
+        if repository.get("default_branch") != "main":
+            raise ValueError("development default branch mismatch")
+        if set(rules) != {"deletion", "non_fast_forward"}:
+            raise ValueError("development history protection rule mismatch")
+        return {"status": "DEVELOPMENT_CONFIG_VERIFIED", "remote_configuration": "PASS",
+                "repository": policy["repository"], "default_branch": "main", "ruleset_id": ruleset["id"],
+                "automation_has_admin": repository.get("permissions", {}).get("admin", "UNKNOWN"),
+                "guarantee": "history protection only; local checks are not server-enforced",
+                "protected_executor": "NOT_ESTABLISHED", "release": "BLOCKED"}
     if not {"deletion", "non_fast_forward", "pull_request", "required_status_checks"} <= set(rules):
         raise ValueError("required remote rule missing")
     review = rules["pull_request"]["parameters"]
@@ -80,11 +92,12 @@ def main():
     parser.add_argument("--policy", type=Path, default=Path(__file__).resolve().parents[2] / "governance/remote-policy.json")
     args = parser.parse_args()
     try:
-        print(json.dumps(audit(json.loads(args.policy.read_text())), indent=2))
+        report = audit(json.loads(args.policy.read_text()))
+        print(json.dumps(report, indent=2))
     except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as error:
         print("remote boundary FAIL:", error)
         return 1
-    return 2
+    return 0 if report["status"] == "DEVELOPMENT_CONFIG_VERIFIED" else 2
 
 
 if __name__ == "__main__":

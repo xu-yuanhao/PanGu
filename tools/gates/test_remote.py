@@ -17,6 +17,27 @@ class RemoteBoundaryTests(unittest.TestCase):
                             {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": True,
                                 "do_not_enforce_on_create": False, "required_status_checks": [{"context": "pangu/trusted-gates"}]}}]}
 
+    def development(self):
+        self.policy.update(schema="pangu.github-development.v2", required_check=None, required_approvals=0)
+        self.ruleset["rules"] = self.ruleset["rules"][:2]
+
+    def test_explicit_development_profile(self):
+        self.development()
+        report=validate(self.policy,self.repo,self.ruleset)
+        self.assertEqual(report["status"],"DEVELOPMENT_CONFIG_VERIFIED")
+        self.assertEqual(report["release"],"BLOCKED")
+
+    def test_development_still_requires_history_protection(self):
+        self.development()
+        self.ruleset["rules"].pop()
+        with self.assertRaisesRegex(ValueError,"history protection"):
+            validate(self.policy,self.repo,self.ruleset)
+
+    def test_development_requires_default_main(self):
+        self.development();self.repo["default_branch"]="old"
+        with self.assertRaisesRegex(ValueError,"default branch"):
+            validate(self.policy,self.repo,self.ruleset)
+
     def test_active_rules_are_not_privilege_separation(self):
         report = validate(self.policy, self.repo, self.ruleset)
         self.assertEqual(report["remote_configuration"], "PASS")
