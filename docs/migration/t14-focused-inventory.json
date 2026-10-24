@@ -319,11 +319,23 @@
       "id": "T14-F19",
       "source": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/transaction-test.c",
       "source_sha256": "d08c01d9bce4b8b0c06f9cc2e42c372a348402529d62e2fe68d8ecb745fe6463",
-      "status": "NOT_RUN_CURRENT_ABI",
-      "next_action": "通过现有公开ABI重表达旧私有helper场景，逐条保留断言的约束或记录有意差异；不得为通过用例重新导出私有helper，也不得把仅包含/编译的旧入口计作执行。"
+      "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+      "next_action": "最新快照入口迁移完成；继续更早standalone owner语料审计、对应ABI守卫和完整G04/G07，不据此关闭T14。",
+      "suite": "transaction-public-98",
+      "evidence": "docs/migration/t14-transaction-native-evidence.json",
+      "normal_runs": 4,
+      "ubsan_runs": 4,
+      "candidate_source": "src/async-setup-core/main.c",
+      "candidate_source_sha256": "f7bd7bd6e5be9ca2d658f4f83e4bffdc0e8767d3b159fadae1b78470e4e826e0",
+      "candidate_commit": "21f35ed53ec61239573fcca586960f9dca13bed2",
+      "transactions_per_run": 98,
+      "refused_plans_per_run": 145,
+      "alias_rejections_per_run": 6432,
+      "quota_rejections_per_run": 12127,
+      "adaptation": "旧runtime_prepare_lifecycle经公开prepare执行；保留输入快照、输出毒值、容量溢出/错位/跨区重叠及全部不足fuel断言，成功结果通过公开bind_geometry/start/stop验证。"
     }
   ],
-  "pending_current_abi_ports": 1,
+  "pending_current_abi_ports": 0,
   "earlier_standalone_owner_corpus_audit": "PENDING",
   "full_T14": "NOT_COMPLETED"
 }

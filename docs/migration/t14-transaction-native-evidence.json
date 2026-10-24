@@ -1,0 +1,117 @@
+{
+  "schema": "pangu.t14-transaction-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "T14-F19 public unified prepare transactional rejection and successful lifecycle execution; no full T14 or production admission.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-sdk2-wip-lyaw4e3h/transaction-test.c",
+    "sha256": "d08c01d9bce4b8b0c06f9cc2e42c372a348402529d62e2fe68d8ecb745fe6463"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "21f35ed53ec61239573fcca586960f9dca13bed2",
+    "parent": "e99a688f94d0ef701316501126d3e7c374dab4d6",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "f7bd7bd6e5be9ca2d658f4f83e4bffdc0e8767d3b159fadae1b78470e4e826e0",
+    "candidate_tree_sha256": "68c350595adec9762d9546e965b0ad4eb94062364c60109e5f7b9dc292c27a53",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "f7bd7bd6e5be9ca2d658f4f83e4bffdc0e8767d3b159fadae1b78470e4e826e0"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "95e57b1ca43ee6945ed2f8effa896a0858567c4f1628949a5203d78f5e506a67",
+    "native_candidate_controller_sha256": "0f8e16bfaeee2438e91a66fdbfb327aff0926bf686472804535753150e106799",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "8f3af346524f32a0fa0bbb78c45592f5a142a05b91553ae2a5793ebd7d2c79cd",
+    "ubsan_request_sha256": "808a2502d9b441bd97536ff431824364765774faf77befb4b87a537a408eaba5"
+  },
+  "coverage": {
+    "transactions_per_run": 98,
+    "refused_plans_per_run": 145,
+    "alias_rejections_per_run": 6432,
+    "quota_rejections_per_run": 12127,
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_sha256": "913a13dc4c424b97fdbc8ebee979aa6b5f5f2c5e80874c729ba841d05cd402e4",
+    "all_stdout_identical": true,
+    "historical_counts_match": true,
+    "input_snapshots": "plan/registry/graph views, storage, source items, eligible owner/resource/operation pools",
+    "rejected_output_sentinels": "activation items, edge array and result info remain 0xa5; successful unused tails remain 0xa5"
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "prepare",
+      "bind_geometry",
+      "start",
+      "stop",
+      "register_resource"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "Private unified prepare entry replaced by current public prepare; callbacks use public runtime resource registration. All historical transaction assertions preserved."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "6f84c52a6997f4b15be5195c7011442a1b8895f550ce7ef706179e74d5262fd1",
+      "executions_json_sha256": "35726a9ef17e0159f60803356e7fbc751903b7b02bdf570e6c36499e2bdd7e0b",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "5291baf95d5da57a1f58758bb73f6d300fc8dc449fc81308e7872e06c5a41c60",
+      "executions_json_sha256": "be91e1d4e67f69a6cdb9411349d2e1e2557218d7244fbb3e774b7134a0d8621f",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording F19 native public transaction evidence and continued local experiments only; same-Agent self-review.",
+    "fixed_candidate_digest": "68c350595adec9762d9546e965b0ad4eb94062364c60109e5f7b9dc292c27a53",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS"
+    ],
+    "risks": [
+      "Same-Agent review, not independent approval.",
+      "Snapshot inventory completion is limited to 19 entries; F12 link-only, SDKs previously verified.",
+      "Earlier standalone owner audit, full G04/G07 and T14 remain incomplete.",
+      "External trust/production/release blocked.",
+      "UBSan does not instrument assembly instructions."
+    ],
+    "control_scope_sha256": "788ea36a8d47553cfba911132d6f5ac734688ab794cfe663ee510a3e8c3831ae",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "93fa66b7062bf99a2a38be13460e80d96a3993a4be0b4809f058d0a96d47f573",
+      "docs/migration/t14-focused-inventory.json": "8a9819d002a25745a4789a7c8faaf54c598910211ca0346f0b8068a1c06413c9",
+      "docs/migration/t14-owner-boundaries.md": "99f97bf0db33d966cdd3118f4a5f33b555fb39485d20deb547fc754ca277ddb8",
+      "docs/原生重写路线与迁移TODO.md": "4848fb39605fb21abd5cd03e535dfa3328e617db91f7da4d1e817ee47f5a3395"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": []
+}

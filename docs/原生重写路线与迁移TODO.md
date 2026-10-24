@@ -364,6 +364,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 旧 `geometry-test.c` 当前公开 ABI 几何专项：98个计划、600轮protected-span矩阵、143,961次拒绝验证；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。standalone owner私有函数无公开等价入口；fuel不足时bind_geometry只保证runtime未提交，span scratch可能已有中间写入，差异与实现契约均记录，F08按API适配通过，完整T14/G04/G07仍待完成，见 [F08证据](migration/t14-geometry-native-evidence.json)。
 - [x] 旧 `graph-test.c` 当前公开 ABI 图停止专项：98个边构建计划、516个停止场景；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。覆盖独立分支、祖先保活、异步setup/cleanup和错误传播；292个无公开依赖边的旧私有owner hold明确跳过，完整T14/G04/G07仍待完成，见 [F09证据](migration/t14-graph-native-evidence.json)。
 - [x] 旧 `start-test.c` 当前公开 ABI 启动预算专项：6056个场景、103692次有界推进、285次setup前取消、114次回调前拒绝；量子1–4，普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。保留同步/异步失败取消、槽退休、重入停止与graph/prefix断言，完整T14/G04/G07待完成，见 [F17证据](migration/t14-start-native-evidence.json)。
+- [x] 旧 `transaction-test.c` 当前公开 ABI 准备事务专项：98次成功事务、145个失败计划、6432次别名拒绝、12127次不足预算拒绝；输入快照/输出毒值与尾部边界验证，普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。最新快照入口迁移无剩余，但更早owner审计及完整T14/G04/G07未完成，见 [F19证据](migration/t14-transaction-native-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 
