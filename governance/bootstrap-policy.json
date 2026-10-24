@@ -261,6 +261,7 @@
     "docs/migration/t14-g04-interleave-evidence.json": "control",
     "tools/migration/g04_bundle.py": "gate",
     "tools/migration/test_g04_bundle.py": "gate-test",
-    "docs/migration/t14-g04-bundle-evidence.json": "control"
+    "docs/migration/t14-g04-bundle-evidence.json": "control",
+    "docs/migration/t14-resource-observations.json": "control"
   }
 }

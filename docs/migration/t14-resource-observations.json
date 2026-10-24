@@ -1,0 +1,1667 @@
+{
+  "schema": "pangu.t14-test-resource-observations.v1",
+  "status": "MEASURED_UNBASELINED_NOT_G07_OR_G10_PASS",
+  "script_sha256": "fcc78ef48255e1f5e3350d1ec4b793e169c0e1028189da35a4c5af5e9540d152",
+  "checker_pins": {
+    "g04_async_trace.py": "966ffc19409b7e8979053c728024628cce18c9ff69055574bbb613e1df0203ac",
+    "g04_branch_trace.py": "8d8310c6fae01e1791820e4ba23726d74fc3c539431f1445612fcfdbea1a9ea2",
+    "g04_composition.py": "945265f32320bcad86e36d042469f1328648945fa9d694eddafedd9967becb3c",
+    "g04_interleave.py": "c76396692d0da572d0f5a1d8ce26a9596175fa85d8c043d58c14b03c9f994637",
+    "g04_bundle.py": "a97b3a04cb146b087aef559ec4bda2c7cb84fbc2af64b111117ec01053739254"
+  },
+  "records": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "7dd5dd9226937061577cc7d8c405849c538440b26c6499cda99eca6fb431a2f6",
+      "elf": {
+        "file_bytes": 1708088,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 163444,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859384,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199536,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1224180,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 163444,
+            "memory_bytes": 163444
+          },
+          {
+            "file_bytes": 859432,
+            "memory_bytes": 859432
+          },
+          {
+            "file_bytes": 201304,
+            "memory_bytes": 272488
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "b82b008c639362578d779ffd18c1aff5fd8e46867868b6aaa0a8cb0e877ae250",
+      "lifecycle_object": {
+        "file_bytes": 67008,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 32739,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 32971,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 1959256233,
+          "user_seconds": 0.0,
+          "system_seconds": 0.0012829999999999999,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 358,
+          "probe_sampled_peak_rss_kib": 1340,
+          "probe_sampled_peak_hwm_kib": 1340,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 2017264588,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001735,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 367,
+          "probe_sampled_peak_rss_kib": 1348,
+          "probe_sampled_peak_hwm_kib": 1348,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 2435626873,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001521,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 433,
+          "probe_sampled_peak_rss_kib": 1344,
+          "probe_sampled_peak_hwm_kib": 1344,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "7b701fb1b664729eaec91563cc0a985e8574586d95b85b1e1af9edf8362a562f",
+      "elf": {
+        "file_bytes": 1342736,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 111381,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859596,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199088,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1736,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1171849,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 111381,
+            "memory_bytes": 111381
+          },
+          {
+            "file_bytes": 859648,
+            "memory_bytes": 859648
+          },
+          {
+            "file_bytes": 200824,
+            "memory_bytes": 272024
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "fd69359566e20d60828e413e8eab555631361c8ba1121dfdf032736710c8b7eb",
+      "lifecycle_object": {
+        "file_bytes": 22256,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 17485,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.cst16",
+            "bytes": 128,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 24,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst4",
+            "bytes": 12,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 17881,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 997499699,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001416,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 181,
+          "probe_sampled_peak_rss_kib": 1292,
+          "probe_sampled_peak_hwm_kib": 1292,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 1026450541,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001594,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 184,
+          "probe_sampled_peak_rss_kib": 1288,
+          "probe_sampled_peak_hwm_kib": 1288,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 1000335843,
+          "user_seconds": 0.001286,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 182,
+          "probe_sampled_peak_rss_kib": 1288,
+          "probe_sampled_peak_hwm_kib": 1288,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "f393bc6b866acfc3cc456a54f28d88bdb1d4979edee5721f7b347dfda9cc9f12",
+      "elf": {
+        "file_bytes": 1709144,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 163732,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859384,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199536,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1224468,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 163732,
+            "memory_bytes": 163732
+          },
+          {
+            "file_bytes": 859432,
+            "memory_bytes": 859432
+          },
+          {
+            "file_bytes": 201304,
+            "memory_bytes": 272488
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "b82b008c639362578d779ffd18c1aff5fd8e46867868b6aaa0a8cb0e877ae250",
+      "lifecycle_object": {
+        "file_bytes": 67008,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 32739,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 32971,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 2482684938,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001588,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 451,
+          "probe_sampled_peak_rss_kib": 1348,
+          "probe_sampled_peak_hwm_kib": 1348,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 2336441515,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001272,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 425,
+          "probe_sampled_peak_rss_kib": 1348,
+          "probe_sampled_peak_hwm_kib": 1348,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 2388206911,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001888,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 433,
+          "probe_sampled_peak_rss_kib": 1348,
+          "probe_sampled_peak_hwm_kib": 1348,
+          "minor_faults": 99,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "4066b0e9bf4e41ae1d75554b9002128a4b0fdcc59ea0086a055acb28c52643fe",
+      "elf": {
+        "file_bytes": 1342800,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 111423,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859596,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199088,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1736,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1171891,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 111423,
+            "memory_bytes": 111423
+          },
+          {
+            "file_bytes": 859648,
+            "memory_bytes": 859648
+          },
+          {
+            "file_bytes": 200824,
+            "memory_bytes": 272024
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "fd69359566e20d60828e413e8eab555631361c8ba1121dfdf032736710c8b7eb",
+      "lifecycle_object": {
+        "file_bytes": 22256,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 17485,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.cst16",
+            "bytes": 128,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 24,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst4",
+            "bytes": 12,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 17881,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 1065210806,
+          "user_seconds": 0.0013779999999999999,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 194,
+          "probe_sampled_peak_rss_kib": 1292,
+          "probe_sampled_peak_hwm_kib": 1292,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 1082396085,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001374,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 196,
+          "probe_sampled_peak_rss_kib": 1292,
+          "probe_sampled_peak_hwm_kib": 1292,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 1119401963,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001488,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 202,
+          "probe_sampled_peak_rss_kib": 1292,
+          "probe_sampled_peak_hwm_kib": 1292,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_sha256": "6348be0647dd4edf72245727d3d982345672633cd3a839e5f248d65ccd138a39",
+      "elf": {
+        "file_bytes": 2478696,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 636182,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 886032,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199536,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1723566,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 636182,
+            "memory_bytes": 636182
+          },
+          {
+            "file_bytes": 886080,
+            "memory_bytes": 886080
+          },
+          {
+            "file_bytes": 201304,
+            "memory_bytes": 272488
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "399adc8cad201455e6a5d1d460776f83cf658ff2ac755f81348edf7f40edcb0a",
+      "lifecycle_object": {
+        "file_bytes": 244704,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 163525,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.str1.1",
+            "bytes": 78,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 4992,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst32",
+            "bytes": 32,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 168859,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 4739344493,
+          "user_seconds": 0.000957,
+          "system_seconds": 0.000957,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 863,
+          "probe_sampled_peak_rss_kib": 1844,
+          "probe_sampled_peak_hwm_kib": 1844,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 4848915750,
+          "user_seconds": 0.0,
+          "system_seconds": 0.0014559999999999998,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 881,
+          "probe_sampled_peak_rss_kib": 1840,
+          "probe_sampled_peak_hwm_kib": 1840,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 4843040691,
+          "user_seconds": 0.001343,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 884,
+          "probe_sampled_peak_rss_kib": 1844,
+          "probe_sampled_peak_hwm_kib": 1844,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_sha256": "aec984ef83bba1228edf4487d352f1839f55217f29ced26fb53b9f96ee14152a",
+      "elf": {
+        "file_bytes": 1392400,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 161589,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859496,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199088,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1221989,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 161589,
+            "memory_bytes": 161589
+          },
+          {
+            "file_bytes": 859544,
+            "memory_bytes": 859544
+          },
+          {
+            "file_bytes": 200856,
+            "memory_bytes": 272040
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "a1f72b6b0d0ba52f38257cea0f51d772941148d0a2dfbe9d0487daf0736ccb24",
+      "lifecycle_object": {
+        "file_bytes": 30568,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 26100,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.cst16",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 24,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst4",
+            "bytes": 4,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 26408,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 2317825618,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001369,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 423,
+          "probe_sampled_peak_rss_kib": 1340,
+          "probe_sampled_peak_hwm_kib": 1340,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 2468003196,
+          "user_seconds": 0.0,
+          "system_seconds": 0.0013139999999999998,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 445,
+          "probe_sampled_peak_rss_kib": 1336,
+          "probe_sampled_peak_hwm_kib": 1336,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 2356276817,
+          "user_seconds": 0.001622,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 428,
+          "probe_sampled_peak_rss_kib": 1344,
+          "probe_sampled_peak_hwm_kib": 1344,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_sha256": "43840999ccf346765c440cfd11cd06cca0d6dc4681ef9d7fa3237eb85515ef32",
+      "elf": {
+        "file_bytes": 2479944,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 636918,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 886080,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199536,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1724350,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 636918,
+            "memory_bytes": 636918
+          },
+          {
+            "file_bytes": 886128,
+            "memory_bytes": 886128
+          },
+          {
+            "file_bytes": 201304,
+            "memory_bytes": 272488
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "399adc8cad201455e6a5d1d460776f83cf658ff2ac755f81348edf7f40edcb0a",
+      "lifecycle_object": {
+        "file_bytes": 244704,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 163525,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.str1.1",
+            "bytes": 78,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 4992,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst32",
+            "bytes": 32,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 168859,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 6020186424,
+          "user_seconds": 0.001346,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 1085,
+          "probe_sampled_peak_rss_kib": 1844,
+          "probe_sampled_peak_hwm_kib": 1844,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 5443187136,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001284,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 991,
+          "probe_sampled_peak_rss_kib": 1848,
+          "probe_sampled_peak_hwm_kib": 1848,
+          "minor_faults": 99,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 6170064744,
+          "user_seconds": 0.00141,
+          "system_seconds": 0.0,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 1116,
+          "probe_sampled_peak_rss_kib": 1840,
+          "probe_sampled_peak_hwm_kib": 1840,
+          "minor_faults": 100,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_sha256": "28e7a2a516d258b159f53659b36a55c205b053d664dcc3a8d40c76d341bcc8bb",
+      "elf": {
+        "file_bytes": 1392472,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 161841,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 859496,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 199088,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".data",
+            "bytes": 1768,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 71176,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          }
+        ],
+        "alloc_file_bytes": 1222241,
+        "alloc_nobits_bytes": 71176,
+        "load_segments": [
+          {
+            "file_bytes": 512,
+            "memory_bytes": 512
+          },
+          {
+            "file_bytes": 161841,
+            "memory_bytes": 161841
+          },
+          {
+            "file_bytes": 859544,
+            "memory_bytes": 859544
+          },
+          {
+            "file_bytes": 200856,
+            "memory_bytes": 272040
+          }
+        ]
+      },
+      "lifecycle_object_sha256": "a1f72b6b0d0ba52f38257cea0f51d772941148d0a2dfbe9d0487daf0736ccb24",
+      "lifecycle_object": {
+        "file_bytes": 30568,
+        "allocated_sections": [
+          {
+            "name": ".text",
+            "bytes": 26100,
+            "nobits": false,
+            "executable": true,
+            "writable": false
+          },
+          {
+            "name": ".data",
+            "bytes": 0,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".bss",
+            "bytes": 0,
+            "nobits": true,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".rodata.cst16",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata",
+            "bytes": 24,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".rodata.cst4",
+            "bytes": 4,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          },
+          {
+            "name": ".data.rel.ro",
+            "bytes": 184,
+            "nobits": false,
+            "executable": false,
+            "writable": true
+          },
+          {
+            "name": ".note.gnu.property",
+            "bytes": 48,
+            "nobits": false,
+            "executable": false,
+            "writable": false
+          }
+        ],
+        "alloc_file_bytes": 26408,
+        "alloc_nobits_bytes": 0,
+        "load_segments": []
+      },
+      "samples": [
+        {
+          "sample": 0,
+          "wall_ns": 2730181467,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001964,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 493,
+          "probe_sampled_peak_rss_kib": 1344,
+          "probe_sampled_peak_hwm_kib": 1344,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 1,
+          "wall_ns": 2700551308,
+          "user_seconds": 0.0,
+          "system_seconds": 0.001481,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 490,
+          "probe_sampled_peak_rss_kib": 1344,
+          "probe_sampled_peak_hwm_kib": 1344,
+          "minor_faults": 101,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        },
+        {
+          "sample": 2,
+          "wall_ns": 3071844698,
+          "user_seconds": 0.0,
+          "system_seconds": 0.002055,
+          "launch_chain_max_rss_kib": 59264,
+          "probe_samples": 550,
+          "probe_sampled_peak_rss_kib": 1340,
+          "probe_sampled_peak_hwm_kib": 1340,
+          "minor_faults": 102,
+          "major_faults": 0,
+          "stdout_sha256": "8c686c83d765c408279867e9e1afc133f6533b25c8f6cf9112e8bafd438914fc",
+          "bundle_status": "PASS_LOCAL_BUNDLE"
+        }
+      ]
+    }
+  ],
+  "scope": "24 fresh test-suite executions, no new native builds. Wall includes bwrap, test fixture and sampler overhead. wait4 maxrss includes launch chain and inherited parent memory; it is not runtime RSS. Separate /proc probe RSS/HWM are sampled about every5ms and can miss final or short peaks. None is idle RSS, cold start or Agent performance.",
+  "limits": [
+    "No budget established or approved.",
+    "UBSan does not instrument assembly.",
+    "Not leak/UAF/race verification."
+  ],
+  "summary": [
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_file_bytes": 1708088,
+      "lifecycle_object_file_bytes": 67008,
+      "lifecycle_text_bytes": 32739,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1340,
+        1348
+      ],
+      "suite_wall_ms_range": [
+        1959.256,
+        2435.627
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_file_bytes": 1342736,
+      "lifecycle_object_file_bytes": 22256,
+      "lifecycle_text_bytes": 17485,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1288,
+        1292
+      ],
+      "suite_wall_ms_range": [
+        997.5,
+        1026.451
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_file_bytes": 1709144,
+      "lifecycle_object_file_bytes": 67008,
+      "lifecycle_text_bytes": 32739,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1348,
+        1348
+      ],
+      "suite_wall_ms_range": [
+        2336.442,
+        2482.685
+      ]
+    },
+    {
+      "mode": "normal",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_file_bytes": 1342800,
+      "lifecycle_object_file_bytes": 22256,
+      "lifecycle_text_bytes": 17485,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1292,
+        1292
+      ],
+      "suite_wall_ms_range": [
+        1065.211,
+        1119.402
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "debug",
+      "elf_file_bytes": 2478696,
+      "lifecycle_object_file_bytes": 244704,
+      "lifecycle_text_bytes": 163525,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1840,
+        1844
+      ],
+      "suite_wall_ms_range": [
+        4739.344,
+        4848.916
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-asm",
+      "optimization": "release",
+      "elf_file_bytes": 1392400,
+      "lifecycle_object_file_bytes": 30568,
+      "lifecycle_text_bytes": 26100,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1336,
+        1344
+      ],
+      "suite_wall_ms_range": [
+        2317.826,
+        2468.003
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "debug",
+      "elf_file_bytes": 2479944,
+      "lifecycle_object_file_bytes": 244704,
+      "lifecycle_text_bytes": 163525,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1840,
+        1848
+      ],
+      "suite_wall_ms_range": [
+        5443.187,
+        6170.065
+      ]
+    },
+    {
+      "mode": "ubsan",
+      "build": "async-setup-core-alternate",
+      "optimization": "release",
+      "elf_file_bytes": 1392472,
+      "lifecycle_object_file_bytes": 30568,
+      "lifecycle_text_bytes": 26100,
+      "lifecycle_alloc_nobits_bytes": 0,
+      "observed_probe_peak_rss_kib_range": [
+        1340,
+        1344
+      ],
+      "suite_wall_ms_range": [
+        2700.551,
+        3071.845
+      ]
+    }
+  ],
+  "readelf_crosscheck": {
+    "readelf_sha256": "a72f12f3dd8c560554a3ba818bcecbda9178db5befbcc64d91bbb6a241fc21bc",
+    "records": [
+      {
+        "mode": "normal",
+        "build": "async-setup-core-alternate-debug",
+        "core_text_bytes_readelf": 32739,
+        "raw_sha256": "b2e9e506639e271823a0654e494beb81a55d7b95a22d6bee969e0fd32b9af7b4"
+      },
+      {
+        "mode": "normal",
+        "build": "async-setup-core-alternate-release",
+        "core_text_bytes_readelf": 17485,
+        "raw_sha256": "736240201879180e2717df5ccf763ec9efe48e65be2720564f7e431029b114d6"
+      },
+      {
+        "mode": "normal",
+        "build": "async-setup-core-asm-debug",
+        "core_text_bytes_readelf": 32739,
+        "raw_sha256": "b2e9e506639e271823a0654e494beb81a55d7b95a22d6bee969e0fd32b9af7b4"
+      },
+      {
+        "mode": "normal",
+        "build": "async-setup-core-asm-release",
+        "core_text_bytes_readelf": 17485,
+        "raw_sha256": "736240201879180e2717df5ccf763ec9efe48e65be2720564f7e431029b114d6"
+      },
+      {
+        "mode": "ubsan",
+        "build": "async-setup-core-alternate-debug",
+        "core_text_bytes_readelf": 163525,
+        "raw_sha256": "bbf2762accbc2d79bd169df3f1562313fa51f6235bac89819e286298fd1ea4e9"
+      },
+      {
+        "mode": "ubsan",
+        "build": "async-setup-core-alternate-release",
+        "core_text_bytes_readelf": 26100,
+        "raw_sha256": "74d843cafdcdea8a78b519a4924812494317d4ee9b796cef4c39fbe5dc973fe3"
+      },
+      {
+        "mode": "ubsan",
+        "build": "async-setup-core-asm-debug",
+        "core_text_bytes_readelf": 163525,
+        "raw_sha256": "bbf2762accbc2d79bd169df3f1562313fa51f6235bac89819e286298fd1ea4e9"
+      },
+      {
+        "mode": "ubsan",
+        "build": "async-setup-core-asm-release",
+        "core_text_bytes_readelf": 26100,
+        "raw_sha256": "74d843cafdcdea8a78b519a4924812494317d4ee9b796cef4c39fbe5dc973fe3"
+      }
+    ]
+  },
+  "measurement_receipt_sha256": "e718629371469fb1345d3c6289621024eae633fb2cf2325d5d0b3c72cd9d5bfd",
+  "measurement_source": "from pathlib import Path\nimport hashlib,json,os,resource,struct,subprocess,sys,time,shutil\nr=Path(__file__).resolve().parent;original=Path('/home/xu-yuanhao/Documents/PanGu-artifacts/t14-g04-interleaving');root=Path('/home/xu-yuanhao/Documents/PanGu');sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest();sys.path.insert(0,str(root/'tools/migration'));import g04_bundle\npins={p.name:sha(p) for p in (root/'tools/migration').glob('g04_*.py')}\ndef layout(path):\n b=path.read_bytes();assert b[:6]==b'\\x7fELF\\x02\\x01';assert struct.unpack_from('<H',b,18)[0]==62\n phoff,shoff=struct.unpack_from('<QQ',b,32);phsize,phnum,shsize,shnum,shstr=struct.unpack_from('<HHHHH',b,54);assert phsize in (0,56) and shsize==64 and 0<shnum<65535\n sections=[struct.unpack_from('<IIQQQQIIQQ',b,shoff+i*64) for i in range(shnum)];namesec=sections[shstr];names=b[namesec[4]:namesec[4]+namesec[5]];alloc=[]\n for x in sections:\n  name=names[x[0]:].split(b'\\0')[0].decode()\n  if x[2]&2:alloc.append({'name':name,'bytes':x[5],'nobits':x[1]==8,'executable':bool(x[2]&4),'writable':bool(x[2]&1)})\n loads=[]\n for i in range(phnum):\n  p=struct.unpack_from('<IIQQQQQQ',b,phoff+i*phsize)\n  if p[0]==1:loads.append({'file_bytes':p[5],'memory_bytes':p[6]})\n return {'file_bytes':len(b),'allocated_sections':alloc,'alloc_file_bytes':sum(x['bytes'] for x in alloc if not x['nobits']),'alloc_nobits_bytes':sum(x['bytes'] for x in alloc if x['nobits']),'load_segments':loads}\ndef sample_probe(pid):\n found=[];pending=[pid]\n while pending:\n  current=pending.pop()\n  try:\n   pending.extend(int(x) for x in Path(f'/proc/{current}/task/{current}/children').read_text().split())\n   if Path(f'/proc/{current}/cmdline').read_bytes().split(b'\\0')[0]!=b'/probe':continue\n   fields={line.split(':',1)[0]:line.split(':',1)[1].strip() for line in Path(f'/proc/{current}/status').read_text().splitlines() if ':' in line}\n   if 'VmRSS' in fields and 'VmHWM' in fields:found.append((int(fields['VmRSS'].split()[0]),int(fields['VmHWM'].split()[0])))\n  except (OSError,ValueError,IndexError):pass\n return found\nresource.setrlimit(resource.RLIMIT_CORE,(0,0))\nrecords=[]\nfor mode in ('normal','ubsan'):\n q=json.loads((original/f'request-{mode}.json').read_text());sys.path.insert(0,q['controller']+'/tools/gates');from admission import verify\n native=original/f'build-{mode}-r01/native';verified=verify(Path(q['candidate']),Path(q['controller']),q['policy_sha256'],q['controller_sha256'],q['registry'],native,sha(native/'admission.json'));assert verified['verified_builds']==4\n for rec in json.loads((original/f'executions-{mode}.json').read_text())['records']:\n  name=rec['build']+'-'+rec['optimization'];folder=native/name;original_exe=folder/'probe.elf';assert sha(original_exe)==rec['elf_sha256'];exe=r/('exec-'+mode+'-'+name);shutil.copy2(original_exe,exe);exe.chmod(0o700);assert sha(exe)==rec['elf_sha256'];build=json.loads((folder/'build.json').read_text());corehash=build['object_sha256']['src/t14-lifecycle/lifecycle.c'];core=next(p for p in folder.glob('*.o') if sha(p)==corehash)\n  item={'mode':mode,'build':rec['build'],'optimization':rec['optimization'],'elf_sha256':sha(exe),'elf':layout(exe),'lifecycle_object_sha256':corehash,'lifecycle_object':layout(core),'samples':[]}\n  for sample in range(3):\n   stem=f'r3-{mode}-{name}-{sample}';out=r/(stem+'.stdout');err=r/(stem+'.stderr');command=['/usr/bin/bwrap','--unshare-all','--die-with-parent','--new-session','--clearenv','--ro-bind',str(exe),'/probe','--proc','/proc','--dev','/dev','--tmpfs','/tmp','--','/probe']\n   with out.open('wb') as stdout,err.open('wb') as stderr:\n    start=time.monotonic_ns();p=subprocess.Popen(command,stdout=stdout,stderr=stderr);observations=[]\n    while True:\n     observations.extend(sample_probe(p.pid));pid,status,usage=os.wait4(p.pid,os.WNOHANG)\n     if pid:break\n     if time.monotonic_ns()-start>90000000000:p.kill();os.wait4(p.pid,0);raise RuntimeError('measurement deadline')\n     time.sleep(0.005)\n    p.returncode=os.waitstatus_to_exitcode(status);elapsed=time.monotonic_ns()-start\n   assert p.returncode==0 and not err.read_bytes();data=out.read_bytes();assert hashlib.sha256(data).hexdigest()==rec['stdout_sha256'];validated=g04_bundle.validate(data)\n   item['samples'].append({'sample':sample,'wall_ns':elapsed,'user_seconds':usage.ru_utime,'system_seconds':usage.ru_stime,'launch_chain_max_rss_kib':usage.ru_maxrss,'probe_samples':len(observations),'probe_sampled_peak_rss_kib':max((x[0] for x in observations),default=None),'probe_sampled_peak_hwm_kib':max((x[1] for x in observations),default=None),'minor_faults':usage.ru_minflt,'major_faults':usage.ru_majflt,'stdout_sha256':sha(out),'bundle_status':validated['status']});assert observations;print(mode,name,sample,max(x[0] for x in observations),len(observations),flush=True)\n  assert sha(exe)==rec['elf_sha256'] and sha(core)==corehash;records.append(item)\nassert all(sha(root/'tools/migration'/name)==h for name,h in pins.items());(r/'measurement-r3.json').write_text(json.dumps({'schema':'pangu.t14-test-resource-observations.v1','status':'MEASURED_UNBASELINED_NOT_G07_OR_G10_PASS','script_sha256':sha(Path(__file__)),'checker_pins':pins,'records':records,'scope':'24 fresh test-suite executions, no new native builds. Wall includes bwrap, test fixture and sampler overhead. wait4 maxrss includes launch chain and inherited parent memory; it is not runtime RSS. Separate /proc probe RSS/HWM are sampled about every5ms and can miss final or short peaks. None is idle RSS, cold start or Agent performance.','limits':['No budget established or approved.','UBSan does not instrument assembly.','Not leak/UAF/race verification.']},indent=2)+'\\n')\n",
+  "crosscheck_receipt_sha256": "695fa69d7e84b04fb5340d008203a9d05e8fea8130b6fe35ca55ecc64bf51841",
+  "development_attempts": [
+    "r1 executable permission refusal before any test execution; original artifacts unchanged; copies made executable.",
+    "r2 wait4 maxrss included inherited parent Python footprint; not interpreted as runtime RSS. r3 separately samples /proc/probe."
+  ],
+  "coverage": {
+    "fresh_executions": 24,
+    "new_native_builds": 0,
+    "bundle_records_verified": 8976,
+    "budget_status": "UNBASELINED",
+    "G07": "NOT_COMPLETED",
+    "G10": "NOT_PASSED",
+    "production_admission": "NOT_GRANTED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording measured test-only observations without budget or safety/performance admission.",
+    "validation": [
+      "24 fresh isolated executions passed fixed G04 bundle.",
+      "Eight lifecycle .text measurements match readelf.",
+      "Binary/object inputs reverified with original admission.verify.",
+      "G00 PASS; production admission BLOCKED; git diff --check PASS."
+    ],
+    "risks": [
+      "Caller-provided measurement and host OS, not attested execution.",
+      "Sampling can miss short/final memory peaks.",
+      "Launch-chain maxrss includes parent footprint and is not runtime RSS.",
+      "Test suite timings/ELF are not minimal Agent/startup/Idle metrics.",
+      "No leak/UAF/race proof or resource budget acceptance."
+    ],
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "46b049bda0031bc2955f13206ec659eb663cc28ebc132870c68ff8b3209e129e",
+      "docs/migration/t14-focused-inventory.json": "c8654e71778539fbaede01ec1b0b25b50d7012f99939675acc77611a47bd1b78",
+      "docs/migration/t14-owner-boundaries.md": "5e887e8cc68d1b7f60de73ca4f3eaacdb6dac52c41278378cdf74aaf9e7095b0",
+      "docs/原生重写路线与迁移TODO.md": "89e785dab553c190828a7e1ddc9de59f1c954e21a7d862f74d9529f1445ddd17"
+    },
+    "control_scope_sha256": "317e267af1affef5138c6925b0e565097dc0d180a9220afa08a45916cd203f95"
+  }
+}
