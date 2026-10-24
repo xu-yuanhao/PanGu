@@ -1298,6 +1298,59 @@ static void transaction_public_core(void) {pangu_prepare_result p;
  assert(transactions==98&&refused_plans==145&&alias_rejections==6432&&quota_rejections==12127);
 }
 
+/* Earliest standalone-owner observable behavior through current public host ABI. */
+static pangu_lifecycle_runtime early_runtime;
+static pangu_owner early_owner;
+static pangu_owned_resource early_resources[4];
+static pangu_owned_operation early_operations[2];
+static pangu_lifecycle_item early_item;
+static pangu_lifecycle_span early_spans[32];
+static pangu_lifecycle_setup_ticket early_ticket;
+static int early_mode,early_events[4],early_event_count,early_groups;
+static pangu_u64 early_epoch;
+static pangu_i32 early_release(void *context) {
+ int id=(int)(pangu_u64)context;assert(early_event_count<4);early_events[early_event_count++]=id;
+ if(early_mode==0&&id==3){pangu_lifecycle_report report;assert(api->stop(&early_runtime,FUEL,&report)==5);assert(api->register_resource(&early_runtime,0,early_release,context)==10);}
+ return early_mode==0&&id==2?-80:early_mode==1?-9:0;
+}
+static pangu_i32 early_setup(pangu_owner *owner,void *context) {
+ (void)context;assert(owner==&early_owner&&owner->inflight==1);
+ int count=early_mode==0?4:1;
+ for(int i=0;i<count;i++)assert(!api->register_resource(&early_runtime,0,early_release,(void *)(pangu_u64)i));
+ if(early_mode==0)assert(api->register_resource(&early_runtime,0,early_release,0)==2);
+ if(early_mode==2){assert(!api->setup_defer(&early_runtime,&early_ticket));return 5;}
+ return early_mode==1?-7:0;
+}
+static void early_prepare(int mode) {
+ early_mode=mode;early_event_count=0;early_epoch++;
+ assert(!api->owner_init(&early_owner,early_resources,4,early_operations,2,early_epoch,FUEL));
+ memset(&early_runtime,0,sizeof early_runtime);early_item=(pangu_lifecycle_item){&early_owner,early_setup,0};early_runtime.items=&early_item;early_runtime.count=1;
+ assert(!api->bind_geometry(&early_runtime,early_spans,32,FUEL));
+}
+static void early_owner_public_core(void) {
+ pangu_lifecycle_report report;
+ early_prepare(0);assert(!api->start(&early_runtime,FUEL,&report));assert(api->stop(&early_runtime,FUEL,&report)==-80);
+ assert(early_event_count==4&&early_owner.state==PANGU_OWNER_DISPOSED&&!early_owner.count&&!early_owner.inflight);
+ for(int i=0;i<4;i++)assert(early_events[i]==3-i);
+ assert(api->stop(&early_runtime,FUEL,&report)==-80&&early_event_count==4);early_groups++;
+ early_prepare(1);assert(api->start(&early_runtime,FUEL,&report)==-7);
+ assert(early_owner.load_error==-7&&early_owner.cleanup_error==-9&&early_runtime.load_error==-7&&early_runtime.cleanup_error==-9&&early_event_count==1);
+ assert(api->stop(&early_runtime,FUEL,&report)==-9&&early_event_count==1);early_groups++;
+ early_prepare(2);assert(api->start(&early_runtime,FUEL,&report)==5);pangu_lifecycle_setup_ticket old=early_ticket;
+ assert(api->stop(&early_runtime,FUEL,&report)==5&&early_owner.state==PANGU_OWNER_QUIESCING&&!early_event_count);
+ assert(api->register_resource(&early_runtime,0,early_release,0)==10);
+ assert(!api->setup_finish(&early_runtime,&early_ticket,0));assert(api->setup_finish(&early_runtime,&old,0)==10);
+ assert(!early_event_count&&early_owner.state!=PANGU_OWNER_ACTIVE);
+ assert(api->pump(&early_runtime,FUEL,&report)==6&&early_event_count==1&&early_owner.state==PANGU_OWNER_DISPOSED);early_groups++;
+ pangu_owner before=early_owner;assert(api->owner_init(&early_owner,early_resources,4,early_operations,2,early_epoch,FUEL)==10&&!memcmp(&before,&early_owner,sizeof before));
+ early_prepare(2);assert(api->start(&early_runtime,FUEL,&report)==5);assert(api->setup_finish(&early_runtime,&old,0)==10&&early_owner.inflight==1);
+ assert(!api->setup_finish(&early_runtime,&early_ticket,0));assert(!api->pump(&early_runtime,FUEL,&report));assert(!api->stop(&early_runtime,FUEL,&report));
+ before=early_owner;assert(api->owner_init(&early_owner,(pangu_owned_resource *)(void *)&early_owner,1,early_operations,2,early_epoch+1,FUEL)==1&&!memcmp(&before,&early_owner,sizeof before));
+ pangu_owner invalid={0};invalid.struct_size=1;pangu_owner invalid_before=invalid;
+ assert(api->owner_init(&invalid,early_resources,4,early_operations,2,1,FUEL)==1&&!memcmp(&invalid,&invalid_before,sizeof invalid));early_groups++;
+ assert(early_groups==4);
+}
+
 int main(void) {
  api=pangu_lifecycle_query(1,152,1,0);assert(api);adapter_public_core();pangu_prepare_result plan;int valid=0,rejected=0;
  for(pangu_u32 i=0;i<sizeof host_graph_cases/sizeof host_graph_cases[0];i++) {
@@ -1324,7 +1377,7 @@ int main(void) {
  assert(valid==95 && rejected==145 && scenarios==1414);
  for(int i=0;i<7;i++) assert(by_mode[i]==202);
  assert(invalid_ticket_refusals==3636 && inline_finishes==202 && async_cleanup_finishes==202);
- async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();
- printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections);
+ async_disposer_public_core(&plan,&output);budget_public_core();call_budget_public_core();call_lifecycle_public_core();geometry_public_core();graph_public_core();start_public_core();transaction_public_core();early_owner_public_core();
+ printf("async_setup_core_scenarios=%d valid_plans=%d rejected_plans=%d invalid_ticket_refusals=%d inline_finishes=%d async_cleanup_finishes=%d async_disposer_public_groups=%d rejected_cleanup_tickets=%d inline_cleanup_finishes=%d budget_public_cases=%d bounded_ticks=%d zero_budget_owner_work=%d public_call_skips=%d prefix_cases=%d call_budget_cases=%d admitted_calls=%d insufficient_budget_retries=%d quota_refusals=%d invalid_bindings=%d overlap_refusals=%d setup_contexts=%d cleanup_contexts=%d call_lifecycle_cases=%d direct_calls=%d setup_calls=%d cleanup_calls=%d provider_invocations=%d rejected_calls=%d async_cleanup_begins=%d geometry_cases=%d geometry_matrices=%d geometry_refusals=%d graph_cases=%d independent_cases=%d ancestor_cases=%d independent_setup_cases=%d error_while_waiting=%d edge_prepare_cases=%d call_hold_cases=%d private_owner_hold_skips=%d start_budget_cases=%d start_ticks=%d pre_setup_cancellations=%d invalid_before_callbacks=%d transactions=%d refused_plans=%d transaction_alias_rejections=%d transaction_quota_rejections=%d earlier_owner_groups=%d\n",scenarios,valid,rejected,invalid_ticket_refusals,inline_finishes,async_cleanup_finishes,disposer_groups,disposer_ticket_refusals,disposer_inline_finishes,budget_cases,budget_total_ticks,budget_single_work,budget_call_skips,budget_prefix_cases,call_budget_scenarios,call_budget_admissions,call_budget_retries,call_budget_quota_refusals,call_budget_invalid_bindings,call_budget_overlap_refusals,call_budget_setup_contexts,call_budget_cleanup_contexts,call_lifecycle_cases,call_lifecycle_direct_calls,call_lifecycle_setup_calls,call_lifecycle_cleanup_calls,call_lifecycle_provider_calls,call_lifecycle_rejected_calls,call_lifecycle_async_begin_total,geometry_cases,geometry_matrices,geometry_refused,graph_public_scenarios,graph_public_independent,graph_public_ancestors,graph_public_independent_setup,graph_public_error_waiting,graph_public_edge_cases,graph_public_call_holds,graph_public_owner_hold_skips,start_cases,(int)start_ticks,start_cancellations,start_invalid,transactions,refused_plans,alias_rejections,quota_rejections,early_groups);
  return 0;
 }
