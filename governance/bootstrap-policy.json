@@ -236,6 +236,8 @@
     "docs/migration/t14-geometry-native-evidence.json": "control",
     "docs/migration/t14-graph-native-evidence.json": "control",
     "docs/migration/t14-start-native-evidence.json": "control",
-    "docs/migration/t14-transaction-native-evidence.json": "control"
+    "docs/migration/t14-transaction-native-evidence.json": "control",
+    "docs/migration/t14-earliest-owner-native-evidence.json": "control",
+    "docs/migration/t14-earlier-owner-discovery.json": "control"
   }
 }

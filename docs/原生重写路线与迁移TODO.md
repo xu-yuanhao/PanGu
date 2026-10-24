@@ -365,6 +365,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 旧 `graph-test.c` 当前公开 ABI 图停止专项：98个边构建计划、516个停止场景；普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。覆盖独立分支、祖先保活、异步setup/cleanup和错误传播；292个无公开依赖边的旧私有owner hold明确跳过，完整T14/G04/G07仍待完成，见 [F09证据](migration/t14-graph-native-evidence.json)。
 - [x] 旧 `start-test.c` 当前公开 ABI 启动预算专项：6056个场景、103692次有界推进、285次setup前取消、114次回调前拒绝；量子1–4，普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。保留同步/异步失败取消、槽退休、重入停止与graph/prefix断言，完整T14/G04/G07待完成，见 [F17证据](migration/t14-start-native-evidence.json)。
 - [x] 旧 `transaction-test.c` 当前公开 ABI 准备事务专项：98次成功事务、145个失败计划、6432次别名拒绝、12127次不足预算拒绝；输入快照/输出毒值与尾部边界验证，普通/UBSan × 双内存实现 × debug/release共8次构建执行一致。最新快照入口迁移无剩余，但更早owner审计及完整T14/G04/G07未完成，见 [F19证据](migration/t14-transaction-native-evidence.json)。
+- [x] 最早owner六组断言首轮审计及4组公开ABI补测：四资源LIFO、加载/清理双错误、setup取消迟到完成、跨epoch旧票据及初始化拒绝；8个普通/UBSan构建运行一致。旧任意单端hold差异和30份早期测试发现清单明确保留，更早语料审计仍未完成，见 [证据](migration/t14-earliest-owner-native-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

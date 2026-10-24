@@ -501,3 +501,9 @@ SDK1八次各824场景/1794租约消费，guard四次各122627调用；SDK2八�
 普通/UBSan × 汇编/C内存提供者 × debug/release共8次冻结构建和隔离运行通过且输出一致。每次98次成功准备/启动/停止、145个失败计划、6432次别名拒绝和12127次不足fuel拒绝，与历史计数一致。快照覆盖plan、registry、graph输入/输出、storage/source items及有效owner/资源/operation池；拒绝后输入不变，激活项/边/结果仍为毒值，成功后输出尾部不被覆盖。保留容量溢出、结果错位和输入/输出交叉重叠断言。
 
 使用公开prepare、bind_geometry、start/stop及登记方法，无生产源码、公开ABI、预算或门禁变化；[F19原生证据](t14-transaction-native-evidence.json)记录固定输入和同一Agent自审。最新快照19项入口均已建立各自范围内证据，其中F12仅链接边界、SDK1/SDK2为既有原生矩阵，不能将pending_current_abi_ports=0解释为完整T14完成。更早standalone owner语料审计、其余ABI/故障轨迹及完整G04/G07仍待完成。
+
+## 最早 standalone owner 语料补充（2026-10-24）
+
+逐组读最早owner实验probe.py六组断言，新增4组公开runtime测试：四资源LIFO与满额/重入停止/登记拒绝、加载错误-7与清理错误-9分别保留、setup取消后的迟到完成与重复票据、跨epoch旧票据及同epoch重用/资源别名/非零初始帧拒绝。start返回加载错误，后续stop返回清理错误，与旧语义一致。普通/UBSan × 双内存提供者 × debug/release共8构建运行通过且输出一致。
+
+旧任意owner enter/leave已移除，不能声称逐条等价；实际依赖调用的槽位/代际/排空由F04/F05覆盖，但双端保活不等价于旧单端任意hold。六组映射与明确差异见 [最早owner证据](t14-earliest-owner-native-evidence.json)。[发现清单](t14-earlier-owner-discovery.json)按内容摘要整理含owner.c实验目录中的30份不同测试，属于发现结果，尚未逐份证明覆盖；审计仅部分推进。完整T14/G04/G07与生产准入仍未完成。

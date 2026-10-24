@@ -1,0 +1,163 @@
+{
+  "schema": "pangu.t14-earliest-owner-native-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_CURRENT_NATIVE_WITH_API_ADAPTATIONS",
+  "scope": "Four supplemental public ABI groups from earliest standalone owner six-group probe; partial earlier corpus audit only.",
+  "historical_source": {
+    "path": "/home/xu-yuanhao/Documents/PanGu-artifacts/t14-owner-wip-5stexo34/probe.py",
+    "sha256": "67eb5ead1520093a4bd957e508e4d236d78063ed5237ed5eb20093fb43ca43fd",
+    "owner_source_sha256": "108c3e6c095c1688a000095e322494d0a0bc299373164dcee77849b856321d7c",
+    "header_sha256": "737e53af0042289f1e5057bb2a127e4fb1d953009842e0db897025f5b018a401"
+  },
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "65cfbc358b386cd14eacbafa9b3ef5ed481fbb1c",
+    "parent": "21f35ed53ec61239573fcca586960f9dca13bed2",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "dabe98a9ca838ac077e6ff8c83c04189decb49571e3f1e3d35285e0032153d9f",
+    "candidate_tree_sha256": "84aa10d97c6950382c91c8dc422a62f6a2045c5d424e05e1de1efa4e9c288318",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "dabe98a9ca838ac077e6ff8c83c04189decb49571e3f1e3d35285e0032153d9f"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "93fa66b7062bf99a2a38be13460e80d96a3993a4be0b4809f058d0a96d47f573",
+    "native_candidate_controller_sha256": "0c65ead4cef6f01f85273618b532f8e83bc2f48c52ace32c3181f3b86bf35870",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "410509b667f7020ef48acea788fb93757c523102ff2f4f6c50c2c478322df9ce",
+    "ubsan_request_sha256": "7b10c4ffd26c26c69bc665bbffda77a35a798cf4a1af0b49332aa8a126d79bb3"
+  },
+  "coverage": {
+    "supplemental_groups_per_run": 4,
+    "historical_groups_reviewed": 6,
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "all_stdout_identical": true,
+    "all_stdout_sha256": "2de189708688740732db8c0936785b884c0c3d314d48f0d497906840f465b35a",
+    "earlier_corpus_audit_complete": false
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "bind_geometry",
+      "start",
+      "pump",
+      "stop",
+      "register_resource",
+      "setup_defer",
+      "setup_finish"
+    ],
+    "private_helpers_reexported": false,
+    "difference": "Public runtime owns setup tickets; old standalone owner enter/leave/finish_load removed. Exact gaps recorded per historical group."
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "8ccdd554ca910e0fd4f270d93257f11d77e8bfc997002c0a4d101cbf0880b5f9",
+      "executions_json_sha256": "7e9ddd0e20c233cef917142cf18bd889c3d8525b17ca0a554118d9362d2c882f",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "b3f60045db644cf7c5fdbe2fd54529434b3b1e8795d9ad7172725ff864d4da16",
+      "executions_json_sha256": "36c5f1560c4eda430618f10c7a58d09dad80c47df9f337e4bf426286e7e587d2",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve recording four supplemental public test groups and partial earliest-owner audit only; same-Agent review.",
+    "fixed_candidate_digest": "84aa10d97c6950382c91c8dc422a62f6a2045c5d424e05e1de1efa4e9c288318",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md",
+      "docs/migration/t14-earlier-owner-discovery.json"
+    ],
+    "validation": [
+      "normal frozen matrix: four builds and executions PASS",
+      "UBSan frozen matrix: four builds and executions PASS",
+      "all eight stdout outputs byte-identical",
+      "GitHub source branch and blob readback match commit/source SHA256",
+      "python3 -B tools/gates/check.py: G00 PASS; production admission remains BLOCKED",
+      "git diff --check: PASS"
+    ],
+    "risks": [
+      "Same-Agent self-review, not independent approval.",
+      "Removed owner-only private operations are gaps, not passed tests.",
+      "30-content discovery is not exhaustive proven migration coverage.",
+      "Earlier corpus audit and full T14/G04/G07 incomplete.",
+      "Production/external trust/release remain blocked.",
+      "UBSan does not instrument assembly instructions."
+    ],
+    "control_scope_sha256": "6640be2dd361e7cba8c38747429a7a504955b27aba1b544444a3de669e202eff",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "7606c3b96f2c2202458fe8a4603d7218a848d9787fe07626d9189a78b3de405c",
+      "docs/migration/t14-focused-inventory.json": "bc4e09f68c694467d4aae91f476cbaf770c2a495bccd22e085e1afa46f29917d",
+      "docs/migration/t14-owner-boundaries.md": "60cacda5967265ef6fd9377635082a08a95caafa574a6929f8ce1ec784c7db50",
+      "docs/原生重写路线与迁移TODO.md": "2f416d5666ef3f393253fabdd757f27f44632ab53f8011eb50378c6ade4dab1e",
+      "docs/migration/t14-earlier-owner-discovery.json": "c6838dd994851c39f4cb0ea98a6513d7e4f5e9c6f17259337070202ae92604d2"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": [
+    "r01 incorrect new assertion expected stop=-7 after failed start; source and execution confirm stop returns cleanup=-9; corrected test, implementation unchanged."
+  ],
+  "historical_group_mapping": [
+    {
+      "group": 1,
+      "status": "PUBLIC_ADAPTATION_EXECUTED",
+      "target": "early_owner_public_core mode0; four resources, exact LIFO, reentrant stop5, registration10, capacity2, cleanup-80, repeat stop"
+    },
+    {
+      "group": 2,
+      "status": "PUBLIC_ADAPTATION_EXECUTED_WITH_PRIVATE_ENTRY_GAP",
+      "target": "mode2 defer/stop/finish/pump; no reactivation or immediate cleanup, duplicate finish10",
+      "gap": "Private arbitrary enter setup/active flag has no public owner-only equivalent."
+    },
+    {
+      "group": 3,
+      "status": "PUBLIC_ADAPTATION_PARTIAL",
+      "target": "supplemental same-epoch refusal and cross-epoch setup completion; F04/F05 stale call generations",
+      "gap": "No claim of owner-only leave/finish_load entry equivalence."
+    },
+    {
+      "group": 4,
+      "status": "PUBLIC_ADAPTATION_EXECUTED",
+      "target": "mode1 start=-7, subsequent stop=-9, both owner/runtime errors retained, cleanup once"
+    },
+    {
+      "group": 5,
+      "status": "EXISTING_REAL_DEPENDENCY_ADAPTATION_WITH_GAP",
+      "target": "call_budget_refusal_cases/call_budget_generation_case and call_lifecycle cases",
+      "gap": "Public call holds both endpoints; no single-owner arbitrary hold."
+    },
+    {
+      "group": 6,
+      "status": "PUBLIC_ADAPTATION_PARTIAL",
+      "target": "supplemental owner resource alias and nonzero frame, F08 protected ticket/owner geometry",
+      "gap": "Private enter ticket-output alias is not itself executed."
+    }
+  ],
+  "discovery": {
+    "path": "docs/migration/t14-earlier-owner-discovery.json",
+    "unique_test_contents": 30,
+    "coverage_proven": false
+  }
+}
