@@ -35,7 +35,7 @@
       "dependencies": [
         "client.contract.v0"
       ],
-      "role": "handwritten SysV AMD64 bounded Loop and memory session; injected model/tools; C ABI declarations only",
+      "role": "handwritten SysV AMD64 bounded Loop; transient draft separate from settled memory transcript; no persistent transaction or recovery yet",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -43,6 +43,21 @@
         "pg_agent_reset_session"
       ],
       "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/harness/generation.ts",
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/harness/submissions.ts"
+          ],
+          "semantics": "primary target: separate live partial from immutable assistant entry; admission/transaction/recovery pending; current transient preview and discard-on-abort are explicit bounded differences",
+          "tests_to_read": [
+            "packages/durable/test/harness-partial-changes.test.ts",
+            "packages/durable/test/session-deferred-commits.test.ts",
+            "packages/durable/test/harness-tasks-recovery.test.ts"
+          ]
+        },
         {
           "repository": "pi",
           "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
@@ -282,5 +297,5 @@
     "c",
     "cpp"
   ],
-  "reference_basis_scope": "Source locators only; read corresponding functions/callers/tests before each implementation batch, record decisions in existing progress/handoff; not proof of reading or compatibility; references never enter product build."
+  "reference_basis_scope": "Source locators only; read corresponding functions/callers/tests before each implementation batch, record decisions in existing progress/handoff; not proof of reading or compatibility; references never enter product build. Primary behavioral target is Pi Durable; historical Pi agent references are secondary and historical snapshots remain unchanged."
 }

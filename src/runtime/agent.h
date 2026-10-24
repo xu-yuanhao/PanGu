@@ -45,6 +45,7 @@ typedef struct {
     size_t assistant_index, call_index;
     char event_text[PG_TEXT_LIMIT];
     char error_text[256];
+    pg_message draft;
 } pg_agent;
 int pg_agent_init(pg_agent *, pg_model, pg_tools);
 pg_client pg_agent_client(pg_agent *);

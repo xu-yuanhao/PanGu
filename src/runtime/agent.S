@@ -141,7 +141,7 @@ pg_agent_reset_session:
 .Lidentifier_end:
     ret
 
-# append(owner, role, bytes, length); no callbacks while storage is uncommitted.
+# append(owner, role, bytes, length); publish count after completing the record.
 .Lappend:
     cmp qword ptr [rdi+PG_A_COUNT],64
     jae .Lappend_bad
@@ -193,6 +193,10 @@ pg_agent_reset_session:
     mov rbx,rdi
     mov r12d,esi
     call .Lclose
+    lea rdi,[rbx+PG_A_DRAFT]
+    xor eax,eax
+    mov ecx,PG_MSG_BYTES/8
+    rep stosq
     mov [rbx+PG_A_OUTCOME],r12d
     mov dword ptr [rbx+PG_A_STATE],PG_ST_FINISH
     add rsp,8
@@ -249,6 +253,16 @@ pg_agent_reset_session:
 .Lsubmit_bad:
     mov eax,1
     ret
+
+# rbx owns the run. Only settled text enters model-visible history.
+.Lsettle_draft:
+    mov rax,[rbx+PG_A_COUNT]
+    mov [rbx+PG_A_ASSISTANT],rax
+    mov rdi,rbx
+    mov esi,PG_ROLE_ASSISTANT
+    lea rdx,[rbx+PG_A_DRAFT+PG_MSG_TEXT]
+    mov rcx,[rbx+PG_A_DRAFT+PG_MSG_SIZE]
+    jmp .Lappend
 
 .Lcancel:
     mov eax,[rdi+PG_A_STATE]
@@ -373,15 +387,13 @@ pg_agent_reset_session:
     call [rbx+PG_A_MODEL+8]
     test eax,eax
     jnz .Lerror_start
-    mov rax,[rbx+PG_A_COUNT]
-    mov [rbx+PG_A_ASSISTANT],rax
-    mov rdi,rbx
-    mov esi,1
-    xor edx,edx
-    xor ecx,ecx
-    call .Lappend
-    test rax,rax
-    jz .Lerror_capacity
+    cmp qword ptr [rbx+PG_A_COUNT],64
+    jae .Lerror_capacity
+    lea rdi,[rbx+PG_A_DRAFT]
+    xor eax,eax
+    mov ecx,PG_MSG_BYTES/8
+    rep stosq
+    mov dword ptr [rbx+PG_A_DRAFT],PG_ROLE_ASSISTANT
     mov dword ptr [rbx+PG_A_STATE],PG_ST_STREAM
     jmp .Lpoll_zero
 .Lstream:
@@ -407,6 +419,9 @@ pg_agent_reset_session:
     je .Lerror_model
     jmp .Lerror_event
 .Lstream_done:
+    call .Lsettle_draft
+    test rax,rax
+    jz .Lerror_capacity
     mov rdi,rbx
     xor esi,esi
     call .Lfinish
@@ -420,8 +435,7 @@ pg_agent_reset_session:
     cmp qword ptr [rsp+8],0
     je .Lerror_text
 .Ltext_valid:
-    imul r13,[rbx+PG_A_ASSISTANT],PG_MSG_BYTES
-    add r13,rbx
+    lea r13,[rbx+PG_A_DRAFT]
     mov rax,4096
     sub rax,[r13+PG_MSG_SIZE]
     cmp r14,rax
@@ -452,8 +466,18 @@ pg_agent_reset_session:
     call .Lidentifier
     test eax,eax
     jz .Lerror_event
-    cmp qword ptr [rbx+PG_A_COUNT],62
+    cmp qword ptr [rbx+PG_A_COUNT],61
     ja .Lerror_result_capacity
+    cmp qword ptr [rsp+16],4096
+    jae .Lerror_arguments
+    cmp qword ptr [rsp+16],0
+    je .Lcall_valid
+    cmp qword ptr [rsp+8],0
+    je .Lerror_arguments
+.Lcall_valid:
+    call .Lsettle_draft
+    test rax,rax
+    jz .Lerror_capacity
     mov rax,[rbx+PG_A_COUNT]
     mov [rbx+PG_A_CALL],rax
     mov rdi,rbx

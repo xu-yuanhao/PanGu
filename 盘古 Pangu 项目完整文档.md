@@ -2,7 +2,7 @@
 
 ## 当前执行决定（2026-10-24）
 
-当前从原生基础实验转入最小 Agent 纵向闭环开发。最终目标是手写Assembly优先、C仅必要胶水、C++限批准桥接的实现、以 Pi 为行为基线、参考 deepseek-harness/Cordis 组合语义、包括基础服务在内可替换的原生 Agent。第一交互入口是 TUI；完整 CLI、GUI、多平台和 JS 插件兼容不进入首个闭环。
+当前从原生基础实验转入最小 Agent 纵向闭环开发。最终目标是手写Assembly优先、C仅必要胶水、C++限批准桥接的实现、以 Pi Durable 为主要行为与恢复基线、参考 deepseek-harness/Cordis 组合语义、包括基础服务在内可替换的原生 Agent。第一交互入口是 TUI；完整 CLI、GUI、多平台和 JS 插件兼容不进入首个闭环。
 
 按 [迁移 TODO 的近期执行队列](docs/原生重写路线与迁移TODO.md#近期执行队列2026-10-24) 推进。历史证据和未完成项保留，但完整阶段认证、远端权限分离和全平台矩阵不再作为本地核心开发的统一前置条件。产品代码仍须进入明确登记的源码和构建，不能长期藏在测试夹具或项目外实验中。
 
@@ -53,22 +53,25 @@ Infinite Capability
 
 | 参考 | 采用的内容 | 不直接继承的内容 |
 |---|---|---|
-| Pi | 最小 Agent 的能力范围、循环行为、工具调用、流式输出、上下文、会话、取消和扩展体验 | TypeScript 实现结构、固定 Agent 宿主边界、Node.js 依赖 |
+| Pi Durable（主要） | Conversation、不可变 Entry、原子提交、Submission、可恢复 Task、明确 abort 与等待取消；按最小子集递增实现 | 整套 TS/Chord 实现、固化领域宿主、全部存储后端及 Node.js 依赖 |
+| Pi Coding Agent（辅助）与共享库 | 旧 Coding Agent 的工具与交互经验；pi-ai/tui 等共享基础模块的实际行为 | 旧 Session 树/格式自动成为 Durable 默认模型、完整 CLI 功能并集 |
 | deepseek-harness | Agent Loop、Session、工具注册表等自身作为插件；服务定义、提供者、消费者分离；配置组合应用 | 全量产品功能、全部包划分和运行环境 |
 | Cordis | 服务依赖、作用域、组合、资源所有权、异步生命周期与有序清理语义 | JS Proxy、动态对象、Promise API 及 npm 插件兼容性 |
 | VS Code | 插件清单、声明式贡献、按需激活、扩展宿主与客户端 API 边界 | 整套编辑器架构和 Extension Host 实现 |
 
-Pi 是最小 Agent 的设计基线；“最小”由盘古自身的构建与运行测量验证，不以项目声誉代替量化结果。插件化的目标是在 deepseek-harness 的服务组合基础上，进一步允许替换内存分配、解析、事件后端、传输等底层实现。
+Pi Durable 是主要基座，旧 Coding Agent 为辅助；“最小”由盘古自身的构建与运行测量验证，不以项目声誉代替量化结果。插件化的目标是在 deepseek-harness 的服务组合基础上，进一步允许替换内存分配、解析、事件后端、传输等底层实现。
 
 ## 1.2 移植范围
 
 每个实现批次先阅读相应函数、直接调用和测试，再确定采用语义及原生差异；不以README/文件清单或自己旧代码代替参考阅读，不因参考语言而选择C。阅读结论记入现有进展/交接记录，列具体版本、路径/函数和测试关联；缺少直接参考时明确说明并按对应平台/ABI规范实现。此记录不等于机器证明阅读或兼容。
 
-行为复现以固定提交的 Pi 为依据。开始实现前记录参考提交、选定模块、输入输出、事件顺序、取消、错误恢复和会话语义，建立差异清单和验收样例。
+行为复现以固定提交的 Pi Durable 为主；旧 Coding Agent 与之冲突时不自动覆盖 Durable。开始实现前记录参考提交、选定模块、输入输出、事件顺序、取消、错误恢复和会话语义，建立差异清单和验收样例。
 
 不逐句翻译源码，不要求目录、类和语言技巧一比一对应。Pi 的固定流程需要拆成服务接口和默认插件实现；有意差异必须记录原因和行为影响。未完成范围审查前，不宣称完整兼容 Pi。
 
 不要求直接运行 Pi 或 Cordis 的现有 JS/TS 插件。此类兼容由未来可选桥接宿主提供，其运行环境与体积单独计算。
+
+本轮主要入口：[Durable](references/pi/packages/durable/README.md)、`packages/durable/src/harness/`、`session/`、`storage/` 及对应测试；以下旧 Loop/扩展入口为辅助参考。
 
 本轮设计参考入口：[Pi Agent Loop](references/pi/packages/agent/src/agent-loop.ts)、[Pi 扩展机制](references/pi/packages/coding-agent/docs/extensions.md)、[Harness 架构](references/deepseek-harness/docs/architecture.md)、[Harness vendored 修改](references/deepseek-harness/vendor/README.md)、[Cordis 生命周期](references/cordis/packages/core/src/fiber.ts)、[VS Code 扩展宿主](references/vscode/src/vs/workbench/api/common/extHostExtensionService.ts)。T01～T04 已固定参考提交、迁移范围与静态清单，见 [参考基线](docs/migration/reference-baseline.json) 和 [迁移 TODO](docs/原生重写路线与迁移TODO.md)；固定与盘点不等于运行兼容性已经通过。
 
@@ -413,7 +416,7 @@ Remote Protocol
 
 # 11. Agent Runtime
 
-默认 Agent Runtime 以 Pi 为行为基线，由 Agent Loop 等服务插件负责完整 Agent 生命周期。循环实现可替换，宿主不内置固定 Agent 算法。
+默认 Agent Runtime 以 Pi Durable 为主要行为与恢复基线，由 Agent Loop 等服务插件负责完整 Agent 生命周期。循环实现可替换，宿主不内置固定 Agent 算法。
 
 基本循环：
 
@@ -837,7 +840,7 @@ Subagent 仍然运行在统一 Runtime 中。
 
 # 25. Session Runtime
 
-Session 服务以插件提供，独立于 UI；默认格式与行为参考选定的 Pi 基线。存储后端可替换，领域状态规则与物理存储接口分离。
+Session 服务以插件提供，独立于 UI；默认行为参考 Pi Durable 的不可变 Entry、原子 Commit 与上下文投影，不默认沿用旧 Coding Agent Session 格式。存储后端可替换，领域状态规则与物理存储接口分离。
 
 Session 接口按职责拆分；以下是可组合的信息类别，Tasks、Memory 等可选功能不作为最小 Session 的强制字段或依赖：
 
@@ -2122,7 +2125,7 @@ Pangu Robot
 
 # 68. 开发实现顺序与阶段验收
 
-详细顺序、技术栈转换、依赖清单、双运行差异验证、上线门禁与回滚策略见[《原生重写路线与迁移 TODO》](docs/原生重写路线与迁移TODO.md)。该计划以 Pi 为行为基线、Harness/Cordis 为组合参考；Rust 重写项目仅提供迁移组织方法。T01～T48 与功能/依赖/证据账本逐项追踪，未验证任务不能勾选完成。
+详细顺序、技术栈转换、依赖清单、双运行差异验证、上线门禁与回滚策略见[《原生重写路线与迁移 TODO》](docs/原生重写路线与迁移TODO.md)。该计划以 Pi Durable 为主要行为与恢复基线、Harness/Cordis 为组合参考；Rust 重写项目仅提供迁移组织方法。T01～T48 与功能/依赖/证据账本逐项追踪，未验证任务不能勾选完成。
 
 实现顺序服从同一最终架构，允许通过测试和实测修正规格；不承诺未经验证的设计永远不变。
 
@@ -2257,3 +2260,11 @@ Small ≠ Limited
 Small enough to run anywhere.
 Powerful enough to become anything.
 ```
+
+### 当前基座修订（2026-10-25）
+
+采用应用层微内核：固定宿主仅负责引导、服务绑定、作用域与生命周期。Durable 的 Conversation/Submission、Task/Scheduler、Storage 均由服务和默认插件提供，不将其整个 Harness 固化为宿主。静态组合可以先行，暂不要求动态加载或进程隔离。
+
+当前 agent.S 是已验证的有界内存闭环，并非 Durable 实现：输入写入有界消息数组，reset 清空数组，没有原子存储、持久任务或重启恢复。下一批须原地调整会话与Loop边界，不另留旧运行时；已有 MiMo、read 与薄 TUI 可复用。持久事实发布须在存储提交成功之后；新版Durable允许临时进度在有界延迟落盘前显示，流式预览与持久事实分开定义，不能把内存更新或模型重试称为持久恢复。等待取消仅停止等待，明确 abort 才停止任务；现有 TUI cancel 维持“明确 abort 当前运行”的含义。关闭中断和已发生工具副作用不得自动当作用户取消或无条件重放。
+
+2026-10-25首批调整：agent.S已将流式草稿移出模型可见消息数组，成功响应才追加，取消/错误丢弃草稿；仍没有存储事务或恢复，不能称为Durable提交。上游默认还会保存部分中断响应，当前丢弃草稿是明确的暂时差异，后续须按任务状态与已提交partial处理。

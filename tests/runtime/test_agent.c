@@ -10,6 +10,8 @@ static int start(void *p,const pg_session *session){fixture *f=p;f->step=0;++f->
 static int next(void *p,pg_model_event *e){fixture *f=p;++f->step;
  if(f->mode==1){e->kind=PG_MODEL_WAIT;return 0;}
  if(f->mode==2){e->kind=PG_MODEL_ERROR;return 0;}
+ if(f->mode==7 && f->step>1){e->kind=PG_MODEL_ERROR;return 0;}
+ if(f->mode==8 && f->step>1){e->kind=PG_MODEL_CALL;e->text=(pg_slice){0,1};e->call_id=s("bad");e->tool_name=s("echo");return 0;}
  if(f->mode==4){e->kind=(pg_model_kind)99;return 0;}
  if(f->step==1){e->kind=PG_MODEL_TEXT;e->text=s(f->turn==1?"checking":"done");}
  else if(f->turn==1 || f->mode==5){e->kind=PG_MODEL_CALL;e->text=s("{}");e->call_id=s("call-1");e->tool_name=s("echo");}
@@ -44,4 +46,21 @@ int main(void){fixture f={0};pg_client c=setup(&f);int n;pg_event e;
  f=(fixture){.mode=5};c=setup(&f);assert(!c.submit(c.context,s("bounded")));assert(drain(c,&n)==PG_ERROR);assert(f.turn==PG_TURN_LIMIT && f.executed==PG_TURN_LIMIT && f.closed==PG_TURN_LIMIT);
  f=(fixture){0};c=setup(&f);agent.session.count=PG_MESSAGE_LIMIT-3;assert(c.submit(c.context,s("full")));assert(agent.session.count==PG_MESSAGE_LIMIT-3);
  char oversized[PG_TEXT_LIMIT+1];memset(oversized,'x',sizeof(oversized));c=setup(&f);assert(c.submit(c.context,(pg_slice){oversized,sizeof(oversized)}));assert(agent.session.count==0);
+ /* Preview is not accepted history. Error/abort/invalid tool arguments cannot admit it. */
+ for(int mode=0;mode<3;++mode){f=(fixture){.mode=mode==0?0:mode==1?7:8};c=setup(&f);
+  assert(!c.submit(c.context,s("preview")));pg_message admitted=agent.session.messages[0];
+  assert(c.poll(c.context,&e)&&e.kind==PG_RUN_STARTED);assert(!c.poll(c.context,&e));
+  assert(c.poll(c.context,&e)&&e.kind==PG_TEXT_DELTA&&e.text.size==8);
+  assert(agent.session.count==1&&!memcmp(&admitted,&agent.session.messages[0],sizeof(admitted)));
+  if(mode==0)c.cancel(c.context);
+  assert(drain(c,&n)==(mode==0?PG_CANCELLED:PG_ERROR));
+  assert(agent.session.count==1&&!memcmp(&admitted,&agent.session.messages[0],sizeof(admitted)));
+  assert(agent.draft.size==0&&f.executed==0&&f.closed==1);
+ }
+ f=(fixture){0};c=setup(&f);assert(!c.submit(c.context,s("settled")));
+ for(int j=0;j<16;++j)if(c.poll(c.context,&e)&&e.kind==PG_TOOL_STARTED)break;
+ assert(e.kind==PG_TOOL_STARTED&&agent.session.count==3);
+ pg_message settled=agent.session.messages[1];assert(settled.role==PG_ASSISTANT&&settled.size==8);
+ assert(drain(c,&n)==PG_SUCCESS);
+ assert(!memcmp(&settled,&agent.session.messages[1],sizeof(settled))&&agent.draft.size==0);
  puts("PASS: tool round-trip, denied side effects, model failures, cancellation, busy and invalid input");return 0;}

@@ -239,3 +239,29 @@ e6b8178c5e566194ffac802a7b8bba28e5e50e341d2f390f8865bddba078636c  governance/boo
 ```
 
 提交候选复验：仅用本Agent暂存内容检验，未包含另一Agent未交接的TUI改动；该提交树G00、核心七组O0/O2测试、无网络PTY及真实MiMo PTY（read续答、收到文本后取消、终端恢复）全部通过。检验目录完成后自动删除。当前共享工作区的TUI改动仍由另一Agent负责，不据此声称其汇编版本已验收。
+
+## 2026-10-25：Durable主基座与微内核边界修订
+
+用户明确选择Durable主基座，旧Coding Agent辅助，Harness/Cordis负责应用层微内核与组合。当前仅完成文档/队列修订，尚未完成核心语义改造；agent.S可变内存会话不能称为Durable兼容。取消等待与明确abort、事务失败不发布、检查点恢复及工具副作用处理进入近期队列，现有TUI cancel保持明确abort。
+
+Pi参考从2ec55d808d455b1a64a2bf7888198207a096120a干净快进到38ff99177fba21e9c57a670f4e95adcf407c99c7；Harness从687f282e8625c6b8d11ff58211a90524be2e4317更新至origin/master（精确提交见下），首次误用origin/main未成功，随后改用实际master。更新不改变历史基线或宣称接受全部修复。读取Durable README概念/恢复、Submissions.submit→commitWith、Conversation.reset/commit/abort及恢复测试入口；任务恢复测试目前只完成入口定位，尚未运行TS套件，不能称兼容验证。读取Harness docs/architecture.md的Cordis、Core packages、Turn flow与Session log：领域功能由插件提供。
+
+同一Agent自审本次文档控制变更：不放宽预算/测试；风险是原核心仍缺Durable语义，明确保持未完成。git diff --check通过；G00实际失败于另一Agent正在迁移的TUI新增汇编未登记/旧C已删除，本批不代其验收，也不修改门禁隐藏失败。固定摘要（不含本记录）：
+
+```text
+Harness 22ddee3792402c3e70ec5f86a63c3e3e895a2f60
+7f7d6d966016ec2a04cae0940ac8c83058cc4b2d1acdd6a04b6a366de238e48d  AGENTS.md
+ab3c281079000af3707f7bebf31d796289fac9be2e6b4e11f3c998bfc29fcf2c  盘古 Pangu 项目完整文档.md
+bf46950c6739e0106532fb9698c60180f4bf7ae3cc7bee6e5e28d9ddce962627  docs/工程门禁与架构守卫.md
+1367841178e8c7a9ba0bf9d53032b1ddd0d5648fae94de8f68dbbd0be34a3c00  docs/原生重写路线与迁移TODO.md
+```
+
+## 2026-10-25：Durable边界首批——草稿与结束消息分离
+
+阅读固定Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7：generation.ts的streamResponse→PartialChanges与classify→answer/startToolRound、convertPartial；session.ts的Storage.commit→adopt→publish；submissions.ts的wait/abort；harness-partial-changes.test.ts的分片/提交失败恢复用例。采用live partial不直接改Entry的边界。最新CHANGELOG还明确进度可deferred（默认persistWithinMs=1000），故修正“任何展示均先落盘”的过强陈述；持久事实和临时预览分开。
+
+agent.S原地新增4248字节有界draft，不在request start插入空assistant；文本只修改draft，成功DONE或有效CALL才追加结束消息。CALL先验证标识/参数/整个往返容量，再追加assistant与call；没有中途回调。结束/取消/错误清除draft。既有消息偏移和pg_client接口不变，pg_agent尺寸从280440变为284688，消费者须同批重编译；不承诺稳定ABI。没有第二份核心实现。
+
+有意未完成差异：临时文本事件仍为进程内预览；取消/错误草稿丢弃，不实现Durable的已提交partial→aborted entry。仍无Storage事务、requestId、任务检查点、重开恢复或等待句柄；取消仍明确abort，不把poll缺席称为自动后台调度。此批只建立后续提交服务的生成边界，不声称Durable兼容。
+
+验证：核心七组O0/O2 UBSan构建执行通过，新增预览不入模型历史、错误/取消/无效参数无半消息、已结束消息不随下一轮变化、draft清除；汇编ABI/寄存器/栈/保护页及满容量原用例通过。当前共享工作区G00因并行TUI迁移未登记而失败，不修改其文件或放宽检查。真实模型和隔离候选结果另追加实际回执。

@@ -18,6 +18,7 @@ OFFSET(pg_session,count,PG_A_COUNT);OFFSET(pg_session,system_prompt,PG_A_SYSTEM)
 OFFSET(pg_agent,model,PG_A_MODEL);OFFSET(pg_agent,tools,PG_A_TOOLS);OFFSET(pg_agent,state,PG_A_STATE);
 OFFSET(pg_agent,turns,PG_A_TURNS);OFFSET(pg_agent,cancelled,PG_A_CANCEL);OFFSET(pg_agent,request_open,PG_A_OPEN);
 OFFSET(pg_agent,outcome,PG_A_OUTCOME);OFFSET(pg_agent,assistant_index,PG_A_ASSISTANT);OFFSET(pg_agent,call_index,PG_A_CALL);
+OFFSET(pg_agent,draft,PG_A_DRAFT);
 OFFSET(pg_agent,event_text,PG_A_TEXT);OFFSET(pg_agent,error_text,PG_A_ERROR);
 OFFSET(pg_event,text,8);OFFSET(pg_event,call_id,24);OFFSET(pg_event,tool_name,40);
 OFFSET(pg_model_event,text,8);OFFSET(pg_model_event,call_id,24);OFFSET(pg_model_event,tool_name,40);

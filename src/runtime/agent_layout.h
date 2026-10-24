@@ -44,5 +44,6 @@
 #define PG_A_CALL 276080
 #define PG_A_TEXT 276088
 #define PG_A_ERROR 280184
-#define PG_A_BYTES 280440
+#define PG_A_DRAFT 280440
+#define PG_A_BYTES 284688
 #endif
