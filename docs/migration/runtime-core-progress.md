@@ -347,3 +347,17 @@ a9412685663bf08f761f9d14fe39a51577e1efc050fe25b74b1e49ff3a0a2427  src/client/tui
 fd79244b76e0f5885ca85ce8d09bfa3de8d2ca9286aa1feb29845e095207cf80  tests/client/tui/test_tui_view.c
 0eafc3b166d1a9cb124a2864b707e4af7ff441010c096f8e5ca9a26d9c35b94d  tools/client/tui/build.sh
 ```
+
+## 2026-10-25：更新并行派发范围
+
+已完成TUI派发文档删除，历史交接保留并标注派发已退役；新任务为工具注册/read的手写汇编原地迁移。主Agent独占Durable存储/任务/恢复与共享清单，第二Agent独占tools/read与专项测试，冻结工具公开布局，不添加写入/命令/异步能力。任务明确源码参考、文件归属、单版本替换、平台胶水限制、安全边界、ABI/容量验证和真实交接要求。未执行新任务，不将文档视为实现。
+
+同一Agent按授权自审自批登记与任务归属调整，无门禁/预算放宽。G00通过，git diff --check通过；仅文档/清单修改，未重复运行产品测试。固定摘要（不含本记录）：
+
+```text
+0c3fbbcb00a6f5e804550c763bbbd24d7dd800c665234c1865b21161c2d7361e  docs/并行开发任务提示词-工具核心汇编重构.md
+9ed691ebf24471927469468c8be60ce1737913d44b230faa1fc4f468d3c164a8  governance/bootstrap-policy.json
+79df87a19a349576bf7cc9e875cb476fb4eae0cad79d108ddb1e59f9353c79ab  docs/migration/task-ledger.json
+d3b0a3a79c4ddc9456ec392330a34ff147e22f60a18a4f2c0849877ffbc1e5af  docs/原生重写路线与迁移TODO.md
+449acddee056db19a8687a7f1a6e2bee3cb50844d266323bf518d31dea9f6fe9  docs/migration/tui-assembly-handoff.md
+```

@@ -2221,7 +2221,7 @@
       "cpp"
     ],
     "next_work": "Agent Loop and bounded memory session now handwritten ASM; continue in-place tool/protocol migration; TUI migration in separate Agent scope",
-    "ownership": "main Agent owns Runtime/contracts/bridge/composition/shared controls; second Agent owns TUI files listed in docs/并行开发任务提示词-汇编优先TUI重构.md",
+    "ownership": "main Agent owns Durable storage/tasks/recovery/shared controls; second Agent owns tools/read modules and dedicated tests in docs/并行开发任务提示词-工具核心汇编重构.md; public tool ABI frozen",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
     "status": "plan and admission only; assembly implementation not completed",
     "reference_workflow": "Read pinned functions, direct callers and related tests before implementation; record adopted semantics/native differences and verification in existing handoff/progress. runtime-local-modules.reference_basis is a locator, never reading/compliance proof."

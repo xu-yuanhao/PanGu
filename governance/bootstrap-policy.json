@@ -515,7 +515,6 @@
     "tests/client/tui/test_runtime_bridge.c": "client-test",
     "tools/runtime/build_pangu.py": "development-tool",
     "tools/runtime/test_pangu_pty.py": "development-tool",
-    "docs/并行开发任务提示词-汇编优先TUI重构.md": "document",
     "governance/assembly-first.json": "control",
     "tools/gates/assembly_first.py": "gate",
     "tools/gates/test_assembly_first.py": "gate-test",
@@ -535,6 +534,7 @@
     "src/client/tui/tui_term.S": "client-source",
     "src/client/tui/tui_layout.h": "client-source",
     "tests/client/tui/test_tui_abi.c": "client-test",
-    "docs/migration/tui-assembly-handoff.md": "document"
+    "docs/migration/tui-assembly-handoff.md": "document",
+    "docs/并行开发任务提示词-工具核心汇编重构.md": "document"
   }
 }
