@@ -369,6 +369,7 @@ C++ 首先只用于 Qt 桥接等批准区域，P0～P3 默认不依赖 C++ Runti
 - [x] 早期owner固定发现清单30份不同内容逐份静态审计：全部路径摘要复核，18份与focused源码相同、11份历史变体完整差异及最早probe六组边界均记录；这不是新增运行证据，发现完整性与私有API差异仍待处理，见 [审计](migration/t14-earlier-owner-content-audit.json)。
 - [x] 固定44份早期Python运行器/生成器审计：全部assert节点与源码摘要记录，唯一嵌入测试已在30份内容清单中；外部副本重跑8项SDK2本地回执检查通过。未重跑会改写源文件的旧生成器，尚不关闭完整发现/ABI/G04/G07，见 [审计](migration/t14-earlier-runner-audit.json)。
 - [x] G04局部异步setup/cleanup轨迹：3组50事件，8个普通/UBSan构建运行逐事件一致；伪造/重复票据、取消迟到成功、加载/清理双错误及终态排空覆盖。局部参考检查器5组自测（含700个字段变异）通过；多owner/分支/预算完整矩阵仍未验收，见 [证据](migration/t14-g04-async-trace-evidence.json)。
+- [x] G04固定分支图小预算轨迹：8场景/228事件/148次推进，量子1–4、公开依赖call双端保活、无关分支独立清理与清理错误保留；8个普通/UBSan构建运行一致，分支检查器8组自测通过。尚未覆盖planner组合及完整异步交错/故障矩阵，见 [证据](migration/t14-g04-branch-trace-evidence.json)。
 
 - [x] 局部宿主异步清理：完成票据、等待期间 owner 可见、重复/迟到拒绝与消费者清理期间保留 provider；O0/O2 各 8 组补充场景及原 675 生命周期场景通过。完整异步事件循环及原生准入仍待完成，见 [T14 草稿](migration/t14-owner-boundaries.md)。
 

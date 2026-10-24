@@ -1,0 +1,171 @@
+{
+  "schema": "pangu.t14-g04-branch-trace-evidence.v1",
+  "date": "2026-10-24",
+  "status": "PASS_LOCAL_BRANCH_BUDGET_TRACE_NOT_FULL_G04",
+  "scope": "Eight fixed four-owner/two-edge lifecycle graph scenarios, quantum1-4 and independent cleanup failure; not planner integration or full G04.",
+  "candidate": {
+    "repository": "https://github.com/xu-yuanhao/PanGu",
+    "branch": "codex/t14-async-setup-core",
+    "commit": "78b8b67f7f137d3e3998034363e599bb3a4eacc1",
+    "parent": "06abfa95e11bdb4c00b74c6fe208b76575a49e46",
+    "source": "src/async-setup-core/main.c",
+    "source_sha256": "d76b273b831105f6ceea44ebeaee975ab5033d1ca0092a125d7deaeb7c78a5cb",
+    "candidate_tree_sha256": "b33e4531a6c9fa72cd900584bf38bb7de07a2e96f6ec32a9440a2c4ed078711c",
+    "remote_readback": "PASS",
+    "remote_source_sha256": "d76b273b831105f6ceea44ebeaee975ab5033d1ca0092a125d7deaeb7c78a5cb"
+  },
+  "fixed_inputs": {
+    "native_candidate_policy_sha256": "97eb8496e35392d80c2dfe41c23d4d596bafc053b1dbd80af22a90a76d93c4c3",
+    "native_candidate_controller_sha256": "317296c220b695aee8a20936784ec4a1ff7b0a92da7470f2d6d24070cfcde1e9",
+    "normal_registry_sha256": "b12cf3f5ea23e2220473a7b41dd0599d202323a39fc8587af2e97994ce0a109e",
+    "ubsan_registry_sha256": "5506af0c641fd7640019ce215978fdf8e444fe6f3ed6fcce208c5f0111cdb718",
+    "normal_image_sha256": "23d6086651c009e3863556828331b6d6badb6065a336c90c6cc18fc59b824616",
+    "ubsan_image_sha256": "4b6b9758fe337a4c57a4bc904bba23c2903855deb7aa50fa9b4271d2f4f41b41",
+    "normal_request_sha256": "ae9c4febe81309ddf7aa67075b01eaa6ecca58182f19e031926f2fc9f695c6ea",
+    "ubsan_request_sha256": "43e1ebc568776ee5b7341d09aa8d28cfabb5a5df985cb4dff24ac8158191b4d1"
+  },
+  "coverage": {
+    "cases_per_run": 8,
+    "events_per_run": 228,
+    "budget_ticks_per_run": 148,
+    "quantum_values": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "normal_builds_and_runs": 4,
+    "ubsan_builds_and_runs": 4,
+    "branch_events_verified_across_matrix": 1824,
+    "prior_async_events_per_run": 50,
+    "all_stdout_identical": true,
+    "all_stdout_sha256": "6bbe19278fd204c437f0a64a27df79174de0d15721a5efbd1e172c3f6f097978",
+    "graph_edges": [
+      [
+        1,
+        0
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    "held_public_binding": 0,
+    "cleanup_fault_owner": 3,
+    "cleanup_fault_values": [
+      0,
+      -33
+    ],
+    "zero_budget_snapshots": [
+      "runtime",
+      "owners",
+      "resources",
+      "operations",
+      "disposed"
+    ],
+    "planner_integration_in_this_suite": false,
+    "full_G04": false
+  },
+  "public_api_adaptation": {
+    "methods": [
+      "owner_init",
+      "register_resource",
+      "bind_geometry",
+      "start",
+      "stop",
+      "call",
+      "call_finish"
+    ],
+    "private_helpers_reexported": false
+  },
+  "build_evidence": {
+    "normal": {
+      "admission_json_sha256": "c103b3d25f2f3e57845171cdd4cd453023ef9d8ea7c3238e95ec9bf7c185bad2",
+      "executions_json_sha256": "31a8832e732187421a8f0e0be13a3a874529692d0e405c58fb27f750075e3985",
+      "build_count": 4,
+      "native_matrix": "PASS"
+    },
+    "ubsan": {
+      "admission_json_sha256": "5462f0ac18334909da853839db49cc3a8dbe9e724cf89155c5de3aa3aefd0596",
+      "executions_json_sha256": "6df50078cea5d548494a36ba72f59ddb64079fe8a7f1c4571cdd998752f4068e",
+      "build_count": 4,
+      "native_matrix": "PASS",
+      "assembly_instrumentation": "UBSan does not instrument assembly provider instructions"
+    }
+  },
+  "environment_and_release": {
+    "execution_environment": "CALLER_PROVIDED_NOT_ATTESTED; bwrap network-unshared, read-only controller/candidate inputs and frozen toolchain image.",
+    "isolated_controller_status": "BLOCKED",
+    "external_trust_approval": "PENDING",
+    "release": "BLOCKED",
+    "production_admission": "NOT_GRANTED",
+    "full_T14": "NOT_COMPLETED",
+    "G04_G07": "NOT_COMPLETED"
+  },
+  "self_review": {
+    "implementer": "same Agent",
+    "reviewer": "same Agent",
+    "independent_review": false,
+    "decision": "Approve fixed local branch invariant checker, tests and evidence for continued experiments only; same-Agent review.",
+    "fixed_candidate_digest": "b33e4531a6c9fa72cd900584bf38bb7de07a2e96f6ec32a9440a2c4ed078711c",
+    "changed_control_files": [
+      "governance/bootstrap-policy.json",
+      "docs/migration/t14-focused-inventory.json",
+      "docs/migration/t14-owner-boundaries.md",
+      "docs/原生重写路线与迁移TODO.md",
+      "tools/migration/g04_branch_trace.py",
+      "tools/migration/test_g04_branch_trace.py",
+      "docs/migration/t14-g04-branch-trace-fixture.json"
+    ],
+    "validation": [
+      "Eight frozen builds and isolated executions PASS; 1824 branch events checked.",
+      "Prior async50-event suite and all existing count suites re-executed.",
+      "All full stdout hashes identical; GitHub source blob matches.",
+      "Eight branch checker self-test groups PASS.",
+      "G00 PASS; production admission BLOCKED; test_check.py 13 tests PASS; git diff --check PASS."
+    ],
+    "risks": [
+      "Same-Agent oracle review, not independent approval.",
+      "Fixed lifecycle graph bypasses planner composition in this suite.",
+      "No full async/branch/fault interleaving or production G04 admission claim.",
+      "Prior async checker is explicitly pinned; new branch checker is local only.",
+      "G07/T14/external trust and production release incomplete.",
+      "UBSan does not instrument assembly."
+    ],
+    "control_scope_sha256": "1fed9c62becd64b4f61f99bdfcd6763922cedc69e6f3d7b7e43a2d72d6c407d0",
+    "control_scope_inputs": {
+      "governance/bootstrap-policy.json": "db8af7f2ffdcd43343d6ecdf10c7a0a7f1d7ad83a598e8f086fdff12ee109b61",
+      "docs/migration/t14-focused-inventory.json": "4a445c6ca3e9497be35b07f6451e45ddf65226eb790aaaa771b0d73306344a40",
+      "docs/migration/t14-owner-boundaries.md": "7616aac5385009c748e5e6e368c11b11e5e5828b80bb01dd296d945bbeec7c17",
+      "docs/原生重写路线与迁移TODO.md": "49269768a43d3871026b6eec0faf24b276c509002c585713eba99dad8881fc70",
+      "tools/migration/g04_branch_trace.py": "bbe3cedd50a4892bea4e77c7eeda76d930de3b1cabc89c7fafd8a84851fa264a",
+      "tools/migration/test_g04_branch_trace.py": "271567da583d8589497324f194fbb7231642577334371669803ebe35049d621e",
+      "docs/migration/t14-g04-branch-trace-fixture.json": "03dd7ccbddda7a0f185c96d53b12efe20549fdf1835e50ed887e53f77e7f2af5"
+    }
+  },
+  "evidence_timing": "Native candidate/controller frozen before adding this evidence and updating inventory; fixed test inputs remain preserved in artifact directory.",
+  "development_failures": [],
+  "trace_checker": {
+    "path": "tools/migration/g04_branch_trace.py",
+    "sha256": "bbe3cedd50a4892bea4e77c7eeda76d930de3b1cabc89c7fafd8a84851fa264a",
+    "external_checker_bytes_match": true,
+    "fixture": "docs/migration/t14-g04-branch-trace-fixture.json",
+    "fixture_sha256": "03dd7ccbddda7a0f185c96d53b12efe20549fdf1835e50ed887e53f77e7f2af5",
+    "self_test_path": "tools/migration/test_g04_branch_trace.py",
+    "self_test_sha256": "271567da583d8589497324f194fbb7231642577334371669803ebe35049d621e",
+    "self_test_groups": 8,
+    "mandatory_G04_integration": false,
+    "authority": "Same-Agent local invariant oracle, not independent attestation."
+  },
+  "review_adjustments": [
+    "Before first completed run, reference model changed its event-side observation for successful call_finish: output snapshot is after references are released, unlike preceding independent-drained snapshot. Native implementation unchanged."
+  ],
+  "baseline_checker_extension": {
+    "scope": "Prior two async trace checker/test files absent from older coordinator baseline are checked against explicit SHA256 pins; every other gate/instruction remains byte-equal to prior controller.",
+    "pins": {
+      "tools/migration/g04_async_trace.py": "966ffc19409b7e8979053c728024628cce18c9ff69055574bbb613e1df0203ac",
+      "tools/migration/test_g04_async_trace.py": "241f368d2543b936f64c5899d4ed668eb227ac56ed4092c52a07f845fe9884ff"
+    },
+    "authorization": "Previous fixed same-Agent control registration, no gate/budget relaxation."
+  }
+}
