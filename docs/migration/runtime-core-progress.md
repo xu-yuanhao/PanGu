@@ -265,3 +265,20 @@ agent.S原地新增4248字节有界draft，不在request start插入空assistant
 有意未完成差异：临时文本事件仍为进程内预览；取消/错误草稿丢弃，不实现Durable的已提交partial→aborted entry。仍无Storage事务、requestId、任务检查点、重开恢复或等待句柄；取消仍明确abort，不把poll缺席称为自动后台调度。此批只建立后续提交服务的生成边界，不声称Durable兼容。
 
 验证：核心七组O0/O2 UBSan构建执行通过，新增预览不入模型历史、错误/取消/无效参数无半消息、已结束消息不随下一轮变化、draft清除；汇编ABI/寄存器/栈/保护页及满容量原用例通过。当前共享工作区G00因并行TUI迁移未登记而失败，不修改其文件或放宽检查。真实模型和隔离候选结果另追加实际回执。
+
+最终回执：真实MiMo五步会话HTTP200，记忆/回忆/清空/文本后取消/重新提交通过，live_session_exit=0。隔离候选G00通过（生产准入仍BLOCKED），无网络PTY Ctrl-D、SIGTERM、resize退出及精确termios恢复通过，不含并行TUI汇编改动。
+
+同一Agent自审自批：参考选择/模块来源与核心边界调整，不修改检查器或预算；风险是pg_agent尺寸变化、异常partial暂时丢弃和未实现持久化。首次追加摘要脚本因Git中文路径转义失败，修正为NUL分隔后重记，不影响上述测试。固定摘要（排除本记录）：
+
+```text
+7f7d6d966016ec2a04cae0940ac8c83058cc4b2d1acdd6a04b6a366de238e48d  AGENTS.md
+d2fa9edb77376c21928438115629264e69bbefb9593cec074e33eaec9176645b  docs/原生重写路线与迁移TODO.md
+7cfc09b878049381459b280db488c3cb40fb7aea9ce9317cdcdb1d25c3b60f1e  docs/工程门禁与架构守卫.md
+563a0b84a3e1c21d3ac8b5dc6564e41f00b2d4772dcd842c78ac4a075cb7cb2b  governance/runtime-local-modules.json
+88367fd6f957e156e678df4c67d0f945d9319ba090210ea69c35fc54cbd5e992  src/runtime/agent.S
+94bccda5cf4638f7474b2d1bd0747959ba0e412e29f701d78021252d0abe7b65  src/runtime/agent.h
+d43c3a088b3380b975a93034b7fe5ef2a092ff7899b9626a3d6ec5f9d2d76d7a  src/runtime/agent_layout.h
+849fb554253347c4837708cdf51c01efca5b8b2cf5071b37fc82e0a69975f29c  tests/runtime/test_agent.c
+9579829fb10c5a544a75c6c41941b7669db9d9e9f86630fa2460d2c3c9596b2d  tests/runtime/test_agent_asm.c
+f1bdf9dde75aa770ab23d9e0928598adb5081704e4868ba30799d56be90d833f  盘古 Pangu 项目完整文档.md
+```
