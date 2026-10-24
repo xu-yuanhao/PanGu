@@ -199,3 +199,5 @@ d207e2246149e6e114239735ce0ed079e1e04ed0304097b5fcc1e418365161c6  tools/runtime/
 752d812f9331919ced83ed0f87035761cd2a7f067b047e227cc8b15c9d647753  tools/runtime/build_test.py
 2bda7276b99d3de15aa89d47d6c8576c86cf3f7c9e8856f19d518ba47686d7f9  tools/gates/test_assembly_first.py
 ```
+
+并行状态补充：上述G00通过是本轮检查时的结果。提交前另一Agent新增 `src/client/tui/tui_layout.h`，最终复核G00实际exit1：该头文件未登记。只提交本Agent负责的13个入口/控制/脚本文件，没有暂存、修改或登记TUI进行中产物；等待其交接。此状态不应被报告为最终全仓G00通过。
