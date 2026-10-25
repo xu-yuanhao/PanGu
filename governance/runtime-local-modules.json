@@ -559,6 +559,44 @@
           ]
         }
       ]
+    },
+    {
+      "id": "process.posix.local.v0",
+      "sources": [
+        "src/runtime/process.h",
+        "src/runtime/process_layout.h",
+        "src/runtime/process.S"
+      ],
+      "dependencies": [
+        "client.contract.v0",
+        "GNU libc posix_spawn file-action extensions",
+        "Linux pipe2/waitid/clock/process-group APIs"
+      ],
+      "role": "replaceable pg_process_ops provider; handwritten cooperative subprocess lifecycle and separate bounded raw stream events; libc owns spawn/exec setup, waitid WNOWAIT retains leader ownership until final reap, timeout/cancel/close kill owned group, post-exit idle grace; consumer owns decoding/retention/spill and async tool integration is pending",
+      "exports": [
+        "pg_process_init",
+        "pg_process_start",
+        "pg_process_next",
+        "pg_process_cancel",
+        "pg_process_close",
+        "pg_process_service"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "0eea54f11c2c8d45ec3dfaa40522030539ab28f1",
+          "paths": [
+            "packages/durable/src/tools/bash.ts",
+            "packages/durable/src/env/node.ts",
+            "packages/coding-agent/src/utils/child-process.ts"
+          ],
+          "semantics": "exec, killProcessTree and waitForChildProcess: per-stream bytes, explicit cwd/env, nonzero/signal statuses, cancellation/timeout, 100ms rearmed idle grace; native explicit environment and poll-driven deadlines, no tool output retention/spill yet",
+          "tests_to_read": [
+            "packages/durable/test/env-node.test.ts",
+            "packages/durable/test/tools.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
@@ -602,6 +640,14 @@
       "license": "MIT/Expat; bundled Unicode data licensing applies to packaging",
       "purpose": "mature Unicode NFKC and UTF-8 iteration for edit text matching; no custom Unicode database",
       "impact": "edit text module only, not a Loop dependency; Unicode-version-wide equivalence/other platforms/redistribution packaging not certified"
+    },
+    {
+      "name": "GNU libc process API",
+      "version": "2.44",
+      "source": "system getconf GNU_LIBC_VERSION and public spawn/signal/wait/time headers",
+      "license": "LGPL-2.1-or-later",
+      "purpose": "existing libc dependency: mature spawn/exec setup, directory/descriptor actions, process groups and nonblocking wait; no new third-party library",
+      "impact": "Linux/glibc process backend only; opaque spawn storage is checked during product build, other libc/platform ports not certified"
     }
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",

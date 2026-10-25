@@ -8,6 +8,13 @@ ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
+PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
+    'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
+    'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
+    'posix_spawn_file_actions_addopen', 'posix_spawn_file_actions_adddup2', 'posix_spawn_file_actions_addclosefrom_np',
+    'posix_spawnattr_setsigmask', 'posix_spawnattr_setsigdefault', 'posix_spawnattr_setpgroup',
+    'posix_spawnattr_setflags', 'posix_spawn')]
+
 SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), str(ROOT / 'tests/runtime/test_agent.c')]
 
 def main():
@@ -108,6 +115,11 @@ def main():
             subprocess.run([edit_tool_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
                             '--tool-binary', edit_tool_test], check=True, timeout=45)
+            process_test = str(Path(directory) / 'test-process')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/process'),
+                            str(ROOT / 'tests/runtime/test_process.c'), *PROCESS_WRAPS, '-o', process_test], check=True)
+            subprocess.run([process_test], check=True, timeout=20)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
             tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',

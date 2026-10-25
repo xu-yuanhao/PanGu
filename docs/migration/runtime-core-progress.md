@@ -641,3 +641,20 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 收尾fetch发现Pi从38ff991新增4个提交，干净工作树已快进至0eea54f11c2c8d45ec3dfaa40522030539ab28f1。已读差异：旧Coding Agent的带slash provider/id解析、NPM symlink prefix，以及no-env测试脚本和Windows入口图路径规范；本批Durable edit/harness文件均未变，固定38ff991函数oracle字节核对仍通过，暂无本批原生修复需采用。Harness仍22ddee3，上游一致；不把参考工作树更新当成所有新行为已移植。
 
 固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`59ecf34f9cd8fd8fa4c16d0e84573649b116eab7fee62e69907af3a0ef19a651`（14个路径）。
+
+
+## 2026-10-25：非阻塞进程后端（bash工具尚待接入）
+
+读取固定Pi 0eea54f的tools/bash.ts、env/node.ts::exec/killProcessTree/waitForChildProcess及env-node.test.ts、tools.test.ts命令/取消/超时/继承stdio用例，辅读旧Coding Agent的child-process.ts。新增手写process.S与可替换pg_process_ops：成熟libc posix_spawn负责启动/exec，汇编负责独立stdout/stderr非阻塞块、退出码/信号、单调时钟超时、取消/关闭与资源回收。未自行实现fork/exec框架，也未把命令运行放进同步工具execute阻塞TUI。
+
+采用无默认超时、进程组SIGKILL、信号退出映射128+signal、正常退出后100ms输出空闲收尾（有新输出则重置）。原生差异：超时从start前的时间戳计算、由next协作观察；取消/错误时确认leader退出后最多排空100ms，防止持续的外部输出拖住关闭。waitid WNOWAIT保留leader为可等待状态直到最终waitpid，避免自己提前回收导致PID复用；要求默认SIGCHLD、owner不得外部回收或改其处置。子进程工作目录/环境显式提供，NULL环境不继承，stdin=/dev/null、无关FD关闭；这不是工作目录沙箱/守护进程监管，正常结束的后台后代不承诺全部清理。
+
+实际验证：核心20组O0/O2 UBSan通过，进程专项O2 ASan/UBSan通过。真实OS命令验证非零/信号退出、二进制/大块双流、stdin EOF、cwd/env/信号默认值/FD继承、stdout已关但leader未退、忙拒绝/复用/终态一次、取消/超时/协作close后leader已回收。27个启动失败点保持实例不变、FD计数不变、无命令副作用/遗留子进程；另测read/waitid/waitpid EINTR/EAGAIN、IO/clock错误、kill失败重试、命令与实例页尾、低编号FD。持续输出取消收尾用read故障注入模拟，不冒充真实逃逸进程或模型验证；正常后代持续写与安静持有stdio均用真实进程检查。测试修正了即时终态可能被驱动丢弃的等待方式，未放宽操作语义断言。
+
+当前宿主GNU libc 2.44；只是使用已有libc的新接口，无新第三方库/C核心。product builder新增对process_layout.h的C语法/sizeof/offset/alignment断言检查，防止opaque spawn存储布局不符时仍链接运行。实际组合构建与离线PTY终端/持久闲置检查通过；对象text2450字节、data/bss0，实例4160字节，只有公开libc依赖。原始输出允许二进制/UTF-8分块，消费方负责解码、保留/溢出；尚未接Runtime/registry异步工具协议或bash入口，本批没有真实MiMo命令闭环，T26保持IN_PROGRESS、bash项未勾选。下一步接异步工具生命周期，再完成bash输出与真实交互。
+
+同一Agent按授权自审自批进程服务、实际构建/文件/语言/依赖登记。G00、assembly-first、diff检查通过；生产准入仍BLOCKED，不宣称完整平台/性能/服务器侧防绕过认证。主文档仍51行，未扩张额外框架。
+
+收尾fetch发现Pi新增d5b3de22d0e24a3e9c38a9410d3329b099717283，干净树已快进。已读generation及两份测试差异：请求thinking level写入assistant消息/deferred checkpoint，旧缺失字段不补造；本批process/bash参考文件未变。当前MiMo固定thinking disabled、原生无thinkingLevel/deferred字段，尚无对应配置迁移，不伪称该新增语义已移植；未来引入该能力时需采用请求级别的固定记录与恢复语义。Harness仍22ddee3。
+
+固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`2e5dd6bd81dc9fdefec56be86f798dbfebaab7b1703f101214f41de8cf3c750e`（11个路径）。

@@ -100,6 +100,10 @@
     "src/runtime/edit_tool.S": {
       "role": "assembly-core",
       "reason": "手写编辑参数准备、所有权与读/改/写服务组合；借用可替换pg_tools，不复制文件后端"
+    },
+    "src/runtime/process.S": {
+      "role": "assembly-core",
+      "reason": "手写协作式子进程轮询/超时/取消/输出与回收；启动复用公开libc posix_spawn，不重写fork/exec细节"
     }
   }
 }

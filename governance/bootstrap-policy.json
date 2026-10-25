@@ -578,6 +578,10 @@
     "tools/runtime/test_edit_text.py": "gate",
     "src/runtime/edit_tool.S": "native-source",
     "src/runtime/edit_tool.h": "native-source",
-    "tests/runtime/test_edit_tool.c": "native-test"
+    "tests/runtime/test_edit_tool.c": "native-test",
+    "src/runtime/process.S": "native-source",
+    "src/runtime/process.h": "native-source",
+    "src/runtime/process_layout.h": "native-source",
+    "tests/runtime/test_process.c": "native-test"
   }
 }

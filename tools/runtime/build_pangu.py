@@ -24,6 +24,10 @@ def build(output):
     if output.is_relative_to(ROOT):
         raise ValueError('build output must be outside the checkout')
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Spawn attributes are opaque to ASM; reject a mismatching host layout before linking.
+    subprocess.run(['/usr/bin/clang-23', '-D_GNU_SOURCE', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
+                    '-x', 'c', '-fsyntax-only', '-include', str(ROOT / 'src/runtime/process_layout.h'),
+                    '/dev/null'], check=True)
     flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
