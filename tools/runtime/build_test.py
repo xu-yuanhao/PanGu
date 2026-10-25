@@ -96,6 +96,18 @@ def main():
             subprocess.run([edit_test], check=True, timeout=10)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
                             '--binary', edit_test], check=True, timeout=45)
+            edit_tool_test = str(Path(directory) / 'test-edit-tool')
+            edit_tool_sources = ['agent', 'session', 'submissions', 'journal', 'journal_posix',
+                                 'tools', 'read_tool', 'write_tool', 'edit_text', 'edit_tool']
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in edit_tool_sources],
+                            str(ROOT / 'tests/runtime/test_edit_tool.c'),
+                            '-Wl,--wrap=json_tokener_new,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext',
+                            *edit_flags, '-o', edit_tool_test], check=True)
+            subprocess.run([edit_tool_test], check=True, timeout=15)
+            subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
+                            '--tool-binary', edit_tool_test], check=True, timeout=45)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
             tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',

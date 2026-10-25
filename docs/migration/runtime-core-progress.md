@@ -624,3 +624,20 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 同一Agent按用户授权自审自批本批文本模块、Unicode依赖与文件/语言/构建登记。主文档仍51行，只补实际构建依赖；未新增C核心、备用实现或认证框架。生产准入仍BLOCKED。收尾fetch后Pi/Harness仍分别38ff991/22ddee3，与各自上游一致、工作树干净，无新上游代码待采用。
 
 固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`b54b3a3be468c8b6da549583458d54241e27a078e97a82857d851d710e1616d2`（12个路径）。
+
+
+## 2026-10-25：edit文件工具接入与真实验证
+
+复读固定Pi 38ff991的edit.ts::prepareEditArguments/createEditTool、tools.test.ts参数修复/批量冲突用例及harness/tool.ts的unsafe恢复分支。新增手写edit_tool.S：canonical edits[]、单对象、JSON字符串数组/对象、顶层oldText/newText及与已有数组追加；解析树自持有、切片借用至调用结束，不修改原始参数。通过注入pg_tools调用read/write，保留内层校验/授权，不复制POSIX文件后端。同步单执行器的owner串行约束代替进程内异步mutation queue；外部并发文件锁不在本次范围。
+
+审核修复两类准备边界：可识别的单项编辑若为空oldText/未知属性等非法，不得丢弃后只执行附带legacy项；有效canonical edits附带不成对/类型不对的legacy字段时按Pi忽略。后者由直接调用实际Pi prepare函数的差异测试先检出，随后修正实现及本批测试中原先过严的假设；未加差异豁免，未知非legacy属性仍按原生schema拒绝。91例实际prepare+文本函数与原生文件结果共识通过；成功字节相同，拒绝保持原文件。原1300文本案例继续通过。
+
+实际验证：核心19组O0/O2 UBSan通过；edit工具O2 ASan/UBSan与91例对照通过。17个JSON解析/构造/插入/序列化失败点、参数不变、读写授权次序、无匹配/重复/重叠/无改动不写、路径拒绝、带引号文件名、JSON转义后超额不写、错误长度、页尾与fd回收均检查。真实文件已写成功但回执报错时返回“may have partially changed”；跨进程在write已刷盘、tool-result尚未提交时退出，重开保持unsafe检查点，提交interrupted错误并续答，文件内容/mtime及内层read/write计数均未变化，证明恢复未再次执行编辑。
+
+真实MiMo最终版本实际通过：TUI用edit完成两处配置修改、read回读并续答，BOM/CRLF/未改动空格逐字节保持；phase5意图及终态落盘，重开历史不重新运行，日志与文件mtime不变、termios恢复、凭据不入日志。组合read/write/edit三工具，配置身份read-write-edit-v1；旧在途配置仍拒绝静默切换。主文档保持51行，近期edit工具项勾选；结构化diff/patch展示、一般异步队列、完整T25和bash未完成，未宣称全部Pi兼容。本批无新外部依赖。
+
+同一Agent按授权自审自批工具模块/组合/文件/语言登记，未修改检查器、预算或既有通过基线；G00、assembly-first与diff检查通过，生产准入仍BLOCKED。对象text3560字节、data/bss0，唯一导出pg_edit_tool_definition，无直接POSIX文件操作导入。
+
+收尾fetch发现Pi从38ff991新增4个提交，干净工作树已快进至0eea54f11c2c8d45ec3dfaa40522030539ab28f1。已读差异：旧Coding Agent的带slash provider/id解析、NPM symlink prefix，以及no-env测试脚本和Windows入口图路径规范；本批Durable edit/harness文件均未变，固定38ff991函数oracle字节核对仍通过，暂无本批原生修复需采用。Harness仍22ddee3，上游一致；不把参考工作树更新当成所有新行为已移植。
+
+固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`59ecf34f9cd8fd8fa4c16d0e84573649b116eab7fee62e69907af3a0ef19a651`（14个路径）。

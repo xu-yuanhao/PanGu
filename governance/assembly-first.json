@@ -96,6 +96,10 @@
     "src/runtime/edit_text.S": {
       "role": "assembly-core",
       "reason": "手写Durable批量编辑匹配/冲突/行块保留及BOM/换行恢复；Unicode NFKC复用utf8proc"
+    },
+    "src/runtime/edit_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写编辑参数准备、所有权与读/改/写服务组合；借用可替换pg_tools，不复制文件后端"
     }
   }
 }

@@ -352,9 +352,10 @@
         "system libc",
         "storage.journal.posix.local.v1",
         "runtime.profile.local.v1",
-        "tools.write.posix.local.v0"
+        "tools.write.posix.local.v0",
+        "tools.edit.local.v0"
       ],
-      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime; read/write tools and idle configured system refresh",
+      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime; read/write/edit tools and idle configured system refresh",
       "exports": [
         "main"
       ],
@@ -507,7 +508,7 @@
         "system libc",
         "libutf8proc"
       ],
-      "role": "handwritten bounded original-batch matching, NFKC fuzzy uniqueness, stable conflict ordering, touched-line preservation, BOM/CRLF restoration; pure text engine, filesystem edit tool not yet bound",
+      "role": "handwritten bounded original-batch matching, NFKC fuzzy uniqueness, stable conflict ordering, touched-line preservation, BOM/CRLF restoration; pure text engine used by the injected edit tool",
       "exports": [
         "pg_edit_text_apply"
       ],
@@ -522,6 +523,39 @@
           "semantics": "applyEditsToNormalizedContent and its actual helpers; byte offsets in valid UTF-8, at most 16 replacements and 4095 content/combined edit bytes; transactional caller output",
           "tests_to_read": [
             "packages/durable/test/tools.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tools.edit.local.v0",
+      "sources": [
+        "src/runtime/edit_tool.h",
+        "src/runtime/edit_tool.S"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0",
+        "tools.edit.text.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "handwritten canonical/legacy argument preparation and one synchronous read-transform-write operation through an injected pg_tools read/write service; preserves inner validation/authorization, borrows no POSIX backend internals, unsafe replay policy",
+      "exports": [
+        "pg_edit_tool_definition"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/tools/edit.ts",
+            "packages/durable/src/tools/file-mutation-queue.ts",
+            "packages/durable/src/harness/tool.ts"
+          ],
+          "semantics": "createEditTool/prepareEditArguments; immutable raw arguments, all original targets validated before write, serial owner replaces in-process async mutation queue, unsafe interruption result; bounded UTF-8 relative-path subset, no structured diff details yet",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
           ]
         }
       ]

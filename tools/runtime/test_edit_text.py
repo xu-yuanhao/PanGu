@@ -19,12 +19,21 @@ if(source.split(dependency).length!==2) throw new Error('unexpected import bound
 // The diff display dependency is unused by these actual upstream transformations.
 const code=stripTypeScriptTypes(source.replace(dependency,''),{mode:'strip'});
 const pi=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+let prepare;
+if(process.argv[2]) {
+ const tool=readFileSync(process.argv[2],'utf8');
+ const begin=tool.indexOf('function isSingleEditInput('),end=tool.indexOf('export type EditToolDetails');
+ if(begin<0||end<=begin)throw new Error('unexpected prepare boundary');
+ const code=stripTypeScriptTypes(tool.slice(begin,end)+'\nexport {prepareEditArguments};',{mode:'strip'});
+ prepare=(await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))).prepareEditArguments;
+}
 const cases=JSON.parse(readFileSync(0,'utf8'));
 const results=cases.map(item=>{
  try {
   const {bom,text}=pi.stripBom(item.content);
   const ending=pi.detectLineEnding(text);
-  const {newContent}=pi.applyEditsToNormalizedContent(pi.normalizeToLF(text),item.edits,'case.txt');
+  const edits=prepare?prepare(item.arguments).edits:item.edits;
+  const {newContent}=pi.applyEditsToNormalizedContent(pi.normalizeToLF(text),edits,'case.txt');
   return {output:bom+pi.restoreLineEndings(newContent,ending)};
  } catch(error) {return {error:String(error.message)};}
 });
@@ -81,14 +90,37 @@ def corpus():
         add(text, *edits)
     return cases
 
-def compare(binary):
+def tool_corpus():
+    edit = {'oldText': 'alpha', 'newText': 'ALPHA'}
+    legacy = {'oldText': 'beta', 'newText': 'BETA'}
+    shapes = [[edit], edit, json.dumps([edit]), json.dumps(edit), [], {}, 7, None,
+              'invalid', '[]', '7', [None], [{}], {'oldText': 7, 'newText': 'x'},
+              {'oldText': '', 'newText': 'x'}]
+    cases = []
+    for value in shapes:
+        for extra in ({}, legacy, {'oldText': 7, 'newText': 'x'}):
+            cases.append({'content': 'alpha\nbeta\n', 'arguments': {'path': 'file.txt', 'edits': value, **extra}})
+    for extra in (legacy, {'oldText': 'alpha'}, {'newText': 'ALPHA'}, {}):
+        cases.append({'content': 'alpha\nbeta\n', 'arguments': {'path': 'file.txt', **extra}})
+    for case in corpus()[:22] + corpus()[-20:]:
+        cases.append({'content': case['content'], 'arguments': {'path': 'file.txt', 'edits': case['edits']}})
+    return cases
+
+def compare(binary, tool=False):
     frozen = subprocess.check_output(['git', '-C', str(ROOT / 'references/pi'), 'show',
                                       COMMIT + ':packages/durable/src/tools/edit-diff.ts'])
     assert hashlib.sha256(REFERENCE.read_bytes()).digest() == hashlib.sha256(frozen).digest(), 'reference drift'
-    cases = corpus()
+    cases = tool_corpus() if tool else corpus()
     encoded = json.dumps(cases, ensure_ascii=False).encode()
     native = subprocess.run([str(binary), '--json'], input=encoded, capture_output=True, check=True, timeout=30)
-    oracle = subprocess.run(['node', '--input-type=module', '-e', ORACLE, str(REFERENCE)],
+    command = ['node', '--input-type=module', '-e', ORACLE, str(REFERENCE)]
+    if tool:
+        path = REFERENCE.with_name('edit.ts')
+        frozen = subprocess.check_output(['git', '-C', str(ROOT / 'references/pi'), 'show',
+                                         COMMIT + ':packages/durable/src/tools/edit.ts'])
+        assert path.read_bytes() == frozen, 'prepare reference drift'
+        command.append(str(path))
+    oracle = subprocess.run(command,
                             input=encoded, capture_output=True, check=True, timeout=30)
     actual, expected = json.loads(native.stdout), json.loads(oracle.stdout)
     assert len(actual) == len(expected) == len(cases)
@@ -96,12 +128,18 @@ def compare(binary):
         assert (left['status'] == 0) == ('output' in right), (i, cases[i], left, right)
         if not left['status']:
             assert left['output'] == right['output'], (i, cases[i], left, right)
-    print(f'PASS: {len(cases)} edit cases against actual Pi Durable {COMMIT[:12]} (exact output or rejection)')
+        elif tool:
+            assert left['output'] == cases[i]['content'], (i, cases[i], left)
+    print(f'PASS: {len(cases)} edit {"file/prepare" if tool else "text"} cases against actual Pi Durable {COMMIT[:12]} (exact output or rejection)')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path)
+    parser.add_argument('--tool-binary', type=Path)
     args = parser.parse_args()
+    if args.tool_binary:
+        compare(args.tool_binary, tool=True)
+        return
     if args.binary:
         compare(args.binary)
         return

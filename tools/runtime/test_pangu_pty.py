@@ -227,11 +227,56 @@ def write_live(binary, root):
         terminal.close()
     print('PASS: actual persistent TUI / MiMo write and read-back, unsafe intent, settled reopen without rewrite and termios restoration', flush=True)
 
+def edit_live(binary, root):
+    storage = root / 'edit-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    target = root / 'settings.txt'
+    target.write_bytes(b'\xef\xbb\xbf# PanGu settings  \r\nenabled = false\r\nattempts = 2\r\n')
+    expected = b'\xef\xbb\xbf# PanGu settings  \r\nenabled = true\r\nattempts = 3\r\n'
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.send(b'Use edit once on settings.txt with two edits: replace enabled = false with enabled = true; replace attempts = 2 with attempts = 3. Preserve all other content. Then confirm briefly.\r')
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] edit' in terminal.output and b'finished ok:' in terminal.output, repr(terminal.output[-3000:].replace(terminal.secret,b'[REDACTED]'))
+        assert b'[tool] write' not in terminal.output
+        assert target.read_bytes() == expected, 'edit altered unexpected bytes or line endings'
+        terminal.output = b''
+        terminal.send(b'Call read for settings.txt and state the enabled and attempts values.\r')
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] read' in terminal.output and b'finished ok:' in terminal.output
+        plain = re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', terminal.output)
+        after_tool = plain.split(b'finished ok:', 1)[1].split(b'\n', 1)[1]
+        assert b'true' in after_tool and b'3' in after_tool
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    log = storage / 'session.pgj'
+    original = log.read_bytes()
+    assert env['MIMO_API_KEY'].encode() not in original
+    assert any(checkpoint[1] == 5 for checkpoint in checkpoints(log))
+    assert checkpoints(log)[-1][1] == 3
+    before = target.stat().st_mtime_ns
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        assert b'[history] call' in terminal.output and b'[run] started' not in terminal.output
+        assert target.read_bytes() == expected and target.stat().st_mtime_ns == before
+        assert log.read_bytes() == original
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual MiMo/TUI edit and read-back, BOM/CRLF/unchanged bytes, unsafe intent and settled reopen without rewrite', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--live-persistent', action='store_true')
     parser.add_argument('--live-write', action='store_true')
+    parser.add_argument('--live-edit', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -267,6 +312,9 @@ def main():
         if args.live_write:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-write'
             write_live(binary, root)
+        if args.live_edit:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
+            edit_live(binary, root)
         if args.live:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live'
             live_env = os.environ.copy()

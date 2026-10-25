@@ -1749,8 +1749,8 @@
         "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "workspace-root read and bounded write, parent creation, partial failure semantics and unsafe recovery; no edit/bash or full Pi filesystem compatibility",
-      "local_implementation": "handwritten tools/read_tool/write_tool with recorded replay intent and current-policy check; static TUI composition; full T25 remains incomplete; edit_text.S pure batch/fuzzy/BOM/line-ending engine tested against actual fixed upstream functions, edit tool IO/argument preparation still pending"
+      "local_subset_scope": "workspace-root bounded read/write/edit, canonical and common repaired edit shapes, BOM/line-ending/untouched-line preservation, unsafe recovery; no bash or full Pi filesystem compatibility",
+      "local_implementation": "handwritten tools/read_tool/write_tool/edit_text/edit_tool; injected pg_tools read/write composition with preserved inner validation/authorization; actual Pi text+prepare differential checks and real MiMo/TUI edit read-back; structured diff/general async mutation queue and full T25 remain incomplete"
     },
     {
       "id": "T26",
