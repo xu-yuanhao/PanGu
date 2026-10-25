@@ -285,7 +285,6 @@
     "governance/runtime-local-modules.json": "control",
     "docs/migration/runtime-core-progress.md": "document",
     "src/runtime/mimo.h": "native-source",
-    "src/runtime/mimo.c": "native-source",
     "tests/runtime/live_mimo.c": "native-test",
     "docs/migration/mimo-live-progress.md": "document",
     "tests/runtime/test_mimo_stream.c": "native-test",
@@ -558,6 +557,16 @@
     "tests/runtime/test_profile.c": "native-test",
     "src/runtime/submissions.h": "native-source",
     "src/runtime/submissions.S": "native-source",
-    "tests/runtime/test_submissions.c": "native-test"
+    "tests/runtime/test_submissions.c": "native-test",
+    "src/runtime/mimo.S": "native-source",
+    "src/runtime/mimo_projection.S": "native-source",
+    "src/runtime/mimo_stream.S": "native-source",
+    "src/runtime/mimo_layout.h": "native-source",
+    "tests/runtime/mimo_abi.S": "native-test",
+    "tests/runtime/test_mimo_asm.c": "native-test",
+    "tests/runtime/test_mimo_transport.c": "native-test",
+    "tests/runtime/test_mimo_alloc.c": "native-test",
+    "tools/runtime/test_mimo_asm.py": "development-tool",
+    "docs/migration/mimo-assembly-handoff.md": "document"
   }
 }

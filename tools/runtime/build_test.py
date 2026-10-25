@@ -6,6 +6,8 @@ import sys
 import os
 ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
+from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
+MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
 SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), str(ROOT / 'tests/runtime/test_agent.c')]
 
 def main():
@@ -18,7 +20,7 @@ def main():
             live_source = 'live_journal.c' if '--live-journal' in sys.argv or '--live-resume' in sys.argv or '--live-submission' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
-                            implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/mimo'),
+                            implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), *MODEL_SOURCES,
                             implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime' / live_source), *flags, '-o', output], check=True)
             if '--live-journal' in sys.argv or '--live-resume' in sys.argv or '--live-submission' in sys.argv:
                 storage_dir = Path(directory) / 'storage'
@@ -30,6 +32,19 @@ def main():
                 subprocess.run([output], check=True, timeout=350)
             return 0
         for mode in ('-O0', '-O2'):
+            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+            for name, sources, wraps in [
+                ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),
+                ('transport', ['test_mimo_transport.c', 'mimo_abi.S'], ABI_WRAPS + CURL_WRAPS),
+                ('alloc', ['test_mimo_alloc.c'], ALLOC_WRAPS),
+            ]:
+                model_test = str(Path(directory) / ('test-mimo-' + name))
+                subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra',
+                                '-Werror', '-pedantic', '-Wno-cast-function-type', mode, '-fsanitize=undefined',
+                                '-fno-sanitize-recover=all', *MODEL_SOURCES,
+                                *[str(ROOT / 'tests/runtime' / source) for source in sources],
+                                *wraps, *model_flags, '-o', model_test], check=True)
+                subprocess.run([model_test], check=True, timeout=30)
             submissions_test = str(Path(directory) / 'test-submissions')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/agent'),
@@ -81,7 +96,7 @@ def main():
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/mimo'), str(ROOT / 'tests/runtime/test_mimo_stream.c'),
+                            *MODEL_SOURCES, str(ROOT / 'tests/runtime/test_mimo_stream.c'),
                             *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
@@ -95,7 +110,7 @@ def main():
                             str(ROOT / 'tests/runtime/test_read_tool.c'), *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
-                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/mimo'),
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', *MODEL_SOURCES,
                             str(ROOT / 'tests/runtime/test_projection.c'), *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

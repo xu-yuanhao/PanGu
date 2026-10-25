@@ -116,8 +116,11 @@
     {
       "id": "model.mimo.local.v0",
       "sources": [
-        "src/runtime/mimo.c",
-        "src/runtime/mimo.h"
+        "src/runtime/mimo.S",
+        "src/runtime/mimo_projection.S",
+        "src/runtime/mimo_stream.S",
+        "src/runtime/mimo.h",
+        "src/runtime/mimo_layout.h"
       ],
       "dependencies": [
         "agent.runtime.v0",
@@ -126,7 +129,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "replaceable HTTPS SSE provider using cooperative curl multi; bounded incremental text and single tool argument assembly",
+      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c via public ABI, bounded streaming/single tool; allocation/insertion failure ownership cleanup and checked setup",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -134,6 +137,21 @@
         "pg_mimo_encode_request (internal projection test seam)"
       ],
       "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/ai/src/api/openai-completions.ts",
+            "packages/ai/src/api/transform-messages.ts",
+            "packages/durable/src/harness/generation.ts"
+          ],
+          "semantics": "projection, fragment accumulation and provider/harness lifecycle boundary; native single-choice/single-tool protocol remains intentionally narrower",
+          "tests_to_read": [
+            "packages/ai/test/openai-completions-provider-stream-event.test.ts",
+            "packages/ai/test/streaming-tool-arguments.test.ts",
+            "packages/ai/test/openai-completions-tool-choice.test.ts"
+          ]
+        },
         {
           "repository": "pi",
           "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",

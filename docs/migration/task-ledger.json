@@ -1677,7 +1677,8 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "injected model contract and real MiMo SSE subset; no full provider capability matrix"
+      "local_subset_scope": "injected model contract and real MiMo SSE subset; no full provider capability matrix",
+      "local_implementation": "pg_model replaceable contract and handwritten MiMo assembly provider; no full capability matrix"
     },
     {
       "id": "T23",
@@ -1786,10 +1787,12 @@
       "definition": "docs/原生重写路线与迁移TODO.md#T27",
       "owner_role": "implementer and same-Agent reviewer under explicit user authorization",
       "evidence": [
-        "docs/migration/runtime-core-progress.md"
+        "docs/migration/runtime-core-progress.md",
+        "docs/migration/mimo-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "hosted libcurl/json-c MiMo Token Plan CN SSE; no production packaging/full HTTP protocol matrix"
+      "local_subset_scope": "hosted libcurl/json-c MiMo Token Plan CN SSE; no production packaging/full HTTP protocol matrix",
+      "local_implementation": "mimo.S/mimo_projection.S/mimo_stream.S, libcurl/json-c; original C deleted, scoped ABI/ownership/protocol and real network validation; full production stage remains incomplete"
     },
     {
       "id": "T28",
@@ -2228,10 +2231,10 @@
       "c",
       "cpp"
     ],
-    "next_work": "main Agent implements bounded native Durable submission/task behavior; second Agent replaces MiMo core in place with handwritten ASM",
-    "ownership": "main Agent owns Durable submissions/session/storage/profile/agent/client/composition/shared controls; second Agent exclusively owns MiMo modules and protocol/projection dedicated tests under docs/并行开发任务提示词-MiMo协议汇编重构.md; model ABI/configuration semantics frozen",
+    "next_work": "current interactive Agent/Session/tools/read/MiMo/TUI cores are handwritten ASM; continue actual native Agent/Durable functionality using references",
+    "ownership": "TUI/tools/MiMo parallel tasks delivered and integrated; no active unmerged parallel implementation assignment",
     "cleanup": "delete replaced C sources and obsolete build/registration entries in same change; no separate C implementation or fallback; history in Git",
-    "status": "tools/read and TUI subsets integrated; MiMo assembly task assigned by document, not yet implemented or verified",
+    "status": "no pending-inplace-assembly C core in current composition; only static composition and platform layout C bridges; not whole-repository or production certification",
     "reference_workflow": "Read pinned functions, direct callers and related tests before implementation; record adopted semantics/native differences and verification in existing handoff/progress. runtime-local-modules.reference_basis is a locator, never reading/compliance proof."
   }
 }

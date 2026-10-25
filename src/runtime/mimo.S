@@ -1,0 +1,526 @@
+/* mimo.S — MiMo provider 生命周期：model/bind_tools/start/next/cancel/close。
+ *
+ * 适配器只做投影、传输与协议事件，不持有 Session 提交/恢复/工具执行（契约见
+ * agent.h pg_model 与 Pi durable generation 的宿主边界）。start 复用 MIMO_API_KEY/
+ * MIMO_MODEL 环境与固定端点，max_tokens/thinking/认证来源不变；easy/multi/headers/
+ * request 为本实例所有，cancel/close 全量释放，重复 close 幂等，半初始化可安全关闭。
+ * next 是非阻塞推进：multi_perform 轮询→HTTP 状态→行拆分（跨接收块换行、CRLF、
+ * 未完成末行）→decode_line；transport 完成后按 [DONE]+finish 出终态，工具参数须
+ * 是完整 JSON object。curl_easy_setopt/getinfo 为变参：al=0，变参走 rdx。
+ * WRITE 回调 receive 做乘法溢出与 body 容量检查，拒绝即向 curl 返回 0 触发传输
+ * 错误。布局见 mimo_layout.h。
+ */
+#include "mimo_layout.h"
+.intel_syntax noprefix
+
+.section .rodata
+.Lstr_endpoint:     .asciz "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+.Lstr_https:        .asciz "https"
+.Lstr_content_type: .asciz "Content-Type: application/json"
+.Lstr_auth_prefix:  .asciz "Authorization: Bearer "
+.Lstr_env_key:      .asciz "MIMO_API_KEY"
+
+.section .text
+
+/* ---- pg_model pg_mimo_model(pg_mimo *m)：清零实例并返回函数表（sret）。 ---- */
+.globl pg_mimo_model
+.type pg_mimo_model,@function
+pg_mimo_model:
+ push rdi                             /* 保存 sret 目标；本函数无外部调用 */
+ mov rdi, rsi
+ xor eax, eax
+ mov ecx, PG_MM_BYTES/8
+ cld
+ rep stosq                           /* *m = {0} */
+ pop rdi
+ mov qword ptr [rdi + PG_MM_MODEL_CONTEXT], rsi
+ lea rax, [rip + li_start]
+ mov qword ptr [rdi + PG_MM_MODEL_START], rax
+ lea rax, [rip + li_next]
+ mov qword ptr [rdi + PG_MM_MODEL_NEXT], rax
+ lea rax, [rip + li_cancel]
+ mov qword ptr [rdi + PG_MM_MODEL_CANCEL], rax
+ lea rax, [rip + li_close]
+ mov qword ptr [rdi + PG_MM_MODEL_CLOSE], rax
+ mov rax, rdi
+ ret
+.size pg_mimo_model, .-pg_mimo_model
+
+/* ---- void pg_mimo_bind_tools(pg_mimo *m, const pg_tool_registry *tools) ---- */
+.globl pg_mimo_bind_tools
+.type pg_mimo_bind_tools,@function
+pg_mimo_bind_tools:
+ mov qword ptr [rdi + PG_MM_TOOLS], rsi
+ ret
+.size pg_mimo_bind_tools, .-pg_mimo_bind_tools
+
+/* ---- void li_close(void *ctx)：释放 easy/multi/headers/request 后置空。
+ * 依赖 curl_slist_free_all/free 的 NULL 安全；重复调用幂等。文件内私有。 */
+.type li_close,@function
+li_close:
+ push rbx                             /* 入口 rsp≡8 → 0，可调用 */
+ mov rbx, rdi
+ mov rdi, qword ptr [rbx + PG_MM_MULTI]
+ mov rsi, qword ptr [rbx + PG_MM_EASY]
+ test rdi, rdi
+ jz 1f
+ test rsi, rsi
+ jz 1f
+ call curl_multi_remove_handle@PLT
+1:
+ mov rdi, qword ptr [rbx + PG_MM_EASY]
+ test rdi, rdi
+ jz 1f
+ call curl_easy_cleanup@PLT
+1:
+ mov rdi, qword ptr [rbx + PG_MM_MULTI]
+ test rdi, rdi
+ jz 1f
+ call curl_multi_cleanup@PLT
+1:
+ mov rdi, qword ptr [rbx + PG_MM_HEADERS]
+ call curl_slist_free_all@PLT
+ mov rdi, qword ptr [rbx + PG_MM_REQUEST]
+ call free@PLT
+ mov qword ptr [rbx + PG_MM_EASY], 0
+ mov qword ptr [rbx + PG_MM_MULTI], 0
+ mov qword ptr [rbx + PG_MM_HEADERS], 0
+ mov qword ptr [rbx + PG_MM_REQUEST], 0
+ pop rbx
+ ret
+.size li_close, .-li_close
+
+.type li_cancel,@function
+li_cancel:
+ jmp li_close                         /* 尾跳：入口栈型一致 */
+.size li_cancel, .-li_cancel
+
+/* ---- size_t li_receive(char *p, size_t size, size_t nmemb, void *ctx)
+ * curl WRITE 回调：乘法溢出/容量不足返回 0（curl 判为写错误），成功整块拷贝。 */
+.type li_receive,@function
+li_receive:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
+ mov rbx, rcx                         /* m */
+ mov r12, rdi                         /* p */
+ xor r14d, r14d                       /* n = 0 */
+ test rsi, rsi
+ jz .Lrx_check
+ mov r13, rdx                         /* count */
+ mov rax, -1                          /* SIZE_MAX */
+ xor edx, edx
+ div rsi                              /* rax = SIZE_MAX/size */
+ cmp r13, rax
+ ja .Lrx_zero                         /* size*count 溢出 */
+ mov r14, rsi
+ imul r14, r13                        /* n = size*count */
+.Lrx_check:
+ mov rax, qword ptr [rbx + PG_MM_USED]
+ mov rcx, PG_MM_BODY_LIMIT
+ sub rcx, rax                         /* 剩余容量（含终止 NUL 位） */
+ cmp r14, rcx
+ jae .Lrx_zero
+ mov rdi,r12
+ xor esi,esi
+ mov rdx,r14
+ call memchr@PLT
+ test rax,rax
+ jnz .Lrx_zero
+ mov rax,[rbx + PG_MM_USED]
+ lea rdi, [rbx + rax + PG_MM_BODY]
+ mov rsi, r12
+ mov rdx, r14
+ call memcpy@PLT
+ mov rcx, qword ptr [rbx + PG_MM_USED]
+ add rcx, r14
+ mov qword ptr [rbx + PG_MM_USED], rcx
+ mov byte ptr [rbx + rcx + PG_MM_BODY], 0
+ mov rax, r14
+ jmp .Lrx_out
+.Lrx_zero:
+ xor eax, eax
+.Lrx_out:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_receive, .-li_receive
+
+/* ---- int li_start(void *ctx, const pg_session *s)
+ * 栈帧 544：[0..512) auth 头缓冲。失败路径经 close 语义可安全善后。 */
+.type li_start,@function
+li_start:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
+ sub rsp, 544
+ mov rbx, rdi                         /* m */
+ mov r12, rsi                         /* s */
+ call li_close                        /* 复用：释放上一请求 */
+ mov qword ptr [rbx + PG_MM_USED], 0
+ mov qword ptr [rbx + PG_MM_CONSUMED], 0
+ mov dword ptr [rbx + PG_MM_DELIVERED], 0
+ mov dword ptr [rbx + PG_MM_FAILED], 0
+ mov dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
+ mov dword ptr [rbx + PG_MM_FINISH_REASON], 0
+ mov dword ptr [rbx + PG_MM_SAW_DONE], 0
+ mov qword ptr [rbx + PG_MM_HTTP], 0
+ mov byte ptr [rbx + PG_MM_ARGUMENTS], 0
+ mov byte ptr [rbx + PG_MM_ID], 0
+ mov byte ptr [rbx + PG_MM_NAME], 0
+ lea rdi, [rip + .Lstr_env_key]
+ call getenv@PLT
+ test rax, rax
+ jz .Lst_bad
+ mov r13, rax                         /* key */
+ mov rdi, rax
+ call strlen@PLT
+ cmp rax, 400
+ ja .Lst_bad
+ mov rdi, r13
+ mov esi, 13                          /* '\r' */
+ call strchr@PLT
+ test rax, rax
+ jnz .Lst_bad
+ mov rdi, r13
+ mov esi, 10                          /* '\n' */
+ call strchr@PLT
+ test rax, rax
+ jnz .Lst_bad
+ mov rdi, rbx
+ mov rsi, r12
+ call pg_mimo_encode_request
+ test eax, eax
+ jnz .Lst_bad
+ /* auth = "Authorization: Bearer " + key + NUL（总长 < 512） */
+ lea rdi, [rsp]
+ lea rsi, [rip + .Lstr_auth_prefix]
+ mov edx, PG_MM_AUTH_PREFIX_LEN
+ call memcpy@PLT
+ mov rdi, r13
+ call strlen@PLT
+ lea rdi, [rsp + PG_MM_AUTH_PREFIX_LEN]
+ mov rsi, r13
+ lea rdx, [rax + 1]
+ call memcpy@PLT
+ xor edi, edi
+ lea rsi, [rsp]
+ call curl_slist_append@PLT
+ mov r13, rax
+ mov qword ptr [rbx + PG_MM_HEADERS], rax
+ test rax,rax
+ jz .Lst_bad
+ mov rdi, r13
+ lea rsi, [rip + .Lstr_content_type]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lst_bad
+ mov r13, rax
+ mov qword ptr [rbx + PG_MM_HEADERS], r13
+ call curl_easy_init@PLT
+ mov r14, rax
+ mov qword ptr [rbx + PG_MM_EASY], r14
+ call curl_multi_init@PLT
+ mov r15, rax
+ mov qword ptr [rbx + PG_MM_MULTI], r15
+ test r14, r14
+ jz .Lst_bad                          /* 半初始化：close 释放已建部分 */
+ test r15, r15
+ jz .Lst_bad
+ /* 变参 setopt：整数/指针变参在 rdx，al=0（无向量参数） */
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_URL
+ lea rdx, [rip + .Lstr_endpoint]
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_HTTPHEADER
+ mov rdx, r13
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_POSTFIELDS
+ mov rdx, qword ptr [rbx + PG_MM_REQUEST]
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_WRITEFUNCTION
+ lea rdx, [rip + li_receive]
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_WRITEDATA
+ mov rdx, rbx
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_TIMEOUT
+ mov edx, 60
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_CONNECTTIMEOUT
+ mov edx, 15
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_NOSIGNAL
+ mov edx, 1
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r14
+ mov esi, PG_MM_CURLOPT_PROTOCOLS_STR
+ lea rdx, [rip + .Lstr_https]
+ xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi, r15
+ mov rsi, r14
+ call curl_multi_add_handle@PLT
+ test eax, eax
+ setne al
+ movzx eax, al
+ jmp .Lst_out
+.Lst_bad:
+ mov eax, 1
+.Lst_out:
+ add rsp, 544
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_start, .-li_start
+
+/* ---- int li_next(void *ctx, pg_model_event *event)
+ * 栈帧 64：[0]=running(int) [8]=left(int) [16]=invalid(int) [24]=parse end。 ---- */
+.type li_next,@function
+li_next:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
+ sub rsp, 64
+ mov rbx, rdi                         /* m */
+ mov r12, rsi                         /* event */
+ mov rdi, r12
+ xor eax, eax
+ mov ecx, 7
+ cld
+ rep stosq                           /* *event = {WAIT} */
+ cmp dword ptr [rbx + PG_MM_DELIVERED], 0
+ jne .Lnx_delivered
+ cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
+ jne .Lnx_lines
+ mov dword ptr [rsp], 0               /* running */
+ mov rdi, qword ptr [rbx + PG_MM_MULTI]
+ lea rsi, [rsp]
+ call curl_multi_perform@PLT
+ test eax, eax
+ jnz .Lnx_bad
+ mov rdi, qword ptr [rbx + PG_MM_EASY]
+ mov esi, PG_MM_CURLINFO_RESPONSE_CODE
+ lea rdx, [rbx + PG_MM_HTTP]
+ xor eax, eax                         /* getinfo 亦为变参 */
+ call curl_easy_getinfo@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ mov rax, qword ptr [rbx + PG_MM_HTTP]
+ test rax, rax
+ jz .Lnx_running                      /* 首响应头未到 */
+ cmp rax, 200
+ jne .Lnx_bad                         /* 非 200 立即失败 */
+.Lnx_running:
+ cmp dword ptr [rsp], 0
+ jne .Lnx_lines
+ mov dword ptr [rsp + 8], 0           /* left */
+ mov rdi, qword ptr [rbx + PG_MM_MULTI]
+ lea rsi, [rsp + 8]
+ call curl_multi_info_read@PLT
+ test rax, rax
+ jz .Lnx_bad
+ cmp dword ptr [rax + PG_MM_CURLMSG_MSG], PG_MM_CURLMSG_DONE
+ jne .Lnx_bad
+ cmp dword ptr [rax + PG_MM_CURLMSG_RESULT], PG_MM_CURLE_OK
+ jne .Lnx_bad                         /* 传输错误不得伪造成功 */
+ cmp qword ptr [rbx + PG_MM_HTTP], 200
+ jne .Lnx_bad
+ mov dword ptr [rbx + PG_MM_TRANSPORT_DONE], 1
+.Lnx_lines:
+ mov r14, qword ptr [rbx + PG_MM_CONSUMED]
+ cmp r14, qword ptr [rbx + PG_MM_USED]
+ jae .Lnx_drain
+ lea r13, [rbx + r14 + PG_MM_BODY]    /* 行起点 */
+ mov rdx, qword ptr [rbx + PG_MM_USED]
+ sub rdx, r14                         /* 剩余字节 */
+ mov rdi, r13
+ mov esi, 10                          /* '\n' */
+ call memchr@PLT
+ test rax, rax
+ jnz .Lnx_have_line
+ cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
+ jne .Lnx_bad                         /* 传输已结束仍无换行：截断 */
+ xor eax, eax                         /* 行未完整：WAIT */
+ jmp .Lnx_out
+.Lnx_have_line:
+ mov byte ptr [rax], 0
+ cmp rax, r13
+ jbe 1f
+ cmp byte ptr [rax - 1], 13           /* 剥离 CR */
+ jne 1f
+ mov byte ptr [rax - 1], 0
+1:
+ sub rax, rbx
+ sub rax, PG_MM_BODY
+ inc rax
+ mov qword ptr [rbx + PG_MM_CONSUMED], rax
+ mov rdi, rbx
+ mov rsi, r13
+ mov rdx, r12
+ call pg_mimo_decode_line
+ jmp .Lnx_out
+.Lnx_drain:
+ cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
+ je .Lnx_wait
+ cmp dword ptr [rbx + PG_MM_SAW_DONE], 0
+ je .Lnx_bad
+ cmp dword ptr [rbx + PG_MM_FINISH_REASON], 0
+ je .Lnx_bad
+ cmp dword ptr [rbx + PG_MM_FINISH_REASON], 2
+ jne .Lnx_done_event
+ /* 工具参数必须是完整 JSON object；校验借用栈解析、不修改 m 缓冲 */
+ call json_tokener_new@PLT
+ test rax, rax
+ jz .Lnx_bad
+ mov r13, rax                         /* tok */
+ lea rdi, [rbx + PG_MM_ARGUMENTS]
+ call strlen@PLT
+ mov r14, rax                         /* len */
+ mov rdi, r13
+ lea rsi, [rbx + PG_MM_ARGUMENTS]
+ mov rdx, r14
+ call json_tokener_parse_ex@PLT
+ mov r15, rax                         /* args */
+ mov rdi, r13
+ call json_tokener_get_parse_end@PLT
+ mov rcx, rax                         /* end */
+.Lnx_ws:
+ cmp rcx, r14
+ jae .Lnx_ws_done
+ movzx edx, byte ptr [rbx + rcx + PG_MM_ARGUMENTS]
+ cmp dl, ' '
+ je .Lnx_ws_next
+ cmp dl, 9
+ je .Lnx_ws_next
+ cmp dl, 10
+ je .Lnx_ws_next
+ cmp dl, 13
+ je .Lnx_ws_next
+ jmp .Lnx_ws_done
+.Lnx_ws_next:
+ inc rcx
+ jmp .Lnx_ws
+.Lnx_ws_done:
+ mov qword ptr [rsp + 24], rcx
+ mov dword ptr [rsp + 16], 0          /* invalid */
+ mov rdi, r13
+ call json_tokener_get_error@PLT
+ test eax, eax
+ jz 1f
+ mov dword ptr [rsp + 16], 1
+1:
+ cmp qword ptr [rsp + 24], r14
+ je 1f
+ mov dword ptr [rsp + 16], 1          /* 尾随非空白残余 */
+1:
+ test r15, r15
+ jnz 1f
+ mov dword ptr [rsp + 16], 1
+1:
+ test r15, r15
+ jz 1f
+ mov rdi, r15
+ mov esi, PG_MM_JSON_OBJECT
+ call json_object_is_type@PLT
+ test eax, eax
+ jnz 1f
+ mov dword ptr [rsp + 16], 1
+1:
+ mov rdi, r13
+ call json_tokener_free@PLT
+ test r15, r15
+ jz 1f
+ mov rdi, r15
+ call json_object_put@PLT
+1:
+ cmp dword ptr [rsp + 16], 0
+ jne .Lnx_bad
+ mov dword ptr [r12 + PG_MM_EVT_KIND], PG_MM_KIND_CALL
+ lea rax, [rbx + PG_MM_ARGUMENTS]
+ mov qword ptr [r12 + PG_MM_EVT_TEXT + PG_MM_SLICE_DATA], rax
+ mov rdi, rax
+ call strlen@PLT
+ mov qword ptr [r12 + PG_MM_EVT_TEXT + PG_MM_SLICE_SIZE], rax
+ lea rax, [rbx + PG_MM_ID]
+ mov qword ptr [r12 + PG_MM_EVT_CALL_ID + PG_MM_SLICE_DATA], rax
+ mov rdi, rax
+ call strlen@PLT
+ mov qword ptr [r12 + PG_MM_EVT_CALL_ID + PG_MM_SLICE_SIZE], rax
+ lea rax, [rbx + PG_MM_NAME]
+ mov qword ptr [r12 + PG_MM_EVT_TOOL_NAME + PG_MM_SLICE_DATA], rax
+ mov rdi, rax
+ call strlen@PLT
+ mov qword ptr [r12 + PG_MM_EVT_TOOL_NAME + PG_MM_SLICE_SIZE], rax
+ jmp .Lnx_terminal
+.Lnx_done_event:
+ mov dword ptr [r12 + PG_MM_EVT_KIND], PG_MM_KIND_DONE
+.Lnx_terminal:
+ mov dword ptr [rbx + PG_MM_DELIVERED], 1
+ xor eax, eax
+ jmp .Lnx_out
+.Lnx_delivered:
+ mov dword ptr [r12 + PG_MM_EVT_KIND], PG_MM_KIND_DONE
+ xor eax, eax
+ jmp .Lnx_out
+.Lnx_wait:
+ xor eax, eax
+ jmp .Lnx_out
+.Lnx_bad:
+ mov eax, 1
+.Lnx_out:
+ add rsp, 64
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_next, .-li_next
+
+.section .note.GNU-stack,"",@progbits

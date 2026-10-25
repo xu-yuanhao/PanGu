@@ -1,5 +1,7 @@
 # 给第二位 Agent：原地重构 MiMo 协议适配，Assembly 第一
 
+状态（2026-10-25）：已交接并由主Agent审核修复、验证及集成，不再执行本任务。结果见 docs/migration/mimo-assembly-handoff.md 与 docs/migration/runtime-core-progress.md。下文保留原任务范围。
+
 你是 PanGu 的并行实现 Agent。请直接完成 MiMo 请求投影、SSE 解码和请求生命周期的手写汇编重构，实际编译验证后交接，不停留在建议或计划。主 Agent 同时推进 Durable 配置身份、持久会话入口与恢复；共用工作树，必须遵守下面的文件归属。
 
 本任务替代已完成的 TUI/工具重构派发。TUI 与 tools/read 已经是手写汇编，不要重复重构它们。当前剩余待迁移的 C 核心是 `src/runtime/mimo.c`。本任务不增加工具、不扩展 TUI，不重写整个模型生态。

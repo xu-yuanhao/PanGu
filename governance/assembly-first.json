@@ -15,11 +15,6 @@
       "role": "assembly-core",
       "reason": "手写SysV状态推进、内存会话、取消和工具续接"
     },
-    "src/runtime/mimo.c": {
-      "role": "pending-inplace-assembly",
-      "reason": "包含自身SSE解析、消息投影与请求状态逻辑，不能整文件当C胶水；原地迁移后仅保留必要libcurl/json-c调用封装",
-      "sha256": "a3242bcf5fb0c970fca6233188bf03d6056fccba182009ae1ffbbf55677fd2fa"
-    },
     "src/client/tui/tui_term.c": {
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
@@ -81,6 +76,18 @@
     "src/runtime/submissions.S": {
       "role": "assembly-core",
       "reason": "手写有界Submission请求标识查询；无IO、分配或调度副作用"
+    },
+    "src/runtime/mimo.S": {
+      "role": "assembly-core",
+      "reason": "手写MiMo请求投影、SSE解析或生命周期；通过公开libcurl/json-c ABI调用成熟传输与JSON库"
+    },
+    "src/runtime/mimo_projection.S": {
+      "role": "assembly-core",
+      "reason": "手写MiMo请求投影、SSE解析或生命周期；通过公开libcurl/json-c ABI调用成熟传输与JSON库"
+    },
+    "src/runtime/mimo_stream.S": {
+      "role": "assembly-core",
+      "reason": "手写MiMo请求投影、SSE解析或生命周期；通过公开libcurl/json-c ABI调用成熟传输与JSON库"
     }
   }
 }

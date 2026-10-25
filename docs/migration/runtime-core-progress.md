@@ -568,3 +568,25 @@ c855bf7e422785363b3dc129abb31de7d9f82a042d8deda7796f13f695d19720  22个路径
 ```
 
 Goal继续，下一步审核并集成MiMo汇编交接，不把交接自述当实际验证通过。
+
+## 2026-10-25：MiMo协议汇编交接集成
+
+主Agent读取mimo.S/projection/stream、对应头/专项及Pi 38ff991的openai-completions stream/convertMessages/mapStopReason，沿用generation的provider/宿主边界。第二Agent交接被复验并修复，不直接采信报告通过字段。正式构建输入改为三份手写汇编；测试驱动显式链接三份源（单stem解析不自动包含另两份），新增所有权专项进入主验证。原mimo.c、语言pending角色及旧源码登记删除，无C备份/回跳；四个公开导出、pg_mimo/pg_model/事件/Session视图布局不变。
+
+复核修复：工具参数parse_end跨json_tokener_get_error的rcx易失寄存器；未挂入JSON树的容器/叶子、插入/序列化失败清理；finish_reason decoded NUL前缀、原始NUL接收；slist追加失败遗失旧链及curl setopt/getinfo错误未检查。JSON树使用局部所有权位，成功挂入父对象才释放本地所有权，不新增框架或依赖。真实验证又发现普通assistant分支复用了lookahead索引为role：前两进程中断/恢复成功，第三进程追问初始化失败；新增普通两/三消息回归先确实失败，角色从当前消息重载后真实完整链路通过。未放宽任何原断言、预算或结束理由；max_tokens512及length拒绝仍为当前局部限制。
+
+实际验证：原交接16次复验通过；修复后5套件×O0/O2×普通/UBSan=20次全部通过，UBSan设不恢复；主核心16组O0/O2 UBSan通过（新增MiMo ABI/运输/所有权三组），客户端6组通过。所有权75个构造/插入/序列化逐点失败、真实析构观察与最终O2 ASan通过。最初探针误认为userdata删除通知只发生一次，json-c0.19的迭代容器释放实际重复通知并复用context；经GDB确认后按对象身份计唯一释放、不读取context，未降低存活对象归零断言，ASan也验证无实际泄漏/非法释放。另修正新测试中slist脚本变量声明顺序的编译错误；均不计作通过证据。
+
+两份仅在临时目录构造的负例：恢复rcx缺陷→运输工具参数测试退出-6，遗漏未挂入消息清理→所有权测试退出-6；普通对话角色错误也在修复前被新断言退出-6检出。负例/产物均在临时目录删除，未保留旧实现。对象text字节为lifecycle1895/projection3018/stream1610，data/bss均0；导出恰四个既有函数，导入仅公开libcurl/json-c/libc及自身两函数，无旧C核心依赖。
+
+真实MiMo用全汇编协议代码实际通过：PTY持久流中退出/身份不匹配拒绝/自动恢复/历史只读回显/第三进程回忆，另有read工具续答、流中取消与精确termios恢复；--live-submission三进程HTTP200，seq3/messages1/MODEL→seq6/messages2/TERMINAL→seq9/messages4，重复请求未新增写入/网络。失败的首次追问测试明确不计为成功，其修复后重跑整链通过。G00及assembly-first检查通过，当前交互组合无待迁移C核心角色，仅composition/termios/stat三份必要C胶水；不等于全仓都是汇编。生产准入仍BLOCKED，完整Pi provider与跨平台兼容未完成。
+
+同一主Agent按用户授权自审自批源码/构建/语言/模块登记；未改检查器或预算，历史阶段状态不自动提升。协议仍是单choice/单工具、有界缓冲和同一公开配置，未更换模型、TLS端点或凭据来源。主文档仅补当前MiMo汇编适配一句、保持51行，派发标记完成；下一项按实际Agent/Durable需求推进。
+
+固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：
+
+```text
+0d3e6b49c336384e0e31e74a3bef55e95cbd8bcd564cfefa5c4e6a1cf2788cd9  19个路径
+```
+
+Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成。
