@@ -108,6 +108,10 @@
     "src/runtime/stream_decode.S": {
       "role": "assembly-core",
       "reason": "手写有界逐流UTF-8增量解码和replacement/BOM语义；不混用stdout/stderr状态"
+    },
+    "src/runtime/bash_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写bash参数/异步工具状态、逐流解码/尾部保留、原始输出文件和错误清理；借用进程服务与成熟json-c/libc"
     }
   }
 }

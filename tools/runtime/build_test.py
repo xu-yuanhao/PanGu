@@ -115,6 +115,16 @@ def main():
             subprocess.run([edit_tool_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
                             '--tool-binary', edit_tool_test], check=True, timeout=45)
+            bash_test = str(Path(directory) / 'test-bash-tool')
+            bash_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in
+                              ['tools', 'process', 'stream_decode', 'bash_tool', 'agent', 'session', 'submissions']],
+                            str(ROOT / 'tests/runtime/test_bash_tool.c'),
+                            '-Wl,--wrap=mkostemp,--wrap=write,--wrap=close,--wrap=unlink,--wrap=json_tokener_new',
+                            *bash_flags, '-o', bash_test], check=True)
+            subprocess.run([bash_test], check=True, timeout=20)
             decoder_test = str(Path(directory) / 'test-stream-decode')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/stream_decode'),

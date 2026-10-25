@@ -353,9 +353,10 @@
         "storage.journal.posix.local.v1",
         "runtime.profile.local.v1",
         "tools.write.posix.local.v0",
-        "tools.edit.local.v0"
+        "tools.edit.local.v0",
+        "tool.bash.local.v0"
       ],
-      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime; read/write/edit tools and idle configured system refresh",
+      "role": "explicit static composition of Agent, MiMo, read/write/edit/bash and thin TUI; fixed PATH/LANG child environment, optional profile-verified journal; no core algorithms",
       "exports": [
         "main"
       ],
@@ -572,7 +573,7 @@
         "GNU libc posix_spawn file-action extensions",
         "Linux pipe2/waitid/clock/process-group APIs"
       ],
-      "role": "replaceable pg_process_ops provider; handwritten cooperative subprocess lifecycle and separate bounded raw stream events; libc owns spawn/exec setup, waitid WNOWAIT retains leader ownership until final reap, timeout/cancel/close kill owned group, post-exit idle grace; consumer owns decoding/retention/spill and product bash adapter is pending",
+      "role": "replaceable pg_process_ops provider; handwritten cooperative subprocess lifecycle and separate bounded raw stream events; libc owns spawn/exec setup, waitid WNOWAIT retains leader ownership until final reap, timeout/cancel/close kill owned group, post-exit idle grace; consumer owns decoding/retention/spill consumed by the injected bash adapter",
       "exports": [
         "pg_process_init",
         "pg_process_start",
@@ -608,7 +609,7 @@
       "dependencies": [
         "client.contract.v0"
       ],
-      "role": "handwritten bounded streaming UTF-8 replacement decoder; independent caller-owned stream state, initial BOM only, final flush; internal shell output helper, not yet a product bash tool",
+      "role": "handwritten bounded streaming UTF-8 replacement decoder; independent caller-owned stream state, initial BOM only, final flush; internal shell output helper consumed by bash_tool",
       "exports": [
         "pg_stream_decoder_init",
         "pg_stream_decode"
@@ -625,6 +626,42 @@
           "tests_to_read": [
             "packages/durable/test/env-line-scan.test.ts",
             "packages/durable/test/env-node.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tool.bash.local.v0",
+      "sources": [
+        "src/runtime/bash_tool.h",
+        "src/runtime/bash_tool_layout.h",
+        "src/runtime/bash_tool.S"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0",
+        "process.posix.local.v0",
+        "stream.decode.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "handwritten cooperative bash adapter; explicit borrowed process service/cwd/environment, validated command and timeout, separate stream decoding, 3072-byte/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
+      "exports": [
+        "pg_bash_tool_init",
+        "pg_bash_tool_definition"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/bash.ts",
+            "packages/durable/src/env/node.ts"
+          ],
+          "semantics": "validateTimeout/runCommand; streamed output with retained tail, raw spill, nonzero/timeout/cancel errors; native bounded transcript and capture quota differ, explicit minimal environment instead of inherited credentials",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts",
+            "packages/durable/test/env-node.test.ts",
+            "packages/durable/test/env-node-spill.test.ts"
           ]
         }
       ]

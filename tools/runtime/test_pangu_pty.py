@@ -1,6 +1,7 @@
 """PTY tests of the actual composition. --live uses MIMO_API_KEY without logging it."""
 from pathlib import Path
 import argparse
+import json
 import os
 import pty
 import select
@@ -271,12 +272,138 @@ def edit_live(binary, root):
         terminal.close()
     print('PASS: actual MiMo/TUI edit and read-back, BOM/CRLF/unchanged bytes, unsafe intent and settled reopen without rewrite', flush=True)
 
+def bash_live(binary, root):
+    storage = root / 'bash-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        command = "printf PANGU_BASH_PROOF > shell-proof.txt; printf stdout-proof; printf stderr-proof >&2; if [ -z \"$MIMO_API_KEY\" ]; then printf clear > shell-env.txt; else exit 91; fi"
+        terminal.send(('Call bash exactly once with arguments: '+json.dumps({'command':command})+' . Do not use other tools. Then report the result briefly.\r').encode())
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] bash' in terminal.output and b'finished ok:' in terminal.output
+        assert (root / 'shell-proof.txt').read_bytes() == b'PANGU_BASH_PROOF'
+        assert (root / 'shell-env.txt').read_bytes() == b'clear'
+        terminal.output = b''
+        terminal.send(b'Use bash exactly once: printf PANGU_BASH_FAILED; exit 7 . Report its nonzero exit without retrying.\r')
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] bash' in terminal.output and b'finished error:' in terminal.output and b'exit=7' in terminal.output
+        terminal.output = b''
+        terminal.send(b'Use bash once to execute: printf PANGU_BASH_WAITING; sleep 30; printf late > should-not-exist.txt . Wait for its result.\r')
+        terminal.until(b') started')
+        terminal.output = terminal.output.split(b') started', 1)[1]
+        terminal.until(b'PANGU_BASH_WAITING')
+        terminal.send(b'\x03')
+        terminal.until(b'[run] finished: cancelled', 10)
+        assert not (root / 'should-not-exist.txt').exists()
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    log = storage / 'session.pgj'
+    original = log.read_bytes()
+    assert env['MIMO_API_KEY'].encode() not in original
+    assert any(cp[1] == 5 for cp in checkpoints(log)) and checkpoints(log)[-1][1] == 3
+    before = (root / 'shell-proof.txt').stat().st_mtime_ns
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        assert b'[history] call' in terminal.output and b'[run] started' not in terminal.output
+        assert log.read_bytes() == original and (root / 'shell-proof.txt').stat().st_mtime_ns == before
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual MiMo/TUI bash side effect, explicit environment, nonzero result, cancellation, unsafe intent and settled reopen', flush=True)
+
+def bash_recovery_live(binary, root):
+    storage = root / 'bash-recovery-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    terminal = Terminal(binary, root, env)
+    artifact = None
+    try:
+        terminal.until(b'\r\n> ', 5)
+        command = "printf '%06000d' 0"
+        terminal.send(('Call bash exactly once with arguments: '+json.dumps({'command':command})+' . Do not repeat or read its full output; report briefly.\r').encode())
+        terminal.until(b'[run] finished: success')
+        found = re.search(rb'full raw output: (/tmp/pangu-output-[A-Za-z0-9]+)', (storage / 'session.pgj').read_bytes())
+        assert found, 'missing committed spill artifact path; terminal: '+repr(terminal.output[-5000:].replace(terminal.secret,b'[REDACTED]'))
+        artifact = Path(found[1].decode())
+        assert b'[tool] bash' in terminal.output and b'earlier output omitted' in terminal.output
+        assert found[1] in terminal.output, 'spill path was hidden by the visible summary'
+        assert artifact.read_bytes() == b'0'*6000 and artifact.stat().st_mode & 0o777 == 0o600
+        terminal.output = b''
+        command = 'printf once >> bash-effects.txt; printf PANGU_BASH_PARKED; sleep 30; printf late >> bash-effects.txt'
+        terminal.send(('Call bash exactly once with arguments: '+json.dumps({'command':command})+' . Never repeat this command if it is interrupted. Report its result briefly.\r').encode())
+        terminal.until(b') started')
+        terminal.output = terminal.output.split(b') started', 1)[1]
+        terminal.until(b'PANGU_BASH_PARKED')
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+        if artifact is not None:
+            artifact.unlink()
+    target = root / 'bash-effects.txt'
+    assert target.read_bytes() == b'once'
+    log = storage / 'session.pgj'
+    assert checkpoints(log)[-1][1] == 5, 'detach must preserve unsafe checkpoint, not abort or settle'
+    before = target.stat().st_mtime_ns
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'[run] finished: success')
+        assert b'interrupted' in terminal.output
+        assert target.read_bytes() == b'once' and target.stat().st_mtime_ns == before
+        assert checkpoints(log)[-1][1] == 3 and env['MIMO_API_KEY'].encode() not in log.read_bytes()
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual MiMo/TUI bash raw spill and cooperative detach, unsafe restart result without repeating command effects', flush=True)
+
+def workflow_live(binary, root):
+    storage = root / 'workflow-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    original = b'.intel_syntax noprefix\n.section .rodata\nmessage: .ascii "OLD_WORKFLOW\\n"\nmessage_end:\n.set message_length,message_end-message\n.text\n.globl _start\n_start:\n mov eax,1\n mov edi,1\n lea rsi,[rip+message]\n mov edx,OFFSET message_length\n syscall\n mov eax,60\n xor edi,edi\n syscall\n.section .note.GNU-stack,"",@progbits\n'
+    expected = original.replace(b'OLD_WORKFLOW', b'PANGU_WORKFLOW_OK')
+    (root / 'example.S').write_bytes(original)
+    script = 'set -eu\nclang-23 -nostdlib -no-pie example.S -o example-run\noutput=$(./example-run)\ntest "$output" = PANGU_WORKFLOW_OK\nprintf "PANGU_WORKFLOW_VERIFIED\\n"\n'
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        request = ('Read example.S with read. Use edit to replace only OLD_WORKFLOW with PANGU_WORKFLOW_OK. '
+                   'Use write to create verify.sh with exactly this content: '+json.dumps(script)+
+                   ' . Then use bash to run sh verify.sh. Do not perform these changes using bash. Report the actual test result briefly.\r')
+        terminal.send(request.encode())
+        terminal.until(b'[run] finished: success', 180)
+        for name in (b'read', b'edit', b'write', b'bash'):
+            assert b'[tool] '+name in terminal.output, 'workflow omitted '+repr(name)
+        assert (root / 'example.S').read_bytes() == expected
+        assert (root / 'verify.sh').read_text() == script
+        artifact = root / 'example-run'
+        assert artifact.read_bytes().startswith(b'\x7fELF')
+        check = subprocess.run([str(artifact)],env={'PATH':'/usr/bin:/bin'},capture_output=True,check=True,timeout=3)
+        assert check.stdout == b'PANGU_WORKFLOW_OK\n'
+        assert b'PANGU_WORKFLOW_VERIFIED' in terminal.output and b'finished error:' not in terminal.output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert env['MIMO_API_KEY'].encode() not in (storage / 'session.pgj').read_bytes()
+    print('PASS: actual MiMo read/edit/write/bash workflow built and tested handwritten Assembly with exact source preservation', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--live-persistent', action='store_true')
     parser.add_argument('--live-write', action='store_true')
     parser.add_argument('--live-edit', action='store_true')
+    parser.add_argument('--live-bash', action='store_true')
+    parser.add_argument('--live-bash-recovery', action='store_true')
+    parser.add_argument('--live-workflow', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -315,6 +442,15 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_workflow:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-workflow'
+            workflow_live(binary, root)
+        if args.live_bash_recovery:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-bash-recovery'
+            bash_recovery_live(binary, root)
+        if args.live_bash:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-bash'
+            bash_live(binary, root)
         if args.live:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live'
             live_env = os.environ.copy()

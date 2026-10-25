@@ -1772,7 +1772,8 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "real Linux/glibc subprocess service only: explicit cwd/env, separate raw streams, cooperative timeout/cancel/close and reaping; bash/async Tool integration, retention/spill and real model command validation remain pending"
+      "local_subset_scope": "Linux/glibc cooperative process + handwritten bash tool: explicit cwd/PATH-LANG environment, separate UTF-8 decoding, bounded tail/raw spill/capture quota, nonzero/timeout/cancel, durable unsafe detach/recovery; no sandbox or full Pi shell compatibility",
+      "local_implementation": "native async pg_tools lifecycle; actual MiMo/TUI command, nonzero exit, cancellation, spill and unsafe restart evidence; full read/edit/write/bash workflow remains blocked by existing single-tool MiMo response parser, not by process backend"
     },
     {
       "id": "T27",
@@ -1826,7 +1827,7 @@
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
       "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
-      "local_subset_scope": "read-only TUI with profile-verified persistent session, committed startup history, resume and detach; no full P1, history viewport/search or session selector",
+      "local_subset_scope": "thin TUI with read/write/edit/bash, profile-verified persistent session/history/resume/detach; individual real model workflows pass, full multi-tool build/test workflow still fails on MiMo batched calls; no full P1 or history viewport/search/selector",
       "local_implementation": "handwritten TUI/bridge and startup snapshot reader; history separate from execution events, control escaping after UTF-8 carry joining; termios platform structure remains thin C"
     },
     {

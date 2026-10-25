@@ -682,3 +682,22 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 实际验证：140477条逐块输出与固定Pi实际StreamDecoder通过（Node直接导入只读参考decode.ts，源摘要固定；不是另写TS预言机），包括所有256个单字节和65536种双字节的整块/拆块、特殊前缀/中途BOM、随机及4096字节坏输入。核心O0/O2 UBSan完整构建运行退出0，专项O2 ASan/UBSan通过；另测双流状态隔离、容量拒绝不变、页尾状态/输入/输出及重复final。实际产品组合构建通过，G00、assembly-first与diff检查通过。该批没有改变模型或现有工具调用行为，未做新的真实模型验证；现有进程与协议专项不等于bash已完成。
 
 同一Agent按授权自审自批helper模块、文件/语言登记与测试构建；未修改检查器/预算或放宽基线。风险/限制：调用者须初始化并逐流维护状态，输入输出和状态不得重叠，原始完整输出保留与溢出策略仍须在bash适配中完成。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`5535cf683f1af81e5b395882294b2b31e6ebf25f5fab37b9aabe6c0fbd4fbabc`。
+
+
+## 2026-10-25：bash本地工具与真实命令闭环
+
+阅读固定Pi d5b3de22的tools/bash.ts::validateTimeout/prepareExecution/runCommand/createBashTool，env/node.ts::exec的双流解码、onAbort、spill、finishSpill和settle，以及tools.test.ts的bash状态/超时/环境用例、env-node-spill.test.ts的背压测试。fetch确认Pi仍d5b3de22，Harness仍22ddee3（其上游分支为master），参考源码未改。
+
+新增手写bash_tool.S，借用可替换pg_process_ops；参数、调用状态、双流解码、尾部保留、raw文件和释放都在汇编，C只在入口显式组合。采用非持久/bin/bash、cwd/env、可选秒超时（无默认）、非零/信号/超时/取消错误、临时输出和完整原始输出文件。原生差异：当前消息槽4096字节，保留3072字节/2000行UTF-8尾部，开头放退出状态和文件路径以供TUI短摘要显示；没有上游structuredOutput、prepare hook或PowerShell兼容。超时正小数按毫秒截断，最小1ms，上限2147483647ms。执行不构成目录沙箱。
+
+完整raw输出按stdout/stderr到达顺序写入mkostemp的0600文件；普通小结果在发布前关闭并删除临时文件，截断才保留路径。采用从启动便写临时文件，避免丢失溢出前缀，未照搬Node异步文件流；每次poll最多处理一个4096字节进程块，普通文件IO仍可能等待磁盘。捕获硬上限16 MiB，超过即取消并以partial文件错误返回，不声称文件完整。取消/暂停借用现有协作回收；未发布就detach时删除临时文件，删除失败保留所有权供重试。已发布的完整/partial临时文件由使用者管理，不保证/tmp清理或主机重启后仍存在，不作为Session的持久附件。
+
+默认组合只给命令PATH=/usr/bin:/bin、LANG=C.UTF-8，未继承模型key或父环境；已有profile实现身份改为read-write-edit-bash-v1，旧在途配置不能静默换成新工具集。命令本身无沙箱限制，环境不继承不等于任意同用户命令无法访问主机资源。参数严格解析并拒绝decoded NUL（包含会被json-c键截断的参数名），普通转义反斜线文本仍可使用。
+
+实际验证：核心常规构建O0/O2 UBSan退出0，bash专项O2 ASan/UBSan退出0。真实进程覆盖空命令、双流、非零/信号、超时、取消/重复取消、未发布关闭、UTF-8/BOM/坏字节、原始文件字节/0600权限、3072字节/2000行/emoji边界、16 MiB停止、FD计数、页尾上下文/输出、mkostemp失败、三处JSON分配失败、短写/EINTR/零写/ENOSPC、close/unlink错误及删除重试。五次确定性单元模型驱动真实6000字节命令，Agent收齐进度并提交带完整文件路径的结果；该模型是单元替身，不冒充真实MiMo。sanitizer主要覆盖C测试/库边界，汇编内存边界由长度断言与保护页用例验证。
+
+真实MiMo/TUI：命令写文件与环境key未继承、exit7错误结果、Ctrl-C取消后无late副作用、unsafe intent和已终结重开不重复写通过；6000字节raw文件完整且0600、可见摘要显示路径、Ctrl-D协作退出保持TOOL_UNSAFE，跨进程恢复返回interrupted且原副作用不重复，通过。启动/信号/resize/termios、闲置持久重开检查也通过。联调发现末尾诊断会被TUI snippet隐藏，结果元数据已前置。两次早期长输出联调未通过路径断言，当时失败响应留存不足，未全部定位，不能将后续通过写成那些失败均已修复。
+
+完整read→edit→write→bash汇编构建/测试的真实用例已加入--live-workflow，当前**未通过**：初版测试汇编立即数写法已单独修正并验证可构建；随后无网络内容泄露的临时诊断驱动记录HTTP200、tool_calls分块从index0进入index1，当前单调用MiMo解析器即拒绝，尚未到达完整构建。官方[MiMo Chat Completions文档](https://mimo.mi.com/docs/en-US/api/chat/openai-api)亦明确tool_calls可以含多个调用。没有放宽单调用拒绝测试、丢弃后续调用或把完整工作流标成通过；下一批需参考Pi完整assistant工具集合，接入有界批量调用及Durable提交/恢复，再复验这一用例。诊断驱动只是/tmp中的临时测试客户端，未进入产品；T26/T28与完整P1继续IN_PROGRESS。
+
+同一Agent按授权自审自批bash服务、实际语言/文件/模块/构建登记、四工具组合和profile身份更新；未改变检查器、预算基线或生产准入。接口新导出只有pg_bash_tool_init/definition，对象text/rodata合计3604字节、relocation只读表64字节、bss0；调用者状态15592字节，另借用原进程提供者。G00、assembly-first和diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`c18bdba071e1a6cb75d8c5e8359fc30fd3eb31632bc5fd98255eb4a33ff27ffd`。
