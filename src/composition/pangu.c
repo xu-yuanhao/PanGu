@@ -5,6 +5,7 @@
 #include "../runtime/edit_tool.h"
 #include "../runtime/bash_tool.h"
 #include "../runtime/profile.h"
+#include "../runtime/prompt.h"
 #include "../runtime/journal.h"
 #include "../client/tui/runtime_bridge.h"
 #include "../client/tui/tui_app.h"
@@ -16,6 +17,7 @@
 #include <unistd.h>
 /* Explicit static composition: neither Loop nor TUI chooses a provider. */
 static pg_agent agent;
+static char configured_prompt[4096];
 static pg_mimo provider;
 static pg_tool_registry registry;
 static pg_tool_registry file_registry;
@@ -27,7 +29,7 @@ static pg_bash_tool shell_tool;
 static char *const command_environment[]={"PATH=/usr/bin:/bin","LANG=C.UTF-8",0};
 static pg_journal journal={.file=-1,.directory=-1};
 int main(int argc,char **argv){
- if(argc>2 || (argc==2 && (!strcmp(argv[1],"--help")||!strcmp(argv[1],"-h")))){fprintf(stderr,"Usage: pangu [workspace-directory]\nSet MIMO_API_KEY in the environment; MIMO_MODEL is optional. PANGU_SESSION_DIR optionally selects an existing private directory for session.pgj. Ctrl-C cancels while busy and exits while idle; Ctrl-D exits. Persistent exit preserves pending work. Tools: read, write, edit and bash. Commands are not sandboxed; shell environment contains PATH and LANG only.\n");return argc>2?2:0;}
+ if(argc>2 || (argc==2 && (!strcmp(argv[1],"--help")||!strcmp(argv[1],"-h")))){fprintf(stderr,"Usage: pangu [workspace-directory]\nSet MIMO_API_KEY in the environment; MIMO_MODEL is optional. PANGU_SYSTEM_PROMPT_FILE optionally replaces the default system prompt from a workspace-relative UTF-8 file. PANGU_SESSION_DIR optionally selects an existing private directory for session.pgj. Ctrl-C cancels while busy and exits while idle; Ctrl-D exits. Persistent exit preserves pending work. Tools: read, write, edit and bash. Commands are not sandboxed; shell environment contains PATH and LANG only.\n");return argc>2?2:0;}
  if(!getenv("MIMO_API_KEY") || !*getenv("MIMO_API_KEY")){fputs("MIMO_API_KEY is required (environment only).\n",stderr);return 2;}
  if(!isatty(STDIN_FILENO)||!isatty(STDOUT_FILENO)){fputs("PanGu requires an interactive terminal.\n",stderr);return 2;}
  if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
@@ -60,6 +62,11 @@ int main(int argc,char **argv){
  }
  const char *prompt="You are PanGu, a minimal native coding agent. Answer concisely. Use read to inspect workspace files and write to create or overwrite files when requested. Use edit for targeted replacements against original file content. File tool paths are relative to the configured workspace. Use bash for commands in that working directory; commands are not sandboxed. The shell receives PATH and LANG only, not your credentials or the parent environment. For long output, use the reported raw output file if needed. If a tool was interrupted and may have partially run, inspect current state before deciding whether to repeat a write or command. Never claim an action that was not executed.";
  size_t prompt_size=strlen(prompt);
+ const char *prompt_file=getenv("PANGU_SYSTEM_PROMPT_FILE");
+ if((!agent.commits.run.id || agent.commits.run.phase==PG_RUN_TERMINAL) && prompt_file){
+  if(pg_prompt_from_file(&editor.files,(pg_slice){prompt_file,strlen(prompt_file)},configured_prompt,sizeof(configured_prompt),&prompt_size)){fputs("Cannot load configured system prompt (workspace-relative UTF-8 file, max 4095 bytes).\n",stderr);goto cleanup;}
+  prompt=configured_prompt;
+ }
  if((!agent.commits.run.id || agent.commits.run.phase==PG_RUN_TERMINAL) &&
     (agent.session.system_size!=prompt_size || memcmp(agent.session.system_prompt,prompt,prompt_size)) &&
     pg_agent_set_system(&agent,(pg_slice){prompt,prompt_size}))goto cleanup;

@@ -518,6 +518,85 @@ def snapshot_edit_live(binary, root):
         terminal.close()
     print('PASS: actual MiMo/TUI edit beyond the model read page preserved all 2000 leading newlines, verified with ranged read and settled reopen', flush=True)
 
+def prompt_file_live(binary, root):
+    storage = root / 'prompt-source-storage'
+    storage.mkdir()
+    path = root / 'rules.md'
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage), PANGU_SYSTEM_PROMPT_FILE='rules.md')
+    for attempt in range(2):
+        marker = 'PANGU_PROMPT_' + os.urandom(6).hex()
+        instructions = 'Reply with exactly ' + marker + ' and no other text. Do not use any tools.'
+        path.write_text(instructions)
+        terminal = Terminal(binary, root, env)
+        try:
+            terminal.until(b'\r\n> ', 5)
+            terminal.output = b''
+            terminal.send(b'Say hello.\r')
+            terminal.until(b'[run] finished: success', 120)
+            clean = re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', terminal.output)
+            if marker.encode() not in clean or b'[tool]' in clean:
+                data = (storage / 'session.pgj').read_bytes()
+                cursor, system, assistant = 0, b'', b''
+                while cursor < len(data):
+                    version, length = struct.unpack_from('<II', data, cursor + 8)
+                    kind, count = struct.unpack_from('<II', data, cursor + 24)
+                    if kind == 1:
+                        system = data[cursor + 40:cursor + length - 16]
+                    if kind == 0:
+                        offset = cursor + 40
+                        for _ in range(count):
+                            role, error, text_len, id_len, name_len = struct.unpack_from('<IIIHH', data, offset)
+                            offset += 16
+                            if role == 1:
+                                assistant = data[offset:offset + text_len]
+                            offset += text_len + id_len + name_len
+                    cursor += length
+                expected_hash = 0xcbf29ce484222325
+                for byte in instructions.encode():
+                    expected_hash = ((expected_hash ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+                print('prompt diagnostic: attempt=', attempt, 'expected hash=', hex(expected_hash), 'latest system matches=', system == instructions.encode(),
+                      'last assistant=', repr(assistant[:300].replace(env['MIMO_API_KEY'].encode(), b'[REDACTED]')),
+                      'terminal tail=', repr(clean[-300:].replace(env['MIMO_API_KEY'].encode(), b'[REDACTED]')), flush=True)
+            assert marker.encode() in clean and b'[tool]' not in clean
+            terminal.send(b'\x04')
+            terminal.finish()
+        finally:
+            terminal.close()
+        data = (storage / 'session.pgj').read_bytes()
+        assert instructions.encode() in data and env['MIMO_API_KEY'].encode() not in data
+        assert checkpoints(storage / 'session.pgj')[-1][1] == 3
+    marker = 'PANGU_FROZEN_' + os.urandom(6).hex()
+    path.write_text('Start with ' + marker + ' then give 12 numbered facts about C pointers, each at most six words. Do not use tools.')
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.output = b''
+        terminal.send(b'Proceed.\r')
+        terminal.until(marker.encode())
+        terminal.send(b'\x04')
+        terminal.finish()
+        assert b'[run] finished:' not in terminal.output
+    finally:
+        terminal.close()
+    assert checkpoints(storage / 'session.pgj')[-1][1] == 1
+    path.unlink()
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'[run] finished: success', 150)
+        assert marker.encode() in re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', terminal.output)
+        assert not path.exists()
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert checkpoints(storage / 'session.pgj')[-1][1] == 3
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.finish(expected=2)
+    finally:
+        terminal.close()
+    print('PASS: actual MiMo used the explicit system file, idle reopen reloaded it, active resume used its stored prompt after source deletion, and missing idle source failed without fallback', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -530,6 +609,7 @@ def main():
     parser.add_argument('--live-batch', action='store_true')
     parser.add_argument('--live-read-pages', action='store_true')
     parser.add_argument('--live-snapshot-edit', action='store_true')
+    parser.add_argument('--live-prompt-file', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -568,6 +648,9 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_prompt_file:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-prompt-file'
+            prompt_file_live(binary, root)
         if args.live_snapshot_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-snapshot-edit'
             snapshot_edit_live(binary, root)

@@ -810,3 +810,16 @@ read_tool.S原地实现4096字节块扫描和逐行选择，沿用最多4095字�
 write_tool.S在原有有界JSON解析前扫描字符串转义，仅拒绝含decoded NUL的键名；正文中的NUL仍按显式长度写入，不全局禁止u0000，也不误把值内的引号/冒号识别为键。标准JSON语法/UTF-8仍交给现有严格json-c解析，路径和权限规则不变；无新增内存、导出、文件、依赖、配额或门禁。测试包含两种键别名、合法前缀加别名、Unicode拼写别名、键后空白，正文NUL/引号/冒号和字面量反斜线、全部截断输入靠近保护页，以及原有短写/EINTR/ENOSPC/零写/部分失败/FD清理。
 
 write与依赖它的edit专项O0 UBSan、O2 ASan/UBSan退出0，编辑的17个分配失败点与副作用恢复保留。G00和diff检查通过。本批未调用真实模型，不把字节解析测试写成端到端模型或TUI验收；并行TUI改造不在本次修改和提交范围。
+
+
+## 2026-10-26：显式系统提示文件来源（真实多轮验收未完成）
+
+读取固定Pi d5b3de22 Durable harness/agent.ts的instructions section、types.ts配置契约，harness-conversations/registry的替换与section顺序测试；另读旧Coding Agent resource-loader.ts::loadContextFileFromDir。Durable本身提供instructions注入，AGENTS自动发现属于旧资源层。本批只实现明确选择的文件来源，不自动扫描父目录、合并AGENTS/CLAUDE或移植完整资源加载器。
+
+新增手写prompt.S/h：借用已注入的同步完整文件read服务，将路径有界编码、先授权再读取，拒绝PARTIAL/WAIT/错误及超限并清空输出。没有复制文件读取、增加目录扫描或Session状态。C入口仅选择PANGU_SYSTEM_PROMPT_FILE；未设置时沿用默认提示，设置时用文件全文替换默认，包含有意的空文件。默认provider仍限制工作区相对路径、普通UTF-8文件、无符号链接及4095字节；显式配置失败不回退。在途启动沿用已提交系统提示，不重读源文件；该新恢复场景的真实验收仍未完成。新增静态输出缓冲4096字节，prompt helper自身栈56字节；既有消息/文件配额不变。用法：已设置MIMO_API_KEY后，PANGU_SYSTEM_PROMPT_FILE=AGENTS.md /tmp/pangu-native/pangu <workspace>。默认提示被替换而非追加。
+
+局部验证：prompt O0 UBSan/O2 ASan/UBSan通过，覆盖注入服务、转义路径、四个JSON构造失败点、拒绝/partial/协议长度、真实文件/空文件/缺失/符号链接、4095/4096边界及保护页。请求投影新增保持旧历史但更换system的确定性检查，O2 ASan/UBSan通过。共享TUI处于并行修改，本批用git archive ecc62ff加自有文件构成临时候选树，不动对方文件。
+
+真实MiMo结果必须分开记录：最初的双轮文件加载/空闲重开/缺失配置测试曾通过；随后增加在途源删除/恢复测试时，两次在前面的第二轮严格输出断言失败。失败诊断确认journal最新system与新文件一致，最后assistant却是Hello!，不是仅终端匹配失败。另一次仅在临时目录加发送前摘要wrapper的诊断越过前两轮，但在新的长响应前缀等待处失败，实际回答沿用旧token。wrapper未进入产品或仓库，没有修改严格断言或靠重复到成功宣称修复；目前不足以把原因唯一归到服务端或本地发送路径。保留--live-prompt-file失败与诊断，真实多轮/源删除恢复继续未验收，不能声称模型始终遵循新指令。
+
+同一Agent自审新增服务、文件/语言/依赖登记与入口组合；这是有明确未通过可选真实测试的本地开发候选，不是完整体验或生产放行。没有扩大预算、修改检查器或删除失败条件。G00、assembly-first、diff检查通过；仅本批文件提交，并行TUI不包含在内。固定包SHA256（仅本批文件，不含本记录与并行TUI；排序[path,文件SHA256]紧凑UTF-8 JSON）：`03c24e93536f418c9a80c2a68b8638d7ec4b0302b5522f642d5b03f9bfdab9ca`。

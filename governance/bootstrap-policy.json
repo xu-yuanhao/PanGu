@@ -595,6 +595,9 @@
     "tests/runtime/test_bash_tool.c": "native-test",
     "tests/runtime/test_tool_batch_storage.c": "native-test",
     "tests/runtime/live_mimo_batch.c": "native-test",
-    "docs/并行开发任务提示词-TUI输入体验.md": "document"
+    "docs/并行开发任务提示词-TUI输入体验.md": "document",
+    "src/runtime/prompt.S": "native-source",
+    "src/runtime/prompt.h": "native-source",
+    "tests/runtime/test_prompt.c": "native-test"
   }
 }

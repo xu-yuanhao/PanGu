@@ -1,0 +1,40 @@
+#define _GNU_SOURCE
+#include "../../src/runtime/prompt.h"
+#include "../../src/runtime/read_tool.h"
+#include <assert.h>
+#include <fcntl.h>
+#include <json-c/json.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
+static unsigned calls,fail_at,executed;
+static int mode,denied;
+static const char *expected="rules\".txt";
+static pg_slice s(const char *p){return (pg_slice){p,strlen(p)};}
+json_object *__real_json_object_new_object(void);
+json_object *__real_json_object_new_string_len(const char *,int);
+int __real_json_object_object_add(json_object *,const char *,json_object *);
+const char *__real_json_object_to_json_string_ext(json_object *,int);
+json_object *__wrap_json_object_new_object(void){return ++calls==fail_at?0:__real_json_object_new_object();}
+json_object *__wrap_json_object_new_string_len(const char *p,int n){return ++calls==fail_at?0:__real_json_object_new_string_len(p,n);}
+int __wrap_json_object_object_add(json_object *o,const char *k,json_object *v){return ++calls==fail_at?-1:__real_json_object_object_add(o,k,v);}
+const char *__wrap_json_object_to_json_string_ext(json_object *o,int f){return ++calls==fail_at?0:__real_json_object_to_json_string_ext(o,f);}
+static int allow(void *ctx,pg_slice name,pg_slice args){(void)ctx;assert(name.size==4&&!memcmp(name.data,"read",4));json_object *o=json_tokener_parse(args.data),*v=0;assert(o&&json_object_object_get_ex(o,"path",&v)&&!strcmp(json_object_get_string(v),expected));json_object_put(o);return !denied;}
+static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t cap,size_t *n){(void)ctx;(void)name;(void)args;++executed;*n=0;if(mode==4){*n=cap;return PG_TOOL_OK;}if(mode==5){*n=4096;return PG_TOOL_OK;}if(cap<4)return PG_TOOL_ERROR;memcpy(out,"abc",3);*n=3;return mode==1?PG_TOOL_PARTIAL:mode==2?PG_TOOL_WAIT:mode==3?PG_TOOL_ERROR:PG_TOOL_OK;}
+int main(void){pg_tools files={0,allow,execute,0,0,0,0};char out[5000];size_t n;
+ assert(!pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&n==3&&!memcmp(out,"abc",4));
+ for(unsigned i=1;i<=4;++i){calls=0;fail_at=i;unsigned before=executed;assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&!n&&!out[0]&&before==executed);}fail_at=0;
+ denied=1;unsigned before=executed;assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&!n&&!out[0]&&before==executed);denied=0;
+ for(mode=1;mode<=5;++mode)assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&!n&&!out[0]);mode=0;
+ assert(pg_prompt_from_file(0,s(expected),out,sizeof(out),&n)&&!n);assert(pg_prompt_from_file(&files,(pg_slice){0,1},out,sizeof(out),&n)&&!n);assert(pg_prompt_from_file(&files,(pg_slice){"x\0y",3},out,sizeof(out),&n)&&!n);assert(pg_prompt_from_file(&files,s(""),out,sizeof(out),&n)&&!n);assert(pg_prompt_from_file(&files,s(expected),out,0,&n)&&!n);assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),0));
+ char large_path[4096];memset(large_path,'"',sizeof(large_path));before=executed;assert(pg_prompt_from_file(&files,(pg_slice){large_path,4095},out,sizeof(out),&n)&&!n&&before==executed);assert(pg_prompt_from_file(&files,(pg_slice){large_path,4096},out,sizeof(out),&n)&&!n);
+ long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));assert(!pg_prompt_from_file(&files,s(expected),map+page-4,4,&n)&&n==3&&!memcmp(map+page-4,"abc",4));assert(!munmap(map,(size_t)page*2));
+ char root[]="/tmp/pangu-prompt-XXXXXX";assert(mkdtemp(root));pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,root));pg_tool_definition d=pg_read_snapshot_definition(&reader);pg_tool_registry registry;assert(!pg_tool_registry_init(&registry,&d,1));files=pg_tool_registry_service(&registry);
+ int fd=openat(reader.directory,"rules.txt",O_CREAT|O_WRONLY|O_TRUNC,0600);assert(fd>=0&&write(fd,"Always answer 中文.\n",22)==22&&!close(fd));assert(!pg_prompt_from_file(&files,s("rules.txt"),out,sizeof(out),&n)&&n==22);
+ assert(pg_prompt_from_file(&files,s("missing"),out,sizeof(out),&n)&&!n&&!out[0]);assert(pg_prompt_from_file(&files,s("../rules.txt"),out,sizeof(out),&n)&&!n);assert(!symlinkat("rules.txt",reader.directory,"link"));assert(pg_prompt_from_file(&files,s("link"),out,sizeof(out),&n)&&!n);assert(!unlinkat(reader.directory,"link",0));
+ fd=openat(reader.directory,"rules.txt",O_WRONLY|O_TRUNC);assert(fd>=0&&!close(fd));assert(!pg_prompt_from_file(&files,s("rules.txt"),out,sizeof(out),&n)&&!n&&!out[0]);
+ fd=openat(reader.directory,"rules.txt",O_WRONLY|O_TRUNC);assert(fd>=0);memset(out,'x',4096);assert(write(fd,out,4095)==4095&&!close(fd));assert(!pg_prompt_from_file(&files,s("rules.txt"),out,sizeof(out),&n)&&n==4095);
+ fd=openat(reader.directory,"rules.txt",O_WRONLY|O_APPEND);assert(fd>=0&&write(fd,"x",1)==1&&!close(fd));assert(pg_prompt_from_file(&files,s("rules.txt"),out,sizeof(out),&n)&&!n&&!out[0]);
+ assert(!unlinkat(reader.directory,"rules.txt",0));pg_read_tool_close(&reader);assert(!rmdir(root));puts("PASS: injected prompt source, escaped path, four allocation failures, denial/partial/protocol rejection and real complete-file loading");return 0;}

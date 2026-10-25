@@ -403,7 +403,8 @@
         "runtime.profile.local.v1",
         "tools.write.posix.local.v0",
         "tools.edit.local.v0",
-        "tool.bash.local.v0"
+        "tool.bash.local.v0",
+        "context.prompt.local.v0"
       ],
       "role": "explicit static composition of Agent, MiMo, read/write/edit/bash and thin TUI; separate model-facing and internal file registries, editor receives complete snapshots; fixed PATH/LANG child environment and optional profile-verified journal, implementation identity v2; no core algorithms",
       "exports": [
@@ -723,6 +724,38 @@
             "packages/durable/test/tools.test.ts",
             "packages/durable/test/env-node.test.ts",
             "packages/durable/test/env-node-spill.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "context.prompt.local.v0",
+      "sources": [
+        "src/runtime/prompt.S",
+        "src/runtime/prompt.h"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "bounded explicit system prompt file source using injected synchronous complete UTF-8 file service; no discovery, Session mutation, fallback or asynchronous provider ownership",
+      "exports": [
+        "pg_prompt_from_file"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/agent.ts",
+            "packages/durable/src/harness/types.ts",
+            "packages/coding-agent/src/core/resource-loader.ts"
+          ],
+          "semantics": "Durable explicit instructions and Coding Agent context-file loading; native user-selected workspace file replaces default system text, no automatic discovery",
+          "tests_to_read": [
+            "packages/durable/test/harness-conversations.test.ts",
+            "packages/durable/test/harness-registry.test.ts"
           ]
         }
       ]
