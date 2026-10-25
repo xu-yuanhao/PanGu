@@ -49,6 +49,7 @@ def main():
                 subprocess.run([output], check=True, timeout=350)
             return 0
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_documents.py')], check=True, timeout=45)
+        subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_record_memory.py')], check=True, timeout=45)
         native_paths = []
         for name, define in (('good', None), ('abi', 'BAD_ABI'), ('symbol', 'NO_ENTRY'), ('dependency', 'MISSING_DEP'), ('start', 'START_FAIL')):
             library = str(Path(directory) / (name + '.so'))
@@ -82,6 +83,14 @@ def main():
                             str(ROOT / 'tests/runtime/test_records.c'), '-Wl,--wrap=json_object_deep_copy',
                             *documents_flags, '-o', records_test], check=True)
             subprocess.run([records_test], check=True, timeout=15)
+            memory_test = str(Path(directory) / 'test-record-memory')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-DPG_MEMORY_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/documents'), implementation('src/runtime/records'), implementation('src/runtime/record_memory'),
+                            str(ROOT / 'tests/runtime/test_record_memory.c'),
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray',
+                            *documents_flags, '-o', memory_test], check=True)
+            subprocess.run([memory_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
             prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

@@ -132,6 +132,10 @@
     "src/runtime/records.S": {
       "role": "assembly-core",
       "reason": "手写通用StorageWrite批次脱离、同步adopt/发布顺序、只读与失败锁存；json-c承担对象复制"
+    },
+    "src/runtime/record_memory.S": {
+      "role": "assembly-core",
+      "reason": "手写四类记录的原子准备/应用、全局ID与有序索引；libc容量预留和json-c对象复制"
     }
   }
 }

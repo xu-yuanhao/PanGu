@@ -72,6 +72,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 
 - [x] 移植Document地址身份、作用域/owner/family-key解析和上游JSON tuple编码，作为事务/存储查询共用基础。
 - [x] 移植通用准备批次的Storage提交边界：脱离调用者输入、同步adopt、成功结算后发布、只读/空批次及失败锁存。
+- [x] 完成conversation/entry/task/submission四类记录的内存批次准备、原子应用、全局ID分配与独立点读；接通通用提交入口。
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
@@ -212,7 +213,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03值准入：对照同版本 `packages/chord/src/json.ts:copy/isJsonValue`，新增 `pg_document_value_valid`，在输入复制和迁移结果复制前检查有限数值与祖先环；允许共享子对象。C ABI限定256层容器，避免原生栈无限递归，超过边界返回拒绝。实际Chord函数对照finite/nonfinite/cycle/DAG六种图一致；ASan/UBSan验证256层接受、257层拒绝，非法输入/迁移返回被拒绝，调用者保留输入图所有权。
 - K03批次入口：`records.h/.S:pg_records_commit` 对应 `types.ts:Storage.commit`、`session/session.ts` 的提交/GuardedStorage.#call、`transaction.ts:settleSuccess/discard`；阅读并移植 `session-adoption.test.ts` 的同步采纳、采纳前/后错误、漏采纳及采纳错误场景。原生使用同步C ABI回调：backend持久化后调用adopt，返回时核对唯一采纳与相同序号，再发布；已采纳的状态在后端后续失败时保留，Session停止继续提交。
 - K03批次验证：O0/O2 ASan/UBSan专项通过；混合Entry/Document准备批次用确定性Storage边界验证整批脱离、adopt-before-resolve/publication、空/只读、重复/缺失/错误序号、回调内重入拒绝、采纳失败不会逃逸到Storage、后端失败锁存，以及复制失败/部分复制清理和页尾Session布局。完整记录约束由Storage/Tx实现，当前模块是提交契约，尚未接通通用记录持久提供者。
-- 下一完整行为：接Entry/Document完整记录Storage和事务暂存，并接入当前消息投影；文档revision/checkpoint与查询仍按K03剩余项推进。
+- K03内存表提供者：`record_memory.h/.S` 对应Pi固定提交 `storage/memory.ts:prepareCommit/checkGlobalIds/applyPreparedCommit/mintId/conversation/entry/task/submission`。四类记录先复制/校验并预留容量，再无分配地应用与同步adopt；原生用有序行数组和libc qsort维护索引，避免每次克隆全部已存状态。ID全局共享，conversation/entry不可覆盖，task/submission仅原类型更新且同批最后值生效；读返回owned副本。
+- K03提供者验证：`test_record_memory.py` 直接导入实际MemoryStorage与实际Chord/delta，430次混合批次/读取/mint操作一致，含整数/整数浮点ID；O0/O2专项验证乱序/重复/跨表ID、失败无半批、替换/读取隔离、容量增长、提交序号、释放/重开、与pg_records_commit组合。ASan/UBSan及分配失败检查通过，故障覆盖深复制的部分结果、暂存分配、已有行扩容失败、读取复制失败和页尾提供者对象。当前提供者仍待Document revision与扫描/查询接入。
+- 下一完整行为：同一内存提供者补Document revision/地址查询与扫描，然后接事务暂存及当前消息投影。
 
 ### K01 当前落点与补齐映射
 
@@ -222,7 +225,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 | JSON/Schema | 产品模型/工具调用json-c；`bootstrap-api/{json,schema}.h`是已有实验入口 | 协议与工具字段随K05/K08验证；复用成熟库 |
 | 服务宿主 | `runtime/host.h`、`host.S` | K02绑定撤销/重新激活与全部服务注入 |
 | Entry/Session/Document | `runtime/session.h/.S` | K03通用记录、文档/表、分页/版本；当前为有界消息事务 |
-| Storage | `runtime/session.h`的pg_storage、`journal.h/.S`、`journal_posix.c` | K04内存/JSONL/SQLite与迁移 |
+| Storage | `runtime/session.h`的pg_storage、`records.h`/`record_memory.h`、`journal.h/.S`、`journal_posix.c` | K04内存/JSONL/SQLite与迁移 |
 | Model | `runtime/agent.h`的pg_model、`mimo.h`、`mimo*.S` | K05目录/认证、多协议与完整内容块 |
 | Task/调度 | `session.h`的pg_run_checkpoint、`agent.h/.S` | K06通用持久任务、timer/join/owner服务 |
 | Generation/工具轮次 | `agent.h/.S`、`session.h/.S` | K07持久generation/tool、deferred与完整恢复 |

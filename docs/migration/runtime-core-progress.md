@@ -117,3 +117,11 @@ tools/runtime/test_documents.py
 O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、采纳前后Storage错误、回调重入、复制失败/部分复制清理和页尾布局。当前Runtime全专项退出0。单独暂存核心27个文件，暂存清单排除未交接TUI工具的登记；工作区保留该登记与全部TUI候选。独立临时树使用已提交TUI基线，G00、17项检查器自测、assembly-first和产品离线PTY全部通过，包含存储打开/重放失败、持久重开与精确终端恢复。
 
 同一Agent自审本检查点，非独立审批。固定源包摘要 `29b45aa5618e74da645eebfa3070cf054e63d0fc9c1b48f933b1a8df287dadc2`，为暂存改动文件（除本记录）按路径排序的[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256。新增records产品/测试登记及现有Runtime测试入口，未改变现有消息/工具预算与测试基线。上述源包包含前述宿主、原生插件与Document实现；较早的工作区候选摘要描述各自审查时的文件内容。检查点实际源码可由本次Git提交回溯。K03完整事务、K02其余服务与K15尚未完成。
+
+## K03 内存表记录提供者（2026-10-26）
+
+`record_memory.h/.S` 沿Pi MemoryStorage的prepareCommit/checkGlobalIds/applyPreparedCommit移植四类表写入、独立读取和全局mintId，并接入pg_records_commit。原生索引用有序行数组，先准备/容量预留，再无分配应用；输入、已存状态、读取副本分开持有。conversation/entry不可覆盖，task/submission同类型更新，跨表ID冲突拒绝。整数浮点ID与整数共享命名空间。Document revision和扫描/查询继续在同一提供者补齐。
+
+430次实际Pi MemoryStorage差异操作通过；O0/O2 ASan/UBSan覆盖混合/重复/乱序批次、拒绝无半批、容量增长、序号、mint、独立读取、关闭/重开及关闭后读取副本存活。复制部分结果、暂存分配、已有行扩容、读取复制故障均释放并保持原状态；页尾提供者通过。Runtime全专项退出0。暂存核心候选在已提交TUI基线的独立树中G00、assembly-first与产品链接通过；共享树的TUI候选继续按交接集成。Pi/Harness fetch后旧/新提交均仍为当前固定版本，无新增上游修复。
+
+同一Agent自审：四个新增文件及现有模块/源/测试登记，固定暂存源包摘要 `7afd17e5aa6aa7bbcdabc8b87dd2463a70c830c193b62bef8ff1771a83e1bc1c`；算法为本批9个改动路径排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256，不包含本记录。候选清单排除尚未交接的TUI工具登记，工作区保留其登记。风险/原生差异：此ABI的记录ID为正safe整数；采用有序行存储，查询返回owned JSON；调用方串行访问。消息/工具预算及门禁判定保持原值，K03/K04整体仍未验收。

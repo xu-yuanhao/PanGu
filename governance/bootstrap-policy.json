@@ -608,6 +608,10 @@
     "tools/runtime/test_documents.py": "gate",
     "src/runtime/records.h": "native-source",
     "src/runtime/records.S": "native-source",
-    "tests/runtime/test_records.c": "native-test"
+    "tests/runtime/test_records.c": "native-test",
+    "src/runtime/record_memory.h": "native-source",
+    "src/runtime/record_memory.S": "native-source",
+    "tests/runtime/test_record_memory.c": "native-test",
+    "tools/runtime/test_record_memory.py": "gate"
   }
 }
