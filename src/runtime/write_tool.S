@@ -39,6 +39,64 @@
  call memchr@PLT
  test rax,rax
  jnz .Lparse_bad
+ /* json-c exposes keys as C strings; reject decoded NUL in keys only. */
+ xor ecx,ecx
+ xor r8d,r8d
+ xor r9d,r9d
+.Lkey_scan:
+ cmp rcx,r12
+ jae .Lkey_scan_done
+ movzx eax,byte ptr [rbx+rcx]
+ test r8d,r8d
+ jnz .Lkey_string
+ cmp al,34
+ jne .Lkey_scan_next
+ mov r8d,1
+ xor r9d,r9d
+ jmp .Lkey_scan_next
+.Lkey_string:
+ cmp al,92
+ jne .Lkey_quote
+ lea rdx,[rcx+5]
+ cmp rdx,r12
+ jae .Lkey_escape_skip
+ cmp byte ptr [rbx+rcx+1],'u'
+ jne .Lkey_escape_skip
+ cmp dword ptr [rbx+rcx+2],0x30303030
+ jne .Lkey_escape_skip
+ mov r9d,1
+.Lkey_escape_skip:
+ inc rcx
+ jmp .Lkey_scan_next
+.Lkey_quote:
+ cmp al,34
+ jne .Lkey_scan_next
+ xor r8d,r8d
+ test r9d,r9d
+ jz .Lkey_scan_next
+ lea rdx,[rcx+1]
+.Lkey_space:
+ cmp rdx,r12
+ jae .Lkey_scan_next
+ movzx eax,byte ptr [rbx+rdx]
+ cmp al,32
+ je .Lkey_space_next
+ cmp al,9
+ je .Lkey_space_next
+ cmp al,10
+ je .Lkey_space_next
+ cmp al,13
+ jne .Lkey_colon
+.Lkey_space_next:
+ inc rdx
+ jmp .Lkey_space
+.Lkey_colon:
+ cmp al,58
+ je .Lparse_bad
+.Lkey_scan_next:
+ inc rcx
+ jmp .Lkey_scan
+.Lkey_scan_done:
  call json_tokener_new@PLT
  test rax,rax
  jz .Lparse_bad

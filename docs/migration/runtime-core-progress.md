@@ -801,3 +801,12 @@ read_tool.S原地实现4096字节块扫描和逐行选择，沿用最多4095字�
 为继续验证已授权核心路径，扩展现有live_mimo_batch.c及build_test.py的--live-snapshot-edit：直接用真实MiMo/Model/Agent/文件服务，无TUI替身，实际edit第2001行、read范围核验，并断言2000个前导换行逐字节保留、没有write工具替代或错误结果。该真实入口退出0，凭据仅子进程环境。它不是TUI或持久化重开验收。
 
 同一Agent自审新工厂导出、静态组合/身份和模块来源更新，非独立审核；没有新增源文件、依赖、检查器或放宽预算。G00、assembly-first和diff检查通过，整机集成与生产准入不因此放行。固定包SHA256（仅本批上述Runtime/组合/测试/登记/主TODO文件，不含本记录及并行TUI文件；排序[path,文件SHA256]紧凑UTF-8 JSON）：`6dedfb0e0a6074989cd1af2cd80cc806d4e8d08ed4c1b62da52672fd89262422`。
+
+
+## 2026-10-26：write键名NUL歧义修复
+
+读取Pi Durable d5b3de22 tools/write.ts::createWriteTool、env/node.ts::writeFile、file-mutation-queue.ts::withFileMutationQueue与tools.test.ts的创建目录/取消写入用例。上游没有本次json-c键截断的直接实现；这是原生C字符串适配边界。上游队列只串行化同进程文件修改，不防护bash/外部进程；原生当前单活动顺序执行，不额外引入外部锁或CAS框架。实际查出的是json-c适配差异：键按C字符串查询，decoded-NUL后缀可能被忽略，让缺失的path/content被别名冒充或覆盖。新增回归在修复前实际触发validate断言失败，未执行文件写入。
+
+write_tool.S在原有有界JSON解析前扫描字符串转义，仅拒绝含decoded NUL的键名；正文中的NUL仍按显式长度写入，不全局禁止u0000，也不误把值内的引号/冒号识别为键。标准JSON语法/UTF-8仍交给现有严格json-c解析，路径和权限规则不变；无新增内存、导出、文件、依赖、配额或门禁。测试包含两种键别名、合法前缀加别名、Unicode拼写别名、键后空白，正文NUL/引号/冒号和字面量反斜线、全部截断输入靠近保护页，以及原有短写/EINTR/ENOSPC/零写/部分失败/FD清理。
+
+write与依赖它的edit专项O0 UBSan、O2 ASan/UBSan退出0，编辑的17个分配失败点与副作用恢复保留。G00和diff检查通过。本批未调用真实模型，不把字节解析测试写成端到端模型或TUI验收；并行TUI改造不在本次修改和提交范围。

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 static int write_mode,truncate_fail,sync_fail;
 static unsigned writes;
@@ -42,13 +43,18 @@ int main(void){
  assert(!run("{\"path\":\"a/b/file\",\"content\":\"x\"}"));expect_file("a/b/file","x",1);
  assert(!run("{\"path\":\"a/b/file\",\"content\":\"\"}"));expect_file("a/b/file","",0);
  assert(!run("{\"path\":\"binary\",\"content\":\"a\\u0000b\"}"));expect_file("binary","a\0b",3);
- const char *bad[]={"", "{}", "[]", "{\"path\":\"f\"}","{\"path\":\"f\",\"content\":7}",
+ assert(!run("{\"pa\\u0074h\":\"escaped\",\"content\":\"a\\u0000:more\"}"));expect_file("escaped","a\0:more",7);
+ assert(!run("{\"path\":\"escaped\",\"content\":\"literal\\\\u0000\"}"));expect_file("escaped","literal\\u0000",13);
+ assert(!unlink("escaped"));
+ assert(!run("{\"path\":\"escaped\",\"content\":\"a\\u0000\\\"fake\\\":1\"}"));expect_file("escaped","a\0\"fake\":1",10);assert(!unlink("escaped"));
+ const char *bad[]={"{\"path\":\"safe\",\"path\\u0000ignored\":\"f\",\"content\":\"x\"}","{\"path\":\"f\",\"content\\u0000suffix\" \r\n : \"x\"}","{\"path\\u0000suffix\":\"f\",\"content\":\"x\"}","{\"path\":\"f\",\"content\\u0000suffix\":\"x\"}","{\"path\":\"f\",\"cont\\u0065nt\\u0000\":\"x\"}","", "{}", "[]", "{\"path\":\"f\"}","{\"path\":\"f\",\"content\":7}",
   "{\"path\":\"f\",\"content\":\"x\",\"extra\":0}","{\"path\":\"\",\"content\":\"x\"}",
   "{\"path\":\"/tmp/escape\",\"content\":\"x\"}","{\"path\":\"../escape\",\"content\":\"x\"}",
   "{\"path\":\"a/../escape\",\"content\":\"x\"}","{\"path\":\"./f\",\"content\":\"x\"}",
   "{\"path\":\"a//f\",\"content\":\"x\"}","{\"path\":\"a/\",\"content\":\"x\"}",
   "{\"path\":\"f\\u0000suffix\",\"content\":\"x\"}","{\"path\":\"f\",\"content\":\"x\"} {}",
   "{\"path\":\"f\",\"content\":\"\xff\"}","{\"path\":\"f\",\"content\":\"x\",}"};
+ long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));for(size_t cut=0;cut<=strlen(bad[1]);++cut){char *tail=map+page-cut;memcpy(tail,bad[1],cut);assert(!tool.validate(tool.context,(pg_slice){tail,cut}));}assert(!munmap(map,(size_t)page*2));
  unsigned before=descriptors();
  for(size_t i=0;i<sizeof(bad)/sizeof(*bad);++i){assert(!tool.validate(tool.context,slice(bad[i])));assert(run(bad[i]));}
  assert(access("f",F_OK)&&errno==ENOENT);
