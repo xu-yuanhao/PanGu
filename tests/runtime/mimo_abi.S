@@ -51,6 +51,13 @@ WRAP_TRASH json_tokener_get_error
 WRAP_TRASH json_object_get_string
 WRAP_TRASH json_object_is_type
 WRAP_TRASH json_object_object_get_ex
+WRAP_TRASH json_object_get_int64
+WRAP_TRASH memset
+WRAP_TRASH json_object_array_length
+WRAP_TRASH json_object_array_get_idx
+WRAP_TRASH json_object_get_string_len
+WRAP_TRASH json_tokener_get_parse_end
+WRAP_TRASH json_tokener_free
 
 .macro CHECK register,value,bit
     mov r10,\value

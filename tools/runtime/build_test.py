@@ -19,6 +19,16 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
+        if '--live-batch' in sys.argv:
+            if not os.environ.get('MIMO_API_KEY'):
+                raise SystemExit('MIMO_API_KEY is required; environment only')
+            output = str(Path(directory) / 'live-model-batch')
+            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
+                            *MODEL_SOURCES, implementation('src/runtime/tools'), implementation('src/runtime/read_tool'),
+                            str(ROOT / 'tests/runtime/live_mimo_batch.c'), *model_flags, '-o', output], check=True)
+            subprocess.run([output], check=True, timeout=150)
+            return 0
         if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal', '--live-resume', '--live-submission')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; never put credentials in source or arguments')

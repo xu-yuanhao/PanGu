@@ -3,13 +3,18 @@
 #include "agent.h"
 #include "tools.h"
 #include <curl/curl.h>
+typedef struct { char arguments[PG_TEXT_LIMIT],id[PG_ID_LIMIT],name[PG_ID_LIMIT]; } pg_mimo_call_storage;
 typedef struct {
  CURL *easy; CURLM *multi; struct curl_slist *headers;
  char body[131072], text[PG_TEXT_LIMIT], arguments[PG_TEXT_LIMIT], id[PG_ID_LIMIT], name[PG_ID_LIMIT];
  size_t used, consumed; int delivered, failed, transport_done, finish_reason, saw_done; long http;
  char *request;
  const pg_tool_registry *tools;
+ pg_mimo_call_storage extra[PG_TOOL_BATCH_LIMIT-1];
+ pg_model_call calls[PG_TOOL_BATCH_LIMIT];
+ unsigned call_count;
 } pg_mimo;
+/* Initialize fresh/released storage only; close before discarding an instance. */
 pg_model pg_mimo_model(pg_mimo *);
 /* Bind the same immutable registry used by the executor before starting runs. */
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);

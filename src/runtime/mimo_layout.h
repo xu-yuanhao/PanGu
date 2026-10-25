@@ -4,7 +4,7 @@
  * 数值只有这一份；C 侧 _Static_assert 对齐 session.h/agent.h/tools.h/mimo.h
  * 与本机公开 libcurl/json-c 头，漂移即编译失败，不手抄私有结构。
  *
- * pg_mimo 公开布局冻结（mimo.h）：字段顺序/尺寸不得改动。
+ * pg_mimo 为内部布局；保留原字段偏移，批次存储追加在尾部，调用者同批重建。
  * curl_easy_setopt/curl_easy_getinfo 为变参函数：整数/指针变参在 rdx/rcx/r8，
  * 调用前须置 al=0（无向量寄存器参数），不能按普通三参函数猜测。 */
 #define PG_MM_MESSAGE_LIMIT 64
@@ -52,6 +52,10 @@
 #define PG_MM_KIND_CALL 2
 #define PG_MM_KIND_DONE 3
 #define PG_MM_KIND_ERROR 4
+#define PG_MM_KIND_BATCH 5
+#define PG_MM_CALL_LIMIT 8
+#define PG_MM_CALL_BYTES 48
+#define PG_MM_SLOT_BYTES 4224
 
 /* pg_model 函数表（agent.h）；40 字节聚合经 sret 返回 */
 #define PG_MM_MODEL_CONTEXT 0
@@ -70,7 +74,7 @@
 #define PG_MM_REG_COUNT 1152
 #define PG_MM_REG_BYTES 1184
 
-/* pg_mimo（mimo.h；公开布局冻结） */
+/* pg_mimo（mimo.h；原字段偏移保留） */
 #define PG_MM_EASY 0
 #define PG_MM_MULTI 8
 #define PG_MM_HEADERS 16
@@ -89,7 +93,10 @@
 #define PG_MM_HTTP 139456
 #define PG_MM_REQUEST 139464
 #define PG_MM_TOOLS 139472
-#define PG_MM_BYTES 139480
+#define PG_MM_EXTRA 139480
+#define PG_MM_CALLS 169048
+#define PG_MM_CALL_COUNT 169432
+#define PG_MM_BYTES 169440
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -124,7 +131,19 @@
 /* Authorization 头前缀长度（mimo.S 按长度 memcpy，不跑 strlen） */
 #define PG_MM_AUTH_PREFIX_LEN 22
 
-#ifndef __ASSEMBLER__
+#ifdef __ASSEMBLER__
+/* rbx=provider; destination must differ from index. */
+.macro PG_MM_CALL_SLOT destination,index
+ lea \destination,[rbx+PG_MM_ARGUMENTS]
+ test \index,\index
+ jz .Lslot_done\@
+ mov \destination,\index
+ dec \destination
+ imul \destination,PG_MM_SLOT_BYTES
+ lea \destination,[rbx+PG_MM_EXTRA+\destination]
+.Lslot_done\@:
+.endm
+#else
 #include <stddef.h>
 #include "mimo.h"
 #include <json-c/json.h>
@@ -182,7 +201,19 @@ PG_MM_ASSERT_OFF(pg_mimo, saw_done, PG_MM_SAW_DONE);
 PG_MM_ASSERT_OFF(pg_mimo, http, PG_MM_HTTP);
 PG_MM_ASSERT_OFF(pg_mimo, request, PG_MM_REQUEST);
 PG_MM_ASSERT_OFF(pg_mimo, tools, PG_MM_TOOLS);
+PG_MM_ASSERT_OFF(pg_mimo, extra, PG_MM_EXTRA);
+PG_MM_ASSERT_OFF(pg_mimo, calls, PG_MM_CALLS);
+PG_MM_ASSERT_OFF(pg_mimo, call_count, PG_MM_CALL_COUNT);
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
+PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);
+PG_MM_ASSERT_SIZE(pg_model_call, PG_MM_CALL_BYTES);
+PG_MM_ASSERT_SIZE(pg_model_batch, 16);
+PG_MM_ASSERT_OFF(pg_model_batch, calls, 0);
+PG_MM_ASSERT_OFF(pg_model_batch, count, 8);
+PG_MM_ASSERT_OFF(pg_model_event, batch, PG_MM_EVT_TEXT);
+_Static_assert(offsetof(pg_mimo_call_storage,id)==4096&&offsetof(pg_mimo_call_storage,name)==4160,"call slot fields");
+_Static_assert(offsetof(pg_model_call,arguments)==0&&offsetof(pg_model_call,call_id)==16&&offsetof(pg_model_call,tool_name)==32,"model call slices");
+_Static_assert(PG_TOOL_BATCH_LIMIT==PG_MM_CALL_LIMIT,"batch limit");
 _Static_assert(PG_MESSAGE_LIMIT == PG_MM_MESSAGE_LIMIT, "message limit drifted");
 _Static_assert(PG_TEXT_LIMIT == PG_MM_TEXT_LIMIT, "text limit drifted");
 _Static_assert(PG_ID_LIMIT == PG_MM_ID_LIMIT, "id limit drifted");
@@ -192,7 +223,7 @@ _Static_assert(PG_USER == PG_MM_ROLE_USER && PG_ASSISTANT == PG_MM_ROLE_ASSISTAN
                "pg_role drifted");
 _Static_assert(PG_MODEL_WAIT == PG_MM_KIND_WAIT && PG_MODEL_TEXT == PG_MM_KIND_TEXT &&
                PG_MODEL_CALL == PG_MM_KIND_CALL && PG_MODEL_DONE == PG_MM_KIND_DONE &&
-               PG_MODEL_ERROR == PG_MM_KIND_ERROR, "pg_model_kind drifted");
+               PG_MODEL_ERROR == PG_MM_KIND_ERROR && PG_MODEL_BATCH == PG_MM_KIND_BATCH, "pg_model_kind drifted");
 _Static_assert(json_type_null == PG_MM_JSON_NULL && json_type_int == PG_MM_JSON_INT &&
                json_type_object == PG_MM_JSON_OBJECT && json_type_array == PG_MM_JSON_ARRAY &&
                json_type_string == PG_MM_JSON_STRING, "json_type drifted");

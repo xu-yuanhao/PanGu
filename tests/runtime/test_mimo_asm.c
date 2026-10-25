@@ -213,15 +213,15 @@ static void test_decode_structure(void) {
     /* content 非字符串拒绝 */
     reset();
     assert(line("data: {\"choices\":[{\"delta\":{\"content\":7}}]}"));
-    /* index 非法：缺失/类型错/非 0 */
+    /* index 非法/不完整：缺失/类型错，索引1空分片不能完成整组 */
     reset();
     assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"function\":{\"arguments\":\"{}\"}}]}}]}"));
     reset();
     assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":\"0\"}]}},{\"delta\":{}}]}"));
     reset();
-    assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));
+    assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));
     reset();
-    assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0},{\"index\":1}]}}]}"));
+    assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0},{\"index\":1}]}}]}"));assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));
     reset();
     assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":{}}}]}"));
     /* 空字符串分片：成功但不产生 TEXT 事件 */

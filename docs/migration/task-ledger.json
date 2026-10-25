@@ -1677,7 +1677,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "injected model contract and real MiMo SSE subset; no full provider capability matrix",
+      "local_subset_scope": "injected Model contract with complete BATCH event and real MiMo SSE producer for 1..8 indexed calls; real two-call metadata verified, grouped projection and Agent consumer pending; no full provider capability matrix",
       "local_implementation": "pg_model replaceable contract and handwritten MiMo assembly provider; no full capability matrix"
     },
     {
@@ -1700,7 +1700,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "single sequential run with read/write/edit and asynchronous bash; replaceable input submission, bounded key dedup, explicit resume/suspend, persisted outcomes and stored/current safe-only replay; batch storage exists but batch execution/model contract pending; no general scheduler or exactly-once side effects",
+      "local_subset_scope": "single sequential run with read/write/edit and asynchronous bash; replaceable input submission, bounded key dedup, explicit resume/suspend, persisted outcomes and stored/current safe-only replay; batch storage and Model contract exist but Loop execution/projection pending; no general scheduler or exactly-once side effects",
       "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {
@@ -1773,7 +1773,7 @@
       ],
       "completion_approved": false,
       "local_subset_scope": "Linux/glibc cooperative process + handwritten bash tool: explicit cwd/PATH-LANG environment, separate UTF-8 decoding, bounded tail/raw spill/capture quota, nonzero/timeout/cancel, durable unsafe detach/recovery; no sandbox or full Pi shell compatibility",
-      "local_implementation": "native async pg_tools lifecycle; actual MiMo/TUI command, nonzero exit, cancellation, spill and unsafe restart evidence; full read/edit/write/bash workflow remains blocked by existing single-tool MiMo response parser, not by process backend"
+      "local_implementation": "native async pg_tools lifecycle; actual MiMo/TUI bash/nonzero/cancel/spill/unsafe restart evidence; Model now decodes complete call batches, but full read/edit/write/bash workflow still needs Agent batching and grouped context/history integration"
     },
     {
       "id": "T27",
@@ -1827,7 +1827,7 @@
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
       "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
-      "local_subset_scope": "thin TUI with read/write/edit/bash, profile-verified persistent session/history/resume/detach; individual real model workflows pass, full multi-tool build/test workflow still fails on MiMo batched calls; no full P1 or history viewport/search/selector",
+      "local_subset_scope": "thin TUI with read/write/edit/bash, profile-verified persistent session/history/resume/detach; individual real model workflows pass; full multi-tool build/test workflow awaits Agent batching and grouped context/history integration; no full P1 or history viewport/search/selector",
       "local_implementation": "handwritten TUI/bridge and startup snapshot reader; history separate from execution events, control escaping after UTF-8 carry joining; termios platform structure remains thin C"
     },
     {

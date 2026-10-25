@@ -175,6 +175,10 @@ li_start:
  mov byte ptr [rbx + PG_MM_ARGUMENTS], 0
  mov byte ptr [rbx + PG_MM_ID], 0
  mov byte ptr [rbx + PG_MM_NAME], 0
+ lea rdi,[rbx+PG_MM_EXTRA]
+ xor esi,esi
+ mov edx,PG_MM_BYTES-PG_MM_EXTRA
+ call memset@PLT
  lea rdi, [rip + .Lstr_env_key]
  call getenv@PLT
  test rax, rax
@@ -318,7 +322,7 @@ li_start:
 .size li_start, .-li_start
 
 /* ---- int li_next(void *ctx, pg_model_event *event)
- * 栈帧 64：[0]=running(int) [8]=left(int) [16]=invalid(int) [24]=parse end。 ---- */
+ * 栈帧 64：[0]=running(int) [8]=left(int)；调用集合的校验在私有helper中。 ---- */
 .type li_next,@function
 li_next:
  push rbx
@@ -334,6 +338,8 @@ li_next:
  mov ecx, 7
  cld
  rep stosq                           /* *event = {WAIT} */
+ cmp dword ptr [rbx+PG_MM_FAILED],0
+ jne .Lnx_bad
  cmp dword ptr [rbx + PG_MM_DELIVERED], 0
  jne .Lnx_delivered
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
@@ -404,6 +410,8 @@ li_next:
  mov rsi, r13
  mov rdx, r12
  call pg_mimo_decode_line
+ test eax,eax
+ jnz .Lnx_bad
  jmp .Lnx_out
 .Lnx_drain:
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
@@ -414,89 +422,31 @@ li_next:
  je .Lnx_bad
  cmp dword ptr [rbx + PG_MM_FINISH_REASON], 2
  jne .Lnx_done_event
- /* 工具参数必须是完整 JSON object；校验借用栈解析、不修改 m 缓冲 */
- call json_tokener_new@PLT
- test rax, rax
- jz .Lnx_bad
- mov r13, rax                         /* tok */
- lea rdi, [rbx + PG_MM_ARGUMENTS]
- call strlen@PLT
- mov r14, rax                         /* len */
- mov rdi, r13
- lea rsi, [rbx + PG_MM_ARGUMENTS]
- mov rdx, r14
- call json_tokener_parse_ex@PLT
- mov r15, rax                         /* args */
- mov rdi, r13
- call json_tokener_get_parse_end@PLT
- mov rcx, rax                         /* end */
-.Lnx_ws:
- cmp rcx, r14
- jae .Lnx_ws_done
- movzx edx, byte ptr [rbx + rcx + PG_MM_ARGUMENTS]
- cmp dl, ' '
- je .Lnx_ws_next
- cmp dl, 9
- je .Lnx_ws_next
- cmp dl, 10
- je .Lnx_ws_next
- cmp dl, 13
- je .Lnx_ws_next
- jmp .Lnx_ws_done
-.Lnx_ws_next:
- inc rcx
- jmp .Lnx_ws
-.Lnx_ws_done:
- mov qword ptr [rsp + 24], rcx
- mov dword ptr [rsp + 16], 0          /* invalid */
- mov rdi, r13
- call json_tokener_get_error@PLT
- test eax, eax
- jz 1f
- mov dword ptr [rsp + 16], 1
-1:
- cmp qword ptr [rsp + 24], r14
- je 1f
- mov dword ptr [rsp + 16], 1          /* 尾随非空白残余 */
-1:
- test r15, r15
- jnz 1f
- mov dword ptr [rsp + 16], 1
-1:
- test r15, r15
- jz 1f
- mov rdi, r15
- mov esi, PG_MM_JSON_OBJECT
- call json_object_is_type@PLT
- test eax, eax
- jnz 1f
- mov dword ptr [rsp + 16], 1
-1:
- mov rdi, r13
- call json_tokener_free@PLT
- test r15, r15
- jz 1f
- mov rdi, r15
- call json_object_put@PLT
-1:
- cmp dword ptr [rsp + 16], 0
- jne .Lnx_bad
- mov dword ptr [r12 + PG_MM_EVT_KIND], PG_MM_KIND_CALL
- lea rax, [rbx + PG_MM_ARGUMENTS]
- mov qword ptr [r12 + PG_MM_EVT_TEXT + PG_MM_SLICE_DATA], rax
- mov rdi, rax
- call strlen@PLT
- mov qword ptr [r12 + PG_MM_EVT_TEXT + PG_MM_SLICE_SIZE], rax
- lea rax, [rbx + PG_MM_ID]
- mov qword ptr [r12 + PG_MM_EVT_CALL_ID + PG_MM_SLICE_DATA], rax
- mov rdi, rax
- call strlen@PLT
- mov qword ptr [r12 + PG_MM_EVT_CALL_ID + PG_MM_SLICE_SIZE], rax
- lea rax, [rbx + PG_MM_NAME]
- mov qword ptr [r12 + PG_MM_EVT_TOOL_NAME + PG_MM_SLICE_DATA], rax
- mov rdi, rax
- call strlen@PLT
- mov qword ptr [r12 + PG_MM_EVT_TOOL_NAME + PG_MM_SLICE_SIZE], rax
+ call .Lcalls_ready
+ test eax,eax
+ jnz .Lnx_bad
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],1
+ jne .Lnx_batch
+ mov dword ptr [r12+PG_MM_EVT_KIND],PG_MM_KIND_CALL
+ mov rax,[rbx+PG_MM_CALLS]
+ mov [r12+8],rax
+ mov rax,[rbx+PG_MM_CALLS+8]
+ mov [r12+16],rax
+ mov rax,[rbx+PG_MM_CALLS+16]
+ mov [r12+24],rax
+ mov rax,[rbx+PG_MM_CALLS+24]
+ mov [r12+32],rax
+ mov rax,[rbx+PG_MM_CALLS+32]
+ mov [r12+40],rax
+ mov rax,[rbx+PG_MM_CALLS+40]
+ mov [r12+48],rax
+ jmp .Lnx_terminal
+.Lnx_batch:
+ mov dword ptr [r12+PG_MM_EVT_KIND],PG_MM_KIND_BATCH
+ lea rax,[rbx+PG_MM_CALLS]
+ mov [r12+8],rax
+ mov eax,[rbx+PG_MM_CALL_COUNT]
+ mov [r12+16],rax
  jmp .Lnx_terminal
 .Lnx_done_event:
  mov dword ptr [r12 + PG_MM_EVT_KIND], PG_MM_KIND_DONE
@@ -512,6 +462,7 @@ li_next:
  xor eax, eax
  jmp .Lnx_out
 .Lnx_bad:
+ mov dword ptr [rbx+PG_MM_FAILED],1
  mov eax, 1
 .Lnx_out:
  add rsp, 64
@@ -523,4 +474,111 @@ li_next:
  ret
 .size li_next, .-li_next
 
+
+.Lcalls_ready:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,32
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],1
+ jb .Lready_bad
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],PG_MM_CALL_LIMIT
+ ja .Lready_bad
+ xor r13d,r13d
+.Lready_call:
+ mov rax,r13
+ PG_MM_CALL_SLOT r14,rax
+ imul r15,r13,PG_MM_CALL_BYTES
+ lea r15,[rbx+PG_MM_CALLS+r15]
+ mov [r15],r14
+ mov rdi,r14
+ call strlen@PLT
+ mov [r15+8],rax
+ mov [rsp+24],rax
+ lea rdi,[r14+PG_MM_TEXT_LIMIT]
+ mov [r15+16],rdi
+ call strlen@PLT
+ test rax,rax
+ jz .Lready_bad
+ mov [r15+24],rax
+ lea rdi,[r14+PG_MM_TEXT_LIMIT+PG_MM_ID_LIMIT]
+ mov [r15+32],rdi
+ call strlen@PLT
+ test rax,rax
+ jz .Lready_bad
+ mov [r15+40],rax
+ call json_tokener_new@PLT
+ test rax,rax
+ jz .Lready_bad
+ mov [rsp],rax
+ mov rdi,rax
+ mov rsi,r14
+ mov rdx,[rsp+24]
+ call json_tokener_parse_ex@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_tokener_get_error@PLT
+ test eax,eax
+ jnz .Lready_bad
+ cmp qword ptr [rsp+8],0
+ je .Lready_bad
+ mov rdi,[rsp]
+ call json_tokener_get_parse_end@PLT
+.Lready_tail:
+ cmp rax,[rsp+24]
+ jae .Lready_type
+ movzx ecx,byte ptr [r14+rax]
+ cmp ecx,32
+ je .Lready_space
+ cmp ecx,9
+ je .Lready_space
+ cmp ecx,10
+ je .Lready_space
+ cmp ecx,13
+ jne .Lready_bad
+.Lready_space:
+ inc rax
+ jmp .Lready_tail
+.Lready_type:
+ mov rdi,[rsp+8]
+ mov esi,PG_MM_JSON_OBJECT
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lready_bad
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+ mov rdi,[rsp]
+ call json_tokener_free@PLT
+ mov qword ptr [rsp],0
+ inc r13
+ mov eax,[rbx+PG_MM_CALL_COUNT]
+ cmp r13,rax
+ jb .Lready_call
+ xor eax,eax
+ jmp .Lready_out
+.Lready_bad:
+ mov rdi,[rsp+8]
+ test rdi,rdi
+ jz .Lready_token
+ call json_object_put@PLT
+.Lready_token:
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Lready_error
+ call json_tokener_free@PLT
+.Lready_error:
+ mov eax,1
+.Lready_out:
+ add rsp,32
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
 .section .note.GNU-stack,"",@progbits

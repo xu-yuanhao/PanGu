@@ -3,8 +3,17 @@
 #include "session.h"
 #include "submissions.h"
 #define PG_TURN_LIMIT PG_RUN_TURN_LIMIT
-typedef enum { PG_MODEL_WAIT, PG_MODEL_TEXT, PG_MODEL_CALL, PG_MODEL_DONE, PG_MODEL_ERROR } pg_model_kind;
-typedef struct { pg_model_kind kind; pg_slice text, call_id, tool_name; } pg_model_event;
+typedef enum { PG_MODEL_WAIT, PG_MODEL_TEXT, PG_MODEL_CALL, PG_MODEL_DONE, PG_MODEL_ERROR, PG_MODEL_BATCH } pg_model_kind;
+typedef struct { pg_slice arguments,call_id,tool_name; } pg_model_call;
+typedef struct { const pg_model_call *calls; size_t count; } pg_model_batch;
+/* BATCH is one complete terminal response, 2..PG_TOOL_BATCH_LIMIT calls in
+   provider order. All slices/array are borrowed until next/close. No partial
+   group may be emitted; consumers must detach all before committing/executing. */
+typedef struct {
+    pg_model_kind kind;
+    union { pg_slice text; pg_model_batch batch; };
+    pg_slice call_id,tool_name;
+} pg_model_event;
 /* start/next must return promptly; WAIT is cooperative, not a blocking read.
    close releases each started request on success, error or cancellation. */
 typedef struct {

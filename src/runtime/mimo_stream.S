@@ -2,10 +2,10 @@
  *
  * 输入是已去除 CR/LF 的完整一行：空行/":" 注释→WAIT 0；"data:" 前缀外→1；
  * "[DONE]" 仅在 finish_reason 之后接受一次。JSON 须完整（parse_end 后仅
- * 空白），单 choice（长度恰 1）、tool_calls 单项且 index==0(int)；id/name/
+ * 空白），单 choice（长度恰 1）、tool_calls 按整数index 0..7分别累积；id/name/
  * arguments 为增量追加（null 视为缺席），text 为当前分片整串替换。解码出的
  * 字符串含嵌入 NUL、超出定长容量即拒绝。finish_reason：stop 需无工具 id，
- * tool_calls 需 id+name 齐备，其余取值拒绝；已 finish 后再收数据→1。
+ * tool_calls 需所有索引连续、id/name齐备且ID唯一，其余取值拒绝；已 finish 后再收数据→1。
  * event 借用 m 内缓冲，有效期至下一次 decode/生命周期调用。布局见
  * mimo_layout.h；json-c 经 PLT 调用，caller-saved 不跨调用保存活跃值。
  */
@@ -173,8 +173,8 @@ li_accumulate:
 .size li_accumulate, .-li_accumulate
 
 /* ---- int pg_mimo_decode_line(pg_mimo *m, const char *line, pg_model_event *event)
- * 栈帧 80 字节：[0]=tok [8]=choices [16]=choice [24]=delta [32]=data
- * [40]=calls [48]=content [56]=reason [64]=call [72]=index。 ---- */
+ * 栈帧 112 字节：[0]=tok [8]=choices [16]=choice [24]=delta [32]=data
+ * [40]=calls [48]=content [56]=reason [64]=call [72]=index，[80]=delta个数，[88]=迭代，[96]=slot，[104]=fn/内层迭代。 ---- */
 .globl pg_mimo_decode_line
 .type pg_mimo_decode_line,@function
 pg_mimo_decode_line:
@@ -183,7 +183,7 @@ pg_mimo_decode_line:
  push r13
  push r14
  push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
- sub rsp, 80
+ sub rsp, 112
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* line */
  mov r13, rdx                         /* event */
@@ -314,55 +314,79 @@ pg_mimo_decode_line:
  jz .Ldl_failed
  mov rdi, qword ptr [rsp + 40]
  call json_object_array_length@PLT
- cmp rax, 1
- jne .Ldl_failed                      /* 仅单工具调用 */
- mov rdi, qword ptr [rsp + 40]
- xor esi, esi
+ test rax,rax
+ jz .Ldl_failed
+ cmp rax,PG_MM_CALL_LIMIT
+ ja .Ldl_failed
+ mov [rsp+80],rax
+ mov qword ptr [rsp+88],0
+.Lcall_delta:
+ mov rdi,[rsp+40]
+ mov rsi,[rsp+88]
  call json_object_array_get_idx@PLT
- mov qword ptr [rsp + 64], rax        /* call */
- mov rdi, rax
- lea rsi, [rip + .Lstr_index]
+ mov [rsp+64],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lstr_index]
  call li_get
- mov qword ptr [rsp + 72], rax        /* index */
- test rax, rax
+ test rax,rax
  jz .Ldl_failed
- mov rdi, rax
- mov esi, PG_MM_JSON_INT
+ mov [rsp+72],rax
+ mov rdi,rax
+ mov esi,PG_MM_JSON_INT
  call json_object_is_type@PLT
- test eax, eax
+ test eax,eax
  jz .Ldl_failed
- mov rdi, qword ptr [rsp + 72]
- call json_object_get_int@PLT
- test eax, eax
- jnz .Ldl_failed                      /* index 必须 ==0 */
- mov rdi, qword ptr [rsp + 64]
- lea rsi, [rip + .Lstr_function]
+ mov rdi,[rsp+72]
+ call json_object_get_int64@PLT
+ cmp rax,PG_MM_CALL_LIMIT-1
+ ja .Ldl_failed
+ lea ecx,[eax+1]
+ cmp ecx,[rbx+PG_MM_CALL_COUNT]
+ jbe .Lcall_counted
+ mov [rbx+PG_MM_CALL_COUNT],ecx
+.Lcall_counted:
+ PG_MM_CALL_SLOT r12,rax
+ mov [rsp+96],r12
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lstr_function]
  call li_get
- mov r12, rax                         /* fn；line 已不再使用 */
- mov rdi, qword ptr [rsp + 64]
- lea rsi, [rip + .Lstr_id]
+ mov [rsp+104],rax
+ test rax,rax
+ jz .Lcall_fields
+ mov rdi,rax
+ mov esi,PG_MM_JSON_OBJECT
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldl_failed
+.Lcall_fields:
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lstr_id]
  call li_get
- mov rdi, rax
- lea rsi, [rbx + PG_MM_ID]
- mov edx, PG_MM_ID_LIMIT
+ mov rdi,rax
+ lea rsi,[r12+PG_MM_TEXT_LIMIT]
+ mov edx,PG_MM_ID_LIMIT
  call li_accumulate
- or r15d, eax
- mov rdi, r12
- lea rsi, [rip + .Lstr_name]
+ or r15d,eax
+ mov rdi,[rsp+104]
+ lea rsi,[rip+.Lstr_name]
  call li_get
- mov rdi, rax
- lea rsi, [rbx + PG_MM_NAME]
- mov edx, PG_MM_ID_LIMIT
+ mov rdi,rax
+ lea rsi,[r12+PG_MM_TEXT_LIMIT+PG_MM_ID_LIMIT]
+ mov edx,PG_MM_ID_LIMIT
  call li_accumulate
- or r15d, eax
- mov rdi, r12
- lea rsi, [rip + .Lstr_arguments]
+ or r15d,eax
+ mov rdi,[rsp+104]
+ lea rsi,[rip+.Lstr_arguments]
  call li_get
- mov rdi, rax
- lea rsi, [rbx + PG_MM_ARGUMENTS]
- mov edx, PG_MM_TEXT_LIMIT
+ mov rdi,rax
+ mov rsi,r12
+ mov edx,PG_MM_TEXT_LIMIT
  call li_accumulate
- or r15d, eax
+ or r15d,eax
+ inc qword ptr [rsp+88]
+ mov rax,[rsp+88]
+ cmp rax,[rsp+80]
+ jb .Lcall_delta
 .Ldl_content:
  cmp qword ptr [rsp + 48], 0
  je .Ldl_reason
@@ -417,6 +441,8 @@ pg_mimo_decode_line:
  jnz 1f
  cmp dword ptr [rsp + 72],4
  jne .Ldl_failed
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
+ jne .Ldl_failed
  cmp byte ptr [rbx + PG_MM_ID], 0     /* stop 不允许带工具 id */
  jne .Ldl_failed
  mov dword ptr [rbx + PG_MM_FINISH_REASON], 1
@@ -429,10 +455,36 @@ pg_mimo_decode_line:
  jnz .Ldl_failed                      /* 其余 finish 理由拒绝 */
  cmp dword ptr [rsp + 72],10
  jne .Ldl_failed
- cmp byte ptr [rbx + PG_MM_ID], 0
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
  je .Ldl_failed
- cmp byte ptr [rbx + PG_MM_NAME], 0
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],PG_MM_CALL_LIMIT
+ ja .Ldl_failed
+ mov qword ptr [rsp+88],0
+.Lfinish_call:
+ mov rax,[rsp+88]
+ PG_MM_CALL_SLOT r12,rax
+ cmp byte ptr [r12+PG_MM_TEXT_LIMIT],0
  je .Ldl_failed
+ cmp byte ptr [r12+PG_MM_TEXT_LIMIT+PG_MM_ID_LIMIT],0
+ je .Ldl_failed
+ mov qword ptr [rsp+104],0
+.Lfinish_unique:
+ mov rax,[rsp+104]
+ cmp rax,[rsp+88]
+ jae .Lfinish_next
+ PG_MM_CALL_SLOT rdx,rax
+ lea rdi,[r12+PG_MM_TEXT_LIMIT]
+ lea rsi,[rdx+PG_MM_TEXT_LIMIT]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldl_failed
+ inc qword ptr [rsp+104]
+ jmp .Lfinish_unique
+.Lfinish_next:
+ inc qword ptr [rsp+88]
+ mov eax,[rbx+PG_MM_CALL_COUNT]
+ cmp [rsp+88],rax
+ jb .Lfinish_call
  mov dword ptr [rbx + PG_MM_FINISH_REASON], 2
 .Ldl_finish:
  test r14, r14
@@ -462,7 +514,7 @@ pg_mimo_decode_line:
 .Ldl_ok:
  xor eax, eax
 .Ldl_out:
- add rsp, 80
+ add rsp, 112
  pop r15
  pop r14
  pop r13

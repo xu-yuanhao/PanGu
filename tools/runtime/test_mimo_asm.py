@@ -4,7 +4,7 @@ Builds src/runtime/mimo.S + mimo_projection.S + mimo_stream.S with the C
 layout header (compile-time assertions) and runs, at O0 and O2 (UBSan on the
 C test code where it links):
 
-- the original protocol tests (test_mimo_stream, test_projection) unchanged;
+- the existing protocol suites plus explicit bounded batch-contract cases;
 - test_mimo_asm (ABI/boundary suite) linked with mimo_abi.S and --wrap
   interposition that trashes caller-saved registers after every wrapped
   external call and asserts stack alignment at each call site;
@@ -29,12 +29,14 @@ ABI_WRAPS = ['-Wl,--wrap=' + n for n in (
     'getenv', 'strdup', 'json_object_object_add', 'json_object_array_add',
     'json_object_new_string', 'json_object_new_string_len', 'json_object_put',
     'json_tokener_parse_ex', 'json_tokener_get_error', 'json_object_get_string', 'json_object_is_type',
-    'json_object_object_get_ex')]
+    'json_object_object_get_ex', 'json_object_get_int64', 'memset',
+    'json_object_array_length', 'json_object_array_get_idx', 'json_object_get_string_len',
+    'json_tokener_get_parse_end', 'json_tokener_free')]
 CURL_WRAPS = ['-Wl,--wrap=' + n for n in (
     'curl_easy_init', 'curl_easy_setopt', 'curl_easy_getinfo',
     'curl_easy_cleanup', 'curl_multi_init', 'curl_multi_perform',
     'curl_multi_info_read', 'curl_multi_add_handle', 'curl_multi_cleanup',
-    'curl_slist_free_all', 'curl_slist_append')]
+    'curl_slist_free_all', 'curl_slist_append', 'json_tokener_new')]
 
 ALLOC_WRAPS = ['-Wl,--wrap=' + name for name in ('json_object_new_object', 'json_object_new_array', 'json_object_new_string', 'json_object_new_string_len', 'json_object_new_boolean', 'json_object_new_int', 'json_object_object_add', 'json_object_array_add', 'json_tokener_parse', 'json_object_to_json_string_ext', 'strdup')]
 

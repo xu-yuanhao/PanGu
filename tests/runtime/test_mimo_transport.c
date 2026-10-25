@@ -32,6 +32,9 @@ static void *captured_write_data;
 static const char *captured_url, *captured_post, *captured_protocols;
 static struct curl_slist *captured_headers;
 static long captured_timeout = -1, captured_connect_timeout = -1, captured_nosignal = -1;
+static int token_fail_at,token_calls;
+struct json_tokener *__real_json_tokener_new(void);
+struct json_tokener *__wrap_json_tokener_new(void){++token_calls;return token_fail_at==token_calls?0:__real_json_tokener_new();}
 static int setopt_errors,setopt_fail_at,setopt_calls,getinfo_fail,slist_fail_at,slist_calls;
 struct curl_slist *__wrap_curl_slist_append(struct curl_slist *list,const char *text){++slist_calls;return slist_fail_at==slist_calls?NULL:__real_curl_slist_append(list,text);}
 
@@ -158,6 +161,7 @@ static pg_model model;
 static pg_session session;
 
 static void reset_script(void) {
+    token_fail_at=token_calls=0;
     script_perform_rc = 0;
     script_running = 1;
     script_http = 200;
@@ -220,6 +224,9 @@ static void test_start_setup(void) {
     assert(start() == 0);
     assert(m.request && strstr(m.request, "\"messages\""));
     (void)first;
+    model.close(model.context);
+    assert(!m.easy&&!m.multi&&!m.headers&&!m.request);
+    assert(count_easy_cleanup==2&&count_multi_cleanup==2&&count_slist_free==2);
 }
 
 static void test_text_stream(void) {
@@ -439,6 +446,27 @@ static void test_setup_failures(void){
  reset_script();assert(start()==0);getinfo_fail=1;pg_model_event event;assert(nxt(&event)==1);model.close(model.context);
 }
 
+static void batch_begin(void){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);setenv("MIMO_API_KEY","transport-unit-key",1);make_session();assert(!start());}
+static void feed_call(unsigned index,const char *id,const char *name,const char *args){json_object *o=json_object_new_object(),*choices=json_object_new_array(),*choice=json_object_new_object(),*delta=json_object_new_object(),*calls=json_object_new_array(),*call=json_object_new_object(),*fn=json_object_new_object();assert(o&&choices&&choice&&delta&&calls&&call&&fn);assert(!json_object_object_add(call,"index",json_object_new_int64(index)));if(id)assert(!json_object_object_add(call,"id",json_object_new_string(id)));if(name)assert(!json_object_object_add(fn,"name",json_object_new_string(name)));if(args)assert(!json_object_object_add(fn,"arguments",json_object_new_string(args)));assert(!json_object_object_add(call,"function",fn));assert(!json_object_array_add(calls,call));assert(!json_object_object_add(delta,"tool_calls",calls));assert(!json_object_object_add(choice,"delta",delta));assert(!json_object_array_add(choices,choice));assert(!json_object_object_add(o,"choices",choices));char line[32768];int n=snprintf(line,sizeof(line),"data: %s\n",json_object_to_json_string_ext(o,JSON_C_TO_STRING_PLAIN));assert(n>0&&(size_t)n<sizeof(line));feed(line);json_object_put(o);}
+static void batch_end(void){feed("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n");feed("data: [DONE]\n");}
+static void waiting_lines(unsigned count){pg_model_event e;for(unsigned i=0;i<count;++i)assert(!nxt(&e)&&e.kind==PG_MODEL_WAIT&&!e.batch.count);}
+static void test_batch_stream(void){pg_model_event e;batch_begin();
+ feed_call(1,"second","write","{\"n\":");feed_call(0,"first","read","{}");feed_call(1,0,0,"2}");batch_end();waiting_lines(5);assert(!nxt(&e)&&e.kind==PG_MODEL_WAIT);finish_transport();assert(!nxt(&e)&&e.kind==PG_MODEL_BATCH&&e.batch.count==2&&e.batch.calls==m.calls);assert(!strcmp(e.batch.calls[0].call_id.data,"first")&&!strcmp(e.batch.calls[1].call_id.data,"second")&&e.batch.calls[1].arguments.size==7&&!memcmp(e.batch.calls[1].arguments.data,"{\"n\":2}",7));assert(!e.call_id.data&&!e.tool_name.data);assert(!nxt(&e)&&e.kind==PG_MODEL_DONE);model.close(model.context);
+ assert(!start()&&!m.call_count);for(size_t i=0;i<sizeof(m.extra);++i)assert(!((unsigned char*)m.extra)[i]);for(size_t i=0;i<sizeof(m.calls);++i)assert(!((unsigned char*)m.calls)[i]);model.close(model.context);
+ batch_begin();feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}},{\"index\":1,\"id\":\"b\",\"function\":{\"name\":\"write\",\"arguments\":\"{}\"}}]}}]}\n");batch_end();waiting_lines(3);finish_transport();assert(!nxt(&e)&&e.kind==PG_MODEL_BATCH&&e.batch.count==2);model.close(model.context);
+ for(unsigned fault=0;fault<=8;++fault){batch_begin();for(unsigned index=0;index<8;++index){char id[16];snprintf(id,sizeof(id),"call-%u",index);feed_call(index,id,"read","{}");}batch_end();waiting_lines(10);token_calls=0;token_fail_at=(int)fault;finish_transport();int rc=nxt(&e);if(fault){assert(rc==1&&!m.delivered&&m.failed&&e.kind==PG_MODEL_WAIT&&!e.batch.calls);assert(nxt(&e)==1&&!m.delivered);}else{assert(!rc&&e.kind==PG_MODEL_BATCH&&e.batch.count==8);for(unsigned j=0;j<8;++j){char id[16];snprintf(id,sizeof(id),"call-%u",j);assert(!strcmp(e.batch.calls[j].call_id.data,id)&&e.batch.calls[j].arguments.size==2&&!memcmp(e.batch.calls[j].arguments.data,"{}",2));}}model.close(model.context);}
+ for(unsigned overflow=0;overflow<4;++overflow){batch_begin();char id[64],name[64],args[4096];memset(id,'i',63);id[63]=0;memset(name,'n',63);name[63]=0;memcpy(args,"{\"x\":\"",6);memset(args+6,'z',4087);memcpy(args+4093,"\"}",3);assert(strlen(args)==4095);
+  for(unsigned index=0;index<8;++index){id[62]=(char)('0'+index);feed_call(index,id,name,args);}waiting_lines(8);
+  if(overflow){feed_call(7,overflow==1?"x":0,overflow==2?"x":0,overflow==3?"x":0);assert(nxt(&e)==1&&!m.delivered&&m.failed&&e.kind==PG_MODEL_WAIT);for(size_t byte=0;byte<sizeof(m.calls);++byte)assert(!((unsigned char*)m.calls)[byte]);}
+  else{batch_end();waiting_lines(2);finish_transport();assert(!nxt(&e)&&e.kind==PG_MODEL_BATCH&&e.batch.count==8);for(unsigned index=0;index<8;++index){assert(e.batch.calls[index].arguments.size==4095&&e.batch.calls[index].call_id.size==63&&e.batch.calls[index].tool_name.size==63);assert(!memcmp(e.batch.calls[index].arguments.data,args,4095));}}
+  model.close(model.context);
+ }
+
+}
+static void test_batch_rejection(void){pg_model_event e;
+ for(unsigned bad=0;bad<6;++bad){batch_begin();feed_call(0,"a","read","{}");feed_call(bad==2?2:1,bad==0?"a":"b",bad==1?0:"write",bad==3?"{":bad==4?"[]":"{}");if(bad==5)feed_call(8,"ninth","read","{}");batch_end();finish_transport();int rejected=0;for(unsigned i=0;i<10;++i){int rc=nxt(&e);assert(e.kind!=PG_MODEL_BATCH&&e.kind!=PG_MODEL_CALL);if(rc){rejected=1;break;}}assert(rejected&&!m.delivered&&m.failed&&nxt(&e)==1);model.close(model.context);}
+ batch_begin();feed_call(0,"a","read","{}");feed_call(1,"b","write","{}");feed("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n");finish_transport();waiting_lines(3);assert(nxt(&e)==1&&!m.delivered);model.close(model.context);
+}
 int main(void) {
     test_start_setup();
     test_text_stream();
@@ -447,7 +475,9 @@ int main(void) {
     test_receive_bounds();
     test_partial_init_close();
     test_setup_failures();
+    test_batch_stream();
+    test_batch_rejection();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
-         "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close");
+         "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
 }

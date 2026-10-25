@@ -18,8 +18,10 @@ int main(void){
  assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"}\"}}]}}]}"));
  assert(!strcmp(m.arguments,"{}"));assert(!strcmp(m.id,"call1"));assert(!strcmp(m.name,"echo"));
  assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));assert(m.finish_reason==2);assert(!line("data: [DONE]"));
- m=(pg_mimo){0};assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));
+ m=(pg_mimo){0};assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));
  m=(pg_mimo){0};memset(m.arguments,'x',sizeof(m.arguments)-1);
  assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"a\"}}]}}]}"));
+ const char *indices[]={"-1","8","4294967296","9223372036854775807","0.5","true","\"1\""};
+ for(size_t i=0;i<sizeof(indices)/sizeof(*indices);++i){m=(pg_mimo){0};char text[512];snprintf(text,sizeof(text),"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":%s}]}}]}",indices[i]);assert(line(text));}
  puts("PASS: incremental text, UTF-8, split tool arguments, terminal protocol, malformed/truncated and capacity rejection");return 0;
 }

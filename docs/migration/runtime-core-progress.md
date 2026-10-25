@@ -714,3 +714,18 @@ Session新增有界checkpointed批次（3～9记录，对应assistant+最多8 ca
 实际验证：完整常规核心O0/O2 UBSan退出0；最终专项O0 UBSan及O2 ASan/UBSan退出0；离线真实产品PTY的退出/信号/resize/termios和持久闲置重开通过。专项涵盖9条全部最大字段、源批次被Storage回调修改时仍分离采纳、reject/uncertain不采纳、边界容量、重复ID/跳序/错配/漏结果、顺序结果每步重开及8个取消结果原子终结、独立进程回放、全部小批次尾切分/逐字节损坏、有效checksum的非法版本/kind/count/CP、旧版本及v5超长头不当作torn修复、三处半写/末尾失败与完整帧fsync不确定恢复。32 KiB小栈下的入口guard预期SIGSEGV，未创建日志文件，证明会触碰中间保护页。Sanitizer主要检查C/库边界，汇编由保护页、字段/长度与实际IO用例验证。
 
 同一Agent按授权自审自批新增测试登记、构建集成、Session聚合契约和新v5范围。旧格式上限保持原值，不以扩大旧预算让用例通过；新增栈/帧开销已明确。G00、assembly-first与diff检查通过，生产准入未改变。本批没有再次调用真实模型；这只是必要存储基础，当前MiMo仍拒绝index1，Agent批量调度、projection、TUI历史与--live-workflow依然未完成，接下来继续对应实现。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`9f4bea059d2b4b8faea6a09ebbeead99cab7fad59795687f19c6708440679c26`。
+
+
+## 2026-10-25：MiMo完整多调用响应与Model批次事件
+
+读取Pi d5b3de22的ai/src/api/openai-completions.ts::ensureToolCallBlock/逐tool_calls迭代及流结束分类，tool-choice.test.ts混合文本/多工具分片fixture，以及Durable generation.ts::startToolRound。采用按调用索引分离参数、完整assistant调用集合到达后才交给执行层。原生范围仍要求明确连续整数index0～7、函数工具与完整JSON object参数；未声称移植Pi缺index按ID补救、ID重绑定、custom/reasoning等全部变体，原有id/name片段追加规则保留。fetch确认Pi仍d5b3de22、Harness仍22ddee3。
+
+Model契约新增PG_MODEL_BATCH：2～8个pg_model_call的完整终态，含arguments/id/name借用切片，整体有效期至next/close；event用union保留原56字节与各旧字段偏移，pg_model表仍40字节。MiMo一调用仍输出原CALL，多调用由独立slot累积，按index排序；finish检查身份完整/无洞/唯一，transport完成且finish+DONE后，统一校验每个参数再发布一个BATCH，不先交付可用前缀。任何Model.next/解码错误锁定本请求，后续next继续失败，start才清除。单/多调用共用参数校验路径，无第二套实现。
+
+pg_mimo原字段偏移保留，追加7个参数槽、8个切片view及count，由139480增至169440字节（+29960）；所有内部调用者同批重建，不再把旧“布局冻结”注释误作不可扩展的稳定ABI承诺。没有扩大每项4096/ID64、wire接收131072或API max_tokens512等既有范围，也未添加依赖或运行时框架。
+
+实际验证：常规核心O0/O2 UBSan通过；独立MiMo驱动O0/O2及UBSan组合通过；ABI/page-guard与transport专项O2 ASan/UBSan通过。新增同分片多个调用、分片交错/index1先到、2/8调用、各槽最大4095参数/63字节身份、末槽参数/ID/name溢出不写view、整数范围/类型错误、缺索引/缺身份/重复ID/末项非object或不完整JSON/第9项/缺DONE全组拒绝、8个终态token分配失败点均不发布前缀，复用start清空额外状态。扩展的外部ABI破坏回调包含get_int64/数组访问/长度等；旧“index1立即非法”测试改为合法未完成分片后finish拒绝，并补新越界/不完整整组用例，未删除对应失败边界。
+
+ASan首次查出旧test_start_setup在第二次start后未close就让下个用例清零provider，泄漏12640字节curl相关分配；修复夹具关闭并断言两次资源释放后复验通过，没有关闭LeakSanitizer或修改产品清理来掩盖。真实模型入口python3 -B tools/runtime/build_test.py --live-batch已通过：HTTP请求直接使用真实MiMo，收到同响应两个read调用并验证两个独立path；只是Model层验证，没有执行工具，也不是完整TUI工作流。凭据仅在子进程环境中，未写源码/日志。实际产品组合构建通过。
+
+同一Agent按授权自审自批Model事件扩展、provider尾部内存、登记/测试驱动和相应测试契约调整；不是独立审核。G00、assembly-first和diff检查通过，生产准入不变。当前Agent仍不处理BATCH、历史请求投影仍按单调用配对；完整--live-workflow尚未通过，下一批接Loop的整组提交/顺序执行/取消/恢复及投影，不能把本次真实元数据验证替代执行验收。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`4c4d78acc0e0d7d5ef2502e8f04ce2cff41038f84dd917fb1cc36ede644bbe64`。

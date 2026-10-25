@@ -80,7 +80,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute",
+      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute; Model event header now declares a 56-byte union for complete BATCH metadata; the current Loop still handles single CALL only",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -143,7 +143,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c via public ABI, bounded streaming/single tool; allocation/insertion failure ownership cleanup and checked setup",
+      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; grouped Session projection and Agent batch consumer pending",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -176,6 +176,19 @@
           "tests_to_read": [
             "packages/ai/test/openai-completions-raw-stop-reason.test.ts",
             "packages/ai/test/tool-call-without-result.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/api/openai-completions.ts",
+            "packages/durable/src/harness/generation.ts"
+          ],
+          "semantics": "ensureToolCallBlock/index-based argument isolation and complete assistant tool set before startToolRound; native requires numeric contiguous 0..7 indexes and keeps existing metadata-fragment rules, no full Pi custom/reasoning/fallback compatibility",
+          "tests_to_read": [
+            "packages/ai/test/openai-completions-tool-choice.test.ts",
+            "packages/durable/test/harness-tools.test.ts"
           ]
         }
       ]
