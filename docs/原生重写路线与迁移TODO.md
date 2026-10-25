@@ -116,7 +116,7 @@ T01～T48 保留为功能追踪编号与整体验收清单，不再表示必须�
 
 2026-10-25修订：主要基座改为Pi Durable，微内核/服务组合采用Harness/Cordis。以下勾选仅证明各条注明的局部子集，不证明完整Durable兼容。近期优先：
 
-- [ ] 阅读Durable提交/任务/恢复源码及测试，按当前有界原生需求定义Session、Storage、Submission/Task服务契约；宿主不持有领域逻辑。
+- [x] ~~按当前需求阅读Durable并定义有界Session、Storage、Submission契约~~：实际接口与实现见runtime核心记录，Loop通过服务组合；不把尚无当前需求的通用Task/Scheduler框架作为开发前置。
 - [x] ~~先分离生成草稿与已结束的内存消息~~：手写汇编、取消/错误不入模型历史、原消息不变；仅为内存边界，不是Durable持久提交。
 - [x] ~~原地调整会话与Loop事务边界~~：可替换Storage、确认后事实采纳、显式abort与suspend分离；TUI cancel明确abort，无旧实现副本。通用Task/Scheduler服务仍待实现。
 - [x] ~~有界Session/Storage提交边界子集~~：手写session.S，分离批次、确认序号后采纳；输入/系统/reset/响应/工具结果统一提交；工具assistant+call原子批次，拒绝无部分写入，不确定结果停止写入。默认仍为易失内存；不是持久化或任务恢复完成。
@@ -139,11 +139,12 @@ T01～T48 保留为功能追踪编号与整体验收清单，不再表示必须�
 - [x] ~~Runtime/registry异步工具协议局部接入~~：手写汇编start/next/cancel/close、临时输出事件、释放后提交终态；真实进程单元测试覆盖取消、暂停、关闭延迟与错误；TUI协作退出等待释放，持久模式保留检查点。尚未开放异步产品工具。
 - [x] ~~bash输出的逐流UTF-8增量解码基础~~：手写汇编，初始BOM与replacement/最终flush行为，140477条与固定Pi实际StreamDecoder逐块比较通过；尚待工具消费。
 - [x] ~~bash本地交互子集~~：手写参数/异步执行、双流解码、3072字节/2000行尾部、0600原始输出文件、16 MiB捕获上限；真实MiMo命令/非零退出/取消、溢出文件及持久退出/unsafe恢复通过。固定PATH/LANG环境，无沙箱或完整Pi参数/structuredOutput兼容，T26整阶段仍未验收。
-- [x] ~~批量工具原子存储基础~~：最多8个调用+assistant同事务，v5与旧格式边界分开，唯一ID/顺序结果/取消补齐和跨进程回放验证；Model、Agent和历史投影尚未接入，不能替代完整批次执行验收。
-- [x] ~~MiMo完整批量响应接收~~：手写按index分离的1～8调用累积，完整finish/DONE/transport后验证所有参数并发布单个BATCH事件；真实MiMo同响应两个read调用通过。Agent尚未消费BATCH，不能代替执行闭环。
+- [x] ~~批量工具原子存储基础~~：最多8个调用+assistant同事务，v5与旧格式边界分开，唯一ID/顺序结果/取消补齐和跨进程回放验证；本项仅存储证据；Model、Agent和历史投影的后续接入见下项。
+- [x] ~~MiMo完整批量响应接收~~：手写按index分离的1～8调用累积，完整finish/DONE/transport后验证所有参数并发布单个BATCH事件；真实MiMo同响应两个read调用通过。本项仅Model证据，Agent执行闭环见下项。
 - [x] ~~批量Model请求投影~~：2～8 calls保持一条assistant/tool_calls，结果顺序关联，漏项/错配/重复ID拒绝，8调用207个分配失败点释放验证；不等于Agent已执行。
-- [x] ~~Agent批量原子提交、顺序执行/取消/恢复与TUI历史~~：整组落盘后执行，取消补齐后缀，safe/unsafe重新初始化恢复及异步清理验证；真实MiMo同响应双read实际执行、完整read→edit→write→bash构建汇编工作流通过。不是通用调度器或所有崩溃窗口验收。
+- [x] ~~Agent批量原子提交、顺序执行/取消/恢复与TUI历史~~：整组落盘后执行，取消补齐后缀，safe/unsafe重新初始化恢复及异步清理验证；真实MiMo同响应双read实际执行、完整read→edit→write→bash构建汇编工作流通过。补充200个真实日志/进程退出恢复组合及真实MiMo持久批量TUI重开检查；不是通用调度器、断电保证或所有崩溃窗口验收。
 
+- [ ] 完善read的有界分页：参考Pi Durable的offset/limit与截断提示，在既有消息上限内读取较大文本文件；不通过扩大配额或让模型改用bash绕过read能力缺口。
 
 并行分工（2026-10-25更新）：TUI、tools/read、MiMo三批均已交接并由主Agent审核集成，旧C和失效登记删除，实际证据见各交接/核心进展。当前没有未交付的并行实现任务；已完成派发文档标明退役，下一次工作按新的明确文件归属分配。
 

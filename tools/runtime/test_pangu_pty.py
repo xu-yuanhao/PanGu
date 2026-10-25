@@ -395,6 +395,69 @@ def workflow_live(binary, root):
     assert env['MIMO_API_KEY'].encode() not in (storage / 'session.pgj').read_bytes()
     print('PASS: actual MiMo read/edit/write/bash workflow built and tested handwritten Assembly with exact source preservation', flush=True)
 
+def batch_live(binary, root):
+    storage = root / 'batch-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    markers = (b'PANGU_BATCH_FIRST', b'PANGU_BATCH_SECOND')
+    for index, name in enumerate(('first-batch.txt', 'second-batch.txt')):
+        (root / name).write_bytes(markers[index] + b'\n')
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.send(b'Use read for first-batch.txt and read for second-batch.txt in the same assistant response with two tool calls. After both results, report both file markers briefly.\r')
+        terminal.until(b'[run] finished: success', 150)
+        assert terminal.output.count(b'finished ok:') == 2
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    path = storage / 'session.pgj'
+    saved = path.read_bytes()
+    assert env['MIMO_API_KEY'].encode() not in saved
+    assert checkpoints(path)[-1][1] == 3
+    cursor, group, results = 0, None, {}
+    while cursor < len(saved):
+        version, length = struct.unpack_from('<II', saved, cursor + 8)
+        kind, count = struct.unpack_from('<II', saved, cursor + 24)
+        rows, offset = [], cursor + 40
+        if kind == 0:
+            for _ in range(count):
+                role, error, text_len, id_len, name_len = struct.unpack_from('<IIIHH', saved, offset)
+                offset += 16
+                text = saved[offset:offset + text_len]
+                offset += text_len
+                call_id = saved[offset:offset + id_len]
+                offset += id_len
+                name = saved[offset:offset + name_len]
+                offset += name_len
+                rows.append((role, error, text, call_id, name))
+                if role == 3:
+                    assert call_id not in results and not error
+                    results[call_id] = text
+            if version == 5:
+                assert group is None and count == 3 and [row[0] for row in rows] == [1, 2, 2]
+                group = rows[1:]
+        cursor += length
+    assert group is not None and len(results) == 2
+    assert {json.loads(row[2])['path'] for row in group} == {'first-batch.txt', 'second-batch.txt'}
+    for row in group:
+        assert row[4] == b'read' and row[3] in results
+    assert all(any(marker in result for result in results.values()) for marker in markers)
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        assert terminal.output.count(b'[history] call read') == 2
+        assert terminal.output.count(b'[history] result read') == 2
+        assert all(row[3] in terminal.output for row in group)
+        assert b'[run] started' not in terminal.output and path.read_bytes() == saved
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert path.read_bytes() == saved
+    print('PASS: actual MiMo/TUI two-call group, v5 atomic intent, ordered file results and settled reopen history without model restart', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -404,6 +467,7 @@ def main():
     parser.add_argument('--live-bash', action='store_true')
     parser.add_argument('--live-bash-recovery', action='store_true')
     parser.add_argument('--live-workflow', action='store_true')
+    parser.add_argument('--live-batch', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -442,6 +506,9 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_batch:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-batch'
+            batch_live(binary, root)
         if args.live_workflow:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-workflow'
             workflow_live(binary, root)

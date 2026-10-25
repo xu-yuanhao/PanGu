@@ -755,3 +755,14 @@ ASan首次查出旧test_start_setup在第二次start后未close就让下个用�
 真实MiMo：--live-batch-execute通过，第一次工具开始时断言已提交两个calls，两次read实际完成后继续生成终态；没有替换Model或要求拆成单调用。--live-workflow通过：实际TUI read/edit/write/bash，构建并运行手写汇编测试，校验精确源文件/脚本及未修改内容。离线PTY退出、信号、resize、termios及持久闲置重开同时通过。凭据仅子进程环境，未入库。之前单调用解析阻断的完整工作流现有直接通过证据；不据此宣称所有Pi功能、完整T26/T28或生产发布通过。
 
 同一Agent按授权自审自批Agent内部arena/偏移、模块范围、测试和真实入口构建扩展；无新文件/依赖/门禁，也未放宽失败边界。G00、assembly-first和diff检查通过，生产准入不变。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`34991c069cf492c9c61affbe9b511edaaee574d2d6ee354e3d2c2bfaa1c1ac3a`。
+
+
+## 2026-10-25：批量工具真实日志与进程恢复补验
+
+对照固定Pi d5b3de22 Durable generation.ts::startToolRound及harness-tools.test.ts的sequential trace和abort结果用例；盘古继续采用有界顺序运行与已提交结果边界，不声称移植上游全部持久工具输出。fetch确认Pi仍d5b3de22、Harness仍22ddee3；无参考源码变更。
+
+扩展现有test_agent_resume.c，在真实journal与fork进程中验证2/8项、每个活动位置、stored/current safe两种策略的200个组合：意图提交后执行前退出、外部文件副作用后结果提交前退出、结果提交后事件前退出、abort意图提交后退出，以及取消结果整组帧写入但尚未确认/发布时退出。重开核对全部结果ID/错误状态、逐项副作用实际次数、最终checkpoint和再次idle重开无提交/执行。safe允许重试当前不确定项，unsafe保守提交interrupted（包括无法证明已开始的当前项），已完成项不重复；没有把副作用exactly-once或机器断电作为保证。
+
+新增现有PTY脚本的--live-batch入口，实际MiMo/TUI发出同响应两个read并执行；检查真实v5帧确为assistant+两个calls、结果的两个文件标记/ID，重开显示两项call/result名称与ID、无run_started，日志字节不变。实际运行退出0，且凭据未进入journal。专项进程恢复O2 ASan/UBSan退出0；完整核心O0/O2 UBSan退出0；离线实际PTY退出/信号/resize/termios/持久idle同时通过。本批未修改产品实现，不把这些测试覆盖外推为所有崩溃窗口或生产准入完成。
+
+整理近期队列：已实现的有界Session/Storage/Submission接口不再挂在未完成的通用Task框架下；下一项是现有read的大文件分页缺口，参考Durable offset/limit，在当前消息预算内实现。无需新增框架或门禁。同一Agent自审该测试入口与进度说明，非独立审核。G00与diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`a9f2ca5c8d55ca9ed6155ea66577b7aaa29bb5f39eb25d6ee391655f9784af6f`。
