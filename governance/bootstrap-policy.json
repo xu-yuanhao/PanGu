@@ -17,8 +17,6 @@
     "docs/migration/feature-inventory.json": "control",
     "docs/migration/dependency-inventory.json": "control",
     "docs/migration/evidence-contract.json": "control",
-    "docs/migration/task-ledger.json": "control",
-    "docs/migration/gap-ledger.json": "control",
     "tools/migration/reference_bundle.py": "gate",
     "tools/migration/test_reference_bundle.py": "gate-test",
     "docs/migration/implementation-scope.json": "control",
@@ -72,7 +70,6 @@
     "tools/gates/admission.py": "gate",
     "tools/gates/test_admission.py": "gate-test",
     "docs/migration/native-admission-contract.md": "document",
-    "docs/前期工作交接TODO.md": "document",
     "docs/migration/t07-dependency-decisions.md": "document",
     "docs/migration/t08-native-contract.md": "document",
     "docs/migration/t09-comparison-basis.md": "document",
@@ -85,7 +82,6 @@
     "tools/migration/t09-scenarios.json": "control",
     "docs/migration/t10-native-candidate.json": "control",
     "docs/migration/precore-closure-review.md": "document",
-    "docs/TUI体验参考与设计原则.md": "document",
     "docs/migration/tui-ux-reference-baseline.json": "control",
     "docs/migration/t10-bootstrap-progress.md": "document",
     "docs/migration/t10-bootstrap-evidence.json": "control",
@@ -550,7 +546,6 @@
     "tests/runtime/test_tools_asm.c": "native-test",
     "tools/runtime/test_tools_asm.py": "development-tool",
     "docs/migration/tools-assembly-handoff.md": "document",
-    "docs/并行开发任务提示词-MiMo协议汇编重构.md": "document",
     "src/runtime/profile.S": "native-source",
     "src/runtime/profile.h": "native-source",
     "src/runtime/profile_layout.h": "native-source",
@@ -595,9 +590,9 @@
     "tests/runtime/test_bash_tool.c": "native-test",
     "tests/runtime/test_tool_batch_storage.c": "native-test",
     "tests/runtime/live_mimo_batch.c": "native-test",
-    "docs/并行开发任务提示词-TUI输入体验.md": "document",
     "src/runtime/prompt.S": "native-source",
     "src/runtime/prompt.h": "native-source",
-    "tests/runtime/test_prompt.c": "native-test"
+    "tests/runtime/test_prompt.c": "native-test",
+    "docs/TUI移植TODO.md": "document"
   }
 }
