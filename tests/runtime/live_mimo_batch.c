@@ -29,8 +29,24 @@ static int snapshot_edit(void){
  fd=openat(reader.directory,"many-lines.txt",O_RDONLY|O_CLOEXEC);assert(fd>=0);char actual[2048];assert(read(fd,actual,sizeof(actual))==2011&&!memcmp(actual,expected,2011)&&!close(fd));assert(!pg_agent_suspend(&agent));assert(!provider.easy&&!provider.multi&&!provider.headers&&!provider.request);
  assert(!unlinkat(reader.directory,"many-lines.txt",0));pg_read_tool_close(&reader);assert(!rmdir(path));curl_global_cleanup();puts("PASS: actual MiMo Agent edited beyond the display page through a complete snapshot, preserving 2000 leading newlines and verifying ranged read");return 0;
 }
+static int capacity_write(void){
+ assert(getenv("MIMO_API_KEY")&&*getenv("MIMO_API_KEY"));assert(!curl_global_init(CURL_GLOBAL_DEFAULT));
+ char path[]="/tmp/pangu-live-capacity-XXXXXX";assert(mkdtemp(path));pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,path));pg_write_tool writer={reader.directory};pg_tool_definition definition=pg_write_tool_definition(&writer);assert(!pg_tool_registry_init(&registry,&definition,1));
+ for(unsigned full=0;full<2;++full){
+  pg_model model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);assert(!pg_agent_init(&agent,model,pg_tool_registry_service(&registry)));
+  unsigned prior=PG_MESSAGE_LIMIT-5+full;for(unsigned i=0;i<prior;++i){pg_message *m=&agent.session.messages[i];m->role=i%2?PG_ASSISTANT:PG_USER;const char *text=i%2?"Acknowledged.":"Earlier turn.";m->size=strlen(text);memcpy(m->text,text,m->size+1);}agent.session.count=prior;
+  const char *input="Use write exactly once to create capacity.txt containing exactly CAPACITY_OK. Then report done briefly. Do not call any other tool.";pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){input,strlen(input)}));unsigned starts=0,ends=0;int settled=0;
+  for(unsigned poll=0;poll<12000;++poll){pg_event e;if(client.poll(client.context,&e)){if(e.kind==PG_TOOL_STARTED)++starts;if(e.kind==PG_TOOL_FINISHED)++ends;if(e.kind==PG_RUN_FINISHED){assert(e.outcome==(full?PG_ERROR:PG_SUCCESS));if(full)assert(e.text.size==strlen("session has no room for tool results and follow-up reply")&&!memcmp(e.text.data,"session has no room for tool results and follow-up reply",e.text.size));settled=1;break;}}struct timespec pause={0,10000000};nanosleep(&pause,0);}
+  assert(settled&&starts==(full?0:1)&&ends==starts&&agent.session.count==(full?prior+1:PG_MESSAGE_LIMIT));
+  int fd=openat(reader.directory,"capacity.txt",O_RDONLY|O_CLOEXEC);if(full)assert(fd<0);else{char out[32];assert(fd>=0&&read(fd,out,sizeof(out))==11&&!memcmp(out,"CAPACITY_OK",11)&&!close(fd));assert(!unlinkat(reader.directory,"capacity.txt",0));}
+  assert(!pg_agent_suspend(&agent)&&!provider.easy&&!provider.multi&&!provider.headers&&!provider.request);
+ }
+ pg_read_tool_close(&reader);assert(!rmdir(path));curl_global_cleanup();puts("PASS: actual MiMo write at the exact session boundary retained a follow-up reply; one slot short rejected before tool start and created no file");return 0;
+}
+
 int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--snapshot"))return snapshot_edit();
+ if(argc==2&&!strcmp(argv[1],"--capacity"))return capacity_write();
  int execute_batch=argc==2&&!strcmp(argv[1],"--execute");
  assert(getenv("MIMO_API_KEY")&&*getenv("MIMO_API_KEY"));
  assert(!curl_global_init(CURL_GLOBAL_DEFAULT));

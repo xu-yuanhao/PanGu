@@ -967,6 +967,8 @@ pg_agent_suspend:
     jmp .Ltool_append
 .Lstart:
     PROFILE_GUARD rbx,.Lerror_profile
+    cmp qword ptr [rbx+PG_A_COUNT],64
+    jae .Lerror_capacity
     cmp dword ptr [rbx+PG_A_TURNS],16
     jae .Lerror_turns
     inc dword ptr [rbx+PG_A_TURNS]
@@ -985,8 +987,6 @@ pg_agent_suspend:
     call [rbx+PG_A_MODEL+8]
     test eax,eax
     jnz .Lerror_start
-    cmp qword ptr [rbx+PG_A_COUNT],64
-    jae .Lerror_capacity
     lea rdi,[rbx+PG_A_DRAFT]
     xor eax,eax
     mov ecx,PG_MSG_BYTES/8
@@ -1066,7 +1066,7 @@ pg_agent_suspend:
     mov [rsp+72],rax
     mov rdx,[rsp+8]
     mov [rsp+64],rdx
-    lea rax,[rax+rax+1]
+    lea rax,[rax+rax+2]
     add rax,[rbx+PG_A_COUNT]
     cmp rax,64
     ja .Lerror_result_capacity
@@ -1139,7 +1139,7 @@ pg_agent_suspend:
     call .Lidentifier
     test eax,eax
     jz .Lerror_event
-    cmp qword ptr [rbx+PG_A_COUNT],61
+    cmp qword ptr [rbx+PG_A_COUNT],60
     ja .Lerror_result_capacity
     cmp qword ptr [rsp+16],4096
     jae .Lerror_arguments
@@ -1585,6 +1585,6 @@ pg_agent_suspend:
 .Lerror_model_text: .asciz "model reported an error"
 .Lerror_text_text: .asciz "assistant text limit exceeded"
 .Lerror_event_text: .asciz "invalid model event or tool identifier"
-.Lerror_result_capacity_text: .asciz "session has no room for tool result"
+.Lerror_result_capacity_text: .asciz "session has no room for tool results and follow-up reply"
 .Lerror_arguments_text: .asciz "tool arguments or session capacity exceeded"
 .section .note.GNU-stack,"",@progbits

@@ -847,3 +847,16 @@ write与依赖它的edit专项O0 UBSan、O2 ASan/UBSan退出0，编辑的17个�
 实际SNAPSHOT_EXIT=0：源删除后恢复成功，system记录恰好一次且等于原文、原有日志前缀不变、只提交一条非空完整assistant、终态成功；之后缺失源文件的空闲启动退出2，journal逐字节不变。凭据不入日志。离线ctrl-d/SIGTERM/resize/termios及持久idle检查同时通过。没有改变产品实现、ABI、预算、依赖或检查器。该证据只证明本地显式来源的持久生命周期，不证明模型听从提示、任意崩溃窗口、完整Durable兼容或生产放行。
 
 共享树的TUI输入改造仍未交接；本批用git archive c314834加本批PTY脚本组成临时候选树构建运行，未编辑或提交并行文件，也未把旧TUI组合的结果转写为新输入体验通过。按TODO拆开已验证的快照恢复与仍失败的模型严格遵循。G00和diff检查通过。同一Agent自审测试入口/进度变更，非独立审核。固定包SHA256（仅PTY脚本与主TODO，不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`227ff6b38911c2d915fce7a1642439b3a3893a30547835de7a71706e5e2b1f67`。
+
+
+## 2026-10-26：工具副作用前预留最终回复容量
+
+读取固定Pi d5b3de22 Durable generation.ts::classify/startToolRound及其finishToolRound调用，harness-tools.test.ts的顺序工具trace与续答用例：采用assistant/tool意图提交后执行、结果后继续生成的顺序。上游持久条目没有原生64消息数组限制，本次容量算法属于盘古有界实现差异，不伪称移植了上游同名检查。现有原生检查只预留assistant+N调用+N结果，恰好占满64时仍执行工具，再启动一个无法接纳回复的模型请求。新增测试先在旧代码实际失败于模型start收到已满Session，未调整预算或断言来适配旧行为。
+
+agent.S原地将单调用与批量准入统一为需要1+2N+1剩余槽，最后1用于后续assistant。在当前模型响应内、意图提交和工具授权/执行前拒绝不足容量，不留下新assistant/call片段，也不执行任何工具。另将已满Session检查提前到模型start及turn检查点提交之前，避免启动注定无法保存输出的请求。仍允许无工具回复使用最后一个槽；不增加自动裁剪、摘要、隐藏丢历史、旧实现或新框架。ABI、64消息/4096字节和8调用上限不变。
+
+实际检查：现有test_agent.c覆盖N=1～8每种恰好可容纳/少一槽，足够时全部结果与最终回复恰好占满64，不足时保留此前历史与已提交用户、零工具执行且不发第二个模型请求。专项O2 ASan/UBSan退出0；完整tools/runtime/build_test.py的O0/O2 UBSan、ABI/保护页、现有存储恢复/批量取消检查退出0。未修改任何并行TUI文件。
+
+扩展现有live_mimo_batch.c与build_test.py的可选--live-capacity入口，实际MiMo/Agent/registry/write验证两个边界：59条既有消息时输入+assistant+call+result+reply刚好64，实际文件内容为CAPACITY_OK；60条既有消息时真实模型提出写调用，但Runtime以明确容量错误终结，工具start/finish均0、目标文件不存在、消息仅增加用户一条。LIVE_CAPACITY_EXIT=0。测试只使用临时工作区，凭据仅子进程环境，不承诺未来更大上下文或完整Pi兼容。
+
+同一Agent自审构建测试入口和进度更新，非独立审核；没有新增文件/依赖、门禁变更或配额放宽。G00、assembly-first及diff检查通过，生产准入未改变。固定包SHA256（仅本批实现/测试/入口/主TODO，不含本记录及并行TUI；排序[path,文件SHA256]紧凑UTF-8 JSON）：`31dfd6ae111ab8922d62fc4f5745bbb04ff952c25a2e60d895640706a88be349`。

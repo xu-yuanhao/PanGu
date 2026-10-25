@@ -19,7 +19,7 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
-        if any(flag in sys.argv for flag in ('--live-batch', '--live-batch-execute', '--live-snapshot-edit')):
+        if any(flag in sys.argv for flag in ('--live-batch', '--live-batch-execute', '--live-snapshot-edit', '--live-capacity')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; environment only')
             output = str(Path(directory) / 'live-model-batch')
@@ -27,7 +27,7 @@ def main():
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_tool'),
                             str(ROOT / 'tests/runtime/live_mimo_batch.c'), *model_flags, '-o', output], check=True)
-            subprocess.run([output, *(['--snapshot'] if '--live-snapshot-edit' in sys.argv else ['--execute'] if '--live-batch-execute' in sys.argv else [])], check=True, timeout=150)
+            subprocess.run([output, *(['--capacity'] if '--live-capacity' in sys.argv else ['--snapshot'] if '--live-snapshot-edit' in sys.argv else ['--execute'] if '--live-batch-execute' in sys.argv else [])], check=True, timeout=150)
             return 0
         if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal', '--live-resume', '--live-submission')):
             if not os.environ.get('MIMO_API_KEY'):

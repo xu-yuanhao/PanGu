@@ -63,7 +63,20 @@ static void batch_resume_cases(void){
 static void batch_invalid(void){
  for(unsigned bad=0;bad<5;++bad){batch_fixture f={.n=8};for(unsigned j=0;j<8;++j){snprintf(f.ids[j],16,"id-%u",j);batch_calls[j]=(pg_model_call){s("{}"),s(f.ids[j]),s("echo")};}if(bad==0)batch_calls[7].arguments=(pg_slice){0,1};if(bad==1)batch_calls[7].call_id=batch_calls[0].call_id;if(bad==2)batch_calls[7].tool_name=s("");if(bad==3)f.n=9;if(bad==4)f.n=1;assert(!pg_agent_init(&agent,(pg_model){&f,batch_start,batch_next,batch_cancel,batch_close},(pg_tools){&f,batch_allow,batch_execute,0,0,0,0}));pg_client c=pg_agent_client(&agent);assert(!c.submit(c.context,s("invalid batch")));int count;assert(drain(c,&count)==PG_ERROR);assert(!f.executed&&agent.session.count==1);}
 }
-int main(void){batch_cases();batch_resume_cases();batch_invalid();batch_async_cases();fixture f={0};pg_client c=setup(&f);int n;pg_event e;
+static int capacity_start(void *v,const pg_session *history){batch_fixture *f=v;assert(history->count<PG_MESSAGE_LIMIT);++f->turn;return 0;}
+static int capacity_next(void *v,pg_model_event *event){batch_fixture *f=v;if(f->turn>1){event->kind=PG_MODEL_DONE;return 0;}if(f->n==1){event->kind=PG_MODEL_CALL;event->text=batch_calls[0].arguments;event->call_id=batch_calls[0].call_id;event->tool_name=batch_calls[0].tool_name;}else{event->kind=PG_MODEL_BATCH;event->batch=(pg_model_batch){batch_calls,f->n};}return 0;}
+static void tool_round_capacity(void){
+ for(unsigned n=1;n<=8;++n)for(unsigned full=0;full<2;++full){
+  batch_fixture f={.n=n};for(unsigned i=0;i<n;++i){snprintf(f.ids[i],16,"cap-%u",i);batch_calls[i]=(pg_model_call){s("{}"),s(f.ids[i]),s("echo")};}
+  assert(!pg_agent_init(&agent,(pg_model){&f,capacity_start,capacity_next,batch_cancel,batch_close},(pg_tools){&f,batch_allow,batch_execute,0,0,0,0}));
+  unsigned prior=PG_MESSAGE_LIMIT-(2*n+3)+full;for(unsigned i=0;i<prior;++i){agent.session.messages[i].role=PG_USER;agent.session.messages[i].size=1;memcpy(agent.session.messages[i].text,"x",2);}agent.session.count=prior;
+  pg_client c=pg_agent_client(&agent);assert(!c.submit(c.context,s("capacity")));int count;assert(drain(c,&count)==(full?PG_ERROR:PG_SUCCESS));
+  assert(f.executed==(full?0:n)&&f.turn==(full?1:2)&&f.closed==f.turn);assert(agent.session.count==(full?prior+1:PG_MESSAGE_LIMIT));
+ }
+ puts("PASS: 1..8 tool calls reserve all results and the following assistant before any side effect");
+}
+
+int main(void){tool_round_capacity();batch_cases();batch_resume_cases();batch_invalid();batch_async_cases();fixture f={0};pg_client c=setup(&f);int n;pg_event e;
  assert(!c.submit(c.context,s("hello")));assert(c.submit(c.context,s("busy")));
  assert(drain(c,&n)==PG_SUCCESS);assert(n==6 && f.turn==2 && f.executed==1 && f.closed==2);assert(agent.session.count==5);
  assert(!pg_agent_set_system(&agent,s("system")));assert(!pg_agent_reset_session(&agent));assert(agent.session.count==0 && agent.session.system_size==6);
