@@ -220,7 +220,7 @@ static void test_sret_aggregates(void)
 	rd = pg_read_tool_definition(&reader);
 	assert(strcmp(rd.name, "read") == 0 && rd.context == &reader);
 	assert(strcmp(rd.schema,
-	       "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"additionalProperties\":false}") == 0);
+	       "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}") == 0);
 	assert(rd.validate && rd.authorize && rd.execute);
 	/* ABI 探针 + 哨兵 */
 	assert(abi_probe3((abi_fn3)pg_read_tool_open, (unsigned long)&reader,
@@ -268,6 +268,7 @@ static void test_registry_boundaries(void)
 	/* 16 项成功、17 项失败 */
 	for (i = 2; i < PG_TOOL_LIMIT; i++) {
 		char *n = malloc(8);
+		assert(n);
 		snprintf(n, 8, "t%zu", i);
 		defs[i].name = n;
 	}
@@ -344,6 +345,7 @@ static void test_registry_boundaries(void)
 	assert(pg_tool_registry_init(&keep, NULL, 1) != 0);
 	assert(pg_tool_registry_init(&keep, NULL, 0) == 0);
 	assert(keep.count == 0);
+	for (i = 2; i < PG_TOOL_LIMIT; ++i) free((void *)defs[i].name);
 	puts("ok: registry limits, transactional failure, name/description/schema boundaries");
 }
 

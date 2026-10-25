@@ -766,3 +766,25 @@ ASan首次查出旧test_start_setup在第二次start后未close就让下个用�
 新增现有PTY脚本的--live-batch入口，实际MiMo/TUI发出同响应两个read并执行；检查真实v5帧确为assistant+两个calls、结果的两个文件标记/ID，重开显示两项call/result名称与ID、无run_started，日志字节不变。实际运行退出0，且凭据未进入journal。专项进程恢复O2 ASan/UBSan退出0；完整核心O0/O2 UBSan退出0；离线实际PTY退出/信号/resize/termios/持久idle同时通过。本批未修改产品实现，不把这些测试覆盖外推为所有崩溃窗口或生产准入完成。
 
 整理近期队列：已实现的有界Session/Storage/Submission接口不再挂在未完成的通用Task框架下；下一项是现有read的大文件分页缺口，参考Durable offset/limit，在当前消息预算内实现。无需新增框架或门禁。同一Agent自审该测试入口与进度说明，非独立审核。G00与diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`a9f2ca5c8d55ca9ed6155ea66577b7aaa29bb5f39eb25d6ee391655f9784af6f`。
+
+
+## 2026-10-26：新的并行输入体验任务
+
+按用户要求编写docs/并行开发任务提示词-TUI输入体验.md，派发TUI行内编辑、多行草稿和安全bracketed paste；明确既有TUI文件白名单、Runtime/read/共享登记只读，默认不新增文件，不提交他人改动。主Agent继续read分页，避免交叉修改。此处只完成任务定义，未宣称对应功能已实现，也未自动启动其他Agent。
+
+同一Agent自审新增文档登记与近期分工更新，无检查器/预算变更。G00和diff检查通过；原有read候选实现不包含在本次派发包摘要内。固定包SHA256（仅派发文档、主TODO、bootstrap-policy；排序[path,文件SHA256]紧凑UTF-8 JSON）：`6ceed0d9aa2696b9e115d25111784ff9e418435644138e93c184510fde884899`。
+
+
+## 2026-10-26：read有界分页与完整原文边界
+
+读取固定Pi d5b3de22 Durable tools/read.ts::createReadTool/readText及其scanLines/readHead调用链、tools-read-differential.test.ts的完整读取参考与分页样例。采用1-based行选择、完整行截断与下一offset提示；native只接受1～2147483647正整数offset/limit，不移植小数/负索引、图像、replacement解码、全文件行数统计或全部路径语义。当前页保留严格UTF-8，未选页不宣称验证，既有BOM字节行为保持不变。Pi/Harness当前本地与已fetch上游仍d5b3de22/22ddee3，无引用源码变更。
+
+read_tool.S原地实现4096字节块扫描和逐行选择，沿用最多4095字节输出，默认至多2000行；增加每次1 MiB扫描上限，不为大offset无界扫描。超过输出时退到完整行，按实际提示长度留空间，给出续读offset；单行放不下、扫描超限、offset越过EOF、NUL/无效UTF-8页及不合法参数明确失败。仍拒绝绝对路径、dot分量、符号链接与非普通文件；同步普通文件IO不构成异步磁盘或随时取消保证。自身栈4368字节，参数解析4144、validate4128，入口逐页触碰，未新增堆缓冲/依赖。
+
+发现并处理内部消费者边界：edit通过read取得全文，若将分页当成功完整原文，会把页尾提示写回并丢掉后段。新增终态PG_TOOL_PARTIAL=4，旧枚举值、函数表和结构尺寸不变。registry保留该状态；Agent将其作为成功的模型可见结果；需要完整原文的edit只接受OK，遇PARTIAL直接拒绝、不写。分页/范围选取标记来自状态而非匹配提示字符串，含相同文字的完整普通文件仍可编辑。未复制一套旧read或引入另一套文件框架。旧持久配置通过原有tool schema身份检测变化，未绕过活动配置核对。
+
+实际验证：完整核心O0/O2 UBSan退出0；read与tools ABI/边界O2 ASan/UBSan退出0。覆盖中文/emoji跨页重组原文、4096块边界、显式limit、2000空行页、EOF尾空行、大小/类型/unknown参数、decoded-NUL键与转义反斜线、1 MiB扫描拒绝及多种容量的保护页。Agent PARTIAL续答成功，edit面对大文件分页零写入且原字节不变；完整文件含提示文本仍正常编辑。早期ASan查出旧registry测试14个名称分配共112字节未释放，已修夹具并保留泄漏检测；新页尾夹具最初把哨兵放在映射前一字节，已改成两页可写加末页guard，不改产品边界迁就测试。
+
+真实模型：现有PTY新增--live-read-pages，当前源码执行退出0，MiMo从第一页按offset续读到未在提示词透露的末段随机标记，只用read、无文件变动；离线退出/信号/resize/termios/持久idle同时通过。本阶段原有--live-workflow也实际通过read/edit/write/bash构建运行汇编。凭据仅子进程环境，不入仓库。
+
+同一Agent按授权自审PARTIAL契约、模块范围/来源和测试语义更新，不是独立审核。没有改检查器、提高既有消息配额或伪称生产准入；新扫描上限与同步IO限制已列出。新TUI派发仅定义任务，不含其未实现能力。G00、assembly-first与diff检查通过，生产准入保持原状态。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`bf23fcf41b168f48214f1002b30ea56f967b27987ae8891c48872c2bf1a06aa0`。

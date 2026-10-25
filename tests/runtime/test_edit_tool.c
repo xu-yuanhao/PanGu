@@ -81,6 +81,8 @@ int main(int argc,char **argv){
   "{\"path\":\"file.txt\",\"edits\":[],\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"
  };
  for(size_t i=0;i<sizeof(shapes)/sizeof(*shapes);++i){put("alpha\nbeta\n");unsigned r=reads,w=writes,c=checks;assert(definition.validate(definition.context,s(shapes[i])));assert(!invoke(shapes[i]));assert(reads==r+1&&writes==w+1&&checks==c+2);expect("ALPHA\nbeta\n");}
+ {char large[10000];size_t used=0;for(unsigned i=0;i<500;++i){int n=snprintf(large+used,sizeof(large)-used,"alpha-%u payload\n",i);assert(n>0);used+=(size_t)n;}put(large);unsigned w=writes;assert(invoke(shapes[0])&&writes==w);int fd=open("file.txt",O_RDONLY);assert(fd>=0);char bytes[10000];ssize_t n=read(fd,bytes,sizeof(bytes));assert(n==(ssize_t)used&&!memcmp(bytes,large,used)&&!close(fd));}
+ put("alpha\n\n[read: more lines; use offset=2 to continue]\n");assert(!invoke(shapes[0]));expect("ALPHA\n\n[read: more lines; use offset=2 to continue]\n");
  put("alpha\nbeta\ngamma\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"gamma\",\"newText\":\"GAMMA\"}],\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("ALPHA\nbeta\nGAMMA\n");
  put("\xef\xbb\xbfone\r\nsay ‘hello’ — world  \r\nkeep  \r\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"say 'hello' - world\",\"newText\":\"changed\\nnext\"}]}"));expect("\xef\xbb\xbfone\r\nchanged\r\nnext\r\nkeep  \r\n");
  const char *bad[]={"", "{}", "[]", "null", "{\"path\":\"file.txt\",\"edits\":[]}",

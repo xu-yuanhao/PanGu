@@ -458,6 +458,32 @@ def batch_live(binary, root):
     assert path.read_bytes() == saved
     print('PASS: actual MiMo/TUI two-call group, v5 atomic intent, ordered file results and settled reopen history without model restart', flush=True)
 
+def read_pages_live(binary, root):
+    storage = root / 'read-pages-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    marker = 'PANGU_READ_PAGES_' + os.urandom(6).hex()
+    content = ''.join(f'row-{i:03d}: abcdefghijklmnopqrstuvwxyz0123456789 repeated source content\n' for i in range(1, 121))
+    content += 'END_OF_PAGED_MARKER=' + marker + '\n'
+    (root / 'paged.txt').write_text(content)
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.send(b'Read paged.txt using read, starting from the beginning. Follow the returned offset continuation until you find END_OF_PAGED_MARKER, then report its exact full value. Use only read, never bash/write/edit.\r')
+        terminal.until(b'[run] finished: success', 180)
+        assert marker.encode() in re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', terminal.output)
+        assert terminal.output.count(b'finished ok:') >= 2 and b'finished error:' not in terminal.output
+        assert b'[tool] bash' not in terminal.output and b'[tool] edit' not in terminal.output and b'[tool] write' not in terminal.output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    data = (storage / 'session.pgj').read_bytes()
+    assert env['MIMO_API_KEY'].encode() not in data and (root / 'paged.txt').read_text() == content
+    assert b'[read: more lines; use offset=' in data and marker.encode() in data
+    assert checkpoints(storage / 'session.pgj')[-1][1] == 3
+    print('PASS: actual MiMo/TUI followed read pagination to an undisclosed late-file marker, without shell or file mutation', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -468,6 +494,7 @@ def main():
     parser.add_argument('--live-bash-recovery', action='store_true')
     parser.add_argument('--live-workflow', action='store_true')
     parser.add_argument('--live-batch', action='store_true')
+    parser.add_argument('--live-read-pages', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -506,6 +533,9 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_read_pages:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-read-pages'
+            read_pages_live(binary, root)
         if args.live_batch:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-batch'
             batch_live(binary, root)

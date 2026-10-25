@@ -1,10 +1,10 @@
 /* read_tool.S — 工作目录只读 read 工具。
  *
  * 契约见 read_tool.h：调用方信任并持有根目录 fd；仅相对路径；绝对路径、空分量、
- * "."/".."、嵌入 NUL、任意层符号链接、非普通文件、超限与二进制内容全部拒绝。
+ * "."/".."、嵌入 NUL、任意层符号链接、非普通文件、过长单行与二进制页内容拒绝。
  * 路径按分量逐级 openat（中间目录 O_DIRECTORY、全程 O_NOFOLLOW|O_CLOEXEC|
  * O_NONBLOCK），不拼接字符串、不 realpath；错误路径逐 fd 关闭。JSON 语义：
- * 恰好一个 "path" 字符串成员。fstat/struct stat 经公开 libc 与布局断言常量。
+ * path与可选正整数offset/limit。fstat/struct stat 经公开 libc 与布局断言常量。
  */
 #include "read_tool_layout.h"
 #include "tools_layout.h"
@@ -12,9 +12,14 @@
 
 .section .rodata
 .Lstr_path:      .asciz "path"
+.Lstr_offset: .asciz "offset"
+.Lstr_line_limit: .asciz "limit"
+.Lread_more: .asciz "\n\n[read: more lines; use offset=%llu to continue]"
+.Lmsg_offset: .asciz "read offset is beyond end of file"
+.Lmsg_scan: .asciz "read scan limit exceeded (1 MiB per call)"
 .Lread_name:     .asciz "read"
-.Lread_desc:     .asciz "Read one small regular text file relative to the configured workspace. Absolute paths, symlinks, dot segments and oversized files are refused."
-.Lread_schema:   .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"additionalProperties\":false}"
+.Lread_desc: .asciz "Read a regular UTF-8 text file relative to the workspace. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Absolute paths, symlinks, dot segments and oversized individual lines are refused."
+.Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
 .Lmsg_refused:   .asciz "read refused or unavailable"
@@ -26,8 +31,8 @@
 
 /* ---- int li_parse_path(args.data, args.size, char path[PG_TEXT_LIMIT])
  * 返回 1=非法。文本经 NUL 终止副本交给 json_tokener_parse；
- * 恰好一个成员 "path"，字符串 1..4095 字节、非 '/' 开头、无嵌入 NUL，
- * 逐分量拒绝空段与 "."/".."。栈帧：[rsp]=text[4096] [rsp+4096]=json_object* p。 */
+ * path与可选offset/limit，字符串 1..4095 字节、非 '/' 开头、无嵌入 NUL，
+ * 逐分量拒绝空段与 "."/".."。rcx指向offset/limit/explicit三槽；栈上保留有界JSON副本及解析状态。 */
 .type li_parse_path,@function
 li_parse_path:
  push rbx
@@ -35,7 +40,14 @@ li_parse_path:
  push r13
  push r14
  push r15
- sub rsp, 4112
+ sub rsp,4096
+ test byte ptr [rsp],0
+ sub rsp,48
+ mov [rsp+4112],rcx
+ mov qword ptr [rcx],1
+ mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
+ mov qword ptr [rcx+16],0
+ mov qword ptr [rsp+4120],1
  mov rbx, rdx /* path 目标 */
  mov r13, rdi /* args.data */
  mov r15, rsi /* args.size */
@@ -51,6 +63,25 @@ li_parse_path:
  call memchr@PLT
  test rax, rax
  jnz .Lpp_bad
+ xor ecx,ecx
+.Lpp_escapes:
+ cmp rcx,r15
+ jae .Lpp_copy_json
+ cmp byte ptr [r13+rcx],92
+ jne .Lpp_escape_next
+ lea rax,[rcx+5]
+ cmp rax,r15
+ jae .Lpp_escape_skip
+ cmp byte ptr [r13+rcx+1],'u'
+ jne .Lpp_escape_skip
+ cmp dword ptr [r13+rcx+2],0x30303030
+ je .Lpp_bad
+.Lpp_escape_skip:
+ inc rcx
+.Lpp_escape_next:
+ inc rcx
+ jmp .Lpp_escapes
+.Lpp_copy_json:
  mov rdi, rsp
  mov rsi, r13
  mov rdx, r15
@@ -68,8 +99,11 @@ li_parse_path:
  jz .Lpp_bad_put
  mov rdi, r14
  call json_object_object_length@PLT
- cmp eax, 1
- jne .Lpp_bad_put
+ cmp eax,1
+ jb .Lpp_bad_put
+ cmp eax,3
+ ja .Lpp_bad_put
+ mov [rsp+4128],rax
  mov qword ptr [rsp + 4096], 0
  mov rdi, r14
  lea rsi, [rip + .Lstr_path]
@@ -102,7 +136,7 @@ li_parse_path:
  jnz .Lpp_bad_put
  lea rdi, [rbx]
  mov rsi, [rsp + 4104]
- lea rdx, [r12 + 1] /* 连同终止符一起复制（与被替换 C 一致） */
+ lea rdx, [r12 + 1] /* Include the path terminator. */
  call memcpy@PLT
  /* 分量扫描：空段与 "."/".." 拒绝；i==n 处理末段 */
  xor r8d, r8d /* start */
@@ -145,11 +179,51 @@ li_parse_path:
  mov eax, 1
  jmp .Lpp_ret
 .Lpp_ok:
+ xor r13d,r13d
+.Lpp_option:
+ lea rsi,[rip+.Lstr_offset]
+ test r13,r13
+ jz .Lpp_option_get
+ lea rsi,[rip+.Lstr_line_limit]
+.Lpp_option_get:
+ mov rdi,r14
+ lea rdx,[rsp+4096]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lpp_option_next
+ inc qword ptr [rsp+4120]
+ mov rdi,[rsp+4096]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lpp_bad_put
+ mov rdi,[rsp+4096]
+ call json_object_get_int64@PLT
+ cmp rax,1
+ jl .Lpp_bad_put
+ cmp rax,2147483647
+ ja .Lpp_bad_put
+ mov rcx,[rsp+4112]
+ mov [rcx+r13*8],rax
+ test r13,r13
+ jz .Lpp_option_next
+ mov qword ptr [rcx+16],1
+ cmp rax,PG_RTL_PAGE_LINES
+ jbe .Lpp_option_next
+ mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
+ mov qword ptr [rcx+16],0
+.Lpp_option_next:
+ inc r13
+ cmp r13,2
+ jb .Lpp_option
+ mov rax,[rsp+4120]
+ cmp rax,[rsp+4128]
+ jne .Lpp_bad_put
  mov rdi, r14
  call json_object_put@PLT
  xor eax, eax
 .Lpp_ret:
- add rsp, 4112
+ add rsp, 4144
  pop r15
  pop r14
  pop r13
@@ -164,16 +238,19 @@ li_validate:
  push rbx
  push r12
  push rax
- sub rsp, 4112
+ sub rsp,4096
+ test byte ptr [rsp],0
+ sub rsp,32
  mov r8, rdx
  mov rdx, rsp
  mov rdi, rsi
  mov rsi, r8
+ lea rcx,[rsp+4096]
  call li_parse_path
  test eax, eax
  setz al
  movzx eax, al
- add rsp, 4112
+ add rsp, 4128
  pop rcx
  pop r12
  pop rbx
@@ -213,6 +290,7 @@ li_fail:
  mov rdx, r15
  call memcpy@PLT
  mov qword ptr [r13], r15
+ mov byte ptr [rbx+r15],0
 .Lrf_done:
  mov eax, 1
  pop r15
@@ -318,8 +396,9 @@ li_utf8:
 .size li_utf8, .-li_utf8
 
 /* ---- int li_execute_read(ctx, args.data, args.size, out, capacity, size*)
- * 栈帧（sub 4272）：[rsp]=path[4096] [4096]=stat[144] [4240]=extra
- * [4248]=p [4256]=file fd [4264]=used。寄存器：rbx=ctx→part、r12=out、
+ * 栈帧4368：[0]=path/chunk[4096]，[4096]=stat，[4248]=path cursor，
+ * [4256]=fd，[4264]=output bytes，[4272..4288]=options，
+ * [4296..4336]=line/scan/chunk cursors。寄存器：rbx=ctx→part、r12=out、
  * r13=capacity、r14=size*、r15=dir fd。 ---- */
 .type li_execute_read,@function
 li_execute_read:
@@ -328,10 +407,16 @@ li_execute_read:
  push r13
  push r14
  push r15
- sub rsp, 4272
+ sub rsp,4096
+ test byte ptr [rsp],0
+ sub rsp,272
  mov rbx, rdi
  mov r12, rcx
  mov r13, r8
+ cmp r13,PG_RTL_OUTPUT_MAX
+ jbe .Lrd_capacity
+ mov r13d,PG_RTL_OUTPUT_MAX
+.Lrd_capacity:
  mov r14, r9
  cmp r13, 2
  jb .Lrd_invalid
@@ -339,6 +424,7 @@ li_execute_read:
  mov rdx, rsp
  mov rdi, rsi
  mov rsi, r8
+ lea rcx,[rsp+4272]
  call li_parse_path
  test eax, eax
  jnz .Lrd_invalid
@@ -370,7 +456,7 @@ li_execute_read:
 .Lrd_last:
  mov byte ptr [rax], 0
  mov byte ptr [rsp + 4241], 1
- mov edx, 0xA0800 /* 末端文件不带 O_DIRECTORY */
+ mov edx, 0xA0800 /* Final component is not opened as a directory. */
 .Lrd_openat:
  mov rdi, r15
  mov rsi, rbx
@@ -400,46 +486,153 @@ li_execute_read:
  and eax, PG_RTL_S_IFMT
  cmp eax, PG_RTL_S_IFREG
  jne .Lrd_refused
- mov qword ptr [rsp + 4264], 0
-.Lrd_read:
- mov rax, [rsp + 4264]
- lea rcx, [r13 - 1]
- cmp rax, rcx
- jae .Lrd_read_done
- mov rdi, [rsp + 4256]
- lea rsi, [r12 + rax]
- mov rdx, rcx
- sub rdx, rax
- call read@PLT
- test rax, rax
- js .Lrd_refused
- jz .Lrd_read_done
- add qword ptr [rsp + 4264], rax
- jmp .Lrd_read
-.Lrd_read_done:
- mov rdi, [rsp + 4256]
- lea rsi, [rsp + 4240]
- mov edx, 1
- call read@PLT
- test rax, rax
- jnz .Lrd_limit
- mov rdi, [rsp + 4256]
+ mov qword ptr [rsp+4344],0 /* final complete/partial status */
+ cmp qword ptr [rsp+4272],1
+ je .Lrd_initial_status
+ mov qword ptr [rsp+4344],4
+.Lrd_initial_status:
+ mov qword ptr [rsp+4264],0 /* output bytes */
+ mov qword ptr [rsp+4296],1 /* current source line */
+ mov qword ptr [rsp+4304],0 /* complete output lines */
+ mov qword ptr [rsp+4312],0 /* last full-line output boundary */
+ mov qword ptr [rsp+4320],0 /* bytes scanned */
+ mov qword ptr [rsp+4328],0 /* chunk length */
+ mov qword ptr [rsp+4336],0 /* chunk cursor */
+.Lrd_next_byte:
+ mov rax,[rsp+4336]
+ cmp rax,[rsp+4328]
+ jb .Lrd_have_byte
+ call .Lrd_chunk
+ test rax,rax
+ js .Lrd_chunk_error
+ jz .Lrd_eof
+ xor eax,eax
+.Lrd_have_byte:
+ movzx ecx,byte ptr [rsp+rax]
+ inc qword ptr [rsp+4336]
+ mov rdx,[rsp+4296]
+ cmp rdx,[rsp+4272]
+ jb .Lrd_skip_byte
+ test cl,cl
+ jz .Lrd_binary_close
+ mov rax,[rsp+4264]
+ lea rdx,[r13-1]
+ cmp rax,rdx
+ jae .Lrd_page_full
+ mov [r12+rax],cl
+ inc qword ptr [rsp+4264]
+ cmp cl,10
+ jne .Lrd_next_byte
+ inc qword ptr [rsp+4296]
+ inc qword ptr [rsp+4304]
+ mov rax,[rsp+4264]
+ mov [rsp+4312],rax
+ mov rax,[rsp+4304]
+ cmp rax,[rsp+4280]
+ jb .Lrd_next_byte
+ mov rax,[rsp+4336]
+ cmp rax,[rsp+4328]
+ jb .Lrd_more
+ call .Lrd_chunk
+ test rax,rax
+ js .Lrd_chunk_error
+ jnz .Lrd_more
+ cmp qword ptr [rsp+4288],0
+ je .Lrd_success
+ dec qword ptr [rsp+4264]
+ mov qword ptr [rsp+4344],4
+ jmp .Lrd_success
+.Lrd_skip_byte:
+ cmp cl,10
+ jne .Lrd_next_byte
+ inc qword ptr [rsp+4296]
+ jmp .Lrd_next_byte
+.Lrd_eof:
+ mov rax,[rsp+4296]
+ cmp rax,[rsp+4272]
+ jb .Lrd_offset_close
+ jmp .Lrd_success
+.Lrd_page_full:
+ mov rax,[rsp+4312]
+ test rax,rax
+ jz .Lrd_limit
+ mov [rsp+4264],rax
+.Lrd_more:
+ mov qword ptr [rsp+4344],4
+.Lrd_reserve:
+ cmp qword ptr [rsp+4304],0
+ je .Lrd_limit
+ lea rdi,[rsp+4096]
+ mov esi,96
+ lea rdx,[rip+.Lread_more]
+ mov rcx,[rsp+4272]
+ add rcx,[rsp+4304]
+ xor eax,eax
+ call snprintf@PLT
+ test eax,eax
+ js .Lrd_limit
+ cmp eax,96
+ jae .Lrd_limit
+ cdqe
+ mov [rsp+4352],rax
+ add rax,[rsp+4264]
+ dec rax
+ cmp rax,r13
+ jb .Lrd_hint
+ dec qword ptr [rsp+4304]
+ mov rax,[rsp+4264]
+ dec rax
+.Lrd_back_line:
+ test rax,rax
+ jz .Lrd_limit
+ dec rax
+ cmp byte ptr [r12+rax],10
+ jne .Lrd_back_line
+ inc rax
+ mov [rsp+4264],rax
+ jmp .Lrd_reserve
+.Lrd_hint:
+ dec qword ptr [rsp+4264]
+ mov rax,[rsp+4264]
+ lea rdi,[r12+rax]
+ lea rsi,[rsp+4096]
+ mov rdx,[rsp+4352]
+ call memcpy@PLT
+ mov rax,[rsp+4352]
+ add [rsp+4264],rax
+.Lrd_success:
+ mov rdi,[rsp+4256]
  call close@PLT
- mov qword ptr [rsp + 4256], -1
- mov rdi, r12
- mov rsi, [rsp + 4264]
+ mov qword ptr [rsp+4256],-1
+ mov rdi,r12
+ mov rsi,[rsp+4264]
  call li_utf8
- test eax, eax
+ test eax,eax
  jz .Lrd_utf8_bad
- mov rdi, r12
- xor esi, esi
- mov rdx, [rsp + 4264]
- call memchr@PLT
- test rax, rax
- jnz .Lrd_binary_bad
- mov rax, [rsp + 4264]
- mov [r14], rax
- xor eax, eax
+ mov rax,[rsp+4264]
+ mov byte ptr [r12+rax],0
+ mov [r14],rax
+ mov eax,[rsp+4344]
+ jmp .Lrd_out
+.Lrd_binary_close:
+ lea rbx,[rip+.Lmsg_binary]
+ jmp .Lrd_close_message
+.Lrd_offset_close:
+ lea rbx,[rip+.Lmsg_offset]
+ jmp .Lrd_close_message
+.Lrd_chunk_error:
+ cmp rax,-2
+ jne .Lrd_refused
+ lea rbx,[rip+.Lmsg_scan]
+.Lrd_close_message:
+ mov rdi,[rsp+4256]
+ call close@PLT
+ mov qword ptr [rsp+4256],-1
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ mov rcx,rbx
+ call li_fail
  jmp .Lrd_out
 .Lrd_limit:
  mov rdi, [rsp + 4256]
@@ -456,13 +649,6 @@ li_execute_read:
  mov rsi, r13
  mov rdx, r14
  lea rcx, [rip + .Lmsg_utf8]
- call li_fail
- jmp .Lrd_out
-.Lrd_binary_bad:
- mov rdi, r12
- mov rsi, r13
- mov rdx, r14
- lea rcx, [rip + .Lmsg_binary]
  call li_fail
  jmp .Lrd_out
 .Lrd_invalid:
@@ -496,11 +682,36 @@ li_execute_read:
  lea rcx, [rip + .Lmsg_refused]
  call li_fail
 .Lrd_out:
- add rsp, 4272
+ add rsp, 4368
  pop r15
  pop r14
  pop r13
  pop r12
+ pop rbx
+ ret
+
+.Lrd_chunk:
+ push rbx
+ mov rbx,rsp
+ mov rdx,PG_RTL_SCAN_LIMIT
+ sub rdx,[rbx+16+4320]
+ jz .Lrd_scan_exhausted
+ cmp rdx,4096
+ jbe .Lrd_chunk_size
+ mov edx,4096
+.Lrd_chunk_size:
+ mov rdi,[rbx+16+4256]
+ lea rsi,[rbx+16]
+ call read@PLT
+ test rax,rax
+ js .Lrd_chunk_return
+ add [rbx+16+4320],rax
+ mov [rbx+16+4328],rax
+ mov qword ptr [rbx+16+4336],0
+ jmp .Lrd_chunk_return
+.Lrd_scan_exhausted:
+ mov rax,-2
+.Lrd_chunk_return:
  pop rbx
  ret
 .size li_execute_read, .-li_execute_read

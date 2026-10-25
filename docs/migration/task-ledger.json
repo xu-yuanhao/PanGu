@@ -1725,7 +1725,7 @@
         "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "immutable registry, validation/authorization before execution, injected async start/next/cancel/close with one active owner retained until release and transient progress; bounded sequential batch scheduling; no parallel tool execution",
+      "local_subset_scope": "immutable registry, validation/authorization before execution, explicit PARTIAL terminal output distinct from complete file input, injected async start/next/cancel/close with one active owner retained until release and transient progress; bounded sequential batch scheduling; no parallel tool execution",
       "local_implementation": "src/runtime/tools.S and read_tool.S integrated from parallel handoff; only bounded synchronous read subset; full stage incomplete"
     },
     {
@@ -1749,7 +1749,7 @@
         "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "workspace-root bounded read/write/edit, canonical and common repaired edit shapes, BOM/line-ending/untouched-line preservation, unsafe recovery; no bash or full Pi filesystem compatibility",
+      "local_subset_scope": "workspace-root bounded read/write/edit; read positive offset/limit with typed PARTIAL, UTF-8 pages, 1 MiB scan cap and edit rejection of incomplete snapshots; canonical and common repaired edit shapes, BOM/line-ending/untouched-line preservation, unsafe recovery; no bash or full Pi filesystem compatibility",
       "local_implementation": "handwritten tools/read_tool/write_tool/edit_text/edit_tool; injected pg_tools read/write composition with preserved inner validation/authorization; actual Pi text+prepare differential checks and real MiMo/TUI edit read-back; structured diff/general async mutation queue and full T25 remain incomplete"
     },
     {

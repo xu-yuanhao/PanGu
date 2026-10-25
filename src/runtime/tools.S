@@ -590,6 +590,8 @@ li_operation_result:
  mov r15d,eax
  cmp qword ptr [r14],r13
  jae .Lop_limit
+ cmp r15d,4
+ je .Lop_final
  cmp r15d,1
  jbe .Lop_final
  cmp r15d,3

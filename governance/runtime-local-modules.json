@@ -80,7 +80,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute; complete 1..8-call rounds detach before atomic intent, sequential execution and ordered results; abort fills the unexecuted suffix atomically, resume skips settled results and applies safe/unsafe policy to the active item",
+      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute; complete 1..8-call rounds detach before atomic intent, sequential execution and ordered results; abort fills the unexecuted suffix atomically, resume skips settled results and applies safe/unsafe policy to the active item; terminal PARTIAL tool output is successful model-visible text, while full-snapshot service consumers must reject it",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -258,7 +258,7 @@
         "json-c",
         "POSIX directory-relative file APIs"
       ],
-      "role": "handwritten workspace-root UTF-8 regular-file reader; direct public POSIX/json-c calls with Linux x86-64 ABI assertions; no writes/shell/symlinks/dot paths; native bounded reader explicitly opts into safe replay (upstream built-in read does not declare this)",
+      "role": "handwritten workspace-root UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; directory-relative POSIX safety and explicit safe replay remain",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
@@ -272,7 +272,7 @@
             "packages/durable/src/tools/read.ts",
             "packages/durable/src/tools/path-utils.ts"
           ],
-          "semantics": "primary read capability boundary; native bounded UTF-8 regular-file subset deliberately excludes image/line-range/path variants",
+          "semantics": "initial read capability boundary; original subset excluded image/line-range/path variants, with subsequent native pagination recorded below",
           "tests_to_read": [
             "packages/durable/test/tools.test.ts",
             "packages/durable/test/tools-read-differential.test.ts"
@@ -288,6 +288,17 @@
           "tests_to_read": [
             "packages/coding-agent/test/tools.test.ts",
             "packages/coding-agent/test/read-line-range-display.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/read.ts"
+          ],
+          "semantics": "readText line selection and continuation; native positive integers only, flattened diagnostics and smaller existing message budget, no image/replacement decoding or total-file scan",
+          "tests_to_read": [
+            "packages/durable/test/tools-read-differential.test.ts"
           ]
         }
       ]

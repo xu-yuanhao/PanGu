@@ -4,6 +4,9 @@
  * C 侧断言与 <fcntl.h>/<sys/stat.h> 真实值一致。 */
 #define PG_RTL_DIRECTORY 0
 #define PG_RTL_READ_TOOL_BYTES 4
+#define PG_RTL_SCAN_LIMIT 1048576
+#define PG_RTL_PAGE_LINES 2000
+#define PG_RTL_OUTPUT_MAX 4096
 
 /* open/openat 标志（<fcntl.h>，断言对齐） */
 #define PG_RTL_O_RDONLY 0

@@ -86,7 +86,7 @@ PG_TL_ASSERT_SIZE(pg_tool_async, 24);
 PG_TL_ASSERT_OFF(pg_tool_async, next, 0);
 PG_TL_ASSERT_OFF(pg_tool_async, cancel, 8);
 PG_TL_ASSERT_OFF(pg_tool_async, close, 16);
-_Static_assert(PG_TOOL_OK==0&&PG_TOOL_ERROR==1&&PG_TOOL_WAIT==2&&PG_TOOL_OUTPUT==3,"tool statuses");
+_Static_assert(PG_TOOL_OK==0&&PG_TOOL_ERROR==1&&PG_TOOL_WAIT==2&&PG_TOOL_OUTPUT==3&&PG_TOOL_PARTIAL==4,"tool statuses");
 _Static_assert(PG_TOOL_LIMIT == PG_TL_LIMIT, "tool limit drifted");
 _Static_assert(PG_TEXT_LIMIT == PG_TL_TEXT_LIMIT, "text limit drifted");
 _Static_assert(PG_ID_LIMIT == PG_TL_ID_LIMIT, "id limit drifted");

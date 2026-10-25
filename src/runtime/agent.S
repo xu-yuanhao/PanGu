@@ -1248,6 +1248,11 @@ pg_agent_suspend:
     mov r15d,eax
     cmp qword ptr [rsp+56],4096
     jae .Ltool_bad_limit
+    cmp eax,4
+    jne .Ltool_complete_status
+    xor r15d,r15d
+    jmp .Ltool_complete
+.Ltool_complete_status:
     cmp eax,1
     jbe .Ltool_complete
     cmp eax,3

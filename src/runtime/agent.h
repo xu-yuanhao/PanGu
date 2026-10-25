@@ -23,10 +23,11 @@ typedef struct {
     void (*cancel)(void *);
     void (*close)(void *);
 } pg_model;
-typedef enum { PG_TOOL_OK, PG_TOOL_ERROR, PG_TOOL_WAIT, PG_TOOL_OUTPUT } pg_tool_status;
+typedef enum { PG_TOOL_OK, PG_TOOL_ERROR, PG_TOOL_WAIT, PG_TOOL_OUTPUT, PG_TOOL_PARTIAL } pg_tool_status;
 /* One active tool operation at a time. All callbacks return promptly.
    execute starts; next polls. WAIT has no text, OUTPUT is transient text,
-   OK/ERROR carry a final result. close: 0 released, 1 pending, <0 error;
+   OK/ERROR/PARTIAL carry a final result. PARTIAL is successful bounded output,
+   not a complete source snapshot; consumers requiring full input must reject it. close: 0 released, 1 pending, <0 error;
    keep ownership until released. Async callbacks are all present or all NULL. */
 typedef struct {
     void *context;
