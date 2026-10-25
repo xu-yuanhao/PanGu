@@ -597,6 +597,67 @@ def prompt_file_live(binary, root):
         terminal.close()
     print('PASS: actual MiMo used the explicit system file, idle reopen reloaded it, active resume used its stored prompt after source deletion, and missing idle source failed without fallback', flush=True)
 
+def prompt_snapshot_live(binary, root):
+    """Check real persistent source lifetime separately from model obedience."""
+    storage = root / 'prompt-snapshot-storage'
+    storage.mkdir()
+    source = root / 'snapshot-rules.md'
+    instructions = b'Answer concisely. Use only the supplied conversation. Do not use tools.'
+    source.write_bytes(instructions)
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage), PANGU_SYSTEM_PROMPT_FILE=source.name)
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.output = b''
+        terminal.send(b'Give twelve short numbered facts about C pointers.\r')
+        terminal.until(b'[run] started', 20)
+        terminal.send(b'\x04')
+        terminal.finish()
+        assert b'[run] finished:' not in terminal.output, 'run settled before suspension'
+    finally:
+        terminal.close()
+    journal = storage / 'session.pgj'
+    before = journal.read_bytes()
+    assert checkpoints(journal)[-1][1] == 1
+    assert instructions in before and env['MIMO_API_KEY'].encode() not in before
+    source.unlink()
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'[run] finished: success', 150)
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    after = journal.read_bytes()
+    assert after.startswith(before) and not source.exists()
+    assert checkpoints(journal)[-1][1] == 3
+    cursor, systems, assistants = 0, [], []
+    while cursor < len(after):
+        version, length = struct.unpack_from('<II', after, cursor + 8)
+        kind, count = struct.unpack_from('<II', after, cursor + 24)
+        if kind == 1:
+            systems.append(after[cursor + 40:cursor + length - 16])
+        if kind == 0:
+            offset = cursor + 40
+            for _ in range(count):
+                role, error, text_len, id_len, name_len = struct.unpack_from('<IIIHH', after, offset)
+                offset += 16
+                if role == 1:
+                    assistants.append(after[offset:offset + text_len])
+                offset += text_len + id_len + name_len
+        cursor += length
+    assert cursor == len(after) and systems == [instructions]
+    assert len(assistants) == 1 and assistants[0], 'resume must commit one complete assistant'
+    assert env['MIMO_API_KEY'].encode() not in after
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.finish(expected=2)
+    finally:
+        terminal.close()
+    assert journal.read_bytes() == after, 'failed idle prompt load changed saved history'
+    print('PASS: real MiMo resume after prompt source deletion preserved the committed system and prior journal, settled once, and missing idle source failed without history changes; model obedience is tested separately', flush=True)
+
+
 def prompt_protocol_live():
     """Direct provider probe: same instructions, only stream/tools vary; no tool executes."""
     import urllib.request
@@ -670,6 +731,7 @@ def main():
     parser.add_argument('--live-read-pages', action='store_true')
     parser.add_argument('--live-snapshot-edit', action='store_true')
     parser.add_argument('--live-prompt-file', action='store_true')
+    parser.add_argument('--live-prompt-snapshot', action='store_true')
     parser.add_argument('--live-prompt-protocol', action='store_true', help='direct real-provider stream/tools instruction matrix; no TUI build')
     args = parser.parse_args()
     if args.live_prompt_protocol:
@@ -712,6 +774,9 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_prompt_snapshot:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-prompt-snapshot'
+            prompt_snapshot_live(binary, root)
         if args.live_prompt_file:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-prompt-file'
             prompt_file_live(binary, root)

@@ -838,3 +838,12 @@ write与依赖它的edit专项O0 UBSan、O2 ASan/UBSan退出0，编辑的17个�
 现有test_pangu_pty.py增加可选--live-prompt-protocol：绕过TUI直接调用真实接口，固定同一随机标记，只改变stream/tools，四组合全部执行后严格汇总；不执行任何工具，不输出凭据/请求头，响应有1 MiB上限。实际本轮四组合中无工具通过、带工具两项失败，子测试退出1。该入口是可重复诊断，不作为默认离线门禁，也不靠反复运行至偶然通过宣称修复。原有真实多轮/在途恢复验收保持未完成，不阻挡无关核心实现。
 
 同一Agent自审诊断入口与TODO更新，非独立审核；没有产品源码、依赖、检查器或配额变化。G00、assembly-first和diff检查通过；并行TUI文件不纳入本批，生产准入未改变。固定包SHA256（仅诊断入口与TODO，不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`9c470f44c25fe3ae1653bc2176cd1503d1e1cfccf1be04fc3e65eb9fde0eb988`。
+
+
+## 2026-10-26：真实提示源删除后的恢复生命周期
+
+继续采用已读Pi d5b3de22 Durable instructions注入/已提交会话恢复边界与原生显式来源差异，不扩张自动资源发现。现有PTY脚本增加--live-prompt-snapshot，直接运行产品的真实MiMo、文件Storage和终端：收到run_started即Ctrl-D暂停，确认持久MODEL检查点后删除源文件，再另进程恢复。不是用助手返回特定口令来推断是否落盘；检查实际journal的system记录、完整前缀、终态与assistant数量。原有--live-prompt-file严格指令测试原样保留，未弱化、替换或宣称通过。
+
+实际SNAPSHOT_EXIT=0：源删除后恢复成功，system记录恰好一次且等于原文、原有日志前缀不变、只提交一条非空完整assistant、终态成功；之后缺失源文件的空闲启动退出2，journal逐字节不变。凭据不入日志。离线ctrl-d/SIGTERM/resize/termios及持久idle检查同时通过。没有改变产品实现、ABI、预算、依赖或检查器。该证据只证明本地显式来源的持久生命周期，不证明模型听从提示、任意崩溃窗口、完整Durable兼容或生产放行。
+
+共享树的TUI输入改造仍未交接；本批用git archive c314834加本批PTY脚本组成临时候选树构建运行，未编辑或提交并行文件，也未把旧TUI组合的结果转写为新输入体验通过。按TODO拆开已验证的快照恢复与仍失败的模型严格遵循。G00和diff检查通过。同一Agent自审测试入口/进度变更，非独立审核。固定包SHA256（仅PTY脚本与主TODO，不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`227ff6b38911c2d915fce7a1642439b3a3893a30547835de7a71706e5e2b1f67`。
