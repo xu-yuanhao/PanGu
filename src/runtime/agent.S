@@ -410,6 +410,20 @@ pg_agent_resume:
     jnz .Lresume_pop_bad
     mov rax,[rbx+PG_A_NEXT+PG_CP_CALL]
     mov [rbx+PG_A_CALL],rax
+    mov dword ptr [rbx+PG_A_GROUP_CANCELLED],0
+    mov qword ptr [rbx+PG_A_GROUP_END],0
+    cmp rax,-1
+    je .Lresume_group_done
+.Lresume_group_scan:
+    cmp rax,[rbx+PG_A_COUNT]
+    jae .Lresume_group_done
+    imul rcx,rax,PG_MSG_BYTES
+    cmp dword ptr [rbx+rcx],PG_ROLE_CALL
+    jne .Lresume_group_done
+    inc rax
+    mov [rbx+PG_A_GROUP_END],rax
+    jmp .Lresume_group_scan
+.Lresume_group_done:
     mov dword ptr [rbx+PG_A_CANCEL],0
     mov byte ptr [rbx+PG_A_ERROR],0
     mov dword ptr [rbx+PG_A_STATE],PG_ST_BEGIN
@@ -813,6 +827,10 @@ pg_agent_suspend:
     je .Ldispatch
     cmp dword ptr [rbx+PG_A_CANCEL],0
     je .Ldispatch
+    cmp eax,PG_ST_TOOL_END
+    je .Ldispatch
+    cmp eax,PG_ST_NEXT_TOOL
+    je .Lcancel_next
     cmp eax,PG_ST_TOOL_WAIT
     je .Lcancel_async
     cmp eax,PG_ST_TOOL_CLOSE
@@ -828,6 +846,10 @@ pg_agent_suspend:
     mov rdi,[rbx+PG_A_MODEL]
     call [rbx+PG_A_MODEL+24]
     jmp .Lcancel_operation
+.Lcancel_next:
+    mov rax,[rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_CALL]
+    mov [rbx+PG_A_CALL],rax
+    jmp .Lcancel_tool
 .Lcancel_async:
     mov rdi,[rbx+PG_A_TOOLS]
     call [rbx+PG_A_TOOLS+40]
@@ -838,44 +860,15 @@ pg_agent_suspend:
     cmp dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_EXECUTE
     jne .Lcancel_finish
 .Lcancel_tool:
-    imul r14,[rbx+PG_A_CALL],PG_MSG_BYTES
-    add r14,rbx
-    mov rdi,rbx
-    mov esi,3
-    lea rdx,[rip+.Lcancelled]
-    mov ecx,9
-    call .Lprepare
-    test rax,rax
-    jz .Lcancel_finish
-    mov r13,rax
-    lea rdi,[r14+PG_MSG_ID]
-    call .Llength
-    mov rdx,rax
-    lea rsi,[r14+PG_MSG_ID]
-    lea rdi,[r13+PG_MSG_ID]
+    imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
+    add r13,rbx
+    lea rdi,[rbx+PG_A_TEXT]
+    lea rsi,[rip+.Lcancelled]
+    mov edx,9
     call .Lcopy
-    mov dword ptr [r13+PG_MSG_ERROR],1
-    mov rdi,rbx
-    mov esi,3
-    mov edx,2
-    mov rcx,-1
-    call .Lnext_checkpoint
-    mov rdi,rbx
-    mov rsi,r13
-    mov edx,1
-    call .Lcommit_records
-    test rax,rax
-    jz .Lerror_storage
-    mov r13,rax
-    mov rdi,rbx
-    mov esi,2
-    call .Lfinish
-    mov rdi,r12
-    mov rsi,r14
-    mov rdx,r13
-    mov ecx,2
-    call .Ltool_event
-    jmp .Lpoll_one
+    mov qword ptr [rsp+56],9
+    mov r15d,1
+    jmp .Ltool_append
 .Lcancel_finish:
     mov rdi,rbx
     mov esi,2
@@ -900,6 +893,8 @@ pg_agent_suspend:
     je .Lfinish_wait
     cmp eax,PG_ST_FINISH
     je .Lterminal
+    cmp eax,PG_ST_NEXT_TOOL
+    je .Lnext_tool
     cmp eax,PG_ST_RECOVER_TOOL
     je .Lrecover_tool
     cmp eax,PG_ST_RECOVER_EXECUTE
@@ -921,7 +916,14 @@ pg_agent_suspend:
 .Lbegin_tool:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_TOOL
     jmp .Lpoll_one
+.Lnext_tool:
+    mov rax,[rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_CALL]
+    mov [rbx+PG_A_CALL],rax
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
+    jmp .Ltool_begin
 .Lrecover_tool:
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_EXECUTE
+.Ltool_begin:
     imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
     add r13,rbx
     mov dword ptr [r12],PG_EV_TOOL_BEGIN
@@ -933,7 +935,6 @@ pg_agent_suspend:
     mov [r12+40],rdi
     call .Llength
     mov [r12+48],rax
-    mov dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_EXECUTE
     cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],4
     jne .Lpoll_one
     mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
@@ -1008,6 +1009,8 @@ pg_agent_suspend:
     jz .Lpoll_zero
     cmp eax,PG_ME_TEXT
     je .Ltext
+    cmp eax,PG_ME_BATCH
+    je .Lbatch
     cmp eax,PG_ME_CALL
     je .Lcall
     cmp eax,PG_ME_DONE
@@ -1052,6 +1055,79 @@ pg_agent_suspend:
     mov [r12+8],rax
     mov [r12+16],r14
     jmp .Lpoll_one
+.Lbatch:
+    mov rax,[rsp+16]
+    cmp rax,2
+    jb .Lerror_event
+    cmp rax,8
+    ja .Lerror_event
+    cmp qword ptr [rsp+8],0
+    je .Lerror_event
+    mov [rsp+72],rax
+    mov rdx,[rsp+8]
+    mov [rsp+64],rdx
+    lea rax,[rax+rax+1]
+    add rax,[rbx+PG_A_COUNT]
+    cmp rax,64
+    ja .Lerror_result_capacity
+    mov qword ptr [rsp+80],0
+.Lbatch_copy:
+    mov rax,[rsp+80]
+    imul rax,48
+    add rax,[rsp+64]
+    mov rbp,rax
+    mov rdi,[rbp+16]
+    mov rsi,[rbp+24]
+    call .Lidentifier
+    test eax,eax
+    jz .Lerror_event
+    mov rdi,[rbp+32]
+    mov rsi,[rbp+40]
+    call .Lidentifier
+    test eax,eax
+    jz .Lerror_event
+    cmp qword ptr [rbp+8],4096
+    jae .Lerror_arguments
+    cmp qword ptr [rbp+8],0
+    je .Lbatch_slot
+    cmp qword ptr [rbp],0
+    je .Lerror_arguments
+.Lbatch_slot:
+    mov rax,[rsp+80]
+    inc rax
+    imul rax,PG_MSG_BYTES
+    lea r13,[rbx+PG_A_DRAFT+rax]
+    mov rdi,r13
+    xor eax,eax
+    mov ecx,PG_MSG_BYTES/8
+    rep stosq
+    mov dword ptr [r13],PG_ROLE_CALL
+    mov rax,[rbp+8]
+    mov [r13+PG_MSG_SIZE],rax
+    lea rdi,[r13+PG_MSG_TEXT]
+    mov rsi,[rbp]
+    mov rdx,rax
+    call .Lcopy
+    lea rdi,[r13+PG_MSG_ID]
+    mov rsi,[rbp+16]
+    mov rdx,[rbp+24]
+    call .Lcopy
+    lea rdi,[r13+PG_MSG_NAME]
+    mov rsi,[rbp+32]
+    mov rdx,[rbp+40]
+    call .Lcopy
+    inc qword ptr [rsp+80]
+    mov rax,[rsp+80]
+    cmp rax,[rsp+72]
+    jb .Lbatch_copy
+    mov rax,[rbx+PG_A_COUNT]
+    mov [rbx+PG_A_ASSISTANT],rax
+    inc rax
+    mov [rbx+PG_A_CALL],rax
+    add rax,[rsp+72]
+    mov [rbx+PG_A_GROUP_END],rax
+    lea r13,[rbx+PG_A_PENDING]
+    jmp .Lintent_first
 .Lcall:
     mov rdi,[rsp+24]
     mov rsi,[rsp+32]
@@ -1076,6 +1152,8 @@ pg_agent_suspend:
     mov [rbx+PG_A_ASSISTANT],rax
     inc rax
     mov [rbx+PG_A_CALL],rax
+    inc rax
+    mov [rbx+PG_A_GROUP_END],rax
     mov rdi,rbx
     mov esi,2
     mov rdx,[rsp+8]
@@ -1092,9 +1170,14 @@ pg_agent_suspend:
     mov rsi,[rsp+40]
     mov rdx,[rsp+48]
     call .Lcopy
+.Lintent_first:
+    mov dword ptr [rbx+PG_A_GROUP_CANCELLED],0
+    mov dword ptr [rbx+PG_A_DRAFT],PG_ROLE_ASSISTANT
+    lea rdi,[r13+PG_MSG_NAME]
+    call .Llength
+    mov rdx,rax
+    lea rsi,[r13+PG_MSG_NAME]
     mov rdi,rbx
-    mov rsi,[rsp+40]
-    mov rdx,[rsp+48]
     call .Lsafe_to_replay
     mov esi,5
     cmp eax,1
@@ -1107,24 +1190,15 @@ pg_agent_suspend:
     call .Lnext_checkpoint
     mov rdi,rbx
     lea rsi,[rbx+PG_A_DRAFT]
-    mov edx,2
+    mov rdx,[rbx+PG_A_GROUP_END]
+    sub rdx,[rbx+PG_A_ASSISTANT]
     call .Lcommit_records
     test rax,rax
     jz .Lerror_storage
-    mov r13,rax
     mov rdi,rbx
     call .Lclose
-    mov dword ptr [r12],PG_EV_TOOL_BEGIN
-    lea rax,[r13+PG_MSG_ID]
-    mov [r12+24],rax
-    mov rax,[rsp+32]
-    mov [r12+32],rax
-    lea rax,[r13+PG_MSG_NAME]
-    mov [r12+40],rax
-    mov rax,[rsp+48]
-    mov [r12+48],rax
     mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
-    jmp .Lpoll_one
+    jmp .Ltool_begin
 .Ltool:
     imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
     add r13,rbx
@@ -1291,15 +1365,34 @@ pg_agent_suspend:
     test r15d,r15d
     setne al
     mov [r14+PG_MSG_ERROR],eax
-    mov rdi,rbx
-    mov esi,1
-    xor edx,edx
     cmp dword ptr [rbx+PG_A_CANCEL],0
-    je .Ltool_checkpoint
-    mov esi,3
-    mov edx,2
-.Ltool_checkpoint:
+    jne .Lcancel_group
+    mov rcx,[rbx+PG_A_CALL]
+    inc rcx
+    mov esi,1
+    cmp rcx,[rbx+PG_A_GROUP_END]
+    jae .Ltool_model_checkpoint
+    imul rbp,rcx,PG_MSG_BYTES
+    add rbp,rbx
+    lea rdi,[rbp+PG_MSG_NAME]
+    call .Llength
+    mov rdx,rax
+    lea rsi,[rbp+PG_MSG_NAME]
+    mov rdi,rbx
+    call .Lsafe_to_replay
+    mov esi,5
+    cmp eax,1
+    jne .Ltool_next_checkpoint
+    mov esi,2
+.Ltool_next_checkpoint:
+    mov rcx,[rbx+PG_A_CALL]
+    inc rcx
+    jmp .Ltool_checkpoint
+.Ltool_model_checkpoint:
     mov rcx,-1
+.Ltool_checkpoint:
+    mov rdi,rbx
+    xor edx,edx
     call .Lnext_checkpoint
     mov rdi,rbx
     mov rsi,r14
@@ -1307,24 +1400,65 @@ pg_agent_suspend:
     call .Lcommit_records
     test rax,rax
     jz .Lerror_storage
-    mov r14,rax
-    cmp dword ptr [rbx+PG_A_CANCEL],0
-    je .Ltool_committed
+    jmp .Ltool_committed
+.Lcancel_group:
+    mov qword ptr [rsp+72],1
+.Lcancel_suffix:
+    mov rax,[rbx+PG_A_CALL]
+    add rax,[rsp+72]
+    cmp rax,[rbx+PG_A_GROUP_END]
+    jae .Lcancel_group_commit
+    imul rbp,rax,PG_MSG_BYTES
+    add rbp,rbx
+    mov rax,[rsp+72]
+    imul rax,PG_MSG_BYTES
+    lea r14,[rbx+PG_A_PENDING+rax]
+    mov rdi,r14
+    xor eax,eax
+    mov ecx,PG_MSG_BYTES/8
+    rep stosq
+    mov dword ptr [r14],PG_ROLE_RESULT
+    mov dword ptr [r14+PG_MSG_ERROR],1
+    mov qword ptr [r14+PG_MSG_SIZE],9
+    lea rdi,[r14+PG_MSG_TEXT]
+    lea rsi,[rip+.Lcancelled]
+    mov edx,9
+    call .Lcopy
+    lea rdi,[rbp+PG_MSG_ID]
+    call .Llength
+    mov rdx,rax
+    lea rsi,[rbp+PG_MSG_ID]
+    lea rdi,[r14+PG_MSG_ID]
+    call .Lcopy
+    inc qword ptr [rsp+72]
+    jmp .Lcancel_suffix
+.Lcancel_group_commit:
     mov rdi,rbx
-    mov esi,2
-    call .Lfinish
-    mov rdi,r12
-    mov rsi,r13
-    mov rdx,r14
-    mov ecx,2
-    call .Ltool_event
-    jmp .Lpoll_one
+    mov esi,3
+    mov edx,2
+    mov rcx,-1
+    call .Lnext_checkpoint
+    mov rdi,rbx
+    lea rsi,[rbx+PG_A_PENDING]
+    mov rdx,[rsp+72]
+    call .Lcommit_records
+    test rax,rax
+    jz .Lerror_storage
+    mov dword ptr [rbx+PG_A_GROUP_CANCELLED],1
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_END
+    jmp .Ltool_end
 .Ltool_committed:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_END
     jmp .Lpoll_zero
 .Ltool_end:
     mov rax,[rbx+PG_A_COUNT]
     dec rax
+    cmp dword ptr [rbx+PG_A_GROUP_CANCELLED],0
+    je .Ltool_end_result
+    inc rax
+    sub rax,[rbx+PG_A_GROUP_END]
+    add rax,[rbx+PG_A_CALL]
+.Ltool_end_result:
     imul r13,rax,PG_MSG_BYTES
     add r13,rbx
     imul r14,[rbx+PG_A_CALL],PG_MSG_BYTES
@@ -1332,11 +1466,31 @@ pg_agent_suspend:
     xor ecx,ecx
     cmp dword ptr [r13+PG_MSG_ERROR],0
     setne cl
+    cmp dword ptr [rbx+PG_A_GROUP_CANCELLED],0
+    je .Ltool_end_outcome
+    mov ecx,2
+.Ltool_end_outcome:
     mov rdi,r12
     mov rsi,r14
     mov rdx,r13
     call .Ltool_event
+    cmp dword ptr [rbx+PG_A_GROUP_CANCELLED],0
+    jne .Ltool_end_cancelled
     mov dword ptr [rbx+PG_A_STATE],PG_ST_START
+    mov rax,[rbx+PG_A_CALL]
+    inc rax
+    cmp rax,[rbx+PG_A_GROUP_END]
+    jae .Lpoll_one
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_NEXT_TOOL
+    jmp .Lpoll_one
+.Ltool_end_cancelled:
+    inc qword ptr [rbx+PG_A_CALL]
+    mov rax,[rbx+PG_A_CALL]
+    cmp rax,[rbx+PG_A_GROUP_END]
+    jb .Lpoll_one
+    mov rdi,rbx
+    mov esi,2
+    call .Lfinish
     jmp .Lpoll_one
 .Lterminal:
     mov dword ptr [r12],PG_EV_FINISH

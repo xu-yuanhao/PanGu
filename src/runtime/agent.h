@@ -24,7 +24,7 @@ typedef struct {
     void (*close)(void *);
 } pg_model;
 typedef enum { PG_TOOL_OK, PG_TOOL_ERROR, PG_TOOL_WAIT, PG_TOOL_OUTPUT } pg_tool_status;
-/* One sequential operation per turn. All callbacks return promptly.
+/* One active tool operation at a time. All callbacks return promptly.
    execute starts; next polls. WAIT has no text, OUTPUT is transient text,
    OK/ERROR carry a final result. close: 0 released, 1 pending, <0 error;
    keep ownership until released. Async callbacks are all present or all NULL. */
@@ -48,12 +48,17 @@ typedef struct {
     size_t assistant_index, call_index;
     char event_text[PG_TEXT_LIMIT];
     char error_text[256];
-    pg_message draft, pending;
+    union {
+        struct { pg_message draft, pending; };
+        pg_message round[PG_SESSION_BATCH_LIMIT];
+    };
     pg_session_control commits;
     pg_run_checkpoint next_checkpoint;
     unsigned profile_verified;
     unsigned tool_open, tool_status;
     size_t tool_size;
+    size_t group_end;
+    unsigned group_cancelled;
 } pg_agent;
 int pg_agent_init(pg_agent *, pg_model, pg_tools);
 pg_client pg_agent_client(pg_agent *);

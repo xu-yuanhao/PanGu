@@ -740,3 +740,18 @@ ASan首次查出旧test_start_setup在第二次start后未close就让下个用�
 专项O0/O2及各UBSan组合通过；projection与逐分配失败专项O2 ASan/UBSan通过。新增2～8调用、后续第二轮、各项ID投影和拒绝边界；8调用逐一覆盖207处分配/插入/序列化失败，无遗留JSON所有权；单调用75点保持通过。完整核心O0/O2 UBSan构建运行退出0。本批没有调用真实模型；Agent消费BATCH、顺序执行/取消/恢复及TUI历史仍未接通，完整工作流仍未验收。
 
 同一Agent按授权自审自批模块范围与清单说明更新，没有修改检查器、预算或生产准入。G00、assembly-first和diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`004a95b298e9ab7bec88c7eac479a1fbb01ffc541c755b7769dbc49a2b0597f4`。
+
+
+## 2026-10-25：批量Agent顺序执行与完整真实工作流
+
+继续读取Pi d5b3de22 Durable generation.ts::startToolRound（完整assistant同事务、sequential pending后缀）及对应工具轮测试；请求投影参考沿用上一节。手写Agent支持单CALL与2～8 BATCH共用意图/执行/结果路径；借用调用全部复制到现有草稿arena后才提交，关闭Model后不依赖原切片。预留assistant、calls及所有results容量，不截断后缀。完整意图先存，逐项结果与下一项safe/unsafe检查点一并提交，最后才进入Model请求。
+
+取消先有abort意图，活动工具按既有异步协议释放，再将当前与未开始后缀结果同事务终结；逐项发布结束事实，不为未执行项伪造开始。单独记录本地取消结果是否已提交，防止结果已落盘但结束事件未发布时的取消误索引。恢复从检查点扫描组末尾，已完成结果不重做；当前项仅stored/current均safe才重跑，unsafe返回interrupted，之后继续后缀；持久abort恢复补齐错误结果。TUI历史从连续结果回到对应调用组取名称，不再要求前条必为call。
+
+调用者Agent由298336增至328088字节（+29752）：原draft/pending改为同址9-message union，另加组末尾和本地取消发布标记，不保留第二份调用真相；commits及后续内部偏移统一更新，ABI静态断言和保护页用例同步。Model/event公共表布局、Session消息/日志格式和资源预算不变。工具保持顺序，不移植通用Task图或默认并行。
+
+验证：2～8项正常执行与每项开始前、结果提交后/事件前、结束事件后取消；Model.close清空借用view后仍可执行；尾项坏参数/身份、重复ID与非法批次数全组不执行。8个活动位置的fresh Agent重建，safe/unsafe及已存abort分支通过；这是相同已提交Session/control恢复，跨进程/日志编码仍由既有存储专项覆盖，不能冒充所有Agent批量崩溃窗口都已测。另有8项异步工具、各项输出中取消、close先pending再释放，用例通过。专项Agent O2 ASan/UBSan通过。完整核心O0/O2 UBSan构建运行退出0，ABI/寄存器/栈对齐及两种保护页放置检查通过。
+
+真实MiMo：--live-batch-execute通过，第一次工具开始时断言已提交两个calls，两次read实际完成后继续生成终态；没有替换Model或要求拆成单调用。--live-workflow通过：实际TUI read/edit/write/bash，构建并运行手写汇编测试，校验精确源文件/脚本及未修改内容。离线PTY退出、信号、resize、termios及持久闲置重开同时通过。凭据仅子进程环境，未入库。之前单调用解析阻断的完整工作流现有直接通过证据；不据此宣称所有Pi功能、完整T26/T28或生产发布通过。
+
+同一Agent按授权自审自批Agent内部arena/偏移、模块范围、测试和真实入口构建扩展；无新文件/依赖/门禁，也未放宽失败边界。G00、assembly-first和diff检查通过，生产准入不变。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`34991c069cf492c9c61affbe9b511edaaee574d2d6ee354e3d2c2bfaa1c1ac3a`。

@@ -80,7 +80,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute; Model event header now declares a 56-byte union for complete BATCH metadata; the current Loop still handles single CALL only",
+      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute; complete 1..8-call rounds detach before atomic intent, sequential execution and ordered results; abort fills the unexecuted suffix atomically, resume skips settled results and applies safe/unsafe policy to the active item",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -143,7 +143,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer pending",
+      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",

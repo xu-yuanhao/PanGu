@@ -63,7 +63,14 @@ static void history_snapshot(void){
  long page=sysconf(_SC_PAGESIZE);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));tui_history_entry *tail=(tui_history_entry*)(map+page-sizeof(*tail));assert(bridge.ops.history(&bridge,3,tail)==1&&!tail->tool_ok&&tail->kind==3);assert(!munmap(map,(size_t)page*2));
  bridge.active=1;assert(pg_tui_bridge_set_history(&bridge,&agent.session));bridge.stopped=1;assert(bridge.ops.history(&bridge,0,&out)<0);
 }
-int main(void){boundary_abi();detach_lifecycle();history_snapshot();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
+static void batch_history(void){
+ for(unsigned n=2;n<=8;++n){memset(&agent.session,0,sizeof(agent.session));agent.session.count=2+2*n;agent.session.messages[0].role=PG_USER;agent.session.messages[1].role=PG_ASSISTANT;
+ for(unsigned j=0;j<n;++j){pg_message *c=&agent.session.messages[2+j],*r=&agent.session.messages[2+n+j];c->role=PG_TOOL_CALL;r->role=PG_TOOL_RESULT;snprintf(c->call_id,sizeof(c->call_id),"id-%u",j);strcpy(c->tool_name,j%2?"write":"read");strcpy(r->call_id,c->call_id);}
+ pg_tui_bridge b;assert(!pg_tui_bridge_init(&b,(pg_client){0,pg_bridge_test_submit,pg_bridge_test_cancel,pg_bridge_test_poll}));assert(!pg_tui_bridge_set_history(&b,&agent.session));tui_history_entry e;
+ for(unsigned j=0;j<n;++j){assert(b.ops.history(&b,2+n+j,&e)==1);assert(e.tool_name_len==(j%2?5:4)&&!memcmp(e.tool_name,j%2?"write":"read",e.tool_name_len));agent.session.messages[2+n+j].call_id[0]='X';assert(b.ops.history(&b,2+n+j,&e)<0);agent.session.messages[2+n+j].call_id[0]='i';}
+ }
+}
+int main(void){batch_history();boundary_abi();detach_lifecycle();history_snapshot();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
  pg_tui_bridge bridge;assert(!pg_tui_bridge_init(&bridge,pg_agent_client(&agent)));tui_runtime_ops *ops=&bridge.ops;tui_event e;unsigned starts=0,texts=0,ends=0;
  assert(ops->submit(ops->ctx,"test",4)==TUI_SUBMIT_OK);assert(ops->submit(ops->ctx,"busy",4)==TUI_SUBMIT_BUSY);
  for(unsigned i=0;i<16;++i)if(ops->poll(ops->ctx,&e)){if(e.kind==TUI_EV_RUN_STARTED)++starts;if(e.kind==TUI_EV_TEXT_DELTA){++texts;assert(e.text_len==2&&!memcmp(e.text,"ok",2));}if(e.kind==TUI_EV_RUN_FINISHED){++ends;assert(e.run_status==TUI_RUN_SUCCESS);break;}}

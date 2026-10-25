@@ -136,8 +136,39 @@ pg_tui_bridge_set_history:
     test r10,r10
     jz .Lhistory_bad
     lea r11,[r8-PG_MSG_BYTES]
+    xor edi,edi
+.Lhistory_results_back:
+    dec r10
+    cmp dword ptr [r11],3
+    jne .Lhistory_calls_back
+    inc edi
+    cmp edi,8
+    jae .Lhistory_bad
+    test r10,r10
+    jz .Lhistory_bad
+    sub r11,PG_MSG_BYTES
+    jmp .Lhistory_results_back
+.Lhistory_calls_back:
     cmp dword ptr [r11],2
     jne .Lhistory_bad
+    mov rax,r11
+    mov ecx,1
+.Lhistory_group_start:
+    test r10,r10
+    jz .Lhistory_group_found
+    cmp dword ptr [r11-PG_MSG_BYTES],2
+    jne .Lhistory_group_found
+    dec r10
+    sub r11,PG_MSG_BYTES
+    inc ecx
+    cmp ecx,8
+    ja .Lhistory_bad
+    jmp .Lhistory_group_start
+.Lhistory_group_found:
+    cmp edi,ecx
+    jae .Lhistory_bad
+    imul rdi,rdi,PG_MSG_BYTES
+    add r11,rdi
     xor ecx,ecx
 .Lhistory_match:
     mov al,[r8+PG_MSG_ID+rcx]
