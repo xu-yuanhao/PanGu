@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 
 
 POLICY = "governance/bootstrap-policy.json"
-KINDS = {"instructions", "document", "control", "gate", "gate-test", "native-source", "native-test", "development-tool", "legacy-source", "client-source", "client-test", "client-build", "repository-config"}
+KINDS = {"instructions", "document", "control", "gate", "gate-test", "native-source", "native-test", "development-tool", "legacy-source", "client-source", "client-test", "client-build", "client-tool", "repository-config"}
 # The T09 oracle runner must stay JavaScript: it imports the frozen Pi sources.
 # Only "gate" may use .mjs; documents/controls/tests stay .md/.json/.py.
 SUFFIXES = {"instructions": ".md", "document": ".md", "control": ".json",
@@ -18,7 +18,7 @@ SUFFIXES = {"instructions": ".md", "document": ".md", "control": ".json",
             "native-source": (".c", ".h", ".S"), "native-test": (".c", ".S"),
             "development-tool": ".py", "legacy-source": (".c", ".h", ".cpp", ".S"),
             "client-source": (".c", ".h", ".S"), "client-test": (".c", ".h"),
-            "client-build": ".sh", "repository-config": ""}
+            "client-build": ".sh", "client-tool": ".py", "repository-config": ""}
 
 
 def inspect(root, policy):
@@ -48,7 +48,8 @@ def inspect(root, policy):
                  "development-tool": ("tools/runtime/",),
                  "client-source": ("src/client/tui/",),
                  "client-test": ("tests/client/tui/",),
-                 "client-build": ("tools/client/tui/",)}
+                 "client-build": ("tools/client/tui/",),
+                 "client-tool": ("tools/client/tui/",)}
         if kind in roots and not name.startswith(roots[kind]):
             errors.append(f"policy: invalid source scope for {kind}: {name}")
         if kind == "repository-config" and name != ".gitignore":

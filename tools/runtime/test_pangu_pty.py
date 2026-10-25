@@ -764,6 +764,25 @@ def main():
                 print('PASS: native PTY', exit_mode, 'and exact termios restoration', flush=True)
             finally:
                 terminal.close()
+        terminal = Terminal(binary, root / 'missing-workspace', env)
+        try:
+            terminal.until(b'Cannot activate native plugin workspace', 5)
+            terminal.finish(expected=2)
+        finally:
+            terminal.close()
+        print('PASS: missing workspace fails native plugin activation and preserves terminal attributes', flush=True)
+        for name in ('missing-storage', 'corrupt-storage'):
+            location = root / name
+            if name == 'corrupt-storage':
+                location.mkdir()
+                (location / 'session.pgj').write_bytes(b'invalid-complete-journal-frame' * 4)
+            terminal = Terminal(binary, root, dict(env, PANGU_SESSION_DIR=str(location)))
+            try:
+                terminal.until(b'Cannot open persistent session', 5)
+                terminal.finish(expected=2)
+            finally:
+                terminal.close()
+        print('PASS: storage source open/replay failure closes composition and preserves terminal attributes', flush=True)
         persistent_idle(binary, root, env)
         if args.live_persistent:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-persistent'

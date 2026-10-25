@@ -116,6 +116,22 @@
     "src/runtime/prompt.S": {
       "role": "assembly-core",
       "reason": "手写显式指令文件加载与有界所有权，注入完整文件读取服务"
+    },
+    "src/runtime/host.S": {
+      "role": "assembly-core",
+      "reason": "手写服务声明校验、依赖排序、发布/查询与协作式逆序释放；启动回调为具体库和服务的组合胶水"
+    },
+    "src/runtime/native_plugin.S": {
+      "role": "assembly-core",
+      "reason": "手写版本化原生插件装载、ABI检查与宿主清理后卸载；动态链接由系统libdl提供"
+    },
+    "src/runtime/documents.S": {
+      "role": "assembly-core",
+      "reason": "手写Durable文档地址校验/身份比较与JSON库调用编排；成熟json-c负责字符串转义"
+    },
+    "src/runtime/records.S": {
+      "role": "assembly-core",
+      "reason": "手写通用StorageWrite批次脱离、同步adopt/发布顺序、只读与失败锁存；json-c承担对象复制"
     }
   }
 }

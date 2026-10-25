@@ -31,7 +31,8 @@ def build(output):
     flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
-                    *[str(ROOT / p) for p in SOURCES], *flags, '-o', str(output)], check=True)
+                    '-Wl,--export-dynamic-symbol=pg_host_*',
+                    *[str(ROOT / p) for p in SOURCES], *flags, '-ldl', '-o', str(output)], check=True)
     return output
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

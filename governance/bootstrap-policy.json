@@ -593,6 +593,21 @@
     "src/runtime/prompt.S": "native-source",
     "src/runtime/prompt.h": "native-source",
     "tests/runtime/test_prompt.c": "native-test",
-    "docs/TUI移植TODO.md": "document"
+    "docs/TUI移植TODO.md": "document",
+    "src/runtime/host.S": "native-source",
+    "src/runtime/host.h": "native-source",
+    "src/runtime/host_layout.h": "native-source",
+    "tests/runtime/test_host.c": "native-test",
+    "src/runtime/native_plugin.h": "native-source",
+    "src/runtime/native_plugin.S": "native-source",
+    "tests/runtime/native_plugin_fixture.S": "native-test",
+    "tests/runtime/test_native_plugin.c": "native-test",
+    "src/runtime/documents.h": "native-source",
+    "src/runtime/documents.S": "native-source",
+    "tests/runtime/test_documents.c": "native-test",
+    "tools/runtime/test_documents.py": "gate",
+    "src/runtime/records.h": "native-source",
+    "src/runtime/records.S": "native-source",
+    "tests/runtime/test_records.c": "native-test"
   }
 }

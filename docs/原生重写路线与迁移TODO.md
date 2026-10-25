@@ -51,7 +51,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 
 ### K01 — 整理可直接复用的原生基座
 
-- [ ] 核对当前 `src/runtime/`、`src/bootstrap-api/`、`src/platform-*`、`src/arena/`、`src/buffer/`、`src/text/`、`src/json/`、`src/schema/` 和产品实际构建清单，为上表每组列出当前原生入口与所需补齐点，记在本文交接区。
+- [x] 核对当前 `src/runtime/`、`src/bootstrap-api/`、`src/platform-*`、`src/arena/`、`src/buffer/`、`src/text/`、`src/json/`、`src/schema/` 和产品实际构建清单，为上表每组列出当前原生入口与所需补齐点，记在本文交接区。
 - [ ] 对照当前实际消费者统一内存、Buffer、字符串与文件/进程/时钟接口，复用已接入的json-c/libcurl/utf8proc。后续模块需要的基础能力随对应K步骤实现，纯逻辑手写汇编化。
 - [ ] 验收：所用模块可构建、替换、释放；上游数据样例、容量边界和 ABI 对应通过。
 
@@ -59,16 +59,22 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 
 来源：Harness 的 Cordis `Context/RegistryService/Service/Fiber`；`references/cordis/packages/core/tests/{plugin,service,service-dispose}.spec.ts` 的对应测试。
 
-- [ ] 将服务注册、依赖解析、作用域、激活、失败清理和释放组合接入 `src/composition/`，复用现有宿主实现中的合适部分。
-- [ ] Loop、Session、Task/Scheduler、Storage、Model、Tools和基础服务均按服务契约注入；原生扩展具有清单和静态/本地共享库入口。
+- [x] 将静态服务注册、依赖排序、隔离根作用域、激活、失败清理和协作释放接入实际 `src/composition/`。
+- [x] 完成父子作用域的服务继承、局部提供者替换和子级先释放。
+- [ ] 完成服务变化、单插件/绑定撤销与重新激活的生命周期。
+- [ ] Loop、Session、Task/Scheduler、Storage、Model、Tools和基础服务均按服务契约注入。
+- [x] 原生插件使用服务描述符与版本化清单，提供静态/本地共享库入口；库代码在宿主协作清理完成后卸载。
 - [ ] 验收：替换提供者后消费者行为成立；缺依赖、重复服务、初始化失败和释放时订阅/异步资源的处理与参考对照。
 
 ### K03 — 完整的 Session、事务和状态记录
 
 来源：Durable `types.ts`、`entries.ts`、`documents.ts`、`session/{session,transaction,forks}.ts`；`session-*.test.ts`。
 
+- [x] 移植Document地址身份、作用域/owner/family-key解析和上游JSON tuple编码，作为事务/存储查询共用基础。
+- [x] 移植通用准备批次的Storage提交边界：脱离调用者输入、同步adopt、成功结算后发布、只读/空批次及失败锁存。
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
-- [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移、延迟提交、只读视图和一致的查询语义。
+- [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
+- [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
 ### K04 — 完整存储与重开
@@ -189,9 +195,43 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 
 每批更新以下字段；接口请求从TUI交接区读取。
 
-- 当前步骤：K01。
-- 本批来源/函数：待执行批次填写。
-- 目标文件/公开接口：待填写。
-- 实际实现与验证：待填写。
-- 已提供给TUI的接口/登记：当前 `src/contracts/client.h`、`tui_runtime_adapter.h` 的submit/cancel/poll/history/shutdown。
-- 下一个完整行为：基座落点核对与实际宿主组合。
+- 当前步骤：K03 Document与事务；K01/K02的实际基座可供使用，其余子项按当前勾选状态继续。
+- 上游同步：2026-10-26 fetch Pi/Harness，工作树干净，固定提交与远端均仍为上文版本；本批无新增上游修复。
+- 本批来源：Harness `vendor/cordis/src/context.ts` 的 Context/作用域查询，`registry.ts` 的 Inject.resolve/plugin/inject，`service.ts` 的服务发布，`fiber.ts` 的 effect/释放，`reflect.ts` 的声明注入与父级查找；Cordis `packages/core/tests/plugin.spec.ts` 的注册/无效插件/生命周期，`service-dispose.spec.ts` 的消费者释放期间保留提供者。原生使用同步激活和可重复调用 close 表达协作释放。
+- 公开接口：`src/runtime/host.h` 的 `pg_host_init/init_child/start/provide/get/find/close`；`host.S` 手写依赖检查、拓扑排序、发布和逆序释放；`src/composition/pangu.c` 以七个静态插件组合实际程序。
+- 所有权：宿主由调用者提供1120字节存储；描述符只读借用，服务由提供者持有。每作用域最多32插件/解析服务、32子作用域、每插件32依赖、名字最多63字节；层级最多32条子级边。激活成功且声明导出齐全后才可见；失败清理包含部分初始化插件；pending/error清理保留所有权和依赖。子作用域继承父服务，局部导出遮蔽同名父服务；父关闭先驱动全部子级释放，pending/error期间保留父资源。
+- 实际验证：宿主 O0/O2 的 ASan/UBSan 专项通过，覆盖依赖乱序、缺失/重复/环、发布权限、初始化失败、递归调用拒绝、pending/error清理、独立/子级提供者替换、嵌套关闭、父级等待子级错误/异步清理、32项/32层边界和页尾保护。Runtime 全专项通过。固定1092bdc的TUI加本批核心，在隔离临时树的真实MiMo `--live-workflow` 与 `--live-prompt-snapshot` 退出0；新增工作区打开失败PTY用例确认退出2并精确恢复termios。
+- 实际失败：同一隔离组合的 `--live-bash-recovery` 退出1，模型仅叙述执行而没有调用bash，缺少应产生的spill路径；该场景未通过。共享树整机验证等待TUI当前渲染批次完成，未修改其源码。
+- 已处理TUI登记请求：`tools/client/tui/test_tui_pty.py` 登记为限定在 `tools/client/tui/` 的Python客户端工具；检查器新增接受/拒绝用例，17项自测通过。共享client/adapter函数表保持原布局。
+- Session/Storage装配：`session.h` 的 `pg_session_source` 提供一次加载/回放入口；实际入口将内存与Journal源作为服务注入，Agent声明依赖，存储提供者负责打开失败清理并在Agent释放后关闭。按固定Pi的 `session/session.ts:createSession(storage)`、`harness/harness.ts:Harness.open` 及 `memory-storage.test.ts` 读取采用存储与执行者分离的组合语义；完整Session/Storage能力仍由K03/K04实现。
+- 原生共享库入口：`native_plugin.h/.S` 的 `pg_native_open/close`，使用导出对象 `pangu_plugin_v1`（ABI/清单大小/描述符大小、插件数组）；显式绝对路径装载，内部宿主按现有注入与父子作用域工作。对照Harness固定提交 `vendor/loader/src/config/entry.ts:Entry._init`、`resolve.ts:createResolve` 与 `fiber.ts:restart`；原生差异为POSIX动态链接和明确借用的C ABI。共享库本身的静态/实例状态由插件定义，宿主不改写其描述符。
+- 原生装载验证：五种真实共享库（正常/ABI错误/缺入口/缺依赖/初始化失败）与宿主进行实际链接和装载。O0/O2专项通过；pending保留代码映射、完整清理后RTLD_NOLOAD确认已卸载、父作用域关闭后由库所有者完成卸载、替换上游seed服务后新实例得到新值；4096字节非终止路径拒绝。完整Runtime专项退出0。固定TUI组合产品构建通过，动态符号表确认七个公开Host ABI函数；实际扩展配置加载由K09/K11接入。
+- K03地址实现：`documents.h/.S` 对应Pi固定提交 `documents.ts:resolveAddress/ownerId/addressId`、`ids.ts:idFromNumber`；并阅读 `transaction.ts:appendEntry` 和文档暂存路径、`session-documents.test.ts` 的family与语义/版本拒绝用例。`pg_document_address` 明确scope、signed-safe-integer owner、可选key和借用UTF-8 slice；json-c承担JSON转义，纯逻辑与所有权编排手写汇编。
+- K03实际验证：`tools/runtime/test_documents.py` 直接导入固定Pi原函数，通过Node模块解析hook指向同版本实际Chord/json.ts，未替换被测函数；792条地址逐字节一致。O2 ASan/UBSan测试通过，覆盖空kind/空key/缺key、嵌入NUL、负owner边界、页尾slice、输出别名/容量及逐个JSON分配/插入/序列化故障，输出在失败时保持不变。地址模块尚待下一批事务调用，K03整体仍未验收。
+- K03物化实现：`pg_document_check/materialize` 对应 `documents.ts:checkRecordScope/checkRecordVersion/materializeDocumentValue`。90条有效定义/记录组合直接与Pi函数比对结果一致；原生枚举边界补充校验。输入JSON只读，迁移在私有副本执行，回调返回owned引用，最终再复制以隔离回调保留引用；ASan/UBSan覆盖成功、错误和两次deep-copy失败清理。
+- K03值准入：对照同版本 `packages/chord/src/json.ts:copy/isJsonValue`，新增 `pg_document_value_valid`，在输入复制和迁移结果复制前检查有限数值与祖先环；允许共享子对象。C ABI限定256层容器，避免原生栈无限递归，超过边界返回拒绝。实际Chord函数对照finite/nonfinite/cycle/DAG六种图一致；ASan/UBSan验证256层接受、257层拒绝，非法输入/迁移返回被拒绝，调用者保留输入图所有权。
+- K03批次入口：`records.h/.S:pg_records_commit` 对应 `types.ts:Storage.commit`、`session/session.ts` 的提交/GuardedStorage.#call、`transaction.ts:settleSuccess/discard`；阅读并移植 `session-adoption.test.ts` 的同步采纳、采纳前/后错误、漏采纳及采纳错误场景。原生使用同步C ABI回调：backend持久化后调用adopt，返回时核对唯一采纳与相同序号，再发布；已采纳的状态在后端后续失败时保留，Session停止继续提交。
+- K03批次验证：O0/O2 ASan/UBSan专项通过；混合Entry/Document准备批次用确定性Storage边界验证整批脱离、adopt-before-resolve/publication、空/只读、重复/缺失/错误序号、回调内重入拒绝、采纳失败不会逃逸到Storage、后端失败锁存，以及复制失败/部分复制清理和页尾Session布局。完整记录约束由Storage/Tx实现，当前模块是提交契约，尚未接通通用记录持久提供者。
+- 下一完整行为：接Entry/Document完整记录Storage和事务暂存，并接入当前消息投影；文档revision/checkpoint与查询仍按K03剩余项推进。
+
+### K01 当前落点与补齐映射
+
+| 行为组 | 已有原生入口 | 所属步骤补齐点 |
+|---|---|---|
+| 基础内存/文本/外部接口 | `bootstrap-api/{memory,region,arena,buffer,text,io}.h`、对应platform/arena/buffer/text；产品通过libc与utf8proc适配 | 按实际消费者复用；早期C基础实验未进入当前产品构建，不作为汇编完成证明 |
+| JSON/Schema | 产品模型/工具调用json-c；`bootstrap-api/{json,schema}.h`是已有实验入口 | 协议与工具字段随K05/K08验证；复用成熟库 |
+| 服务宿主 | `runtime/host.h`、`host.S` | K02绑定撤销/重新激活与全部服务注入 |
+| Entry/Session/Document | `runtime/session.h/.S` | K03通用记录、文档/表、分页/版本；当前为有界消息事务 |
+| Storage | `runtime/session.h`的pg_storage、`journal.h/.S`、`journal_posix.c` | K04内存/JSONL/SQLite与迁移 |
+| Model | `runtime/agent.h`的pg_model、`mimo.h`、`mimo*.S` | K05目录/认证、多协议与完整内容块 |
+| Task/调度 | `session.h`的pg_run_checkpoint、`agent.h/.S` | K06通用持久任务、timer/join/owner服务 |
+| Generation/工具轮次 | `agent.h/.S`、`session.h/.S` | K07持久generation/tool、deferred与完整恢复 |
+| 编码工具/环境 | `tools.h`、`read_tool.h`、`write_tool.h`、`edit_tool.h`、`bash_tool.h`、`process.h`及手写实现 | K08完整分页/图片/diff与环境契约 |
+| Extension | `tools.h`的工具注册、`host.h`的静态插件 | K09扩展/hook/动态装载 |
+| 输入/会话/分叉 | `submissions.h/.S`、`agent.h/.S` | K10队列、多conversation与fork |
+| 项目资源/MCP/代码工具 | `prompt.h/.S`、`profile.h/.S`的当前配置身份与system快照 | K11资源加载与MCP/codemode |
+| Context/压缩 | `session.h`消息与`mimo_projection.S` | K12投影/压缩任务与摘要 |
+| View/事件/usage | `contracts/client.h`、`client/tui/runtime_bridge.h` | K13完整snapshot/watch/usage与任务图 |
+| 应用组合/TUI入口 | `composition/pangu.c`、`tui_runtime_adapter.h` | K14/K15完整操作与联调 |
+
+实际构建输入以 `governance/assembly-first.json` 为准；`tools/runtime/build_test.py` 验证当前Runtime及提供者替换，基础实验不自动成为产品依赖。K01其余项仍按全部消费者的ABI与释放验证判断。

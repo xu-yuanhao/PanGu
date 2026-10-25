@@ -65,6 +65,13 @@ typedef struct {
     size_t submission_count;
     pg_submission_record submissions[PG_SUBMISSION_LIMIT];
 } pg_session_control;
+/* Source is borrowed until the loaded Session releases its storage. load accepts
+   fresh view/control once and binds/replays its provider; 0 means success.
+   The hosting provider owns partial-open cleanup even when load fails. */
+typedef struct {
+    void *context;
+    int (*load)(void *, pg_session *, pg_session_control *);
+} pg_session_source;
 /* Caller owns view/control, initialized to zero with an explicit storage binding. */
 int pg_session_commit(pg_session *, pg_session_control *, const pg_session_change *);
 /* Explicit volatile mode: Session adoption is its sole in-memory state; no persistence. */

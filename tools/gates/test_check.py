@@ -61,6 +61,18 @@ class AdmissionTests(unittest.TestCase):
             changed=copy.deepcopy(self.policy);changed["files"][name]=kind
             self.assertTrue(inspect(self.root,changed), (name,kind))
 
+    def test_client_tool_scope_and_suffix(self):
+        name = "tools/client/tui/test_tui_pty.py"
+        path = self.root / name
+        path.parent.mkdir(parents=True)
+        path.write_text("pass\n")
+        self.policy["files"][name] = "client-tool"
+        self.assertEqual(inspect(self.root, self.policy), [])
+        for name in ("tools/runtime/other.py", "tools/client/tui/hidden.c", "other.py"):
+            changed = copy.deepcopy(self.policy)
+            changed["files"][name] = "client-tool"
+            self.assertTrue(inspect(self.root, changed), name)
+
     def test_valid_inventory(self):
         self.assertEqual(inspect(self.root, self.policy), [])
 

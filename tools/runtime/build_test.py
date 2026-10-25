@@ -48,7 +48,40 @@ def main():
             else:
                 subprocess.run([output], check=True, timeout=350)
             return 0
+        subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_documents.py')], check=True, timeout=45)
+        native_paths = []
+        for name, define in (('good', None), ('abi', 'BAD_ABI'), ('symbol', 'NO_ENTRY'), ('dependency', 'MISSING_DEP'), ('start', 'START_FAIL')):
+            library = str(Path(directory) / (name + '.so'))
+            subprocess.run(['/usr/bin/clang-23', '-shared', '-fPIC', *(['-D' + define] if define else []),
+                            str(ROOT / 'tests/runtime/native_plugin_fixture.S'), '-o', library], check=True)
+            native_paths.append(library)
         for mode in ('-O0', '-O2'):
+            host_test = str(Path(directory) / 'test-host')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/host'),
+                            str(ROOT / 'tests/runtime/test_host.c'), '-o', host_test], check=True)
+            subprocess.run([host_test], check=True, timeout=15)
+            native_test = str(Path(directory) / 'test-native-plugin')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', '-Wl,--export-dynamic-symbol=pg_host_*',
+                            implementation('src/runtime/host'), implementation('src/runtime/native_plugin'),
+                            str(ROOT / 'tests/runtime/test_native_plugin.c'), '-ldl', '-o', native_test], check=True)
+            subprocess.run([native_test, *native_paths], check=True, timeout=15)
+            documents_test = str(Path(directory) / 'test-documents')
+            documents_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-DPG_DOC_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/documents'), str(ROOT / 'tests/runtime/test_documents.c'),
+                            '-Wl,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_new_string,--wrap=json_object_new_int64,--wrap=json_object_array_add,--wrap=json_object_to_json_string_length,--wrap=json_object_deep_copy',
+                            *documents_flags, '-o', documents_test], check=True)
+            subprocess.run([documents_test], check=True, timeout=15)
+            records_test = str(Path(directory) / 'test-records')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-DPG_RECORD_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/documents'), implementation('src/runtime/records'),
+                            str(ROOT / 'tests/runtime/test_records.c'), '-Wl,--wrap=json_object_deep_copy',
+                            *documents_flags, '-o', records_test], check=True)
+            subprocess.run([records_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
             prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
