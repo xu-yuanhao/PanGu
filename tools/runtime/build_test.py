@@ -88,7 +88,7 @@ def main():
                             '-DPG_MEMORY_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/documents'), implementation('src/runtime/records'), implementation('src/runtime/record_memory'),
                             str(ROOT / 'tests/runtime/test_record_memory.c'),
-                            '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray',
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray,--wrap=json_object_new_array_ext,--wrap=json_object_array_add',
                             *documents_flags, '-o', memory_test], check=True)
             subprocess.run([memory_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')

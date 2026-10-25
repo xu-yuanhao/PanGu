@@ -914,13 +914,16 @@
         "json-c",
         "system libc"
       ],
-      "role": "atomic in-memory table records and global IDs; sorted native rows, pre-reserved storage, detached read/write ownership and synchronous adoption",
+      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption",
       "exports": [
         "pg_record_memory_open",
         "pg_record_memory_close",
         "pg_record_memory_storage",
         "pg_record_memory_mint",
-        "pg_record_memory_read"
+        "pg_record_memory_read",
+        "pg_record_memory_scan",
+        "pg_record_memory_entry",
+        "pg_record_memory_head"
       ],
       "reference_basis": [
         {
@@ -928,9 +931,10 @@
           "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
           "paths": [
             "packages/durable/src/storage/memory.ts",
-            "packages/durable/src/types.ts"
+            "packages/durable/src/types.ts",
+            "packages/durable/src/storage/scan.ts"
           ],
-          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence",
+          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker",
           "tests_to_read": [
             "packages/durable/test/memory-storage.test.ts",
             "packages/durable/test/session-adoption.test.ts"

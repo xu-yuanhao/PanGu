@@ -590,3 +590,917 @@ pg_record_memory_close:
 .Lvalue_name: .asciz "value"
 .Lid: .asciz "id"
 .section .note.GNU-stack,"",@progbits
+.text
+/* Query scalar comparisons preserve JSON type distinctions. */
+.Lscan_number:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ mov r12,rdi
+ call json_object_get_type@PLT
+ sub eax,2
+ cmp eax,1
+ ja .Lscan_number_bad
+ mov rdi,r12
+ call json_object_get_double@PLT
+ cvtsi2sd xmm1,rbx
+ ucomisd xmm0,xmm1
+ jp .Lscan_number_bad
+ jne .Lscan_number_bad
+ mov eax,1
+ jmp .Lscan_number_return
+.Lscan_number_bad:
+ xor eax,eax
+.Lscan_number_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Lscan_string:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ mov r12,rdi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lscan_string_return
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ cmp rax,[rbx+8]
+ jne .Lscan_string_bad
+ test eax,eax
+ jz .Lscan_string_good
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,[rbx]
+ mov rdx,[rbx+8]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lscan_string_bad
+.Lscan_string_good:
+ mov eax,1
+ jmp .Lscan_string_return
+.Lscan_string_bad:
+ xor eax,eax
+.Lscan_string_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Lscan_boolean:
+ push rbx
+ push r12
+ sub rsp,8
+ mov ebx,esi
+ mov r12,rdi
+ mov esi,1
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lscan_boolean_return
+ mov rdi,r12
+ call json_object_get_boolean@PLT
+ cmp eax,ebx
+ sete al
+ movzx eax,al
+.Lscan_boolean_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+.Lscan_match:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov r15,rdi
+ mov r14,rsi
+ mov eax,[r14]
+ cmp eax,1
+ je .Lscan_match_entry
+ test eax,eax
+ jz .Lscan_match_owner
+ cmp eax,2
+ je .Lscan_match_task
+ lea r13,[rip+.Lsubmission_filters]
+ mov r12d,2
+ jmp .Lscan_match_loop
+.Lscan_match_entry:
+ test qword ptr [r14+32],512
+ jz .Lscan_match_yes
+ mov rdi,r15
+ lea rsi,[rip+.Lhead_name]
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ jmp .Lscan_match_return
+.Lscan_match_task:
+ lea r13,[rip+.Ltask_filters]
+ mov r12d,5
+ jmp .Lscan_match_loop
+.Lscan_match_owner:
+ cmp qword ptr [r14+32],0
+ je .Lscan_match_yes
+ mov rdi,r15
+ lea rsi,[rip+.Lowner]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lscan_match_no
+ lea r13,[rip+.Lowner_filters]
+ mov r12d,2
+.Lscan_match_loop:
+ test r12d,r12d
+ jz .Lscan_match_yes
+ mov eax,[r13]
+ test [r14+32],rax
+ jz .Lscan_match_next
+ mov rdi,r15
+ cmp dword ptr [r13+16],3
+ jne .Lscan_match_field
+ cmp dword ptr [r14],2
+ jne .Lscan_match_field
+ lea rsi,[rip+.Lstate]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lscan_match_no
+ mov rdi,r15
+ lea rsi,[rip+.Lstate]
+ call json_object_object_get@PLT
+ mov rdi,rax
+.Lscan_match_field:
+ mov rsi,[r13+8]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,[r13+4]
+ add rsi,r14
+ mov eax,[r13+16]
+ test eax,eax
+ jz .Lscan_match_numeric
+ cmp eax,1
+ je .Lscan_match_text
+ cmp eax,2
+ je .Lscan_match_bool
+ mov eax,[r14+96]
+ shl rax,4
+ lea rsi,[rip+.Lsubmission_statuses]
+ cmp dword ptr [r14],2
+ jne .Lscan_match_status
+ lea rsi,[rip+.Ltask_statuses]
+.Lscan_match_status:
+ add rsi,rax
+.Lscan_match_text:
+ call .Lscan_string
+ jmp .Lscan_match_result
+.Lscan_match_numeric:
+ mov rsi,[rsi]
+ call .Lscan_number
+ jmp .Lscan_match_result
+.Lscan_match_bool:
+ mov esi,[rsi]
+ call .Lscan_boolean
+.Lscan_match_result:
+ test eax,eax
+ jz .Lscan_match_no
+.Lscan_match_next:
+ add r13,24
+ dec r12d
+ jmp .Lscan_match_loop
+.Lscan_match_yes:
+ mov eax,1
+ jmp .Lscan_match_return
+.Lscan_match_no:
+ xor eax,eax
+.Lscan_match_return:
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.Lscan_single:
+ mov ecx,1
+ jmp .Lscan_impl
+.globl pg_record_memory_scan
+.type pg_record_memory_scan,@function
+pg_record_memory_scan:
+ xor ecx,ecx
+.Lscan_impl:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,120
+ mov [rsp+112],ecx
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor ebp,ebp
+ mov qword ptr [rsp],0 /* result array */
+ mov qword ptr [rsp+8],0 /* copied item */
+ mov qword ptr [rsp+16],0 /* segment count */
+ mov qword ptr [rsp+24],0 /* segment capacity */
+ mov qword ptr [rsp+32],0 /* segment index */
+ mov qword ptr [rsp+40],0 /* returned items */
+ mov qword ptr [rsp+48],0 /* last returned ID */
+ mov dword ptr [rsp+56],0 /* more */
+ test r13,r13
+ jz .Lscan_invalid_return
+ mov qword ptr [r13],0
+ mov qword ptr [r13+8],0
+ mov qword ptr [r13+16],0
+ test rbx,rbx
+ jz .Lscan_invalid_return
+ test r12,r12
+ jz .Lscan_invalid_return
+ cmp dword ptr [rbx+44],0
+ jne .Lscan_invalid_return
+ cmp dword ptr [rbx+40],1
+ je .Lscan_invalid_return
+ cmp qword ptr [rbx+24],0
+ je .Lscan_invalid_return
+ cmp dword ptr [r12],3
+ ja .Lscan_invalid_return
+ cmp dword ptr [r12+4],2
+ ja .Lscan_invalid_return
+ cmp dword ptr [r12+8],1
+ ja .Lscan_invalid_return
+ cmp qword ptr [r12+24],0
+ je .Lscan_invalid_return
+ mov eax,[r12]
+ lea rcx,[rip+.Lscan_masks]
+ mov eax,[rcx+rax*4]
+ not rax
+ test [r12+32],rax
+ jnz .Lscan_invalid_return
+ cmp dword ptr [r12],1
+ jne .Lscan_fields
+ test qword ptr [r12+32],1
+ jz .Lscan_invalid_return
+.Lscan_fields:
+ xor r14d,r14d
+ mov r15,9007199254740991
+.Lscan_numeric_fields:
+ mov ecx,r14d
+ mov eax,1
+ shl rax,cl
+ test [r12+32],rax
+ jz .Lscan_numeric_next
+ mov rax,[r12+r14*8+40]
+ cmp rax,r15
+ ja .Lscan_invalid_return
+ cmp r14d,3
+ jae .Lscan_numeric_next
+ test rax,rax
+ jz .Lscan_invalid_return
+.Lscan_numeric_next:
+ inc r14d
+ cmp r14d,5
+ jb .Lscan_numeric_fields
+ test qword ptr [r12+32],32
+ jz .Lscan_validate_status
+ mov rax,[r12+88]
+ cmp rax,0x7fffffff
+ ja .Lscan_invalid_return
+ test rax,rax
+ jz .Lscan_validate_status
+ cmp qword ptr [r12+80],0
+ je .Lscan_invalid_return
+.Lscan_validate_status:
+ test qword ptr [r12+32],64
+ jz .Lscan_validate_booleans
+ mov eax,3
+ cmp dword ptr [r12],2
+ jne .Lscan_status_limit
+ mov eax,5
+.Lscan_status_limit:
+ cmp [r12+96],eax
+ ja .Lscan_invalid_return
+.Lscan_validate_booleans:
+ test qword ptr [r12+32],128
+ jz .Lscan_background
+ cmp dword ptr [r12+100],1
+ ja .Lscan_invalid_return
+.Lscan_background:
+ test qword ptr [r12+32],256
+ jz .Lscan_order
+ cmp dword ptr [r12+104],1
+ ja .Lscan_invalid_return
+.Lscan_order:
+ mov r14d,1
+ cmp dword ptr [r12],1
+ jne .Lscan_fallback
+ mov r14d,2
+.Lscan_fallback:
+ cmp dword ptr [r12+8],0
+ je .Lscan_no_cursor
+ cmp dword ptr [r12+12],2
+ ja .Lscan_invalid_return
+ mov eax,[r12+12]
+ test eax,eax
+ jz .Lscan_cursor_order
+ mov r14d,eax
+.Lscan_cursor_order:
+ mov eax,[r12+4]
+ test eax,eax
+ jz .Lscan_cursor_bound
+ cmp eax,r14d
+ jne .Lscan_invalid_return
+.Lscan_cursor_bound:
+ mov rax,[r12+16]
+ cmp rax,r15
+ jg .Lscan_invalid_return
+ mov rcx,r15
+ neg rcx
+ cmp rax,rcx
+ jl .Lscan_invalid_return
+ jmp .Lscan_order_ready
+.Lscan_no_cursor:
+ mov eax,[r12+4]
+ test eax,eax
+ jz .Lscan_order_ready
+ mov r14d,eax
+.Lscan_order_ready:
+ mov [rsp+60],r14d
+ mov qword ptr [rsp+64],0 /* entry lower */
+ mov [rsp+72],r15 /* entry upper */
+ cmp dword ptr [r12],1
+ jne .Lscan_allocate_page
+ test qword ptr [r12+32],8
+ jz .Lscan_entry_max
+ mov rax,[r12+64]
+ mov [rsp+64],rax
+.Lscan_entry_max:
+ test qword ptr [r12+32],16
+ jz .Lscan_entry_cursor
+ mov rax,[r12+72]
+ mov [rsp+72],rax
+.Lscan_entry_cursor:
+ cmp dword ptr [r12+8],0
+ je .Lscan_entry_first
+ mov rax,[r12+16]
+ cmp r14d,1
+ je .Lscan_entry_min_cursor
+ dec rax
+ cmp rax,[rsp+72]
+ jge .Lscan_entry_first
+ mov [rsp+72],rax
+ jmp .Lscan_entry_first
+.Lscan_entry_min_cursor:
+ inc rax
+ cmp rax,[rsp+64]
+ jle .Lscan_entry_first
+ mov [rsp+64],rax
+.Lscan_entry_first:
+ mov rax,[r12+40]
+ mov [rsp+80],rax /* current conversation */
+.Lscan_segment_build:
+ mov rdi,rbx
+ mov rsi,[rsp+80]
+ call .Lmemory_lower
+ cmp rax,[rbx+8]
+ jae .Lscan_invalid_cleanup
+ shl rax,5
+ add rax,[rbx]
+ mov rcx,[rsp+80]
+ cmp [rax],rcx
+ jne .Lscan_invalid_cleanup
+ cmp dword ptr [rax+24],0
+ jne .Lscan_invalid_cleanup
+ mov rax,[rax+8]
+ mov [rsp+88],rax /* conversation value */
+ mov rax,[rsp+16]
+ cmp rax,[rbx+8]
+ jae .Lscan_invalid_cleanup
+ cmp rax,[rsp+24]
+ jb .Lscan_segment_slot
+ mov rsi,[rsp+24]
+ test rsi,rsi
+ jnz .Lscan_segment_double
+ mov esi,4
+ jmp .Lscan_segment_allocate
+.Lscan_segment_double:
+ shl rsi,1
+.Lscan_segment_allocate:
+ mov [rsp+96],rsi
+ mov rdi,rbp
+ mov edx,16
+ call reallocarray@PLT
+ test rax,rax
+ jz .Lscan_allocation_cleanup
+ mov rbp,rax
+ mov rax,[rsp+96]
+ mov [rsp+24],rax
+.Lscan_segment_slot:
+ mov rax,[rsp+16]
+ shl rax,4
+ mov rcx,[rsp+80]
+ mov [rbp+rax],rcx
+ mov rcx,[rsp+72]
+ mov [rbp+rax+8],rcx
+ inc qword ptr [rsp+16]
+ cmp dword ptr [rsp+60],2
+ je .Lscan_descending_ready
+.Lscan_parent_step:
+ mov rdi,[rsp+88]
+ lea rsi,[rip+.Lparent]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lscan_parent_exhausted
+ mov [rsp+96],rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lscan_invalid_cleanup
+ mov rax,[rsp+72]
+ cmp rax,[rsp+64]
+ jl .Lscan_parent_exhausted
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lat]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lscan_safe_number
+ test edx,edx
+ jz .Lscan_invalid_cleanup
+ cmp rax,[rsp+72]
+ jge .Lscan_parent_id
+ mov [rsp+72],rax
+.Lscan_parent_id:
+ mov rax,[rsp+72]
+ cmp rax,[rsp+64]
+ jl .Lscan_parent_exhausted
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lconversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lscan_safe_number
+ test edx,edx
+ jz .Lscan_invalid_cleanup
+ test rax,rax
+ jle .Lscan_invalid_cleanup
+ mov [rsp+80],rax
+ jmp .Lscan_segment_build
+.Lscan_parent_exhausted:
+ cmp dword ptr [rsp+60],2
+ je .Lscan_success
+.Lscan_segments_ready:
+ mov rax,[rsp+16]
+ dec rax
+ mov [rsp+32],rax
+ jmp .Lscan_allocate_page
+.Lscan_descending_ready:
+ mov rax,[rsp+16]
+ dec rax
+ mov [rsp+32],rax
+.Lscan_allocate_page:
+ cmp qword ptr [rsp],0
+ jne .Lscan_segment_start
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lscan_allocation_cleanup
+ mov [rsp],rax
+.Lscan_segment_start:
+ cmp dword ptr [rsp+60],1
+ jne .Lscan_start_descending
+ xor r14d,r14d
+ cmp dword ptr [r12],1
+ je .Lscan_start_entry_ascending
+ cmp dword ptr [r12+8],0
+ je .Lscan_row_loop
+ mov rsi,[r12+16]
+ test rsi,rsi
+ js .Lscan_row_loop
+ inc rsi
+ jmp .Lscan_start_lower
+.Lscan_start_entry_ascending:
+ mov rsi,[rsp+64]
+.Lscan_start_lower:
+ mov rdi,rbx
+ call .Lmemory_lower
+ mov r14,rax
+ jmp .Lscan_row_loop
+.Lscan_start_descending:
+ mov r14,[rbx+8]
+ dec r14
+ cmp dword ptr [r12],1
+ je .Lscan_start_entry_descending
+ cmp dword ptr [r12+8],0
+ je .Lscan_row_loop
+ mov rsi,[r12+16]
+ test rsi,rsi
+ jle .Lscan_start_empty
+ jmp .Lscan_start_upper
+.Lscan_start_entry_descending:
+ mov rax,[rsp+32]
+ shl rax,4
+ mov rsi,[rbp+rax+8]
+ test rsi,rsi
+ js .Lscan_start_empty
+ inc rsi
+.Lscan_start_upper:
+ mov rdi,rbx
+ call .Lmemory_lower
+ lea r14,[rax-1]
+ jmp .Lscan_row_loop
+.Lscan_start_empty:
+ mov r14,-1
+.Lscan_row_loop:
+ test r14,r14
+ js .Lscan_segment_done
+ cmp r14,[rbx+8]
+ jae .Lscan_segment_done
+ mov r15,r14
+ shl r15,5
+ add r15,[rbx]
+ mov eax,[r12]
+ cmp [r15+24],eax
+ jne .Lscan_row_next
+ cmp eax,1
+ je .Lscan_entry_row
+ cmp dword ptr [r12+8],0
+ je .Lscan_row_match
+ mov rax,[r15]
+ cmp rax,[r12+16]
+ je .Lscan_row_next
+ cmp dword ptr [rsp+60],1
+ je .Lscan_row_after_ascending
+ cmp rax,[r12+16]
+ jge .Lscan_row_next
+ jmp .Lscan_row_match
+.Lscan_row_after_ascending:
+ cmp rax,[r12+16]
+ jle .Lscan_row_next
+ jmp .Lscan_row_match
+.Lscan_entry_row:
+ mov rax,[r15]
+ cmp rax,[rsp+64]
+ jl .Lscan_entry_below
+ mov rcx,[rsp+32]
+ shl rcx,4
+ cmp rax,[rbp+rcx+8]
+ jg .Lscan_entry_above
+ mov rax,[rbp+rcx]
+ mov [rsp+104],rax
+ mov rdi,[r15+8]
+ lea rsi,[rip+.Lconversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,[rsp+104]
+ call .Lscan_number
+ test eax,eax
+ jz .Lscan_row_next
+ jmp .Lscan_row_match
+.Lscan_entry_below:
+ cmp dword ptr [rsp+60],2
+ je .Lscan_segment_done
+ jmp .Lscan_row_next
+.Lscan_entry_above:
+ cmp dword ptr [rsp+60],1
+ je .Lscan_segment_done
+ jmp .Lscan_row_next
+.Lscan_row_match:
+ mov rdi,[r15+8]
+ mov rsi,r12
+ call .Lscan_match
+ test eax,eax
+ jz .Lscan_row_next
+ mov rax,[rsp+40]
+ cmp rax,[r12+24]
+ jae .Lscan_more
+ mov rdi,[r15+8]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lscan_allocation_cleanup
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lscan_allocation_cleanup
+ mov qword ptr [rsp+8],0
+ mov rax,[r15]
+ mov [rsp+48],rax
+ inc qword ptr [rsp+40]
+ cmp dword ptr [rsp+112],0
+ jne .Lscan_success
+.Lscan_row_next:
+ cmp dword ptr [rsp+60],1
+ je .Lscan_row_up
+ dec r14
+ jmp .Lscan_row_loop
+.Lscan_row_up:
+ inc r14
+ jmp .Lscan_row_loop
+.Lscan_segment_done:
+ cmp dword ptr [r12],1
+ jne .Lscan_success
+ cmp dword ptr [rsp+60],1
+ je .Lscan_segment_parent_first
+ jmp .Lscan_parent_step
+.Lscan_segment_parent_first:
+ dec qword ptr [rsp+32]
+ jns .Lscan_segment_start
+ jmp .Lscan_success
+.Lscan_more:
+ mov dword ptr [rsp+56],1
+.Lscan_success:
+ mov rax,[rsp]
+ mov [r13],rax
+ mov qword ptr [rsp],0
+ mov eax,[rsp+60]
+ mov [r13+16],eax
+ mov eax,[rsp+56]
+ mov [r13+20],eax
+ test eax,eax
+ jz .Lscan_no_next
+ mov rax,[rsp+48]
+ mov [r13+8],rax
+.Lscan_no_next:
+ xor r14d,r14d
+ jmp .Lscan_cleanup
+.Lscan_invalid_cleanup:
+ mov r14d,2
+ jmp .Lscan_cleanup
+.Lscan_allocation_cleanup:
+ mov r14d,3
+.Lscan_cleanup:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,rbp
+ call free@PLT
+ mov eax,r14d
+ jmp .Lscan_return
+.Lscan_invalid_return:
+ mov eax,2
+.Lscan_return:
+ add rsp,120
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_scan,.-pg_record_memory_scan
+
+/* Signed safe integer field for fork metadata. */
+.Lscan_safe_number:
+ push rbx
+ mov rbx,rdi
+ call json_object_get_type@PLT
+ cmp eax,3
+ je .Lscan_safe_integer
+ cmp eax,2
+ jne .Lscan_safe_bad
+ mov rdi,rbx
+ call json_object_get_double@PLT
+ cvttsd2si rax,xmm0
+ cvtsi2sd xmm1,rax
+ ucomisd xmm0,xmm1
+ jp .Lscan_safe_bad
+ jne .Lscan_safe_bad
+ jmp .Lscan_safe_bound
+.Lscan_safe_integer:
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+.Lscan_safe_bound:
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ jg .Lscan_safe_bad
+ neg rcx
+ cmp rax,rcx
+ jl .Lscan_safe_bad
+ mov edx,1
+ pop rbx
+ ret
+.Lscan_safe_bad:
+ xor edx,edx
+ pop rbx
+ ret
+.section .rodata
+.Lscan_masks: .long 6,537,481,65
+.Lowner: .asciz "owner"
+.Lstate: .asciz "state"
+.Lparent: .asciz "parent"
+.Lat: .asciz "at"
+.Lconversation_id: .asciz "conversationId"
+.Ltask_id: .asciz "taskId"
+.Lkind_filter: .asciz "kind"
+.Lstatus_filter: .asciz "status"
+.Labort_requested: .asciz "abortRequested"
+.Lbackground_filter: .asciz "background"
+.Lpending: .asciz "pending"
+.Lrunning: .asciz "running"
+.Lwaiting: .asciz "waiting"
+.Lsleeping: .asciz "sleeping"
+.Lcompleting: .asciz "completing"
+.Lterminal: .asciz "terminal"
+.Lqueued: .asciz "queued"
+.Lplaced: .asciz "placed"
+.Ldone: .asciz "done"
+.Lunanswered: .asciz "unanswered"
+.section .data.rel.ro
+.Lowner_filters:
+ .long 2,48
+ .quad .Lconversation_id
+ .long 0,0
+ .long 4,56
+ .quad .Ltask_id
+ .long 0,0
+.Ltask_filters:
+ .long 1,40
+ .quad .Lconversation_id
+ .long 0,0
+ .long 32,80
+ .quad .Lkind_filter
+ .long 1,0
+ .long 64,96
+ .quad .Lstatus_filter
+ .long 3,0
+ .long 128,100
+ .quad .Labort_requested
+ .long 2,0
+ .long 256,104
+ .quad .Lbackground_filter
+ .long 2,0
+.Lsubmission_filters:
+ .long 1,40
+ .quad .Lconversation_id
+ .long 0,0
+ .long 64,96
+ .quad .Lstatus_filter
+ .long 3,0
+.Ltask_statuses:
+ .quad .Lpending,7,.Lrunning,7,.Lwaiting,7,.Lsleeping,8,.Lcompleting,10,.Lterminal,8
+.Lsubmission_statuses:
+ .quad .Lqueued,6,.Lplaced,6,.Ldone,4,.Lunanswered,10
+
+.text
+/* Detach a first page item and release the page container. */
+.Lscan_first:
+ push rbx
+ push r12
+ push r13
+ sub rsp,32
+ mov r12,rdx
+ mov qword ptr [r12],0
+ mov rdx,rsp
+ call .Lscan_single
+ mov r13d,eax
+ test eax,eax
+ jnz .Lscan_first_cleanup
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lscan_first_missing
+ mov rdi,[rsp]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [r12],rax
+ jmp .Lscan_first_cleanup
+.Lscan_first_missing:
+ mov r13d,1
+.Lscan_first_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r13d
+ add rsp,32
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.globl pg_record_memory_entry
+.type pg_record_memory_entry,@function
+pg_record_memory_entry:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,136
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov ebp,2
+ test r14,r14
+ jz .Lentry_lookup_return
+ mov qword ptr [r14],0
+ test r15,r15
+ jz .Lentry_lookup_return
+ mov qword ptr [r15],0
+ test r13,r13
+ jnz .Lentry_lookup_scoped
+ mov esi,1
+ mov rdx,r12
+ mov rcx,r14
+ call pg_record_memory_read
+ jmp .Lentry_lookup_read
+.Lentry_lookup_scoped:
+ test r12,r12
+ jz .Lentry_lookup_return
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov dword ptr [rsp],1
+ mov qword ptr [rsp+24],1
+ mov qword ptr [rsp+32],25
+ mov [rsp+40],r13
+ mov [rsp+64],r12
+ mov [rsp+72],r12
+ mov rdi,rbx
+ mov rsi,rsp
+ mov rdx,r14
+ call .Lscan_first
+.Lentry_lookup_read:
+ mov ebp,eax
+ test eax,eax
+ jnz .Lentry_lookup_return
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lmemory_lower
+ shl rax,5
+ add rax,[rbx]
+ mov rax,[rax+16]
+ mov [r15],rax
+.Lentry_lookup_return:
+ mov eax,ebp
+ add rsp,136
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_entry,.-pg_record_memory_entry
+
+.globl pg_record_memory_head
+.type pg_record_memory_head,@function
+pg_record_memory_head:
+ push rbx
+ push r12
+ push r13
+ sub rsp,112
+ mov rbx,rdi
+ mov r12,rcx
+ mov r13,rdx
+ test r12,r12
+ jz .Lhead_lookup_invalid
+ mov qword ptr [r12],0
+ mov rdx,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov dword ptr [rsp],1
+ mov qword ptr [rsp+24],1
+ mov qword ptr [rsp+32],513
+ mov [rsp+40],rdx
+ cmp r13,-1
+ je .Lhead_lookup_query
+ or qword ptr [rsp+32],16
+ mov [rsp+72],r13
+.Lhead_lookup_query:
+ mov rdi,rbx
+ mov rsi,rsp
+ mov rdx,r12
+ call .Lscan_first
+ jmp .Lhead_lookup_return
+.Lhead_lookup_invalid:
+ mov eax,2
+.Lhead_lookup_return:
+ add rsp,112
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_memory_head,.-pg_record_memory_head
+.section .rodata
+.Lhead_name: .asciz "head"

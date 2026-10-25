@@ -125,3 +125,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 430次实际Pi MemoryStorage差异操作通过；O0/O2 ASan/UBSan覆盖混合/重复/乱序批次、拒绝无半批、容量增长、序号、mint、独立读取、关闭/重开及关闭后读取副本存活。复制部分结果、暂存分配、已有行扩容、读取复制故障均释放并保持原状态；页尾提供者通过。Runtime全专项退出0。暂存核心候选在已提交TUI基线的独立树中G00、assembly-first与产品链接通过；共享树的TUI候选继续按交接集成。Pi/Harness fetch后旧/新提交均仍为当前固定版本，无新增上游修复。
 
 同一Agent自审：四个新增文件及现有模块/源/测试登记，固定暂存源包摘要 `7afd17e5aa6aa7bbcdabc8b87dd2463a70c830c193b62bef8ff1771a83e1bc1c`；算法为本批9个改动路径排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256，不包含本记录。候选清单排除尚未交接的TUI工具登记，工作区保留其登记。风险/原生差异：此ABI的记录ID为正safe整数；采用有序行存储，查询返回owned JSON；调用方串行访问。消息/工具预算及门禁判定保持原值，K03/K04整体仍未验收。
+
+## K03 分页、分叉可见性与Entry元数据（2026-10-26）
+
+同一内存提供者新增四表过滤分页、旧/新游标顺序、fork-aware Entry/commitSeq和latest head读取。采用Pi的scanStart/nextCursor、visibleEntries/visibleEntriesAscending及entry/findLatestHeadMarker；原生Query/Page明确presence bits、枚举、正整数limit和owned快照。游标用二分定位；降序按需访问祖先，升序收集可见段；点读/head取首项终止。实际缺失祖先边界先复现差异，再修正为按需回溯。
+
+1324次实际Pi操作对照、最终O0/O2 ASan/UBSan和Runtime全专项通过。覆盖全状态/owner/kind/bool过滤、七层fork、inclusive bounds、非法游标、短页/head截点、adopt中查询、Query/Page页尾与关闭后快照；分配失败含段缓存、输出数组、部分页追加和Entry复制，失败输出归零。暂存核心在独立已提交TUI基线树中G00、assembly-first与产品构建通过。
+
+同一Agent自审7文件源包摘要 `b4ffb2ae758635c44cdd49b36aed26ff34cb3b665d6e4aa857ddcd5f8560eca9`，算法为排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256，本记录另行保存。本批只扩展当前提供者与对应测试/接口登记；Native扫描按有序行和可见fork段过滤，性能取决于候选范围。Document revision、文档地址查询与完整Tx暂存继续按K03实现，K03整体验收仍未完成。

@@ -73,6 +73,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植Document地址身份、作用域/owner/family-key解析和上游JSON tuple编码，作为事务/存储查询共用基础。
 - [x] 移植通用准备批次的Storage提交边界：脱离调用者输入、同步adopt、成功结算后发布、只读/空批次及失败锁存。
 - [x] 完成conversation/entry/task/submission四类记录的内存批次准备、原子应用、全局ID分配与独立点读；接通通用提交入口。
+- [x] 完成四类表过滤/分页/游标顺序、fork-aware Entry可见范围、提交序号及latest head marker读取。
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
@@ -215,7 +216,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03批次验证：O0/O2 ASan/UBSan专项通过；混合Entry/Document准备批次用确定性Storage边界验证整批脱离、adopt-before-resolve/publication、空/只读、重复/缺失/错误序号、回调内重入拒绝、采纳失败不会逃逸到Storage、后端失败锁存，以及复制失败/部分复制清理和页尾Session布局。完整记录约束由Storage/Tx实现，当前模块是提交契约，尚未接通通用记录持久提供者。
 - K03内存表提供者：`record_memory.h/.S` 对应Pi固定提交 `storage/memory.ts:prepareCommit/checkGlobalIds/applyPreparedCommit/mintId/conversation/entry/task/submission`。四类记录先复制/校验并预留容量，再无分配地应用与同步adopt；原生用有序行数组和libc qsort维护索引，避免每次克隆全部已存状态。ID全局共享，conversation/entry不可覆盖，task/submission仅原类型更新且同批最后值生效；读返回owned副本。
 - K03提供者验证：`test_record_memory.py` 直接导入实际MemoryStorage与实际Chord/delta，430次混合批次/读取/mint操作一致，含整数/整数浮点ID；O0/O2专项验证乱序/重复/跨表ID、失败无半批、替换/读取隔离、容量增长、提交序号、释放/重开、与pg_records_commit组合。ASan/UBSan及分配失败检查通过，故障覆盖深复制的部分结果、暂存分配、已有行扩容失败、读取复制失败和页尾提供者对象。当前提供者仍待Document revision与扫描/查询接入。
-- 下一完整行为：同一内存提供者补Document revision/地址查询与扫描，然后接事务暂存及当前消息投影。
+- K03表查询：`record_memory.h/.S` 的 `pg_record_memory_scan/entry/head` 对应Pi `storage/scan.ts:scanStart/nextCursor`、MemoryStorage的四类scan、`visibleEntries/visibleEntriesAscending`、`entry/findLatestHeadMarker`。原生Query/Page使用明确C布局，过滤字段采用presence bits，状态/顺序用enum；limit为正整数，游标after为signed-safe整数，旧游标保留表默认顺序。Entry按fork段及各层at截点遍历，降序按需访问祖先，升序先收集可见段；Entry/head取首项即结束，cursor通过二分定位起点；读取返回owned快照。
+- K03查询验证：实际Pi累计1324次批次/点读/分页/Entry/head/ID操作一致，覆盖六种task状态、四种submission状态、owner/kind/bool过滤、NUL/Unicode、旧/新游标、非法顺序/非safe游标、七层fork、inclusive bounds及head截点，含短页/点读在访问缺失祖先前成功的惰性边界。O0/O2 ASan/UBSan验证Query/Page页尾、关闭后快照、adopt期间查询、部分分页分配失败和错误输出归零。当前按有序全局行过滤，各fork段按引用范围扫描；Document查询及Tx暂存继续接入。
+- 下一完整行为：同一提供者补Document revision/地址查询，接事务暂存及当前消息投影。
 
 ### K01 当前落点与补齐映射
 
