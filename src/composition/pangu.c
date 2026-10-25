@@ -18,6 +18,7 @@
 static pg_agent agent;
 static pg_mimo provider;
 static pg_tool_registry registry;
+static pg_tool_registry file_registry;
 static pg_read_tool reader={.directory=-1};
 static pg_write_tool writer={.directory=-1};
 static pg_edit_tool editor;
@@ -38,7 +39,9 @@ int main(int argc,char **argv){
  pg_process_init(&command_process);
  pg_process_ops command_ops=pg_process_service(&command_process);
  if(pg_bash_tool_init(&shell_tool,&command_ops,reader.directory,command_environment))goto cleanup;
- editor.files=pg_tool_registry_service(&registry);
+ pg_tool_definition file_tools[]={pg_read_snapshot_definition(&reader),pg_write_tool_definition(&writer)};
+ if(pg_tool_registry_init(&file_registry,file_tools,2))goto cleanup;
+ editor.files=pg_tool_registry_service(&file_registry);
  pg_tool_definition tools[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor),pg_bash_tool_definition(&shell_tool)};if(pg_tool_registry_init(&registry,tools,4))goto cleanup;
  pg_model model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);
  if(pg_agent_init(&agent,model,pg_tool_registry_service(&registry)))goto cleanup;
@@ -48,7 +51,7 @@ int main(int argc,char **argv){
   const char *model_name=getenv("MIMO_MODEL");if(!model_name)model_name="mimo-v2.6-pro";
   workspace=realpath(path,0);
   if(!workspace || fstat(reader.directory,&status)){fputs("Cannot identify workspace.\n",stderr);goto cleanup;}
-  pg_profile_spec profile={.provider={"mimo-token-plan-cn/v1",sizeof("mimo-token-plan-cn/v1")-1},.model={model_name,strlen(model_name)},.workspace={workspace,strlen(workspace)},.implementation={"pangu.native.read-write-edit-bash-v1",sizeof("pangu.native.read-write-edit-bash-v1")-1},.tools=&registry,.device=(uint64_t)status.st_dev,.inode=(uint64_t)status.st_ino};
+  pg_profile_spec profile={.provider={"mimo-token-plan-cn/v1",sizeof("mimo-token-plan-cn/v1")-1},.model={model_name,strlen(model_name)},.workspace={workspace,strlen(workspace)},.implementation={"pangu.native.read-write-edit-bash-v2",sizeof("pangu.native.read-write-edit-bash-v2")-1},.tools=&registry,.device=(uint64_t)status.st_dev,.inode=(uint64_t)status.st_ino};
   if(pg_profile_encode(&profile,identity,sizeof(identity),&identity_size)){fputs("Runtime profile exceeds supported bounds or contains invalid configuration.\n",stderr);goto cleanup;}
   storage=open(session_directory,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
   if(storage<0 || pg_journal_open(&journal,storage,"session.pgj",&agent.session,&agent.commits)){fputs("Cannot open persistent session (directory, lock or journal validation).\n",stderr);goto cleanup;}

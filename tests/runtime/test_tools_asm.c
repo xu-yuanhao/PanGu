@@ -222,6 +222,12 @@ static void test_sret_aggregates(void)
 	assert(strcmp(rd.schema,
 	       "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}") == 0);
 	assert(rd.validate && rd.authorize && rd.execute);
+	(void)abi_probe3((abi_fn3)pg_read_snapshot_definition,(unsigned long)&rd,(unsigned long)&reader,0);
+	check_sentinels();
+	assert(!strcmp(rd.name,"read")&&rd.context==&reader&&!strstr(rd.schema,"offset"));
+	assert(rd.validate(rd.context,s("{\"path\":\"a\"}")));
+	assert(!rd.validate(rd.context,s("{\"path\":\"a\",\"offset\":1}")));
+	assert(!rd.validate(rd.context,s("{\"path\":\"a\",\"limit\":3000}")));
 	/* ABI 探针 + 哨兵 */
 	assert(abi_probe3((abi_fn3)pg_read_tool_open, (unsigned long)&reader,
 	                   (unsigned long)"/nonexistent-pangu-abi-probe", 0) == 1);

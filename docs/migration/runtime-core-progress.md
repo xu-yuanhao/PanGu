@@ -788,3 +788,16 @@ read_tool.S原地实现4096字节块扫描和逐行选择，沿用最多4095字�
 真实模型：现有PTY新增--live-read-pages，当前源码执行退出0，MiMo从第一页按offset续读到未在提示词透露的末段随机标记，只用read、无文件变动；离线退出/信号/resize/termios/持久idle同时通过。本阶段原有--live-workflow也实际通过read/edit/write/bash构建运行汇编。凭据仅子进程环境，不入仓库。
 
 同一Agent按授权自审PARTIAL契约、模块范围/来源和测试语义更新，不是独立审核。没有改检查器、提高既有消息配额或伪称生产准入；新扫描上限与同步IO限制已列出。新TUI派发仅定义任务，不含其未实现能力。G00、assembly-first与diff检查通过，生产准入保持原状态。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`bf23fcf41b168f48214f1002b30ea56f967b27987ae8891c48872c2bf1a06aa0`。
+
+
+## 2026-10-26：编辑原文与模型读取展示分离
+
+读取Pi d5b3de22 Durable tools/edit.ts::createEditTool到env/node.ts::readTextFile的调用，确认编辑读取完整原文，不消费模型read的截断展示。原生保留既有pg_tools注入形状，由静态组合提供独立file registry（仅snapshot-read/write），模型registry仍提供分页read/write/edit/bash。新增pg_read_snapshot_definition工厂，共用read_tool.S解析/安全打开/读取/UTF-8实现；每次调用的局部模式选择完整快照，不复制旧实现。snapshot仅接受path，拒绝offset/limit，超出全文容量直接错误，不返回PARTIAL或页面提示。
+
+这修复了一个具体回退：文件小于4095字节、但超过2000行时，模型read合理分页，edit却因此不能工作。新增2001个换行的可编码全文编辑检查，完整保留其他字节；保留fake PARTIAL注入拒绝与超大全文零写入检查。模型输出/全文/参数既有容量均不扩大，长文件与JSON编码超限仍明确拒绝。内部registry复用既有定义/授权/执行逻辑，额外静态状态1184字节，edit上下文仍56字节，read调用栈不增加，新工厂为同一服务实现的入口。组合身份升级read-write-edit-bash-v2，未让活动旧配置静默改用不同内部提供者。
+
+独立Runtime/read/registry/edit的O0 UBSan与O2 ASan/UBSan检查退出0，包含新sret工厂ABI/参数拒绝、分页回归、17个编辑分配失败点和真实副作用恢复。批次初始完整核心O0/O2检查曾通过；并行Agent随后修改TUI输入布局，当前产品链接因尚未同步的TUI_LI_INPUT_PENDING_NEED失败，未动对方文件或放宽链接。随后用git archive HEAD（6e8c0ec）加本批自有文件组成临时固定候选树，排除对方未完成TUI修改，实际--live-snapshot-edit退出0：MiMo/TUI编辑第2001行、范围回读、保留2000个前导换行，settled重开不改日志/不重新运行，终端恢复检查通过。临时目录运行后清理；当前共享TUI的新输入体验仍待独立交接，不能把旧TUI组合验证转作其验收。
+
+为继续验证已授权核心路径，扩展现有live_mimo_batch.c及build_test.py的--live-snapshot-edit：直接用真实MiMo/Model/Agent/文件服务，无TUI替身，实际edit第2001行、read范围核验，并断言2000个前导换行逐字节保留、没有write工具替代或错误结果。该真实入口退出0，凭据仅子进程环境。它不是TUI或持久化重开验收。
+
+同一Agent自审新工厂导出、静态组合/身份和模块来源更新，非独立审核；没有新增源文件、依赖、检查器或放宽预算。G00、assembly-first和diff检查通过，整机集成与生产准入不因此放行。固定包SHA256（仅本批上述Runtime/组合/测试/登记/主TODO文件，不含本记录及并行TUI文件；排序[path,文件SHA256]紧凑UTF-8 JSON）：`6dedfb0e0a6074989cd1af2cd80cc806d4e8d08ed4c1b62da52672fd89262422`。

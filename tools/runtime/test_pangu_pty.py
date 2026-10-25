@@ -484,6 +484,40 @@ def read_pages_live(binary, root):
     assert checkpoints(storage / 'session.pgj')[-1][1] == 3
     print('PASS: actual MiMo/TUI followed read pagination to an undisclosed late-file marker, without shell or file mutation', flush=True)
 
+def snapshot_edit_live(binary, root):
+    storage = root / 'snapshot-edit-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    original = b'\n' * 2000 + b'UNIQUE_OLD\n'
+    expected = original.replace(b'UNIQUE_OLD', b'UNIQUE_NEW')
+    path = root / 'many-lines.txt'
+    path.write_bytes(original)
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.send(b'Use edit exactly once on many-lines.txt to replace UNIQUE_OLD with UNIQUE_NEW. Preserve every other byte. Do not use bash or write. Then use read with offset 2001 and limit 1 to verify the changed line. Report the result briefly.\r')
+        terminal.until(b'[run] finished: success', 150)
+        assert b'[tool] edit' in terminal.output and b'[tool] read' in terminal.output
+        assert b'finished error:' not in terminal.output and b'[tool] bash' not in terminal.output and b'[tool] write' not in terminal.output
+        assert path.read_bytes() == expected
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    data = (storage / 'session.pgj').read_bytes()
+    assert b'pangu.native.read-write-edit-bash-v2' in data and env['MIMO_API_KEY'].encode() not in data
+    assert checkpoints(storage / 'session.pgj')[-1][1] == 3
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        assert b'[history] result edit' in terminal.output and b'[run] started' not in terminal.output
+        assert path.read_bytes() == expected and (storage / 'session.pgj').read_bytes() == data
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual MiMo/TUI edit beyond the model read page preserved all 2000 leading newlines, verified with ranged read and settled reopen', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -495,6 +529,7 @@ def main():
     parser.add_argument('--live-workflow', action='store_true')
     parser.add_argument('--live-batch', action='store_true')
     parser.add_argument('--live-read-pages', action='store_true')
+    parser.add_argument('--live-snapshot-edit', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -533,6 +568,9 @@ def main():
         if args.live_edit:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-edit'
             edit_live(binary, root)
+        if args.live_snapshot_edit:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-snapshot-edit'
+            snapshot_edit_live(binary, root)
         if args.live_read_pages:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-read-pages'
             read_pages_live(binary, root)

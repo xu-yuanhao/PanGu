@@ -9,4 +9,6 @@ typedef struct {int directory;} pg_read_tool;
 int pg_read_tool_open(pg_read_tool *, const char *root);
 void pg_read_tool_close(pg_read_tool *);
 pg_tool_definition pg_read_tool_definition(pg_read_tool *);
+/* Internal complete snapshot: path only, same safety/output ceiling, never PARTIAL. */
+pg_tool_definition pg_read_snapshot_definition(pg_read_tool *);
 #endif

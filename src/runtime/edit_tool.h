@@ -3,7 +3,8 @@
 #include "tools.h"
 /* Injected read/write tool service, borrowed for the editor's lifetime.
    Owner serializes calls and does not rebind the service during a run.
-   Both inner operations retain validation/authorization.
+   Both inner operations retain validation/authorization. The injected read must
+   provide a complete file snapshot; a model-facing line pager is not that service.
    An interrupted edit is unsafe to replay; output capacity must be >=64.
    Native text/argument limits apply; structured diff display is not yet exposed. */
 typedef struct { pg_tools files; } pg_edit_tool;

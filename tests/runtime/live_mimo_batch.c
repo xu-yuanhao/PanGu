@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../../src/runtime/mimo_layout.h"
 #include "../../src/runtime/read_tool.h"
+#include "../../src/runtime/write_tool.h"
+#include "../../src/runtime/edit_tool.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -12,7 +14,23 @@ static pg_mimo provider;
 static pg_session session;
 static pg_agent agent;
 static pg_tool_registry registry;
+static int snapshot_edit(void){
+ assert(getenv("MIMO_API_KEY")&&*getenv("MIMO_API_KEY"));assert(!curl_global_init(CURL_GLOBAL_DEFAULT));
+ char path[]="/tmp/pangu-live-snapshot-XXXXXX";assert(mkdtemp(path));pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,path));pg_write_tool writer={reader.directory};pg_tool_registry files;
+ pg_tool_definition file_defs[]={pg_read_snapshot_definition(&reader),pg_write_tool_definition(&writer)};assert(!pg_tool_registry_init(&files,file_defs,2));pg_edit_tool editor={pg_tool_registry_service(&files)};
+ pg_tool_definition defs[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor)};assert(!pg_tool_registry_init(&registry,defs,3));
+ char original[2048],expected[2048];memset(original,'\n',2000);memcpy(original+2000,"UNIQUE_OLD\n",11);memcpy(expected,original,2011);memcpy(expected+2000,"UNIQUE_NEW",10);
+ int fd=openat(reader.directory,"many-lines.txt",O_CREAT|O_EXCL|O_WRONLY|O_CLOEXEC,0600);assert(fd>=0&&write(fd,original,2011)==2011&&!close(fd));
+ pg_model model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);assert(!pg_agent_init(&agent,model,pg_tool_registry_service(&registry)));
+ const char *input="Use edit exactly once on many-lines.txt to replace UNIQUE_OLD with UNIQUE_NEW. Preserve every other byte. Do not use write. Then use read with offset 2001 and limit 1 to verify the line. Report briefly.";
+ pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){input,strlen(input)}));int result=1;
+ for(unsigned poll=0;poll<12000;++poll){pg_event e;if(client.poll(client.context,&e)&&e.kind==PG_RUN_FINISHED){assert(e.outcome==PG_SUCCESS);result=0;break;}struct timespec pause={0,10000000};nanosleep(&pause,0);}
+ assert(!result);unsigned edits=0,reads=0;for(size_t i=0;i<agent.session.count;++i){pg_message *m=&agent.session.messages[i];if(m->role==PG_TOOL_CALL){if(!strcmp(m->tool_name,"edit"))++edits;else{assert(!strcmp(m->tool_name,"read"));++reads;}}if(m->role==PG_TOOL_RESULT)assert(!m->is_error);}assert(edits==1&&reads>=1);
+ fd=openat(reader.directory,"many-lines.txt",O_RDONLY|O_CLOEXEC);assert(fd>=0);char actual[2048];assert(read(fd,actual,sizeof(actual))==2011&&!memcmp(actual,expected,2011)&&!close(fd));assert(!pg_agent_suspend(&agent));assert(!provider.easy&&!provider.multi&&!provider.headers&&!provider.request);
+ assert(!unlinkat(reader.directory,"many-lines.txt",0));pg_read_tool_close(&reader);assert(!rmdir(path));curl_global_cleanup();puts("PASS: actual MiMo Agent edited beyond the display page through a complete snapshot, preserving 2000 leading newlines and verifying ranged read");return 0;
+}
 int main(int argc,char **argv){
+ if(argc==2&&!strcmp(argv[1],"--snapshot"))return snapshot_edit();
  int execute_batch=argc==2&&!strcmp(argv[1],"--execute");
  assert(getenv("MIMO_API_KEY")&&*getenv("MIMO_API_KEY"));
  assert(!curl_global_init(CURL_GLOBAL_DEFAULT));

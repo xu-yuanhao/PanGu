@@ -258,11 +258,12 @@
         "json-c",
         "POSIX directory-relative file APIs"
       ],
-      "role": "handwritten workspace-root UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; directory-relative POSIX safety and explicit safe replay remain",
+      "role": "handwritten workspace-root UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; directory-relative POSIX safety and explicit safe replay remain; explicit internal snapshot factory shares the read engine but rejects pagination arguments and never truncates source input",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
-        "pg_read_tool_definition"
+        "pg_read_tool_definition",
+        "pg_read_snapshot_definition"
       ],
       "reference_basis": [
         {
@@ -299,6 +300,18 @@
           "semantics": "readText line selection and continuation; native positive integers only, flattened diagnostics and smaller existing message budget, no image/replacement decoding or total-file scan",
           "tests_to_read": [
             "packages/durable/test/tools-read-differential.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/edit.ts",
+            "packages/durable/src/env/node.ts"
+          ],
+          "semantics": "edit reads env.readTextFile rather than model-facing read pages; native snapshot shares the same bounded reader and is explicitly injected into the editor",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts"
           ]
         }
       ]
@@ -392,7 +405,7 @@
         "tools.edit.local.v0",
         "tool.bash.local.v0"
       ],
-      "role": "explicit static composition of Agent, MiMo, read/write/edit/bash and thin TUI; fixed PATH/LANG child environment, optional profile-verified journal; no core algorithms",
+      "role": "explicit static composition of Agent, MiMo, read/write/edit/bash and thin TUI; separate model-facing and internal file registries, editor receives complete snapshots; fixed PATH/LANG child environment and optional profile-verified journal, implementation identity v2; no core algorithms",
       "exports": [
         "main"
       ],

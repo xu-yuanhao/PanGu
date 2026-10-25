@@ -19,12 +19,14 @@ _Static_assert(sizeof(pg_edit_tool)==56 && offsetof(pg_edit_tool,files)==0,"edit
 _Static_assert(json_type_object==4&&json_type_array==5&&json_type_string==6,"JSON types");
 _Static_assert((JSON_TOKENER_STRICT|JSON_TOKENER_VALIDATE_UTF8)==17,"JSON flags");
 static pg_tool_registry registry;
+static pg_tool_registry files;
+static pg_tools file_service;
 static pg_edit_tool editor;
 static pg_tools service;
 static pg_tool_definition definition;
 static unsigned reads,writes,checks;
 static int deny_read,deny_write;
-static int oversize_read,fail_after_write,crash_after_write;
+static int partial_read,oversize_read,fail_after_write,crash_after_write;
 static unsigned api_calls,fail_api;
 static char last_output[128];
 static int fault(void){return ++api_calls==fail_api;}
@@ -39,8 +41,8 @@ int __wrap_json_object_object_add(json_object *p,const char *key,json_object *v)
 const char *__real_json_object_to_json_string_ext(json_object *,int);
 const char *__wrap_json_object_to_json_string_ext(json_object *o,int flags){return fault()?0:__real_json_object_to_json_string_ext(o,flags);}
 static pg_slice s(const char *p){return (pg_slice){p,strlen(p)};}
-static int forward_allow(void *p,pg_slice name,pg_slice args){(void)p;++checks;if((name.size==4&&deny_read)||(name.size==5&&deny_write))return 0;return service.authorize(service.context,name,args);}
-static int forward_execute(void *p,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)p;if(name.size==4){++reads;if(oversize_read){*size=cap;return 0;}}else{assert(name.size==5);++writes;}int rc=service.execute(service.context,name,args,out,cap,size);if(name.size==5&&!rc){if(crash_after_write)_exit(73);if(fail_after_write)return 1;}return rc;}
+static int forward_allow(void *p,pg_slice name,pg_slice args){(void)p;++checks;if((name.size==4&&deny_read)||(name.size==5&&deny_write))return 0;return file_service.authorize(file_service.context,name,args);}
+static int forward_execute(void *p,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)p;if(name.size==4){++reads;if(oversize_read){*size=cap;return 0;}if(partial_read){memcpy(out,"alpha",5);*size=5;return PG_TOOL_PARTIAL;}}else{assert(name.size==5);++writes;}int rc=file_service.execute(file_service.context,name,args,out,cap,size);if(name.size==5&&!rc){if(crash_after_write)_exit(73);if(fail_after_write)return 1;}return rc;}
 static int invoke(const char *args){char out[128]={0};size_t n=777;char *copy=strdup(args);assert(copy);int rc=service.execute(service.context,s("edit"),s(args),out,sizeof(out),&n);assert(!strcmp(args,copy));free(copy);assert(n>0&&n<sizeof(out));memcpy(last_output,out,sizeof(out));return rc;}
 static void put(const char *bytes){int fd=open("file.txt",O_WRONLY|O_CREAT|O_TRUNC,0600);assert(fd>=0&&write(fd,bytes,strlen(bytes))==(ssize_t)strlen(bytes));assert(!close(fd));}
 static void expect(const char *bytes){char content[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,content,sizeof(content));assert(n==(ssize_t)strlen(bytes)&&!memcmp(content,bytes,(size_t)n));assert(!close(fd));}
@@ -64,6 +66,7 @@ static void json_cases(void){
 int main(int argc,char **argv){
  char root[]="/tmp/pangu-edit-tool-XXXXXX";assert(mkdtemp(root));int saved=open(".",O_RDONLY|O_DIRECTORY);assert(saved>=0&&!chdir(root));
  pg_read_tool reader={-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
+ pg_tool_definition file_entries[]={pg_read_snapshot_definition(&reader),pg_write_tool_definition(&writer)};assert(!pg_tool_registry_init(&files,file_entries,2));file_service=pg_tool_registry_service(&files);
  service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0,0,0,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
  pg_tool_definition entries[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),definition};assert(!pg_tool_registry_init(&registry,entries,3));
  if(argc==2&&!strcmp(argv[1],"--json")){json_cases();assert(!unlink("file.txt"));pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));return 0;}
@@ -83,6 +86,8 @@ int main(int argc,char **argv){
  for(size_t i=0;i<sizeof(shapes)/sizeof(*shapes);++i){put("alpha\nbeta\n");unsigned r=reads,w=writes,c=checks;assert(definition.validate(definition.context,s(shapes[i])));assert(!invoke(shapes[i]));assert(reads==r+1&&writes==w+1&&checks==c+2);expect("ALPHA\nbeta\n");}
  {char large[10000];size_t used=0;for(unsigned i=0;i<500;++i){int n=snprintf(large+used,sizeof(large)-used,"alpha-%u payload\n",i);assert(n>0);used+=(size_t)n;}put(large);unsigned w=writes;assert(invoke(shapes[0])&&writes==w);int fd=open("file.txt",O_RDONLY);assert(fd>=0);char bytes[10000];ssize_t n=read(fd,bytes,sizeof(bytes));assert(n==(ssize_t)used&&!memcmp(bytes,large,used)&&!close(fd));}
  put("alpha\n\n[read: more lines; use offset=2 to continue]\n");assert(!invoke(shapes[0]));expect("ALPHA\n\n[read: more lines; use offset=2 to continue]\n");
+ {char original[2100],expected[2100];memcpy(original,"alpha",5);memset(original+5,'\n',2001);original[2006]=0;memcpy(expected,original,2007);memcpy(expected,"ALPHA",5);put(original);assert(!invoke(shapes[0]));expect(expected);}
+ put("alpha\n");partial_read=1;{unsigned w=writes;assert(invoke(shapes[0])&&writes==w);expect("alpha\n");}partial_read=0;
  put("alpha\nbeta\ngamma\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"gamma\",\"newText\":\"GAMMA\"}],\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("ALPHA\nbeta\nGAMMA\n");
  put("\xef\xbb\xbfone\r\nsay ‘hello’ — world  \r\nkeep  \r\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"say 'hello' - world\",\"newText\":\"changed\\nnext\"}]}"));expect("\xef\xbb\xbfone\r\nchanged\r\nnext\r\nkeep  \r\n");
  const char *bad[]={"", "{}", "[]", "null", "{\"path\":\"file.txt\",\"edits\":[]}",

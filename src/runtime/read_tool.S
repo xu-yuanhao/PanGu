@@ -11,6 +11,8 @@
 .intel_syntax noprefix
 
 .section .rodata
+.Lsnapshot_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"additionalProperties\":false}"
+.Lsnapshot_desc: .asciz "Read a complete bounded UTF-8 file snapshot for an internal file consumer."
 .Lstr_path:      .asciz "path"
 .Lstr_offset: .asciz "offset"
 .Lstr_line_limit: .asciz "limit"
@@ -192,6 +194,8 @@ li_parse_path:
  test eax,eax
  jz .Lpp_option_next
  inc qword ptr [rsp+4120]
+ mov rcx,[rsp+4112]
+ or qword ptr [rcx+16],2
  mov rdi,[rsp+4096]
  mov esi,3
  call json_object_is_type@PLT
@@ -207,11 +211,11 @@ li_parse_path:
  mov [rcx+r13*8],rax
  test r13,r13
  jz .Lpp_option_next
- mov qword ptr [rcx+16],1
+ or qword ptr [rcx+16],1
  cmp rax,PG_RTL_PAGE_LINES
  jbe .Lpp_option_next
  mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
- mov qword ptr [rcx+16],0
+ and qword ptr [rcx+16],-2
 .Lpp_option_next:
  inc r13
  cmp r13,2
@@ -235,18 +239,32 @@ li_parse_path:
 /* ---- int li_validate(void *ctx, args.data, args.size) ---- */
 .type li_validate,@function
 li_validate:
+ xor r9d,r9d
+ jmp .Lvalidate_mode
+.Lvalidate_snapshot:
+ mov r9d,1
+.Lvalidate_mode:
  push rbx
  push r12
  push rax
  sub rsp,4096
  test byte ptr [rsp],0
  sub rsp,32
+ mov [rsp+4120],r9d
  mov r8, rdx
  mov rdx, rsp
  mov rdi, rsi
  mov rsi, r8
  lea rcx,[rsp+4096]
  call li_parse_path
+ test eax,eax
+ jnz .Lvalidate_return
+ cmp dword ptr [rsp+4120],0
+ je .Lvalidate_return
+ test qword ptr [rsp+4112],2
+ jz .Lvalidate_return
+ mov eax,1
+.Lvalidate_return:
  test eax, eax
  setz al
  movzx eax, al
@@ -402,6 +420,11 @@ li_utf8:
  * r13=capacity、r14=size*、r15=dir fd。 ---- */
 .type li_execute_read,@function
 li_execute_read:
+ xor r10d,r10d
+ jmp .Lexecute_mode
+.Lexecute_snapshot:
+ mov r10d,1
+.Lexecute_mode:
  push rbx
  push r12
  push r13
@@ -410,6 +433,7 @@ li_execute_read:
  sub rsp,4096
  test byte ptr [rsp],0
  sub rsp,272
+ mov [rsp+4360],r10d
  mov rbx, rdi
  mov r12, rcx
  mov r13, r8
@@ -426,8 +450,13 @@ li_execute_read:
  mov rsi, r8
  lea rcx,[rsp+4272]
  call li_parse_path
- test eax, eax
+ test eax,eax
  jnz .Lrd_invalid
+ cmp dword ptr [rsp+4360],0
+ je .Lrd_open_root
+ test qword ptr [rsp+4288],2
+ jnz .Lrd_invalid
+.Lrd_open_root:
  mov edi, dword ptr [rbx + PG_RTL_DIRECTORY]
  mov esi, PG_RTL_F_DUPFD_CLOEXEC
  xor edx, edx
@@ -528,6 +557,8 @@ li_execute_read:
  mov rax,[rsp+4264]
  mov [rsp+4312],rax
  mov rax,[rsp+4304]
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_next_byte
  cmp rax,[rsp+4280]
  jb .Lrd_next_byte
  mov rax,[rsp+4336]
@@ -537,8 +568,8 @@ li_execute_read:
  test rax,rax
  js .Lrd_chunk_error
  jnz .Lrd_more
- cmp qword ptr [rsp+4288],0
- je .Lrd_success
+ test qword ptr [rsp+4288],1
+ jz .Lrd_success
  dec qword ptr [rsp+4264]
  mov qword ptr [rsp+4344],4
  jmp .Lrd_success
@@ -553,6 +584,8 @@ li_execute_read:
  jb .Lrd_offset_close
  jmp .Lrd_success
 .Lrd_page_full:
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_limit
  mov rax,[rsp+4312]
  test rax,rax
  jz .Lrd_limit
@@ -783,5 +816,24 @@ pg_read_tool_definition:
  mov rax, rdi
  ret
 .size pg_read_tool_definition, .-pg_read_tool_definition
+
+.globl pg_read_snapshot_definition
+.type pg_read_snapshot_definition,@function
+pg_read_snapshot_definition:
+ push rbx
+ mov rbx,rdi
+ call pg_read_tool_definition
+ lea rax,[rip+.Lsnapshot_schema]
+ mov [rbx+PG_TL_DEF_SCHEMA],rax
+ lea rax,[rip+.Lsnapshot_desc]
+ mov [rbx+PG_TL_DEF_DESCRIPTION],rax
+ lea rax,[rip+.Lvalidate_snapshot]
+ mov [rbx+PG_TL_DEF_VALIDATE],rax
+ lea rax,[rip+.Lexecute_snapshot]
+ mov [rbx+PG_TL_DEF_EXECUTE],rax
+ mov rax,rbx
+ pop rbx
+ ret
+.size pg_read_snapshot_definition,.-pg_read_snapshot_definition
 
 .section .note.GNU-stack,"",@progbits
