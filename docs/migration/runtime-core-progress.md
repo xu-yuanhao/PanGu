@@ -611,3 +611,16 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 本批收尾fetch后，Pi与Harness工作树均干净，HEAD与各自上游一致（ahead/behind均0）；仍采用38ff991/22ddee3固定版本，没有未评估的上游变更。
 
 固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`7f0ef752ba948bdd65e1b7bceb3b1433edd37578cfc4a55c8f73b407b4728512`（35个路径）。
+
+
+## 2026-10-25：edit文本内核移植（文件工具入口待接）
+
+读取Pi 38ff991的tools/edit.ts::createEditTool/prepareEditArguments、edit-diff.ts::applyEditsToNormalizedContent及匹配/归一化/行块恢复helpers，直接调用的withFileMutationQueue/env.writeFile和tools.test.ts编辑用例。先实现手写edit_text.S纯文本内核：同一原文批量匹配、NFKC后的重复检查、稳定排序/重叠拒绝、模糊匹配按实际范围保留未改动行块、BOM和CRLF恢复；不是仅做简单字符串替换。Unicode NFKC/迭代复用已安装utf8proc 2.12.0公开API（MIT/Expat），新增依赖/实际构建登记；不自写Unicode数据库。Loop无此依赖，当前交互构建链接该模块。
+
+实际验证：1300例以固定Pi实际edit-diff.ts函数为oracle，O0/O2均为成功输出逐字节一致或双方拒绝。测试只剥离TS类型并移除未调用的diff展示库import，源码与固定提交逐字节核对；没有重写一份“预期算法”作oracle，references不进入产品构建且未修改。主核心现18组O0/O2 UBSan通过，专项O2 ASan/UBSan通过；caller output失败不变、alias、NUL/非法UTF-8、页尾输入/输出、合计输入与中间/结果配额、calloc及各NFKC分配失败均检查。实际对象text3153字节、data/bss0，唯一导出pg_edit_text_apply，导入仅公开libc/utf8proc函数；离线实际TUI退出/终端恢复/持久闲置重开与提示更新通过。G00、assembly-first、diff检查通过，未改检查器或放宽原断言。
+
+边界：UTF-8无NUL，内容、合计edit字节、归一化中间/结果均最多4095字节，1～16个替换；并非完整无界Pi/全部Unicode版本兼容证明，错误文字/结构化diff不在本次共识范围。当前尚无edit工具参数准备/文件IO入口，未把文本对照说成真实MiMo编辑闭环；T25保持IN_PROGRESS、完整edit条目保持未完成。下一步复用注入的现有read/write服务接入工具，移植canonical edits及模型常见输入准备，沿用unsafe恢复，再跑真实模型文件编辑。
+
+同一Agent按用户授权自审自批本批文本模块、Unicode依赖与文件/语言/构建登记。主文档仍51行，只补实际构建依赖；未新增C核心、备用实现或认证框架。生产准入仍BLOCKED。收尾fetch后Pi/Harness仍分别38ff991/22ddee3，与各自上游一致、工作树干净，无新上游代码待采用。
+
+固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`b54b3a3be468c8b6da549583458d54241e27a078e97a82857d851d710e1616d2`（12个路径）。

@@ -44,7 +44,7 @@ python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu
 /tmp/pangu-native/pangu /path/to/workspace
 ```
 
-当前构建需要登记的 clang-23、pkg-config、libcurl 和 json-c 开发环境。默认会话易失；可将 `PANGU_SESSION_DIR` 设为现有可信目录，使用其中的 `session.pgj`。恢复前核对模型、工具和工作目录身份，不匹配的在途任务拒绝续跑；凭据不写入日志。
+当前构建需要登记的 clang-23、pkg-config、libcurl、json-c 和 libutf8proc 开发环境。默认会话易失；可将 `PANGU_SESSION_DIR` 设为现有可信目录，使用其中的 `session.pgj`。恢复前核对模型、工具和工作目录身份，不匹配的在途任务拒绝续跑；凭据不写入日志。
 
 Enter 发送；忙时 Ctrl-C 明确取消，闲置时退出；Ctrl-D 退出。持久模式退出时保留待恢复工作，下次启动先回显已提交历史再继续；工具仅在记录与当前策略均安全时自动重跑；write 中断可能部分完成，恢复返回错误，不保证外部写副作用只执行一次。尚无完整历史界面、通用调度或全部 Pi 兼容。
 

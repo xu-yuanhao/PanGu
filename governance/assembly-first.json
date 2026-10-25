@@ -92,6 +92,10 @@
     "src/runtime/write_tool.S": {
       "role": "assembly-core",
       "reason": "手写有界JSON参数、逐分量目录遍历与写入/清理；外部库和平台ABI经断言"
+    },
+    "src/runtime/edit_text.S": {
+      "role": "assembly-core",
+      "reason": "手写Durable批量编辑匹配/冲突/行块保留及BOM/换行恢复；Unicode NFKC复用utf8proc"
     }
   }
 }

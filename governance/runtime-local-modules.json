@@ -495,10 +495,40 @@
           ]
         }
       ]
+    },
+    {
+      "id": "tools.edit.text.local.v0",
+      "sources": [
+        "src/runtime/edit_text.h",
+        "src/runtime/edit_text.S"
+      ],
+      "dependencies": [
+        "client.contract.v0",
+        "system libc",
+        "libutf8proc"
+      ],
+      "role": "handwritten bounded original-batch matching, NFKC fuzzy uniqueness, stable conflict ordering, touched-line preservation, BOM/CRLF restoration; pure text engine, filesystem edit tool not yet bound",
+      "exports": [
+        "pg_edit_text_apply"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/tools/edit-diff.ts",
+            "packages/durable/src/tools/edit.ts"
+          ],
+          "semantics": "applyEditsToNormalizedContent and its actual helpers; byte offsets in valid UTF-8, at most 16 replacements and 4095 content/combined edit bytes; transactional caller output",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
-  "product_runtime_dependencies": "Core uses C ABI layouts, not a required C implementation; optional hosted transport/tool adapters use registered libcurl/json-c/libc/POSIX.",
+  "product_runtime_dependencies": "Core uses C ABI layouts; hosted adapters use registered libcurl/json-c/libc/POSIX, edit text uses libutf8proc for Unicode normalization.",
   "limits": {
     "messages": 64,
     "text_bytes_including_terminator": 4096,
@@ -530,6 +560,14 @@
       "license": "MIT",
       "purpose": "bounded-response JSON conversion in first live adapter",
       "impact": "hosted provider only; own native JSON integration deferred; heap allocations in adapter, not loop"
+    },
+    {
+      "name": "libutf8proc",
+      "version": "2.12.0",
+      "source": "system pkg-config libutf8proc; public utf8proc.h",
+      "license": "MIT/Expat; bundled Unicode data licensing applies to packaging",
+      "purpose": "mature Unicode NFKC and UTF-8 iteration for edit text matching; no custom Unicode database",
+      "impact": "edit text module only, not a Loop dependency; Unicode-version-wide equivalence/other platforms/redistribution packaging not certified"
     }
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",

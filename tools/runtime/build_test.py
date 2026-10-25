@@ -87,6 +87,15 @@ def main():
                             implementation('src/runtime/write_tool'), str(ROOT / 'tests/runtime/test_write_tool.c'),
                             '-Wl,--wrap=write,--wrap=ftruncate,--wrap=fsync', *write_flags, '-o', write_test], check=True)
             subprocess.run([write_test], check=True, timeout=10)
+            edit_test = str(Path(directory) / 'test-edit-text')
+            edit_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/edit_text'),
+                            str(ROOT / 'tests/runtime/test_edit_text.c'), '-Wl,--wrap=calloc,--wrap=utf8proc_map',
+                            *edit_flags, '-o', edit_test], check=True)
+            subprocess.run([edit_test], check=True, timeout=10)
+            subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
+                            '--binary', edit_test], check=True, timeout=45)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
             tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',

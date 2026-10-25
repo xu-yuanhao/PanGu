@@ -1750,7 +1750,7 @@
       ],
       "completion_approved": false,
       "local_subset_scope": "workspace-root read and bounded write, parent creation, partial failure semantics and unsafe recovery; no edit/bash or full Pi filesystem compatibility",
-      "local_implementation": "handwritten tools/read_tool/write_tool with recorded replay intent and current-policy check; static TUI composition; full T25 remains incomplete"
+      "local_implementation": "handwritten tools/read_tool/write_tool with recorded replay intent and current-policy check; static TUI composition; full T25 remains incomplete; edit_text.S pure batch/fuzzy/BOM/line-ending engine tested against actual fixed upstream functions, edit tool IO/argument preparation still pending"
     },
     {
       "id": "T26",

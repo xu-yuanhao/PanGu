@@ -24,7 +24,7 @@ def build(output):
     if output.is_relative_to(ROOT):
         raise ValueError('build output must be outside the checkout')
     output.parent.mkdir(parents=True, exist_ok=True)
-    flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+    flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                     *[str(ROOT / p) for p in SOURCES], *flags, '-o', str(output)], check=True)
