@@ -823,3 +823,18 @@ write与依赖它的edit专项O0 UBSan、O2 ASan/UBSan退出0，编辑的17个�
 真实MiMo结果必须分开记录：最初的双轮文件加载/空闲重开/缺失配置测试曾通过；随后增加在途源删除/恢复测试时，两次在前面的第二轮严格输出断言失败。失败诊断确认journal最新system与新文件一致，最后assistant却是Hello!，不是仅终端匹配失败。另一次仅在临时目录加发送前摘要wrapper的诊断越过前两轮，但在新的长响应前缀等待处失败，实际回答沿用旧token。wrapper未进入产品或仓库，没有修改严格断言或靠重复到成功宣称修复；目前不足以把原因唯一归到服务端或本地发送路径。保留--live-prompt-file失败与诊断，真实多轮/源删除恢复继续未验收，不能声称模型始终遵循新指令。
 
 同一Agent自审新增服务、文件/语言/依赖登记与入口组合；这是有明确未通过可选真实测试的本地开发候选，不是完整体验或生产放行。没有扩大预算、修改检查器或删除失败条件。G00、assembly-first、diff检查通过；仅本批文件提交，并行TUI不包含在内。固定包SHA256（仅本批文件，不含本记录与并行TUI；排序[path,文件SHA256]紧凑UTF-8 JSON）：`03c24e93536f418c9a80c2a68b8638d7ec4b0302b5522f642d5b03f9bfdab9ca`。
+
+
+## 2026-10-26：真实Pi对照提示词遵循失败
+
+按用户要求测试其他Agent，而非仅根据盘古失败推断模型问题。fetch后Pi本地/上游仍d5b3de22d0e24a3e9c38a9410d3329b099717283，Harness仍22ddee3792402c3e70ec5f86a63c3e3e895a2f60。读取Pi api/openai-completions.ts::stream/buildParams/convertMessages、utils/transcript.ts::normalizeContext及对应请求测试，另读agent/src/agent.ts::createMutableAgentState/prompt与agent-loop调用。实验在/tmp导出固定源码，依赖用临时npm目录安装@earendil-works/pi-ai@1.4.0；模型层与Agent Loop执行本地固定TS源码，基础依赖来自该发布包。未编辑references、未安装到产品、未使用假模型或执行文件工具。临时驱动凭据仅子进程环境。
+
+盘古发送前的临时wrapper捕获实际JSON正文，确认第一轮只有正确system指令和user Say hello，journal也匹配，却回答Hello。直接HTTP控制探针（相同Token Plan CN端点、mimo-v2.6-pro、thinking disabled、512 token预算）先出现普通/仅流式/仅工具通过、流式带工具失败；换成产品Bearer认证的四组合又出现两种带工具组合都失败。因此不能把前一次观察写成“仅流式+工具必定失败”，也不能仅凭此判定鉴权差异。
+
+实际Pi provider：system角色、无工具和带read声明的两次流式请求均严格通过。使用同一Pi provider逐项改字段：max_tokens替代max_completion_tokens通过，删除store通过，删除stream_options却失败；进一步使用与原生相同的正文，缺stream_options失败，仅加入include_usage通过。这只支持一次受控关联。随后实际Pi Agent Loop（同一固定源码、真实provider、read声明但零工具执行）两轮均返回Hello问候加随机标记，违反“仅输出标记”，驱动退出1。Pi provider测试不等于完整Pi Coding Agent/Durable恢复验收，未声称已经运行Harness。
+
+尝试在原生请求添加与Pi相同的include_usage后，原有--live-prompt-file仍在第一轮失败，system匹配且assistant为Hello。MiMo汇编专项的O0/O2/UBSan、分配/插入失败清理全部通过，但不能据此把提示遵循失败勾成完成。已撤回该未经端到端证实的产品改动及对应新增字段断言，未更改角色、提示词、严格断言或预算。原因尚未唯一定位；目前证据说明实际Pi Agent也可触发严格指令违背，不支持将所有失败归咎于原生文件加载，也不足以证明盘古全部请求处理无缺陷。
+
+现有test_pangu_pty.py增加可选--live-prompt-protocol：绕过TUI直接调用真实接口，固定同一随机标记，只改变stream/tools，四组合全部执行后严格汇总；不执行任何工具，不输出凭据/请求头，响应有1 MiB上限。实际本轮四组合中无工具通过、带工具两项失败，子测试退出1。该入口是可重复诊断，不作为默认离线门禁，也不靠反复运行至偶然通过宣称修复。原有真实多轮/在途恢复验收保持未完成，不阻挡无关核心实现。
+
+同一Agent自审诊断入口与TODO更新，非独立审核；没有产品源码、依赖、检查器或配额变化。G00、assembly-first和diff检查通过；并行TUI文件不纳入本批，生产准入未改变。固定包SHA256（仅诊断入口与TODO，不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`9c470f44c25fe3ae1653bc2176cd1503d1e1cfccf1be04fc3e65eb9fde0eb988`。

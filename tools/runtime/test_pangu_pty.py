@@ -597,6 +597,66 @@ def prompt_file_live(binary, root):
         terminal.close()
     print('PASS: actual MiMo used the explicit system file, idle reopen reloaded it, active resume used its stored prompt after source deletion, and missing idle source failed without fallback', flush=True)
 
+def prompt_protocol_live():
+    """Direct provider probe: same instructions, only stream/tools vary; no tool executes."""
+    import urllib.request
+    key = os.environ.get('MIMO_API_KEY')
+    assert key and '\r' not in key and '\n' not in key, 'valid MIMO_API_KEY required'
+    marker = 'PANGU_PROTOCOL_' + os.urandom(6).hex()
+    failures = []
+    for streaming, with_tools in ((False, False), (True, False), (False, True), (True, True)):
+        body = {
+            'model': os.environ.get('MIMO_MODEL', 'mimo-v2.6-pro'),
+            'messages': [
+                {'role': 'system', 'content': 'Reply with exactly ' + marker + ' and no other text. Do not use any tools.'},
+                {'role': 'user', 'content': 'Say hello.'},
+            ],
+            'max_tokens': 512, 'thinking': {'type': 'disabled'}, 'stream': streaming,
+        }
+        if with_tools:
+            body['tools'] = [{'type': 'function', 'function': {
+                'name': 'read', 'description': 'Read a file',
+                'parameters': {'type': 'object', 'properties': {'path': {'type': 'string'}}, 'required': ['path']},
+            }}]
+        request = urllib.request.Request(
+            'https://token-plan-cn.xiaomimimo.com/v1/chat/completions',
+            data=json.dumps(body).encode(),
+            headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key},
+        )
+        content, calls, done, finished, received = '', False, False, False, 0
+        with urllib.request.urlopen(request, timeout=55) as response:
+            if streaming:
+                for line in response:
+                    received += len(line)
+                    assert received <= 1048576, 'provider probe response exceeds bound'
+                    if not line.startswith(b'data: '):
+                        continue
+                    if line.strip() == b'data: [DONE]':
+                        done = True
+                        break
+                    event = json.loads(line[6:])
+                    assert 'error' not in event, 'provider returned an SSE error'
+                    for choice in event.get('choices', []):
+                        delta = choice.get('delta', {})
+                        content += delta.get('content') or ''
+                        calls |= bool(delta.get('tool_calls'))
+                        finished |= choice.get('finish_reason') == 'stop'
+                assert done and finished, 'provider probe did not finish cleanly'
+            else:
+                raw = response.read(1048577)
+                assert len(raw) <= 1048576, 'provider probe response exceeds bound'
+                choice = json.loads(raw)['choices'][0]
+                content = choice['message'].get('content') or ''
+                calls = bool(choice['message'].get('tool_calls'))
+                assert choice.get('finish_reason') == 'stop', 'provider probe did not stop normally'
+        matched = content.strip() == marker and not calls
+        print('prompt protocol: stream=' + str(streaming) + ' tools=' + str(with_tools) +
+              ' exact_instruction=' + str(matched) + ' tool_call=' + str(calls), flush=True)
+        if not matched:
+            failures.append((streaming, with_tools))
+    assert not failures, 'direct provider instruction mismatches (stream, tools): ' + repr(failures)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
@@ -610,7 +670,11 @@ def main():
     parser.add_argument('--live-read-pages', action='store_true')
     parser.add_argument('--live-snapshot-edit', action='store_true')
     parser.add_argument('--live-prompt-file', action='store_true')
+    parser.add_argument('--live-prompt-protocol', action='store_true', help='direct real-provider stream/tools instruction matrix; no TUI build')
     args = parser.parse_args()
+    if args.live_prompt_protocol:
+        prompt_protocol_live()
+        return
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
         binary = build(root / 'pangu')
