@@ -1677,7 +1677,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "injected Model contract with complete BATCH event and real MiMo SSE producer for 1..8 indexed calls; real two-call metadata verified, grouped projection and Agent consumer pending; no full provider capability matrix",
+      "local_subset_scope": "injected Model contract with complete BATCH event and real MiMo SSE producer for 1..8 indexed calls; real two-call metadata verified, grouped request projection verified; Agent consumer pending; no full provider capability matrix",
       "local_implementation": "pg_model replaceable contract and handwritten MiMo assembly provider; no full capability matrix"
     },
     {
@@ -1700,7 +1700,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "single sequential run with read/write/edit and asynchronous bash; replaceable input submission, bounded key dedup, explicit resume/suspend, persisted outcomes and stored/current safe-only replay; batch storage and Model contract exist but Loop execution/projection pending; no general scheduler or exactly-once side effects",
+      "local_subset_scope": "single sequential run with read/write/edit and asynchronous bash; replaceable input submission, bounded key dedup, explicit resume/suspend, persisted outcomes and stored/current safe-only replay; batch storage, Model contract and grouped request projection exist but Loop execution and TUI history pending; no general scheduler or exactly-once side effects",
       "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {

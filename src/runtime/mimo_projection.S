@@ -72,7 +72,8 @@ li_field:
 /* ---- int pg_mimo_encode_request(pg_mimo *m, const pg_session *s)
  * 栈帧 128 字节：[0]=root [8]=messages [16]=tools数组 [24]=tool [32]=fn
  * [40]=def/schema暂存 [48]=i/工具下标 [56]=calls [64]=call [72]=func
- * [80]=next/prev/registry [88]=registry count [96]=leaf [104]=owner bits。
+ * [80]=pair/registry [88]=iterator/count [96]=leaf [104]=owner bits
+ * [112]=group start [120]=group end。
  * Owners: messages1/v2/calls4/call8/func16/tools32/tool64/fn128/thinking256/leaf512.
  * Clear an owner only after successful insertion into its parent. ---- */
 .globl pg_mimo_encode_request
@@ -215,6 +216,8 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-3
 .Lno_system:
+ mov qword ptr [rsp+112],0
+ mov qword ptr [rsp+120],0
  mov qword ptr [rsp + 48], 0           /* i = 0 */
 .Lmsg_loop:
  mov rax, qword ptr [rsp + 48]
@@ -255,44 +258,94 @@ pg_mimo_encode_request:
  mov eax,dword ptr [r13 + PG_MM_MSG_ROLE]
  cmp eax, PG_MM_ROLE_TOOL_CALL
  jne .Lplain_message
- /* --- tool_call：id/name 有界非空，后随 tool_result 且 call_id 相等 --- */
- lea rdi, [r13 + PG_MM_MSG_CALL_ID]
- xor esi, esi
- mov edx, PG_MM_ID_LIMIT
- call memchr@PLT
- test rax, rax
- jz .Linvalid
- cmp byte ptr [r13 + PG_MM_MSG_CALL_ID], 0
- je .Linvalid
- lea rdi, [r13 + PG_MM_MSG_TOOL_NAME]
- xor esi, esi
- mov edx, PG_MM_ID_LIMIT
- call memchr@PLT
- test rax, rax
- jz .Linvalid
- cmp byte ptr [r13 + PG_MM_MSG_TOOL_NAME], 0
- je .Linvalid
- mov rax, qword ptr [rsp + 48]
- inc rax
- cmp rax, qword ptr [r12 + PG_MM_SES_COUNT]
+ /* Validate the complete contiguous call group and its ordered results. */
+ mov rax,[rsp+48]
+ mov [rsp+112],rax
+ mov [rsp+120],rax
+.Lgroup_scan:
+ mov rax,[rsp+120]
+ cmp rax,[r12+PG_MM_SES_COUNT]
  jae .Linvalid
- imul rcx, rax, PG_MM_MSG_BYTES
- lea rdx, [r12 + rcx]                  /* next = &messages[i+1] */
- mov qword ptr [rsp + 80], rdx
- cmp dword ptr [rdx + PG_MM_MSG_ROLE], PG_MM_ROLE_TOOL_RESULT
- jne .Linvalid
- lea rdi, [rdx + PG_MM_MSG_CALL_ID]
- xor esi, esi
- mov edx, PG_MM_ID_LIMIT
+ imul rcx,rax,PG_MM_MSG_BYTES
+ cmp dword ptr [r12+rcx+PG_MM_MSG_ROLE],PG_MM_ROLE_TOOL_CALL
+ jne .Lgroup_scanned
+ inc qword ptr [rsp+120]
+ sub rax,[rsp+112]
+ cmp rax,PG_MM_CALL_LIMIT
+ jae .Linvalid
+ jmp .Lgroup_scan
+.Lgroup_scanned:
+ mov rax,[rsp+120]
+ sub rax,[rsp+112]
+ add rax,[rsp+120]
+ cmp rax,[r12+PG_MM_SES_COUNT]
+ ja .Linvalid
+ mov rax,[rsp+112]
+ mov [rsp+88],rax
+.Lgroup_validate:
+ mov rax,[rsp+88]
+ imul rcx,rax,PG_MM_MSG_BYTES
+ lea r13,[r12+rcx]
+ cmp qword ptr [r13+PG_MM_MSG_SIZE],PG_MM_TEXT_LIMIT
+ jae .Linvalid
+ lea rdi,[r13+PG_MM_MSG_CALL_ID]
+ xor esi,esi
+ mov edx,PG_MM_ID_LIMIT
  call memchr@PLT
- test rax, rax
+ test rax,rax
  jz .Linvalid
- mov rdx, qword ptr [rsp + 80]
- lea rdi, [r13 + PG_MM_MSG_CALL_ID]
- lea rsi, [rdx + PG_MM_MSG_CALL_ID]
+ cmp byte ptr [r13+PG_MM_MSG_CALL_ID],0
+ je .Linvalid
+ lea rdi,[r13+PG_MM_MSG_TOOL_NAME]
+ xor esi,esi
+ mov edx,PG_MM_ID_LIMIT
+ call memchr@PLT
+ test rax,rax
+ jz .Linvalid
+ cmp byte ptr [r13+PG_MM_MSG_TOOL_NAME],0
+ je .Linvalid
+ mov rax,[rsp+112]
+ mov [rsp+40],rax
+.Lgroup_unique:
+ mov rax,[rsp+40]
+ cmp rax,[rsp+88]
+ jae .Lgroup_pair
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea rsi,[r12+rax+PG_MM_MSG_CALL_ID]
+ lea rdi,[r13+PG_MM_MSG_CALL_ID]
  call strcmp@PLT
- test eax, eax
+ test eax,eax
+ jz .Linvalid
+ inc qword ptr [rsp+40]
+ jmp .Lgroup_unique
+.Lgroup_pair:
+ mov rax,[rsp+88]
+ sub rax,[rsp+112]
+ add rax,[rsp+120]
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea rax,[r12+rax]
+ mov [rsp+80],rax
+ cmp dword ptr [rax+PG_MM_MSG_ROLE],PG_MM_ROLE_TOOL_RESULT
+ jne .Linvalid
+ lea rdi,[rax+PG_MM_MSG_CALL_ID]
+ xor esi,esi
+ mov edx,PG_MM_ID_LIMIT
+ call memchr@PLT
+ test rax,rax
+ jz .Linvalid
+ mov rax,[rsp+80]
+ lea rsi,[rax+PG_MM_MSG_CALL_ID]
+ lea rdi,[r13+PG_MM_MSG_CALL_ID]
+ call strcmp@PLT
+ test eax,eax
  jnz .Linvalid
+ inc qword ptr [rsp+88]
+ mov rax,[rsp+88]
+ cmp rax,[rsp+120]
+ jb .Lgroup_validate
+ mov rax,[rsp+112]
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea r13,[r12+rax]
  /* v = {role:"assistant", tool_calls:[{id,type,function:{name,arguments}}]} */
  call json_object_new_object@PLT
  test rax, rax
@@ -310,6 +363,7 @@ pg_mimo_encode_request:
  jz .Loom_v
  mov qword ptr [rsp + 56], rax         /* calls */
  or qword ptr [rsp + 104],4
+.Lgroup_build:
  call json_object_new_object@PLT
  test rax, rax
  jz .Loom_calls
@@ -365,6 +419,18 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
  and qword ptr [rsp + 104],-9
+ inc qword ptr [rsp+48]
+ mov rax,[rsp+48]
+ cmp rax,[rsp+120]
+ jae .Lgroup_built
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea r13,[r12+rax]
+ jmp .Lgroup_build
+.Lgroup_built:
+ dec qword ptr [rsp+48]
+ mov rax,[rsp+112]
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea r13,[r12+rax]
  mov rdx, qword ptr [rsp + 56]
  mov rdi, r15
  lea rsi, [rip + .Lstr_tool_calls]
@@ -394,16 +460,19 @@ pg_mimo_encode_request:
 .Lplain_message:
  cmp eax, PG_MM_ROLE_TOOL_RESULT
  jne .Lplain_build
- /* tool_result：前一条必须是配对 tool_call */
- cmp qword ptr [rsp + 48], 0
- je .Linvalid
- mov rax, qword ptr [rsp + 48]
- dec rax
- imul rax, rax, PG_MM_MSG_BYTES
- lea rdx, [r12 + rax]                  /* prev */
- mov qword ptr [rsp + 80], rdx
- cmp dword ptr [rdx + PG_MM_MSG_ROLE], PG_MM_ROLE_TOOL_CALL
- jne .Linvalid
+ /* Map each result back to its call within the preceding validated group. */
+ mov rax,[rsp+48]
+ cmp rax,[rsp+120]
+ jb .Linvalid
+ sub rax,[rsp+120]
+ mov rcx,[rsp+120]
+ sub rcx,[rsp+112]
+ cmp rax,rcx
+ jae .Linvalid
+ add rax,[rsp+112]
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea rdx,[r12+rax]
+ mov [rsp+80],rdx
  lea rdi, [r13 + PG_MM_MSG_CALL_ID]
  xor esi, esi
  mov edx, PG_MM_ID_LIMIT

@@ -729,3 +729,14 @@ pg_mimo原字段偏移保留，追加7个参数槽、8个切片view及count，�
 ASan首次查出旧test_start_setup在第二次start后未close就让下个用例清零provider，泄漏12640字节curl相关分配；修复夹具关闭并断言两次资源释放后复验通过，没有关闭LeakSanitizer或修改产品清理来掩盖。真实模型入口python3 -B tools/runtime/build_test.py --live-batch已通过：HTTP请求直接使用真实MiMo，收到同响应两个read调用并验证两个独立path；只是Model层验证，没有执行工具，也不是完整TUI工作流。凭据仅在子进程环境中，未写源码/日志。实际产品组合构建通过。
 
 同一Agent按授权自审自批Model事件扩展、provider尾部内存、登记/测试驱动和相应测试契约调整；不是独立审核。G00、assembly-first和diff检查通过，生产准入不变。当前Agent仍不处理BATCH、历史请求投影仍按单调用配对；完整--live-workflow尚未通过，下一批接Loop的整组提交/顺序执行/取消/恢复及投影，不能把本次真实元数据验证替代执行验收。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`4c4d78acc0e0d7d5ef2502e8f04ce2cff41038f84dd917fb1cc36ede644bbe64`。
+
+
+## 2026-10-25：批量工具历史请求投影
+
+读取固定Pi d5b3de22的openai-completions.ts::convertMessages及其请求构造调用点、tool-choice和tool-result-images测试，Durable generation.ts::startToolRound。采用同轮完整tool_calls归属一条assistant、随后各工具结果的结构；原生当前无图像与reasoning投影，只接受连续1～8调用及同序完整结果。上游允许的其他上下文变体未声称兼容。
+
+原地扩展手写mimo_projection.S；先验证整组调用身份、唯一ID、参数长度和结果关联，再建一个tool_calls数组。空assistant仍跳过或与下一组融合。结果按组内位置关联，不再误认“前一条必须为call”；孤儿、漏结果、错配、重复ID、第9调用和无终止身份字段整组拒绝。栈仍128字节，使用原未用两槽保存组边界，不增加持久状态、依赖或ABI。
+
+专项O0/O2及各UBSan组合通过；projection与逐分配失败专项O2 ASan/UBSan通过。新增2～8调用、后续第二轮、各项ID投影和拒绝边界；8调用逐一覆盖207处分配/插入/序列化失败，无遗留JSON所有权；单调用75点保持通过。完整核心O0/O2 UBSan构建运行退出0。本批没有调用真实模型；Agent消费BATCH、顺序执行/取消/恢复及TUI历史仍未接通，完整工作流仍未验收。
+
+同一Agent按授权自审自批模块范围与清单说明更新，没有修改检查器、预算或生产准入。G00、assembly-first和diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`004a95b298e9ab7bec88c7eac479a1fbb01ffc541c755b7769dbc49a2b0597f4`。
