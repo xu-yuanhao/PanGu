@@ -7,6 +7,7 @@
 #define P_COUNT 32
 #define P_EDITS 40
 #define P_BYTES 552
+#define FIRST_LINE 552
 #define CONTENT 560
 #define RESULT 4656
 #define IO_SIZE 8752
@@ -34,7 +35,8 @@
 .Loverlap: .asciz "Edit targets overlap; merge them"
 .Lnochange: .asciz "Edit produced no changes"
 .Lmemory: .asciz "Edit memory allocation failed"
-.Lok: .asciz "Successfully edited file"
+.Lok: .asciz "Successfully replaced %zu block(s); first changed line %zu"
+.Lsummary_error: .asciz "Edit succeeded; could not format change summary"
 .text
 
 /* Strict bounded JSON parse; caller owns the returned object. */
@@ -695,6 +697,8 @@
  mov rdi,[rbp+TREE]
  call json_object_put@PLT
  mov qword ptr [rbp+TREE],0
+ mov rax,[rbp+IO_SIZE]
+ mov [rbp+FIRST_LINE],rax
  lea rax,[rbp+IO_SIZE]
  push 0
  push rax
@@ -729,6 +733,25 @@
  lea r15,[rip+.Linvalid]
  jmp .Lcleanup
 .Lwrite_request:
+ xor ecx,ecx
+ mov r8d,1
+ mov rdx,[rbp+FIRST_LINE]
+.Lfirst_line:
+ cmp rcx,rdx
+ jae .Lfirst_line_done
+ cmp rcx,[rbp+IO_SIZE]
+ jae .Lfirst_line_done
+ mov al,[rbp+CONTENT+rcx]
+ cmp al,[rbp+RESULT+rcx]
+ jne .Lfirst_line_done
+ cmp al,10
+ jne .Lfirst_line_next
+ inc r8
+.Lfirst_line_next:
+ inc rcx
+ jmp .Lfirst_line
+.Lfirst_line_done:
+ mov [rbp+FIRST_LINE],r8
  mov rdi,rbp
  lea rsi,[rbp+RESULT]
  mov rdx,[rbp+IO_SIZE]
@@ -774,6 +797,26 @@
 .Lcleanup_parsed:
  mov rdi,rbp
  call .Lparsed_close
+ lea rax,[rip+.Lok]
+ cmp r15,rax
+ jne .Lcopy_message
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r15
+ mov rcx,[rbp+P_COUNT]
+ mov r8,[rbp+FIRST_LINE]
+ xor eax,eax
+ call snprintf@PLT
+ test eax,eax
+ js .Lsummary_failed
+ cmp rax,r13
+ jae .Lsummary_failed
+ mov [r14],rax
+ xor eax,eax
+ jmp .Lexecute_return
+.Lsummary_failed:
+ lea r15,[rip+.Lsummary_error]
+.Lcopy_message:
  mov rdi,r15
  call strlen@PLT
  mov rbx,rax

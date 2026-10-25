@@ -63,6 +63,24 @@ static void json_cases(void){
  for(size_t i=0;i<json_object_array_length(cases);++i){json_object *item=json_object_array_get_idx(cases,i),*content=0,*args=0;assert(json_object_object_get_ex(item,"content",&content)&&json_object_is_type(content,json_type_string));assert(json_object_object_get_ex(item,"arguments",&args));put(json_object_get_string(content));int rc=invoke(json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN));char bytes[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,bytes,sizeof(bytes));assert(n>=0&&n<4096&&!close(fd));json_object *answer=json_object_new_object();assert(answer);json_object_object_add(answer,"status",json_object_new_int(rc));json_object_object_add(answer,"output",json_object_new_string_len(bytes,(int)n));assert(!json_object_array_add(answers,answer));}
  puts(json_object_to_json_string_ext(answers,JSON_C_TO_STRING_PLAIN));json_object_put(answers);json_object_put(cases);
 }
+static void success_summaries(void){
+ const struct {const char *before,*args;unsigned line,blocks;} cases[]={
+  {"head\nalpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}",2,1},
+  {"\357\273\277head\r\nalpha\r\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}",2,1},
+  {"prefix\nalpha\nsuffix","{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"alpha\",\"newText\":\"A\"},{\"oldText\":\"prefix\",\"newText\":\"P\"}]}",1,2},
+  {"prefix\nalpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\\n\",\"newText\":\"\"}",2,1},
+  {"first\n尾巴\n","{\"path\":\"file.txt\",\"oldText\":\"尾巴\",\"newText\":\"改好\"}",2,1},
+  {"alpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\\n\",\"newText\":\"alpha\\nx\"}",2,1},
+  {"alpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\\n\",\"newText\":\"alpha\"}",1,1},
+ };
+ for(size_t i=0;i<sizeof(cases)/sizeof(*cases);++i){put(cases[i].before);assert(!invoke(cases[i].args));char expected[128];snprintf(expected,sizeof(expected),"Successfully replaced %u block(s); first changed line %u",cases[i].blocks,cases[i].line);assert(!strcmp(last_output,expected));}
+ char many[2048];memset(many,'\n',2001);memcpy(many+2001,"alpha",6);put(many);assert(!invoke("{\"path\":\"file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!strcmp(last_output,"Successfully replaced 1 block(s); first changed line 2002"));
+ char content[128]={0};json_object *args=json_object_new_object(),*edits=json_object_new_array();assert(args&&edits);assert(!json_object_object_add(args,"path",json_object_new_string("file.txt")));assert(!json_object_object_add(args,"edits",edits));
+ for(unsigned i=0;i<16;++i){char old[8],replacement[8];snprintf(old,sizeof(old),"T%02u",i);snprintf(replacement,sizeof(replacement),"R%02u",i);strcat(content,old);strcat(content,"\n");json_object *edit=json_object_new_object();assert(edit&&!json_object_object_add(edit,"oldText",json_object_new_string(old))&&!json_object_object_add(edit,"newText",json_object_new_string(replacement))&&!json_object_array_add(edits,edit));}
+ put(content);assert(!invoke(json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN)));assert(!strcmp(last_output,"Successfully replaced 16 block(s); first changed line 1"));json_object_put(args);
+ put("alpha\n");
+}
+
 int main(int argc,char **argv){
  char root[]="/tmp/pangu-edit-tool-XXXXXX";assert(mkdtemp(root));int saved=open(".",O_RDONLY|O_DIRECTORY);assert(saved>=0&&!chdir(root));
  pg_read_tool reader={-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
@@ -70,6 +88,7 @@ int main(int argc,char **argv){
  service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0,0,0,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
  pg_tool_definition entries[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),definition};assert(!pg_tool_registry_init(&registry,entries,3));
  if(argc==2&&!strcmp(argv[1],"--json")){json_cases();assert(!unlink("file.txt"));pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));return 0;}
+ success_summaries();
  const char *shapes[]={
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}]}",
   "{\"path\":\"file.txt\",\"edits\":{\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}}",
@@ -121,7 +140,9 @@ int main(int argc,char **argv){
  assert(!symlink("file.txt","link"));assert(invoke("{\"path\":\"link\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("alpha\n");assert(!unlink("link"));
  api_calls=0;assert(!invoke(shapes[0]));unsigned points=api_calls;assert(points>10);for(unsigned failure=1;failure<=points;++failure){put("alpha\n");api_calls=0;fail_api=failure;assert(invoke(shapes[0]));expect("alpha\n");}fail_api=0;printf("edit allocation/setup failure points: %u\n",points);put("alpha\n");
  char out[128];size_t n=999;r=reads;w=writes;assert(definition.execute(definition.context,s(shapes[0]),out,1,&n)&&!n&&reads==r&&writes==w);
- long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));size_t len=strlen(shapes[0]);char *tail=map+page-len;memcpy(tail,shapes[0],len);assert(!definition.execute(definition.context,(pg_slice){tail,len},out,sizeof(out),&n));expect("ALPHA\n");assert(!munmap(map,(size_t)page*2));
+ long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));size_t len=strlen(shapes[0]);char *tail=map+page-len;memcpy(tail,shapes[0],len);assert(!definition.execute(definition.context,(pg_slice){tail,len},out,sizeof(out),&n));expect("ALPHA\n");put("alpha\n");r=reads;w=writes;n=999;assert(definition.execute(definition.context,s(shapes[0]),out,63,&n)&&!n&&reads==r&&writes==w);
+ char *output_tail=map+page-64;assert(!definition.execute(definition.context,s(shapes[0]),output_tail,64,&n));assert(n==strlen("Successfully replaced 1 block(s); first changed line 1")&&!strcmp(output_tail,"Successfully replaced 1 block(s); first changed line 1"));
+ assert(!munmap(map,(size_t)page*2));
  assert(fds()==before);recovery(reader.directory);assert(fds()==before);assert(!unlink("file.txt"));pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));
  puts("edit tool: canonical/repair shapes, untouched args, batch/fuzzy/BOM, policy order, no-write refusals, borrowed service, page tails and unsafe post-write crash recovery OK");return 0;
 }

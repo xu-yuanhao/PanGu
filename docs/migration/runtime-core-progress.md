@@ -860,3 +860,12 @@ agent.S原地将单调用与批量准入统一为需要1+2N+1剩余槽，最后1
 扩展现有live_mimo_batch.c与build_test.py的可选--live-capacity入口，实际MiMo/Agent/registry/write验证两个边界：59条既有消息时输入+assistant+call+result+reply刚好64，实际文件内容为CAPACITY_OK；60条既有消息时真实模型提出写调用，但Runtime以明确容量错误终结，工具start/finish均0、目标文件不存在、消息仅增加用户一条。LIVE_CAPACITY_EXIT=0。测试只使用临时工作区，凭据仅子进程环境，不承诺未来更大上下文或完整Pi兼容。
 
 同一Agent自审构建测试入口和进度更新，非独立审核；没有新增文件/依赖、门禁变更或配额放宽。G00、assembly-first及diff检查通过，生产准入未改变。固定包SHA256（仅本批实现/测试/入口/主TODO，不含本记录及并行TUI；排序[path,文件SHA256]紧凑UTF-8 JSON）：`31dfd6ae111ab8922d62fc4f5745bbb04ff952c25a2e60d895640706a88be349`。
+
+
+## 2026-10-26：edit成功结果的块数与行定位
+
+对照Pi d5b3de22 Durable tools/edit.ts::createEditTool、edit-diff.ts::generateDiffString与tools.test.ts的disjoint edits/diff结果用例，采用成功替换块数及变更定位的信息；本次不移植diff/patch格式，也不把简单字节比较冒充上游diff算法。原生文本结果为Successfully replaced N block(s); first changed line L，行号按原文与最终保留字节的公共前缀统计LF，不按参数数组第一项推测；因此也能定位实际发生的行结束符变化。BOM仍保留，当前有界全文内一次扫描，不重新读取文件。
+
+edit_tool.S使用现有栈内8字节空隙保存原文长度/首行，不扩大8808字节帧、输出最低64字节、4096消息预算或56字节编辑器ABI。只在读改写成功且清理完成后格式化成功结果，复用libc snprintf；异常格式化会明确说明编辑已成功而结果生成失败，不谎称没有副作用。未新增文件、库、导出、构建入口或检查器。工具契约头注明原生行定位口径，完整结构化diff仍未实现。
+
+实际验证：edit专项O2 ASan/UBSan退出0，覆盖BOM/CRLF、中文、多处乱序替换、删除/EOF换行、第2002行、16块、64字节输出贴保护页及63字节零IO拒绝；原有17个JSON分配失败点、无写入拒绝与写后崩溃恢复保持通过。完整Runtime O0/O2 UBSan退出0。真实--live-snapshot-edit退出0：MiMo实际编辑第2001行，保持2000个前导换行并回读；新增检查确认对应call_id的成功结果恰好一条，块数1、行号2001。G00、assembly-first和diff检查通过。并行TUI改动未修改或提交；本批为Runtime服务检查，不宣称新TUI体验、完整Pi diff兼容或生产准入通过。
