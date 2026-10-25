@@ -115,6 +115,13 @@ def main():
             subprocess.run([edit_tool_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
                             '--tool-binary', edit_tool_test], check=True, timeout=45)
+            decoder_test = str(Path(directory) / 'test-stream-decode')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/stream_decode'),
+                            str(ROOT / 'tests/runtime/test_stream_decode.c'), '-o', decoder_test], check=True)
+            subprocess.run([decoder_test], check=True, timeout=10)
+            subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_stream_decode.py'),
+                            '--binary', decoder_test], check=True, timeout=45)
             process_test = str(Path(directory) / 'test-process')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/process'),

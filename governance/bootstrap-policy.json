@@ -583,6 +583,11 @@
     "src/runtime/process.h": "native-source",
     "src/runtime/process_layout.h": "native-source",
     "tests/runtime/test_process.c": "native-test",
-    "tests/runtime/test_async_tools.c": "native-test"
+    "tests/runtime/test_async_tools.c": "native-test",
+    "src/runtime/stream_decode.h": "native-source",
+    "src/runtime/stream_decode_layout.h": "native-source",
+    "src/runtime/stream_decode.S": "native-source",
+    "tests/runtime/test_stream_decode.c": "native-test",
+    "tools/runtime/test_stream_decode.py": "gate"
   }
 }

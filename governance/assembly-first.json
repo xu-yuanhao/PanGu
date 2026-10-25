@@ -104,6 +104,10 @@
     "src/runtime/process.S": {
       "role": "assembly-core",
       "reason": "手写协作式子进程轮询/超时/取消/输出与回收；启动复用公开libc posix_spawn，不重写fork/exec细节"
+    },
+    "src/runtime/stream_decode.S": {
+      "role": "assembly-core",
+      "reason": "手写有界逐流UTF-8增量解码和replacement/BOM语义；不混用stdout/stderr状态"
     }
   }
 }

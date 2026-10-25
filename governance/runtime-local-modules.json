@@ -597,6 +597,37 @@
           ]
         }
       ]
+    },
+    {
+      "id": "stream.decode.local.v0",
+      "sources": [
+        "src/runtime/stream_decode.h",
+        "src/runtime/stream_decode_layout.h",
+        "src/runtime/stream_decode.S"
+      ],
+      "dependencies": [
+        "client.contract.v0"
+      ],
+      "role": "handwritten bounded streaming UTF-8 replacement decoder; independent caller-owned stream state, initial BOM only, final flush; internal shell output helper, not yet a product bash tool",
+      "exports": [
+        "pg_stream_decoder_init",
+        "pg_stream_decode"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/env/decode.ts",
+            "packages/durable/src/env/node.ts"
+          ],
+          "semantics": "StreamDecoder.decode and exec separate stdout/stderr decoders; preserve a later BOM including after an invalid prefix",
+          "tests_to_read": [
+            "packages/durable/test/env-line-scan.test.ts",
+            "packages/durable/test/env-node.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

@@ -671,3 +671,14 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 实际验证：核心常规构建测试O0/O2退出0；真实OS进程专项O2 ASan/UBSan通过，覆盖进度、忙拒绝、延迟/错误关闭、取消、暂停/unsafe恢复、abort存储失败后回收，以及通过真实TUI桥接退出/挂起20次延迟关闭、最终pid已回收/重复shutdown幂等。TUI测试退出0；实际组合构建、离线PTY退出/信号/termios恢复通过。真实MiMo/TUI edit→read回读、BOM/CRLF/未改动字节、unsafe intent及重开不重复改写通过。异步单元模型是确定性替身，本批没有真实MiMo异步命令验证；bash适配、流解码和输出保留/溢出仍待完成，未开放产品异步bash，未声称完整Durable或生产准入。
 
 同一Agent按授权自审自批新增测试登记、构建集成、模块说明与内部接口调整，未修改检查器或放宽基线。开放产品bash前须完成剩余输出/参数处理和真实模型验证。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`8650d0b6c50a3f05cbe8cbae17172a1dc2b27c6bd192b6e6f9997e572569e883`。G00、assembly-first与diff检查通过，生产准入状态未变。
+
+
+## 2026-10-25：bash逐流输出解码
+
+已读固定Pi d5b3de22的env/decode.ts::StreamDecoder.decode、env/node.ts::exec的独立stdout/stderr解码与结束flush；读取env-line-scan.test.ts的“keeps a U+FEFF that does not start the stream”和任意分块测试、env-node.test.ts的分块进程输出用例。采用UTF-8 replacement、保留未完成前缀、只去掉首个BOM，非法前缀后的BOM保留。
+
+新增手写stream_decode.S，28字节调用者状态；每流独立实例、最多4096字节输入，输出容量明确要求3*n+3，结束flush后封闭，拒绝容量不足保持状态不变。无堆分配/运行时依赖，不复刻Node框架。只是命令输出内部helper，不增设插件框架或通用编码服务；bash工具尚未消费该接口。
+
+实际验证：140477条逐块输出与固定Pi实际StreamDecoder通过（Node直接导入只读参考decode.ts，源摘要固定；不是另写TS预言机），包括所有256个单字节和65536种双字节的整块/拆块、特殊前缀/中途BOM、随机及4096字节坏输入。核心O0/O2 UBSan完整构建运行退出0，专项O2 ASan/UBSan通过；另测双流状态隔离、容量拒绝不变、页尾状态/输入/输出及重复final。实际产品组合构建通过，G00、assembly-first与diff检查通过。该批没有改变模型或现有工具调用行为，未做新的真实模型验证；现有进程与协议专项不等于bash已完成。
+
+同一Agent按授权自审自批helper模块、文件/语言登记与测试构建；未修改检查器/预算或放宽基线。风险/限制：调用者须初始化并逐流维护状态，输入输出和状态不得重叠，原始完整输出保留与溢出策略仍须在bash适配中完成。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`5535cf683f1af81e5b395882294b2b31e6ebf25f5fab37b9aabe6c0fbd4fbabc`。
