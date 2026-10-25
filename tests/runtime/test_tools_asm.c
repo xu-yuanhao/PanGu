@@ -184,7 +184,7 @@ static void test_asm_callbacks_and_stack_args(void)
 	pg_tool_registry r;
 	pg_tools svc;
 	pg_tool_definition d = {"abi", "desc", schema, (void *)0x1234,
-				abi_asm_validate, abi_asm_authorize, abi_asm_execute,0};
+				abi_asm_validate, abi_asm_authorize, abi_asm_execute,0,0};
 	const char *args = "{\"x\":1}";
 	volatile unsigned long canary_a = 0xA11CE, canary_b = 0xB0B5E;
 
@@ -206,7 +206,7 @@ static void test_sret_aggregates(void)
 {
 	pg_tool_registry r;
 	pg_tool_definition d = {"sret", "d", "{\"type\":\"object\"}", NULL,
-				ok_validate, ok_authorize, ok_execute,0};
+				ok_validate, ok_authorize, ok_execute,0,0};
 	pg_tools a, b;
 	pg_read_tool reader;
 	pg_tool_definition rd;
@@ -350,7 +350,7 @@ static void test_registry_boundaries(void)
 static void test_argument_strictness(void)
 {
 	pg_tool_definition d = {"echo", "d", "{\"type\":\"object\"}", NULL,
-				ok_validate, ok_authorize, ok_execute,0};
+				ok_validate, ok_authorize, ok_execute,0,0};
 	pg_tool_registry r;
 	pg_tools svc;
 	char out[64];

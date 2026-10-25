@@ -658,3 +658,16 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 收尾fetch发现Pi新增d5b3de22d0e24a3e9c38a9410d3329b099717283，干净树已快进。已读generation及两份测试差异：请求thinking level写入assistant消息/deferred checkpoint，旧缺失字段不补造；本批process/bash参考文件未变。当前MiMo固定thinking disabled、原生无thinkingLevel/deferred字段，尚无对应配置迁移，不伪称该新增语义已移植；未来引入该能力时需采用请求级别的固定记录与恢复语义。Harness仍22ddee3。
 
 固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`2e5dd6bd81dc9fdefec56be86f798dbfebaab7b1703f101214f41de8cf3c750e`（11个路径）。
+
+
+## 2026-10-25：文档收敛与异步工具协议子集
+
+主文档压缩为34行，只保留目标、参考分工、开发原则和TUI方向；旧清单不自动扩大需求，具体实现开发时查对应源码与测试。
+
+继续此前进程后端接入。参考Pi d5b3de22的tools/bash.ts::runCommand、env/node.ts::exec的onAbort/emit/settle、harness/tool.ts::execute/abort及harness-tools.test.ts“answers an aborted tool with only its durable output”。采用取消先请求、回收后终结、执行意图持久化及unsafe恢复不重跑。原生差异：当前无通用Task图和持久进度slot；OUTPUT只是临时事件，最终结果由提供者明确提交，重启丢失未提交输出，不冒充上游durable进度。真实进程测试提供者在取消后返回已保留的输出，再由Agent原子提交错误结果；不是上游abort进度slot行为完全兼容。
+
+手写汇编registry与Agent支持start/next/cancel/close、临时输出和单操作所有权；close确认释放后才提交结果/终态，清理错误保留所有权重试。TUI接入临时工具输出及控制字符转义，shutdown改为0已释放/1待清理，主循环每10ms继续推进，取消只发一次。持久模式detach反复suspend到释放，不生成durable abort。桥接错误保留stop_error和所有权，不再八次poll后假装关闭；永久无法清理时退出也不会错误宣称完成，当前没有后台监管/强制超时丢弃。同步工具沿用原行为，ABI布局同步至调用者、MiMo描述和profile，使用者需同步重建。
+
+实际验证：核心常规构建测试O0/O2退出0；真实OS进程专项O2 ASan/UBSan通过，覆盖进度、忙拒绝、延迟/错误关闭、取消、暂停/unsafe恢复、abort存储失败后回收，以及通过真实TUI桥接退出/挂起20次延迟关闭、最终pid已回收/重复shutdown幂等。TUI测试退出0；实际组合构建、离线PTY退出/信号/termios恢复通过。真实MiMo/TUI edit→read回读、BOM/CRLF/未改动字节、unsafe intent及重开不重复改写通过。异步单元模型是确定性替身，本批没有真实MiMo异步命令验证；bash适配、流解码和输出保留/溢出仍待完成，未开放产品异步bash，未声称完整Durable或生产准入。
+
+同一Agent按授权自审自批新增测试登记、构建集成、模块说明与内部接口调整，未修改检查器或放宽基线。开放产品bash前须完成剩余输出/参数处理和真实模型验证。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`8650d0b6c50a3f05cbe8cbae17172a1dc2b27c6bd192b6e6f9997e572569e883`。G00、assembly-first与diff检查通过，生产准入状态未变。

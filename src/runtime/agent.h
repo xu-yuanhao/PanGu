@@ -14,14 +14,20 @@ typedef struct {
     void (*cancel)(void *);
     void (*close)(void *);
 } pg_model;
-/* One sequential synchronous call per assistant turn.
-   execute returns promptly; asynchronous OS tools need a later operation API. */
+typedef enum { PG_TOOL_OK, PG_TOOL_ERROR, PG_TOOL_WAIT, PG_TOOL_OUTPUT } pg_tool_status;
+/* One sequential operation per turn. All callbacks return promptly.
+   execute starts; next polls. WAIT has no text, OUTPUT is transient text,
+   OK/ERROR carry a final result. close: 0 released, 1 pending, <0 error;
+   keep ownership until released. Async callbacks are all present or all NULL. */
 typedef struct {
     void *context;
     int (*authorize)(void *, pg_slice name, pg_slice arguments);
     int (*execute)(void *, pg_slice name, pg_slice arguments, char *out, size_t capacity, size_t *size);
     /* Pure metadata query: exactly 1 opts into replay; NULL defaults to unsafe. */
     int (*replay_safe)(void *, pg_slice name);
+    int (*next)(void *, char *, size_t, size_t *);
+    void (*cancel)(void *);
+    int (*close)(void *);
 } pg_tools;
 typedef struct {
     pg_session session;
@@ -37,6 +43,8 @@ typedef struct {
     pg_session_control commits;
     pg_run_checkpoint next_checkpoint;
     unsigned profile_verified;
+    unsigned tool_open, tool_status;
+    size_t tool_size;
 } pg_agent;
 int pg_agent_init(pg_agent *, pg_model, pg_tools);
 pg_client pg_agent_client(pg_agent *);
@@ -50,7 +58,9 @@ int pg_agent_bind_profile(pg_agent *, pg_slice identity);
    retry=1 explicitly retries a parked run. Returns 2 when restart limit parks it. */
 int pg_agent_resume(pg_agent *, unsigned retry);
 /* Stop the local executor without aborting durable work or emitting a terminal.
-   Borrowed events expire; detach observers first, then explicitly resume later. */
+   Borrowed events expire; detach observers first, then explicitly resume later.
+   Returns 2 while tool cleanup is pending; repeat suspend until 0 before
+   releasing the agent/services. No terminal or durable abort is generated. */
 int pg_agent_suspend(void *agent_context);
 /* Idle-only operations; reset clears transcript but preserves system and services. */
 int pg_agent_set_system(pg_agent *, pg_slice);

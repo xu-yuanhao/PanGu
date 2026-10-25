@@ -22,7 +22,7 @@ static void close_model(void *p){++((fixture*)p)->closed;}
 static int allow(void *p,pg_slice name,pg_slice args){fixture *f=p;assert(name.size==4 && args.size==2);return !f->denied;}
 static int execute(void *p,pg_slice name,pg_slice args,char *out,size_t cap,size_t *n){fixture *f=p;(void)name;(void)args;assert(cap>=3);++f->executed;if(f->mode==6){*n=cap;return 0;}memcpy(out,"ok",2);*n=2;return 0;}
 static pg_agent agent;
-static pg_client setup(fixture *f){assert(!pg_agent_init(&agent,(pg_model){f,start,next,cancel_model,close_model},(pg_tools){f,allow,execute,0}));return pg_agent_client(&agent);}
+static pg_client setup(fixture *f){assert(!pg_agent_init(&agent,(pg_model){f,start,next,cancel_model,close_model},(pg_tools){f,allow,execute,0,0,0,0}));return pg_agent_client(&agent);}
 static pg_outcome drain(pg_client c,int *count){pg_event e;int i;*count=0;for(i=0;i<256;++i)if(c.poll(c.context,&e)){++*count;if(e.kind==PG_RUN_FINISHED){pg_outcome outcome=e.outcome;if(outcome==PG_ERROR)assert(e.text.size>0);assert(!c.poll(c.context,&e));return outcome;}}assert(0);return PG_ERROR;}
 int main(void){fixture f={0};pg_client c=setup(&f);int n;pg_event e;
  assert(!c.submit(c.context,s("hello")));assert(c.submit(c.context,s("busy")));

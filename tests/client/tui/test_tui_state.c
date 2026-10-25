@@ -47,9 +47,10 @@ static int m_poll(void *ctx, tui_event *out)
 	return 1;
 }
 
-static void m_shutdown(void *ctx)
+static int m_shutdown(void *ctx)
 {
 	((mock_runtime *)ctx)->shutdown_calls++;
+	return 0;
 }
 
 static void m_add(mock_runtime *m, tui_event ev)

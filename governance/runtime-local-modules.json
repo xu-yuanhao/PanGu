@@ -180,7 +180,7 @@
         "json-c",
         "system libc"
       ],
-      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe",
+      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe; optional async next/cancel/close, one active operation retained until released, transient progress distinct from final result",
       "exports": [
         "pg_tool_registry_init",
         "pg_tool_registry_service"
@@ -194,7 +194,7 @@
             "packages/durable/src/harness/registry.ts",
             "packages/durable/src/harness/define.ts"
           ],
-          "semantics": "primary tool resolution/validation/execution and immutable registry reference; native sync registry leaves task scheduling to runtime",
+          "semantics": "primary tool resolution/validation/execution and immutable registry reference; native cooperative operation table leaves task scheduling to runtime",
           "tests_to_read": [
             "packages/durable/test/harness-tools.test.ts",
             "packages/durable/test/harness-tools-recovery.test.ts"
@@ -572,7 +572,7 @@
         "GNU libc posix_spawn file-action extensions",
         "Linux pipe2/waitid/clock/process-group APIs"
       ],
-      "role": "replaceable pg_process_ops provider; handwritten cooperative subprocess lifecycle and separate bounded raw stream events; libc owns spawn/exec setup, waitid WNOWAIT retains leader ownership until final reap, timeout/cancel/close kill owned group, post-exit idle grace; consumer owns decoding/retention/spill and async tool integration is pending",
+      "role": "replaceable pg_process_ops provider; handwritten cooperative subprocess lifecycle and separate bounded raw stream events; libc owns spawn/exec setup, waitid WNOWAIT retains leader ownership until final reap, timeout/cancel/close kill owned group, post-exit idle grace; consumer owns decoding/retention/spill and product bash adapter is pending",
       "exports": [
         "pg_process_init",
         "pg_process_start",

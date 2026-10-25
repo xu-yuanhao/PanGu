@@ -529,13 +529,23 @@ tui_app_run:
 /* ---- 局部：shutdown（cfg 在 rbx，由主函数持有） ---- */
 .type tui_li_shutdown,@function
 tui_li_shutdown:
+ sub rsp,8
+.Lsd_again:
  mov rax, qword ptr [rbx + TUI_LI_APP_OPS]
  mov rdi, qword ptr [rax + TUI_LI_OPS_CTX]
  mov rax, qword ptr [rax + TUI_LI_OPS_SHUTDOWN]
  test rax, rax
  jz .Lsd_ret
- jmp rax
+ call rax
+ test eax,eax
+ jz .Lsd_ret
+ xor edi,edi
+ xor esi,esi
+ mov edx,10
+ call poll@PLT
+ jmp .Lsd_again
 .Lsd_ret:
+ add rsp,8
  ret
 .size tui_li_shutdown, .-tui_li_shutdown
 

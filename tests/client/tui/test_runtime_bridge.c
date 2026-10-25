@@ -33,12 +33,13 @@ static void boundary_abi(void){long page=sysconf(_SC_PAGESIZE);assert(page>PG_B_
  char *ids=mmap(0,(size_t)page*3,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(ids!=MAP_FAILED);assert(!mprotect(ids+page,(size_t)page,PROT_READ|PROT_WRITE));char *tail=ids+2*page-63;memset(tail,'x',63);
  source=(pg_event){.kind=PG_TOOL_STARTED,.call_id={tail,63},.tool_name={tail,63}};assert(!pg_bridge_probe((probe_fn)b->ops.poll,b,&guarded.event,0));assert(strlen(b->id)==63&&strlen(b->name)==63&&guarded.event.tool_call_id==b->id&&guarded.event.tool_name==b->name);
  source.call_id.size=64;assert(b->ops.poll(b,&guarded.event)<0);source.call_id.size=63;tail[62]=0;assert(b->ops.poll(b,&guarded.event)<0);tail[62]='x';source.tool_name=(pg_slice){0,1};assert(b->ops.poll(b,&guarded.event)<0);
+ source=(pg_event){.kind=PG_TOOL_OUTPUT_DELTA,.text={"chunk",5},.call_id={"job-1",5},.tool_name={"job",3}};assert(b->ops.poll(b,&guarded.event)==1&&guarded.event.kind==TUI_EV_TOOL_OUTPUT&&guarded.event.text_len==5&&!memcmp(guarded.event.text,"chunk",5)&&b->active&&!strcmp(guarded.event.tool_call_id,"job-1"));
  source=(pg_event){.kind=PG_TEXT_DELTA,.text={0,1}};assert(b->ops.poll(b,&guarded.event)<0);source=(pg_event){.kind=(pg_event_kind)99};assert(b->ops.poll(b,&guarded.event)<0);source=(pg_event){.kind=PG_RUN_FINISHED,.outcome=(pg_outcome)99};assert(b->ops.poll(b,&guarded.event)<0&&b->active);
  assert(!pg_bridge_probe((probe_fn)b->ops.cancel,b,0,0));assert(cancel_calls==1);
  source=(pg_event){.kind=PG_RUN_FINISHED,.outcome=PG_CANCELLED};assert(b->ops.poll(b,&guarded.event)==1&&!b->active&&guarded.event.run_status==TUI_RUN_CANCELLED);
  source_rc=-7;assert(b->ops.poll(b,&guarded.event)==-7);int before=poll_calls;assert(b->ops.poll(b,0)<0&&poll_calls==before);source_rc=0;assert(b->ops.poll(b,&guarded.event)==0&&!guarded.event.kind);
  submit_rc=1;assert(b->ops.submit(b,"reject",6)==TUI_SUBMIT_ERROR&&!b->active);submit_rc=0;assert(b->ops.submit(b,"run",3)==TUI_SUBMIT_OK);before=poll_calls;
- assert(!pg_bridge_probe((probe_fn)b->ops.shutdown,b,0,0));assert(b->stopped&&b->active&&poll_calls==before+8);b->ops.shutdown(b);assert(poll_calls==before+8);assert(b->ops.poll(b,&guarded.event)==0&&b->ops.submit(b,"end",3)==TUI_SUBMIT_ERROR);
+ assert(!pg_bridge_probe((probe_fn)b->ops.shutdown,b,0,0));assert(b->stopped==2&&b->active&&poll_calls==before+8);assert(b->ops.shutdown(b)==1&&poll_calls==before+16);assert(b->ops.submit(b,"end",3)==TUI_SUBMIT_ERROR);source_rc=1;source=(pg_event){.kind=PG_RUN_FINISHED,.outcome=PG_CANCELLED};assert(!b->ops.shutdown(b)&&b->stopped==1&&!b->active);before=poll_calls;assert(!b->ops.shutdown(b)&&poll_calls==before);
  assert(guarded.before==0x874192&&guarded.after==0x194582);assert(!munmap(ids,(size_t)page*3));assert(!munmap(mapping,(size_t)page*3));
 }
 static void detach_lifecycle(void){
@@ -46,7 +47,7 @@ static void detach_lifecycle(void){
  assert(pg_tui_bridge_set_detach(0,pg_bridge_test_detach,0));assert(pg_tui_bridge_set_detach(&b,0,0));
  assert(!pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));detach_result=result;int before=detach_calls,cancels=cancel_calls,polls=poll_calls;
  b.active=1;assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));assert(!pg_bridge_probe((probe_fn)b.ops.shutdown,&b,0,0));
- assert(b.stopped&&b.active&&b.stop_error==result&&detach_calls==before+1&&cancel_calls==cancels&&poll_calls==polls);b.ops.shutdown(&b);assert(detach_calls==before+1);assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));}
+ assert(b.stopped==(result?2:1)&&b.active&&b.stop_error==result&&detach_calls==before+1&&cancel_calls==cancels&&poll_calls==polls);if(result){detach_result=2;assert(b.ops.shutdown(&b)==1&&b.stopped==2);detach_result=0;assert(!b.ops.shutdown(&b)&&b.stopped==1);}before=detach_calls;assert(!b.ops.shutdown(&b)&&detach_calls==before);assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));}
 }
 static void history_snapshot(void){
  memset(&agent.session,0,sizeof(agent.session));agent.session.count=4;

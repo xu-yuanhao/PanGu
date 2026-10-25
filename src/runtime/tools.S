@@ -17,6 +17,9 @@
 .Lmsg_validate:   .asciz "tool argument validation failed"
 .Lmsg_authorize:  .asciz "tool permission denied"
 .Lmsg_limit:      .asciz "tool output limit exceeded"
+.Lmsg_busy: .asciz "tool operation is active"
+.Lmsg_protocol: .asciz "invalid tool operation status"
+.Lmsg_no_pending: .asciz "no pending tool operation"
 
 .section .text
 
@@ -251,7 +254,7 @@ pg_tool_registry_init:
  push r13
  push r14
  push r15
- sub rsp, 1072 /* scratch[32], detached registry[1032], alignment[8] */
+ sub rsp, 1216 /* scratch[32], detached registry[1184] */
  mov rbx, rdi /* registry，全程占用 */
  mov r12, rsi
  mov r13, rdx
@@ -290,6 +293,16 @@ pg_tool_registry_init:
  ja .Linit_bad
  cmp qword ptr [r15 + PG_TL_DEF_EXECUTE], 0
  je .Linit_bad
+ mov rax,[r15+PG_TL_DEF_ASYNC]
+ test rax,rax
+ jz .Linit_async_valid
+ cmp qword ptr [rax],0
+ je .Linit_bad
+ cmp qword ptr [rax+8],0
+ je .Linit_bad
+ cmp qword ptr [rax+16],0
+ je .Linit_bad
+.Linit_async_valid:
  mov rax, qword ptr [r15 + PG_TL_DEF_SCHEMA]
  mov [rsp+16], rax
  mov rdi, rax
@@ -369,7 +382,7 @@ pg_tool_registry_init:
  mov edx, PG_TL_REG_BYTES
  call memcpy@PLT
  xor eax, eax
- add rsp, 1072
+ add rsp, 1216
  pop r15
  pop r14
  pop r13
@@ -378,7 +391,7 @@ pg_tool_registry_init:
  ret
 .Linit_bad:
  mov eax, 1
- add rsp, 1072
+ add rsp, 1216
  pop r15
  pop r14
  pop r13
@@ -399,6 +412,12 @@ pg_tool_registry_service:
  mov qword ptr [rdi + PG_TL_SVC_EXECUTE], rax
  lea rax,[rip+li_replay_safe]
  mov [rdi+PG_TL_SVC_REPLAY_SAFE],rax
+ lea rax,[rip+li_next]
+ mov [rdi+PG_TL_SVC_NEXT],rax
+ lea rax,[rip+li_cancel]
+ mov [rdi+PG_TL_SVC_CANCEL],rax
+ lea rax,[rip+li_close]
+ mov [rdi+PG_TL_SVC_CLOSE],rax
  mov rax, rdi
  ret
 .size pg_tool_registry_service, .-pg_tool_registry_service
@@ -444,7 +463,7 @@ li_execute:
  push r13
  push r14
  push r15
- sub rsp, 32 /* [rsp]=args.data [rsp+8]=args.size [rsp+16]=name.data [rsp+24]=name.size */
+ sub rsp, 48 /* [rsp]=args.data [rsp+8]=args.size [rsp+16]=name.data [rsp+24]=name.size */
  mov rbx, rdi /* registry */
  mov r12, r9 /* out */
  mov r13, r10 /* cap */
@@ -458,6 +477,8 @@ li_execute:
  test r14, r14
  jz .Lexec_bad_direct
  mov qword ptr [r14], 0
+ cmp qword ptr [rbx+PG_TL_REG_ACTIVE],0
+ jne .Lexec_busy
  mov rdi, rbx
  mov rsi, [rsp+16]
  mov rdx, [rsp+24]
@@ -484,6 +505,17 @@ li_execute:
  call [r15 + PG_TL_DEF_AUTHORIZE]
  test eax, eax
  jz .Lexec_denied
+ cmp qword ptr [r15+PG_TL_DEF_ASYNC],0
+ je .Lexec_sync
+ cmp dword ptr [rbx+PG_TL_REG_DEPTH],0
+ jne .Lexec_busy
+ mov [rbx+PG_TL_REG_ACTIVE],r15
+ mov dword ptr [rbx+PG_TL_REG_STATE],1
+ mov dword ptr [rbx+PG_TL_REG_CANCEL],0
+ jmp .Lexec_invoke
+.Lexec_sync:
+ inc dword ptr [rbx+PG_TL_REG_DEPTH]
+.Lexec_invoke:
  mov rdi, qword ptr [r15 + PG_TL_DEF_CONTEXT]
  mov rsi, [rsp]
  mov rdx, [rsp+8]
@@ -491,13 +523,21 @@ li_execute:
  mov r8, r13
  mov r9, r14
  call [r15 + PG_TL_DEF_EXECUTE]
- mov r15d, eax /* 工具结果跨末尾检查保存 */
- cmp qword ptr [r14], r13
- jae .Lexec_limit
- mov eax, r15d
+ cmp qword ptr [r15+PG_TL_DEF_ASYNC],0
+ jne .Lexec_check_result
+ dec dword ptr [rbx+PG_TL_REG_DEPTH]
+.Lexec_check_result:
+ call li_operation_result
  jmp .Lexec_out
 .Lexec_bad_direct:
  mov eax, 1
+ jmp .Lexec_out
+.Lexec_busy:
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ lea rcx,[rip+.Lmsg_busy]
+ call li_error
  jmp .Lexec_out
 .Lexec_unknown:
  mov rdi, r12
@@ -534,7 +574,7 @@ li_execute:
  lea rcx, [rip + .Lmsg_limit]
  call li_error
 .Lexec_out:
- add rsp, 32
+ add rsp, 48
  pop r15
  pop r14
  pop r13
@@ -542,5 +582,134 @@ li_execute:
  pop rbx
  ret
 .size li_execute, .-li_execute
+
+
+/* All callers share result validation; active ownership survives until close=0. */
+li_operation_result:
+ push r15
+ mov r15d,eax
+ cmp qword ptr [r14],r13
+ jae .Lop_limit
+ cmp r15d,1
+ jbe .Lop_final
+ cmp r15d,3
+ ja .Lop_invalid
+ cmp qword ptr [rbx+PG_TL_REG_ACTIVE],0
+ je .Lop_invalid
+ cmp r15d,2
+ jne .Lop_return
+ cmp qword ptr [r14],0
+ jne .Lop_invalid
+ jmp .Lop_return
+.Lop_final:
+ cmp qword ptr [rbx+PG_TL_REG_ACTIVE],0
+ je .Lop_return
+ mov dword ptr [rbx+PG_TL_REG_STATE],2
+.Lop_return:
+ mov eax,r15d
+ pop r15
+ ret
+.Lop_limit:
+ lea r15,[rip+.Lmsg_limit]
+ jmp .Lop_fail
+.Lop_invalid:
+ lea r15,[rip+.Lmsg_protocol]
+.Lop_fail:
+ cmp qword ptr [rbx+PG_TL_REG_ACTIVE],0
+ je .Lop_message
+ mov dword ptr [rbx+PG_TL_REG_STATE],2
+ mov rdi,rbx
+ call li_cancel
+.Lop_message:
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ mov rcx,r15
+ call li_error
+ pop r15
+ ret
+
+li_next:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ test r12,r12
+ jz .Lnext_bad
+ test r14,r14
+ jz .Lnext_bad
+ mov qword ptr [r14],0
+ mov r15,[rbx+PG_TL_REG_ACTIVE]
+ test r15,r15
+ jz .Lnext_empty
+ cmp dword ptr [rbx+PG_TL_REG_STATE],1
+ jne .Lnext_empty
+ mov rax,[r15+PG_TL_DEF_ASYNC]
+ mov rdi,[r15+PG_TL_DEF_CONTEXT]
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,r14
+ call [rax]
+ call li_operation_result
+ jmp .Lnext_return
+.Lnext_empty:
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ lea rcx,[rip+.Lmsg_no_pending]
+ call li_error
+ jmp .Lnext_return
+.Lnext_bad:
+ mov eax,1
+.Lnext_return:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+li_cancel:
+ mov rax,[rdi+PG_TL_REG_ACTIVE]
+ test rax,rax
+ jz .Lcancel_return
+ cmp dword ptr [rdi+PG_TL_REG_CANCEL],0
+ jne .Lcancel_return
+ mov dword ptr [rdi+PG_TL_REG_CANCEL],1
+ mov rcx,[rax+PG_TL_DEF_ASYNC]
+ mov rdi,[rax+PG_TL_DEF_CONTEXT]
+ jmp [rcx+8]
+.Lcancel_return:
+ ret
+
+li_close:
+ push rbx
+ mov rbx,rdi
+ mov rax,[rbx+PG_TL_REG_ACTIVE]
+ test rax,rax
+ jz .Lclose_idle
+ mov dword ptr [rbx+PG_TL_REG_STATE],3
+ mov rcx,[rax+PG_TL_DEF_ASYNC]
+ mov rdi,[rax+PG_TL_DEF_CONTEXT]
+ call [rcx+16]
+ test eax,eax
+ jz .Lclose_clear
+ cmp eax,1
+ jle .Lclose_return
+ mov eax,-1
+ jmp .Lclose_return
+.Lclose_clear:
+ mov qword ptr [rbx+PG_TL_REG_ACTIVE],0
+ mov qword ptr [rbx+PG_TL_REG_STATE],0
+.Lclose_idle:
+ xor eax,eax
+.Lclose_return:
+ pop rbx
+ ret
 
 .section .note.GNU-stack,"",@progbits

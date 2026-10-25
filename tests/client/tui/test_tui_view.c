@@ -55,6 +55,14 @@ static void test_event_lines_ansi(void)
 	ev.tool_call_id = "call-7";
 	ev.tool_name = "read_file";
 	tui_view_event(&v, &ev);
+    ev.kind = TUI_EV_TOOL_OUTPUT;
+    ev.text = "running\033[2J";
+    ev.text_len = strlen(ev.text);
+    tui_view_event(&v, &ev);
+    T_CHECK(tstr_contains(&out, "running\\x1b[2J"));
+    ev.text = "\xe4";
+    ev.text_len = 1;
+    tui_view_event(&v, &ev);
 	ev.kind = TUI_EV_TOOL_FINISHED;
 	ev.tool_ok = 1;
 	ev.detail = "20 字节内容";
@@ -62,6 +70,7 @@ static void test_event_lines_ansi(void)
 	tui_view_event(&v, &ev);
 	T_CHECK(tstr_contains(&out, "[tool] read_file (#call-7) started\r\n"));
 	T_CHECK(tstr_contains(&out, "[tool] read_file (#call-7) finished ok: 20 字节内容\r\n"));
+    T_CHECK(tstr_contains(&out, "\\xe4"));
 	tstr_clear(&out);
 
 	ev.kind = TUI_EV_RUN_FINISHED;

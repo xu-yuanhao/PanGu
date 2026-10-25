@@ -7,7 +7,7 @@ static int validate(void *ctx,pg_slice args){fixture *f=ctx;(void)args;++f->vali
 static int allow(void *ctx,pg_slice args){fixture *f=ctx;(void)args;++f->permission;assert(f->order==1);f->order=2;return !f->deny;}
 static int run(void *ctx,pg_slice args,char *out,size_t cap,size_t *size){fixture *f=ctx;(void)args;++f->execution;assert(f->order==2);f->order=3;if(f->overflow){*size=cap;return 0;}assert(cap>=2);memcpy(out,"ok",2);*size=2;return 0;}
 static pg_slice s(const char *v){return (pg_slice){v,strlen(v)};}
-int main(void){fixture f={0};pg_tool_registry r={0};pg_tool_definition d={"echo","test","{\"type\":\"object\"}",&f,validate,allow,run,0};
+int main(void){fixture f={0};pg_tool_registry r={0};pg_tool_definition d={"echo","test","{\"type\":\"object\"}",&f,validate,allow,run,0,0};
  assert(!pg_tool_registry_init(&r,&d,1));pg_tools service=pg_tool_registry_service(&r);assert(!service.replay_safe(service.context,(pg_slice){"echo",4}));d.replay_safe=1;assert(!pg_tool_registry_init(&r,&d,1));assert(service.replay_safe(service.context,(pg_slice){"echo",4})==1);assert(!service.replay_safe(service.context,(pg_slice){"missing",7}));d.replay_safe=2;assert(pg_tool_registry_init(&r,&d,1));assert(r.entries[0].replay_safe==1);d.replay_safe=1;char out[128];size_t n=0;
  assert(service.authorize(service.context,s("echo"),s("{}")));assert(!service.execute(service.context,s("echo"),s("{}"),out,sizeof(out),&n));assert(n==2 && f.execution==1 && f.order==3);
  f=(fixture){.deny=1};assert(service.execute(service.context,s("echo"),s("{}"),out,sizeof(out),&n));assert(!f.execution && f.validation==1 && f.permission==1);

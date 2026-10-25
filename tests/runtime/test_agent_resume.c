@@ -23,7 +23,7 @@ static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t capaci
 ssize_t __real_pwrite(int,const void *,size_t,off_t);
 ssize_t __wrap_pwrite(int fd,const void *p,size_t n,off_t at){ssize_t rc=__real_pwrite(fd,p,n,at);if(scenario==8&&rc==(ssize_t)n&&n>=96){const unsigned char *b=p;uint32_t version,phase;memcpy(&version,b+8,4);memcpy(&phase,b+n-56+8,4);if(version==2&&phase==PG_RUN_TERMINAL)_exit(81);}return rc;}
 static int replay_safe(void *ctx,pg_slice name){(void)ctx;(void)name;return policy;}
-static void open_agent(const char *name){assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel,close_model},(pg_tools){0,allow,execute,replay_safe}));journal=(pg_journal){.file=-1,.directory=-1};assert(!pg_journal_open(&journal,root,name,&agent.session,&agent.commits));}
+static void open_agent(const char *name){assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel,close_model},(pg_tools){0,allow,execute,replay_safe,0,0,0}));journal=(pg_journal){.file=-1,.directory=-1};assert(!pg_journal_open(&journal,root,name,&agent.session,&agent.commits));}
 static pg_outcome drain(pg_client client){unsigned terminal=0;pg_outcome outcome=PG_ERROR;for(unsigned i=0;i<100;++i){pg_event e;if(client.poll(client.context,&e)&&e.kind==PG_RUN_FINISHED){++terminal;outcome=e.outcome;break;}}assert(terminal==1);pg_event e;assert(!client.poll(client.context,&e));return outcome;}
 static void interrupt_run(const char *name,int which){scenario=which;open_agent(name);pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){"read",4}));assert(agent.commits.run.id==1);
  if(which==0)_exit(73);

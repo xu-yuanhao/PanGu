@@ -54,7 +54,7 @@ pg_profile_encode:
     test rax,rax
     jz .Lsuccess
     mov [rsp],rax
-    mov rdx,[rax+1024]
+    mov rdx,[rax+1152]
     cmp rdx,16
     ja .Lbad
     mov [r12+24],edx
@@ -63,7 +63,7 @@ pg_profile_encode:
 .Ltool:
     cmp rbp,[rsp+8]
     jae .Lsuccess
-    imul rax,rbp,64
+    imul rax,rbp,72
     add rax,[rsp]
     mov [rsp+16],rax
     mov qword ptr [rsp+24],0

@@ -22,13 +22,24 @@ pg_agent_init:
     je .Linit_bad
     cmp qword ptr [rsp+40],0
     je .Linit_bad
+    mov rax,[rsp+80]
+    or rax,[rsp+88]
+    or rax,[rsp+96]
+    jz .Linit_tools_valid
+    cmp qword ptr [rsp+80],0
+    je .Linit_bad
+    cmp qword ptr [rsp+88],0
+    je .Linit_bad
+    cmp qword ptr [rsp+96],0
+    je .Linit_bad
+.Linit_tools_valid:
     mov r8,rdi
     xor eax,eax
     mov ecx,PG_A_BYTES/8
     rep stosq
     lea rdi,[r8+PG_A_MODEL]
     lea rsi,[rsp+8]
-    mov ecx,9
+    mov ecx,12
     rep movsq
     lea rax,[rip+pg_session_volatile_commit]
     mov [r8+PG_A_COMMITS+8],rax
@@ -431,6 +442,27 @@ pg_agent_suspend:
     jne .Lsuspend_bad
     push rbx
     mov rbx,rdi
+    cmp dword ptr [rbx+PG_A_TOOL_OPEN],0
+    je .Lsuspend_release
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_SUSPENDING
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+40]
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+48]
+    test eax,eax
+    jz .Lsuspend_tool_closed
+    mov edx,1
+    cmp eax,1
+    jne .Lsuspend_return_pending
+    mov edx,2
+.Lsuspend_return_pending:
+    mov eax,edx
+    pop rbx
+    ret
+.Lsuspend_tool_closed:
+    mov dword ptr [rbx+PG_A_TOOL_OPEN],0
+.Lsuspend_release:
+    mov rdi,rbx
     call .Lclose
     lea rdi,[rbx+PG_A_DRAFT]
     xor eax,eax
@@ -535,6 +567,20 @@ pg_agent_suspend:
     sub rsp,8
     mov rbx,rdi
     mov r12d,esi
+    cmp dword ptr [rbx+PG_A_TOOL_OPEN],0
+    je .Lfinish_released
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+40]
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+48]
+    test eax,eax
+    jz .Lfinish_tool_closed
+    mov [rbx+PG_A_OUTCOME],r12d
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_FAIL_CLOSE
+    jmp .Lfinish_return
+.Lfinish_tool_closed:
+    mov dword ptr [rbx+PG_A_TOOL_OPEN],0
+.Lfinish_released:
     cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_FAILED],0
     jne .Lfinish_close
     cmp qword ptr [rbx+PG_A_COMMITS+PG_SC_RUN],0
@@ -564,6 +610,7 @@ pg_agent_suspend:
     rep stosq
     mov [rbx+PG_A_OUTCOME],r12d
     mov dword ptr [rbx+PG_A_STATE],PG_ST_FINISH
+.Lfinish_return:
     add rsp,8
     pop r12
     pop rbx
@@ -760,8 +807,16 @@ pg_agent_suspend:
     mov eax,[rbx+PG_A_STATE]
     test eax,eax
     jz .Lpoll_zero
+    cmp eax,PG_ST_SUSPENDING
+    je .Lpoll_zero
+    cmp eax,PG_ST_FAIL_CLOSE
+    je .Ldispatch
     cmp dword ptr [rbx+PG_A_CANCEL],0
     je .Ldispatch
+    cmp eax,PG_ST_TOOL_WAIT
+    je .Lcancel_async
+    cmp eax,PG_ST_TOOL_CLOSE
+    je .Lcancel_async
     cmp eax,1
     je .Ldispatch
     cmp eax,6
@@ -772,6 +827,11 @@ pg_agent_suspend:
     je .Lcancel_operation
     mov rdi,[rbx+PG_A_MODEL]
     call [rbx+PG_A_MODEL+24]
+    jmp .Lcancel_operation
+.Lcancel_async:
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+40]
+    jmp .Ldispatch
 .Lcancel_operation:
     cmp dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
     je .Lcancel_tool
@@ -832,6 +892,12 @@ pg_agent_suspend:
     je .Ltool
     cmp eax,PG_ST_TOOL_END
     je .Ltool_end
+    cmp eax,PG_ST_TOOL_WAIT
+    je .Ltool_wait
+    cmp eax,PG_ST_TOOL_CLOSE
+    je .Ltool_close
+    cmp eax,PG_ST_FAIL_CLOSE
+    je .Lfinish_wait
     cmp eax,PG_ST_FINISH
     je .Lterminal
     cmp eax,PG_ST_RECOVER_TOOL
@@ -1076,6 +1142,10 @@ pg_agent_suspend:
     call [rbx+PG_A_TOOLS+8]
     test eax,eax
     jz .Ltool_denied
+    xor eax,eax
+    cmp qword ptr [rbx+PG_A_TOOLS+48],0
+    setne al
+    mov [rbx+PG_A_TOOL_OPEN],eax
     lea rdi,[r13+PG_MSG_NAME]
     call .Llength
     mov rdx,rax
@@ -1090,19 +1160,118 @@ pg_agent_suspend:
     push 4096
     call [rbx+PG_A_TOOLS+16]
     add rsp,16
+    jmp .Ltool_received
+.Ltool_wait:
+    imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
+    add r13,rbx
+    mov qword ptr [rsp+56],0
+    mov rdi,[rbx+PG_A_TOOLS]
+    lea rsi,[rbx+PG_A_TEXT]
+    mov edx,4096
+    lea rcx,[rsp+56]
+    call [rbx+PG_A_TOOLS+32]
+.Ltool_received:
     mov r15d,eax
     cmp qword ptr [rsp+56],4096
-    jb .Ltool_append
+    jae .Ltool_bad_limit
+    cmp eax,1
+    jbe .Ltool_complete
+    cmp eax,3
+    ja .Ltool_bad_status
+    cmp dword ptr [rbx+PG_A_TOOL_OPEN],0
+    je .Ltool_bad_status
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_WAIT
+    cmp eax,3
+    je .Ltool_progress
+    cmp qword ptr [rsp+56],0
+    jne .Ltool_bad_status
+    jmp .Lpoll_zero
+.Ltool_progress:
+    mov dword ptr [r12],PG_EV_TOOL_OUTPUT
+    lea rax,[rbx+PG_A_TEXT]
+    mov [r12+8],rax
+    mov rax,[rsp+56]
+    mov [r12+16],rax
+    lea rdi,[r13+PG_MSG_ID]
+    mov [r12+24],rdi
+    call .Llength
+    mov [r12+32],rax
+    lea rdi,[r13+PG_MSG_NAME]
+    mov [r12+40],rdi
+    call .Llength
+    mov [r12+48],rax
+    jmp .Lpoll_one
+.Ltool_bad_limit:
     lea rsi,[rip+.Ltool_limit]
     jmp .Ltool_error
+.Ltool_bad_status:
+    lea rsi,[rip+.Ltool_status_error]
+    jmp .Ltool_error
+.Ltool_complete:
+    mov [rbx+PG_A_TOOL_STATUS],r15d
+    mov rax,[rsp+56]
+    mov [rbx+PG_A_TOOL_SIZE],rax
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_CLOSE
+.Ltool_close:
+    cmp dword ptr [rbx+PG_A_TOOL_OPEN],0
+    je .Ltool_released
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+48]
+    cmp eax,1
+    je .Lpoll_zero
+    test eax,eax
+    jz .Ltool_closed_ok
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+40]
+    lea rdi,[rip+.Ltool_cleanup_error]
+    call .Llength
+    mov [rbx+PG_A_TOOL_SIZE],rax
+    mov rdx,rax
+    lea rsi,[rip+.Ltool_cleanup_error]
+    lea rdi,[rbx+PG_A_TEXT]
+    call .Lcopy
+    mov dword ptr [rbx+PG_A_TOOL_STATUS],1
+    jmp .Lpoll_zero
+.Ltool_closed_ok:
+    mov dword ptr [rbx+PG_A_TOOL_OPEN],0
+.Ltool_released:
+    imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
+    add r13,rbx
+    mov r15d,[rbx+PG_A_TOOL_STATUS]
+    mov rax,[rbx+PG_A_TOOL_SIZE]
+    mov [rsp+56],rax
+    cmp dword ptr [rbx+PG_A_CANCEL],0
+    je .Ltool_append
+    mov r15d,1
+    test rax,rax
+    jnz .Ltool_append
+    lea rsi,[rip+.Lcancelled]
+    lea rdi,[rbx+PG_A_TEXT]
+    mov edx,9
+    call .Lcopy
+    mov qword ptr [rsp+56],9
+    jmp .Ltool_append
+.Lfinish_wait:
+    mov rdi,rbx
+    mov esi,[rbx+PG_A_OUTCOME]
+    call .Lfinish
+    jmp .Lpoll_zero
 .Ltool_denied:
     lea rsi,[rip+.Ltool_unavailable]
 .Ltool_error:
+    mov r14,rsi
+    cmp dword ptr [rbx+PG_A_TOOL_OPEN],0
+    je .Ltool_error_copy
+    mov rdi,[rbx+PG_A_TOOLS]
+    call [rbx+PG_A_TOOLS+40]
+.Ltool_error_copy:
+    mov rsi,r14
     lea rdi,[rbx+PG_A_TEXT]
     mov edx,26
     call .Lcopy
     mov qword ptr [rsp+56],26
     mov r15d,1
+    jmp .Ltool_complete
 .Ltool_append:
     mov rdi,rbx
     mov esi,3
@@ -1125,6 +1294,11 @@ pg_agent_suspend:
     mov rdi,rbx
     mov esi,1
     xor edx,edx
+    cmp dword ptr [rbx+PG_A_CANCEL],0
+    je .Ltool_checkpoint
+    mov esi,3
+    mov edx,2
+.Ltool_checkpoint:
     mov rcx,-1
     call .Lnext_checkpoint
     mov rdi,rbx
@@ -1133,6 +1307,19 @@ pg_agent_suspend:
     call .Lcommit_records
     test rax,rax
     jz .Lerror_storage
+    mov r14,rax
+    cmp dword ptr [rbx+PG_A_CANCEL],0
+    je .Ltool_committed
+    mov rdi,rbx
+    mov esi,2
+    call .Lfinish
+    mov rdi,r12
+    mov rsi,r13
+    mov rdx,r14
+    mov ecx,2
+    call .Ltool_event
+    jmp .Lpoll_one
+.Ltool_committed:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL_END
     jmp .Lpoll_zero
 .Ltool_end:
@@ -1225,6 +1412,8 @@ pg_agent_suspend:
 .section .rodata
 .Linterrupted: .asciz "Tool was interrupted and may have partially run"
 .Lcancelled: .asciz "cancelled"
+.Ltool_status_error: .asciz "invalid tool status result"
+.Ltool_cleanup_error: .asciz "tool cleanup failed; ownership retained"
 .Ltool_unavailable: .asciz "tool unavailable or denied"
 .Ltool_limit: .asciz "tool output limit exceeded"
 .Lerror_profile_text: .asciz "runtime profile is not verified"

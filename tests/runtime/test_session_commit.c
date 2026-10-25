@@ -67,7 +67,7 @@ static void close_model(void *ctx){++((model_state*)ctx)->closes;}
 static int authorize(void *ctx,pg_slice name,pg_slice args){(void)ctx;(void)name;(void)args;return 1;}
 static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)name;(void)args;assert(cap>2);++((model_state*)ctx)->executed;memcpy(out,"ok",2);*size=2;return 0;}
 static pg_agent agent;
-static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute,0}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=(unsigned[]){0,1,3,4,6}[fail];assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);
+static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute,0,0,0,0}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=(unsigned[]){0,1,3,4,6}[fail];assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);
  if(fail==1){assert(client.submit(client.context,(pg_slice){"input",5}));pg_event e;assert(!client.poll(client.context,&e));assert(!agent.session.count&&!m.starts);storage.fail_at=0;}
  assert(!client.submit(client.context,(pg_slice){"input",5}));assert(pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));unsigned begins=0,results=0,finished=0;
  for(unsigned i=0;i<40;++i){pg_event e;if(!client.poll(client.context,&e))continue;
@@ -83,7 +83,7 @@ static void runtime(void){for(unsigned fail=0;fail<=4;++fail){model_state m={0};
  if(fail>=2){assert(agent.commits.failed);assert(client.submit(client.context,(pg_slice){"retry",5}));}
  else assert(begins==1&&results==1&&m.closes==2);
  }}
-static void cancelled_result_failure(void){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute,0}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=5;assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){"cancel",6}));pg_event e={0};
+static void cancelled_result_failure(void){model_state m={0};assert(!pg_agent_init(&agent,(pg_model){&m,start,next,cancel,close_model},(pg_tools){&m,authorize,execute,0,0,0,0}));memset(&storage,0,sizeof(storage));storage.visible=&agent.session;storage.control=&agent.commits;storage.fail_at=5;assert(!pg_agent_bind_storage(&agent,(pg_storage){&storage,write_batch}));pg_client client=pg_agent_client(&agent);assert(!client.submit(client.context,(pg_slice){"cancel",6}));pg_event e={0};
  for(unsigned i=0;i<16;++i)if(client.poll(client.context,&e)&&e.kind==PG_TOOL_STARTED)break;
  assert(e.kind==PG_TOOL_STARTED);client.cancel(client.context);unsigned finished=0;
  for(unsigned i=0;i<8;++i)if(client.poll(client.context,&e)){assert(e.kind!=PG_TOOL_FINISHED);if(e.kind==PG_RUN_FINISHED){assert(e.outcome==PG_ERROR);finished=1;break;}}

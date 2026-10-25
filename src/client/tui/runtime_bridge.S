@@ -250,8 +250,8 @@ pg_tui_bridge_set_history:
     xor eax,eax
     mov ecx,TUI_LI_EVENT_SIZE/8
     rep stosq
-    cmp dword ptr [rbx+PG_B_STOPPED],0
-    jne .Lpoll_zero
+    cmp dword ptr [rbx+PG_B_STOPPED],1
+    je .Lpoll_zero
     mov rdi,rsp
     mov ecx,7
     rep stosq
@@ -261,7 +261,7 @@ pg_tui_bridge_set_history:
     test eax,eax
     jle .Lpoll_return
     mov eax,[rsp]
-    cmp eax,4
+    cmp eax,5
     ja .Lpoll_bad
     lea ecx,[rax+1]
     mov [r12+TUI_LI_EVENT_KIND],ecx
@@ -287,6 +287,8 @@ pg_tui_bridge_set_history:
     mov [r12+TUI_LI_EVENT_CALL_ID],rax
     lea rax,[rbx+PG_B_NAME]
     mov [r12+TUI_LI_EVENT_TOOL_NAME],rax
+    cmp dword ptr [rsp],5
+    je .Ltext
     xor eax,eax
     cmp dword ptr [rsp+4],0
     sete al
@@ -344,36 +346,48 @@ pg_tui_bridge_set_history:
     push r13
     sub rsp,80
     mov rbx,rdi
-    cmp dword ptr [rbx+PG_B_STOPPED],0
-    jne .Lshutdown_return
+    cmp dword ptr [rbx+PG_B_STOPPED],1
+    je .Lshutdown_released
     cmp qword ptr [rbx+PG_B_DETACH],0
     jne .Lshutdown_detach
     cmp dword ptr [rbx+PG_B_ACTIVE],0
     je .Lshutdown_stop
+    cmp dword ptr [rbx+PG_B_STOPPED],2
+    je .Lshutdown_resume
+    mov dword ptr [rbx+PG_B_STOPPED],2
     mov rdi,[rbx]
     call [rbx+16]
+.Lshutdown_resume:
     xor r12d,r12d
 .Lshutdown_drain:
-    cmp r12d,8
-    jae .Lshutdown_stop
     cmp dword ptr [rbx+PG_B_ACTIVE],0
     je .Lshutdown_stop
+    cmp r12d,8
+    jae .Lshutdown_pending
     mov rdi,rbx
     mov rsi,rsp
     call .Lpoll
     test eax,eax
-    js .Lshutdown_stop
+    js .Lshutdown_error
     inc r12d
     jmp .Lshutdown_drain
 .Lshutdown_detach:
+    mov dword ptr [rbx+PG_B_STOPPED],2
     mov rdi,[rbx+PG_B_DETACH_CONTEXT]
     call [rbx+PG_B_DETACH]
     test eax,eax
-    setne al
-    movzx eax,al
-    mov [rbx+PG_B_STOP_ERROR],eax
+    jz .Lshutdown_stop
+    cmp eax,2
+    je .Lshutdown_pending
+.Lshutdown_error:
+    mov dword ptr [rbx+PG_B_STOP_ERROR],1
+.Lshutdown_pending:
+    mov eax,1
+    jmp .Lshutdown_return
 .Lshutdown_stop:
     mov dword ptr [rbx+PG_B_STOPPED],1
+.Lshutdown_released:
+    xor eax,eax
 .Lshutdown_return:
     add rsp,80
     pop r13

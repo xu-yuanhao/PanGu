@@ -11,7 +11,7 @@
 #define OFFSET(type,field,value) _Static_assert(offsetof(type,field)==value,#type "." #field)
 _Static_assert(sizeof(pg_agent)==PG_A_BYTES,"agent size");
 _Static_assert(sizeof(pg_message)==PG_MSG_BYTES,"message size");
-_Static_assert(sizeof(pg_model)==40 && sizeof(pg_tools)==32 && sizeof(pg_client)==32,"aggregate ABI");
+_Static_assert(sizeof(pg_model)==40 && sizeof(pg_tools)==56 && sizeof(pg_client)==32,"aggregate ABI");
 _Static_assert(sizeof(pg_event)==56 && sizeof(pg_model_event)==56,"event size");
 OFFSET(pg_message,size,PG_MSG_SIZE);OFFSET(pg_message,text,PG_MSG_TEXT);
 OFFSET(pg_message,call_id,PG_MSG_ID);OFFSET(pg_message,tool_name,PG_MSG_NAME);OFFSET(pg_message,is_error,PG_MSG_ERROR);
@@ -51,7 +51,7 @@ void pg_fixture_cancel(void *ctx){++((fixture*)ctx)->cancels;}
 void pg_fixture_close(void *ctx){++((fixture*)ctx)->closes;}
 int pg_fixture_authorize(void *ctx,pg_slice name,pg_slice args){(void)ctx;assert(name.size==4&&!memcmp(name.data,"echo",4));assert(args.size==2&&!memcmp(args.data,"{}",2));return 1;}
 int pg_fixture_execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t capacity,size_t *size){fixture *f=ctx;assert(name.size==4&&args.size==2&&capacity==PG_TEXT_LIMIT);memcpy(out,"ok",2);*size=2;++f->executes;return 0;}
-static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_start,pg_test_next,pg_test_cancel,pg_test_close};pg_tools tools={&f,pg_test_authorize,pg_test_execute,0};
+static void exercise(pg_agent *agent){fixture f={0};pg_model model={&f,pg_test_start,pg_test_next,pg_test_cancel,pg_test_close};pg_tools tools={&f,pg_test_authorize,pg_test_execute,0,0,0,0};
  assert(!pg_agent_init(agent,model,tools));
  assert(!pg_agent_bind_storage(agent,(pg_storage){0,pg_test_storage}));
  pg_client client=pg_agent_client(agent);

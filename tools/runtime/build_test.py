@@ -120,6 +120,14 @@ def main():
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/process'),
                             str(ROOT / 'tests/runtime/test_process.c'), *PROCESS_WRAPS, '-o', process_test], check=True)
             subprocess.run([process_test], check=True, timeout=20)
+            async_test = str(Path(directory) / 'test-async-tools')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in
+                              ['agent', 'session', 'submissions', 'tools', 'process']],
+                            str(ROOT / 'src/client/tui/runtime_bridge.S'),
+                            str(ROOT / 'tests/runtime/test_async_tools.c'), *write_flags, '-o', async_test], check=True)
+            subprocess.run([async_test], check=True, timeout=20)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
             tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',

@@ -166,9 +166,10 @@ static int fake_poll(void *ctx, tui_event *out)
 	return 1;
 }
 
-static void fake_shutdown(void *ctx)
+static int fake_shutdown(void *ctx)
 {
 	(void)ctx;
+	return 0;
 }
 
 void tui_fake_runtime_init(tui_fake_runtime *fr, const tui_demo_scenario *sc)

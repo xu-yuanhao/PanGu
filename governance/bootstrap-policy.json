@@ -582,6 +582,7 @@
     "src/runtime/process.S": "native-source",
     "src/runtime/process.h": "native-source",
     "src/runtime/process_layout.h": "native-source",
-    "tests/runtime/test_process.c": "native-test"
+    "tests/runtime/test_process.c": "native-test",
+    "tests/runtime/test_async_tools.c": "native-test"
   }
 }

@@ -31,7 +31,7 @@ _Static_assert(offsetof(pg_session,count)==PG_S_COUNT,"history count offset");
 _Static_assert(PG_USER==0&&PG_ASSISTANT==1&&PG_TOOL_CALL==2&&PG_TOOL_RESULT==3,"history roles");
 _Static_assert(sizeof(pg_event)==56&&sizeof(pg_client)==32,"client ABI");
 _Static_assert(offsetof(pg_event,text)==8&&offsetof(pg_event,call_id)==24&&offsetof(pg_event,tool_name)==40,"event slices");
-_Static_assert(PG_RUN_STARTED==0&&PG_TEXT_DELTA==1&&PG_TOOL_STARTED==2&&PG_TOOL_FINISHED==3&&PG_RUN_FINISHED==4,"event kinds");
+_Static_assert(PG_RUN_STARTED==0&&PG_TEXT_DELTA==1&&PG_TOOL_STARTED==2&&PG_TOOL_FINISHED==3&&PG_RUN_FINISHED==4&&PG_TOOL_OUTPUT_DELTA==5,"event kinds");
 _Static_assert(PG_SUCCESS==0&&PG_ERROR==1&&PG_CANCELLED==2,"outcomes");
 #endif
 #endif

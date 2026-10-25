@@ -686,6 +686,22 @@ tui_view_protocol_violation:
  .cfi_endproc
 .size tui_view_protocol_violation, .-tui_view_protocol_violation
 
+/* A role/tool boundary never joins an incomplete sequence from another stream. */
+li_finish_carry:
+ push rbx
+ mov rbx,rdi
+ cmp qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
+ je .Lfinish_carry_done
+ call li_event_suspend
+ mov rdi,rbx
+ lea rsi,[rbx+TUI_LI_VIEW_CARRY]
+ mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
+ call li_safe_vput
+ mov qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
+.Lfinish_carry_done:
+ pop rbx
+ ret
+
 /* void tui_view_event(tui_view *v, const tui_event *ev) */
 .globl tui_view_event
 .type tui_view_event,@function
@@ -702,6 +718,8 @@ tui_view_event:
  cmp eax, TUI_LI_EV_RUN_STARTED
  je .Lev_started
  cmp eax, TUI_LI_EV_TEXT_DELTA
+ je .Lev_delta
+ cmp eax, TUI_LI_EV_TOOL_OUTPUT
  je .Lev_delta
  cmp eax, TUI_LI_EV_TOOL_STARTED
  je .Lev_tool_started
@@ -832,6 +850,8 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_tool_started:
+ mov rdi,rbx
+ call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Ltool_pfx]
@@ -854,6 +874,8 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_tool_finished:
+ mov rdi,rbx
+ call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Ltool_pfx]
@@ -889,16 +911,8 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_finished:
- /* A terminal closes any incomplete carry as visible escaped bytes. */
- cmp qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
- je .Lfin_no_carry
- mov rdi, rbx
- call li_event_suspend
- mov rdi, rbx
- lea rsi, [rbx + TUI_LI_VIEW_CARRY]
- mov rdx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
- call li_safe_vput
- mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
+ mov rdi,rbx
+ call li_finish_carry
 .Lfin_no_carry:
  mov rdi, rbx
  call li_event_suspend

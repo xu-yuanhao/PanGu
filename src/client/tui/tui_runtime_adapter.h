@@ -31,7 +31,8 @@ typedef enum {
 	TUI_EV_TEXT_DELTA = 2,
 	TUI_EV_TOOL_STARTED = 3,
 	TUI_EV_TOOL_FINISHED = 4,
-	TUI_EV_RUN_FINISHED = 5
+	TUI_EV_RUN_FINISHED = 5,
+    TUI_EV_TOOL_OUTPUT = 6
 } tui_event_kind;
 
 typedef enum {
@@ -82,7 +83,7 @@ typedef struct tui_runtime_ops {
 	tui_submit_result (*submit)(void *ctx, const char *utf8, size_t byte_len);
 	int (*cancel)(void *ctx); /* 1=已受理（或重复受理），0=当前无活动 run */
 	int (*poll)(void *ctx, tui_event *out); /* 1=有事件 0=无事件 <0=错误 */
-	void (*shutdown)(void *ctx);            /* 客户端退出前调用一次 */
+	int (*shutdown)(void *ctx); /* 0=released, 1=pending; repeat after waiting. */
     int (*history)(void *ctx, size_t index, tui_history_entry *out); /* optional */
 } tui_runtime_ops;
 

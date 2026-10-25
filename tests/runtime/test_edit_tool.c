@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-_Static_assert(sizeof(pg_edit_tool)==32 && offsetof(pg_edit_tool,files)==0,"edit context ABI");
+_Static_assert(sizeof(pg_edit_tool)==56 && offsetof(pg_edit_tool,files)==0,"edit context ABI");
 _Static_assert(json_type_object==4&&json_type_array==5&&json_type_string==6,"JSON types");
 _Static_assert((JSON_TOKENER_STRICT|JSON_TOKENER_VALIDATE_UTF8)==17,"JSON flags");
 static pg_tool_registry registry;
@@ -64,7 +64,7 @@ static void json_cases(void){
 int main(int argc,char **argv){
  char root[]="/tmp/pangu-edit-tool-XXXXXX";assert(mkdtemp(root));int saved=open(".",O_RDONLY|O_DIRECTORY);assert(saved>=0&&!chdir(root));
  pg_read_tool reader={-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
- service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
+ service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0,0,0,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
  pg_tool_definition entries[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),definition};assert(!pg_tool_registry_init(&registry,entries,3));
  if(argc==2&&!strcmp(argv[1],"--json")){json_cases();assert(!unlink("file.txt"));pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));return 0;}
  const char *shapes[]={
