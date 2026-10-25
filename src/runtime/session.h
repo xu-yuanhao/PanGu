@@ -5,6 +5,8 @@
 #define PG_MESSAGE_LIMIT 64
 #define PG_TEXT_LIMIT 4096
 #define PG_ID_LIMIT 64
+#define PG_TOOL_BATCH_LIMIT 8
+#define PG_SESSION_BATCH_LIMIT (PG_TOOL_BATCH_LIMIT+1)
 typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT } pg_role;
 typedef struct {
     pg_role role;
@@ -29,6 +31,7 @@ typedef struct {
     uint64_t input_index;
 } pg_run_checkpoint;
 typedef enum { PG_SESSION_APPEND, PG_SESSION_SYSTEM, PG_SESSION_RESET, PG_SESSION_CHECKPOINT, PG_SESSION_PROFILE, PG_SESSION_SUBMISSION } pg_session_change_kind;
+/* APPEND >2 records requires a checkpoint, atomically stored before any tool. */
 typedef struct {
     pg_session_change_kind kind;
     const pg_message *messages;

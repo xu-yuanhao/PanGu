@@ -592,6 +592,7 @@
     "src/runtime/bash_tool.h": "native-source",
     "src/runtime/bash_tool_layout.h": "native-source",
     "src/runtime/bash_tool.S": "native-source",
-    "tests/runtime/test_bash_tool.c": "native-test"
+    "tests/runtime/test_bash_tool.c": "native-test",
+    "tests/runtime/test_tool_batch_storage.c": "native-test"
   }
 }

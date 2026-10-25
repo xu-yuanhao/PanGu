@@ -113,8 +113,16 @@
     mov r14,[rbx+16]
     test r14,r14
     jz .Lencode_bad
-    cmp r14,2
+    cmp r14,PG_SESSION_APPEND_MAX
     ja .Lencode_bad
+    cmp r14,2
+    jbe .Lencode_count_ready
+    cmp dword ptr [rbx],0
+    jne .Lencode_bad
+    cmp qword ptr [rbx+40],0
+    je .Lencode_bad
+    mov dword ptr [r12+8],5
+.Lencode_count_ready:
     mov [r12+28],r14d
     mov r15,[rbx+8]
     test r15,r15
@@ -170,6 +178,8 @@
     mov rsi,[rbx+40]
     test rsi,rsi
     jz .Lencode_no_checkpoint
+    cmp dword ptr [r12+8],5
+    je .Lencode_checkpoint
     cmp dword ptr [r12+8],4
     je .Lencode_checkpoint
     mov dword ptr [r12+8],2
@@ -232,8 +242,12 @@
     jne .Ldecode_bad
     cmp dword ptr [rbx+8],1
     jb .Ldecode_bad
-    cmp dword ptr [rbx+8],4
+    cmp dword ptr [rbx+8],5
     ja .Ldecode_bad
+    je .Ldecode_version_ready
+    cmp r12,PG_J_LEGACY_RECORD_MAX
+    ja .Ldecode_bad
+.Ldecode_version_ready:
     cmp [rbx+12],r12d
     jne .Ldecode_bad
     cmp [rbx+16],rdx
@@ -257,6 +271,8 @@
     xor eax,eax
     mov ecx,6
     rep stosq
+    cmp dword ptr [rbx+8],5
+    je .Ldecode_checkpoint
     cmp dword ptr [rbx+8],4
     je .Ldecode_checkpoint
     cmp dword ptr [rbx+8],2
@@ -277,6 +293,11 @@
     cmp eax,5
     ja .Ldecode_bad
     mov [r13],eax
+    cmp dword ptr [rbx+8],5
+    jne .Ldecode_kind_ready
+    test eax,eax
+    jnz .Ldecode_bad
+.Ldecode_kind_ready:
     lea r15,[rbx+40]
     cmp eax,5
     je .Ldecode_submission
@@ -339,8 +360,17 @@
     mov ebp,[rbx+28]
     test ebp,ebp
     jz .Ldecode_bad
+    cmp dword ptr [rbx+8],5
+    je .Ldecode_batch_count
     cmp ebp,2
     ja .Ldecode_bad
+    jmp .Ldecode_count_ready
+.Ldecode_batch_count:
+    cmp ebp,3
+    jb .Ldecode_bad
+    cmp ebp,PG_SESSION_APPEND_MAX
+    ja .Ldecode_bad
+.Ldecode_count_ready:
     mov [r13+16],rbp
     mov [r13+8],r14
 .Ldecode_one:
@@ -416,7 +446,7 @@ pg_journal_commit:
     push r13
     push r14
     push r15
-    sub rsp,PG_J_COMMIT_STACK
+    PG_NATIVE_FRAME_ALLOC PG_J_COMMIT_STACK
     mov rbx,rdi
     mov r12,rsi
     mov r13,rdx
@@ -550,7 +580,7 @@ pg_journal_open:
     push r13
     push r14
     push r15
-    sub rsp,PG_J_OPEN_STACK
+    PG_NATIVE_FRAME_ALLOC PG_J_OPEN_STACK
     mov rbx,rdi
     mov r14d,esi
     mov r15,rdx
@@ -689,7 +719,7 @@ pg_journal_open:
     jne .Lopen_fail
     cmp dword ptr [rsp+8],1
     jb .Lopen_fail
-    cmp dword ptr [rsp+8],4
+    cmp dword ptr [rsp+8],5
     ja .Lopen_fail
     mov rdi,rsp
     mov esi,32
@@ -704,6 +734,10 @@ pg_journal_open:
     cmp eax,PG_J_RECORD_MAX
     ja .Lopen_fail
     mov edx,56
+    cmp dword ptr [rsp+8],5
+    je .Lheader_v5
+    cmp eax,PG_J_LEGACY_RECORD_MAX
+    ja .Lopen_fail
     cmp dword ptr [rsp+8],4
     je .Lheader_v4
     cmp dword ptr [rsp+8],2
@@ -714,6 +748,13 @@ pg_journal_open:
     ja .Lopen_fail
     cmp dword ptr [rsp+24],3
     jae .Lopen_fail
+    jmp .Lheader_size_known
+.Lheader_v5:
+    cmp dword ptr [rsp+24],0
+    jne .Lopen_fail
+    cmp dword ptr [rsp+28],3
+    jb .Lopen_fail
+    add edx,40
     jmp .Lheader_size_known
 .Lheader_v3:
     cmp dword ptr [rsp+24],4
@@ -769,8 +810,15 @@ pg_journal_open:
     mov edx,[rsp+28]
     test edx,edx
     jz .Lopen_fail
+    cmp dword ptr [rsp+8],5
+    je .Lheader_batch_count
     cmp edx,2
     ja .Lopen_fail
+    jmp .Lheader_count_ready
+.Lheader_batch_count:
+    cmp edx,PG_SESSION_APPEND_MAX
+    ja .Lopen_fail
+.Lheader_count_ready:
     shl edx,4
     cmp eax,edx
     jb .Lopen_fail

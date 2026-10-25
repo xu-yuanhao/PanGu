@@ -115,6 +115,14 @@ def main():
             subprocess.run([edit_tool_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),
                             '--tool-binary', edit_tool_test], check=True, timeout=45)
+            batch_storage_test = str(Path(directory) / 'test-tool-batch-storage')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in
+                              ['session', 'submissions', 'journal', 'journal_posix']],
+                            str(ROOT / 'tests/runtime/test_tool_batch_storage.c'),
+                            '-Wl,--wrap=pwrite,--wrap=fsync', '-o', batch_storage_test], check=True)
+            subprocess.run([batch_storage_test], check=True, timeout=20)
             bash_test = str(Path(directory) / 'test-bash-tool')
             bash_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

@@ -29,8 +29,26 @@
 #define PG_CP_RESTARTS 28
 #define PG_CP_INPUT 32
 #define PG_CHANGE_BYTES 48
-#define PG_SESSION_STACK 8664
-#define PG_SESSION_REQUEST 8592
+#define PG_SESSION_APPEND_MAX 9
 #define PG_SESSION_DATA 56
-#define PG_SESSION_CP 8552
+#define PG_SESSION_CP (PG_SESSION_DATA+PG_SESSION_APPEND_MAX*PG_MSG_BYTES)
+#define PG_SESSION_REQUEST (PG_SESSION_CP+PG_CP_BYTES)
+#define PG_SESSION_STACK ((PG_SESSION_REQUEST+64+7)/16*16+8)
+#ifdef __ASSEMBLER__
+.macro PG_NATIVE_FRAME_ALLOC amount
+.rept (\amount / 4096)
+    sub rsp,4096
+    test byte ptr [rsp],0
+.endr
+.if (\amount % 4096)
+    sub rsp,(\amount % 4096)
+    test byte ptr [rsp],0
+.endif
+.endm
+#else
+#include "session.h"
+_Static_assert(PG_SESSION_APPEND_MAX==PG_SESSION_BATCH_LIMIT,"session append bound");
+_Static_assert(sizeof(pg_message)==PG_MSG_BYTES&&sizeof(pg_run_checkpoint)==PG_CP_BYTES,"session transaction layout");
+_Static_assert(sizeof(pg_session_control)==PG_SC_BYTES&&sizeof(pg_session_change)==PG_CHANGE_BYTES,"session scratch layout");
+#endif
 #endif

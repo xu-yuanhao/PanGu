@@ -701,3 +701,16 @@ Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成�
 完整read→edit→write→bash汇编构建/测试的真实用例已加入--live-workflow，当前**未通过**：初版测试汇编立即数写法已单独修正并验证可构建；随后无网络内容泄露的临时诊断驱动记录HTTP200、tool_calls分块从index0进入index1，当前单调用MiMo解析器即拒绝，尚未到达完整构建。官方[MiMo Chat Completions文档](https://mimo.mi.com/docs/en-US/api/chat/openai-api)亦明确tool_calls可以含多个调用。没有放宽单调用拒绝测试、丢弃后续调用或把完整工作流标成通过；下一批需参考Pi完整assistant工具集合，接入有界批量调用及Durable提交/恢复，再复验这一用例。诊断驱动只是/tmp中的临时测试客户端，未进入产品；T26/T28与完整P1继续IN_PROGRESS。
 
 同一Agent按授权自审自批bash服务、实际语言/文件/模块/构建登记、四工具组合和profile身份更新；未改变检查器、预算基线或生产准入。接口新导出只有pg_bash_tool_init/definition，对象text/rodata合计3604字节、relocation只读表64字节、bss0；调用者状态15592字节，另借用原进程提供者。G00、assembly-first和diff检查通过。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`c18bdba071e1a6cb75d8c5e8359fc30fd3eb31632bc5fd98255eb4a33ff27ffd`。
+
+
+## 2026-10-25：批量工具的原子存储基础
+
+读取固定Pi d5b3de22的harness/generation.ts::classify/startToolRound、tools顺序阶段和readCalls/createToolTask，以及harness-tools.test.ts的顺序/并行trace和顺序工具状态用例。采用先提交完整assistant调用集合、再逐项推进并等待结果；当前原生先走顺序路线，不声称上游默认并行或通用Task图已移植。fetch后Pi仍d5b3de22、Harness仍22ddee3，未改参考源码。
+
+Session新增有界checkpointed批次（3～9记录，对应assistant+最多8 calls），先分离/验证再Storage确认后采纳；无CP的大批次拒绝。工具组提交后不能追加新的calls，活动CP只能指向下一未有结果项；重复ID、跳序、错误结果ID、漏结果后直接终结均拒绝。结果单条或取消时整组补齐，都受同一事务约束。单调用兼容不变，也补齐is_error取值检查与journal一致。
+
+新wire v5仅kind append/count3～9且固定40字节CP；消息wire字段不变。旧v1～v4消息数/帧长度限制未放宽，旧读取器遇v5拒绝；消息4096、会话64条及日志16 MiB上限不变。新功能需要的编码缓冲38328字节，最大字段批次实际38229字节。Session本地帧38392、journal提交38360、open85976字节，open还嵌套Session；明确增加的临时栈成本，入口逐页探测而不一次跨过guard。没有新持久状态副本、依赖、门禁或审批系统。详见原生日志格式文档v5节。
+
+实际验证：完整常规核心O0/O2 UBSan退出0；最终专项O0 UBSan及O2 ASan/UBSan退出0；离线真实产品PTY的退出/信号/resize/termios和持久闲置重开通过。专项涵盖9条全部最大字段、源批次被Storage回调修改时仍分离采纳、reject/uncertain不采纳、边界容量、重复ID/跳序/错配/漏结果、顺序结果每步重开及8个取消结果原子终结、独立进程回放、全部小批次尾切分/逐字节损坏、有效checksum的非法版本/kind/count/CP、旧版本及v5超长头不当作torn修复、三处半写/末尾失败与完整帧fsync不确定恢复。32 KiB小栈下的入口guard预期SIGSEGV，未创建日志文件，证明会触碰中间保护页。Sanitizer主要检查C/库边界，汇编由保护页、字段/长度与实际IO用例验证。
+
+同一Agent按授权自审自批新增测试登记、构建集成、Session聚合契约和新v5范围。旧格式上限保持原值，不以扩大旧预算让用例通过；新增栈/帧开销已明确。G00、assembly-first与diff检查通过，生产准入未改变。本批没有再次调用真实模型；这只是必要存储基础，当前MiMo仍拒绝index1，Agent批量调度、projection、TUI历史与--live-workflow依然未完成，接下来继续对应实现。固定包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON）：`9f4bea059d2b4b8faea6a09ebbeead99cab7fad59795687f19c6708440679c26`。

@@ -2,7 +2,7 @@
 #define PANGU_JOURNAL_H
 #include "session.h"
 #define PG_JOURNAL_LIMIT (16u * 1024u * 1024u)
-#define PG_JOURNAL_RECORD_MAX 8592
+#define PG_JOURNAL_RECORD_MAX 38328
 typedef struct {
     int file, directory;
     unsigned failed, busy;

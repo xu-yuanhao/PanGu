@@ -61,8 +61,8 @@ def checkpoints(path):
     result = []
     while cursor < len(data):
         version, length = struct.unpack_from('<II', data, cursor + 8)
-        assert 56 <= length <= 8592 and cursor + length <= len(data)
-        if version == 2:
+        assert 56 <= length <= (38328 if version == 5 else 8592) and cursor + length <= len(data)
+        if version in (2,5):
             result.append(struct.unpack_from('<QIIQIIQ', data, cursor + length - 56))
         cursor += length
     assert cursor == len(data)

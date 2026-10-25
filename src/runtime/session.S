@@ -19,7 +19,7 @@ pg_session_commit:
     push r13
     push r14
     push r15
-    sub rsp,PG_SESSION_STACK
+    PG_NATIVE_FRAME_ALLOC PG_SESSION_STACK
     mov rbx,rdi
     mov r12,rsi
     mov r13,rdx
@@ -127,8 +127,13 @@ pg_session_commit:
     mov r14,[r13+16]
     test r14,r14
     jz .Lreject
-    cmp r14,2
+    cmp r14,PG_SESSION_APPEND_MAX
     ja .Lreject
+    cmp r14,2
+    jbe .Lappend_bounded
+    cmp qword ptr [r13+40],0
+    je .Lreject
+.Lappend_bounded:
     mov rax,64
     sub rax,[rbx+PG_S_COUNT]
     cmp r14,rax
@@ -146,6 +151,23 @@ pg_session_commit:
 .Lvalidate:
     cmp dword ptr [r15],3
     ja .Lreject
+    cmp dword ptr [r15+PG_MSG_ERROR],1
+    ja .Lreject
+    cmp qword ptr [r12+PG_SC_RUN],0
+    je .Lmessage_fields
+    mov edx,[r12+PG_SC_RUN+PG_CP_PHASE]
+    cmp edx,2
+    je .Lmessage_tool_result
+    cmp edx,5
+    je .Lmessage_tool_result
+    cmp edx,4
+    jne .Lmessage_fields
+    cmp qword ptr [r12+PG_SC_RUN+PG_CP_CALL],-1
+    je .Lmessage_fields
+.Lmessage_tool_result:
+    cmp dword ptr [r15],3
+    jne .Lreject
+.Lmessage_fields:
     mov rax,[r15+PG_MSG_SIZE]
     cmp rax,4096
     jae .Lreject
@@ -219,20 +241,155 @@ pg_session_commit:
     call .Lmessage_at
     cmp dword ptr [rax],2
     je .Lreject
-    jmp .Lcheckpoint_identity
+    cmp qword ptr [r12+PG_SC_RUN],0
+    je .Lcheckpoint_identity
+    mov eax,[r12+PG_SC_RUN+PG_CP_PHASE]
+    cmp eax,2
+    je .Lround_complete
+    cmp eax,5
+    je .Lround_complete
+    cmp eax,4
+    jne .Lcheckpoint_identity
+.Lround_complete:
+    mov rbp,[r12+PG_SC_RUN+PG_CP_CALL]
+    cmp rbp,-1
+    je .Lcheckpoint_identity
+    cmp rbp,r14
+    jae .Lreject
+    mov rax,rbp
+    call .Lmessage_at
+    cmp dword ptr [rax],2
+    jne .Lreject
+    mov esi,1
+    jmp .Lround_begin
 .Lcheckpoint_has_call:
     cmp dword ptr [r15+PG_CP_PHASE],4
     jne .Lreject
 .Lcheckpoint_call:
     cmp dword ptr [r15+PG_CP_TURNS],0
     je .Lreject
-    inc rax
     cmp rax,r14
-    jne .Lreject
-    dec rax
+    jae .Lreject
+    mov rbp,rax
     call .Lmessage_at
     cmp dword ptr [rax],2
     jne .Lreject
+    lea rax,[rbp+1]
+    cmp rax,r14
+    jne .Lround_pending
+    lea rax,[rbp-1]
+    call .Lmessage_at
+    cmp dword ptr [rax],2
+    jne .Lcheckpoint_identity
+.Lround_pending:
+    # A sequential round has contiguous calls followed by completed results.
+    xor esi,esi
+.Lround_begin:
+    mov r8,rbp
+.Lround_start:
+    test r8,r8
+    jz .Lreject
+    lea rax,[r8-1]
+    call .Lmessage_at
+    cmp dword ptr [rax],2
+    jne .Lround_assistant
+    dec r8
+    mov rax,rbp
+    sub rax,r8
+    cmp rax,8
+    jae .Lreject
+    jmp .Lround_start
+.Lround_assistant:
+    xor ecx,ecx
+    cmp dword ptr [rax],1
+    sete cl
+    mov r9,r8
+.Lround_end:
+    cmp r9,r14
+    jae .Lround_count
+    mov rax,r9
+    call .Lmessage_at
+    cmp dword ptr [rax],2
+    jne .Lround_count
+    inc r9
+    mov rax,r9
+    sub rax,r8
+    cmp rax,8
+    ja .Lreject
+    jmp .Lround_end
+.Lround_count:
+    mov rax,r9
+    sub rax,r8
+    cmp rax,1
+    jbe .Lround_shape
+    test ecx,ecx
+    jz .Lreject
+.Lround_shape:
+    mov r10,r14
+    sub r10,r9
+    test esi,esi
+    jnz .Lround_expected
+    mov rax,rbp
+    sub rax,r8
+.Lround_expected:
+    cmp r10,rax
+    jne .Lreject
+    mov rbp,r8
+.Lround_unique_outer:
+    inc rbp
+    cmp rbp,r9
+    jae .Lround_results_begin
+    mov r11,r8
+.Lround_unique_inner:
+    cmp r11,rbp
+    jae .Lround_unique_outer
+    mov rax,rbp
+    call .Lmessage_at
+    lea rdi,[rax+PG_MSG_ID]
+    mov rax,r11
+    call .Lmessage_at
+    lea rsi,[rax+PG_MSG_ID]
+    xor edx,edx
+.Lround_unique_id:
+    mov cl,[rdi+rdx]
+    cmp cl,[rsi+rdx]
+    jne .Lround_unique_next
+    test cl,cl
+    jz .Lreject
+    inc edx
+    cmp edx,64
+    jb .Lround_unique_id
+    jmp .Lreject
+.Lround_unique_next:
+    inc r11
+    jmp .Lround_unique_inner
+.Lround_results_begin:
+    xor r11d,r11d
+.Lround_results:
+    cmp r11,r10
+    jae .Lcheckpoint_identity
+    lea rax,[r8+r11]
+    call .Lmessage_at
+    lea rdi,[rax+PG_MSG_ID]
+    lea rax,[r9+r11]
+    call .Lmessage_at
+    cmp dword ptr [rax],3
+    jne .Lreject
+    lea rsi,[rax+PG_MSG_ID]
+    xor edx,edx
+.Lround_id:
+    mov cl,[rdi+rdx]
+    cmp cl,[rsi+rdx]
+    jne .Lreject
+    test cl,cl
+    jz .Lround_result_next
+    inc edx
+    cmp edx,64
+    jb .Lround_id
+    jmp .Lreject
+.Lround_result_next:
+    inc r11
+    jmp .Lround_results
 .Lcheckpoint_identity:
     mov rax,[r12+PG_SC_RUN]
     cmp [r15],rax

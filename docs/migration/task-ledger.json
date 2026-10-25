@@ -1636,7 +1636,7 @@
         "docs/migration/native-journal-format.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "journal v1-v4; profile-verified persistent TUI, input requestId dedup across reset/reopen, single-run model/tool/abort recovery; no general scheduler or external side-effect exactly-once"
+      "local_subset_scope": "journal v1-v5; v5 atomically stores 3..9 checkpointed records, sequential round reference/ID validation and complete cancel results; existing profile/input dedup/single-run recovery remain; Model/Agent batch integration pending"
     },
     {
       "id": "T21",
@@ -1700,7 +1700,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "single sequential read-only run; replaceable input submission service, bounded key dedup, explicit resume/suspend, persisted outcome; no general scheduler/queue; stored/current safe-only tool replay, interrupted unsafe result; no generic task graph or exactly-once side effects",
+      "local_subset_scope": "single sequential run with read/write/edit and asynchronous bash; replaceable input submission, bounded key dedup, explicit resume/suspend, persisted outcomes and stored/current safe-only replay; batch storage exists but batch execution/model contract pending; no general scheduler or exactly-once side effects",
       "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {
@@ -1725,7 +1725,7 @@
         "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "immutable registry, per-tool argument validation and authorization; no async/parallel execution",
+      "local_subset_scope": "immutable registry, validation/authorization before execution, injected async start/next/cancel/close with one active owner retained until release and transient progress; no parallel tool execution or batch scheduling yet",
       "local_implementation": "src/runtime/tools.S and read_tool.S integrated from parallel handoff; only bounded synchronous read subset; full stage incomplete"
     },
     {

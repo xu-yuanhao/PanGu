@@ -36,7 +36,7 @@
         "client.contract.v0",
         "submissions.ledger.local.v1"
       ],
-      "role": "atomic message/checkpoint/profile/input-submission transactions; detached request key and data, bounded dedup ledger adopted after Storage confirms; settled outcomes retained across reset",
+      "role": "atomic message/checkpoint/profile/input-submission transactions; detached request key and data, bounded dedup ledger adopted after Storage confirms; settled outcomes retained across reset; checkpointed atomic batches up to 9 records for one assistant +8 calls, ordered pending/completed round references and unique call IDs; legacy <=2-record batches remain supported",
       "exports": [
         "pg_session_commit",
         "pg_session_volatile_commit"
@@ -53,6 +53,18 @@
           "semantics": "validate/detach before store, atomic batch, adopt before publication; synchronous native acknowledgement replaces asynchronous adopt callback",
           "tests_to_read": [
             "packages/durable/src/testing/storage-conformance.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/generation.ts"
+          ],
+          "semantics": "startToolRound commits the full assistant call set, sequential tools checkpoint waits for completed calls before advancing; native bounded group storage only, no task scheduler or parallel execution claim",
+          "tests_to_read": [
+            "packages/durable/test/harness-tools.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
           ]
         }
       ]
@@ -384,7 +396,7 @@
         "system libc",
         "POSIX pread/pwrite/fsync/ftruncate/flock/openat/fcntl"
       ],
-      "role": "framed journal v1-v4: messages, checkpoints, profiles and atomic keyed input admission; recovery reconstructs bounded submission records/outcomes, exclusive writer and fsync",
+      "role": "framed journal v1-v4: messages, checkpoints, profiles and atomic keyed input admission; recovery reconstructs bounded submission records/outcomes, exclusive writer and fsync; v5 checkpointed append of 3..9 records, unchanged v1-v4 acceptance bounds; explicit page-probed bounded scratch frames",
       "exports": [
         "pg_journal_open",
         "pg_journal_close",
@@ -402,6 +414,18 @@
           "semantics": "prepare/encode before IO, poison uncertain writes, committed marker recovery, incomplete tail repair versus complete corruption refusal; custom binary format, synchronous fsync and no sidecars in this bounded subset; v2 checkpoint suffix preserves v1 reads and whole-batch atomicity",
           "tests_to_read": [
             "packages/durable/test/jsonl-storage.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/generation.ts"
+          ],
+          "semantics": "startToolRound commits the full assistant call set, sequential tools checkpoint waits for completed calls before advancing; native bounded group storage only, no task scheduler or parallel execution claim",
+          "tests_to_read": [
+            "packages/durable/test/harness-tools.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
           ]
         }
       ]
