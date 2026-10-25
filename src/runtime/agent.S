@@ -28,7 +28,7 @@ pg_agent_init:
     rep stosq
     lea rdi,[r8+PG_A_MODEL]
     lea rsi,[rsp+8]
-    mov ecx,8
+    mov ecx,9
     rep movsq
     lea rax,[rip+pg_session_volatile_commit]
     mov [r8+PG_A_COMMITS+8],rax
@@ -730,6 +730,17 @@ pg_agent_suspend:
     add rsp,8
     ret
 
+/* rdi=agent, rsi/rdx=name. NULL metadata defaults to unsafe. */
+.Lsafe_to_replay:
+    mov rax,[rdi+PG_A_TOOLS+24]
+    test rax,rax
+    jz .Lpolicy_unsafe
+    mov rdi,[rdi+PG_A_TOOLS]
+    jmp rax
+.Lpolicy_unsafe:
+    xor eax,eax
+    ret
+
 .Lpoll:
     push rbp
     push rbx
@@ -763,7 +774,10 @@ pg_agent_suspend:
     call [rbx+PG_A_MODEL+24]
 .Lcancel_operation:
     cmp dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
+    je .Lcancel_tool
+    cmp dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_EXECUTE
     jne .Lcancel_finish
+.Lcancel_tool:
     imul r14,[rbx+PG_A_CALL],PG_MSG_BYTES
     add r14,rbx
     mov rdi,rbx
@@ -822,11 +836,15 @@ pg_agent_suspend:
     je .Lterminal
     cmp eax,PG_ST_RECOVER_TOOL
     je .Lrecover_tool
+    cmp eax,PG_ST_RECOVER_EXECUTE
+    je .Lrecover_execute
     lea rsi,[rip+.Lerror_state]
     jmp .Lpoll_fail
 .Lbegin:
     mov dword ptr [rbx+PG_A_STATE],PG_ST_START
     cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],2
+    je .Lbegin_tool
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],5
     je .Lbegin_tool
     cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],4
     jne .Lpoll_one
@@ -849,11 +867,37 @@ pg_agent_suspend:
     mov [r12+40],rdi
     call .Llength
     mov [r12+48],rax
-    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_RECOVER_EXECUTE
     cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],4
     jne .Lpoll_one
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
     mov dword ptr [rbx+PG_A_CANCEL],1
     jmp .Lpoll_one
+.Lrecover_execute:
+    imul r13,[rbx+PG_A_CALL],PG_MSG_BYTES
+    add r13,rbx
+    cmp dword ptr [rbx+PG_A_COMMITS+PG_SC_RUN+PG_CP_PHASE],2
+    jne .Ltool_interrupted
+    lea rdi,[r13+PG_MSG_NAME]
+    call .Llength
+    mov rdx,rax
+    lea rsi,[r13+PG_MSG_NAME]
+    mov rdi,rbx
+    call .Lsafe_to_replay
+    cmp eax,1
+    jne .Ltool_interrupted
+    mov dword ptr [rbx+PG_A_STATE],PG_ST_TOOL
+    jmp .Ltool
+.Ltool_interrupted:
+    lea rdi,[rip+.Linterrupted]
+    call .Llength
+    mov [rsp+56],rax
+    mov rdx,rax
+    lea rsi,[rip+.Linterrupted]
+    lea rdi,[rbx+PG_A_TEXT]
+    call .Lcopy
+    mov r15d,1
+    jmp .Ltool_append
 .Lstart:
     PROFILE_GUARD rbx,.Lerror_profile
     cmp dword ptr [rbx+PG_A_TURNS],16
@@ -983,7 +1027,15 @@ pg_agent_suspend:
     mov rdx,[rsp+48]
     call .Lcopy
     mov rdi,rbx
+    mov rsi,[rsp+40]
+    mov rdx,[rsp+48]
+    call .Lsafe_to_replay
+    mov esi,5
+    cmp eax,1
+    jne .Lintent_policy
     mov esi,2
+.Lintent_policy:
+    mov rdi,rbx
     xor edx,edx
     mov rcx,[rbx+PG_A_CALL]
     call .Lnext_checkpoint
@@ -1171,6 +1223,7 @@ pg_agent_suspend:
     ret
 
 .section .rodata
+.Linterrupted: .asciz "Tool was interrupted and may have partially run"
 .Lcancelled: .asciz "cancelled"
 .Ltool_unavailable: .asciz "tool unavailable or denied"
 .Ltool_limit: .asciz "tool output limit exceeded"

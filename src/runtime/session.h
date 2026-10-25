@@ -18,7 +18,7 @@ typedef struct { pg_message messages[PG_MESSAGE_LIMIT]; size_t count;
 } pg_session;
 #define PG_RUN_TURN_LIMIT 16
 #define PG_RUN_RESTART_LIMIT 5
-typedef enum { PG_RUN_MODEL=1, PG_RUN_TOOL, PG_RUN_TERMINAL, PG_RUN_ABORTING } pg_run_phase;
+typedef enum { PG_RUN_MODEL=1, PG_RUN_TOOL, PG_RUN_TERMINAL, PG_RUN_ABORTING, PG_RUN_TOOL_UNSAFE } pg_run_phase;
 typedef struct {
     uint64_t id;
     pg_run_phase phase;

@@ -550,7 +550,7 @@ pg_read_tool_close:
 .size pg_read_tool_close, .-pg_read_tool_close
 
 /* ---- pg_tool_definition pg_read_tool_definition(pg_read_tool *r)
- * 56 字节聚合：sret，rdi=目标缓冲 rsi=r。 ---- */
+ * 64 字节聚合：sret，rdi=目标缓冲 rsi=r。 ---- */
 .globl pg_read_tool_definition
 .type pg_read_tool_definition,@function
 pg_read_tool_definition:
@@ -567,6 +567,7 @@ pg_read_tool_definition:
  mov qword ptr [rdi + PG_TL_DEF_AUTHORIZE], rax
  lea rax, [rip + li_execute_read]
  mov qword ptr [rdi + PG_TL_DEF_EXECUTE], rax
+ mov qword ptr [rdi+PG_TL_DEF_REPLAY_SAFE],1
  mov rax, rdi
  ret
 .size pg_read_tool_definition, .-pg_read_tool_definition

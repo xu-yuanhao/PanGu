@@ -1700,7 +1700,7 @@
         "docs/migration/runtime-core-progress.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "single sequential read-only run; replaceable input submission service, bounded key dedup, explicit resume/suspend, persisted outcome; no general scheduler/queue",
+      "local_subset_scope": "single sequential read-only run; replaceable input submission service, bounded key dedup, explicit resume/suspend, persisted outcome; no general scheduler/queue; stored/current safe-only tool replay, interrupted unsafe result; no generic task graph or exactly-once side effects",
       "local_implementation": "agent.S handwritten SysV; single-run checkpoint executor and profile-verified resume/suspend; general Task/Scheduler service pending"
     },
     {
@@ -1749,8 +1749,8 @@
         "docs/migration/tools-assembly-handoff.md"
       ],
       "completion_approved": false,
-      "local_subset_scope": "workspace-root read-only UTF-8 regular files; no write/edit or full Pi read compatibility",
-      "local_implementation": "src/runtime/tools.S and read_tool.S integrated from parallel handoff; only bounded synchronous read subset; full stage incomplete"
+      "local_subset_scope": "workspace-root read and bounded write, parent creation, partial failure semantics and unsafe recovery; no edit/bash or full Pi filesystem compatibility",
+      "local_implementation": "handwritten tools/read_tool/write_tool with recorded replay intent and current-policy check; static TUI composition; full T25 remains incomplete"
     },
     {
       "id": "T26",

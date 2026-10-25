@@ -68,7 +68,7 @@
         "client.contract.v0",
         "session.commit.local.v0"
       ],
-      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph",
+      "role": "handwritten single-run executor with durable checkpoints, profile verification and replaceable input-submission service; keyed admission deduplicates before busy, no queue/general task graph; intent records safe/unsafe tool policy, recovery reruns only stored+current safe, otherwise commits interrupted error without execute",
       "exports": [
         "pg_agent_init",
         "pg_agent_client",
@@ -88,13 +88,15 @@
             "packages/durable/src/harness/generation.ts",
             "packages/durable/src/session/session.ts",
             "packages/durable/src/harness/submissions.ts",
-            "packages/durable/src/harness/scheduler.ts"
+            "packages/durable/src/harness/scheduler.ts",
+            "packages/durable/src/harness/tool.ts"
           ],
           "semantics": "primary target: commit checkpoint with input/assistant/tool result, persisted abort intent, explicit resume/close separation; native single-run subset, not full Durable scheduler",
           "tests_to_read": [
             "packages/durable/test/harness-partial-changes.test.ts",
             "packages/durable/test/session-deferred-commits.test.ts",
-            "packages/durable/test/harness-tasks-recovery.test.ts"
+            "packages/durable/test/harness-tasks-recovery.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
           ]
         },
         {
@@ -178,7 +180,7 @@
         "json-c",
         "system libc"
       ],
-      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute",
+      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe",
       "exports": [
         "pg_tool_registry_init",
         "pg_tool_registry_service"
@@ -231,7 +233,7 @@
         "json-c",
         "POSIX directory-relative file APIs"
       ],
-      "role": "handwritten workspace-root UTF-8 regular-file reader; direct public POSIX/json-c calls with Linux x86-64 ABI assertions; no writes/shell/symlinks/dot paths",
+      "role": "handwritten workspace-root UTF-8 regular-file reader; direct public POSIX/json-c calls with Linux x86-64 ABI assertions; no writes/shell/symlinks/dot paths; native bounded reader explicitly opts into safe replay (upstream built-in read does not declare this)",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
@@ -349,9 +351,10 @@
         "tools.read.posix.local.v0",
         "system libc",
         "storage.journal.posix.local.v1",
-        "runtime.profile.local.v1"
+        "runtime.profile.local.v1",
+        "tools.write.posix.local.v0"
       ],
-      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime",
+      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime; read/write tools and idle configured system refresh",
       "exports": [
         "main"
       ],
@@ -454,6 +457,41 @@
           "semantics": "admitSubmission dedup before busy/write; status retained across reopen; native input-only 64-record ledger, no queue/writes/wait handles",
           "tests_to_read": [
             "packages/durable/test/harness-submissions.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tools.write.posix.local.v0",
+      "sources": [
+        "src/runtime/write_tool.h",
+        "src/runtime/write_tool.S",
+        "src/runtime/write_tool_layout.h"
+      ],
+      "dependencies": [
+        "tools.registry.local.v0",
+        "json-c",
+        "POSIX directory-relative file APIs; read_tool_layout.h platform constants"
+      ],
+      "role": "handwritten bounded relative-path write: mkdir parents, regular single-link files only, no symlinks or dot segments; synchronous short-write/EINTR loop, file/parent fsync, explicit unsafe replay policy; partial mutation possible on failure",
+      "exports": [
+        "pg_write_tool_definition"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/tools/write.ts",
+            "packages/durable/src/tools/file-mutation-queue.ts",
+            "packages/durable/src/tools/index.ts",
+            "packages/durable/src/env/node.ts",
+            "packages/durable/src/harness/tool.ts"
+          ],
+          "semantics": "create/overwrite and recursive parent creation; unsafe replay default and stored/current both-safe recovery. Native single synchronous executor needs no concurrent mutation queue; stricter relative-path/regular-file scope and bounded args. No full async env or tool progress persistence.",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
           ]
         }
       ]

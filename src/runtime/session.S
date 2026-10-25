@@ -181,7 +181,7 @@ pg_session_commit:
     je .Lreject
     cmp dword ptr [r15+PG_CP_PHASE],1
     jb .Lreject
-    cmp dword ptr [r15+PG_CP_PHASE],4
+    cmp dword ptr [r15+PG_CP_PHASE],5
     ja .Lreject
     cmp dword ptr [r15+PG_CP_TURNS],16
     ja .Lreject
@@ -210,6 +210,8 @@ pg_session_commit:
     jne .Lreject
     mov rax,[r15+PG_CP_CALL]
     cmp dword ptr [r15+PG_CP_PHASE],2
+    je .Lcheckpoint_call
+    cmp dword ptr [r15+PG_CP_PHASE],5
     je .Lcheckpoint_call
     cmp rax,-1
     jne .Lcheckpoint_has_call

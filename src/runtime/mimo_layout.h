@@ -65,10 +65,10 @@
 #define PG_MM_DEF_NAME 0
 #define PG_MM_DEF_DESCRIPTION 8
 #define PG_MM_DEF_SCHEMA 16
-#define PG_MM_DEF_BYTES 56
+#define PG_MM_DEF_BYTES 64
 #define PG_MM_REG_ENTRIES 0
-#define PG_MM_REG_COUNT 896
-#define PG_MM_REG_BYTES 904
+#define PG_MM_REG_COUNT 1024
+#define PG_MM_REG_BYTES 1032
 
 /* pg_mimo（mimo.h；公开布局冻结） */
 #define PG_MM_EASY 0

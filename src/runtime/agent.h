@@ -14,12 +14,14 @@ typedef struct {
     void (*cancel)(void *);
     void (*close)(void *);
 } pg_model;
-/* First subset: one sequential call per assistant turn, no side-effect tools.
+/* One sequential synchronous call per assistant turn.
    execute returns promptly; asynchronous OS tools need a later operation API. */
 typedef struct {
     void *context;
     int (*authorize)(void *, pg_slice name, pg_slice arguments);
     int (*execute)(void *, pg_slice name, pg_slice arguments, char *out, size_t capacity, size_t *size);
+    /* Pure metadata query: exactly 1 opts into replay; NULL defaults to unsafe. */
+    int (*replay_safe)(void *, pg_slice name);
 } pg_tools;
 typedef struct {
     pg_session session;
@@ -44,7 +46,7 @@ int pg_agent_bind_storage(pg_agent *, pg_storage);
 /* Compare loaded identity; replacing it is allowed only when no run is active. */
 int pg_agent_bind_profile(pg_agent *, pg_slice identity);
 /* Explicitly resume a freshly loaded run using its original model/tool configuration.
-   Only the current read-only/replay-safe tool contract is supported.
+   Interrupted tools rerun only when stored and current policies both opt in.
    retry=1 explicitly retries a parked run. Returns 2 when restart limit parks it. */
 int pg_agent_resume(pg_agent *, unsigned retry);
 /* Stop the local executor without aborting durable work or emitting a terminal.

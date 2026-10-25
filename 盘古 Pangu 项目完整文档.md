@@ -35,7 +35,7 @@ TUI 以 Grok Build 为主要 UI/UX 参考，Pi 为简洁性基线，结合 Codex
 
 ## 当前开发与运行
 
-已有手写汇编的 Agent/Session、MiMo 协议适配、原生事务日志、只读 read 工具和薄 TUI，接通真实 MiMo。持久会话支持当前单运行的检查点、恢复及有界输入请求去重；完整任务调度、写工具等尚未完成。最新实际结果与限制见 [核心进展](docs/migration/runtime-core-progress.md)，不以本页代替验收证据。
+已有手写汇编的 Agent/Session、MiMo 协议适配、原生事务日志、read/write 工具和薄 TUI，接通真实 MiMo。持久会话支持当前单运行的检查点、恢复及有界输入请求去重；完整任务调度、edit/bash 等尚未完成。最新实际结果与限制见 [核心进展](docs/migration/runtime-core-progress.md)，不以本页代替验收证据。
 
 设置环境变量 `MIMO_API_KEY`（可选 `MIMO_MODEL`），构建后从终端运行：
 
@@ -46,6 +46,6 @@ python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu
 
 当前构建需要登记的 clang-23、pkg-config、libcurl 和 json-c 开发环境。默认会话易失；可将 `PANGU_SESSION_DIR` 设为现有可信目录，使用其中的 `session.pgj`。恢复前核对模型、工具和工作目录身份，不匹配的在途任务拒绝续跑；凭据不写入日志。
 
-Enter 发送；忙时 Ctrl-C 明确取消，闲置时退出；Ctrl-D 退出。持久模式退出时保留待恢复工作，下次启动先回显已提交历史再继续；当前只支持只读工具的恢复，不保证外部写副作用只执行一次。尚无完整历史界面、通用调度或全部 Pi 兼容。
+Enter 发送；忙时 Ctrl-C 明确取消，闲置时退出；Ctrl-D 退出。持久模式退出时保留待恢复工作，下次启动先回显已提交历史再继续；工具仅在记录与当前策略均安全时自动重跑；write 中断可能部分完成，恢复返回错误，不保证外部写副作用只执行一次。尚无完整历史界面、通用调度或全部 Pi 兼容。
 
 开发顺序以 [迁移 TODO 的近期队列](docs/原生重写路线与迁移TODO.md#近期执行队列2026-10-24) 为准，规则见 [AGENTS](AGENTS.md) 与 [工程守卫](docs/工程门禁与架构守卫.md)。历史计划、功能盘点和实验报告是参考与证据，不是必须全部实现的产品需求；新增工作应能对应当前需求或参考项目中的实际行为。

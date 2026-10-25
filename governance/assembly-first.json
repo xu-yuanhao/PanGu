@@ -88,6 +88,10 @@
     "src/runtime/mimo_stream.S": {
       "role": "assembly-core",
       "reason": "手写MiMo请求投影、SSE解析或生命周期；通过公开libcurl/json-c ABI调用成熟传输与JSON库"
+    },
+    "src/runtime/write_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写有界JSON参数、逐分量目录遍历与写入/清理；外部库和平台ABI经断言"
     }
   }
 }

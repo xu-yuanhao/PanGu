@@ -86,6 +86,40 @@ def persistent_idle(binary, root, env):
             assert original == data, 'idle reopen wrote unnecessary profile/system records'
         original = data
     assert not checkpoints(storage / 'session.pgj')
+    # Valid native fixture with a prior idle composition prompt, same frame size.
+    data = bytearray(original)
+    cursor = 0
+    while cursor < len(data):
+        version, length = struct.unpack_from('<II', data, cursor + 8)
+        kind = struct.unpack_from('<I', data, cursor + 24)[0]
+        if version == 1 and kind == 1:
+            obsolete = b'OLD_READ_ONLY_CONFIG'
+            data[cursor + 40:cursor + length - 16] = obsolete.ljust(length - 56, b' ')
+            checksum = 0xcbf29ce484222325
+            for byte in data[cursor:cursor + length - 16]:
+                checksum = ((checksum ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+            struct.pack_into('<Q', data, cursor + length - 16, checksum)
+            break
+        cursor += length
+    else:
+        raise AssertionError('expected initial system frame')
+    (storage / 'session.pgj').write_bytes(data)
+    for attempt in range(2):
+        terminal = Terminal(binary, root, env)
+        try:
+            terminal.until(b'\r\n> ', 5)
+            terminal.send(b'\x04')
+            terminal.finish()
+        finally:
+            terminal.close()
+        refreshed = (storage / 'session.pgj').read_bytes()
+        if not attempt:
+            assert refreshed.startswith(data) and len(refreshed) > len(data)
+            assert b'Use read to inspect workspace files and write to create' in refreshed[len(data):]
+            original = refreshed
+        else:
+            assert refreshed == original, 'configured prompt refreshed more than once'
+    print('PASS: persistent idle prompt refresh preserves earlier frames and is not repeated', flush=True)
     print('PASS: persistent idle create/reopen without network, credentials absent and no redundant commits', flush=True)
 
 def persistent_live(binary, root):
@@ -150,10 +184,54 @@ def persistent_live(binary, root):
         terminal.close()
     print('PASS: actual persistent TUI auto-resume without resubmit, terminal does not replay, new-process recall and termios restoration', flush=True)
 
+def write_live(binary, root):
+    storage = root / 'write-storage'
+    storage.mkdir()
+    env = dict(os.environ, PANGU_SESSION_DIR=str(storage))
+    expected = b'Hello from PanGu.\n'
+    target = root / 'generated' / 'answer.txt'
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        terminal.send(b'Use write to create generated/answer.txt. Its content must be exactly Hello from PanGu. followed by one newline. Then briefly confirm.\r')
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] write' in terminal.output and b'finished ok:' in terminal.output, repr(terminal.output[-3000:].replace(terminal.secret,b'[REDACTED]'))
+        assert target.read_bytes() == expected, 'actual write content differs'
+        terminal.output = b''
+        terminal.send(b'Call read for generated/answer.txt and quote its content.\r')
+        terminal.until(b'[run] finished: success')
+        assert b'[tool] read' in terminal.output and b'finished ok:' in terminal.output
+        plain = re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', terminal.output)
+        after_tool = plain.split(b'finished ok:', 1)[1].split(b'\n', 1)[1]
+        assert b'HellofromPanGu.' in b''.join(after_tool.split())
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    log = storage / 'session.pgj'
+    original = log.read_bytes()
+    assert env['MIMO_API_KEY'].encode() not in original
+    assert any(checkpoint[1] == 5 for checkpoint in checkpoints(log)), 'write intent was not durably unsafe'
+    assert checkpoints(log)[-1][1] == 3
+    before = target.stat().st_mtime_ns
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'\r\n> ', 5)
+        assert b'[history] call' in terminal.output
+        assert b'[run] started' not in terminal.output
+        assert log.read_bytes() == original and target.stat().st_mtime_ns == before
+        assert target.read_bytes() == expected
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual persistent TUI / MiMo write and read-back, unsafe intent, settled reopen without rewrite and termios restoration', flush=True)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--live-persistent', action='store_true')
+    parser.add_argument('--live-write', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root = Path(directory)
@@ -186,6 +264,9 @@ def main():
         if args.live_persistent:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-persistent'
             persistent_live(binary, root)
+        if args.live_write:
+            assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live-write'
+            write_live(binary, root)
         if args.live:
             assert os.environ.get('MIMO_API_KEY'), 'MIMO_API_KEY required for --live'
             live_env = os.environ.copy()

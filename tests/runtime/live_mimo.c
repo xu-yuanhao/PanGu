@@ -16,7 +16,7 @@ int main(int argc,char **argv){int cancel_test=getenv("PG_LIVE_CANCEL")!=0;const
  if(read_root)prompt="Call read exactly once with path sample.c. Reply with just the PANGU marker found inside the file. This is a native agent integration test.";
  if(cancel_test)prompt="Write a numbered explanation of C memory ownership in 40 short lines. Do not call tools.";
  if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
- pg_tool_definition definition={"echo","Return a fixed harmless verification marker","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,validate,allow,execute};
+ pg_tool_definition definition={"echo","Return a fixed harmless verification marker","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,validate,allow,execute,0};
  if(read_root){if(pg_read_tool_open(&reader,read_root))return 2;original_read=pg_read_tool_definition(&reader);definition=original_read;definition.execute=read_execute;}
  if(pg_tool_registry_init(&registry,&definition,1))return 2;
  pg_model model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);

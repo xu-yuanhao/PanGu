@@ -49,7 +49,7 @@ open只接受新鲜空Session/control，顺序回放连续序号。成功后才�
 
 ## v2单运行检查点
 
-检查点位于帧checksum前40字节，无指针或padding，全部little-endian：id u64（偏移0）、phase u32（8）、turns u32（12）、call_index u64（16）、outcome u32（24）、restarts u32（28）、input_index u64（32）。phase为1待模型、2待工具、3已终结、4取消中；无待处理call时call_index为UINT64_MAX。input_index必须引用该运行的user消息；有待处理call必须引用当前历史最后一条tool-call。消息与检查点一起提交、一起回放，单独检查点kind=3不能创造一个没有对应输入的新运行。
+检查点位于帧checksum前40字节，无指针或padding，全部little-endian：id u64（偏移0）、phase u32（8）、turns u32（12）、call_index u64（16）、outcome u32（24）、restarts u32（28）、input_index u64（32）。phase为1待模型、2待可安全重放工具、3已终结、4取消中、5待不可安全重放工具；无待处理call时call_index为UINT64_MAX。input_index必须引用该运行的user消息；有待处理call必须引用当前历史最后一条tool-call。phase=5与phase=2具有相同call引用约束；恢复仅phase=2且当前工具仍明确声明safe才重执行，其他中断调用提交错误结果，不自动重写。旧读取器拒绝未知phase=5，不将其当安全工具执行。消息与检查点一起提交、一起回放，单独检查点kind=3不能创造一个没有对应输入的新运行。
 
 当前控制契约：新输入只在无活动运行时准入，原子创建id与MODEL检查点；模型调用前持久化轮次；assistant+call与TOOL检查点原子提交；工具结果与MODEL检查点原子提交；最终响应与TERMINAL/成功原子提交。错误或取消的终态也必须提交，不能仅发终态事件。system/reset不能改活动运行；reset在终结后清除当前检查点视图，物理历史保留。
 

@@ -19,18 +19,20 @@
 #define PG_TL_DEF_VALIDATE 32
 #define PG_TL_DEF_AUTHORIZE 40
 #define PG_TL_DEF_EXECUTE 48
-#define PG_TL_DEF_BYTES 56
+#define PG_TL_DEF_REPLAY_SAFE 56
+#define PG_TL_DEF_BYTES 64
 
 /* pg_tool_registry（tools.h） */
 #define PG_TL_REG_ENTRIES 0
-#define PG_TL_REG_COUNT 896
-#define PG_TL_REG_BYTES 904
+#define PG_TL_REG_COUNT 1024
+#define PG_TL_REG_BYTES 1032
 
-/* pg_tools 服务函数表（agent.h）；24 字节聚合经 sret 返回 */
+/* pg_tools 服务函数表（agent.h）；32 字节聚合经 sret 返回 */
 #define PG_TL_SVC_CONTEXT 0
 #define PG_TL_SVC_AUTHORIZE 8
 #define PG_TL_SVC_EXECUTE 16
-#define PG_TL_SVC_BYTES 24
+#define PG_TL_SVC_REPLAY_SAFE 24
+#define PG_TL_SVC_BYTES 32
 
 /* json-c 公开枚举值（<json-c/json.h>，断言对齐） */
 #define PG_TL_JSON_OBJECT 4
@@ -54,6 +56,7 @@ PG_TL_ASSERT_OFF(pg_tool_definition, context, PG_TL_DEF_CONTEXT);
 PG_TL_ASSERT_OFF(pg_tool_definition, validate, PG_TL_DEF_VALIDATE);
 PG_TL_ASSERT_OFF(pg_tool_definition, authorize, PG_TL_DEF_AUTHORIZE);
 PG_TL_ASSERT_OFF(pg_tool_definition, execute, PG_TL_DEF_EXECUTE);
+PG_TL_ASSERT_OFF(pg_tool_definition, replay_safe, PG_TL_DEF_REPLAY_SAFE);
 PG_TL_ASSERT_SIZE(pg_tool_definition, PG_TL_DEF_BYTES);
 PG_TL_ASSERT_OFF(pg_tool_registry, entries, PG_TL_REG_ENTRIES);
 PG_TL_ASSERT_OFF(pg_tool_registry, count, PG_TL_REG_COUNT);
@@ -61,6 +64,7 @@ PG_TL_ASSERT_SIZE(pg_tool_registry, PG_TL_REG_BYTES);
 PG_TL_ASSERT_OFF(pg_tools, context, PG_TL_SVC_CONTEXT);
 PG_TL_ASSERT_OFF(pg_tools, authorize, PG_TL_SVC_AUTHORIZE);
 PG_TL_ASSERT_OFF(pg_tools, execute, PG_TL_SVC_EXECUTE);
+PG_TL_ASSERT_OFF(pg_tools, replay_safe, PG_TL_SVC_REPLAY_SAFE);
 PG_TL_ASSERT_SIZE(pg_tools, PG_TL_SVC_BYTES);
 _Static_assert(PG_TOOL_LIMIT == PG_TL_LIMIT, "tool limit drifted");
 _Static_assert(PG_TEXT_LIMIT == PG_TL_TEXT_LIMIT, "text limit drifted");

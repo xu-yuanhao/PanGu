@@ -11,6 +11,7 @@ typedef struct {
  int (*validate)(void *, pg_slice);
  int (*authorize)(void *, pg_slice);
  int (*execute)(void *, pg_slice, char *, size_t, size_t *);
+ unsigned replay_safe; /* 0=unsafe (default), 1=safe; immutable during a run. */
 } pg_tool_definition;
 typedef struct { pg_tool_definition entries[PG_TOOL_LIMIT]; size_t count; } pg_tool_registry;
 /* Initialization is transactional; no modification/unregistration during a run. */

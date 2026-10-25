@@ -590,3 +590,24 @@ Goal继续，下一步审核并集成MiMo汇编交接，不把交接自述当实
 ```
 
 Goal保持进行中，当前不是完整最小Coding Agent或生产交付完成。
+
+
+## 2026-10-25：write工具与不可重放调用恢复
+
+读取固定Pi 38ff991的tools/write.ts、file-mutation-queue.ts、index.ts、env/node.ts::writeFile，harness/tool.ts的intent/execute恢复分支与tools.test.ts、harness-tools-recovery.test.ts。采用创建/覆盖、递归父目录和默认unsafe策略；只有已记录与当前策略均safe才重跑，否则提交“interrupted and may have partially run”错误，继续模型轮。当前同步单执行器无需并发mutation queue；不宣称异步取消中写入、并发队列或完整Durable Task兼容。盘古有界read显式声明safe是原生策略选择，Pi内置read并未声明safe，不把该差异说成逐项一致。
+
+新增手写write_tool.S及契约/布局断言，复用json-c与公开POSIX接口：相对路径、拒绝dot/空段/符号链接/非普通文件及多硬链接文件，调用者持有可信根fd；父目录创建后逐级打开，文件truncate后处理短写/EINTR并同步文件/父目录，所有退出清理fd。参数总量仍小于4096字节；允许JSON转义NUL内容。失败可能留下目录、空文件或部分内容，不提供写事务、抗敌对并发目录迁移沙箱或外部副作用exactly-once保证。
+
+工具定义64字节（新增replay_safe）、服务32字节（新增纯策略查询），registry和Agent布局/初始化/所有调用方一并更新；内部调用者须重编译，没有双实现或旧ABI兼容壳。调用意图与assistant/call原子提交：phase2记录safe，新增phase5记录unsafe，同为40字节检查点；恢复还要求当前服务明确返回1，NULL/未知/非法值均不重跑。取消优先于恢复执行，已提交结果不再执行。现有JSONL/通用调度等范围不扩张。
+
+实际验证：核心17组O0/O2 UBSan全部通过，客户端6组通过，write专项O2 ASan/UBSan通过。路径/类型/输出容量、UTF-8/NUL、覆盖/空内容、短写/EINTR/零写/ENOSPC/部分写、truncate及fsync失败与重复失败后fd计数检查通过。跨进程原11个中断点分别以safe/unsafe运行，加存量/当前safe与unsafe、NULL/非法值、执行前后16个组合及恢复tool_started后取消；旧断言在safe模式保持原要求，unsafe明确不得重复副作用。
+
+真实MiMo：最终普通问候文本通过实际TUI写入generated/answer.txt→read工具回读→精确文件字节/unsafe日志意图→重开历史与日志、mtime不变，termios精确恢复。先前标记内容请求出现未调用工具的失败，另次通过；最终复验又明确收到模型将标记视作注入/水印而拒绝。改为普通文件内容后仍保留实际工具调用、字节、日志与不重复改写断言；拒绝请求不计为写入成功。既有真实read续答、流中取消和持久退出/身份不匹配拒绝/自动恢复/跨进程回忆也通过。
+
+组合层启用read/write，工具配置身份改为read-write-v1；旧工具配置的在途运行仍拒绝静默切换。闲置会话才更新组合层固定system提示，避免保留“不能写文件”；离线有效旧提示夹具验证旧帧保留、仅追加一次更新、再次重开不重复提交。在途提示不被改写。主文档保持51行，TODO仅勾选此子集，T23/T25仍IN_PROGRESS；edit/bash及完整阶段验收未完成。
+
+同一Agent按用户授权自审自批本批源码、内部服务ABI、模块/语言/文件登记及证据；未修改检查器、预算或放宽既有行为断言。G00、assembly-first、diff检查通过；生产准入仍BLOCKED，本地通过不提供服务器侧防绕过保证。无新依赖、C备用或自动生成汇编。
+
+本批收尾fetch后，Pi与Harness工作树均干净，HEAD与各自上游一致（ahead/behind均0）；仍采用38ff991/22ddee3固定版本，没有未评估的上游变更。
+
+固定变更包SHA256（不含本记录；排序[path,文件SHA256]紧凑UTF-8 JSON，删除项null）：`7f0ef752ba948bdd65e1b7bceb3b1433edd37578cfc4a55c8f73b407b4728512`（35个路径）。

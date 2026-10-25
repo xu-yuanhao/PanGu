@@ -567,6 +567,10 @@
     "tests/runtime/test_mimo_transport.c": "native-test",
     "tests/runtime/test_mimo_alloc.c": "native-test",
     "tools/runtime/test_mimo_asm.py": "development-tool",
-    "docs/migration/mimo-assembly-handoff.md": "document"
+    "docs/migration/mimo-assembly-handoff.md": "document",
+    "src/runtime/write_tool.S": "native-source",
+    "src/runtime/write_tool.h": "native-source",
+    "src/runtime/write_tool_layout.h": "native-source",
+    "tests/runtime/test_write_tool.c": "native-test"
   }
 }

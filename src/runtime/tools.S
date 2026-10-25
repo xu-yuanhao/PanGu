@@ -251,7 +251,7 @@ pg_tool_registry_init:
  push r13
  push r14
  push r15
- sub rsp, 944 /* [0..32) 验证 scratch；[32..936) candidate(904B)；尾 8 对齐 */
+ sub rsp, 1072 /* scratch[32], detached registry[1032], alignment[8] */
  mov rbx, rdi /* registry，全程占用 */
  mov r12, rsi
  mov r13, rdx
@@ -286,6 +286,8 @@ pg_tool_registry_init:
  je .Linit_bad
  cmp qword ptr [r15 + PG_TL_DEF_AUTHORIZE], 0
  je .Linit_bad
+ cmp dword ptr [r15 + PG_TL_DEF_REPLAY_SAFE],1
+ ja .Linit_bad
  cmp qword ptr [r15 + PG_TL_DEF_EXECUTE], 0
  je .Linit_bad
  mov rax, qword ptr [r15 + PG_TL_DEF_SCHEMA]
@@ -367,7 +369,7 @@ pg_tool_registry_init:
  mov edx, PG_TL_REG_BYTES
  call memcpy@PLT
  xor eax, eax
- add rsp, 944
+ add rsp, 1072
  pop r15
  pop r14
  pop r13
@@ -376,7 +378,7 @@ pg_tool_registry_init:
  ret
 .Linit_bad:
  mov eax, 1
- add rsp, 944
+ add rsp, 1072
  pop r15
  pop r14
  pop r13
@@ -386,7 +388,7 @@ pg_tool_registry_init:
 .size pg_tool_registry_init, .-pg_tool_registry_init
 
 /* ---- pg_tools pg_tool_registry_service(pg_tool_registry *r)
- * 24 字节聚合：sret，rdi=目标缓冲 rsi=r。 ---- */
+ * 32 字节聚合：sret，rdi=目标缓冲 rsi=r。 ---- */
 .globl pg_tool_registry_service
 .type pg_tool_registry_service,@function
 pg_tool_registry_service:
@@ -395,9 +397,28 @@ pg_tool_registry_service:
  mov qword ptr [rdi + PG_TL_SVC_AUTHORIZE], rax
  lea rax, [rip + li_execute]
  mov qword ptr [rdi + PG_TL_SVC_EXECUTE], rax
+ lea rax,[rip+li_replay_safe]
+ mov [rdi+PG_TL_SVC_REPLAY_SAFE],rax
  mov rax, rdi
  ret
 .size pg_tool_registry_service, .-pg_tool_registry_service
+
+/* Pure lookup; absent/invalid policy is unsafe. */
+.type li_replay_safe,@function
+li_replay_safe:
+ sub rsp,8
+ call li_lookup
+ add rsp,8
+ test rax,rax
+ jz .Lreplay_absent
+ cmp dword ptr [rax+PG_TL_DEF_REPLAY_SAFE],1
+ sete al
+ movzx eax,al
+ ret
+.Lreplay_absent:
+ xor eax,eax
+ ret
+.size li_replay_safe,.-li_replay_safe
 
 /* ---- int li_available(ctx, name.data, name.size, args.data, args.size)
  * 可见性查询：仅查找存在，不构成授权。 ---- */

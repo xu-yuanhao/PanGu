@@ -80,6 +80,13 @@ def main():
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/session'), implementation('src/runtime/submissions'),
                             implementation('src/runtime/agent'), str(ROOT / 'tests/runtime/test_session_commit.c'), '-o', session_test], check=True)
             subprocess.run([session_test], check=True, timeout=10)
+            write_test = str(Path(directory) / 'test-write-tool')
+            write_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/tools'),
+                            implementation('src/runtime/write_tool'), str(ROOT / 'tests/runtime/test_write_tool.c'),
+                            '-Wl,--wrap=write,--wrap=ftruncate,--wrap=fsync', *write_flags, '-o', write_test], check=True)
+            subprocess.run([write_test], check=True, timeout=10)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
             tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',
