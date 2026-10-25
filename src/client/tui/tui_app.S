@@ -310,6 +310,13 @@ tui_app_run:
 .Lhave_name:
  mov rdi, r14
  call tui_view_banner@PLT
+ mov rdi,r15
+ call tui_state_history@PLT
+ test eax,eax
+ jns .Lhistory_ready
+ mov dword ptr [rsp+OFF_REASON],TUI_LI_EXIT_POLL_ERROR
+ jmp .Ldone
+.Lhistory_ready:
  cmp dword ptr [rsp + OFF_INTERACTIVE], 0
  je .Lattach_runtime
  mov rdi, r14

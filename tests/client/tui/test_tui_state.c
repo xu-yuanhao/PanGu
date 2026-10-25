@@ -75,7 +75,7 @@ static tui_event mk(tui_event_kind kind)
 }
 
 static tui_runtime_ops m_ops = {
-	"mock", NULL, m_submit, m_cancel, m_poll, m_shutdown,
+	"mock", NULL, m_submit, m_cancel, m_poll, m_shutdown, NULL,
 };
 
 static void test_submit_and_busy(void)
@@ -271,8 +271,13 @@ static void test_attach_existing_run(void)
  T_RUN("attach_existing_run");
 }
 
+static unsigned history_calls,history_mode;
+static int m_history(void *ctx,size_t index,tui_history_entry *out){(void)ctx;++history_calls;*out=(tui_history_entry){.kind=index?1u:0u,.text=index?"answer":"question",.text_len=index?6u:8u};if(history_mode==1)return -1;if(history_mode==2){out->text=0;return 1;}if(history_mode==3){out->kind=4;return 1;}if(history_mode==4)return 1;if(history_mode==5){out->kind=2;out->tool_name="t";out->tool_name_len=64;out->call_id="c";out->call_id_len=1;return 1;}return index<2?1:0;}
+static void test_startup_history(void){for(history_mode=0;history_mode<6;++history_mode){tstr out;tui_view view;tui_state state;mock_runtime runtime={0};tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_runtime_ops ops=m_ops;ops.ctx=&runtime;ops.history=m_history;history_calls=0;tui_state_init(&state,&ops,&view);int result=tui_state_history(&state);T_CHECK(!runtime.poll_calls&&!runtime.submit_calls&&!runtime.cancel_calls&&!state.running);if(!history_mode){T_CHECK(result==2&&history_calls==3&&!state.fatal);T_CHECK(tstr_contains(&out,"[history] user: question")&&tstr_contains(&out,"[history] assistant: answer"));T_CHECK(tui_state_history(&state)==0&&history_calls==3);}else{T_CHECK(result<0&&state.fatal);T_CHECK(history_calls<=(history_mode==4?65u:1u));}T_CHECK(!tstr_contains(&out,"[run] started")&&!tstr_contains(&out,"finished: success"));}T_RUN("startup_history_no_execution_and_bounded_errors");}
+
 int main(void)
 {
+    test_startup_history();
 	test_attach_existing_run();
 	test_submit_and_busy();
 	test_cancel_notice_once();

@@ -20,6 +20,7 @@ tui_state_init:
  mov dword ptr [rdi + TUI_LI_STATE_RUNNING], 0
  mov dword ptr [rdi + TUI_LI_STATE_CANCEL_SHOWN], 0
  mov dword ptr [rdi + TUI_LI_STATE_FATAL], 0
+ mov dword ptr [rdi + TUI_LI_STATE_HISTORY_LOADED], 0
  ret
  .cfi_endproc
 .size tui_state_init, .-tui_state_init
@@ -231,5 +232,89 @@ tui_state_poll:
  ret
  .cfi_endproc
 .size tui_state_poll, .-tui_state_poll
+
+ .globl tui_state_history
+.type tui_state_history,@function
+tui_state_history:
+ push rbx
+ push r12
+ push r13
+ sub rsp,TUI_LI_HISTORY_SIZE
+ mov rbx,rdi
+ cmp dword ptr [rbx+TUI_LI_STATE_FATAL],0
+ jne .Lhistory_error
+ cmp dword ptr [rbx+TUI_LI_STATE_HISTORY_LOADED],0
+ jne .Lhistory_none
+ cmp dword ptr [rbx+TUI_LI_STATE_RUNNING],0
+ jne .Lhistory_error
+ xor r12d,r12d
+ mov r13,[rbx+TUI_LI_STATE_OPS]
+ cmp qword ptr [r13+TUI_LI_OPS_HISTORY],0
+ je .Lhistory_done
+.Lhistory_next:
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,TUI_LI_HISTORY_SIZE/8
+ rep stosq
+ mov rdi,[r13+TUI_LI_OPS_CTX]
+ mov rsi,r12
+ mov rdx,rsp
+ call [r13+TUI_LI_OPS_HISTORY]
+ test eax,eax
+ jz .Lhistory_done
+ cmp eax,1
+ jne .Lhistory_error
+ cmp r12,64
+ jae .Lhistory_error
+ cmp dword ptr [rsp+TUI_LI_HISTORY_KIND],3
+ ja .Lhistory_error
+ cmp qword ptr [rsp+TUI_LI_HISTORY_TEXT_LEN],4095
+ ja .Lhistory_error
+ cmp qword ptr [rsp+TUI_LI_HISTORY_TEXT_LEN],0
+ je .Lhistory_text_valid
+ cmp qword ptr [rsp+TUI_LI_HISTORY_TEXT],0
+ je .Lhistory_error
+.Lhistory_text_valid:
+ cmp dword ptr [rsp+TUI_LI_HISTORY_KIND],2
+ jb .Lhistory_render
+ cmp dword ptr [rsp+TUI_LI_HISTORY_OK],1
+ ja .Lhistory_error
+ cmp qword ptr [rsp+TUI_LI_HISTORY_NAME],0
+ je .Lhistory_error
+ cmp qword ptr [rsp+TUI_LI_HISTORY_ID],0
+ je .Lhistory_error
+ mov rax,[rsp+TUI_LI_HISTORY_NAME_LEN]
+ dec rax
+ cmp rax,62
+ ja .Lhistory_error
+ mov rax,[rsp+TUI_LI_HISTORY_ID_LEN]
+ dec rax
+ cmp rax,62
+ ja .Lhistory_error
+.Lhistory_render:
+ mov rdi,[rbx+TUI_LI_STATE_VIEW]
+ mov rsi,rsp
+ call tui_view_history
+ inc r12
+ jmp .Lhistory_next
+.Lhistory_done:
+ mov dword ptr [rbx+TUI_LI_STATE_HISTORY_LOADED],1
+ mov eax,r12d
+ jmp .Lhistory_return
+.Lhistory_none:
+ xor eax,eax
+ jmp .Lhistory_return
+.Lhistory_error:
+ mov dword ptr [rbx+TUI_LI_STATE_FATAL],1
+ mov rdi,[rbx+TUI_LI_STATE_VIEW]
+ call tui_view_poll_error
+ mov eax,-1
+.Lhistory_return:
+ add rsp,TUI_LI_HISTORY_SIZE
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_state_history,.-tui_state_history
 
 .section .note.GNU-stack,"",@progbits

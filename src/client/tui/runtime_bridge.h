@@ -1,7 +1,7 @@
 #ifndef PG_TUI_RUNTIME_BRIDGE_H
 #define PG_TUI_RUNTIME_BRIDGE_H
 #include "tui_runtime_adapter.h"
-#include "../../contracts/client.h"
+#include "../../runtime/session.h"
 typedef struct {
  pg_client client;
  tui_runtime_ops ops;
@@ -10,8 +10,12 @@ typedef struct {
  int (*detach)(void *);
  void *detach_context;
  int stop_error;
+ const pg_session *history_session;
+ size_t history_count;
 } pg_tui_bridge;
 int pg_tui_bridge_init(pg_tui_bridge *, pg_client);
+/* Bind a stable committed view before startup attach/poll. No storage ownership. */
+int pg_tui_bridge_set_history(pg_tui_bridge *, const pg_session *);
 /* Optional owner lifecycle binding: stop observing without requesting abort. */
 int pg_tui_bridge_set_detach(pg_tui_bridge *, int (*detach)(void *), void *context);
 #endif

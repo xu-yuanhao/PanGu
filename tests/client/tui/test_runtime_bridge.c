@@ -48,7 +48,21 @@ static void detach_lifecycle(void){
  b.active=1;assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));assert(!pg_bridge_probe((probe_fn)b.ops.shutdown,&b,0,0));
  assert(b.stopped&&b.active&&b.stop_error==result&&detach_calls==before+1&&cancel_calls==cancels&&poll_calls==polls);b.ops.shutdown(&b);assert(detach_calls==before+1);assert(pg_tui_bridge_set_detach(&b,pg_bridge_test_detach,&detach_calls));}
 }
-int main(void){boundary_abi();detach_lifecycle();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
+static void history_snapshot(void){
+ memset(&agent.session,0,sizeof(agent.session));agent.session.count=4;
+ for(unsigned i=0;i<4;++i){pg_message *m=&agent.session.messages[i];m->role=(pg_role)i;m->size=4;memcpy(m->text,"fact",5);}
+ strcpy(agent.session.messages[2].call_id,"read-1");strcpy(agent.session.messages[2].tool_name,"read");strcpy(agent.session.messages[3].call_id,"read-1");agent.session.messages[3].is_error=1;
+ pg_tui_bridge bridge;pg_client client={0,pg_bridge_test_submit,pg_bridge_test_cancel,pg_bridge_test_poll};assert(!pg_tui_bridge_init(&bridge,client));tui_history_entry out;assert(bridge.ops.history(&bridge,0,&out)==0);
+ assert(pg_tui_bridge_set_history(0,&agent.session));assert(pg_tui_bridge_set_history(&bridge,0));assert(!pg_bridge_probe((probe_fn)pg_tui_bridge_set_history,&bridge,&agent.session,0));assert(bridge.history_count==4);
+ int submits=submit_calls,polls=poll_calls,cancels=cancel_calls;
+ for(unsigned i=0;i<4;++i){assert(!pg_bridge_probe((probe_fn)bridge.ops.history,&bridge,(void*)(uintptr_t)i,(size_t)&out));assert(out.kind==i&&out.text_len==4&&!memcmp(out.text,"fact",4));if(i>=2)assert(out.call_id_len==6&&out.tool_name_len==4&&!memcmp(out.tool_name,"read",4));if(i==3)assert(!out.tool_ok);}
+ assert(bridge.ops.history(&bridge,4,&out)==0&&bridge.ops.history(&bridge,0,0)<0);assert(submits==submit_calls&&polls==poll_calls&&cancels==cancel_calls);
+ agent.session.count=5;assert(bridge.ops.history(&bridge,0,&out)<0);agent.session.count=65;assert(pg_tui_bridge_set_history(&bridge,&agent.session));agent.session.count=4;assert(bridge.history_count==4);
+ agent.session.messages[3].call_id[0]='x';assert(bridge.ops.history(&bridge,3,&out)<0);agent.session.messages[3].call_id[0]='r';agent.session.messages[0].size=4096;assert(bridge.ops.history(&bridge,0,&out)<0);agent.session.messages[0].size=4;
+ long page=sysconf(_SC_PAGESIZE);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));tui_history_entry *tail=(tui_history_entry*)(map+page-sizeof(*tail));assert(bridge.ops.history(&bridge,3,tail)==1&&!tail->tool_ok&&tail->kind==3);assert(!munmap(map,(size_t)page*2));
+ bridge.active=1;assert(pg_tui_bridge_set_history(&bridge,&agent.session));bridge.stopped=1;assert(bridge.ops.history(&bridge,0,&out)<0);
+}
+int main(void){boundary_abi();detach_lifecycle();history_snapshot();assert(!pg_agent_init(&agent,(pg_model){0,start,next,cancel_model,close_model},(pg_tools){0}));
  pg_tui_bridge bridge;assert(!pg_tui_bridge_init(&bridge,pg_agent_client(&agent)));tui_runtime_ops *ops=&bridge.ops;tui_event e;unsigned starts=0,texts=0,ends=0;
  assert(ops->submit(ops->ctx,"test",4)==TUI_SUBMIT_OK);assert(ops->submit(ops->ctx,"busy",4)==TUI_SUBMIT_BUSY);
  for(unsigned i=0;i<16;++i)if(ops->poll(ops->ctx,&e)){if(e.kind==TUI_EV_RUN_STARTED)++starts;if(e.kind==TUI_EV_TEXT_DELTA){++texts;assert(e.text_len==2&&!memcmp(e.text,"ok",2));}if(e.kind==TUI_EV_RUN_FINISHED){++ends;assert(e.run_status==TUI_RUN_SUCCESS);break;}}

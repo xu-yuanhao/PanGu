@@ -1,16 +1,4 @@
-/* tui_view.S — 展示渲染，手写汇编原地替换 tui_view.c。
- *
- * 契约见 tui_view.h：主屏滚动回显；事件输出前挂起编辑行；有界展示按 code point
- * 截断并带标记；text_delta 的跨事件拆断序列用 ≤3 字节 carry 拼接。
- * libc 只用 strlen/memcpy/snprintf（登记依赖），渲染算法全部在本文件内。
- *
- * 与被替换 C 版的已知行为差异（记录于交接报告）：
- *  1. carry “吸收”路径（本段全部并入 carry）不再提前写出已并入的字节——
- *     C 版在该路径会把不完整前缀写给终端并重复一次（4 字节序列按 1+2+1 拆分
- *     可复现），违反头文件声明的“绝不向终端写出半个序列”；本版遵守该契约。
- *  2. banner/截断标记的 snprintf 返回值截断到缓冲区长度内再交给 sink——
- *     C 版直接用返回长度读栈缓冲，超长 runtime 名会越界读。
- */
+/* Scrollback rendering; UTF-8 carry joins precede untrusted control escaping. */
 #include "tui_layout.h"
 .intel_syntax noprefix
 
@@ -39,6 +27,15 @@
 .Lfmt_banner:       .asciz "[tui] 盘古薄客户端（事件源: %s）\n"
 .Lfmt_exit:         .asciz "[tui] 退出（%s），终端已恢复\n"
 .Lfmt_marker:       .asciz "…[+%zu 字节截断]"
+
+.Lhistory_user: .asciz "[history] user: "
+.Lhistory_assistant: .asciz "[history] assistant: "
+.Lhistory_call: .asciz "[history] call "
+.Lhistory_result: .asciz "[history] result "
+.Lhistory_args: .asciz "): "
+.Lhistory_ok: .asciz ") ok: "
+.Lhistory_error: .asciz ") error: "
+.Lhex: .ascii "0123456789abcdef"
 
 .section .text
 
@@ -110,6 +107,156 @@ li_vput:
  mov rdi, qword ptr [rdi + TUI_LI_VIEW_SINK_CTX]
  jmp rax
 .size li_vput, .-li_vput
+
+/* Escape control bytes in data, preserving complete UTF-8 and newline/tab. */
+.type li_safe_vput,@function
+li_safe_vput:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ xor r15d,r15d
+.Lsafe_scan:
+ cmp r14,r13
+ jae .Lsafe_tail
+ movzx eax,byte ptr [r12+r14]
+ cmp eax,32
+ jae .Lsafe_non_c0
+ cmp eax,9
+ je .Lsafe_next
+ cmp eax,10
+ je .Lsafe_next
+ jmp .Lsafe_byte
+.Lsafe_non_c0:
+ cmp eax,127
+ je .Lsafe_byte
+ cmp eax,128
+ jb .Lsafe_next
+ cmp eax,160
+ jb .Lsafe_byte
+ cmp eax,194
+ jb .Lsafe_byte
+ cmp eax,244
+ ja .Lsafe_byte
+ cmp eax,194
+ jne .Lsafe_utf8
+ lea rcx,[r14+1]
+ cmp rcx,r13
+ jae .Lsafe_byte
+ movzx eax,byte ptr [r12+rcx]
+ cmp eax,128
+ jb .Lsafe_utf8
+ cmp eax,159
+ ja .Lsafe_utf8
+ mov qword ptr [rsp+8],2
+ jmp .Lsafe_escape
+.Lsafe_utf8:
+ movzx edi,byte ptr [r12+r14]
+ call tui_utf8_seq_len
+ mov rcx,r13
+ sub rcx,r14
+ cmp rax,rcx
+ ja .Lsafe_incomplete
+ mov ecx,1
+.Lsafe_continuation:
+ cmp rcx,rax
+ jae .Lsafe_sequence_bounds
+ lea rdx,[r14+rcx]
+ movzx edx,byte ptr [r12+rdx]
+ sub edx,128
+ cmp edx,63
+ ja .Lsafe_incomplete
+ inc ecx
+ jmp .Lsafe_continuation
+.Lsafe_sequence_bounds:
+ movzx edx,byte ptr [r12+r14]
+ movzx ecx,byte ptr [r12+r14+1]
+ cmp edx,224
+ jne .Lsafe_surrogate
+ cmp ecx,160
+ jb .Lsafe_incomplete
+.Lsafe_surrogate:
+ cmp edx,237
+ jne .Lsafe_plane
+ cmp ecx,159
+ ja .Lsafe_incomplete
+.Lsafe_plane:
+ cmp edx,240
+ jne .Lsafe_maximum
+ cmp ecx,144
+ jb .Lsafe_incomplete
+.Lsafe_maximum:
+ cmp edx,244
+ jne .Lsafe_advance
+ cmp ecx,143
+ ja .Lsafe_incomplete
+.Lsafe_advance:
+ add r14,rax
+ jmp .Lsafe_scan
+.Lsafe_incomplete:
+ movzx eax,byte ptr [r12+r14]
+.Lsafe_byte:
+ mov qword ptr [rsp+8],1
+.Lsafe_escape:
+ mov [rsp+4],eax
+ cmp r14,r15
+ je .Lsafe_marker
+ mov rdi,rbx
+ lea rsi,[r12+r15]
+ mov rdx,r14
+ sub rdx,r15
+ call li_vput
+.Lsafe_marker:
+ mov eax,[rsp+4]
+ lea rsi,[rip+.Lhex]
+ mov ecx,eax
+ and eax,15
+ shr ecx,4
+ mov al,[rsi+rax]
+ mov cl,[rsi+rcx]
+ mov word ptr [rsp],0x785c
+ mov [rsp+2],cl
+ mov [rsp+3],al
+ mov edx,4
+ cmp qword ptr [rsp+8],2
+ jne .Lsafe_emit
+ mov dword ptr [rsp],0x3030755c
+ mov [rsp+4],cl
+ mov [rsp+5],al
+ mov edx,6
+.Lsafe_emit:
+ mov rdi,rbx
+ mov rsi,rsp
+ call li_vput
+ add r14,[rsp+8]
+ mov r15,r14
+ jmp .Lsafe_scan
+.Lsafe_next:
+ inc r14
+ jmp .Lsafe_scan
+.Lsafe_tail:
+ cmp r13,r15
+ jbe .Lsafe_done
+ mov rdi,rbx
+ lea rsi,[r12+r15]
+ mov rdx,r13
+ sub rdx,r15
+ call li_vput
+.Lsafe_done:
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_safe_vput,.-li_safe_vput
 
 /* ---- 内部：vputs(tui_view *v, const char *s) ---- */
 .type li_vputs,@function
@@ -185,7 +332,7 @@ li_put_bounded:
  mov rdi, rbx
  mov rsi, r12
  mov rdx, r15
- call li_vput
+ call li_safe_vput
  cmp r13, r15
  jbe .Lpb_done /* 未截断 */
  sub rsp, 64 /* char marker[64]，保持 16 对齐 */
@@ -624,17 +771,31 @@ tui_view_event:
  jz .Ldelta_no_flush
  mov rdi, rbx
  call li_event_suspend
- mov rdi, rbx
- lea rsi, [rbx + TUI_LI_VIEW_CARRY]
- mov rdx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
- call li_vput
- mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
- lea rdx, [r13 + r15]
- test rdx, rdx
+ lea rdi,[rsp+8]
+ lea rsi,[rbx+TUI_LI_VIEW_CARRY]
+ mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
+ call memcpy
+ lea rdi,[rsp+8]
+ add rdi,[rbx+TUI_LI_VIEW_CARRY_LEN]
+ test r13,r13
+ jz .Lcarry_joined
+ mov rsi,[r12+TUI_LI_EVENT_TEXT]
+ mov rdx,r13
+ call memcpy
+.Lcarry_joined:
+ mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
+ add rdx,r13
+ mov rdi,rbx
+ lea rsi,[rsp+8]
+ call li_safe_vput
+ mov qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
+ test r15,r15
  jz .Ldelta_tailcopy
- mov rdi, rbx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
- call li_vput
+ mov rdi,rbx
+ mov rsi,[r12+TUI_LI_EVENT_TEXT]
+ add rsi,r13
+ mov rdx,r15
+ call li_safe_vput
  jmp .Ldelta_tailcopy
 .Ldelta_no_flush:
  test r15, r15
@@ -645,7 +806,7 @@ tui_view_event:
  mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
  add rsi, r13
  mov rdx, r15
- call li_vput
+ call li_safe_vput
 .Ldelta_tailcopy:
  mov rax, [rsp]
  test rax, rax
@@ -728,7 +889,7 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_finished:
- /* 终态前冲掉遗留 carry（不完整序列按原样放出） */
+ /* A terminal closes any incomplete carry as visible escaped bytes. */
  cmp qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
  je .Lfin_no_carry
  mov rdi, rbx
@@ -736,7 +897,7 @@ tui_view_event:
  mov rdi, rbx
  lea rsi, [rbx + TUI_LI_VIEW_CARRY]
  mov rdx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
- call li_vput
+ call li_safe_vput
  mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], 0
 .Lfin_no_carry:
  mov rdi, rbx
@@ -792,5 +953,73 @@ tui_view_event:
  ret
  .cfi_endproc
 .size tui_view_event, .-tui_view_event
+
+.globl tui_view_history
+.type tui_view_history,@function
+tui_view_history:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,[r12+TUI_LI_HISTORY_KIND]
+ cmp r13d,3
+ ja .Lhistory_view_done
+ call li_event_suspend
+ lea rsi,[rip+.Lhistory_user]
+ test r13d,r13d
+ je .Lhistory_view_prefix
+ lea rsi,[rip+.Lhistory_assistant]
+ cmp r13d,1
+ je .Lhistory_view_prefix
+ lea rsi,[rip+.Lhistory_call]
+ cmp r13d,2
+ je .Lhistory_view_prefix
+ lea rsi,[rip+.Lhistory_result]
+.Lhistory_view_prefix:
+ mov rdi,rbx
+ call li_vputs
+ cmp r13d,2
+ jb .Lhistory_view_text
+ mov rdi,rbx
+ mov rsi,[r12+TUI_LI_HISTORY_NAME]
+ mov rdx,[r12+TUI_LI_HISTORY_NAME_LEN]
+ call li_safe_vput
+ mov rdi,rbx
+ lea rsi,[rip+.Lhash_paren]
+ call li_vputs
+ mov rdi,rbx
+ mov rsi,[r12+TUI_LI_HISTORY_ID]
+ mov rdx,[r12+TUI_LI_HISTORY_ID_LEN]
+ call li_safe_vput
+ lea rsi,[rip+.Lhistory_args]
+ cmp r13d,2
+ je .Lhistory_view_suffix
+ lea rsi,[rip+.Lhistory_ok]
+ cmp dword ptr [r12+TUI_LI_HISTORY_OK],0
+ jne .Lhistory_view_suffix
+ lea rsi,[rip+.Lhistory_error]
+.Lhistory_view_suffix:
+ mov rdi,rbx
+ call li_vputs
+.Lhistory_view_text:
+ mov rdi,rbx
+ mov rsi,[r12+TUI_LI_HISTORY_TEXT]
+ mov rdx,[r12+TUI_LI_HISTORY_TEXT_LEN]
+ mov ecx,4095
+ cmp r13d,2
+ jb .Lhistory_view_body
+ mov ecx,TUI_LI_VIEW_TOOL_SNIPPET
+.Lhistory_view_body:
+ call li_put_bounded
+ mov rdi,rbx
+ lea rsi,[rip+.Lnl]
+ call li_vputs
+.Lhistory_view_done:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_view_history,.-tui_view_history
 
 .section .note.GNU-stack,"",@progbits

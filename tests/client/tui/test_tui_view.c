@@ -249,8 +249,24 @@ static void test_error_and_cancel_lines(void)
 	T_RUN("error_and_cancel_lines");
 }
 
+static void test_history_and_controls(void)
+{
+ const char content[]="A\x1b]52;c;evil\a\b\r\x7f\xc2\x9b你好🙂\n\tB";
+ for(int ansi=0;ansi<2;++ansi){tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),ansi,NULL);
+  tui_history_entry history={.kind=0,.text=content,.text_len=sizeof(content)-1};tui_view_history(&view,&history);
+  T_CHECK(tstr_contains(&out,"[history] user: A\\x1b]52;c;evil\\x07\\x08\\x0d\\x7f\\u009b你好🙂"));T_CHECK(!memchr(out.buf,27,out.len));T_CHECK(!memchr(out.buf,7,out.len));
+  history=(tui_history_entry){.kind=3,.text="ok",.text_len=2,.tool_name="read",.tool_name_len=4,.call_id="one",.call_id_len=3,.tool_ok=0};tui_view_history(&view,&history);T_CHECK(tstr_contains(&out,"[history] result read (#one) error: ok"));T_CHECK(!tstr_contains(&out,"[run] started")&&!tstr_contains(&out,"finished: success"));
+ }
+ const char stream[]="hi你好🙂\xc2\x9b\x1b[2J\r!";
+ for(size_t split=0;split<sizeof(stream);++split){tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event event={.kind=TUI_EV_TEXT_DELTA,.text=stream,.text_len=split};tui_view_event(&view,&event);event.text=stream+split;event.text_len=sizeof(stream)-1-split;tui_view_event(&view,&event);T_CHECK(!strcmp(out.buf,"hi你好🙂\\u009b\\x1b[2J\\x0d!"));T_CHECK(!view.carry_len);}
+ const char malformed[]="\xe0\x1b]52;bad\a\xc0\x9b\xed\xa0\x80";tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_history_entry entry={.text=malformed,.text_len=sizeof(malformed)-1};tui_view_history(&view,&entry);T_CHECK(!memchr(out.buf,27,out.len)&&!memchr(out.buf,7,out.len));T_CHECK(tstr_contains(&out,"\\xe0\\x1b]52;bad\\x07\\xc0\\x9b\\xed\\xa0\\x80"));
+ tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event partial={.kind=TUI_EV_TEXT_DELTA,.text="\xe4",.text_len=1};tui_view_event(&view,&partial);T_CHECK(!out.len&&view.carry_len==1);partial=(tui_event){.kind=TUI_EV_RUN_FINISHED,.run_status=TUI_RUN_CANCELLED};tui_view_event(&view,&partial);T_CHECK(tstr_contains(&out,"\\xe4[run] finished: cancelled")&&!view.carry_len&&!memchr(out.buf,0xe4,out.len));
+ T_RUN("history_and_control_escaping_all_splits");
+}
+
 int main(void)
 {
+    test_history_and_controls();
 	test_editor_redraw_ansi();
 	test_event_lines_ansi();
 	test_utf8_split_join();

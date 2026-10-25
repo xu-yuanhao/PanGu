@@ -1,5 +1,6 @@
 #include "runtime_bridge_layout.h"
 #include "tui_layout.h"
+#include "../../runtime/session_layout.h"
 .intel_syntax noprefix
 .text
 .globl pg_tui_bridge_init
@@ -32,6 +33,8 @@ pg_tui_bridge_init:
     mov [r8+PG_B_OPS+TUI_LI_OPS_POLL],rax
     lea rax,[rip+.Lshutdown]
     mov [r8+PG_B_OPS+TUI_LI_OPS_SHUTDOWN],rax
+    lea rax,[rip+.Lhistory]
+    mov [r8+PG_B_OPS+TUI_LI_OPS_HISTORY],rax
     xor eax,eax
     ret
 .Linit_bad:
@@ -58,6 +61,119 @@ pg_tui_bridge_set_detach:
     mov eax,1
     ret
 .size pg_tui_bridge_set_detach,.-pg_tui_bridge_set_detach
+
+.globl pg_tui_bridge_set_history
+.type pg_tui_bridge_set_history,@function
+pg_tui_bridge_set_history:
+    test rdi,rdi
+    jz .Ldetach_bad
+    test rsi,rsi
+    jz .Ldetach_bad
+    cmp dword ptr [rdi+PG_B_ACTIVE],0
+    jne .Ldetach_bad
+    cmp dword ptr [rdi+PG_B_STOPPED],0
+    jne .Ldetach_bad
+    mov rax,[rsi+PG_S_COUNT]
+    cmp rax,64
+    ja .Ldetach_bad
+    mov [rdi+PG_B_HISTORY],rsi
+    mov [rdi+PG_B_HISTORY_COUNT],rax
+    xor eax,eax
+    ret
+.size pg_tui_bridge_set_history,.-pg_tui_bridge_set_history
+
+.Lhistory:
+    test rdx,rdx
+    jz .Lhistory_bad
+    cmp dword ptr [rdi+PG_B_STOPPED],0
+    jne .Lhistory_bad
+    mov r8,[rdi+PG_B_HISTORY]
+    test r8,r8
+    jz .Lhistory_end
+    mov rax,[rdi+PG_B_HISTORY_COUNT]
+    cmp rax,[r8+PG_S_COUNT]
+    jne .Lhistory_bad
+    cmp rsi,rax
+    jae .Lhistory_end
+    mov r10,rsi
+    imul rax,rsi,PG_MSG_BYTES
+    add r8,rax
+    mov r9,rdx
+    mov eax,[r8]
+    cmp eax,3
+    ja .Lhistory_bad
+    mov rcx,[r8+PG_MSG_SIZE]
+    cmp rcx,4096
+    jae .Lhistory_bad
+    cmp byte ptr [r8+PG_MSG_TEXT+rcx],0
+    jne .Lhistory_bad
+    cmp dword ptr [r8+PG_MSG_ERROR],1
+    ja .Lhistory_bad
+    mov rdi,r9
+    xor eax,eax
+    mov ecx,TUI_LI_HISTORY_SIZE/8
+    rep stosq
+    mov eax,[r8]
+    mov [r9+TUI_LI_HISTORY_KIND],eax
+    lea rax,[r8+PG_MSG_TEXT]
+    mov [r9+TUI_LI_HISTORY_TEXT],rax
+    mov rax,[r8+PG_MSG_SIZE]
+    mov [r9+TUI_LI_HISTORY_TEXT_LEN],rax
+    xor eax,eax
+    cmp dword ptr [r8+PG_MSG_ERROR],0
+    sete al
+    mov [r9+TUI_LI_HISTORY_OK],eax
+    cmp dword ptr [r8],2
+    jb .Lhistory_one
+    lea rsi,[r8+PG_MSG_ID]
+    call .Lhistory_length
+    test edx,edx
+    jz .Lhistory_bad
+    mov [r9+TUI_LI_HISTORY_ID],rsi
+    mov [r9+TUI_LI_HISTORY_ID_LEN],rdx
+    cmp dword ptr [r8],2
+    je .Lhistory_name
+    test r10,r10
+    jz .Lhistory_bad
+    lea r11,[r8-PG_MSG_BYTES]
+    cmp dword ptr [r11],2
+    jne .Lhistory_bad
+    xor ecx,ecx
+.Lhistory_match:
+    mov al,[r8+PG_MSG_ID+rcx]
+    cmp [r11+PG_MSG_ID+rcx],al
+    jne .Lhistory_bad
+    inc rcx
+    cmp rcx,rdx
+    jbe .Lhistory_match
+    mov r8,r11
+.Lhistory_name:
+    lea rsi,[r8+PG_MSG_NAME]
+    call .Lhistory_length
+    test edx,edx
+    jz .Lhistory_bad
+    mov [r9+TUI_LI_HISTORY_NAME],rsi
+    mov [r9+TUI_LI_HISTORY_NAME_LEN],rdx
+.Lhistory_one:
+    mov eax,1
+    ret
+.Lhistory_length:
+    xor edx,edx
+.Lhistory_length_byte:
+    cmp byte ptr [rsi+rdx],0
+    je .Lhistory_length_end
+    inc edx
+    cmp edx,64
+    jb .Lhistory_length_byte
+    xor edx,edx
+.Lhistory_length_end:
+    ret
+.Lhistory_end:
+    xor eax,eax
+    ret
+.Lhistory_bad:
+    mov eax,-1
+    ret
 
 .Lsubmit:
     cmp dword ptr [rdi+PG_B_STOPPED],0

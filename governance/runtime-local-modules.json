@@ -272,16 +272,36 @@
       "dependencies": [
         "client.contract.v0",
         "system libc",
-        "POSIX termios/poll/signals"
+        "POSIX termios/poll/signals",
+        "session.commit.local.v0"
       ],
-      "role": "handwritten terminal/input/view/state/app and native bridge; attach existing run; optional owner detach closes observation without abort; platform termios layout remains C",
+      "role": "handwritten TUI and native bridge; optional bounded startup committed-history reader before attach, no lifecycle replay; escape untrusted terminal controls after UTF-8 carry joining; termios layout remains thin C",
       "exports": [
         "tui_app_run",
         "pg_tui_bridge_init",
         "tui_state_attach",
-        "pg_tui_bridge_set_detach"
+        "pg_tui_bridge_set_detach",
+        "pg_tui_bridge_set_history",
+        "tui_state_history",
+        "tui_view_history"
       ],
       "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
+          "paths": [
+            "packages/durable/src/harness/view.ts",
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+            "packages/coding-agent/src/utils/ansi.ts",
+            "packages/tui/src/program-status.ts"
+          ],
+          "semantics": "hydrate committed active entries separately from execution events; initial messages rendered without submitting. Native scrollback escapes control data visibly rather than copying component tree/ANSI regex",
+          "tests_to_read": [
+            "packages/durable/test/harness-view.test.ts",
+            "packages/coding-agent/test/ansi-utils.test.ts",
+            "packages/tui/test/program-status.test.ts"
+          ]
+        },
         {
           "repository": "pi",
           "commit": "2ec55d808d455b1a64a2bf7888198207a096120a",
@@ -313,7 +333,7 @@
         "storage.journal.posix.local.v1",
         "runtime.profile.local.v1"
       ],
-      "role": "explicit static Linux composition; volatile default or opt-in PANGU_SESSION_DIR journal with profile verification and pending-run resume; no fake runtime",
+      "role": "explicit static Linux composition: profile-verified persistent or volatile session, read-only startup history binding, pending-run resume and detach; no fake runtime",
       "exports": [
         "main"
       ],

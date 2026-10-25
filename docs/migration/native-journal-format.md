@@ -73,7 +73,7 @@ v3只允许kind=4、count=0，不带检查点，payload为1～4096字节身份�
 
 PANGU_SESSION_DIR需指向现有目录，最终目录不跟随符号链接；固定文件session.pgj沿用独占锁和日志校验。目录由用户可信选择，不承诺完整祖先路径沙箱。目录变量未设置仍使用易失模式。启动在进入raw终端和网络请求前核对身份，再自动resume未结束运行；已终结运行不重跑。达到5次恢复上限时停在诊断，底层显式retry API仍可用，当前TUI未提供重试界面。
 
-持久模式通过bridge的可选detach回调绑定pg_agent_suspend：Ctrl-D/外部终止信号退出时停止本地请求、保留检查点，不调用cancel或排空伪造终态；Ctrl-C忙时仍明确abort。默认易失bridge保持原有有限取消排空。bridge尺寸240字节，stop_error记录detach失败，composition将其计入退出码。单所有者、没有后台执行器；关闭后下次进程重开才继续。不会保存流式草稿、完整TUI屏幕或补显示历史记录。
+持久模式通过bridge的可选detach回调绑定pg_agent_suspend：Ctrl-D/外部终止信号退出时停止本地请求、保留检查点，不调用cancel或排空伪造终态；Ctrl-C忙时仍明确abort。默认易失bridge保持原有有限取消排空。bridge尺寸240字节，stop_error记录detach失败，composition将其计入退出码。单所有者、没有后台执行器；关闭后下次进程重开才继续。不会保存流式草稿或完整TUI屏幕；启动只回显当前已提交消息。
 
 专项证据在test_profile.c（身份/配额/不匹配）、test_journal.c（v3最大帧、全部小帧尾切分/逐字节损坏、合法校验的非法版本/kind/count及fsync不确定恢复）、test_runtime_bridge.c（detach不cancel/poll、失败、幂等和ABI）。实际交互验收入口为python3 -B tools/runtime/test_pangu_pty.py --live-persistent；需要环境凭据，临时目录和会话自动删除。
 
@@ -90,3 +90,9 @@ v4只允许kind=5、count=1、40字节检查点。payload先放requestId长度u3
 Session控制尾部增加submission_count及64个记录；checkpoint仍40、change仍48、模型可见Session/pg_client/pg_model布局不变，所有内部消费者同批重编译。新增lookup无IO/分配，提交与结果发布仍由原事务边界保证。
 
 验证入口：`python3 -B tools/runtime/build_test.py`包含test_submissions.c及ABI探针；`--live-submission`使用真实MiMo三进程中断/去重恢复/已结束去重与新输入回忆。仅输入去重，不等于外部工具副作用的exactly-once。
+
+## 启动历史展示
+
+组合入口通过pg_tui_bridge_set_history绑定借用的已提交Session视图，记录启动时消息数；TUI的可选history(index,out)回调仅提供有界事实，最多64条、文本4095字节、工具名/ID63字节。客户端先逐条渲染一次，再attach在途运行；历史与执行事件分开，不发run_started/run_finished，不推进模型、提交消息或改写日志。包含已提交的待工具call，显示为call而非宣称已执行；结果从相邻call取得工具关联，系统提示与未提交draft不回显。读取期间视图变化、非法字段、非终止或错误回调会报告错误，不继续启动任务。
+
+展示沿用当前终端scrollback，不新增会话浏览器。文字中的C0（LF/tab除外）、DEL与C1转为可见转义，非法UTF-8字节按字节转义；先合并完整UTF-8 carry再过滤，避免跨分片的编码控制或emoji误处理。截断按原始文本字节/UTF-8边界，转义可能扩展显示字节；会话原始内容和模型投影不变。可信ANSI编辑命令保留。内部tui_runtime_ops由48变56字节、history_entry64、bridge264；tui_state仍32字节，利用原尾部padding记录一次加载。所有客户端消费者重编译，pg_client/模型/日志格式不变。

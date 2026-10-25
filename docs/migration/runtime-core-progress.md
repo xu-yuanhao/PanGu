@@ -548,3 +548,23 @@ Goal保持进行中；下一步继续以参考源码推进实际Task/Submission�
 ```
 
 Goal继续；MiMo重构由并行Agent完成后再集成，不重复实现或覆盖其文件。
+
+## 2026-10-25：持久会话启动历史与终端数据转义
+
+读取固定Pi 38ff99177fba21e9c57a670f4e95adcf407c99c7的Durable Views.#build/advance及harness-view.test.ts的hydrates active entries、shares unchanged parts；旧Coding Agent的renderInitialMessages→renderSessionEntries→renderSessionItems。采用先挂载已提交事实、再观察运行的边界，不重送输入或伪造执行事件。另读utils/ansi.ts及ansi-utils.test.ts的OSC/CSI/不完整序列案例，tui/program-status.ts及测试的控制字符规则。原生选择可见转义而非复制TS组件树/正则或直接删除整段序列，保留LF/tab。
+
+新增可选history(index,out)只读启动接口，桥接显式借用已提交Session视图并固定count；最多64条、文本4095、工具字段63字节，结果核对相邻call关联。客户端一次性渲染user/assistant/call/result后再attach，history不调用submit/poll/cancel、不改运行状态或日志，系统提示和未提交draft不回显。非法字段、快照count变化、错误或不终止回调失败关闭，不继续执行任务。当前仅scrollback，不含历史浏览器、搜索、会话选择或持久编辑草稿。
+
+展示纯逻辑保持手写汇编。C0（LF/tab除外）、DEL、C1和非法UTF-8以可见转义输出；按完整UTF-8序列扫描，不让畸形序列藏住控制字符。跨事件carry先拼成完整序列再过滤；复核发现旧终态会原样冲出残留半序列，也已转义并补回归。可信编辑ANSI不变；只改展示，Session原始数据/模型投影、日志格式、模型/pg_client ABI均不变。内部ops=56/history_entry=64/bridge=264，state仍32，原padding存一次加载标志；所有消费者重编译。没有新增C算法、第三方依赖或文件。
+
+实际验证：13组核心O0/O2及6组客户端通过；历史零执行/只加载一次、64条截止、非法字段/回调错误/非终止、工具关联/快照变化、桥接对象与64字节输出页尾、caller-saved破坏/栈对齐/寄存器探针通过。ANSI/plain展示、中文/emoji/C1/ESC的全部两段切分、非法前缀和终态残留carry回归通过。首次候选3c82540ae6ab2224805d402416b1d0c32b5c2c4d完整验证后，仅补View终态carry转义及其测试；最终候选c7e127270b5aedbb9008b2aca9531370134613fb重跑G00、6组客户端、离线PTY与真实MiMo --live-persistent/--live均通过。真实恢复只回显已提交输入、终结重开回显user/assistant、未重跑、回忆成功且历史加载前后日志字节相同；read续答/取消/精确termios恢复通过。生产准入仍BLOCKED。
+
+同一主Agent按授权自审自批客户端内部ABI与模块公开视图依赖/导出登记，不伪称独立审核；检查器/预算/原拒绝断言不放宽。风险为借用快照要求单所有者、内部消费者须重编译和展示字节转义扩展（最多4倍原始文本）；不声称是完整终端模拟器或安全沙箱。对象text：bridge1172/state885/view3796/app1961字节，bridge无未定义导入；app原信号状态data12字节保持。
+
+并行MiMo交接文件已出现，本批不纳入其新源或mimo.c改动；候选从本Agent暂存树归档验证，未声称共享工作树G00通过。主文档保持51行。固定变更包SHA256（不含本记录，排序[path,文件SHA256]紧凑UTF-8 JSON）：
+
+```text
+c855bf7e422785363b3dc129abb31de7d9f82a042d8deda7796f13f695d19720  22个路径
+```
+
+Goal继续，下一步审核并集成MiMo汇编交接，不把交接自述当实际验证通过。

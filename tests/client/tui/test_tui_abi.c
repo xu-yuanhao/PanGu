@@ -265,7 +265,7 @@ static int mock_poll(void *ctx, tui_event *out)
 	(void)ctx; (void)out;
 	return 0;
 }
-static tui_runtime_ops abi_ops = { "abi-mock", NULL, mock_submit, mock_cancel, mock_poll, NULL };
+static tui_runtime_ops abi_ops = { "abi-mock", NULL, mock_submit, mock_cancel, mock_poll, NULL, NULL };
 
 static void test_abi_state(void)
 {
@@ -383,6 +383,20 @@ static void test_callback_alignment(void)
 	T_RUN("callback_alignment");
 }
 
+__asm__(
+".intel_syntax noprefix\n"
+".type abi_history_callback,@function\n"
+"abi_history_callback:\n"
+" mov rax,rsp\n and eax,15\n cmp eax,8\n je 1f\n ud2\n"
+"1:\n sub rsp,8\n call abi_history_fixture\n add rsp,8\n"
+" mov rcx,0xcccccccc\n mov rdx,0xdddddddd\n mov rsi,0x51515151\n mov rdi,0xd1d1d1d1\n"
+" mov r8,0x88888888\n mov r9,0x99999999\n mov r10,0xaaaaaaaa\n mov r11,0xbbbbbbbb\n ret\n"
+".size abi_history_callback,.-abi_history_callback\n"
+".att_syntax prefix\n");
+int abi_history_callback(void *,size_t,tui_history_entry *);
+int abi_history_fixture(void *ctx,size_t index,tui_history_entry *entry){(void)ctx;if(index)return 0;*entry=(tui_history_entry){.text="控制\x1b]52;bad\a",.text_len=sizeof("控制\x1b]52;bad\a")-1};return 1;}
+static void test_abi_history(void){tui_view view;tui_state state;tstr out;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_runtime_ops ops=abi_ops;ops.history=abi_history_callback;tui_state_init(&state,&ops,&view);T_CHECK(abi_probe1((abi_fn1)tui_state_history,(unsigned long)&state)==1);check_sentinels("history callback");T_CHECK(tstr_contains(&out,"[history] user:"));tui_history_entry entry={.kind=1,.text="\x1b]52;bad\a",.text_len=9};(void)abi_probe2((abi_fn2)tui_view_history,(unsigned long)&view,(unsigned long)&entry);check_sentinels("history view");T_RUN("abi_history_callback_clobbers");}
+
 /* ---- 保护页边界 ---- */
 static char *guard_alloc(size_t usable)
 {
@@ -486,6 +500,7 @@ int main(void)
 	test_abi_state();
 	test_abi_view_term();
 	test_callback_alignment();
+    test_abi_history();
 	test_guard_utf8();
 	test_guard_input_full();
 	test_guard_view_text();

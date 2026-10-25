@@ -13,7 +13,7 @@
  *  - 事件按序：run_started, text_delta, tool_started, tool_finished,
  *    run_finished；错误/取消通过唯一 run_finished 终态表达
  *    （success/error/cancelled）。
- *  - 事件内字符串只在本次 poll 调用期间有效；客户端保留必须复制到有界存储。
+ *  - 事件内字符串从本次 poll 返回后有效，至下一次 poll 失效；客户端保留必须复制到有界存储。
  *  - 单客户端、单线程、同一时间一个活动 run；每个 run 恰好一个终态，
  *    客户端不自行补造终态。
  */
@@ -62,6 +62,20 @@ typedef enum {
 	TUI_SUBMIT_ERROR = 2
 } tui_submit_result;
 
+/* Read-only startup snapshot, separate from execution events. Borrowed slices
+   expire on next call. history(index): 1 entry, 0 end, <0 error; no execution.
+   At most 64 entries, text <=4095 bytes, tool fields <=63 bytes. */
+typedef struct tui_history_entry {
+    unsigned kind; /* 0 user, 1 assistant, 2 tool call, 3 tool result */
+    const char *text;
+    size_t text_len;
+    const char *tool_name;
+    size_t tool_name_len;
+    const char *call_id;
+    size_t call_id_len;
+    int tool_ok;
+} tui_history_entry;
+
 typedef struct tui_runtime_ops {
 	const char *name; /* 适配来源标识，如 "fake-runtime" */
 	void *ctx;
@@ -69,6 +83,7 @@ typedef struct tui_runtime_ops {
 	int (*cancel)(void *ctx); /* 1=已受理（或重复受理），0=当前无活动 run */
 	int (*poll)(void *ctx, tui_event *out); /* 1=有事件 0=无事件 <0=错误 */
 	void (*shutdown)(void *ctx);            /* 客户端退出前调用一次 */
+    int (*history)(void *ctx, size_t index, tui_history_entry *out); /* optional */
 } tui_runtime_ops;
 
 #ifdef __cplusplus

@@ -25,6 +25,7 @@ typedef struct tui_state {
 	int running;              /* 1=等待终态 */
 	int cancel_notice_shown;  /* 本次 run 的取消提示只显示一次 */
 	int fatal;                /* poll 错误等不可恢复情况；客户端未补造终态 */
+    int history_loaded;
 } tui_state;
 
 void tui_state_init(tui_state *s, const tui_runtime_ops *ops, tui_view *view);
@@ -38,6 +39,8 @@ int tui_state_cancel(tui_state *s);
 /* 推进有限工作量并渲染事件；终态后回到闲置。 */
 /* Observe one initial run_started without submitting an input; 0 idle, 1 attached, -1 error. */
 int tui_state_attach(tui_state *s);
+/* Render optional bounded startup facts before attach; never submit/poll. */
+int tui_state_history(tui_state *s);
 
 void tui_state_poll(tui_state *s);
 

@@ -5,7 +5,7 @@
  *  - 事件输出前先挂起编辑行（写 "\r\n" 结束该行）；
  *  - 编辑内容变化后整行重绘（"\r" + 清屏到行尾 + 提示符 + 缓冲），
  *    只支持行尾光标（限制见交接报告）。
- *  - text_delta 原样写字节；跨事件拆断的 UTF-8 序列用 ≤3 字节 carry 拼接。
+ *  - text_delta 先拼接 UTF-8 carry，再转义不可信控制字节；carry最多3字节。
  * 有界展示：工具/错误内容按 code point 边界截断并带明确标记；输入上限由
  * tui_input 保证；系统级上限协调由主 Agent 负责。
  */
@@ -60,6 +60,8 @@ void tui_view_protocol_violation(tui_view *v);
 
 /* 渲染一条 Runtime 事件；返回 0 成功。run_finished 后编辑行重新可用。 */
 void tui_view_event(tui_view *v, const tui_event *ev);
+/* Startup only: validated borrowed slices, no execution events or state changes. */
+void tui_view_history(tui_view *v, const tui_history_entry *entry);
 
 #ifdef __cplusplus
 }

@@ -24,6 +24,7 @@
 #define TUI_LI_STATE_RUNNING         16
 #define TUI_LI_STATE_CANCEL_SHOWN    20
 #define TUI_LI_STATE_FATAL           24
+#define TUI_LI_STATE_HISTORY_LOADED  28
 #define TUI_LI_STATE_SIZE            32
 #define TUI_LI_STATE_POLL_BATCH      16
 
@@ -56,7 +57,17 @@
 #define TUI_LI_OPS_CANCEL            24
 #define TUI_LI_OPS_POLL              32
 #define TUI_LI_OPS_SHUTDOWN          40
-#define TUI_LI_OPS_SIZE              48
+#define TUI_LI_OPS_HISTORY           48
+#define TUI_LI_OPS_SIZE              56
+#define TUI_LI_HISTORY_KIND          0
+#define TUI_LI_HISTORY_TEXT          8
+#define TUI_LI_HISTORY_TEXT_LEN      16
+#define TUI_LI_HISTORY_NAME          24
+#define TUI_LI_HISTORY_NAME_LEN      32
+#define TUI_LI_HISTORY_ID            40
+#define TUI_LI_HISTORY_ID_LEN        48
+#define TUI_LI_HISTORY_OK            56
+#define TUI_LI_HISTORY_SIZE          64
 
 /* tui_app_config（tui_app.h） */
 #define TUI_LI_APP_IN_FD             0
@@ -160,6 +171,7 @@ TUI_ASSERT_OFF(tui_state, view, TUI_LI_STATE_VIEW);
 TUI_ASSERT_OFF(tui_state, running, TUI_LI_STATE_RUNNING);
 TUI_ASSERT_OFF(tui_state, cancel_notice_shown, TUI_LI_STATE_CANCEL_SHOWN);
 TUI_ASSERT_OFF(tui_state, fatal, TUI_LI_STATE_FATAL);
+TUI_ASSERT_OFF(tui_state, history_loaded, TUI_LI_STATE_HISTORY_LOADED);
 TUI_ASSERT_SIZE(tui_state, TUI_LI_STATE_SIZE);
 TUI_ASSERT_EQ(TUI_STATE_POLL_BATCH, TUI_LI_STATE_POLL_BATCH);
 
@@ -191,7 +203,17 @@ TUI_ASSERT_OFF(tui_runtime_ops, submit, TUI_LI_OPS_SUBMIT);
 TUI_ASSERT_OFF(tui_runtime_ops, cancel, TUI_LI_OPS_CANCEL);
 TUI_ASSERT_OFF(tui_runtime_ops, poll, TUI_LI_OPS_POLL);
 TUI_ASSERT_OFF(tui_runtime_ops, shutdown, TUI_LI_OPS_SHUTDOWN);
+TUI_ASSERT_OFF(tui_runtime_ops, history, TUI_LI_OPS_HISTORY);
 TUI_ASSERT_SIZE(tui_runtime_ops, TUI_LI_OPS_SIZE);
+TUI_ASSERT_OFF(tui_history_entry, kind, TUI_LI_HISTORY_KIND);
+TUI_ASSERT_OFF(tui_history_entry, text, TUI_LI_HISTORY_TEXT);
+TUI_ASSERT_OFF(tui_history_entry, text_len, TUI_LI_HISTORY_TEXT_LEN);
+TUI_ASSERT_OFF(tui_history_entry, tool_name, TUI_LI_HISTORY_NAME);
+TUI_ASSERT_OFF(tui_history_entry, tool_name_len, TUI_LI_HISTORY_NAME_LEN);
+TUI_ASSERT_OFF(tui_history_entry, call_id, TUI_LI_HISTORY_ID);
+TUI_ASSERT_OFF(tui_history_entry, call_id_len, TUI_LI_HISTORY_ID_LEN);
+TUI_ASSERT_OFF(tui_history_entry, tool_ok, TUI_LI_HISTORY_OK);
+TUI_ASSERT_SIZE(tui_history_entry, TUI_LI_HISTORY_SIZE);
 
 TUI_ASSERT_OFF(tui_app_config, in_fd, TUI_LI_APP_IN_FD);
 TUI_ASSERT_OFF(tui_app_config, out_fd, TUI_LI_APP_OUT_FD);

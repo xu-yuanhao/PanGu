@@ -1820,8 +1820,8 @@
       "scope_note": "Primary interactive experience is a thin TUI. CLI limited to launch and required automation; advanced input/rendering remains T33/T34.",
       "ux_reference": "docs/TUI体验参考与设计原则.md",
       "ux_reference_baseline": "docs/migration/tui-ux-reference-baseline.json",
-      "local_subset_scope": "read-only TUI with optional profile-verified persistent session, startup resume and detach on exit; no full P1 or history-screen replay",
-      "local_implementation": "handwritten TUI and runtime_bridge.S; platform termios remains thin C; persisted owner detach callback; actual evidence in runtime-core-progress.md"
+      "local_subset_scope": "read-only TUI with profile-verified persistent session, committed startup history, resume and detach; no full P1, history viewport/search or session selector",
+      "local_implementation": "handwritten TUI/bridge and startup snapshot reader; history separate from execution events, control escaping after UTF-8 carry joining; termios platform structure remains thin C"
     },
     {
       "id": "T29",

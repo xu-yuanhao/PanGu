@@ -184,6 +184,7 @@ static tui_runtime_ops fake_ops = {
 	fake_cancel,
 	fake_poll,
 	fake_shutdown,
+    NULL,
 };
 
 const tui_runtime_ops *tui_fake_runtime_ops(tui_fake_runtime *fr)

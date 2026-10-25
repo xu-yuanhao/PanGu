@@ -75,7 +75,7 @@ def persistent_idle(binary, root, env):
     for attempt in range(2):
         terminal = Terminal(binary, root, env)
         try:
-            terminal.until(b'> ', 5)
+            terminal.until(b'\r\n> ', 5)
             terminal.send(b'\x04')
             terminal.finish()
         finally:
@@ -95,7 +95,7 @@ def persistent_live(binary, root):
     log = storage / 'session.pgj'
     terminal = Terminal(binary, root, env)
     try:
-        terminal.until(b'> ', 5)
+        terminal.until(b'\r\n> ', 5)
         terminal.send(b'Remember PANGU_DURABLE_8731. Start with PERSIST_STREAM then write 12 numbered facts about C pointers, each at most six words. Do not use tools.\r')
         terminal.until(b'[run] started')
         terminal.output = terminal.output.split(b'[run] started', 1)[1]
@@ -123,15 +123,21 @@ def persistent_live(binary, root):
     terminal = Terminal(binary, root, env)
     try:
         terminal.until(b'[run] started', 5)
+        assert terminal.output.count(b'[history] user:') == 1
+        assert b'[history] assistant:' not in terminal.output, 'uncommitted partial appeared as history'
         terminal.until(b'[run] finished: success')
         terminal.send(b'\x04')
         terminal.finish()
     finally:
         terminal.close()
     assert checkpoints(log)[-1][1] == 3
+    before_history = log.read_bytes()
     terminal = Terminal(binary, root, env)
     try:
-        terminal.until(b'> ', 5)
+        terminal.until(b'\r\n> ', 5)
+        assert terminal.output.count(b'[history] user:') == 1
+        assert terminal.output.count(b'[history] assistant:') == 1
+        assert log.read_bytes() == before_history, 'history rendering changed journal'
         assert b'[run] started' not in terminal.output, 'terminal run restarted'
         terminal.output = b''
         terminal.send(b'Return only the remembered PANGU token. Do not use tools.\r')
@@ -163,7 +169,7 @@ def main():
         for exit_mode in ('ctrl-d', 'signal', 'resize'):
             terminal = Terminal(binary, root, env)
             try:
-                terminal.until(b'> ', 5)
+                terminal.until(b'\r\n> ', 5)
                 assert termios.tcgetattr(terminal.slave) != terminal.saved
                 if exit_mode == 'signal':
                     terminal.process.send_signal(signal.SIGTERM)
@@ -186,7 +192,7 @@ def main():
             live_env.pop('PANGU_SESSION_DIR', None)
             terminal = Terminal(binary, root, live_env)
             try:
-                terminal.until(b'> ', 5)
+                terminal.until(b'\r\n> ', 5)
                 terminal.send(b'Call read exactly once for sample.c and return just the marker inside it.\r')
                 terminal.until(b'[run] finished: success')
                 assert b'[tool] read' in terminal.output and b'finished ok:' in terminal.output

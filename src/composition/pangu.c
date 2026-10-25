@@ -49,6 +49,7 @@ int main(int argc,char **argv){
   if(resumed){fputs(resumed==2?"Pending session is parked at its recovery limit; explicit recovery is required.\n":"Cannot resume pending session.\n",stderr);goto cleanup;}
  }
  pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,pg_agent_client(&agent)))goto cleanup;
+ if(pg_tui_bridge_set_history(&bridge,&agent.session))goto cleanup;
  if(session_directory && pg_tui_bridge_set_detach(&bridge,pg_agent_suspend,&agent))goto cleanup;
  tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};
  int reason=tui_app_run(&config);bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;
