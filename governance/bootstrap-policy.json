@@ -612,6 +612,10 @@
     "src/runtime/record_memory.h": "native-source",
     "src/runtime/record_memory.S": "native-source",
     "tests/runtime/test_record_memory.c": "native-test",
-    "tools/runtime/test_record_memory.py": "gate"
+    "tools/runtime/test_record_memory.py": "gate",
+    "src/runtime/delta.h": "native-source",
+    "src/runtime/delta.S": "native-source",
+    "tests/runtime/test_delta.c": "native-test",
+    "tools/runtime/test_delta.py": "gate"
   }
 }

@@ -133,3 +133,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 1324次实际Pi操作对照、最终O0/O2 ASan/UBSan和Runtime全专项通过。覆盖全状态/owner/kind/bool过滤、七层fork、inclusive bounds、非法游标、短页/head截点、adopt中查询、Query/Page页尾与关闭后快照；分配失败含段缓存、输出数组、部分页追加和Entry复制，失败输出归零。暂存核心在独立已提交TUI基线树中G00、assembly-first与产品构建通过。
 
 同一Agent自审7文件源包摘要 `b4ffb2ae758635c44cdd49b36aed26ff34cb3b665d6e4aa857ddcd5f8560eca9`，算法为排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256，本记录另行保存。本批只扩展当前提供者与对应测试/接口登记；Native扫描按有序行和可见fork段过滤，性能取决于候选范围。Document revision、文档地址查询与完整Tx暂存继续按K03实现，K03整体验收仍未完成。
+
+## K03 Document delta重放候选（2026-10-26）
+
+`delta.h/.S` 对照实际Chord的decoded Op校验/路径安全/applyImmutable/applyImmutableBatches，实现r/s/d/a/t/p/m和多批最终值重放；json-c持有私有工作树，utf8proc辅助UTF-16计数到UTF-8边界转换。调用者值与ops保持不变，失败输出为空；Source pending.merge的同路径追加语义用于连续a一次拼接。
+
+449个实际Chord单/多批结果一致，包含10,000次连续追加；另三条原生ABI差异单列为拒绝验证（UTF-16内部截点、NUL属性路径、超safe数字路径），未计入兼容通过，继续K03/K15核对。O0/O2 ASan/UBSan和直接分配/复制/插入逐点故障通过，最终Runtime全专项退出0。暂存核心在已提交TUI基线的独立树中G00、assembly-first和产品构建通过。640KB/10,000追加的本机单次重放观测由0.3004s降至0.0118s，作为本批优化观测，未设性能门禁。
+
+同一Agent自审9文件源包摘要 `ea3a76d75a8059276f3c7784cbe348f0a8eb6316dc9a867ae30dfc3f2a7f185d`（排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256；本记录另存）。四个新增文件与实际依赖/构建/测试入口登记，复用既有json-c/utf8proc/libc。风险/差异：当前API接受C-string属性路径和safe数字路径、输出保持UTF-8标量；Doc revision存取及事务仍按K03推进。候选清单排除未交接TUI工具登记，工作区保留其登记与候选，K03整体验收仍未完成。

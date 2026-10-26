@@ -941,6 +941,36 @@
           ]
         }
       ]
+    },
+    {
+      "id": "session.documents.delta.local.v0",
+      "sources": [
+        "src/runtime/delta.h",
+        "src/runtime/delta.S"
+      ],
+      "dependencies": [
+        "session.documents.local.v0",
+        "json-c",
+        "utf8proc",
+        "system libc"
+      ],
+      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup",
+      "exports": [
+        "pg_document_delta_apply",
+        "pg_document_delta_batches"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/chord/src/delta/index.ts",
+            "packages/durable/src/storage/memory.ts",
+            "packages/chord/src/delta/pending.ts"
+          ],
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation"
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

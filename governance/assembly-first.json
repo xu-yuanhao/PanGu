@@ -136,6 +136,10 @@
     "src/runtime/record_memory.S": {
       "role": "assembly-core",
       "reason": "手写四类记录的原子准备/应用、全局ID与有序索引；libc容量预留和json-c对象复制"
+    },
+    "src/runtime/delta.S": {
+      "role": "assembly-core",
+      "reason": "手写Chord解码delta路径校验、七种操作与单/多批私有值重放；json-c和utf8proc承担成熟基础能力"
     }
   }
 }

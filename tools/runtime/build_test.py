@@ -50,6 +50,7 @@ def main():
             return 0
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_documents.py')], check=True, timeout=45)
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_record_memory.py')], check=True, timeout=45)
+        subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_delta.py')], check=True, timeout=45)
         native_paths = []
         for name, define in (('good', None), ('abi', 'BAD_ABI'), ('symbol', 'NO_ENTRY'), ('dependency', 'MISSING_DEP'), ('start', 'START_FAIL')):
             library = str(Path(directory) / (name + '.so'))
@@ -91,6 +92,15 @@ def main():
                             '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray,--wrap=json_object_new_array_ext,--wrap=json_object_array_add',
                             *documents_flags, '-o', memory_test], check=True)
             subprocess.run([memory_test], check=True, timeout=15)
+            delta_test = str(Path(directory) / 'test-delta')
+            delta_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-DPG_DELTA_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/documents'), implementation('src/runtime/delta'),
+                            str(ROOT / 'tests/runtime/test_delta.c'),
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_array_add,--wrap=json_object_array_put_idx,--wrap=json_object_object_add,--wrap=malloc,--wrap=calloc',
+                            *delta_flags, '-o', delta_test], check=True)
+            subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
             prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

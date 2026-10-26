@@ -218,7 +218,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03提供者验证：`test_record_memory.py` 直接导入实际MemoryStorage与实际Chord/delta，430次混合批次/读取/mint操作一致，含整数/整数浮点ID；O0/O2专项验证乱序/重复/跨表ID、失败无半批、替换/读取隔离、容量增长、提交序号、释放/重开、与pg_records_commit组合。ASan/UBSan及分配失败检查通过，故障覆盖深复制的部分结果、暂存分配、已有行扩容失败、读取复制失败和页尾提供者对象。当前提供者仍待Document revision与扫描/查询接入。
 - K03表查询：`record_memory.h/.S` 的 `pg_record_memory_scan/entry/head` 对应Pi `storage/scan.ts:scanStart/nextCursor`、MemoryStorage的四类scan、`visibleEntries/visibleEntriesAscending`、`entry/findLatestHeadMarker`。原生Query/Page使用明确C布局，过滤字段采用presence bits，状态/顺序用enum；limit为正整数，游标after为signed-safe整数，旧游标保留表默认顺序。Entry按fork段及各层at截点遍历，降序按需访问祖先，升序先收集可见段；Entry/head取首项即结束，cursor通过二分定位起点；读取返回owned快照。
 - K03查询验证：实际Pi累计1324次批次/点读/分页/Entry/head/ID操作一致，覆盖六种task状态、四种submission状态、owner/kind/bool过滤、NUL/Unicode、旧/新游标、非法顺序/非safe游标、七层fork、inclusive bounds及head截点，含短页/点读在访问缺失祖先前成功的惰性边界。O0/O2 ASan/UBSan验证Query/Page页尾、关闭后快照、adopt期间查询、部分分页分配失败和错误输出归零。当前按有序全局行过滤，各fork段按引用范围扫描；Document查询及Tx暂存继续接入。
-- 下一完整行为：同一提供者补Document revision/地址查询，接事务暂存及当前消息投影。
+- K03 revision重放候选：`delta.h/.S` 对照Chord固定提交的 `assertValidOp/assertSafePath/applyOps/applyImmutable/applyImmutableBatches/resolve/copyContainers`，以及MemoryStorage的 `documentDeltaBatches/materializeDocument`；采用decoded r/s/d/a/t/p/m、稠密数组、reserved path拒绝、UTF-16计数及最终值重放。原生在私有JSON副本应用操作，输入与ops不变，单次多批重放复用同一工作根；对照pending.ts:merge的追加合并语义，同路径连续a一次拼接，ASCII截断使用直接计数。
+- K03 delta验证：449个单/多批实际Chord结果一致；C专项覆盖失败原子性和每个直接分配/插入/复制故障。三条已识别ABI差异单独验证：非BMP字符内部UTF-16截点、含NUL属性路径、超safe整数数字路径会被当前候选拒绝，仍纳入K03/K15兼容核对；候选用于Document值还原，Storage revision接入继续推进。
+- 下一完整行为：同一内存提供者补Document revision/地址查询，接事务暂存及当前消息投影。
 
 ### K01 当前落点与补齐映射
 
