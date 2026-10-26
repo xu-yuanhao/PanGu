@@ -693,6 +693,7 @@ pg_durable_storage_mint:
 .globl pg_durable_storage_scan
 .type pg_durable_storage_scan,@function
 pg_durable_storage_scan:
+ mov r10d,16
  mov r8,rdx
  mov rdx,rsi
  xor esi,esi
@@ -703,6 +704,7 @@ pg_durable_storage_scan:
 .globl pg_durable_storage_head
 .type pg_durable_storage_head,@function
 pg_durable_storage_head:
+ mov r10d,24
  mov r8,rcx
  mov rcx,rdx
  mov rdx,rsi
@@ -713,6 +715,7 @@ pg_durable_storage_head:
 .globl pg_durable_storage_request
 .type pg_durable_storage_request,@function
 pg_durable_storage_request:
+ mov r10d,32
  mov r8,rdx
  mov rdx,rsi
  mov esi,2
@@ -723,6 +726,7 @@ pg_durable_storage_request:
 .globl pg_durable_storage_entry
 .type pg_durable_storage_entry,@function
 pg_durable_storage_entry:
+ mov r10d,40
  mov r9,r8
  mov r8,rcx
  mov rcx,rdx
@@ -744,6 +748,7 @@ pg_durable_storage_entry:
  mov r14,rcx
  mov r15,r8
  mov [rsp+32],r9
+ mov [rsp+40],r10
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  mov qword ptr [rsp+16],0
@@ -765,7 +770,7 @@ pg_durable_storage_entry:
 .Lstorage_query_descriptor:
  test rbx,rbx
  jz .Lstorage_query_end
- cmp qword ptr [rbx+16+r12*8],0
+ cmp qword ptr [rbx+r10],0
  je .Lstorage_query_end
  mov rdi,[rbx]
  call .Lstorage_enter
@@ -785,7 +790,8 @@ pg_durable_storage_entry:
 .Lstorage_query_short:
  mov rdx,rsp
 .Lstorage_query_call:
- call [rbx+16+r12*8]
+ mov rax,[rsp+40]
+ call [rbx+rax]
  mov esi,eax
  mov rdi,[rbx]
  call .Lstorage_read_status
@@ -822,4 +828,68 @@ pg_durable_storage_entry:
  pop rbx
  pop rbp
  ret
+.section .note.GNU-stack,"",@progbits
+.text
+.globl pg_durable_document_find
+.type pg_durable_document_find,@function
+pg_durable_document_find:
+ mov r10d,16
+ jmp .Lstorage_doc_point
+.size pg_durable_document_find,.-pg_durable_document_find
+.globl pg_durable_document_read
+.type pg_durable_document_read,@function
+pg_durable_document_read:
+ mov r10d,24
+.Lstorage_doc_point:
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ mov esi,1
+ xor r9d,r9d
+ jmp .Lstorage_doc_query
+.size pg_durable_document_read,.-pg_durable_document_read
+.globl pg_durable_document_scan
+.type pg_durable_document_scan,@function
+pg_durable_document_scan:
+ mov r10d,32
+ mov r8,rdx
+ mov rdx,rsi
+ xor esi,esi
+ xor ecx,ecx
+ xor r9d,r9d
+ jmp .Lstorage_doc_query
+.size pg_durable_document_scan,.-pg_durable_document_scan
+.globl pg_durable_document_entry
+.type pg_durable_document_entry,@function
+pg_durable_document_entry:
+ mov r10d,40
+ mov r9,r8
+ mov r8,rcx
+ mov rcx,rsi
+ mov esi,3
+.Lstorage_doc_query:
+ push rbx
+ mov rbx,rdi
+ call .Lstorage_query
+ cmp eax,1
+ jbe .Lstorage_doc_end
+ test rbx,rbx
+ jz .Lstorage_doc_end
+ mov rdx,[rbx]
+ test rdx,rdx
+ jz .Lstorage_doc_end
+ mov rdx,[rdx]
+ test rdx,rdx
+ jz .Lstorage_doc_end
+ mov rdx,[rdx]
+ test rdx,rdx
+ jz .Lstorage_doc_end
+ cmp dword ptr [rdx+52],0
+ jne .Lstorage_doc_end
+ /* The outer Document reader must preserve nonfatal read rejection. */
+ mov eax,68
+.Lstorage_doc_end:
+ pop rbx
+ ret
+.size pg_durable_document_entry,.-pg_durable_document_entry
 .section .note.GNU-stack,"",@progbits

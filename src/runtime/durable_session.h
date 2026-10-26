@@ -89,4 +89,22 @@ int pg_durable_storage_scan(void *,const pg_memory_query *,pg_memory_page *);
 int pg_durable_storage_head(void *,uint64_t,uint64_t,struct json_object **);
 int pg_durable_storage_request(void *,const pg_record_request_query *,struct json_object **);
 int pg_durable_storage_entry(void *,uint64_t,uint64_t,struct json_object **,uint64_t *);
+/* Document providers share the guard above. An unsuccessful but nonfatal
+   guarded read returns EXEMPT; callers must not relatch it as a backend failure.
+   Existing pg_document_storage/scan and historical Entry signatures are kept. */
+#define PG_GUARDED_STORAGE_EXEMPT 68
+typedef struct {
+ pg_durable_storage *guard;
+ void *context;
+ int (*find)(void *,const pg_document_address *,uint64_t,struct json_object **);
+ int (*read)(void *,uint64_t,uint64_t,struct json_object **);
+ int (*scan)(void *,const pg_document_query *,pg_memory_page *);
+ int (*entry)(void *,uint64_t id,uint64_t conversation,struct json_object **,uint64_t *sequence);
+} pg_durable_documents;
+int pg_durable_document_find(void *,const pg_document_address *,uint64_t,struct json_object **);
+int pg_durable_document_read(void *,uint64_t,uint64_t,struct json_object **);
+int pg_durable_document_scan(void *,const pg_document_query *,pg_memory_page *);
+/* Frontend takes conversation,id for pg_document_history_reader; the backend
+   callback above takes id,conversation like MemoryStorage. */
+int pg_durable_document_entry(void *,uint64_t conversation,uint64_t id,struct json_object **,uint64_t *);
 #endif

@@ -58,6 +58,8 @@
  mov rax,[rax]
  cmp dword ptr [rax+52],0
  jne .Lreader_crossed
+ cmp r12d,68
+ je .Lreader_call_result
  cmp r12d,1
  jbe .Lreader_call_result
  mov dword ptr [rax+52],3
@@ -255,7 +257,10 @@ pg_durable_snapshot_as_of:
  jz .Lasof_entry
  cmp eax,1
  je .Lasof_invisible
- jmp .Lasof_storage
+ cmp eax,68
+ jne .Lasof_storage
+ mov ebp,9
+ jmp .Lasof_cleanup
 .Lasof_entry:
  mov rdi,[rsp]
  lea rsi,[rip+.Lreader_id]

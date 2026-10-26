@@ -458,3 +458,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写四种查询适配，独立48字节pg_durable_queries借用既有Storage guard；分页/head/request绑定现有Tx查询接口，Entry返回fork-aware record和序号。共享read completion函数替换前批点读重复分支；正常missing/异常/crossed失败清理partial结果，分页metadata与Entry sequence只在成功时转交。既有结构布局保持。
 - 实际验证：32组原生四类查询×成功/missing/backend/request/cancel/crossed/reentry/close，验证同一首因与busy恢复；MemoryStorage通过Tx分页/head/request以及fork-aware Entry读取验证实际服务组合，无效分页拒绝后再次正常读取。3个分页直接分配/部分复制故障锁存失败并清空所有输出。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、56组实际Pi GuardedStorage及其余固定Pi/Chord差异基线通过；共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：仅既有Session独立查询接口/导出、专项与TODO，共享失败函数收敛；门禁、预算和旧ABI保持。5个候选路径内容清单摘要（本记录加入前）：5026e3bf9565d393ed817affc03cc979640e2a0824cec1434103d8abe669f000；隔离核心树d3c95eaa6a0ac3cc555a7bbbb7ef79dd3834c3ee。结论为本地候选通过；Document提供者统一守卫和公开观察/只读完整验收继续推进，K03总验收未完成。TUI工作树独立保留。
+
+## K03 Document提供者统一失败守卫
+
+- 来源：Pi d5b3de22 GuardedStorage.findDocument/document/scanDocuments/#call、Session.snapshot/snapshotAsOf及失败/参数错误/取消测试。fetch发现origin由f9daca3更新89c921d，Session/Transaction无变化；新assignJson原型污染与URL/stream/终端加固已在核心TODO记录后续采用点。Harness保持22ddee37，固定对照HEAD保持d5b3de22。
+- 实现：手写Document find/read/scan/历史Entry适配，独立48字节描述符共享既有guard、query dispatch、read completion；历史前端conversation/id转换为后端id/conversation，保持commit sequence。非致命参数错误/取消以EXEMPT明确传给外层快照，外层不重复锁存Storage失败；普通错误和跨失败仍遵循首因/partial清理。旧结构布局、回调签名保持。
+- 实际验证：35组MemoryStorage当前/历史Document查询，覆盖成功、参数错误、取消、后端失败、跨失败及参数/取消后重新读取成功；页面metadata与partial JSON清理正确。首次测试误将guard已经锁存的Snapshot结果期望成普通Storage错误，改为实际SessionFailed语义后重新运行。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有Session/reader独立导出与来源、专项、TODO，守卫/预算与旧ABI保持。6个候选路径内容清单摘要（本记录加入前）：cc4a169f1e93bc8e05b6e611aa469cbe4d8a918b51e0a4c2f22f55a716c41b24；隔离核心树7c1aa424985fb0f666111b53c4c40df5da1f13ad。结论为本地候选通过；公开观察/只读及K03整体验收继续，TUI工作树独立保留。

@@ -1298,6 +1298,24 @@ typedef struct {durable_fixture *f;pg_document_storage docs;unsigned mode,entrie
 static int reader_probe_entry(void *context,uint64_t conversation,uint64_t id,struct json_object **out,uint64_t *seq){reader_probe *p=context;++p->entries;assert(p->f->session.busy);if(p->mode==1)return 1;if(p->mode==9)assert(pg_durable_session_close(&p->f->session)==1);int status=fork_entry(&p->f->native.n.f.memory,conversation,id,out,seq);if(status)return status;if(p->mode==2)return 7;if(p->mode==3)assert(!json_object_object_add(*out,"id",json_object_new_int64(999)));if(p->mode==4)*seq=0;if(p->mode==7)p->f->native.n.f.session.failed=PG_RECORDS_ALLOCATION;return 0;}
 static int reader_probe_find(void *context,const pg_document_address *address,uint64_t point,struct json_object **out){reader_probe *p=context;++p->finds;assert(p->f->session.busy);int status=p->docs.find(p->docs.context,address,point,out);if(status)return status;if(p->mode==5)return 7;if(p->mode==8||p->mode==10)p->f->native.n.f.session.failed=PG_RECORDS_ALLOCATION;return 0;}
 static int reader_probe_read(void *context,uint64_t id,uint64_t point,struct json_object **out){reader_probe *p=context;++p->reads;assert(p->f->session.busy);int status=p->docs.read(p->docs.context,id,point,out);if(status)return status;if(p->mode==6||p->mode==12)return 1;if(p->mode==11)p->f->native.n.f.session.failed=PG_RECORDS_ALLOCATION;return 0;}
+typedef struct {durable_fixture *fixture;unsigned operation,mode,calls;} guarded_doc_fixture;
+static int guarded_doc_status(guarded_doc_fixture *f,unsigned operation){++f->calls;if(f->operation!=operation)return 0;if(f->mode==3)f->fixture->native.n.f.session.failed=PG_RECORDS_ADOPTION_FAILED;return f->mode==1?8:f->mode==2||f->mode==4?7:0;}
+static int guarded_doc_find(void *ctx,const pg_document_address *address,uint64_t point,struct json_object **out){guarded_doc_fixture *f=ctx;int status=pg_record_memory_find_document(&f->fixture->native.n.f.memory,address,point,out);return status?status:guarded_doc_status(f,0);}
+static int guarded_doc_read(void *ctx,uint64_t id,uint64_t point,struct json_object **out){guarded_doc_fixture *f=ctx;int status=pg_record_memory_document(&f->fixture->native.n.f.memory,id,point,out);return status?status:guarded_doc_status(f,1);}
+static int guarded_doc_scan(void *ctx,const pg_document_query *query,pg_memory_page *out){guarded_doc_fixture *f=ctx;int status=pg_record_memory_scan_documents(&f->fixture->native.n.f.memory,query,out);return status?status:guarded_doc_status(f,2);}
+static int guarded_doc_entry(void *ctx,uint64_t id,uint64_t conversation,struct json_object **out,uint64_t *seq){guarded_doc_fixture *f=ctx;int status=pg_record_memory_entry(&f->fixture->native.n.f.memory,id,conversation,out,seq);return status?status:guarded_doc_status(f,3);}
+static int guarded_doc_request_error(void *ctx,int status){(void)ctx;return status==8;}
+static int guarded_doc_cancelled(void *ctx){return ((guarded_doc_fixture*)ctx)->mode==4;}
+static void document_storage_guard_tests(void){
+ _Static_assert(sizeof(pg_durable_documents)==48,"document guard ABI");
+ for(unsigned historical=0;historical<2;++historical)for(unsigned operation=0;operation<4;++operation)for(unsigned mode=0;mode<5;++mode){if(!historical&&operation==3)continue;durable_fixture f;durable_open(&f);if(historical)durable_history_seed(&f);guarded_doc_fixture probe={&f,operation,mode,0};pg_durable_storage guard={.session=&f.session,.context=&probe,.request_error=guarded_doc_request_error,.cancelled=guarded_doc_cancelled};pg_durable_documents providers={&guard,&probe,guarded_doc_find,guarded_doc_read,guarded_doc_scan,guarded_doc_entry};pg_document_storage docs={&providers,pg_durable_document_find,pg_durable_document_read};pg_document_history_reader history={.documents=docs,.context=&providers,.entry=pg_durable_document_entry};struct json_object *value=0;int status=0;
+ if(operation==2){pg_document_query query={.scope=PG_DOC_CONVERSATION,.owner=1,.at=UINT64_MAX,.limit=10};pg_memory_page page={0};status=pg_durable_document_scan(&providers,&query,&page);assert(!guard.busy&&!f.session.busy);if(mode){assert(!page.items&&!page.after&&!page.order&&!page.has_next);assert(status==(mode==1||mode==4?PG_GUARDED_STORAGE_EXEMPT:mode==2?7:PG_GUARDED_STORAGE_FAILED));}else assert(page.items);json_object_put(page.items);}
+ else {if(!historical)f.native.n.f.cache.storage=docs;status=historical?pg_durable_snapshot_as_of(&f.session,&history,&history_def,&history_address,20,&value):pg_durable_snapshot(&f.session,&f.native.n.f.definition,&f.native.n.f.address,&value);assert(!guard.busy&&!f.session.busy);if(mode){assert(!value&&status==(mode==2||mode==3?PG_DOCUMENT_SESSION_FAILED:PG_DOC_STORAGE_FAILED));}else assert(!status&&value);json_object_put(value);}
+ assert(f.native.n.f.session.failed==(mode==2?PG_RECORDS_STORAGE_FAILED:mode==3?PG_RECORDS_ADOPTION_FAILED:0));if(mode==1||mode==4){probe.mode=0;value=0;if(operation==2){pg_document_query query={.scope=PG_DOC_CONVERSATION,.owner=1,.at=UINT64_MAX,.limit=10};pg_memory_page page={0};assert(!pg_durable_document_scan(&providers,&query,&page));json_object_put(page.items);}else{assert(!(historical?pg_durable_snapshot_as_of(&f.session,&history,&history_def,&history_address,20,&value):pg_durable_snapshot(&f.session,&f.native.n.f.definition,&f.native.n.f.address,&value))&&value);json_object_put(value);}}
+ int result=mode==2||mode==3?-1:0;assert(pg_durable_session_close(&f.session)==result);durable_closed(&f,result);
+ }
+ puts("PASS: 35 current/historical Document guard paths, exempt retries, scan metadata and first failure");
+}
 static void reader_guard_tests(void){
  for(unsigned mode=1;mode<=12;++mode){durable_fixture f;durable_open(&f);if(mode<10)durable_history_seed(&f);reader_probe p={.f=&f,.mode=mode};pg_record_memory_documents(&f.native.n.f.memory,&p.docs);pg_document_history_reader history={.documents={&p,reader_probe_find,reader_probe_read},.context=&p,.entry=reader_probe_entry};struct json_object *value=0;
  if(mode>=10)f.native.n.f.cache.storage=history.documents;
@@ -1352,6 +1370,7 @@ int main(void){
  reader_current_tests();
  reader_history_tests();
  reader_guard_tests();
+ document_storage_guard_tests();
 #ifdef PG_MEMORY_FAULTS
  reader_faults();
 #endif

@@ -1201,7 +1201,11 @@
         "pg_durable_storage_scan",
         "pg_durable_storage_head",
         "pg_durable_storage_request",
-        "pg_durable_storage_entry"
+        "pg_durable_storage_entry",
+        "pg_durable_document_find",
+        "pg_durable_document_read",
+        "pg_durable_document_scan",
+        "pg_durable_document_entry"
       ],
       "reference_basis": [
         {
@@ -1210,7 +1214,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction; independent query descriptor wraps scans, latest head, request ID lookup and fork-aware Entry with commit sequence; all reads share one completion guard and transfer output metadata only on success",
+          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction; independent query descriptor wraps scans, latest head, request ID lookup and fork-aware Entry with commit sequence; all reads share one completion guard and transfer output metadata only on success; Document find/read/scan and historical Entry use shared guard, nonfatal guarded errors signal EXEMPT to outer snapshot readers without relatching failure; historical frontend orders conversation/id while backend retains id/conversation",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-adoption.test.ts",
@@ -1245,7 +1249,7 @@
             "packages/durable/src/session/session.ts",
             "packages/durable/src/documents.ts"
           ],
-          "semantics": "snapshot/cache-version fast path, snapshotAsOf resolves storage.entry(conversation,id), finds document at Entry original conversation+commitSeq and materializes detached version; missing record is absent, invisible Entry throws; GuardedStorage first-failure before/after calls, failed call suppresses subsequent reads; native owned JSON outputs and explicit pending retry on busy mutation line",
+          "semantics": "snapshot/cache-version fast path, snapshotAsOf resolves storage.entry(conversation,id), finds document at Entry original conversation+commitSeq and materializes detached version; missing record is absent, invisible Entry throws; GuardedStorage first-failure before/after calls, failed call suppresses subsequent reads; native owned JSON outputs and explicit pending retry on busy mutation line; explicit guarded EXEMPT read errors retain healthy Session and permit retry while releasing partial results",
           "tests_to_read": [
             "packages/durable/test/session-document-retention.test.ts",
             "packages/durable/test/session-checkpoints-migrations.test.ts"

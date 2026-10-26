@@ -106,6 +106,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植createTask的submissionIds前置options派生：候选优先、首trace/root、后续links、空列表及失败清理。
 - [x] 接通可注入的Storage点读/ID分配失败守卫：首因锁存、跨失败结果丢弃、读取参数错误/取消豁免、活跃调用阻止后端关闭。
 - [x] 将分页/head/request/fork-aware Entry查询接入共享Storage失败守卫，错误时释放partial页/记录并清空游标和提交序号。
+- [x] 将Document find/read/scan与历史Entry接入统一失败守卫，参数错误/取消在快照外层保持非致命，允许随后重试。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -448,3 +449,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S`新增独立48字节pg_durable_queries，注入分页/head/request/fork-aware Entry提供者并复用既有pg_durable_storage锁存/取消/参数错误服务。scan/head/request可直接绑定现有Tx查询描述符，Entry保留原会话可见性和commit sequence。点读与查询共用read completion函数；异常、缺失和跨失败清理partial记录/页，只有成功才转交metadata。
 - 原生32组四类查询×成功/missing/error/request/cancel/crossed/reentry/close验证，真实MemoryStorage经Tx查询完成分页/head/request和独立Entry序号读取；无效分页拒绝后仍可查询。分页逐分配/部分复制故障锁存并清空输出。最终专项/差异/完整Runtime结果见当前实现记录。
 - 后续继续document提供者统一守卫和Session公开观察/只读总验收，K03整体保持未勾选。
+
+### K03 Document Storage守卫交接
+
+- 阅读固定Pi d5b3de22 GuardedStorage.findDocument/document/scanDocuments/#call、Session.snapshot/snapshotAsOf及harness-storage-failure参数错误/取消场景；对照现有cache加载、Doc事务与历史Entry回调。
+- `durable_session.h/.S`新增独立48字节pg_durable_documents与find/read/scan/历史Entry适配，复用共享query dispatch和read completion。历史Entry前端按conversation/id匹配history_reader，后端按id/conversation匹配Storage。非致命拒绝使用明确EXEMPT返回值；`document_reader.S`保留此语义，释放partial结果且不二次锁存。既有结构/函数表不变。
+- 35组真实MemoryStorage当前/历史find/read/scan/Entry路径验证成功、参数错误、取消、普通后端失败和跨失败首因；参数错误/取消后同入口重试成功。专项与完整Runtime见当前实现记录。
+- 上游检查：Pi HEAD保持d5b3de22；origin由f9daca3推进到89c921d8b56b59e768b26e7f48b6832978119310。新提交包含Harness `json.ts:assignJson`的__proto__原型污染修复，以及pi-ai URL/stream和TUI终端文本加固。Session/Transaction本批来源无差异。K07/K09移植assignJson时采用own-member查找（原生json-c成员无JS原型链）；K05对照新trusted-url及pi-messages大小/流限制，终端相关修复在整机集成时核对。固定对照提交保持，references工作树不改。
+- 后续继续Session观察/只读与K03总验收，任务调度及整机服务按对应步骤接入。
