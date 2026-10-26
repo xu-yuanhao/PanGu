@@ -618,6 +618,8 @@
     "tests/runtime/test_delta.c": "native-test",
     "tools/runtime/test_delta.py": "gate",
     "src/runtime/document_tx.h": "native-source",
-    "src/runtime/document_tx.S": "native-source"
+    "src/runtime/document_tx.S": "native-source",
+    "src/runtime/pending.S": "native-source",
+    "docs/licenses/pi.md": "document"
   }
 }

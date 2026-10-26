@@ -87,6 +87,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通显式retireDoc、仅record退休、同址新incarnation与同批创建后退休；最终内容和retire原子提交，确认后按ID驱逐/安装。
 - [x] 接通Task最终terminal候选的文档自动退休：事务内新旧Doc及已提交Doc分页发现/去重，与Task状态同批提交；通过独立scan服务结算。
 - [x] 接通同事务fork-copy的获取、源快照核对、迁移/编辑及单一create/base结算；保留复制源冲突校验，并支持副本退休/同址重建。
+- [x] 移植Chord PendingOps的跨路径折叠/结构屏障/溢出状态与Pi storeHeld内容构造；验证owned输入输出和失败时保留队列。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -205,6 +206,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 对应资料已保存到 `references/pi-rust-yannelli`、`pie`、`pi-rust-nktkt`、`pi-rust-bigfish`、`pi-python-vamsi`、`bun-porting`。功能与行为的实现依据为上表中的Pi和Harness源码。
 
 ## 核心交接区
+
+- K03 holds队列/内容：固定Pi d5b3de22 的Chord PendingOps、merge/pathKey、Durable.storeHeld及delta-pending/session-deferred-commits用例；手写pending.S与delta.h的32字节PendingOps、16字节take/held content映射push/size/take和内容构造。901次队列结果、54组base/delta/overflow/root结果执行实际上游一致；先构造候选再清空队列，分配失败保留原状态。JSON索引用成熟json-c，操作数组浅复制与索引副本保证Native错误回滚，输入批次按owned契约脱离。Memory实际落盘验证delta、root delta和选定base重放计数。Source MIT许可保留在docs/licenses/pi.md。下一批接Session deferred eligibility、内存采纳、pin/deadline及实际flush；完整K03保持待完成。
+
 
 - K03 fork-copy获取：固定Pi d5b3de22 的Transaction.acquireForkCopy、planDocument(created)、rejectForkSourceWrites，以及session-forks.test.ts的typed migration/override、source writes和retire/recreate用例。document_tx.S在已登记copy中按地址获取选定source id/at，核对kind/key/history/fork，按目标版本物化并复用目标ID。结算原位将copy换成单一create/base，保留源身份在全部生成计划后校验；record-only退休保持copy写入。as-of/current、迁移、重复获取、无额外mint/initializer、退休后重建、源冲突与逐直接故障通过。既有scope/entry布局及外部函数表保持；私有copy句柄持有原始计划到清理。K03继续接holds与完整Session查询/事务整合。
 

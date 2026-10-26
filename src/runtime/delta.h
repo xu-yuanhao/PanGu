@@ -81,4 +81,32 @@ typedef struct {
 pg_document_status pg_document_adoption_prepare(pg_document_adoption *,pg_document_loaded *,const pg_document_prepared *,pg_document_adoption_kind);
 pg_document_status pg_document_adoption_apply(pg_document_adoption *);
 pg_document_status pg_document_adoption_discard(pg_document_adoption *);
+#define PG_PENDING_MAX_OPS 10000
+typedef struct {
+ struct json_object *ops,*leaves;
+ unsigned state,busy,active,reserved;
+} pg_pending_ops;
+typedef struct {struct json_object *ops;unsigned replace,reserved;} pg_pending_take;
+/* Owned native PendingOps over decoded finite UTF-8 tracker/diff tuples. Push
+   detaches input; leaf operations merge across independent paths, structural
+   operations clear the index, and root replacement drops preceding work.
+   A single batch retains its full size; folding beyond 10000 switches to
+   replace until take or a batch beginning with r. Fallible push is atomic.
+   State fields are API-managed; use zeroed/closed storage on open.
+   take transfers owned ops (including an allocated empty array), or replace=1
+   with ops=NULL, then resets the queue. Output is disjoint and initially
+   unowned. size returns 0 for inactive/busy storage. Serialized use. */
+pg_document_status pg_pending_ops_open(pg_pending_ops *);
+pg_document_status pg_pending_ops_push(pg_pending_ops *,const struct json_object *);
+size_t pg_pending_ops_size(const pg_pending_ops *);
+pg_document_status pg_pending_ops_take(pg_pending_ops *,pg_pending_take *);
+pg_document_status pg_pending_ops_close(pg_pending_ops *);
+typedef struct {struct json_object *content,*ops;} pg_document_held_content;
+/* Source storeHeld: fold extra ops, then select delta, selected base, or an
+   overflow base/root replacement. Success drains pending and transfers two
+   owned references; content may retain ops. Failure preserves pending.
+   value is a borrowed finite object, version positive/safe, base is 0/1.
+   All input/output storage is disjoint; result starts unowned and is cleared. */
+pg_document_status pg_document_store_held(pg_pending_ops *,const struct json_object *extra,
+ const struct json_object *value,uint64_t version,unsigned base,pg_document_held_content *);
 #endif

@@ -87,7 +87,7 @@ def main():
             memory_test = str(Path(directory) / 'test-record-memory')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-DPG_MEMORY_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/documents'), implementation('src/runtime/records'), implementation('src/runtime/record_memory'), implementation('src/runtime/delta'), implementation('src/runtime/document_tx'),
+                            implementation('src/runtime/documents'), implementation('src/runtime/records'), implementation('src/runtime/record_memory'), implementation('src/runtime/delta'), implementation('src/runtime/pending'), implementation('src/runtime/document_tx'),
                             str(ROOT / 'tests/runtime/test_record_memory.c'),
                             '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray,--wrap=json_object_new_array_ext,--wrap=json_object_array_add,--wrap=json_object_new_object,--wrap=json_object_new_int64,--wrap=json_object_new_string,--wrap=json_object_object_add,--wrap=lh_table_new,--wrap=lh_table_insert,--wrap=lh_table_resize,--wrap=lh_kptr_table_new,--wrap=json_object_array_put_idx',
                             *documents_flags, '-lutf8proc', '-o', memory_test], check=True)
@@ -96,9 +96,9 @@ def main():
             delta_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-DPG_DELTA_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/documents'), implementation('src/runtime/delta'),
+                            implementation('src/runtime/documents'), implementation('src/runtime/delta'), implementation('src/runtime/pending'),
                             str(ROOT / 'tests/runtime/test_delta.c'),
-                            '-Wl,--wrap=json_object_deep_copy,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_array_add,--wrap=json_object_array_put_idx,--wrap=json_object_object_add,--wrap=malloc,--wrap=calloc,--wrap=json_object_new_object,--wrap=json_object_new_int64',
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_array_add,--wrap=json_object_array_put_idx,--wrap=json_object_object_add,--wrap=malloc,--wrap=calloc,--wrap=json_object_new_object,--wrap=json_object_new_int64,--wrap=json_object_to_json_string_ext',
                             *delta_flags, '-o', delta_test], check=True)
             subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')

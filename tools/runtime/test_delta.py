@@ -161,6 +161,116 @@ for(const c of JSON.parse(readFileSync(0,'utf8'))){const tracker=track({n:1}),ol
             for pointer in [loaded.value,value,ops]:library.json_object_put(pointer)
     print(f'PASS: {len(cases)} loaded adoption value/version/counter outcomes match actual Pi adopt body and Chord tracker')
 
+
+def pending_cases(native,library):
+    class Pending(ctypes.Structure):
+        _fields_=[('ops',ctypes.c_void_p),('leaves',ctypes.c_void_p),('state',ctypes.c_uint),('busy',ctypes.c_uint),('active',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    class Take(ctypes.Structure):
+        _fields_=[('ops',ctypes.c_void_p),('replace',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    sequences=[
+        [{'take':True}],
+        [{'push':[['a',['x'],'a'],['a',['y'],'b']]},{'push':[['a',['x'],'中\0😀']]},{'push':[['s',['y'],'new']]},{'take':True}],
+        [{'push':[['s',['xs',1.0],'a']]},{'push':[['a',['xs',1],'b'],['s',['xs','1'],'distinct']]},{'take':True}],
+        [{'push':[['a',['a.b'],'x'],['a',['a','b'],'y']]},{'push':[['a',['a.b'],'!'],['a',['a','b'],'?']]},{'take':True}],
+        [{'push':[['s',['x'],1]]},{'push':[['a',['x'],'a'],['a',['x'],'b']]},{'take':True}],
+        [{'push':[['a',['x'],'old']]},{'push':[['r',{'x':'root'}],['a',['x'],'new']]},{'push':[['a',['x'],'!']]},{'take':True}],
+        [{'push':[['a',['x'],'old']]},{'push':[['d',['x']],['s',['x'],'new'],['a',['x'],'!']]},{'take':True}],
+    ]
+    huge=[['s',['k'+str(i)],i] for i in range(10001)]
+    sequences += [
+        [{'push':huge},{'push':[]},{'take':True}],
+        [{'push':huge},{'push':[['a',['x'],'x']]},{'push':[['s',['ignored'],1]]},{'take':True},{'take':True}],
+        [{'push':huge},{'push':[['a',['x'],'x']]},{'push':[['r',{'x':'reset'}]]},{'take':True}],
+        [{'push':huge[:10000]},{'push':[['s',['k0'],99]]},{'push':[['s',['extra'],1]]},{'take':True}],
+    ]
+    rng=random.Random(7701);paths=[['x'],['y'],['a.b'],['a','b'],['nul\0key'],['中','😀'],['xs',0],['xs',1.0],['xs','1']]
+    for _ in range(24):
+        steps=[]
+        for j in range(35):
+            if rng.randrange(7)==0:steps.append({'take':True});continue
+            batch=[]
+            for k in range(rng.randrange(1,5)):
+                path=rng.choice(paths);choice=rng.randrange(8)
+                if choice<3:batch.append(['a',path,rng.choice(['','a','中😀','\0','é'])])
+                elif choice<5:batch.append(['s',path,rng.choice([None,False,3,'set',{'nested':1},[1,2]])])
+                elif choice==5:batch.append(['t',path,rng.randrange(4)])
+                elif choice==6:batch.append(['d',path])
+                else:batch.append(['r',{'root':j}])
+            steps.append({'push':batch})
+        steps.append({'take':True});sequences.append(steps)
+    script=r'''
+import {readFileSync} from 'node:fs';import {pathToFileURL} from 'node:url';
+const {PendingOps}=await import(pathToFileURL(process.argv[1]));const cases=JSON.parse(readFileSync(0,'utf8')),before=JSON.stringify(cases),result=[];
+for(const steps of cases){const q=new PendingOps(),out=[];for(const step of steps){if(step.take)out.push({taken:q.take(),size:q.size});else{q.push(step.push);out.push({size:q.size});}}result.push(out);}
+if(before!==JSON.stringify(cases))throw Error('input mutated');console.log(JSON.stringify(result));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',script,str(ROOT/'references/pi/packages/chord/src/delta/pending.ts')],input=json.dumps(sequences,ensure_ascii=False),text=True,capture_output=True,check=True,timeout=30).stdout)
+    native.pg_pending_ops_open.argtypes=[ctypes.POINTER(Pending)]
+    native.pg_pending_ops_push.argtypes=[ctypes.POINTER(Pending),ctypes.c_void_p]
+    native.pg_pending_ops_size.argtypes=[ctypes.POINTER(Pending)];native.pg_pending_ops_size.restype=ctypes.c_size_t
+    native.pg_pending_ops_take.argtypes=[ctypes.POINTER(Pending),ctypes.POINTER(Take)]
+    native.pg_pending_ops_close.argtypes=[ctypes.POINTER(Pending)]
+    count=0
+    for number,(steps,wanted) in enumerate(zip(sequences,expected)):
+        queue=Pending();assert not native.pg_pending_ops_open(ctypes.byref(queue))
+        try:
+            for step,answer in zip(steps,wanted):
+                if step.get('take'):
+                    result=Take();assert not native.pg_pending_ops_take(ctypes.byref(queue),ctypes.byref(result))
+                    try:actual={'taken':{'kind':'replace'} if result.replace else {'kind':'ops','ops':json.loads(library.json_object_to_json_string_ext(result.ops,0))},'size':native.pg_pending_ops_size(ctypes.byref(queue))}
+                    finally:library.json_object_put(result.ops)
+                else:
+                    source=library.json_tokener_parse(json.dumps(step['push'],ensure_ascii=False).encode())
+                    try:assert not native.pg_pending_ops_push(ctypes.byref(queue),source),(number,step)
+                    finally:library.json_object_put(source)
+                    actual={'size':native.pg_pending_ops_size(ctypes.byref(queue))}
+                assert actual==answer,(number,step,actual,answer);count+=1
+        finally:assert not native.pg_pending_ops_close(ctypes.byref(queue))
+    print(f'PASS: {count} PendingOps push/take/size outcomes match actual fixed Chord, including cap/root/structural boundaries')
+
+
+def held_store_cases(native,library):
+    class Pending(ctypes.Structure):
+        _fields_=[('ops',ctypes.c_void_p),('leaves',ctypes.c_void_p),('state',ctypes.c_uint),('busy',ctypes.c_uint),('active',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    class Held(ctypes.Structure):
+        _fields_=[('content',ctypes.c_void_p),('ops',ctypes.c_void_p)]
+    path=ROOT/'references/pi/packages/durable/src/session/transaction.ts'
+    assert path.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':packages/durable/src/session/transaction.ts'])
+    batches=[[],[[['a',['text'],'a']]],[[['a',['text'],'a'],['s',['n'],1]],[['a',['text'],'b']]],[[['r',{'text':'root'}]],[['a',['text'],'!']]]]
+    extras=[[],[['a',['text'],'own']],[['r',{'text':'new-root'}]]]
+    cases=[dict(batches=held,extra=extra,base=base,version=version,value={'text':'final\0中😀','xs':[1]}) for held in batches for extra in extras for base in [False,True] for version in [1,2]]
+    huge=[['s',['k'+str(i)],i] for i in range(10001)]
+    for base in [False,True]:
+        for extra in extras:cases.append(dict(batches=[huge,[['a',['text'],'overflow']]],extra=extra,base=base,version=2,value={'text':'final'}))
+    script=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {pathToFileURL} from 'node:url';
+const {PendingOps}=await import(pathToFileURL(process.argv[2])),source=readFileSync(process.argv[1],'utf8'),a=source.indexOf('export function storeHeld('),b=source.indexOf('\n/**',a),storeHeld=eval('('+stripTypeScriptTypes(source.slice(a,b).replace('export ',''))+')'),out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){const pending=new PendingOps();for(const ops of c.batches)pending.push(ops);const result=storeHeld({pending,base:c.base},c.extra,c.value,c.version);out.push({result,size:pending.size});}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',script,str(path),str(ROOT/'references/pi/packages/chord/src/delta/pending.ts')],input=json.dumps(cases,ensure_ascii=False),text=True,capture_output=True,check=True,timeout=30).stdout)
+    # The same C layout is local to this independent oracle.
+    native.pg_pending_ops_open.argtypes=[ctypes.POINTER(Pending)]
+    native.pg_pending_ops_push.argtypes=[ctypes.POINTER(Pending),ctypes.c_void_p]
+    native.pg_pending_ops_size.argtypes=[ctypes.POINTER(Pending)]
+    native.pg_pending_ops_close.argtypes=[ctypes.POINTER(Pending)]
+    native.pg_document_store_held.argtypes=[ctypes.POINTER(Pending),ctypes.c_void_p,ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint,ctypes.POINTER(Held)]
+    for index,(case,wanted) in enumerate(zip(cases,expected)):
+        queue=Pending();assert not native.pg_pending_ops_open(ctypes.byref(queue));result=Held()
+        more=library.json_tokener_parse(json.dumps(case['extra'],ensure_ascii=False).encode());value=library.json_tokener_parse(json.dumps(case['value'],ensure_ascii=False).encode())
+        try:
+            for batch in case['batches']:
+                pointer=library.json_tokener_parse(json.dumps(batch,ensure_ascii=False).encode())
+                try:assert not native.pg_pending_ops_push(ctypes.byref(queue),pointer)
+                finally:library.json_object_put(pointer)
+            assert not native.pg_document_store_held(ctypes.byref(queue),more,value,case['version'],case['base'],ctypes.byref(result))
+            actual={'result':{'content':json.loads(library.json_object_to_json_string_ext(result.content,0)),'ops':json.loads(library.json_object_to_json_string_ext(result.ops,0))},'size':native.pg_pending_ops_size(ctypes.byref(queue))}
+            assert actual==wanted,(index,actual,wanted)
+            assert json.loads(library.json_object_to_json_string_ext(more,0))==case['extra'] and json.loads(library.json_object_to_json_string_ext(value,0))==case['value']
+        finally:
+            for pointer in [more,value,result.content,result.ops]:library.json_object_put(pointer)
+            assert not native.pg_pending_ops_close(ctypes.byref(queue))
+    print(f'PASS: {len(cases)} held-store base/delta/overflow/root results match actual Pi storeHeld and Chord PendingOps')
+
 def main():
     reference=ROOT/'references/pi/packages/chord/src/delta/index.ts'
     for name in ('index.ts','diff.ts','tracker.ts','pending.ts','draft.ts'):
@@ -171,11 +281,13 @@ def main():
     expected=json.loads(oracle.stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-delta-') as temp:
         path=Path(temp)/'delta.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
-        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
+        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/delta.S'),str(ROOT/'src/runtime/pending.S'),*flags,'-o',str(path)],check=True)
         native=ctypes.CDLL(str(path));library=ctypes.CDLL(ctypes.util.find_library('json-c'))
         library.json_tokener_parse.argtypes=[ctypes.c_char_p];library.json_tokener_parse.restype=ctypes.c_void_p
         library.json_object_put.argtypes=[ctypes.c_void_p]
         library.json_object_to_json_string_ext.argtypes=[ctypes.c_void_p,ctypes.c_int];library.json_object_to_json_string_ext.restype=ctypes.c_char_p
+        pending_cases(native,library)
+        held_store_cases(native,library)
         native.pg_document_delta_apply.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_document_delta_apply.restype=ctypes.c_int
         native.pg_document_delta_batches.argtypes=native.pg_document_delta_apply.argtypes;native.pg_document_delta_batches.restype=ctypes.c_int
         revision_cases(native,library)

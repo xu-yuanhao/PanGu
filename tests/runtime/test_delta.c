@@ -1,12 +1,18 @@
+#define _GNU_SOURCE
 #include "../../src/runtime/delta.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <json-c/json.h>
 #ifdef PG_DELTA_FAULTS
-static unsigned tracking,calls,fail_at;
+static unsigned tracking,calls,fail_at,path_keys;
 static int fault(void){return tracking&&++calls==fail_at;}
+const char *__real_json_object_to_json_string_ext(struct json_object *,int);
+const char *__wrap_json_object_to_json_string_ext(struct json_object *o,int flags){++path_keys;return fault()?0:__real_json_object_to_json_string_ext(o,flags);}
 int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
 struct json_object *__real_json_object_new_array_ext(int);
 struct json_object *__real_json_object_new_string_len(const char *,int);
@@ -91,7 +97,95 @@ static void adoptions(void){
 #endif
  json_object_put(target.value);json_object_put(base);json_object_put(next);json_object_put(ops);json_object_put(empty);
 }
+static void pending_ownership(void){
+ _Static_assert(sizeof(pg_pending_ops)==32&&offsetof(pg_pending_ops,state)==16&&offsetof(pg_pending_ops,active)==24&&sizeof(pg_pending_take)==16,"PendingOps ABI");
+ pg_pending_ops q={0};pg_pending_take take={0};struct json_object *a=json_tokener_parse("[[\"a\",[\"x\"],\"A\"],[\"s\",[\"y\"],1]]"),*b=json_tokener_parse("[[\"a\",[\"x\"],\"中\\u0000😀\"],[\"s\",[\"y\"],2]]");assert(a&&b&&!pg_pending_ops_open(&q));
+ assert(!pg_pending_ops_push(&q,a)&&pg_pending_ops_size(&q)==2);
+ json_object_array_put_idx(json_object_array_get_idx(a,0),2,json_object_new_string("caller"));
+ assert(!pg_pending_ops_push(&q,b)&&pg_pending_ops_size(&q)==2);
+#ifdef PG_DELTA_FAULTS
+ tracking=1;calls=0;fail_at=1;
+#endif
+ assert(!pg_pending_ops_take(&q,&take)&&!take.replace&&take.ops&&!pg_pending_ops_size(&q));
+#ifdef PG_DELTA_FAULTS
+ tracking=0;assert(!calls);fail_at=0;
+#endif
+ struct json_object *expected=json_tokener_parse("[[\"a\",[\"x\"],\"A中\\u0000😀\"],[\"s\",[\"y\"],2]]");assert(expected&&json_object_equal(take.ops,expected));
+ assert(!pg_pending_ops_push(&q,b));json_object_put(a);json_object_put(b);assert(json_object_equal(take.ops,expected));json_object_put(take.ops);json_object_put(expected);
+ q.busy=1;take=(pg_pending_take){0};assert(pg_pending_ops_take(&q,&take)==PG_DOC_INVALID&&!take.ops&&pg_pending_ops_close(&q)==PG_DOC_INVALID&&!pg_pending_ops_size(&q));q.busy=0;
+ assert(!pg_pending_ops_close(&q)&&!pg_pending_ops_close(&q)&&!pg_pending_ops_open(&q));
+#ifdef PG_DELTA_FAULTS
+ tracking=1;calls=0;fail_at=1;assert(pg_pending_ops_take(&q,&take)==PG_DOC_ALLOCATION&&!take.ops&&!q.busy&&q.active&&!q.state);tracking=0;fail_at=0;
+#endif
+ assert(!pg_pending_ops_take(&q,&take)&&take.ops&&!json_object_array_length(take.ops));json_object_put(take.ops);assert(!pg_pending_ops_close(&q));
+ long page=sysconf(_SC_PAGESIZE);char *memory=mmap(0,(size_t)page*4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(memory!=MAP_FAILED&&!mprotect(memory+page,(size_t)page,PROT_NONE)&&!mprotect(memory+3*page,(size_t)page,PROT_NONE));pg_pending_ops *tail=(pg_pending_ops*)(memory+page-sizeof(*tail));pg_pending_take *result=(pg_pending_take*)(memory+3*page-sizeof(*result));memset(tail,0,sizeof(*tail));memset(result,0,sizeof(*result));a=json_tokener_parse("[[\"a\",[\"tail\"],\"x\"]]");assert(a&&!pg_pending_ops_open(tail)&&!pg_pending_ops_push(tail,a)&&!pg_pending_ops_take(tail,result)&&result->ops&&!pg_pending_ops_close(tail));json_object_put(a);json_object_put(result->ops);assert(!munmap(memory,(size_t)page*4));
+}
+static void pending_overflow(void){
+ pg_pending_ops q={0};pg_pending_take take={0};struct json_object *large=json_object_new_array_ext(10001),*small=json_tokener_parse("[[\"a\",[\"x\"],\"a\"]]"),*root=json_tokener_parse("[[\"r\",{\"x\":\"r\"}],[\"a\",[\"x\"],\"t\"]]");assert(large&&small&&root&&!pg_pending_ops_open(&q));
+ for(unsigned i=0;i<10001;++i){char text[96];int n=snprintf(text,sizeof(text),"[\"s\",[\"k%u\"],%u]",i,i);assert(n>0&&(size_t)n<sizeof(text));struct json_object *op=json_tokener_parse(text);assert(op&&!json_object_array_add(large,op));}
+ assert(!pg_pending_ops_push(&q,large)&&pg_pending_ops_size(&q)==10001&&!pg_pending_ops_push(&q,small)&&pg_pending_ops_size(&q)==1);
+#ifdef PG_DELTA_FAULTS
+ tracking=1;calls=0;fail_at=1;
+#endif
+ assert(!pg_pending_ops_push(&q,small));
+#ifdef PG_DELTA_FAULTS
+ tracking=0;assert(!calls);fail_at=0;
+#endif
+ assert(!pg_pending_ops_take(&q,&take)&&take.replace&&!take.ops&&!pg_pending_ops_size(&q)&&!pg_pending_ops_push(&q,large)&&!pg_pending_ops_push(&q,root)&&pg_pending_ops_size(&q)==2&&!pg_pending_ops_take(&q,&take)&&!take.replace&&json_object_equal(take.ops,root));
+ json_object_put(take.ops);json_object_put(large);json_object_put(small);json_object_put(root);assert(!pg_pending_ops_close(&q));
+}
+#ifdef PG_DELTA_FAULTS
+static void pending_key_cost(void){
+ pg_pending_ops q={0};struct json_object *a=json_tokener_parse("[[\"a\",[\"x\"],\"a\"],[\"s\",[\"y\"],1]]"),*b=json_tokener_parse("[[\"a\",[\"x\"],\"b\"]]"),*structural=json_tokener_parse("[[\"d\",[\"gone\"]],[\"p\",[\"xs\"],0,0,[1]]]");assert(a&&b&&structural&&!pg_pending_ops_open(&q));
+ path_keys=0;assert(!pg_pending_ops_push(&q,a)&&!path_keys&&!pg_pending_ops_push(&q,b)&&path_keys==3&&!pg_pending_ops_push(&q,b)&&path_keys==4&&!pg_pending_ops_push(&q,structural)&&path_keys==4);
+ json_object_put(a);json_object_put(b);json_object_put(structural);assert(!pg_pending_ops_close(&q));
+}
+static void pending_failures(void){
+ struct json_object *a=json_tokener_parse("[[\"a\",[\"x\"],\"a\"],[\"s\",[\"n\"],1]]"),*b=json_tokener_parse("[[\"a\",[\"x\"],\"b\"],[\"s\",[\"n\"],2]]"),*c=json_tokener_parse("[[\"a\",[\"x\"],\"c\"],[\"d\",[\"gone\"]],[\"s\",[\"xs\",1.0],\"one\"],[\"a\",[\"xs\",1],\"!\"]]");assert(a&&b&&c);
+ unsigned totals[3]={0};for(unsigned mode=0;mode<3;++mode)for(unsigned attempt=0;attempt<=totals[mode];++attempt){
+  pg_pending_ops q={0};assert(!pg_pending_ops_open(&q));if(mode)assert(!pg_pending_ops_push(&q,a));if(mode==2)assert(!pg_pending_ops_push(&q,b));
+  struct json_object *ops=0,*map=0;assert(!q.ops||!json_object_deep_copy(q.ops,&ops,0));assert(!q.leaves||!json_object_deep_copy(q.leaves,&map,0));unsigned state=q.state;void *identity=q.ops;
+  tracking=1;calls=0;fail_at=attempt;int status=pg_pending_ops_push(&q,mode==0?a:mode==1?b:c);tracking=0;
+  if(!attempt){assert(!status);totals[mode]=calls;}else assert(status!=PG_DOC_OK&&!q.busy&&q.active&&q.state==state&&q.ops==identity&&json_object_equal(q.ops,ops)&&json_object_equal(q.leaves,map));
+  fail_at=0;json_object_put(ops);json_object_put(map);assert(!pg_pending_ops_close(&q));
+ }
+ json_object_put(a);json_object_put(b);json_object_put(c);
+}
+#endif
+static void held_store_ownership(void){
+ _Static_assert(sizeof(pg_document_held_content)==16,"held content ABI");pg_pending_ops q={0};pg_document_held_content held={0};
+ struct json_object *a=json_tokener_parse("[[\"a\",[\"text\"],\"a\"]]"),*b=json_tokener_parse("[[\"a\",[\"text\"],\"b\"]]"),*value=json_tokener_parse("{\"text\":\"final\"}");assert(a&&b&&value&&!pg_pending_ops_open(&q)&&!pg_pending_ops_push(&q,a));
+ assert(pg_document_store_held(&q,b,value,0,0,&held)==PG_DOC_INVALID&&!held.content&&!held.ops&&pg_pending_ops_size(&q)==1);
+ assert(pg_document_store_held(&q,b,value,1,2,&held)==PG_DOC_INVALID&&!held.content&&!held.ops&&pg_pending_ops_size(&q)==1);
+ assert(!pg_document_store_held(&q,b,value,2,1,&held)&&!pg_pending_ops_size(&q)&&!strcmp(json_object_get_string(json_object_object_get(held.content,"kind")),"base")&&json_object_get_int(json_object_object_get(held.content,"version"))==2);
+ struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"ab\"]]");assert(ops&&json_object_equal(held.ops,ops));json_object_object_add(value,"text",json_object_new_string("caller"));json_object_array_put_idx(json_object_array_get_idx(b,0),2,json_object_new_string("caller"));assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(held.content,"value"),"text")),"final")&&json_object_equal(held.ops,ops));
+ json_object_put(held.content);json_object_put(held.ops);json_object_put(ops);json_object_put(a);json_object_put(b);json_object_put(value);assert(!pg_pending_ops_close(&q));
+}
+#ifdef PG_DELTA_FAULTS
+static void held_store_failures(void){
+ struct json_object *a=json_tokener_parse("[[\"a\",[\"text\"],\"a\"]]"),*b=json_tokener_parse("[[\"a\",[\"text\"],\"b\"]]"),*value=json_tokener_parse("{\"text\":\"final\"}");assert(a&&b&&value);
+ unsigned totals[3]={0};for(unsigned mode=0;mode<3;++mode)for(unsigned attempt=0;attempt<=totals[mode];++attempt){
+  pg_pending_ops q={0};assert(!pg_pending_ops_open(&q));if(mode<2)assert(!pg_pending_ops_push(&q,a)&&!pg_pending_ops_push(&q,b));else q.state=3;
+  struct json_object *ops=0,*map=0;assert(!q.ops||!json_object_deep_copy(q.ops,&ops,0));assert(!q.leaves||!json_object_deep_copy(q.leaves,&map,0));void *identity=q.ops;unsigned state=q.state;pg_document_held_content held={0};
+  tracking=1;calls=0;fail_at=attempt;int status=pg_document_store_held(&q,b,value,2,mode==1,&held);tracking=0;
+  if(!attempt){assert(!status&&!pg_pending_ops_size(&q));totals[mode]=calls;if(mode==2){struct json_object *op=json_object_array_get_idx(held.ops,0);assert(!strcmp(json_object_get_string(json_object_array_get_idx(op,0)),"r")&&json_object_equal(json_object_array_get_idx(op,1),value)&&!strcmp(json_object_get_string(json_object_object_get(held.content,"kind")),"base"));}}
+  else assert(status!=PG_DOC_OK&&!held.content&&!held.ops&&!q.busy&&q.active&&q.state==state&&q.ops==identity&&json_object_equal(q.ops,ops)&&json_object_equal(q.leaves,map));
+  fail_at=0;json_object_put(held.content);json_object_put(held.ops);json_object_put(ops);json_object_put(map);assert(!pg_pending_ops_close(&q));
+ }
+ json_object_put(a);json_object_put(b);json_object_put(value);
+}
+#endif
 int main(void){
+ held_store_ownership();
+#ifdef PG_DELTA_FAULTS
+ held_store_failures();
+#endif
+ pending_ownership();
+ pending_overflow();
+#ifdef PG_DELTA_FAULTS
+ pending_key_cost();
+ pending_failures();
+#endif
  adoptions();
  plans();
  changes();

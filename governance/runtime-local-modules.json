@@ -993,7 +993,8 @@
       "id": "session.documents.delta.local.v0",
       "sources": [
         "src/runtime/delta.h",
-        "src/runtime/delta.S"
+        "src/runtime/delta.S",
+        "src/runtime/pending.S"
       ],
       "dependencies": [
         "session.documents.local.v0",
@@ -1001,7 +1002,7 @@
         "utf8proc",
         "system libc"
       ],
-      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup; committed revision snapshots with lifetime and current-only policy; native document change journal and prepared value/op ownership",
+      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup; committed revision snapshots with lifetime and current-only policy; native document change journal and prepared value/op ownership; owned PendingOps queue with staged atomic folding, leaf index, structural barriers and source 10000-op replacement threshold; held operation folding to owned base/delta content with overflow replacement and atomic pending drain",
       "exports": [
         "pg_document_delta_apply",
         "pg_document_delta_batches",
@@ -1015,7 +1016,13 @@
         "pg_document_loaded_begin",
         "pg_document_adoption_prepare",
         "pg_document_adoption_apply",
-        "pg_document_adoption_discard"
+        "pg_document_adoption_discard",
+        "pg_pending_ops_open",
+        "pg_pending_ops_push",
+        "pg_pending_ops_size",
+        "pg_pending_ops_take",
+        "pg_pending_ops_close",
+        "pg_document_store_held"
       ],
       "reference_basis": [
         {
@@ -1028,7 +1035,7 @@
             "packages/chord/src/delta/tracker.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters"
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters; PendingOps push/size/take: first batch, indexed cross-path a/s merges, structural index clearing, root resets, 10000 folded-op overflow and replace recovery; native owned inputs/results and atomic allocation failure; storeHeld folds additional ops and chooses delta, selected base or overflow base/root op; native preparation preserves original queue on error and drains it only after content construction"
         }
       ]
     },

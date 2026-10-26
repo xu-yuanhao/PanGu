@@ -144,6 +144,10 @@
     "src/runtime/document_tx.S": {
       "role": "assembly-core",
       "reason": "手写多文档事务准备、验证后的checkpoint、同步adoption和失败清理；复用已有records/delta服务"
+    },
+    "src/runtime/pending.S": {
+      "role": "assembly-core",
+      "reason": "手写Chord PendingOps队列、跨路径叶子折叠、结构屏障、根替换与有界溢出；json-c承担持久值/索引与序列化"
     }
   }
 }

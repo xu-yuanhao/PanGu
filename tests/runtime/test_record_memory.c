@@ -690,7 +690,21 @@ static void fork_document_rejections(void){
   assert(!pg_document_tx_abort(&scope)&&!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
  }
 }
+static void held_content_storage(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"held\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}]"));pg_pending_ops q={0};assert(!pg_pending_ops_open(&q));pg_record_session session={.storage=pg_record_memory_storage(&m)};
+ const char *batches[]={"[[\"a\",[\"text\"],\"a\"]]","[[\"r\",{\"text\":\"reset\"}]]","[[\"a\",[\"text\"],\"B\"]]"};
+ const char *values[]={"{\"text\":\"ab\"}","{\"text\":\"reset\"}","{\"text\":\"resetB\"}"};
+ for(unsigned step=0;step<3;++step){
+  struct json_object *batch=json_tokener_parse(batches[step]),*extra=json_tokener_parse(step==0?"[[\"a\",[\"text\"],\"b\"]]":"[]"),*value=json_tokener_parse(values[step]);assert(batch&&extra&&value&&!pg_pending_ops_push(&q,batch));
+  pg_document_held_content planned={0};assert(!pg_document_store_held(&q,extra,value,1,step==2,&planned)&&!pg_pending_ops_size(&q));struct json_object *write=json_object_new_object();assert(write&&!json_object_object_add(write,"type",json_object_new_string("document.change"))&&!json_object_object_add(write,"id",json_object_new_int(2))&&!json_object_object_add(write,"content",json_object_get(planned.content)));
+  pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_stage(&tx,PG_TX_DOCUMENT_CHANGE,write)&&!pg_record_tx_commit(&tx));
+  struct json_object *stored=0;assert(!pg_record_memory_document(&m,2,UINT64_MAX,&stored)&&json_object_equal(json_object_object_get(stored,"value"),value)&&json_object_get_uint64(json_object_object_get(stored,"deltasSinceBase"))==(step==2?0u:step+1));
+  json_object_put(stored);json_object_put(write);json_object_put(planned.content);json_object_put(planned.ops);json_object_put(batch);json_object_put(extra);json_object_put(value);
+ }
+ assert(!pg_pending_ops_close(&q)&&!pg_record_memory_close(&m));
+}
 int main(void){
+ held_content_storage();
  fork_document_acquisition();
  fork_document_rejections();
  fork_document_retirement();
