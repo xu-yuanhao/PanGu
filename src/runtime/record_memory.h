@@ -47,19 +47,10 @@ pg_memory_status pg_record_memory_document(void *,uint64_t id,uint64_t at,struct
    content. Historical membership also works for current-only documents.
    at=UINT64_MAX selects current. Absence returns PG_MEMORY_MISSING. */
 pg_memory_status pg_record_memory_find_document(void *,const pg_document_address *,uint64_t at,struct json_object **);
-typedef struct {
- unsigned scope,has_kind;
- uint64_t owner;
- pg_slice kind;
- uint64_t at;
- size_t limit;
- int64_t after;
- unsigned has_cursor,reserved;
-} pg_document_query;
 /* Scope-exact ascending lifecycle records; at=UINT64_MAX means current.
    Optional kind and signed-safe after cursor. limit>=1; owned Page snapshot.
    Historical membership works even when content is current-only. */
-pg_memory_status pg_record_memory_scan_documents(pg_record_memory *,const pg_document_query *,pg_memory_page *);
+pg_memory_status pg_record_memory_scan_documents(void *,const pg_document_query *,pg_memory_page *);
 /* Borrow a scan/head service descriptor; no resources are allocated. */
 void pg_record_memory_queries(pg_record_memory *,pg_record_queries *);
 /* Borrow find/read bindings for generic document acquisition. */

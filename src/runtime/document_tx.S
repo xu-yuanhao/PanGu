@@ -1,7 +1,7 @@
 .intel_syntax noprefix
 .text
 /* Settlement context: entries/count, original hooks, error, cache,
-   reservation[32], monotonic time, new-incarnation count. */
+   reservation[32], monotonic time, new-incarnation count, managed scope/scan. */
 .Ldocs_finalize:
  push rbp
  push rbx
@@ -94,6 +94,18 @@
  call pg_record_tx_validate_batch@PLT
  test eax,eax
  jnz .Ldocs_finalize_invalid
+ cmp qword ptr [rbx+104],0
+ je .Ldocs_lifecycle_ready
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ldocs_terminal_retire
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+ mov rdi,r12
+ call pg_record_tx_validate_batch@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_invalid
+.Ldocs_lifecycle_ready:
  xor r13d,r13d
 .Ldocs_checkpoint_each:
  cmp r13,[rbx+8]
@@ -322,6 +334,8 @@
 .type pg_document_tx_commit,@function
 pg_document_tx_commit:
  xor ecx,ecx
+ xor r8d,r8d
+ xor r9d,r9d
 .Ldocs_commit_common:
  push rbp
  push rbx
@@ -329,7 +343,9 @@ pg_document_tx_commit:
  push r13
  push r14
  push r15
- sub rsp,104
+ sub rsp,120
+ mov [rsp+104],r8
+ mov [rsp+112],r9
  mov [rsp+48],rcx
  mov rbx,rdi
  mov r12,rsi
@@ -446,6 +462,8 @@ pg_document_tx_commit:
  je .Ldocs_commit_restore
  mov ebp,[rsp+40]
 .Ldocs_commit_restore:
+ mov r12,[rsp]
+ mov r13,[rsp+8]
  mov rax,[rsp+16]
  mov [r15+24],rax
  mov rax,[rsp+24]
@@ -482,7 +500,7 @@ pg_document_tx_commit:
  jmp .Ldocs_commit_cleanup
 .Ldocs_commit_return:
  mov eax,ebp
- add rsp,104
+ add rsp,120
  pop r15
  pop r14
  pop r13
@@ -734,9 +752,16 @@ pg_document_tx_get:
 .globl pg_document_tx_finish
 .type pg_document_tx_finish,@function
 pg_document_tx_finish:
+ xor esi,esi
+ jmp pg_document_tx_settle
+.size pg_document_tx_finish,.-pg_document_tx_finish
+.globl pg_document_tx_settle
+.type pg_document_tx_settle,@function
+pg_document_tx_settle:
  push rbx
  push r12
  sub rsp,8
+ mov [rsp],rsi
  mov rbx,rdi
  mov eax,1
  test rbx,rbx
@@ -754,6 +779,8 @@ pg_document_tx_finish:
  mov rsi,[rbx+16]
  mov rdx,[rbx+24]
  mov rcx,[rbx+8]
+ mov r8,rbx
+ mov r9,[rsp]
  call .Ldocs_commit_common
  mov r12d,eax
  mov rdi,rbx
@@ -764,7 +791,7 @@ pg_document_tx_finish:
  pop r12
  pop rbx
  ret
-.size pg_document_tx_finish,.-pg_document_tx_finish
+.size pg_document_tx_settle,.-pg_document_tx_settle
 
 .globl pg_document_tx_abort
 .type pg_document_tx_abort,@function
@@ -1329,3 +1356,380 @@ pg_document_tx_retire:
  pop rbp
  ret
 .size pg_document_tx_retire,.-pg_document_tx_retire
+
+.text
+/* Append a retirement once; context flags retain reservation ownership. */
+.Ldocs_terminal_emit:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ xor eax,eax
+ test dword ptr [r13+148],2
+ jnz .Lterminal_emit_return
+ mov rax,[r13]
+ mov rdi,[rax+72]
+ mov rsi,rsp
+ call .Ldocs_retire_write
+ test eax,eax
+ jnz .Lterminal_emit_return
+ mov rdi,[r12+24]
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lterminal_emit_error
+ or dword ptr [r13+148],2
+ mov dword ptr [rbx+44],1
+ xor eax,eax
+ jmp .Lterminal_emit_return
+.Lterminal_emit_error:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,3
+.Lterminal_emit_return:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+/* Stack: task cursor/candidate/committed/id, index, query[64], page[24],
+   page index/last ID, private node, spare, spare, seen-ID linkhash.
+   Seen-ID keys encode safe IDs as opaque uintptr_t values, never dereferenced. */
+.Ldocs_terminal_retire:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,184
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,[rbx+104]
+ mov r14,[rbx+112]
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+144],0
+ mov qword ptr [rsp+176],0
+ mov ebp,1
+.Lterminal_task_next:
+ mov rdi,r12
+ mov rsi,rsp
+ lea rdx,[rsp+8]
+ call pg_record_tx_terminal_next@PLT
+ test eax,eax
+ jnz .Lterminal_tasks_ok
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Lterminal_tasks_done
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lterminal_tasks_done
+ mov [rsp+24],rax
+ cmp qword ptr [r12+16],0
+ je .Lterminal_tasks_done
+ mov rdi,[r12+8]
+ mov esi,2
+ mov rdx,rax
+ lea rcx,[rsp+16]
+ call [r12+16]
+ cmp eax,1
+ je .Lterminal_owner_missing
+ test eax,eax
+ jnz .Lterminal_tasks_storage
+ cmp qword ptr [rsp+16],0
+ je .Lterminal_tasks_storage
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+24]
+ jne .Lterminal_tasks_done
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lterminal_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lterminal_status]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ cmp eax,8
+ jne .Lterminal_committed_open
+ mov rdi,r15
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lterminal_tasks_done
+ mov rdi,rax
+ lea rsi,[rip+.Lterminal_name]
+ mov edx,8
+ call memcmp@PLT
+ test eax,eax
+ jz .Lterminal_tasks_done
+.Lterminal_committed_open:
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lterminal_conversation]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+168],rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lterminal_conversation]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+168]
+ jne .Lterminal_tasks_done
+ jmp .Lterminal_owner_new
+.Lterminal_owner_missing:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lterminal_owner_new:
+ cmp qword ptr [rsp+176],0
+ jne .Lterminal_mark_begin
+ mov edi,16
+ xor esi,esi
+ call lh_kptr_table_new@PLT
+ test rax,rax
+ jz .Lterminal_tasks_allocation
+ mov [rsp+176],rax
+ mov qword ptr [rsp+32],0
+.Lterminal_index_each:
+ mov rax,[rsp+32]
+ cmp rax,[r13+24]
+ jae .Lterminal_mark_begin
+ imul rax,152
+ add rax,[r13+16]
+ mov rax,[rax]
+ mov rsi,[rax+72]
+ mov rdi,[rsp+176]
+ mov edx,1
+ call lh_table_insert@PLT
+ test eax,eax
+ jnz .Lterminal_tasks_allocation
+ inc qword ptr [rsp+32]
+ jmp .Lterminal_index_each
+.Lterminal_mark_begin:
+ mov qword ptr [rsp+32],0
+.Lterminal_mark_each:
+ mov rax,[rsp+32]
+ cmp rax,[r13+24]
+ jae .Lterminal_scan_begin
+ imul rax,152
+ add rax,[r13+16]
+ mov rdx,[rax]
+ cmp dword ptr [rdx+64],2
+ jne .Lterminal_mark_next
+ mov rcx,[rsp+24]
+ cmp [rdx+56],rcx
+ jne .Lterminal_mark_next
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call .Ldocs_terminal_emit
+ test eax,eax
+ jnz .Lterminal_tasks_allocation
+.Lterminal_mark_next:
+ inc qword ptr [rsp+32]
+ jmp .Lterminal_mark_each
+.Lterminal_scan_begin:
+ cmp qword ptr [rsp+16],0
+ je .Lterminal_task_cleanup
+ test r14,r14
+ jz .Lterminal_tasks_done
+ cmp qword ptr [r14+8],0
+ je .Lterminal_tasks_done
+ lea rdi,[rsp+40]
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ mov dword ptr [rsp+40],2
+ mov rax,[rsp+24]
+ mov [rsp+48],rax
+ mov qword ptr [rsp+72],-1
+ mov qword ptr [rsp+80],256
+.Lterminal_scan_page:
+ pxor xmm0,xmm0
+ movups [rsp+104],xmm0
+ mov qword ptr [rsp+120],0
+ mov rdi,[r14]
+ lea rsi,[rsp+40]
+ lea rdx,[rsp+104]
+ call [r14+8]
+ test eax,eax
+ jnz .Lterminal_tasks_storage
+ mov rdi,[rsp+104]
+ call json_object_get_type@PLT
+ cmp eax,5
+ jne .Lterminal_tasks_done
+ cmp dword ptr [rsp+124],1
+ ja .Lterminal_tasks_done
+ mov rdi,[rsp+104]
+ call json_object_array_length@PLT
+ cmp rax,256
+ ja .Lterminal_tasks_done
+ mov rax,[rsp+88]
+ mov [rsp+136],rax
+ mov qword ptr [rsp+128],0
+.Lterminal_scan_item:
+ mov rdi,[rsp+104]
+ call json_object_array_length@PLT
+ mov rsi,[rsp+128]
+ cmp rsi,rax
+ jae .Lterminal_scan_advance
+ mov rdi,[rsp+104]
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+136]
+ jbe .Lterminal_tasks_done
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lterminal_tasks_done
+ mov [rsp+136],rax
+ mov rdi,[rsp+176]
+ mov rsi,rax
+ lea rdx,[rsp+160]
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jnz .Lterminal_scan_item_next
+ mov edi,1
+ mov esi,160
+ call calloc@PLT
+ test rax,rax
+ jz .Lterminal_tasks_allocation
+ mov [rsp+144],rax
+ mov rdi,r15
+ call json_object_get@PLT
+ mov rcx,[rsp+144]
+ mov [rcx],rax
+ mov rdi,rax
+ lea rsi,[rcx+24]
+ call pg_document_record_decode@PLT
+ test eax,eax
+ jnz .Lterminal_tasks_done
+ mov rax,[rsp+144]
+ cmp dword ptr [rax+64],2
+ jne .Lterminal_tasks_done
+ mov rcx,[rsp+24]
+ cmp [rax+56],rcx
+ jne .Lterminal_tasks_done
+ mov rcx,[rbx+48]
+ mov [rax+152],rcx
+ mov rdi,r13
+ mov rsi,rax
+ xor edx,edx
+ xor ecx,ecx
+ xor r8d,r8d
+ mov r9d,4
+ call .Ldoc_scope_append
+ cmp eax,3
+ je .Lterminal_tasks_allocation
+ test eax,eax
+ jnz .Lterminal_tasks_done
+ mov qword ptr [rsp+144],0
+ mov rax,[r13+16]
+ mov [rbx],rax
+ mov rax,[r13+24]
+ mov [rbx+8],rax
+ dec rax
+ imul rax,152
+ add rax,[r13+16]
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call .Ldocs_terminal_emit
+ test eax,eax
+ jnz .Lterminal_tasks_allocation
+ mov rdi,[rsp+176]
+ mov rsi,[rsp+136]
+ mov edx,1
+ call lh_table_insert@PLT
+ test eax,eax
+ jnz .Lterminal_tasks_allocation
+.Lterminal_scan_item_next:
+ inc qword ptr [rsp+128]
+ jmp .Lterminal_scan_item
+.Lterminal_scan_advance:
+ cmp dword ptr [rsp+124],0
+ je .Lterminal_page_last
+ cmp qword ptr [rsp+128],0
+ je .Lterminal_tasks_done
+ mov rax,[rsp+112]
+ cmp rax,[rsp+88]
+ jbe .Lterminal_tasks_done
+ cmp rax,[rsp+136]
+ jb .Lterminal_tasks_done
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lterminal_tasks_done
+ mov [rsp+88],rax
+ mov dword ptr [rsp+96],1
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov qword ptr [rsp+104],0
+ jmp .Lterminal_scan_page
+.Lterminal_page_last:
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov qword ptr [rsp+104],0
+.Lterminal_task_cleanup:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ jmp .Lterminal_task_next
+.Lterminal_tasks_ok:
+ xor ebp,ebp
+ jmp .Lterminal_tasks_done
+.Lterminal_tasks_storage:
+ mov ebp,9
+ jmp .Lterminal_tasks_done
+.Lterminal_tasks_allocation:
+ mov ebp,3
+.Lterminal_tasks_done:
+ mov rdi,[rsp+144]
+ test rdi,rdi
+ jz .Lterminal_tasks_page_cleanup
+ call pg_document_loaded_close@PLT
+ mov rdi,[rsp+144]
+ call free@PLT
+.Lterminal_tasks_page_cleanup:
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+176]
+ test rdi,rdi
+ jz .Lterminal_tasks_return
+ call lh_table_free@PLT
+.Lterminal_tasks_return:
+ mov eax,ebp
+ add rsp,184
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lterminal_state: .asciz "state"
+.Lterminal_status: .asciz "status"
+.Lterminal_name: .asciz "terminal"
+.Lterminal_conversation: .asciz "conversationId"

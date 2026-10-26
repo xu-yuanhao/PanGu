@@ -72,6 +72,20 @@ pg_document_status pg_document_tx_doc(pg_document_tx *,const pg_document_request
    without an edit only resolves record identity/scope, without initialization,
    migration or Storage.read. Missing addresses have no write. */
 pg_document_status pg_document_tx_retire(pg_document_tx *,const pg_document_definition *,const pg_document_address *);
+typedef struct {
+ void *context;
+ /* 0 owned ascending current-lifecycle page, other values error.
+    Output starts zeroed; any partial items remain owned by the caller on error. */
+ int (*scan)(void *,const pg_document_query *,pg_memory_page *);
+} pg_document_scan;
+/* Finish with terminal-Task lifecycle discovery. Newly terminal tasks retire
+   acquired/new documents and page through committed task documents without
+   loading their values. Committed tasks transitioning to terminal require scan; an absent scan
+   rejects before Storage admission. New tasks need no committed scan.
+   All edits are sealed before Storage reads/scan; callbacks cannot reenter.
+   Scanner and context are borrowed only for this synchronous call. */
+pg_record_tx_status pg_document_tx_settle(pg_document_tx *,const pg_document_scan *);
+/* finish delegates to settle with no committed-document scanner. */
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);
 #endif

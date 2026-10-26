@@ -16,6 +16,8 @@ _Static_assert(sizeof(pg_record_memory)==48&&offsetof(pg_record_memory,next_id)=
 static unsigned allocation_failure,array_add_calls,doc_tracking,doc_calls,doc_fail;
 static int doc_fault(void){return doc_tracking&&++doc_calls==doc_fail;}
 struct lh_table *__real_lh_table_new(int,lh_entry_free_fn *,lh_hash_fn *,lh_equal_fn *);
+struct lh_table *__real_lh_kptr_table_new(int,lh_entry_free_fn *);
+struct lh_table *__wrap_lh_kptr_table_new(int size,lh_entry_free_fn *f){return doc_fault()?0:__real_lh_kptr_table_new(size,f);}
 int __real_lh_table_insert(struct lh_table *,const void *,const void *);
 int __real_lh_table_resize(struct lh_table *,int);
 int __wrap_lh_table_resize(struct lh_table *t,int size){return doc_fault()?-1:__real_lh_table_resize(t,size);}
@@ -519,7 +521,85 @@ static void managed_retirement_backend_failure(void){
   json_object_put(seed);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
  }
 }
+typedef struct {pg_record_memory *memory;pg_document_tx *scope;pg_document_change *edit;unsigned calls,mode,read_fail;} task_doc_scan_fixture;
+static int task_doc_scan(void *context,const pg_document_query *query,pg_memory_page *page){
+ task_doc_scan_fixture *f=context;++f->calls;assert(f->scope->busy&&f->scope->records->busy&&f->scope->records->sealed&&query->scope==PG_DOC_TASK&&query->at==UINT64_MAX&&query->limit==256);
+ if(f->edit)assert(f->edit->sealed&&pg_document_tx_abort(f->scope)==PG_TX_INVALID);
+ if(f->mode==1){page->items=json_object_new_array();assert(page->items);return 7;}
+ if(f->mode==2){page->items=json_tokener_parse("[{\"id\":99999,\"kind\":\"wrong\",\"scope\":{\"kind\":\"session\"},\"createdAt\":1}]");assert(page->items);return 0;}
+ if(f->mode==3){page->items=json_object_new_array();assert(page->items);page->has_next=1;page->after=1;return 0;}
+ int status=pg_record_memory_scan_documents(f->memory,query,page);
+ if(!status&&f->mode==4){page->has_next=1;page->after=0;}return status;
+}
+static int task_doc_read(void *context,unsigned table,uint64_t id,struct json_object **out){
+ task_doc_scan_fixture *f=context;if(f->read_fail==2)return pg_record_memory_read(f->memory,(pg_record_table)table,2000,out);if(f->read_fail){*out=json_object_new_object();assert(*out);return 7;}return pg_record_memory_read(f->memory,(pg_record_table)table,id,out);
+}
+static void stage_task_state(pg_record_tx *tx,uint64_t id,uint64_t conversation,const char *status){
+ char text[256];int n=snprintf(text,sizeof(text),"{\"type\":\"task\",\"value\":{\"id\":%llu,\"conversationId\":%llu,\"state\":{\"status\":\"%s\"}}}",(unsigned long long)id,(unsigned long long)conversation,status);assert(n>0&&(size_t)n<sizeof(text));struct json_object *value=json_tokener_parse(text);assert(value&&!pg_record_tx_stage(tx,PG_TX_TASK,value));json_object_put(value);
+}
+static void initialize_task_docs(pg_record_memory *m,unsigned count){
+ assert(!pg_record_memory_open(m)&&!doc_commit(m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"task\",\"value\":{\"id\":1000,\"conversationId\":1,\"state\":{\"status\":\"running\"}}},{\"type\":\"task\",\"value\":{\"id\":2000,\"conversationId\":1,\"state\":{\"status\":\"running\"}}},{\"type\":\"task\",\"value\":{\"id\":3000,\"conversationId\":1,\"state\":{\"status\":\"running\"}}}]"));
+ struct json_object *writes=json_object_new_array();assert(writes);
+ for(unsigned i=0;i<count;++i){unsigned owner=i<520?1000:i<525?2000:3000;char text[512];int n=snprintf(text,sizeof(text),"{\"type\":\"document.create\",\"record\":{\"id\":%u,\"kind\":\"progress\",\"key\":\"k%u\",\"scope\":{\"kind\":\"task\",\"taskId\":%u}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}",i+10,i,owner);assert(n>0&&(size_t)n<sizeof(text));struct json_object *write=json_tokener_parse(text);assert(write&&!json_object_array_add(writes,write));}
+ pg_record_storage provider=pg_record_memory_storage(m);uint64_t seq;assert(!provider.commit(m,writes,doc_adopt,0,&seq));json_object_put(writes);
+}
+static void terminal_task_documents(void){
+ _Static_assert(sizeof(pg_document_query)==64&&sizeof(pg_document_scan)==16,"Doc lifecycle query ABI");
+ pg_record_memory m={0};initialize_task_docs(&m,530);pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+ pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};task_doc_scan_fixture scanner={.memory=&m,.scope=&scope};pg_document_scan scan={&scanner,task_doc_scan};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));
+ managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"progress",8},.version=1,.scope=PG_DOC_TASK,.family=1};pg_document_address address={.kind={"progress",8},.key={"k0",2},.owner=1000,.scope=PG_DOC_TASK,.has_key=1};struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"!\"]]");assert(seed&&ops);pg_document_request request={&def,&address,seed,&initial,tx_mint,&f,new_checkpoint};pg_document_change *edit=0;assert(!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_change_append(edit,ops));scanner.edit=edit;
+ address.key=(pg_slice){"k1",2};pg_document_loaded *loaded=0;assert(!pg_document_cache_get(&cache,&def,&address,&loaded));
+ address.key=(pg_slice){"k2",2};assert(!pg_document_tx_retire(&scope,&def,&address));
+ address.key=(pg_slice){"fresh",5};assert(!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_change_append(edit,ops));
+ address.key=(pg_slice){"k525",4};address.owner=3000;assert(!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_change_append(edit,ops));
+ stage_task_state(&tx,1000,1,"terminal");stage_task_state(&tx,2000,1,"terminal");
+ assert(!pg_document_tx_settle(&scope,&scan)&&scanner.calls==4&&f.initial_calls==1&&f.checkpoint_calls==2&&!session.failed&&cache.count==1&&m.next_sequence==4);
+ pg_document_query query={.scope=PG_DOC_TASK,.owner=1000,.at=UINT64_MAX,.limit=1000};pg_memory_page page={0};assert(!pg_record_memory_scan_documents(&m,&query,&page)&&json_object_array_length(page.items)==0);json_object_put(page.items);
+ query.owner=2000;assert(!pg_record_memory_scan_documents(&m,&query,&page)&&json_object_array_length(page.items)==0);json_object_put(page.items);query.owner=3000;assert(!pg_record_memory_scan_documents(&m,&query,&page)&&json_object_array_length(page.items)==5);json_object_put(page.items);
+ assert(!pg_document_cache_get(&cache,&def,&address,&loaded)&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"old!"));
+ unsigned retired=0;for(size_t i=0;i<m.count;++i)if(m.rows[i].table==PG_TABLE_DOCUMENT){struct json_object *record=json_object_object_get(m.rows[i].value,"record");if(json_object_object_get(record,"retiredAt")){++retired;assert(json_object_get_int(json_object_object_get(record,"retiredAt"))==3);}}assert(retired==526);
+ scanner.edit=0;assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));stage_task_state(&tx,1000,1,"terminal");assert(pg_document_tx_settle(&scope,&scan)!=PG_TX_OK&&!session.failed&&m.next_sequence==4&&scanner.calls==4);
+ json_object_put(seed);json_object_put(ops);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+}
+static void terminal_task_rejections(void){
+ for(unsigned mode=0;mode<9;++mode){
+  pg_record_memory m={0};initialize_task_docs(&m,3);pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+  pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};task_doc_scan_fixture scanner={.memory=&m,.scope=&scope,.mode=mode<5?mode:0,.read_fail=mode==6?1:mode==7?2:0};pg_document_scan scan={&scanner,task_doc_scan};session.read_only=mode==8;
+  assert(!pg_record_tx_begin(&tx,&session,&scanner,task_doc_read)&&!pg_document_tx_open(&scope,&tx,&cache));stage_task_state(&tx,1000,mode==5?2:1,"terminal");
+  assert((mode?pg_document_tx_settle(&scope,&scan):pg_document_tx_finish(&scope))!=PG_TX_OK&&!session.failed&&m.next_sequence==3&&scope.sealed&&!scope.entries);
+  struct json_object *task=0;assert(!pg_record_memory_read(&m,PG_TABLE_TASK,1000,&task)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(task,"state"),"status")),"running"));json_object_put(task);
+  pg_document_query q={.scope=PG_DOC_TASK,.owner=1000,.at=UINT64_MAX,.limit=10};pg_memory_page page={0};assert(!pg_record_memory_scan_documents(&m,&q,&page)&&json_object_array_length(page.items)==3);json_object_put(page.items);
+  assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+ }
+}
+static void new_terminal_task_documents(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+ pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));stage_task_state(&tx,100,1,"pending");
+ managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"progress",8},.version=1,.scope=PG_DOC_TASK,.family=1};pg_document_address address={.kind={"progress",8},.key={"new",3},.owner=100,.scope=PG_DOC_TASK,.has_key=1};struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}");assert(seed);pg_document_request request={&def,&address,seed,&initial,tx_mint,0,0};pg_document_change *edit=0;assert(!pg_document_tx_doc(&scope,&request,&edit));stage_task_state(&tx,100,1,"terminal");assert(!pg_document_tx_finish(&scope)&&!cache.count&&m.count==2&&m.next_sequence==2);
+ struct json_object *stored=0;assert(pg_record_memory_document(&m,2,UINT64_MAX,&stored)==PG_MEMORY_MISSING&&!stored);
+ json_object_put(seed);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+}
+#ifdef PG_MEMORY_FAULTS
+static void terminal_task_faults(void){
+ unsigned counts[2]={0};for(unsigned mode=0;mode<2;++mode)for(unsigned attempt=0;attempt<=counts[mode];++attempt){
+  pg_record_memory m={0};initialize_task_docs(&m,8);pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+  pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};task_doc_scan_fixture scanner={.memory=&m,.scope=&scope};pg_document_scan scan={&scanner,task_doc_scan};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));
+  managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"progress",8},.version=1,.scope=PG_DOC_TASK,.family=1};pg_document_address address={.kind={"progress",8},.key={"k0",2},.owner=1000,.scope=PG_DOC_TASK,.has_key=1};struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"!\"]]");assert(seed&&ops);
+  if(mode){pg_document_request request={&def,&address,seed,&initial,tx_mint,0,0};pg_document_change *edit=0;assert(!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_change_append(edit,ops));scanner.edit=edit;address.key=(pg_slice){"new",3};assert(!pg_document_tx_doc(&scope,&request,&edit));}
+  stage_task_state(&tx,1000,1,"terminal");
+  doc_tracking=1;doc_calls=0;doc_fail=attempt;int status=pg_document_tx_settle(&scope,&scan);doc_tracking=0;
+  if(!attempt){assert(!status);counts[mode]=doc_calls;}else{assert(status!=PG_TX_OK&&m.next_sequence==3&&!scope.entries&&scope.sealed&&cache.count==mode);if(mode){address.key=(pg_slice){"k0",2};pg_document_loaded *loaded=0;assert(!pg_document_cache_get(&cache,&def,&address,&loaded)&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"old"));}}
+  doc_fail=0;json_object_put(seed);json_object_put(ops);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+ }
+}
+#endif
 int main(void){
+ terminal_task_documents();
+ terminal_task_rejections();
+ new_terminal_task_documents();
+#ifdef PG_MEMORY_FAULTS
+ terminal_task_faults();
+#endif
  managed_document_retirement();
  managed_retirement_backend_failure();
 #ifdef PG_MEMORY_FAULTS

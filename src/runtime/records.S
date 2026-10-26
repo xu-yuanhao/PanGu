@@ -2850,3 +2850,84 @@ pg_record_tx_require_document_owner:
  pop rbp
  ret
 .size pg_record_tx_require_document_owner,.-pg_record_tx_require_document_owner
+
+.text
+/* Visit only the latest staged terminal candidate per Task ID. */
+.globl pg_record_tx_terminal_next
+.hidden pg_record_tx_terminal_next
+.type pg_record_tx_terminal_next,@function
+pg_record_tx_terminal_next:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r13],0
+ mov qword ptr [rsp],0
+ mov ebp,1
+.Lterminal_next_each:
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov rsi,[r12]
+ cmp rsi,rax
+ jae .Lterminal_next_done
+ inc qword ptr [r12]
+ mov rdi,[rbx+24]
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Lterminal_next_each
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_terminal]
+ call .Ls_string
+ test eax,eax
+ jz .Lterminal_next_each
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,rbx
+ mov rdx,rsp
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Lterminal_next_done
+ cmp rax,r14
+ jne .Lterminal_next_each
+ mov [r13],r14
+ xor ebp,ebp
+.Lterminal_next_done:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_terminal_next,.-pg_record_tx_terminal_next

@@ -49,6 +49,15 @@ pg_document_status pg_document_materialize(const pg_document_definition *,const 
    output is disjoint and cleared on failure. IDs are positive safe integers. */
 pg_document_status pg_document_record_decode(const struct json_object *,pg_document_record *);
 typedef struct {
+ unsigned scope,has_kind;
+ uint64_t owner;
+ pg_slice kind;
+ uint64_t at;
+ size_t limit;
+ int64_t after;
+ unsigned has_cursor,reserved;
+} pg_document_query;
+typedef struct {
  void *context;
  /* 0 owned result, 1 missing, other values storage failure. */
  int (*find)(void *,const pg_document_address *,uint64_t at,struct json_object **);
