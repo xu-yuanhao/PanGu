@@ -1507,3 +1507,219 @@ pg_session_publications_deliver:
 .Lpublication_stored_kind: .asciz "stored"
 .Lpublication_memory: .asciz "memory"
 .section .note.GNU-stack,"",@progbits
+.text
+.Lnotice_copy:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ test rdx,rdx
+ jz .Lnotice_copy_attach
+ mov rdi,rdx
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lnotice_copy_bad
+.Lnotice_copy_attach:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lnotice_copy_end
+.Lnotice_copy_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,1
+.Lnotice_copy_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.globl pg_document_publication_prepare
+.type pg_document_publication_prepare,@function
+pg_document_publication_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov ebp,1
+ test r12,r12
+ jz .Lnotice_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Lnotice_end
+ mov r13d,[rbx+48]
+ cmp r13d,15
+ ja .Lnotice_end
+ test r13d,11
+ jnz .Lnotice_validate
+ xor ebp,ebp
+ jmp .Lnotice_end
+.Lnotice_validate:
+ mov rdi,[rbx]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lnotice_end
+ mov rdi,[rbx]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lnotice_end
+ mov r14,[rbx+32]
+ mov rax,9007199254740991
+ cmp r14,rax
+ ja .Lnotice_end
+ test r13d,1
+ jnz .Lnotice_build
+ test r13d,2
+ jnz .Lnotice_copy_validate
+ mov rdi,[rbx+16]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lnotice_end
+ mov rax,9007199254740991
+ cmp [rbx+40],rax
+ ja .Lnotice_end
+ test r13d,4
+ jnz .Lnotice_build
+ mov rdi,[rbx+24]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lnotice_end
+ mov rdi,[rbx+24]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lnotice_end
+ jmp .Lnotice_build
+.Lnotice_copy_validate:
+ mov rdi,[rbx+8]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lnotice_end
+ mov rdi,[rbx+8]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lnotice_end
+.Lnotice_build:
+ mov ebp,2
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lnotice_cleanup
+ mov [rsp],rax
+ lea rdi,[rip+.Lnotice_document]
+ test r13d,1
+ jnz .Lnotice_type
+ test r13d,2
+ jz .Lnotice_type
+ lea rdi,[rip+.Lnotice_document_copy]
+.Lnotice_type:
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_type]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lnotice_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_record]
+ mov rdx,[rbx]
+ call .Lnotice_copy
+ test eax,eax
+ jnz .Lnotice_cleanup
+ test r14,r14
+ jz .Lnotice_content
+ mov rdi,r14
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_conversation]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lnotice_cleanup
+.Lnotice_content:
+ test r13d,1
+ jnz .Lnotice_retire
+ test r13d,2
+ jz .Lnotice_value
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_source]
+ mov rdx,[rbx+8]
+ call .Lnotice_copy
+ test eax,eax
+ jnz .Lnotice_cleanup
+ jmp .Lnotice_success
+.Lnotice_value:
+ mov rdi,[rbx+40]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_version]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lnotice_cleanup
+ mov rdx,[rbx+16]
+ jmp .Lnotice_set_value
+.Lnotice_retire:
+ xor edx,edx
+.Lnotice_set_value:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_value_key]
+ call .Lnotice_copy
+ test eax,eax
+ jnz .Lnotice_cleanup
+ test r13d,5
+ jz .Lnotice_loaded_ops
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lnotice_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_ops]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lnotice_cleanup
+ jmp .Lnotice_success
+.Lnotice_loaded_ops:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_ops]
+ mov rdx,[rbx+24]
+ call .Lnotice_copy
+ test eax,eax
+ jnz .Lnotice_cleanup
+.Lnotice_success:
+ mov rax,[rsp]
+ mov [r12],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+.Lnotice_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lnotice_end:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_publication_prepare,.-pg_document_publication_prepare
+.section .rodata
+.Lnotice_document: .asciz "document"
+.Lnotice_document_copy: .asciz "document.copy"
+.Lnotice_record: .asciz "record"
+.Lnotice_conversation: .asciz "conversationId"
+.Lnotice_source: .asciz "source"
+.Lnotice_version: .asciz "version"
+.Lnotice_value_key: .asciz "value"
+.Lnotice_ops: .asciz "ops"
+.section .note.GNU-stack,"",@progbits

@@ -149,4 +149,19 @@ void pg_session_publications_discard(pg_session_publications *);
    The host supplies the originating delivery context. Callback errors remain
    contained as for deliver; successful return means notification completed. */
 int pg_session_publications_deliver(pg_session_listeners *,const pg_session_publications *,void *);
+typedef struct {
+ const struct json_object *record,*copy_source,*value,*ops;
+ uint64_t conversation_id,version;
+ unsigned flags,reserved;
+} pg_document_publication_request;
+enum {PG_NOTICE_RETIRE=1,PG_NOTICE_COPY=2,PG_NOTICE_CREATED=4,PG_NOTICE_PUBLISHES=8};
+/* Describe one adopted Document plan. record is its final lifecycle record;
+   conversation_id=0 omits the Session-scoped field. Retirement precedes copy,
+   and omits version, emits null value/empty ops. Copy emits source only. New
+   content emits empty ops; loaded changes preserve exact prepared ops,
+   including empty migration ops. No publish flag means successful no notice.
+   Inputs are borrowed only during call; output is detached/owned or NULL.
+   Failure leaves NULL. Prepare lifecycle stamps before calling; do not retain
+   a loaded handle across retirement eviction. */
+int pg_document_publication_prepare(const pg_document_publication_request *,struct json_object **);
 #endif

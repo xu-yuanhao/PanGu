@@ -485,3 +485,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写publication准备/释放/分发，普通表过滤保留原序、排除Document StorageWrites，追加预备文档集合。observed/stored输入集合相同时保留输出共享身份，否则分别形成含/不含已观察held内容的集合；memory仅observed、held flush仅stored，正常提交内部先外部后。owned输出隔离于输入，失败返回零输出；类型匹配核对字节长度，含NUL伪前缀不误匹配。
 - 实际验证：16组执行实际Pi #publish构造分支，数据及共享身份一致；六组stored/memory/held×共享/分离集合验证与25个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心树G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有Session独立类型/导出/来源、专项和TODO；旧ABI、门禁、预算保持。6个候选路径内容清单摘要（本记录加入前）：7f9ea48d0da8e8d9641092ac40d09b738629bb6a844ea5e14785b1d6b3e32ec5；隔离核心树f7e7e82d02eab7acd05e01102fe481659348acba。结论为publication构造/分发本地通过；实际Doc adoption/holds变更构造、Session接线与Document watch仍待接入，完整观察与K03总验收未完成。TUI工作树保留。
+
+## K03 Document计划通知描述
+
+- 来源：Pi d5b3de22 describe/publishes/adopt/adoptHeld与Session.#storeHolds，原生DocTx的Prepared/安装/退休驱逐路径。fetch后Pi origin为89c921d，固定来源无变化，Harness为22ddee37。
+- 实现：手写独立通知描述入口，退休优先于copy，退休null value/空ops/无version；copy保留source；创建空ops，loaded更新与迁移保留prepared ops；Session-scope省略conversation。输出独立拥有record/value/ops，避免退休驱逐后读取已释放loaded句柄。入口接收最终record与上层解析的conversation，生命周期stamp/自动计划捕获继续接入。
+- 实际验证：36组执行实际Pi describe函数，对照创建/更新/空ops迁移/退休/copy及优先级、缺省字段；原生输入/输出隔离和13个直接分配/插入/部分复制故障通过。最初局部代码label与rodata同名，汇编器拒绝后改为独立key label，最终树重跑通过。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan与固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：既有Session独立描述契约/导出/来源、专项和TODO；旧ABI、门禁、预算保持。6个候选路径内容清单摘要（本记录加入前）：38208b691ed1723b676568ecf23c927c8563b9103dac6ca8b3282233fb3d787a；隔离核心树2cccbb834825ccbe65a70f34d6a021e51603cc1b。结论为计划通知描述本地通过；finalizer预备、adoption补stamp与Session/holds实际通知接线、Document watch继续，K03总验收未完成。TUI工作树保留。

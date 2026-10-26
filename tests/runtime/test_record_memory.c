@@ -297,6 +297,15 @@ static void publication_tests(void){
 #endif
  json_object_put(writes);json_object_put(observed);json_object_put(stored);
 }
+static void document_notice_tests(void){
+ _Static_assert(sizeof(pg_document_publication_request)==56,"Document notice ABI");struct json_object *record=json_tokener_parse("{\"id\":10,\"kind\":\"doc\",\"createdAt\":2,\"retiredAt\":7}"),*source=json_tokener_parse("{\"id\":3,\"at\":2}"),*value=json_tokener_parse("{\"text\":\"new\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"tail\"]]");assert(record&&source&&value&&ops);
+ unsigned modes[]={0,PG_NOTICE_RETIRE,PG_NOTICE_COPY,PG_NOTICE_PUBLISHES,PG_NOTICE_CREATED|PG_NOTICE_PUBLISHES};
+ for(unsigned i=0;i<5;++i){pg_document_publication_request request={record,source,value,ops,1,2,modes[i],0};struct json_object *out=0;assert(!pg_document_publication_prepare(&request,&out));if(!i)assert(!out);else{assert(out&&json_object_get_int(json_object_object_get(out,"conversationId"))==1&&json_object_equal(json_object_object_get(out,"record"),record));if(i==2)assert(json_object_equal(json_object_object_get(out,"source"),source)&&!json_object_object_get(out,"value"));else{assert(json_object_array_length(json_object_object_get(out,"ops"))==(i==3?1:0));if(i==1){struct json_object *null_value=(void*)1;assert(json_object_object_get_ex(out,"value",&null_value)&&!null_value&&!json_object_object_get(out,"version"));}else assert(json_object_equal(json_object_object_get(out,"value"),value)&&json_object_get_int(json_object_object_get(out,"version"))==2);}assert(!json_object_object_add(json_object_object_get(out,"record"),"outside",json_object_new_int(1))&&!json_object_object_get(record,"outside"));}json_object_put(out);}
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;for(unsigned target=0;target<=total;++target){pg_document_publication_request request={record,source,value,ops,1,2,PG_NOTICE_PUBLISHES,0};struct json_object *out=0;doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_document_publication_prepare(&request,&out);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;if(target){assert(status&&!out);++failures;}else{assert(!status&&out);total=calls;json_object_put(out);}}printf("PASS: Document notice semantics/ownership and %u direct allocation/insert/clone failures\n",failures);
+#endif
+ json_object_put(record);json_object_put(source);json_object_put(value);json_object_put(ops);
+}
 static void storage_guard_tests(void){
  _Static_assert(sizeof(pg_durable_storage)==56&&offsetof(pg_durable_storage,busy)==48,"guard descriptor ABI");
  for(unsigned mint=0;mint<2;++mint)for(unsigned mode=0;mode<9;++mode){pg_record_session records={0};pg_durable_session session={.records=&records,.phase=1};guard_fixture f={.mode=mode};pg_durable_storage guard={.session=&session,.context=&f,.read=guard_read,.mint=guard_mint,.request_error=guard_error,.cancelled=guard_cancelled};f.guard=&guard;struct json_object *out=0;uint64_t id=999;int status=mint?pg_durable_storage_mint(&guard,&id):pg_durable_storage_read(&guard,2,10,&out);unsigned failed=mode==5?PG_RECORDS_ADOPTION_FAILED:mode==2||(mint&&(mode==3||mode==4||mode==8))?PG_RECORDS_STORAGE_FAILED:0;int want=mode==5?64:mint&&mode==8?66:mode==2||mode==4?7:mode==3?8:!mint&&mode==1?1:0;assert(status==want&&records.failed==failed&&!guard.busy&&!session.busy&&f.calls==1);if(!status){if(mint)assert(id==100);else assert(out);}else{assert(!out);if(mint)assert(!id);}json_object_put(out);out=0;
@@ -1500,6 +1509,7 @@ int main(void){
  storage_guard_tests();
  session_listener_tests();
  publication_tests();
+ document_notice_tests();
  guarded_transaction_tests();
  guarded_query_tests();
  guarded_memory_query_tests();

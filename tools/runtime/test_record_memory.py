@@ -636,6 +636,28 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
             for value in inputs:library.json_object_put(value)
     print(f'PASS: {len(cases)} observed/stored publication payloads and identity match actual Pi publish body')
 
+def document_notices(native,library):
+    cases=[]
+    for conversation in [0,1,50]:
+        for flags in [0,1,2,3,8,12]:
+            for ops in [[],[['a',['text'],'tail']]]:
+                cases.append(dict(conversation=conversation,flags=flags,ops=ops))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(process.argv[1],'utf8'),a=source.indexOf('function describe('),b=source.indexOf('\n/**',a);const EMPTY_OPERATIONS=[];function publishes(plan){return plan.testPublish}const describe=eval('('+stripTypeScriptTypes(source.slice(a,b))+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){const record={id:10,kind:'doc',createdAt:2,...(c.flags&1?{retiredAt:7}:{})};const plan={conversationId:c.conversation||undefined,retire:!!(c.flags&1),content:c.flags&2?{type:'document.copy',source:{id:3,at:2}}:undefined,change:{loaded:c.flags&4?undefined:{},version:2,prepared:{value:{text:'new'},ops:c.ops}},testPublish:!!(c.flags&8)};out.push(describe(plan,record)??null)}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Request(ctypes.Structure):
+        _fields_=[('record',ctypes.c_void_p),('source',ctypes.c_void_p),('value',ctypes.c_void_p),('ops',ctypes.c_void_p),('conversation',ctypes.c_uint64),('version',ctypes.c_uint64),('flags',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    native.pg_document_publication_prepare.argtypes=[ctypes.POINTER(Request),ctypes.POINTER(ctypes.c_void_p)]
+    for case,want in zip(cases,expected,strict=True):
+        record=dict(id=10,kind='doc',createdAt=2,**({'retiredAt':7} if case['flags']&1 else {}));inputs=[library.json_tokener_parse(json.dumps(v).encode()) for v in [record,dict(id=3,at=2),dict(text='new'),case['ops']]];request=Request(*inputs,case['conversation'],2,case['flags'],0);out=ctypes.c_void_p()
+        try:
+            assert not native.pg_document_publication_prepare(ctypes.byref(request),ctypes.byref(out));actual=json.loads(library.json_object_to_json_string_ext(out,0)) if out.value else None;assert actual==want,(case,actual,want)
+        finally:
+            library.json_object_put(out)
+            for value in inputs:library.json_object_put(value)
+    print(f'PASS: {len(cases)} Document creation/update/migration/retirement/copy notices match actual Pi describe function')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -924,5 +946,6 @@ def main():
         task_creation(native,library)
         storage_guard(native,library)
         publications(native,library)
+        document_notices(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

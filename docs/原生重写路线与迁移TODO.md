@@ -110,6 +110,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 验证原生只读Session的普通/deferred事务：空批成功、所有记录/文档写入拒绝、无采纳/发布/持久序号变化，拒绝后读取与关闭正常。
 - [x] 移植同步listener注册/取消/分发宿主：身份去重、通知快照、内部失败锁存、外部错误报告和一次关闭清理。
 - [x] 移植observed/stored publication构造：普通表过滤/顺序、observed与stored文档集合分离、memory与held-only通知、共享对象身份和内部先通知。
+- [x] 移植Document计划的通知描述：退休/复制优先级、创建空ops、迁移空ops保留、可选conversation与独立输出所有权。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -480,3 +481,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S:pg_session_publications_prepare/discard/deliver`从StorageWrite和独立observed/stored文档集合准备owned publication。普通表先按源顺序过滤，再追加文档；相同文档集合保留observed/stored共享对象身份，不同集合使held已观察内容仅进入持久通知。memory仅内部、held-only仅外部，普通提交内部先于外部。输入/输出隔离，构造错误清理全部结果。
 - 16组执行实际Pi #publish数据构造分支，payload和共享身份一致，包含NUL type拒绝匹配；六组普通/memory/held×共享/分离集合验证和25个直接分配/插入/部分复制故障通过。最终专项/完整Runtime见当前实现记录。
 - 下一行为：从原生Doc adoption/holds生成DocumentCommitChange，连同table batch把这些publication接入实际Session钩子及关闭通知。此处验证独立publication构造/分发，尚未把Session接线或Document watch视作完成。
+
+### K03 Document通知描述交接
+
+- 阅读Pi d5b3de22 Transaction.describe/publishes/adopt/adoptHeld与Session.#storeHolds；对照原生DocTx安装/驱逐与Prepared生命周期。fetch后origin保持89c921d，Harness保持22ddee37。
+- `durable_session.h/.S:pg_document_publication_prepare`以明确字段描述一个计划的通知，退休优先于复制，退休无version/null value/空ops；copy只带record/conversation/source；新内容空ops，loaded更新保留精确prepared ops，迁移即使ops为空也可发布。所有输入仅在调用中借用，结果独立持有record/value/ops；无发布标记返回空结果。
+- 36组执行实际Pi describe函数，数据与缺省字段一致；原生所有权和13个直接分配/插入/部分复制故障通过。专项/完整Runtime见当前实现记录。
+- 下一行为：在DocTx finalizer中准备通知及生命周期stamp，adopt时无分配补seq；保留退休前的独立数据，再经Session发布。当前描述入口消费最终record，不宣称已经自动捕获DocTx/holds通知；task-scope conversation仍由上层计划解析提供。
