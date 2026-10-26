@@ -1129,6 +1129,38 @@
           ]
         }
       ]
+    },
+    {
+      "id": "session.documents.hold-timer.local.v0",
+      "sources": [
+        "src/runtime/hold_timer.h",
+        "src/runtime/hold_timer.S"
+      ],
+      "dependencies": [
+        "session.documents.holds.local.v0",
+        "session.records.local.v0",
+        "libc"
+      ],
+      "role": "Session mutation-line holds timer controller consuming injected mandatory foreground/cancel/enqueue services: minimum finite deadline, fired ticket retention, enqueue-only delivery, batch flush job, quiescent stop and failed Session handling",
+      "exports": [
+        "pg_hold_timer_open",
+        "pg_hold_timer_sync",
+        "pg_hold_timer_stop"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/timers.ts"
+          ],
+          "semantics": "#armHoldTimer arms minimum deadline, preserves fired timer until queued job, disarms replaced deadline, infinity has no timer, queued callback stores all held docs only while active/healthy; timer/queue services are injected native providers; queued tickets own callback storage through drain; foreground delivery and mutation-line enqueue are never inline",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

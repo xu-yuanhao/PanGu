@@ -3,6 +3,7 @@
 #include "../../src/runtime/delta.h"
 #include "../../src/runtime/document_tx.h"
 #include "../../src/runtime/holds.h"
+#include "../../src/runtime/hold_timer.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -1001,12 +1002,44 @@ static void native_finish_tests(void){
 #endif
 }
 
+
+typedef struct {pg_timer_job callback;void *context;} native_timer_handle;
+typedef struct {native_holds_fixture n;pg_hold_timer timer;pg_hold_timer_host host;native_timer_handle *armed;pg_timer_job pending;void *pending_context;uint64_t delay;unsigned arms,cancels,enqueues,mode;} native_timer_fixture;
+static int native_foreground(void *context,uint64_t delay,pg_timer_job callback,void *owner,void **out){native_timer_fixture *f=context;assert(f->timer.busy&&!f->armed);++f->arms;f->delay=delay;*out=0;if(f->mode==1)return 1;native_timer_handle *handle=calloc(1,sizeof(*handle));if(!handle)return 1;handle->callback=callback;handle->context=owner;f->armed=handle;*out=handle;return f->mode==2;}
+static void native_timer_cancel(void *context,void *handle){native_timer_fixture *f=context;assert(handle&&handle==f->armed&&f->timer.busy);++f->cancels;f->armed=0;free(handle);}
+static int native_timer_enqueue(void *context,pg_timer_job job,void *owner){native_timer_fixture *f=context;assert(!f->pending);++f->enqueues;if(f->mode==3)return 1;f->pending=job;f->pending_context=owner;return 0;}
+static void native_timer_open(native_timer_fixture *f,unsigned other){memset(f,0,sizeof(*f));pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&f->n,&deferred,&merge,0);if(other)native_merge_other_hold(&f->n,&deferred);f->host=(pg_hold_timer_host){f,native_foreground,native_timer_cancel,native_timer_enqueue};assert(!pg_hold_timer_open(&f->timer,&f->n.holds,&f->n.f.session,&f->host));}
+static void native_timer_fire(native_timer_fixture *f){assert(f->armed);f->armed->callback(f->armed->context);}
+static void native_timer_run(native_timer_fixture *f){assert(f->pending&&!f->n.f.session.busy&&!f->n.holds.busy&&!f->n.f.cache.busy);pg_timer_job job=f->pending;void *context=f->pending_context;f->pending=0;f->pending_context=0;job(context);}
+static void native_timer_close(native_timer_fixture *f){assert(!f->pending&&!pg_hold_timer_stop(&f->timer)&&!f->armed);native_hold_close(&f->n);}
+static void native_timer_edit(native_timer_fixture *f,const char *suffix){deferred_edit(&f->n.f,suffix);f->n.f.scope.entries[0].checkpoint=0;}
+static void native_timer_tests(void){
+ _Static_assert(sizeof(pg_hold_timer)==72&&sizeof(pg_hold_timer_host)==32,"hold timer ABI");
+ native_timer_fixture f;native_timer_open(&f,1);assert(!pg_hold_timer_sync(&f.timer)&&f.arms==1&&f.delay==100);assert(!pg_hold_timer_sync(&f.timer)&&f.arms==1&&!f.cancels);
+ pg_document_deferred deferred;assert(!pg_document_holds_bind(&f.n.holds,&deferred));f.n.f.now=150;native_timer_edit(&f,"a");assert(!pg_document_tx_deferred(&f.n.f.scope,0,&deferred,500)&&!pg_hold_timer_sync(&f.timer)&&f.arms==1);
+ native_timer_edit(&f,"b");assert(!pg_document_tx_deferred(&f.n.f.scope,0,&deferred,10)&&!pg_hold_timer_sync(&f.timer)&&f.arms==2&&f.cancels==1&&f.delay==10);
+ f.n.f.now=160;f.n.f.session.busy=1;native_timer_fire(&f);native_timer_fire(&f);assert(f.enqueues==1&&f.pending&&!f.n.f.adopted&&!f.n.f.published&&!f.n.f.session.failed);f.n.f.session.busy=0;native_timer_edit(&f,"c");assert(!pg_document_tx_deferred(&f.n.f.scope,0,&deferred,0)&&!pg_hold_timer_sync(&f.timer)&&f.arms==2&&f.cancels==1);native_timer_run(&f);
+ assert(!f.timer.ticket&&!f.n.holds.count&&f.n.f.adopted==1&&f.n.f.published==1&&f.n.f.observed==5&&f.cancels==2);struct json_object *stored=0;assert(!pg_record_memory_document(&f.n.f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"seedheldabc"));json_object_put(stored);assert(!pg_hold_timer_sync(&f.timer)&&f.arms==2);native_timer_close(&f);
+ native_timer_open(&f,0);assert(!pg_document_holds_bind(&f.n.holds,&deferred));assert(!pg_document_holds_flush(&f.n.holds,&f.n.f.session));native_timer_edit(&f,"infinite");assert(!pg_document_tx_deferred(&f.n.f.scope,0,&deferred,UINT64_MAX)&&!pg_hold_timer_sync(&f.timer)&&!f.arms);native_timer_edit(&f,"due");assert(!pg_document_tx_deferred(&f.n.f.scope,0,&deferred,0));f.n.f.now=200;assert(!pg_hold_timer_sync(&f.timer)&&f.arms==1&&!f.delay);native_timer_close(&f);
+ native_timer_open(&f,1);assert(!pg_hold_timer_sync(&f.timer));native_timer_fire(&f);assert(pg_hold_timer_stop(&f.timer)==1&&f.cancels==1&&f.pending&&f.n.holds.count==2);assert(pg_hold_timer_stop(&f.timer)==1&&f.cancels==1);native_timer_run(&f);assert(!f.n.f.published&&f.n.holds.count==2&&!pg_hold_timer_stop(&f.timer));assert(!pg_document_holds_finish(&f.n.holds,&f.n.f.session)&&f.n.f.published==1);deferred_close(&f.n.f);
+ for(unsigned mode=1;mode<=3;++mode){native_timer_open(&f,0);f.mode=mode;if(mode<3)assert(pg_hold_timer_sync(&f.timer)==PG_RECORDS_ADOPTION_FAILED);else {assert(!pg_hold_timer_sync(&f.timer));native_timer_fire(&f);assert(!f.pending&&pg_hold_timer_sync(&f.timer)==PG_RECORDS_ADOPTION_FAILED);}assert(f.n.f.session.failed==PG_RECORDS_ADOPTION_FAILED&&f.n.holds.count==1&&!f.timer.busy);native_timer_close(&f);}
+ native_timer_open(&f,0);assert(!pg_hold_timer_sync(&f.timer));f.n.f.session.failed=PG_RECORDS_STORAGE_FAILED;native_timer_fire(&f);native_timer_run(&f);assert(f.n.holds.count==1&&!f.n.f.published&&f.n.f.session.failed==PG_RECORDS_STORAGE_FAILED);native_timer_close(&f);
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){native_timer_open(&f,1);assert(!pg_hold_timer_sync(&f.timer));native_timer_fire(&f);doc_calls=0;doc_fail=target;doc_tracking=1;native_timer_run(&f);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;assert(!f.timer.ticket&&!f.timer.busy&&!f.armed);
+ if(target){assert(f.n.f.session.failed&&f.timer.error==f.n.f.session.failed&&f.n.holds.count==2&&!f.n.f.published);++failures;}else {assert(!f.n.f.session.failed&&!f.n.holds.count&&f.n.f.published==1);total=calls;}native_timer_close(&f);}
+ for(unsigned target=1;target<=2;++target){native_timer_open(&f,0);doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_hold_timer_sync(&f.timer);doc_tracking=0;doc_fail=0;assert(status!=0&&f.n.f.session.failed==(unsigned)status&&!f.timer.ticket&&!f.armed&&f.n.holds.count==1);native_timer_close(&f);++failures;}
+ printf("PASS: foreground hold timer, earliest/rearm/infinity, queued flush/stop, errors and %u direct allocation/insert/clone failures\n",failures);
+#endif
+}
+
 int main(void){
  native_holds_tests();
  native_flush_tests();
  native_merge_tests();
  native_reload_tests();
  native_finish_tests();
+ native_timer_tests();
  deferred_memory_transactions();
  deferred_other_reads_and_documents();
  deferred_fallbacks();

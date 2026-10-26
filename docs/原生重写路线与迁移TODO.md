@@ -93,6 +93,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通holds整批持久flush：统一Storage提交、确认时更新持久计数、成功后释放pin并通知持久订阅者；失败遵循Session fail-stop。
 - [x] 接通正常事务及deferred混合回退的takeHeld合并：当前编辑/只读与其他写入/退休同批保存，保留无关holds，支持checkpoint base覆盖。
 - [x] 接通按incarnation的版本重载前flush及holds结束服务：只保存目标队列、保持其它期限；健康时排空、失败时清理、保留首个错误。
+- [x] 移植holds最早期限定时器控制器：前台定时/串行入队服务注入、已触发ticket保留、到期批量保存与关闭时排空。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -345,3 +346,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - holds_finish用于宿主停止接收工作后的队列结束：健康Session排空，失败Session跳过写入，所有结果清理并关闭holds owner，保留首个失败；重复结束返回同一结果。Cache和Storage由宿主随后关闭，整机Session admission/关闭队列仍由后续组合衔接。
 - 验证：真实MemoryStorage完成v1 held→仅目标保存→v2迁移→正常迁移base提交，另一个文档的队列/pin/期限保持。拒绝后端时保留旧loaded；62个逐直接分配/插入/部分复制故障区分落盘前失败与落盘成功后重载失败。结束服务65个故障点及健康/已失败/后端失败/重复结束通过。专项和完整Runtime结果记入当前实现记录。
 - 下一行为：deadline/timer服务衔接及完整Session关闭组合，继续K03查询/只读视图和整机接口。
+
+### K03 holds定时器控制器交接（2026-10-26）
+
+- 阅读固定Pi d5b3de22 Session.#armHoldTimer、#storeHolds、close、timers.ts的Timers.foreground契约与session-deferred-commits.test.ts；本批Pi/Harness仍为d5b3de22 / 22ddee37。
+- hold_timer.h/.S消费前台定时/cancel/Session enqueue服务：sync在held变更/释放后设置最早有限deadline，仅期限改变才替换定时器；Infinity保持无定时器。timer回调只入队，已触发ticket保留到串行job运行，job保存全部holds且不重复内存通知。stop先封闭timer并取消handle，已入队job须排空且跳过写入，之后宿主调用holds_finish和Cache/Storage close。原ABI保持。
+- timer/队列提供者由宿主注入；实际Session组合须在deferred/merge/flush后调用sync，并保证enqueue不内联、cancel后无未来timer回调、已入队job恰好一次运行。K06实现可复用的原生Timers/队列服务，完整Session关闭组合继续衔接。
+- 验证：最早期限/相同期限复用/更早期限取消重设/Infinity/过期期限0 delay，回调只入队、fired期间不重设、批量保存最新值、stop pending/drain、既有失败及provider拒绝/partial handle/入队拒绝均通过；67个直接分配/插入/部分复制故障保留数据和首因。具体命令结果见当前实现记录。

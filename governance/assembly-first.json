@@ -152,6 +152,10 @@
     "src/runtime/holds.S": {
       "role": "assembly-core",
       "reason": "手写延迟文档队列所有权、候选快照/采纳、缓存pin与最早期限管理"
+    },
+    "src/runtime/hold_timer.S": {
+      "role": "assembly-core",
+      "reason": "手写holds最早期限定时器、仅入队回调、串行落盘、取消与关闭待排空生命周期"
     }
   }
 }
