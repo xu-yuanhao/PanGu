@@ -78,6 +78,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [x] 完成已提交revision的current/as-of快照读取、生命周期截点、最近base选择与同版本delta尾重放。
 - [x] 将Document create/change/retire与其余四类表接入同一原子内存批次，维护全局ID、live地址唯一性及revision历史，提供current/as-of物化读取。
+- [x] 完成Document逻辑地址查找、精确scope/kind过滤与升序分页；current及历史成员关系返回独立生命周期record。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -225,7 +226,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 revision读取：`delta.h/.S:pg_document_revision_read` 对照Pi `MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly/documentDeltaBatches` 和 `storage-conformance.ts` 的历史/长尾/拷贝场景，原生view借用已提交revision数组，snapshot拥有独立JSON值。historical current-only先拒绝，再检查[createdAt,retiredAt)；current只读未退役，最近base后的delta版本必须一致。96条实际MemoryStorage读取对照一致，含退役/未退役、Session/Task/Conversation、latest/rewindable与base版本切换。O0/O2 ASan/UBSan覆盖逐个直接分配/插入/部分复制故障，失败输出清空。接口暂供Storage集成，未声明Document写入完成。
 - K03 Document提供者：`record_memory.S` 对照同版Pi `prepareDocumentActions/checkDocumentActions/applyDocumentActions/materializeDocument`，Document与四类表共用全局行索引、预留后无分配应用及adopt；同批content/retire先按ID合并并检查，live地址在批次最终状态中唯一。latest新base替换历史、退役清空；rewindable保留revision。`pg_record_memory_document` 返回独立StoredDocument JSON。公开Memory结构及既有表查询ABI不变。
 - K03 Document验证：累计2048条实际MemoryStorage操作对照一致，增加四类scope/history组合、连续delta与版本base、退役/重建、重复命令、混合表失败、历史截点读取。O0/O2内存专项验证创建、已有值更新、退役+同址重建、读取时逐直接分配/插入/部分复制失败；失败不改变已存记录/ID/序号，不采纳，输出归零。完整Runtime检查通过，新增故障场景后的全量复验见当前实现记录。
-- 下一完整行为：补Document.copy、地址find/scan，再接事务暂存及当前消息投影。
+- K03 Document查询：`pg_record_memory_find_document/scan_documents` 对照Pi `MemoryStorage.findDocument/scanDocuments/isAliveAt`、`addressKey`、`scopeKey`与`page`，阅读 `storage-conformance.ts` 的退役重建和身份字段场景。Native地址复用既有48字节类型；DocumentQuery 64字节，Page沿用24字节。成员关系可查询current-only的历史，区别于content历史拒绝；at截点按[createdAt,retiredAt)判断。当前基于provider有序全局行过滤，不新增平行存储。
+- K03查询验证：4922条累计实际MemoryStorage对照一致；新增singleton/空key、NUL kind/key、同址新旧实例、scope/kind过滤、0～120截点、负/正after及分页。O0/O2 ASan/UBSan验证输出隔离、缺失、无效limit、复制部分结果/分配/插入失败清理。完整Runtime复验结果见当前实现记录。K03仍待copy及完整Tx。
+- 下一完整行为：补Document.copy，再接事务暂存及当前消息投影。
 
 ### K01 当前落点与补齐映射
 

@@ -155,3 +155,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：现有 `record_memory.S` 手写Document动作合并、全局ID/类型检查、live地址唯一性、版本和历史保留、创建/退役序号及公开 `pg_record_memory_document`。准备阶段为受影响文档生成私有record与revision数组（借用未变revision引用），与普通表一同预留容量后无分配应用；失败不修改可见记录/ID/序号。无需复制所有已存文档值。既有48字节Memory及Query/Page ABI不变。
 - 验证：2048条实际MemoryStorage混合操作对照一致；包括Document四种scope/history组合、连续delta、base版本切换、live冲突、退役并重建、重复动作、跨表失败和0～120历史截点。原1324条记录行为仍覆盖。O0/O2 ASan/UBSan专项通过，创建、delta更新+task、退役重建及snapshot读取枚举直接分配/插入/部分复制故障，检查所有权、输出、记录与计数不变；完整Runtime最终树退出0。隔离暂存核心树G00、Assembly inventory与实际产品构建通过；共享树G00仍报告TUI的4个未登记候选文件。
 - 同一实施Agent自审：新增实际Document导出及delta依赖登记，构建补链接依赖和故障注入；未修改门禁/预算。8个候选路径与暂存内容SHA256清单摘要（本记录加入前）`33724d06f0441ecfb0e67f11d99406ee82378540e53bfa58086a88f209ec631f`。结论为本地集成候选通过；尚待Document.copy、地址find/scan与完整Tx，K03未完成。JSON delta已记录的三条原生ABI差异仍待解决。
+
+## K03 Document地址查找与分页（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `MemoryStorage.findDocument/scanDocuments/isAliveAt`、`addressKey/scopeKey/page`；`testing/storage-conformance.ts` 的同址退役重建与NUL身份字段场景。2026-10-26 fetch Pi/Harness，HEAD与远端仍分别为固定 `d5b3de22` / `22ddee37`，无新修复待采用。
+- 实现：现有provider新增手写Assembly `pg_record_memory_find_document/scan_documents`，复用原地址类型与Page，DocumentQuery布局64字节；精确scope/owner/kind/可选key身份，生命周期成员关系不要求content历史可读，返回独立owned record。扫描按有序全局行过滤，升序after游标与limit+1续页语义取自上游。
+- 实际验证：累计4922条MemoryStorage操作直接对照一致；O0/O2 ASan/UBSan专项覆盖隔离、current/历史、空key、NUL身份字段及逐直接复制/分配/插入故障清理，完整Runtime退出0。隔离暂存核心树G00、Assembly inventory及产品构建通过；共享树G00仍因4个TUI候选文件未登记失败。
+- 同一实施Agent自审：仅新增实际导出/参考登记，未调整门禁与预算；6个候选路径及暂存内容清单SHA256摘要（本记录加入前）`797454a97bac4d76b8b1ad1dc7c15da86ddc247a3b24d86f1cb2d937472b32f3`。结论为本地候选验证通过。当前扫描使用线性候选过滤，Document.copy和Tx仍在K03执行队列，K03未完成。

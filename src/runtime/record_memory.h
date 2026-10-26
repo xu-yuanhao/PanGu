@@ -1,6 +1,7 @@
 #ifndef PANGU_RECORD_MEMORY_H
 #define PANGU_RECORD_MEMORY_H
 #include "records.h"
+#include "documents.h"
 #include <stddef.h>
 typedef enum { PG_TABLE_CONVERSATION,PG_TABLE_ENTRY,PG_TABLE_TASK,PG_TABLE_SUBMISSION,PG_TABLE_DOCUMENT } pg_record_table;
 typedef struct {uint64_t id;struct json_object *value;uint64_t sequence;unsigned table,reserved;} pg_memory_row;
@@ -53,4 +54,21 @@ pg_memory_status pg_record_memory_head(pg_record_memory *,uint64_t conversation_
    Document rows are private; generic read/scan accept the four ordinary tables.
    This reader may be used in adopt, after the batch has been fully applied. */
 pg_memory_status pg_record_memory_document(pg_record_memory *,uint64_t id,uint64_t at,struct json_object **);
+/* Logical identity lookup returns an owned DocumentRecord, without reading
+   content. Historical membership also works for current-only documents.
+   at=UINT64_MAX selects current. Absence returns PG_MEMORY_MISSING. */
+pg_memory_status pg_record_memory_find_document(pg_record_memory *,const pg_document_address *,uint64_t at,struct json_object **);
+typedef struct {
+ unsigned scope,has_kind;
+ uint64_t owner;
+ pg_slice kind;
+ uint64_t at;
+ size_t limit;
+ int64_t after;
+ unsigned has_cursor,reserved;
+} pg_document_query;
+/* Scope-exact ascending lifecycle records; at=UINT64_MAX means current.
+   Optional kind and signed-safe after cursor. limit>=1; owned Page snapshot.
+   Historical membership works even when content is current-only. */
+pg_memory_status pg_record_memory_scan_documents(pg_record_memory *,const pg_document_query *,pg_memory_page *);
 #endif

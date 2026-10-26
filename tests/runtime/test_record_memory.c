@@ -56,8 +56,10 @@ static void scan_tests(void){
 static void doc_adopt(void *context,uint64_t seq){(void)context;assert(seq);}
 static int doc_commit(pg_record_memory *memory,const char *text){struct json_object *batch=json_tokener_parse(text);assert(batch);uint64_t seq=0;pg_record_storage service=pg_record_memory_storage(memory);int result=service.commit(memory,batch,doc_adopt,0,&seq);json_object_put(batch);return result;}
 static void document_writes(void){
+ _Static_assert(sizeof(pg_document_query)==64&&offsetof(pg_document_query,at)==32&&offsetof(pg_document_query,has_cursor)==56,"document query ABI");
  pg_record_memory m={0};assert(!pg_record_memory_open(&m));
  assert(!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]"));
+ pg_document_address address={.kind={"test",4},.scope=PG_DOC_SESSION};struct json_object *found=0;assert(!pg_record_memory_find_document(&m,&address,UINT64_MAX,&found)&&json_object_get_int(json_object_object_get(found,"id"))==2);json_object_object_add(found,"local",json_object_new_boolean(1));json_object_put(found);assert(!pg_record_memory_find_document(&m,&address,1,&found)&&!json_object_object_get(found,"local"));json_object_put(found);assert(pg_record_memory_find_document(&m,&address,0,&found)==PG_MEMORY_MISSING&&!found);address.has_key=1;assert(pg_record_memory_find_document(&m,&address,UINT64_MAX,&found)==PG_MEMORY_MISSING&&!found);address.has_key=0;
  assert(m.count==1&&m.rows[0].table==4&&m.next_id==3);struct json_object *state=m.rows[0].value,*record=json_object_object_get(state,"record"),*revisions=json_object_object_get(state,"revisions");assert(json_object_get_int(json_object_object_get(record,"createdAt"))==1&&json_object_array_length(revisions)==1);
  assert(!doc_commit(&m,"[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":1,\"ops\":[[\"s\",[\"x\"],2]]}}]"));
  assert(json_object_array_length(json_object_object_get(m.rows[0].value,"revisions"))==2);
@@ -66,6 +68,8 @@ static void document_writes(void){
  assert(!doc_commit(&m,"[{\"type\":\"document.retire\",\"id\":2},{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{}}}]"));
  assert(m.count==2&&json_object_array_length(json_object_object_get(m.rows[0].value,"revisions"))==0&&json_object_get_int(json_object_object_get(json_object_object_get(m.rows[0].value,"record"),"retiredAt"))==3);
  assert(doc_commit(&m,"[{\"type\":\"document.retire\",\"id\":2}]")==PG_MEMORY_INVALID);
+ assert(!pg_record_memory_find_document(&m,&address,2,&found)&&json_object_get_int(json_object_object_get(found,"id"))==2);json_object_put(found);assert(!pg_record_memory_find_document(&m,&address,3,&found)&&json_object_get_int(json_object_object_get(found,"id"))==3);json_object_put(found);
+ pg_document_query query={.scope=PG_DOC_SESSION,.at=UINT64_MAX,.limit=1};pg_memory_page page={0};assert(!pg_record_memory_scan_documents(&m,&query,&page)&&json_object_array_length(page.items)==1&&!page.has_next&&json_object_get_int(json_object_object_get(json_object_array_get_idx(page.items,0),"id"))==3);json_object_put(page.items);query.at=2;assert(!pg_record_memory_scan_documents(&m,&query,&page)&&json_object_get_int(json_object_object_get(json_object_array_get_idx(page.items,0),"id"))==2);json_object_put(page.items);query.limit=0;assert(pg_record_memory_scan_documents(&m,&query,&page)==PG_MEMORY_INVALID&&!page.items&&!page.has_next);query.limit=1;
  assert(!pg_record_memory_close(&m));
 #ifdef PG_MEMORY_FAULTS
  const char *source="[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]";

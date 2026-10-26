@@ -16,6 +16,8 @@ const {MemoryStorage}=await import(new URL('packages/durable/src/storage/memory.
 const storage=new MemoryStorage(),out=[];
 for(const op of JSON.parse(readFileSync(0,'utf8'))){
  if(op.op==='commit'){const adopted=[];try{const seq=await storage.commit(op.writes,s=>adopted.push(s),{});out.push({ok:true,seq,adopted});}catch{out.push({ok:false,adopted});}}
+ if(op.op==='docscan'){try{out.push({ok:true,page:await storage.scanDocuments(op.query,op.limit,op.cursor,{})});}catch{out.push({ok:false});}}
+ if(op.op==='find'){try{out.push({ok:true,value:await storage.findDocument(op.address,op.at,{})??null});}catch{out.push({ok:false});}}
  if(op.op==='document'){try{out.push({ok:true,value:await storage.document(op.id,op.at,{})??null});}catch{out.push({ok:false});}}
  if(op.op==='mint'){try{out.push({ok:true,id:await storage.mintId()});}catch{out.push({ok:false});}}
  if(op.op==='entry'){try{out.push({ok:true,value:await (op.conversation===undefined?storage.entry(op.id,{}):storage.entry(op.conversation,op.id,{}))??null});}catch{out.push({ok:false});}}
@@ -32,6 +34,10 @@ class Storage(ctypes.Structure):
     _fields_=[('context',ctypes.c_void_p),('commit',ctypes.c_void_p)]
 class Slice(ctypes.Structure):
     _fields_=[('data',ctypes.c_void_p),('size',ctypes.c_size_t)]
+class Address(ctypes.Structure):
+    _fields_=[('kind',Slice),('key',Slice),('owner',ctypes.c_int64),('scope',ctypes.c_uint),('has_key',ctypes.c_uint)]
+class DocumentQuery(ctypes.Structure):
+    _fields_=[('scope',ctypes.c_uint),('has_kind',ctypes.c_uint),('owner',ctypes.c_uint64),('kind',Slice),('at',ctypes.c_uint64),('limit',ctypes.c_size_t),('after',ctypes.c_int64),('has_cursor',ctypes.c_uint),('reserved',ctypes.c_uint)]
 class Query(ctypes.Structure):
     _fields_=[('table',ctypes.c_uint),('order',ctypes.c_uint),('has_cursor',ctypes.c_uint),('cursor_order',ctypes.c_uint),
               ('after',ctypes.c_int64),('limit',ctypes.c_size_t),('flags',ctypes.c_uint64),('conversation_id',ctypes.c_uint64),
@@ -132,6 +138,26 @@ def main():
             dict(op='document',id=id+1,at='current')])
     for id in range(100000,100400,100):
         for at in range(121):operations.append(dict(op='document',id=id,at=at))
+    for scope,history,index in [('session',None,0),('task',None,1),('conversation','latest',2),('conversation','rewindable',3)]:
+        owner={'kind':scope,**({'conversationId':1} if scope=='conversation' else {'taskId':4000} if scope=='task' else {})}
+        for at in [*range(121),'current']:
+            operations.append(dict(op='find',address=dict(kind='doc.中',scope=owner),at=at))
+            operations.append(dict(op='find',address=dict(kind='doc.中',scope=owner,key=''),at=at))
+    for offset,(kind,key) in enumerate([('nul\0kind',None),('nul\0kind',''),('family','x\0y'),('family','x')]):
+        definition=dict(id=200000+offset,kind=kind,scope=dict(kind='session'))
+        if key is not None:definition['key']=key
+        operations.append(dict(op='commit',writes=[dict(type='document.create',record=definition,content=dict(kind='base',version=1,value={}))]))
+        operations.append(dict(op='find',address={k:v for k,v in definition.items() if k!='id'},at='current'))
+    for scope in [dict(kind='session'),dict(kind='conversation',conversationId=1),dict(kind='task',taskId=4000)]:
+        for at in [0,1,10,30,60,120,'current']:
+            for kind in [None,'doc.中','nul\0kind','family','missing']:
+                for limit in [1,2,100]:
+                    query=dict(scope=scope,at=at)
+                    if kind is not None:query['kind']=kind
+                    for after in [None,-1,100000,100001,200000,999999]:
+                        operation=dict(op='docscan',query=query,limit=limit)
+                        if after is not None:operation['cursor']=dict(after=after)
+                        operations.append(operation)
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
@@ -148,6 +174,8 @@ def main():
         native.pg_record_memory_scan.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(Query),ctypes.POINTER(Page)]
         native.pg_record_memory_storage.argtypes=[ctypes.POINTER(Memory)];native.pg_record_memory_storage.restype=Storage
         native.pg_record_memory_document.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
+        native.pg_record_memory_find_document.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(Address),ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
+        native.pg_record_memory_scan_documents.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(DocumentQuery),ctypes.POINTER(Page)]
         adopt_type=ctypes.CFUNCTYPE(None,ctypes.c_void_p,ctypes.c_uint64)
         commit_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,adopt_type,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
         memory=Memory();assert native.pg_record_memory_open(ctypes.byref(memory))==0
@@ -166,6 +194,22 @@ def main():
                     finally:library.json_object_put(batch)
                     actual=dict(ok=status==0,adopted=adopted)
                     if not status:actual['seq']=seq.value
+                elif op['op']=='docscan':
+                    definition=op['query'];scope=definition['scope'];kind=definition.get('kind','').encode();buffer=ctypes.create_string_buffer(kind);cursor=op.get('cursor',{});query=DocumentQuery(('session','conversation','task').index(scope['kind']),int('kind' in definition),scope.get('conversationId',scope.get('taskId',0)),Slice(ctypes.addressof(buffer),len(kind)),2**64-1 if definition['at']=='current' else definition['at'],op['limit'],cursor.get('after',0),int('cursor' in op),0);page=Page()
+                    status=native.pg_record_memory_scan_documents(ctypes.byref(memory),ctypes.byref(query),ctypes.byref(page));actual=dict(ok=status==0)
+                    try:
+                        if not status:
+                            result=dict(items=json.loads(library.json_object_to_json_string_ext(page.items,0)))
+                            if page.has_next:result['next']=dict(after=page.after,order='ascending')
+                            actual['page']=result
+                    finally:library.json_object_put(page.items)
+                elif op['op']=='find':
+                    definition=op['address'];kind=ctypes.create_string_buffer(definition['kind'].encode());key=ctypes.create_string_buffer(definition.get('key','').encode());scope=definition['scope'];address=Address(Slice(ctypes.addressof(kind),len(definition['kind'].encode())),Slice(ctypes.addressof(key),len(definition.get('key','').encode())),scope.get('conversationId',scope.get('taskId',0)),('session','conversation','task').index(scope['kind']),int('key' in definition))
+                    value=ctypes.c_void_p();status=native.pg_record_memory_find_document(ctypes.byref(memory),ctypes.byref(address),2**64-1 if op['at']=='current' else op['at'],ctypes.byref(value))
+                    try:
+                        actual=dict(ok=status in (0,1))
+                        if status in (0,1):actual['value']=json.loads(library.json_object_to_json_string_ext(value,0)) if not status else None
+                    finally:library.json_object_put(value)
                 elif op['op']=='document':
                     value=ctypes.c_void_p();status=native.pg_record_memory_document(ctypes.byref(memory),op['id'],2**64-1 if op['at']=='current' else op['at'],ctypes.byref(value))
                     try:

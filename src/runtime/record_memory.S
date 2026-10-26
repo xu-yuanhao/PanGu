@@ -2615,3 +2615,333 @@ pg_record_memory_document:
 .size pg_record_memory_document,.-pg_record_memory_document
 .section .rodata
 .Ld_deltas_since_base: .asciz "deltasSinceBase"
+.text
+.globl pg_record_memory_find_document
+.type pg_record_memory_find_document,@function
+pg_record_memory_find_document:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,2
+ mov qword ptr [rsp+48],0
+ test r14,r14
+ jz .Ld_find_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ld_find_return
+ cmp dword ptr [rbx+44],0
+ jne .Ld_find_return
+ cmp dword ptr [rbx+40],1
+ je .Ld_find_return
+ cmp qword ptr [rbx+24],0
+ je .Ld_find_return
+ cmp r13,-1
+ je .Ld_find_address
+ mov rax,9007199254740991
+ cmp r13,rax
+ ja .Ld_find_return
+.Ld_find_address:
+ mov rdi,r12
+ call pg_document_address_valid
+ test eax,eax
+ jz .Ld_find_return
+ xor r15d,r15d
+.Ld_find_each:
+ cmp r15,[rbx+8]
+ jae .Ld_find_missing
+ mov rax,r15
+ shl rax,5
+ add rax,[rbx]
+ cmp dword ptr [rax+24],4
+ jne .Ld_find_next
+ DGET "qword ptr [rax+8]",record
+ mov [rsp+56],rax
+ mov rdi,rax
+ mov rsi,rsp
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_find_return
+ mov rdi,r12
+ mov rsi,rsp
+ call pg_document_address_equal
+ test eax,eax
+ jz .Ld_find_next
+ cmp r13,-1
+ je .Ld_find_retirement
+ DGET "qword ptr [rsp+56]",created_at
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp r13,rax
+ jb .Ld_find_next
+.Ld_find_retirement:
+ DGET "qword ptr [rsp+56]",retired_at
+ test rax,rax
+ jz .Ld_find_copy
+ cmp r13,-1
+ je .Ld_find_next
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp r13,rax
+ jae .Ld_find_next
+.Ld_find_copy:
+ mov rdi,[rsp+56]
+ lea rsi,[rsp+48]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ld_find_allocation
+ mov rax,[rsp+48]
+ mov [r14],rax
+ xor ebp,ebp
+ jmp .Ld_find_return
+.Ld_find_allocation:
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov ebp,3
+ jmp .Ld_find_return
+.Ld_find_next:
+ inc r15
+ jmp .Ld_find_each
+.Ld_find_missing:
+ mov ebp,1
+.Ld_find_return:
+ mov eax,ebp
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_find_document,.-pg_record_memory_find_document
+.text
+/* Record lifetime predicate; does not inspect the retained content policy. */
+.Ld_alive:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ cmp r12,-1
+ je .Ld_alive_retired
+ DGET rbx,created_at
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp r12,rax
+ jb .Ld_alive_no
+.Ld_alive_retired:
+ DGET rbx,retired_at
+ test rax,rax
+ jz .Ld_alive_yes
+ cmp r12,-1
+ je .Ld_alive_no
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp r12,rax
+ jae .Ld_alive_no
+.Ld_alive_yes:
+ mov eax,1
+ jmp .Ld_alive_return
+.Ld_alive_no:
+ xor eax,eax
+.Ld_alive_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+.globl pg_record_memory_scan_documents
+.type pg_record_memory_scan_documents,@function
+pg_record_memory_scan_documents:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,88
+ mov rbx,rdi
+ mov r12,rsi
+ mov r14,rdx
+ mov ebp,2
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+64],0
+ test r14,r14
+ jz .Ld_scan_return
+ mov qword ptr [r14],0
+ mov qword ptr [r14+8],0
+ mov qword ptr [r14+16],0
+ test rbx,rbx
+ jz .Ld_scan_return
+ test r12,r12
+ jz .Ld_scan_return
+ cmp dword ptr [rbx+44],0
+ jne .Ld_scan_return
+ cmp dword ptr [rbx+40],1
+ je .Ld_scan_return
+ cmp qword ptr [rbx+24],0
+ je .Ld_scan_return
+ cmp dword ptr [r12],2
+ ja .Ld_scan_return
+ cmp dword ptr [r12+4],1
+ ja .Ld_scan_return
+ cmp dword ptr [r12+56],1
+ ja .Ld_scan_return
+ cmp dword ptr [r12+60],0
+ jne .Ld_scan_return
+ cmp qword ptr [r12+40],0
+ je .Ld_scan_return
+ mov rax,9007199254740991
+ cmp qword ptr [r12+32],-1
+ je .Ld_scan_owner
+ cmp [r12+32],rax
+ ja .Ld_scan_return
+.Ld_scan_owner:
+ mov rcx,[r12+8]
+ cmp dword ptr [r12],0
+ jne .Ld_scan_owned
+ test rcx,rcx
+ jnz .Ld_scan_return
+ jmp .Ld_scan_cursor
+.Ld_scan_owned:
+ test rcx,rcx
+ jle .Ld_scan_return
+ cmp rcx,rax
+ ja .Ld_scan_return
+.Ld_scan_cursor:
+ cmp dword ptr [r12+56],0
+ je .Ld_scan_kind
+ cmp [r12+48],rax
+ jg .Ld_scan_return
+ neg rax
+ cmp [r12+48],rax
+ jl .Ld_scan_return
+.Ld_scan_kind:
+ cmp dword ptr [r12+4],0
+ je .Ld_scan_allocate
+ /* Validate UTF-8 slice with the existing address contract. */
+ pxor xmm0,xmm0
+ movups [rsp],xmm0
+ movups [rsp+16],xmm0
+ movups [rsp+32],xmm0
+ movups xmm0,[r12+16]
+ movups [rsp],xmm0
+ mov rdi,rsp
+ call pg_document_address_valid
+ test eax,eax
+ jz .Ld_scan_return
+.Ld_scan_allocate:
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ld_scan_allocation
+ mov [rsp+48],rax
+ xor r15d,r15d
+.Ld_scan_each:
+ cmp r15,[rbx+8]
+ jae .Ld_scan_success
+ mov rax,r15
+ shl rax,5
+ add rax,[rbx]
+ cmp dword ptr [rax+24],4
+ jne .Ld_scan_next
+ cmp dword ptr [r12+56],0
+ je .Ld_scan_record
+ mov rcx,[r12+48]
+ test rcx,rcx
+ js .Ld_scan_record
+ cmp [rax],rcx
+ jbe .Ld_scan_next
+.Ld_scan_record:
+ DGET "qword ptr [rax+8]",record
+ mov r13,rax
+ mov rdi,rax
+ mov rsi,rsp
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_scan_cleanup
+ mov eax,[rsp+40]
+ cmp eax,[r12]
+ jne .Ld_scan_next
+ mov rax,[rsp+32]
+ cmp rax,[r12+8]
+ jne .Ld_scan_next
+ cmp dword ptr [r12+4],0
+ je .Ld_scan_lifetime
+ mov rdx,[rsp+8]
+ cmp rdx,[r12+24]
+ jne .Ld_scan_next
+ test rdx,rdx
+ jz .Ld_scan_lifetime
+ mov rdi,[rsp]
+ mov rsi,[r12+16]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Ld_scan_next
+.Ld_scan_lifetime:
+ mov rdi,r13
+ mov rsi,[r12+32]
+ call .Ld_alive
+ test eax,eax
+ jz .Ld_scan_next
+ mov rax,[rsp+64]
+ cmp rax,[r12+40]
+ jae .Ld_scan_continuation
+ mov rdi,r13
+ lea rsi,[rsp+56]
+ mov qword ptr [rsp+56],0
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ld_scan_partial_failed
+ mov rdi,[rsp+48]
+ mov rsi,[rsp+56]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ld_scan_partial_failed
+ inc qword ptr [rsp+64]
+ DGET r13,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+72],rax
+.Ld_scan_next:
+ inc r15
+ jmp .Ld_scan_each
+.Ld_scan_continuation:
+ mov rax,[rsp+72]
+ mov [r14+8],rax
+ mov dword ptr [r14+20],1
+.Ld_scan_success:
+ mov rax,[rsp+48]
+ mov [r14],rax
+ mov dword ptr [r14+16],1
+ xor ebp,ebp
+ jmp .Ld_scan_return
+.Ld_scan_partial_failed:
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+.Ld_scan_allocation:
+ mov ebp,3
+.Ld_scan_cleanup:
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+.Ld_scan_return:
+ mov eax,ebp
+ add rsp,88
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_scan_documents,.-pg_record_memory_scan_documents
