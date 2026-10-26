@@ -849,7 +849,7 @@
         "system libc",
         "json-c"
       ],
-      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention",
+      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention; preadmission new-incarnation installation plans and reserved index capacity for synchronous Storage adoption",
       "exports": [
         "pg_document_address_valid",
         "pg_document_address_equal",
@@ -868,7 +868,11 @@
         "pg_document_cache_retention",
         "pg_document_cache_close",
         "pg_document_record_create",
-        "pg_document_initialize"
+        "pg_document_initialize",
+        "pg_document_cache_reserve",
+        "pg_document_install_prepare",
+        "pg_document_install_apply",
+        "pg_document_install_discard"
       ],
       "reference_basis": [
         {
@@ -879,9 +883,10 @@
             "packages/durable/src/ids.ts",
             "packages/durable/src/types.ts",
             "packages/chord/src/json.ts",
-            "packages/durable/src/session/session.ts"
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy"
+          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install"
         }
       ]
     },

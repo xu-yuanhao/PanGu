@@ -1876,3 +1876,352 @@ pg_document_initialize:
 .size pg_document_initialize,.-pg_document_initialize
 .section .rodata
 .Lcreate_forks: .long .La_current-.Lcreate_forks,.La_initial-.Lcreate_forks,.La_asof-.Lcreate_forks
+
+.text
+.globl pg_document_cache_reserve
+.type pg_document_cache_reserve,@function
+pg_document_cache_reserve:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rdx
+ mov eax,1
+ test r12,r12
+ jz .Lreserve_return
+ pxor xmm0,xmm0
+ movups [r12],xmm0
+ movups [r12+16],xmm0
+ test rbx,rbx
+ jz .Lreserve_return
+ cmp qword ptr [rbx],0
+ je .Lreserve_return
+ cmp qword ptr [rbx+104],0
+ jne .Lreserve_return
+ mov eax,2
+ mov r13,[rbx+32]
+ add r13,rsi
+ jc .Lreserve_return
+ cmp r13,0x3fffffff
+ ja .Lreserve_return
+ mov dword ptr [rbx+104],1
+ lea rsi,[r13*2+1]
+ cmp esi,16
+ mov eax,16
+ cmovb esi,eax
+ mov rdi,[rbx]
+ call lh_table_resize@PLT
+ test eax,eax
+ jnz .Lreserve_allocation
+ mov [r12],rbx
+ mov rax,[rbx]
+ mov [r12+8],rax
+ mov [r12+16],r13
+ mov rax,[rbx+32]
+ mov [r12+24],rax
+ xor eax,eax
+ jmp .Lreserve_done
+.Lreserve_allocation:
+ mov eax,3
+.Lreserve_done:
+ mov dword ptr [rbx+104],0
+.Lreserve_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_cache_reserve,.-pg_document_cache_reserve
+
+.globl pg_document_install_prepare
+.type pg_document_install_prepare,@function
+pg_document_install_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test r15,r15
+ jz .Linstall_prepare_return
+ cmp qword ptr [r15+24],0
+ jne .Linstall_prepare_return
+ cmp qword ptr [r15+8],0
+ jne .Linstall_prepare_return
+ test rbx,rbx
+ jz .Linstall_prepare_return
+ test r12,r12
+ jz .Linstall_prepare_return
+ test r13,r13
+ jz .Linstall_prepare_return
+ cmp qword ptr [rbx],0
+ je .Linstall_prepare_return
+ cmp qword ptr [rbx+104],0
+ jne .Linstall_prepare_return
+ mov dword ptr [rbx+104],1
+ mov rdi,r13
+ lea rsi,[rip+.Li_created]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rdi,r13
+ lea rsi,[rip+.Li_retired]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov edi,1
+ mov esi,168
+ call calloc@PLT
+ test rax,rax
+ jz .Linstall_prepare_allocation
+ mov [rsp],rax
+ mov rdi,r13
+ lea rsi,[rax+72]
+ call pg_document_record_decode
+ mov ebp,eax
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rax,[rsp]
+ mov rdi,r12
+ lea rsi,[rax+72]
+ mov rdx,[r12+16]
+ call pg_document_check
+ mov ebp,eax
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rax,[rsp]
+ mov rdi,r12
+ lea rsi,[rax+72]
+ mov rdx,[rax+120]
+ lea rcx,[rax+48]
+ call pg_document_record_create
+ mov ebp,eax
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rax,[rsp]
+ mov rdi,[rax+48]
+ lea rsi,[rax+72]
+ call pg_document_record_decode
+ mov ebp,eax
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rax,[rsp]
+ mov rdi,r12
+ lea rsi,[rax+72]
+ mov rdx,[r12+16]
+ mov rcx,r14
+ lea r8,[rax+56]
+ call pg_document_materialize
+ mov ebp,eax
+ test eax,eax
+ jnz .Linstall_prepare_cleanup
+ mov rax,[rsp]
+ mov [rax+64],r12
+ mov rdx,[r12+16]
+ mov [rax+136],rdx
+ mov [rax+144],rdx
+ mov dword ptr [rax+164],1
+ xor edi,edi
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Linstall_prepare_allocation
+ mov [rsp+8],rax
+ mov rdx,rax
+ mov rax,[rsp]
+ mov rdi,[rax+48]
+ lea rsi,[rip+.Li_created]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Linstall_prepare_stamp_fail
+ mov rax,[rsp+8]
+ mov [r15+16],rax
+ mov rax,[rsp]
+ mov [r15+8],rax
+ mov [r15],rbx
+ mov dword ptr [r15+24],1
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Linstall_prepare_cleanup
+.Linstall_prepare_stamp_fail:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+.Linstall_prepare_allocation:
+ mov ebp,3
+.Linstall_prepare_cleanup:
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Linstall_prepare_unlock
+ add rdi,48
+ call pg_document_loaded_close
+ mov rdi,[rsp]
+ call free@PLT
+.Linstall_prepare_unlock:
+ mov dword ptr [rbx+104],0
+.Linstall_prepare_return:
+ mov eax,ebp
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_install_prepare,.-pg_document_install_prepare
+
+.globl pg_document_install_apply
+.type pg_document_install_apply,@function
+pg_document_install_apply:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov r12,rdi
+ mov r13,rsi
+ mov r14,rdx
+ mov r15,rcx
+ mov ebp,1
+ test r12,r12
+ jz .Linstall_apply_return
+ test r13,r13
+ jz .Linstall_apply_return
+ cmp qword ptr [r12+24],1
+ jne .Linstall_apply_return
+ test r14,r14
+ jz .Linstall_apply_return
+ mov rax,9007199254740991
+ cmp r14,rax
+ ja .Linstall_apply_return
+ mov rbx,[r12]
+ test rbx,rbx
+ jz .Linstall_apply_return
+ cmp rbx,[r13]
+ jne .Linstall_apply_return
+ cmp qword ptr [rbx+104],0
+ jne .Linstall_apply_return
+ mov rax,[rbx]
+ test rax,rax
+ jz .Linstall_apply_return
+ cmp rax,[r13+8]
+ jne .Linstall_apply_return
+ mov rax,[rbx+32]
+ cmp rax,[r13+24]
+ jne .Linstall_apply_return
+ cmp rax,[r13+16]
+ jae .Linstall_apply_return
+ mov rax,[r12+8]
+ test rax,rax
+ jz .Linstall_apply_return
+ mov [rsp],rax
+ mov dword ptr [rbx+104],1
+ mov dword ptr [r12+28],1
+ mov rdi,[rbx]
+ lea rsi,[rax+72]
+ lea rdx,[rsp+8]
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jnz .Linstall_apply_duplicate
+ mov rdi,[r12+16]
+ mov rsi,r14
+ call json_object_set_int64@PLT
+ test eax,eax
+ jz .Linstall_apply_invalid
+ mov rax,[rsp]
+ mov rdi,[rbx]
+ lea rsi,[rax+72]
+ mov rdx,rax
+ call lh_table_insert@PLT
+ test eax,eax
+ jnz .Linstall_apply_allocation
+ mov rdx,[rsp]
+ mov rax,[rbx+8]
+ mov [rdx+8],rax
+ test rax,rax
+ jz .Linstall_apply_head
+ mov [rax],rdx
+.Linstall_apply_head:
+ mov [rbx+8],rdx
+ mov [rdx+32],r15
+ mov rax,[rbx+24]
+ mov [rdx+16],rax
+ test rax,rax
+ jz .Linstall_apply_idle
+ mov [rax+24],rdx
+ jmp .Linstall_apply_tail
+.Linstall_apply_idle:
+ mov [rbx+16],rdx
+.Linstall_apply_tail:
+ mov [rbx+24],rdx
+ inc qword ptr [rbx+32]
+ inc qword ptr [r13+24]
+ mov qword ptr [r12+8],0
+ mov qword ptr [r12+16],0
+ mov dword ptr [r12+24],2
+ xor ebp,ebp
+ jmp .Linstall_apply_unlock
+.Linstall_apply_duplicate:
+ mov ebp,4
+ jmp .Linstall_apply_unlock
+.Linstall_apply_invalid:
+ mov ebp,1
+ jmp .Linstall_apply_unlock
+.Linstall_apply_allocation:
+ mov ebp,3
+.Linstall_apply_unlock:
+ mov dword ptr [r12+28],0
+ mov dword ptr [rbx+104],0
+.Linstall_apply_return:
+ mov eax,ebp
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_install_apply,.-pg_document_install_apply
+
+.globl pg_document_install_discard
+.type pg_document_install_discard,@function
+pg_document_install_discard:
+ mov eax,1
+ test rdi,rdi
+ jz .Linstall_discard_return
+ cmp dword ptr [rdi+28],0
+ jne .Linstall_discard_return
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+28],1
+ mov rdi,[rbx+8]
+ test rdi,rdi
+ jz .Linstall_discard_clear
+ add rdi,48
+ call pg_document_loaded_close
+ mov rdi,[rbx+8]
+ call free@PLT
+.Linstall_discard_clear:
+ pxor xmm0,xmm0
+ movups [rbx],xmm0
+ movups [rbx+16],xmm0
+ xor eax,eax
+ pop rbx
+.Linstall_discard_return:
+ ret
+.size pg_document_install_discard,.-pg_document_install_discard
+.section .rodata
+.Li_created: .asciz "createdAt"
+.Li_retired: .asciz "retiredAt"

@@ -288,3 +288,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly record_create生成独立owned创建记录，保留scope/owner/history/fork/family身份，无createdAt/retiredAt；initialize通过显式initializer服务复制family seed、调用callback、验证并再次复制其object结果。singleton seed不进入callback，返回值/输入/保留引用所有权隔离，partial失败清理明确。INITIAL_FAILED枚举追加，旧状态值不变。
 - 实际验证：189条记录与固定Pi实际documentCreate一致；O0/O2 ASan/UBSan覆盖identity/版本/语义拒绝、seed及initializer保留引用隔离、callback失败和逐直接分配插入复制故障。实际MemoryStorage完成initializer→mint→RecordCreate→Tx create→loaded重读，Storage提供createdAt，调用者修改seed不影响数据。完整Runtime、隔离核心暂存树G00/Assembly清单/产品构建及共享G00通过。
 - 同一实施Agent自审：扩展已有实际导出/initializer ABI、故障注入与来源登记，不修改门禁或预算。8个候选路径/暂存内容清单摘要（加入本记录前）：09762ead4f9010272a5885c2e0eda5ac148dcf8b6c7996aa9c3faaebb1af287a。结论为本地候选通过；missing地址自动获取、owner检查串接、缓存安装/retirement/holds尚待实现，K03整体未完成。
+
+## K03 新Doc缓存安装（2026-10-26）
+
+- 来源：固定Pi d5b3de22 的Transaction.adopt新incarnation分支、Session.host.install/touchDocument；本批fetch Pi/Harness仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly 32字节install候选与32字节reservation；prepare核对未带lifecycle stamp的创建记录，隔离record/value，预分配node和createdAt整数。reserve通过json-c公开lh_table_resize预留容量，apply确认sequence后设置整数、插入索引并接入all/idle链；discard释放未安装所有权。保持cache112字节与旧函数表布局。reservation要求同一Session执行线且期间只允许共用预留的安装操作；host随后维护pin。
+- 实际验证：真实MemoryStorage同批创建32个Doc，确认后install，再get全部零find/read命中，record/value/version/createdAt与输入隔离符合源语义。重复install、重复地址、已关闭缓存、过期count、非法sequence、带createdAt/retiredAt输入拒绝；逐直接分配/插入/复制故障与预留失败清理通过。O0/O2 ASan/UBSan通过；apply计数只有一次预留容量内的linkhash插入，直接分配/复制/resize wrapper均未调用。完整Runtime退出0，最终语义检查补充后O2专项通过；原Pi/Chord差异基线保持。共享及隔离核心暂存树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：扩展已有模块导出/来源及专项wrap，无门禁预算变更。6个候选路径内容清单摘要（加入本记录前）：bd91064c5e37a89d72edb4eb245fd4dca718a5dc97eb21d626ca2dbf0a21f98b。结论为本地候选通过。缺失地址自动创建与统一Doc Tx结算尚需接线；新incarnation的retirement/holds仍属于K03。TUI未提交文件保留原样。

@@ -17,6 +17,8 @@ static unsigned allocation_failure,array_add_calls,doc_tracking,doc_calls,doc_fa
 static int doc_fault(void){return doc_tracking&&++doc_calls==doc_fail;}
 struct lh_table *__real_lh_table_new(int,lh_entry_free_fn *,lh_hash_fn *,lh_equal_fn *);
 int __real_lh_table_insert(struct lh_table *,const void *,const void *);
+int __real_lh_table_resize(struct lh_table *,int);
+int __wrap_lh_table_resize(struct lh_table *t,int size){return doc_fault()?-1:__real_lh_table_resize(t,size);}
 struct lh_table *__wrap_lh_table_new(int size,lh_entry_free_fn *f,lh_hash_fn *h,lh_equal_fn *e){return doc_fault()?0:__real_lh_table_new(size,f,h,e);}
 int __wrap_lh_table_insert(struct lh_table *t,const void *k,const void *v){return doc_fault()?-1:__real_lh_table_insert(t,k,v);}
 
@@ -294,7 +296,76 @@ static int new_document_initial(void *context,struct json_object *seed,struct js
 static void document_creation_factory(void){
  pg_record_memory m={0};assert(!pg_record_memory_open(&m));pg_document_definition definition={.kind={"created",7},.version=1,.scope=PG_DOC_SESSION,.family=1};pg_document_address address={.kind={"created",7},.key={"member",6},.scope=PG_DOC_SESSION,.has_key=1};pg_document_initializer initializer={0,new_document_initial};struct json_object *seed=json_tokener_parse("{\"text\":\"initial\"}"),*value=0,*record=0;assert(seed&&!pg_document_initialize(&definition,seed,&initializer,&value));uint64_t id=0;assert(!pg_record_memory_mint(&m,&id)&&!pg_document_record_create(&definition,&address,id,&record));struct json_object *write=json_object_new_object(),*content=json_object_new_object();assert(write&&content&&!json_object_object_add(write,"type",json_object_new_string("document.create"))&&!json_object_object_add(write,"record",record)&&!json_object_object_add(content,"kind",json_object_new_string("base"))&&!json_object_object_add(content,"version",json_object_new_int(1))&&!json_object_object_add(content,"value",value)&&!json_object_object_add(write,"content",content));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_stage(&tx,PG_TX_DOCUMENT_CREATE,write)&&!pg_record_tx_commit(&tx));json_object_object_add(seed,"text",json_object_new_string("caller"));pg_document_storage storage;pg_record_memory_documents(&m,&storage);pg_document_loaded loaded={0};assert(!pg_document_loaded_open(&loaded,&storage,&definition,&address)&&loaded.record.id==id&&!strcmp(json_object_get_string(json_object_object_get(loaded.value,"text")),"initial")&&json_object_get_uint64(json_object_object_get(loaded.record_owner,"createdAt"))==1);assert(!pg_document_loaded_close(&loaded));json_object_put(seed);json_object_put(write);assert(!pg_record_memory_close(&m));
 }
+typedef struct {
+ pg_document_install *plans;
+ pg_document_cache_reservation *reservation;
+ size_t count;
+} install_fixture;
+static int install_adopt(void *context,const struct json_object *batch,uint64_t seq){
+ (void)batch;
+ install_fixture *f=context;for(size_t i=0;i<f->count;++i)assert(!pg_document_install_apply(&f->plans[i],f->reservation,seq,123));return 0;
+}
+static void document_installation(void){
+ _Static_assert(sizeof(pg_document_install)==32&&sizeof(pg_document_cache_reservation)==32,"install ABI");
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));
+ pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};
+ pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};
+ assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+ pg_document_definition def={.kind={"new",3},.version=1,.scope=PG_DOC_SESSION,.family=1};
+ pg_document_install plans[32]={0};pg_document_cache_reservation reservation={0};
+ struct json_object *batch=json_object_new_array(),*value=json_tokener_parse("{\"text\":\"initial\"}");
+ assert(batch&&value);
+ for(unsigned i=0;i<32;++i){
+  char key[16];int n=snprintf(key,sizeof(key),"key%u",i);
+  pg_document_address address={.kind={"new",3},.key={key,(size_t)n},.scope=PG_DOC_SESSION,.has_key=1};
+  struct json_object *record=0;assert(!pg_document_record_create(&def,&address,i+2,&record));
+  assert(!pg_document_install_prepare(&cache,&def,record,value,&plans[i])&&!cache.count);
+  struct json_object *write=json_object_new_object(),*content=json_object_new_object();assert(write&&content);
+  assert(!json_object_object_add(write,"type",json_object_new_string("document.create"))&&!json_object_object_add(write,"record",record));
+  assert(!json_object_object_add(content,"kind",json_object_new_string("base"))&&!json_object_object_add(content,"version",json_object_new_int(1))&&!json_object_object_add(content,"value",json_object_get(value))&&!json_object_object_add(write,"content",content)&&!json_object_array_add(batch,write));
+ }
+ assert(pg_document_cache_reserve(&cache,SIZE_MAX,&reservation)==PG_DOC_CAPACITY&&!reservation.cache&&!cache.busy);
+ assert(!pg_document_cache_reserve(&cache,32,&reservation)&&reservation.limit==32);
+ assert(pg_document_install_apply(&plans[0],&reservation,0,123)==PG_DOC_INVALID&&!cache.count);
+ install_fixture f={plans,&reservation,32};pg_record_session session={.storage=pg_record_memory_storage(&m),.context=&f,.adopt=install_adopt};
+ assert(!pg_records_commit(&session,batch)&&session.sequence==1&&cache.count==32&&reservation.expected_count==32);
+ json_object_object_add(value,"text",json_object_new_string("caller"));
+ for(unsigned i=0;i<32;++i){
+  char key[16];int n=snprintf(key,sizeof(key),"key%u",i);
+  pg_document_address address={.kind={"new",3},.key={key,(size_t)n},.scope=PG_DOC_SESSION,.has_key=1};pg_document_loaded *loaded=0;
+  assert(!pg_document_cache_get(&cache,&def,&address,&loaded)&&loaded->record.id==i+2&&loaded->stored_version==1&&loaded->value_version==1&&!loaded->deltas_since_base&&json_object_get_int(json_object_object_get(loaded->record_owner,"createdAt"))==1&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"initial"));
+  assert(pg_document_install_apply(&plans[i],&reservation,1,123)==PG_DOC_INVALID&&!pg_document_install_discard(&plans[i]));
+ }
+ assert(!host.finds&&!host.reads);
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=1;doc_calls=0;doc_fail=1;assert(pg_document_cache_reserve(&cache,1,&reservation)==PG_DOC_ALLOCATION);doc_tracking=0;doc_fail=0;assert(!reservation.cache&&!cache.busy&&cache.count==32);
+#endif
+ pg_document_address address={.kind={"new",3},.key={"key0",4},.scope=PG_DOC_SESSION,.has_key=1};struct json_object *record=0;
+ assert(!pg_document_record_create(&def,&address,100,&record)&&!pg_document_install_prepare(&cache,&def,record,value,&plans[0])&&!pg_document_cache_reserve(&cache,1,&reservation));
+ assert(pg_document_install_apply(&plans[0],&reservation,2,123)==PG_DOC_SEMANTICS&&cache.count==32&&!plans[0].busy&&!cache.busy&&!pg_document_install_discard(&plans[0]));
+ assert(!json_object_object_add(record,"createdAt",json_object_new_int(1))&&pg_document_install_prepare(&cache,&def,record,value,&plans[0])==PG_DOC_INVALID&&!plans[0].node);
+ json_object_object_del(record,"createdAt");json_object_object_add(record,"retiredAt",0);
+ assert(pg_document_install_prepare(&cache,&def,record,value,&plans[0])==PG_DOC_INVALID&&!plans[0].node);json_object_object_del(record,"retiredAt");
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=1;doc_calls=doc_fail=0;assert(!pg_document_install_prepare(&cache,&def,record,value,&plans[0]));doc_tracking=0;unsigned total=doc_calls;assert(!pg_document_install_discard(&plans[0]));
+ for(unsigned i=1;i<=total;++i){doc_tracking=1;doc_calls=0;doc_fail=i;int status=pg_document_install_prepare(&cache,&def,record,value,&plans[0]);doc_tracking=0;assert(status!=PG_DOC_OK&&!cache.busy&&!plans[0].node&&!plans[0].state&&!pg_document_install_discard(&plans[0]));}doc_fail=0;
+#endif
+ address.key=(pg_slice){"other",5};json_object_put(record);record=0;assert(!pg_document_record_create(&def,&address,100,&record));
+ assert(!pg_document_install_prepare(&cache,&def,record,value,&plans[0])&&!pg_document_cache_reserve(&cache,1,&reservation));
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=1;doc_calls=0;doc_fail=1;assert(pg_document_install_apply(&plans[0],&reservation,2,123)==PG_DOC_ALLOCATION);doc_tracking=0;assert(doc_calls==1&&plans[0].node&&plans[0].state==1&&cache.count==32&&!cache.busy&&!plans[0].busy);doc_fail=0;
+ doc_tracking=1;doc_calls=0;assert(!pg_document_install_apply(&plans[0],&reservation,2,123));doc_tracking=0;
+ /* The one intercepted operation is insertion; all allocation/copy wrappers stay unused. */
+ assert(doc_calls==1&&cache.count==33&&!pg_document_install_discard(&plans[0]));
+ assert(!pg_document_install_prepare(&cache,&def,record,value,&plans[0])&&!pg_document_cache_reserve(&cache,1,&reservation));
+ assert(!pg_document_cache_evict(&cache,&address,100)&&pg_document_install_apply(&plans[0],&reservation,3,123)==PG_DOC_INVALID);
+ assert(!pg_document_cache_reserve(&cache,1,&reservation));
+#endif
+ assert(!pg_document_cache_close(&cache)&&pg_document_install_apply(&plans[0],&reservation,2,123)==PG_DOC_INVALID&&!pg_document_install_discard(&plans[0]));
+ json_object_put(record);json_object_put(value);json_object_put(batch);assert(!pg_record_memory_close(&m));
+}
 int main(void){
+ document_installation();
  document_creation_factory();
  managed_document_access();
 #ifdef PG_MEMORY_FAULTS

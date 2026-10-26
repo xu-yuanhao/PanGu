@@ -104,6 +104,32 @@ pg_document_status pg_document_cache_evict(pg_document_cache *,const pg_document
 pg_document_status pg_document_cache_sweep(pg_document_cache *);
 pg_document_status pg_document_cache_retention(pg_document_cache *,uint64_t);
 pg_document_status pg_document_cache_close(pg_document_cache *);
+typedef struct {
+ pg_document_cache *cache;
+ void *table;
+ size_t limit,expected_count;
+} pg_document_cache_reservation;
+typedef struct {
+ pg_document_cache *cache;
+ void *node;
+ struct json_object *stamp;
+ unsigned state,busy;
+} pg_document_install;
+/* Prepare owns detached record/value and a preallocated lifecycle stamp.
+   Input is an unstamped DocumentCreate; definition remains borrowed by cache.
+   Plans/reservations are API-managed and disjoint from all inputs. Plan starts
+   zeroed; discard releases any uninstalled node.
+   After every acquisition/checkpoint, reserve once for all planned installs.
+   Between reserve and apply only applies sharing this reservation may mutate
+   the cache; keep cache open on the same Session mutation line. Apply invokes
+   no hooks and allocates no storage under this precondition. New incarnations
+   enter the idle chain at supplied monotonic milliseconds; host pins follow.
+   Storage sequence is positive and safe; successful apply consumes the plan. */
+pg_document_status pg_document_install_prepare(pg_document_cache *,const pg_document_definition *,
+ const struct json_object *record,struct json_object *value,pg_document_install *);
+pg_document_status pg_document_cache_reserve(pg_document_cache *,size_t extra,pg_document_cache_reservation *);
+pg_document_status pg_document_install_apply(pg_document_install *,pg_document_cache_reservation *,uint64_t sequence,uint64_t now);
+pg_document_status pg_document_install_discard(pg_document_install *);
 /* Durable documentCreate record, without storage lifecycle stamps. Definition
    identity/semantics and native safe ID are checked; result owns all slices. */
 pg_document_status pg_document_record_create(const pg_document_definition *,const pg_document_address *,uint64_t id,struct json_object **);
