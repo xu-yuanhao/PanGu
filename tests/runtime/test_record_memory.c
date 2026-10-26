@@ -8,11 +8,17 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <json-c/json.h>
+#include <json-c/linkhash.h>
 _Static_assert(sizeof(pg_memory_row)==32&&offsetof(pg_memory_row,table)==24,"row ABI");
 _Static_assert(sizeof(pg_record_memory)==48&&offsetof(pg_record_memory,next_id)==24&&offsetof(pg_record_memory,busy)==40,"memory ABI");
 #ifdef PG_MEMORY_FAULTS
 static unsigned allocation_failure,array_add_calls,doc_tracking,doc_calls,doc_fail;
 static int doc_fault(void){return doc_tracking&&++doc_calls==doc_fail;}
+struct lh_table *__real_lh_table_new(int,lh_entry_free_fn *,lh_hash_fn *,lh_equal_fn *);
+int __real_lh_table_insert(struct lh_table *,const void *,const void *);
+struct lh_table *__wrap_lh_table_new(int size,lh_entry_free_fn *f,lh_hash_fn *h,lh_equal_fn *e){return doc_fault()?0:__real_lh_table_new(size,f,h,e);}
+int __wrap_lh_table_insert(struct lh_table *t,const void *k,const void *v){return doc_fault()?-1:__real_lh_table_insert(t,k,v);}
+
 int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
 void *__real_calloc(size_t,size_t);
 void *__real_reallocarray(void *,size_t,size_t);
@@ -218,7 +224,30 @@ static void loaded_documents(void){
  assert(!pg_document_loaded_open(&loaded,&storage,&definition,&address)&&!pg_record_memory_close(&m));assert(!pg_document_loaded_begin(&loaded,&edit)&&!pg_document_loaded_close(&loaded)&&!pg_document_change_snapshot(&edit,&snapshot));json_object_put(snapshot);assert(!pg_document_change_discard(&edit));
  struct json_object *record=json_tokener_parse("{\"id\":1.5,\"kind\":\"x\",\"scope\":{\"kind\":\"session\"}}");pg_document_record native={0},zero={0};assert(record&&pg_document_record_decode(record,&native)==PG_DOC_INVALID&&!memcmp(&native,&zero,sizeof(native)));json_object_put(record);
 }
+typedef struct {pg_record_memory *memory;pg_document_cache *cache;uint64_t now;unsigned finds,reads,flushes,pin,fail_flush;} cache_fixture;
+static uint64_t cache_clock(void *context){cache_fixture *f=context;assert(f->cache->busy&&pg_document_cache_close(f->cache)==PG_DOC_INVALID);return f->now;}
+static int cache_pinned(void *context,uint64_t id){cache_fixture *f=context;return f->pin&&id==2;}
+static int cache_flush(void *context,const pg_document_loaded *loaded){cache_fixture *f=context;++f->flushes;assert(loaded->active&&loaded->record.id==2&&f->cache->busy);return (int)f->fail_flush;}
+static int cache_find(void *context,const pg_document_address *address,uint64_t at,struct json_object **out){cache_fixture *f=context;++f->finds;return pg_record_memory_find_document(f->memory,address,at,out);}
+static int cache_read(void *context,uint64_t id,uint64_t at,struct json_object **out){cache_fixture *f=context;++f->reads;return pg_record_memory_document(f->memory,id,at,out);}
+static void document_cache(void){
+ _Static_assert(sizeof(pg_document_cache)==112&&offsetof(pg_document_cache,busy)==104&&offsetof(pg_document_cache,pinned)==96,"cache ABI");pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"cache\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}]"));pg_document_cache cache={0};cache_fixture f={.memory=&m,.cache=&cache};pg_document_storage storage={&f,cache_find,cache_read};pg_document_cache_hooks hooks={&f,cache_clock,cache_flush,cache_pinned};pg_document_definition one={.kind={"cache",5},.version=1,.scope=PG_DOC_SESSION},two=one;two.version=2;two.migrate=migrate_document;pg_document_address address={.kind={"cache",5},.scope=PG_DOC_SESSION};pg_document_loaded *loaded=0,*same=0;assert(!pg_document_cache_open(&cache,&storage,&hooks,100)&&!pg_document_cache_get(&cache,&one,&address,&loaded)&&cache.count==1&&f.finds==1&&f.reads==1);f.now=5;assert(!pg_document_cache_get(&cache,&one,&address,&same)&&same==loaded&&f.finds==1);pg_document_definition mismatch=one;mismatch.scope=PG_DOC_TASK;assert(pg_document_cache_get(&cache,&mismatch,&address,&same)==PG_DOC_SEMANTICS&&!same&&cache.count==1&&f.finds==1&&!cache.busy);f.now=100;assert(!pg_document_cache_sweep(&cache)&&!cache.count);assert(!pg_document_cache_get(&cache,&one,&address,&loaded)&&f.finds==2);f.now=115;assert(!pg_document_cache_get(&cache,&one,&address,&loaded));f.now=214;assert(!pg_document_cache_sweep(&cache)&&cache.count==1);f.now=215;assert(!pg_document_cache_sweep(&cache)&&!cache.count);
+ f.pin=1;assert(!pg_document_cache_get(&cache,&one,&address,&loaded)&&!cache.idle_head);f.now=1000;assert(!pg_document_cache_sweep(&cache)&&cache.count==1);f.pin=0;assert(!pg_document_cache_touch(&cache,&address));f.now=1099;assert(!pg_document_cache_sweep(&cache)&&cache.count==1);f.now=1100;assert(!pg_document_cache_sweep(&cache)&&!cache.count);assert(!pg_document_cache_get(&cache,&one,&address,&loaded));unsigned reads=f.reads;assert(!pg_document_cache_get(&cache,&two,&address,&loaded)&&loaded->value_version==2&&loaded->stored_version==1&&f.reads==reads+1&&f.flushes==1);assert(!pg_document_cache_get(&cache,&two,&address,&same)&&same==loaded&&f.reads==reads+1);f.fail_flush=1;assert(pg_document_cache_get(&cache,&one,&address,&same)==PG_DOC_STORAGE_FAILED&&!same&&cache.count==1&&f.reads==reads+1);assert(!pg_document_cache_get(&cache,&two,&address,&same)&&same==loaded);f.fail_flush=0;assert(!pg_document_cache_get(&cache,&one,&address,&loaded)&&f.flushes==3&&loaded->value_version==1);assert(!pg_document_cache_evict(&cache,&address,999)&&cache.count==1&&!pg_document_cache_evict(&cache,&address,2)&&!cache.count);assert(!pg_document_cache_retention(&cache,0)&&!pg_document_cache_get(&cache,&one,&address,&loaded)&&cache.count==1&&!pg_document_cache_sweep(&cache)&&!cache.count);assert(!pg_document_cache_close(&cache)&&!pg_document_cache_close(&cache)&&pg_document_cache_get(&cache,&one,&address,&loaded)==PG_DOC_INVALID&&!loaded);
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=1;doc_calls=doc_fail=0;assert(!pg_document_cache_open(&cache,&storage,&hooks,100));doc_tracking=0;unsigned count=doc_calls;assert(!pg_document_cache_close(&cache));for(unsigned i=1;i<=count;++i){doc_tracking=1;doc_calls=0;doc_fail=i;int status=pg_document_cache_open(&cache,&storage,&hooks,100);doc_tracking=0;assert(status==PG_DOC_ALLOCATION&&!cache.table&&!cache.busy);}doc_fail=0;
+ assert(!pg_document_cache_open(&cache,&storage,&hooks,100));doc_tracking=1;doc_calls=0;assert(!pg_document_cache_get(&cache,&one,&address,&loaded));doc_tracking=0;count=doc_calls;assert(!pg_document_cache_close(&cache));for(unsigned i=1;i<=count;++i){assert(!pg_document_cache_open(&cache,&storage,&hooks,100));doc_tracking=1;doc_calls=0;doc_fail=i;int status=pg_document_cache_get(&cache,&one,&address,&loaded);doc_tracking=0;assert(status!=PG_DOC_OK&&!loaded&&!cache.count&&!cache.head&&!cache.idle_head&&!cache.idle_tail&&!cache.busy);assert(!pg_document_cache_close(&cache));}doc_fail=0;
+#endif
+ assert(!pg_record_memory_close(&m));
+}
+static void cache_many_addresses(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));struct json_object *writes=json_object_new_array();assert(writes);for(unsigned i=0;i<160;++i){char text[512];int size=snprintf(text,sizeof(text),"{\"type\":\"document.create\",\"record\":{\"id\":%u,\"kind\":\"family\",\"key\":\"key%u\\u0000中\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"n\":%u}}}",i+2,i,i);assert(size>0&&(size_t)size<sizeof(text));struct json_object *write=json_tokener_parse(text);assert(write&&!json_object_array_add(writes,write));}pg_record_storage store=pg_record_memory_storage(&m);uint64_t seq;assert(!store.commit(&m,writes,doc_adopt,0,&seq));json_object_put(writes);pg_document_cache cache={0};cache_fixture f={.memory=&m,.cache=&cache};pg_document_storage storage={&f,cache_find,cache_read};pg_document_cache_hooks hooks={&f,cache_clock,0,cache_pinned};pg_document_definition definition={.kind={"family",6},.version=1,.scope=PG_DOC_SESSION,.family=1};assert(!pg_document_cache_open(&cache,&storage,&hooks,101));pg_document_loaded *original[160];
+ for(unsigned pass=0;pass<2;++pass)for(unsigned i=0;i<160;++i){char key[64];int length=snprintf(key,sizeof(key),"key%u",i);assert(length>0);key[length]=0;memcpy(key+length+1,"中",3);pg_document_address address={.kind={"family",6},.key={key,(size_t)length+4},.scope=PG_DOC_SESSION,.has_key=1};pg_document_loaded *value=0;assert(!pg_document_cache_get(&cache,&definition,&address,&value)&&value->record.id==i+2&&json_object_get_int(json_object_object_get(value->value,"n"))==(int)i);if(!pass)original[i]=value;else assert(original[i]==value);}
+ assert(cache.count==160&&f.finds==160&&f.reads==160);f.now=10;char key0[]={'k','e','y','0',0,(char)0xe4,(char)0xb8,(char)0xad};pg_document_address first={.kind={"family",6},.key={key0,sizeof(key0)},.scope=PG_DOC_SESSION,.has_key=1};assert(!pg_document_cache_touch(&cache,&first));f.now=101;assert(!pg_document_cache_sweep(&cache)&&!cache.count);/* 10ms touch is inside ceil(101/10), so it does not postpone expiry. */
+ f.now=200;pg_document_loaded *value=0;assert(!pg_document_cache_get(&cache,&definition,&first,&value));f.pin=1;assert(!pg_document_cache_touch(&cache,&first)&&!cache.idle_head);f.now=1000;assert(!pg_document_cache_sweep(&cache)&&cache.count==1);f.pin=0;assert(!pg_document_cache_touch(&cache,&first));f.now=1101;assert(!pg_document_cache_sweep(&cache)&&!cache.count&&!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+}
 int main(void){
+ cache_many_addresses();
+ document_cache();
  loaded_documents();
  document_edit_commit();
  final_owners();

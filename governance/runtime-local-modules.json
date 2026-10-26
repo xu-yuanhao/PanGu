@@ -849,7 +849,7 @@
         "system libc",
         "json-c"
       ],
-      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership",
+      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention",
       "exports": [
         "pg_document_address_valid",
         "pg_document_address_equal",
@@ -859,7 +859,14 @@
         "pg_document_value_valid",
         "pg_document_record_decode",
         "pg_document_loaded_open",
-        "pg_document_loaded_close"
+        "pg_document_loaded_close",
+        "pg_document_cache_open",
+        "pg_document_cache_get",
+        "pg_document_cache_touch",
+        "pg_document_cache_evict",
+        "pg_document_cache_sweep",
+        "pg_document_cache_retention",
+        "pg_document_cache_close"
       ],
       "reference_basis": [
         {
@@ -872,7 +879,7 @@
             "packages/chord/src/json.ts",
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership"
+          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling"
         }
       ]
     },

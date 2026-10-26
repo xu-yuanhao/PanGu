@@ -69,4 +69,39 @@ typedef struct {
    is a loaded handle; Session cache/revision arbitration owns its lifetime. */
 pg_document_status pg_document_loaded_open(pg_document_loaded *,const pg_document_storage *,const pg_document_definition *,const pg_document_address *);
 pg_document_status pg_document_loaded_close(pg_document_loaded *);
+typedef struct {
+ void *context;
+ uint64_t (*clock)(void *); /* monotonic milliseconds */
+ /* Store held changes before version-driven replacement; NULL is no holds. */
+ int (*flush)(void *,const pg_document_loaded *);
+ /* Observer/held incarnation pin count lives in its owning service. */
+ int (*pinned)(void *,uint64_t id);
+} pg_document_cache_hooks;
+typedef struct {
+ void *table,*head,*idle_head,*idle_tail;
+ size_t count;
+ pg_document_storage storage;
+ void *context;
+ uint64_t (*clock)(void *);
+ uint64_t retention;
+ int (*flush)(void *,const pg_document_loaded *);
+ int (*pinned)(void *,uint64_t);
+ unsigned busy,closed;
+} pg_document_cache;
+/* Session mutation-line only. Definitions, providers and hook contexts remain
+   borrowed until close. get returns a cache-owned loaded handle, valid until
+   reload/evict/sweep/close; consumers retaining data take independent ownership.
+   Matching value_version reuses the handle; other versions flush held state
+   before dropping/reloading. Acquisition still checks token semantics.
+   Hash keys borrow cache-owned record slices (including embedded NUL).
+   touch must follow observer/hold pin changes. sweep runs on the mutation line;
+   its scheduling belongs to the host. Retention updates are explicit.
+   close releases resources; Session stores holds before invoking it. */
+pg_document_status pg_document_cache_open(pg_document_cache *,const pg_document_storage *,const pg_document_cache_hooks *,uint64_t retention);
+pg_document_status pg_document_cache_get(pg_document_cache *,const pg_document_definition *,const pg_document_address *,pg_document_loaded **);
+pg_document_status pg_document_cache_touch(pg_document_cache *,const pg_document_address *);
+pg_document_status pg_document_cache_evict(pg_document_cache *,const pg_document_address *,uint64_t incarnation);
+pg_document_status pg_document_cache_sweep(pg_document_cache *);
+pg_document_status pg_document_cache_retention(pg_document_cache *,uint64_t);
+pg_document_status pg_document_cache_close(pg_document_cache *);
 #endif

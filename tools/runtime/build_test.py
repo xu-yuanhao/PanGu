@@ -89,7 +89,7 @@ def main():
                             '-DPG_MEMORY_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/documents'), implementation('src/runtime/records'), implementation('src/runtime/record_memory'), implementation('src/runtime/delta'),
                             str(ROOT / 'tests/runtime/test_record_memory.c'),
-                            '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray,--wrap=json_object_new_array_ext,--wrap=json_object_array_add,--wrap=json_object_new_object,--wrap=json_object_new_int64,--wrap=json_object_new_string,--wrap=json_object_object_add',
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=calloc,--wrap=reallocarray,--wrap=json_object_new_array_ext,--wrap=json_object_array_add,--wrap=json_object_new_object,--wrap=json_object_new_int64,--wrap=json_object_new_string,--wrap=json_object_object_add,--wrap=lh_table_new,--wrap=lh_table_insert',
                             *documents_flags, '-lutf8proc', '-o', memory_test], check=True)
             subprocess.run([memory_test], check=True, timeout=15)
             delta_test = str(Path(directory) / 'test-delta')

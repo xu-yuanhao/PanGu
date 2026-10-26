@@ -972,3 +972,607 @@ pg_document_loaded_close:
 .La_version: .asciz "version"
 .La_deltas: .asciz "deltasSinceBase"
 .La_value: .asciz "value"
+.text
+/* Cache node: all prev/next, idle prev/next, since, reserved, loaded[120]. */
+.Lcache_hash:
+ mov r10,rdi
+ mov rax,0xcbf29ce484222325
+ mov r8,0x100000001b3
+ xor rax,[r10+32]
+ imul rax,r8
+ xor rax,[r10+40]
+ imul rax,r8
+ xor rax,[r10+8]
+ imul rax,r8
+ xor rax,[r10+24]
+ imul rax,r8
+ mov rdx,[r10]
+ mov rcx,[r10+8]
+.Lcache_hash_kind:
+ test rcx,rcx
+ jz .Lcache_hash_key_start
+ movzx r9d,byte ptr [rdx]
+ xor rax,r9
+ imul rax,r8
+ inc rdx
+ dec rcx
+ jmp .Lcache_hash_kind
+.Lcache_hash_key_start:
+ mov rdx,[r10+16]
+ mov rcx,[r10+24]
+.Lcache_hash_key:
+ test rcx,rcx
+ jz .Lcache_hash_return
+ movzx r9d,byte ptr [rdx]
+ xor rax,r9
+ imul rax,r8
+ inc rdx
+ dec rcx
+ jmp .Lcache_hash_key
+.Lcache_hash_return:
+ ret
+.Lcache_equal:
+ jmp pg_document_address_equal@PLT
+
+/* Remove node from idle chain if present. */
+.Lcache_unidle:
+ mov rax,[rsi+16]
+ mov rdx,[rsi+24]
+ test rax,rax
+ jnz .Lcache_unidle_prev
+ cmp [rdi+16],rsi
+ jne .Lcache_unidle_return
+ mov [rdi+16],rdx
+ jmp .Lcache_unidle_next
+.Lcache_unidle_prev:
+ mov [rax+24],rdx
+.Lcache_unidle_next:
+ test rdx,rdx
+ jz .Lcache_unidle_tail
+ mov [rdx+16],rax
+ jmp .Lcache_unidle_clear
+.Lcache_unidle_tail:
+ mov [rdi+24],rax
+.Lcache_unidle_clear:
+ mov qword ptr [rsi+16],0
+ mov qword ptr [rsi+24],0
+.Lcache_unidle_return:
+ ret
+.Lcache_touch_node:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ cmp qword ptr [rbx+96],0
+ je .Lcache_touch_clock
+ mov rdi,[rbx+64]
+ mov rsi,[r12+120]
+ call [rbx+96]
+ test eax,eax
+ jnz .Lcache_touch_pinned
+.Lcache_touch_clock:
+ mov rdi,[rbx+64]
+ call [rbx+72]
+ mov r13,rax
+ cmp qword ptr [r12+16],0
+ jne .Lcache_touch_since
+ cmp [rbx+16],r12
+ jne .Lcache_touch_move
+.Lcache_touch_since:
+ cmp r13,[r12+32]
+ jb .Lcache_touch_return
+ mov rcx,r13
+ sub rcx,[r12+32]
+ mov rax,[rbx+80]
+ xor edx,edx
+ mov esi,10
+ div rsi
+ test rdx,rdx
+ jz .Lcache_touch_round_ready
+ inc rax
+.Lcache_touch_round_ready:
+ cmp rax,1000
+ jbe .Lcache_touch_granule
+ mov eax,1000
+.Lcache_touch_granule:
+ cmp rcx,rax
+ jb .Lcache_touch_return
+.Lcache_touch_move:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcache_unidle
+ mov [r12+32],r13
+ mov rax,[rbx+24]
+ mov [r12+16],rax
+ test rax,rax
+ jz .Lcache_touch_first
+ mov [rax+24],r12
+ jmp .Lcache_touch_tail
+.Lcache_touch_first:
+ mov [rbx+16],r12
+.Lcache_touch_tail:
+ mov [rbx+24],r12
+ jmp .Lcache_touch_return
+.Lcache_touch_pinned:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcache_unidle
+.Lcache_touch_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.Lcache_drop_node:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[rbx]
+ lea rsi,[r12+72]
+ call lh_table_delete@PLT
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcache_unidle
+ mov rax,[r12]
+ mov rdx,[r12+8]
+ test rax,rax
+ jz .Lcache_drop_head
+ mov [rax+8],rdx
+ jmp .Lcache_drop_next
+.Lcache_drop_head:
+ mov [rbx+8],rdx
+.Lcache_drop_next:
+ test rdx,rdx
+ jz .Lcache_drop_close
+ mov [rdx],rax
+.Lcache_drop_close:
+ dec qword ptr [rbx+32]
+ cmp qword ptr [rbx+32],0
+ jne .Lcache_drop_loaded
+ cmp dword ptr [rbx+108],0
+ jne .Lcache_drop_loaded
+ mov rdi,[rbx]
+ mov esi,16
+ call lh_table_resize@PLT
+.Lcache_drop_loaded:
+ lea rdi,[r12+48]
+ call pg_document_loaded_close
+ mov rdi,r12
+ call free@PLT
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+.globl pg_document_cache_open
+.type pg_document_cache_open,@function
+pg_document_cache_open:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov eax,1
+ test rbx,rbx
+ jz .Lcache_open_return
+ test r12,r12
+ jz .Lcache_open_return
+ test r13,r13
+ jz .Lcache_open_return
+ cmp dword ptr [rbx+104],0
+ jne .Lcache_open_return
+ cmp qword ptr [rbx],0
+ jne .Lcache_open_return
+ cmp qword ptr [r12+8],0
+ je .Lcache_open_return
+ cmp qword ptr [r12+16],0
+ je .Lcache_open_return
+ cmp qword ptr [r13+8],0
+ je .Lcache_open_return
+ mov dword ptr [rbx+104],1
+ mov edi,16
+ xor esi,esi
+ lea rdx,[rip+.Lcache_hash]
+ lea rcx,[rip+.Lcache_equal]
+ call lh_table_new@PLT
+ test rax,rax
+ jz .Lcache_open_allocation
+ mov [rbx],rax
+ mov qword ptr [rbx+8],0
+ mov qword ptr [rbx+16],0
+ mov qword ptr [rbx+24],0
+ mov qword ptr [rbx+32],0
+ movups xmm0,[r12]
+ movups [rbx+40],xmm0
+ mov rax,[r12+16]
+ mov [rbx+56],rax
+ mov rax,[r13]
+ mov [rbx+64],rax
+ mov rax,[r13+8]
+ mov [rbx+72],rax
+ mov [rbx+80],r14
+ mov rax,[r13+16]
+ mov [rbx+88],rax
+ mov rax,[r13+24]
+ mov [rbx+96],rax
+ mov qword ptr [rbx+104],0
+ xor eax,eax
+ jmp .Lcache_open_return
+.Lcache_open_allocation:
+ mov dword ptr [rbx+104],0
+ mov eax,3
+.Lcache_open_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_cache_open,.-pg_document_cache_open
+
+.globl pg_document_cache_get
+.type pg_document_cache_get,@function
+pg_document_cache_get:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,152
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ lea rdi,[rsp+16]
+ xor eax,eax
+ mov ecx,15
+ rep stosq
+ test r14,r14
+ jz .Lcache_get_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lcache_get_return
+ test r12,r12
+ jz .Lcache_get_return
+ cmp qword ptr [rbx],0
+ je .Lcache_get_return
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_get_return
+ mov dword ptr [rbx+104],1
+ mov rdi,r13
+ call pg_document_address_valid
+ test eax,eax
+ jz .Lcache_get_cleanup
+ mov rax,[r12+8]
+ cmp rax,[r13+8]
+ jne .Lcache_get_cleanup
+ mov ecx,[r12+36]
+ cmp ecx,[r13+44]
+ jne .Lcache_get_cleanup
+ test rax,rax
+ jz .Lcache_get_key_ready
+ mov rdi,[r12]
+ test rdi,rdi
+ jz .Lcache_get_cleanup
+ mov rsi,[r13]
+ mov rdx,rax
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lcache_get_cleanup
+.Lcache_get_key_ready:
+ mov rdi,[rbx]
+ mov rsi,r13
+ mov rdx,rsp
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Lcache_get_load
+ mov r15,[rsp]
+ mov rax,[r12+16]
+ cmp rax,[r15+144]
+ je .Lcache_get_hit
+ cmp qword ptr [rbx+88],0
+ je .Lcache_get_drop
+ mov rdi,[rbx+64]
+ lea rsi,[r15+48]
+ call [rbx+88]
+ test eax,eax
+ jnz .Lcache_get_flush_failed
+.Lcache_get_drop:
+ mov rdi,rbx
+ mov rsi,r15
+ call .Lcache_drop_node
+ mov qword ptr [rsp],0
+.Lcache_get_load:
+ cmp qword ptr [rbx+32],0x3fffffff
+ jae .Lcache_get_capacity
+ lea rdi,[rsp+16]
+ lea rsi,[rbx+40]
+ mov rdx,r12
+ mov rcx,r13
+ call pg_document_loaded_open
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcache_get_cleanup
+ mov edi,1
+ mov esi,168
+ call calloc@PLT
+ test rax,rax
+ jz .Lcache_get_allocation
+ mov r15,rax
+ mov [rsp+8],rax
+ lea rdi,[rax+48]
+ lea rsi,[rsp+16]
+ mov ecx,15
+ rep movsq
+ lea rdi,[rsp+16]
+ xor eax,eax
+ mov ecx,15
+ rep stosq
+ mov rdi,[rbx]
+ lea rsi,[r15+72]
+ mov rdx,r15
+ call lh_table_insert@PLT
+ test eax,eax
+ jnz .Lcache_get_allocation
+ mov rax,[rbx+8]
+ mov [r15+8],rax
+ test rax,rax
+ jz .Lcache_get_first
+ mov [rax],r15
+.Lcache_get_first:
+ mov [rbx+8],r15
+ inc qword ptr [rbx+32]
+ mov qword ptr [rsp+8],0
+.Lcache_get_hit:
+ mov rdi,r12
+ lea rsi,[r15+72]
+ mov rdx,[r15+136]
+ call pg_document_check
+ test eax,eax
+ jnz .Lcache_get_check_failed
+ mov rdi,rbx
+ mov rsi,r15
+ call .Lcache_touch_node
+ lea rax,[r15+48]
+ mov [r14],rax
+ xor ebp,ebp
+ jmp .Lcache_get_cleanup
+.Lcache_get_check_failed:
+ mov ebp,eax
+ jmp .Lcache_get_cleanup
+.Lcache_get_flush_failed:
+ mov ebp,9
+ jmp .Lcache_get_cleanup
+.Lcache_get_capacity:
+ mov ebp,2
+ jmp .Lcache_get_cleanup
+.Lcache_get_allocation:
+ mov ebp,3
+.Lcache_get_cleanup:
+ cmp qword ptr [rsp+8],0
+ je .Lcache_get_temp_close
+ mov rdi,[rsp+8]
+ add rdi,48
+ call pg_document_loaded_close
+ mov rdi,[rsp+8]
+ call free@PLT
+.Lcache_get_temp_close:
+ lea rdi,[rsp+16]
+ call pg_document_loaded_close
+ mov dword ptr [rbx+104],0
+.Lcache_get_return:
+ mov eax,ebp
+ add rsp,152
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_cache_get,.-pg_document_cache_get
+
+.globl pg_document_cache_touch
+.type pg_document_cache_touch,@function
+pg_document_cache_touch:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Lcache_public_touch_return
+ cmp qword ptr [rbx],0
+ je .Lcache_public_touch_return
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_public_touch_return
+ mov [rsp+8],rsi
+ mov dword ptr [rbx+104],1
+ mov rdi,rsi
+ call pg_document_address_valid
+ test eax,eax
+ jz .Lcache_public_touch_invalid
+ mov rdi,[rbx]
+ mov rsi,[rsp+8]
+ mov rdx,rsp
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Lcache_public_touch_done
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lcache_touch_node
+.Lcache_public_touch_done:
+ xor eax,eax
+ jmp .Lcache_public_touch_settled
+.Lcache_public_touch_invalid:
+ mov eax,1
+.Lcache_public_touch_settled:
+ mov dword ptr [rbx+104],0
+.Lcache_public_touch_return:
+ add rsp,16
+ pop rbx
+ ret
+.size pg_document_cache_touch,.-pg_document_cache_touch
+
+.globl pg_document_cache_evict
+.type pg_document_cache_evict,@function
+pg_document_cache_evict:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rdx
+ mov eax,1
+ test rbx,rbx
+ jz .Lcache_evict_return
+ cmp qword ptr [rbx],0
+ je .Lcache_evict_return
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_evict_return
+ mov [rsp+8],rsi
+ mov dword ptr [rbx+104],1
+ mov rdi,rsi
+ call pg_document_address_valid
+ test eax,eax
+ jz .Lcache_evict_invalid
+ mov rdi,[rbx]
+ mov rsi,[rsp+8]
+ mov rdx,rsp
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Lcache_evict_done
+ mov rsi,[rsp]
+ cmp [rsi+120],r12
+ jne .Lcache_evict_done
+ mov rdi,rbx
+ call .Lcache_drop_node
+.Lcache_evict_done:
+ xor eax,eax
+ jmp .Lcache_evict_settled
+.Lcache_evict_invalid:
+ mov eax,1
+.Lcache_evict_settled:
+ mov dword ptr [rbx+104],0
+.Lcache_evict_return:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.size pg_document_cache_evict,.-pg_document_cache_evict
+
+.globl pg_document_cache_sweep
+.type pg_document_cache_sweep,@function
+pg_document_cache_sweep:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Lcache_sweep_return
+ cmp qword ptr [rbx],0
+ je .Lcache_sweep_return
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_sweep_return
+ mov dword ptr [rbx+104],1
+ mov rdi,[rbx+64]
+ call [rbx+72]
+ mov r12,rax
+.Lcache_sweep_each:
+ mov r13,[rbx+16]
+ test r13,r13
+ jz .Lcache_sweep_done
+ cmp qword ptr [rbx+96],0
+ je .Lcache_sweep_time
+ mov rdi,[rbx+64]
+ mov rsi,[r13+120]
+ call [rbx+96]
+ test eax,eax
+ jz .Lcache_sweep_time
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lcache_unidle
+ jmp .Lcache_sweep_each
+.Lcache_sweep_time:
+ cmp r12,[r13+32]
+ jb .Lcache_sweep_done
+ mov rax,r12
+ sub rax,[r13+32]
+ cmp rax,[rbx+80]
+ jb .Lcache_sweep_done
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lcache_drop_node
+ jmp .Lcache_sweep_each
+.Lcache_sweep_done:
+.Lcache_sweep_settled:
+ mov dword ptr [rbx+104],0
+ xor eax,eax
+.Lcache_sweep_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_cache_sweep,.-pg_document_cache_sweep
+
+.globl pg_document_cache_retention
+.type pg_document_cache_retention,@function
+pg_document_cache_retention:
+ mov eax,1
+ test rdi,rdi
+ jz .Lcache_retention_return
+ cmp qword ptr [rdi],0
+ je .Lcache_retention_return
+ cmp qword ptr [rdi+104],0
+ jne .Lcache_retention_return
+ mov [rdi+80],rsi
+ xor eax,eax
+.Lcache_retention_return:
+ ret
+.size pg_document_cache_retention,.-pg_document_cache_retention
+
+.globl pg_document_cache_close
+.type pg_document_cache_close,@function
+pg_document_cache_close:
+ push rbx
+ mov eax,1
+ test rdi,rdi
+ jz .Lcache_close_return
+ mov rbx,rdi
+ cmp dword ptr [rbx+104],0
+ jne .Lcache_close_return
+ mov dword ptr [rbx+104],1
+ mov dword ptr [rbx+108],1
+.Lcache_close_each:
+ mov rsi,[rbx+8]
+ test rsi,rsi
+ jz .Lcache_close_table
+ mov rdi,rbx
+ call .Lcache_drop_node
+ jmp .Lcache_close_each
+.Lcache_close_table:
+ mov rdi,[rbx]
+ test rdi,rdi
+ jz .Lcache_close_clear
+ call lh_table_free@PLT
+.Lcache_close_clear:
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov dword ptr [rbx+108],1
+ xor eax,eax
+.Lcache_close_return:
+ pop rbx
+ ret
+.size pg_document_cache_close,.-pg_document_cache_close

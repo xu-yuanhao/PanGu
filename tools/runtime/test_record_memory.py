@@ -200,7 +200,7 @@ def loaded_access(native,library):
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';
 const base=pathToFileURL(process.argv[1]+'/');registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};return n(s,c);}});const {materializeDocument}=await import(new URL('packages/durable/src/documents.ts',base));const {track}=await import(new URL('packages/chord/src/delta/tracker.ts',base));
 const source=readFileSync(new URL('packages/durable/src/session/session.ts',base),'utf8');const start=source.indexOf('async #loadDocument('),end=source.indexOf('#enqueue<',start);
-const text='class Probe{#documents=new Map();#holds=new Map();#storage;calls=[];constructor(c){this.#storage={findDocument:async()=>{this.calls.push("find");return c.find?c.record:undefined},document:async()=>{this.calls.push("read");return c.read?{record:c.record,version:c.stored,value:{text:"old"},deltasSinceBase:3}:undefined}}}#touchDocument(){}#dropDocument(){}async #storeHolds(){}'+source.slice(start,end)+'run(d,a){return this.#loadDocument(d,"test",a,{})}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];
+const text='class Probe{#documents=new Map();#holds=new Map();#storage;calls=[];constructor(c){this.#storage={findDocument:async()=>{this.calls.push("find");return c.find?c.record:undefined},document:async()=>{this.calls.push("read");return c.read?{record:c.record,version:c.stored,value:{text:"old"},deltasSinceBase:3}:undefined}}}#touchDocument(){}#dropDocument(id){this.#documents.delete(id)}async #storeHolds(){this.calls.push("flush");if(this.failFlush)throw Error("flush");this.#holds.clear()}hold(id){this.#holds.set(id,{})}'+source.slice(start,end)+'run(d,a){return this.#loadDocument(d,"test",a,{})}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];
 for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c);const definition={kind:c.record.kind,scope:c.record.scope.kind,version:c.version,...(c.record.history?{history:c.record.history,fork:c.record.fork}:{}),...(c.migration?{migrate:(value,from)=>({...value,from})}:{})};try{const x=await p.run(definition,c.record);out.push({ok:true,value:x?{record:x.record,stored:x.storedVersion,version:x.valueVersion,deltas:x.deltasSinceBase,value:x.tracker.value}:null,calls:p.calls})}catch{out.push({ok:false,calls:p.calls})}}console.log(JSON.stringify(out));
 '''
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
@@ -238,6 +238,45 @@ for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c);const de
             assert actual==want,(case,status,actual,want)
         finally:assert not native.pg_document_loaded_close(ctypes.byref(loaded))
     print(f'PASS: {len(cases)} loaded document acquisitions match actual Pi loadDocument body with injected Storage')
+    sequence=[dict(version=1,migration=False),dict(version=1,migration=False),dict(version=2,migration=True),dict(version=2,migration=True),dict(version=1,migration=False),dict(version=3,migration=False),dict(version=1,migration=False),dict(version=2,migration=True,hold=True),dict(version=1,migration=False,hold=True,fail=True),dict(version=2,migration=True),dict(version=1,migration=False)]
+    preamble=code[:code.index('const out=[];')]
+    tail=r'''
+const steps=JSON.parse(readFileSync(0,'utf8'));const fixed={record:{id:2,kind:'cache',scope:{kind:'session'},createdAt:1},stored:1,find:true,read:true};const p=new Probe(fixed),out=[];
+for(const c of steps){if(c.hold)p.hold(2);p.failFlush=!!c.fail;const d={kind:'cache',scope:'session',version:c.version,...(c.migration?{migrate:(value,from)=>({...value,from})}:{})};try{const x=await p.run(d,fixed.record);out.push({ok:true,stored:x.storedVersion,version:x.valueVersion,value:x.tracker.value,calls:[...p.calls]})}catch{out.push({ok:false,calls:[...p.calls]})}}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',preamble+tail,str(ROOT/'references/pi')],input=json.dumps(sequence),text=True,capture_output=True,check=True).stdout)
+    class Hooks(ctypes.Structure):
+        _fields_=[('context',ctypes.c_void_p),('clock',ctypes.c_void_p),('flush',ctypes.c_void_p),('pinned',ctypes.c_void_p)]
+    class Cache(ctypes.Structure):
+        _fields_=[('table',ctypes.c_void_p),('head',ctypes.c_void_p),('idle_head',ctypes.c_void_p),('idle_tail',ctypes.c_void_p),('count',ctypes.c_size_t),('storage',Documents),('context',ctypes.c_void_p),('clock',ctypes.c_void_p),('retention',ctypes.c_uint64),('flush',ctypes.c_void_p),('pinned',ctypes.c_void_p),('busy',ctypes.c_uint),('closed',ctypes.c_uint)]
+    clock_type=ctypes.CFUNCTYPE(ctypes.c_uint64,ctypes.c_void_p);flush_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(Loaded));calls=[];pending=False;failed=False
+    @clock_type
+    def clock(context):return 0
+    @flush_type
+    def flush(context,value):
+        nonlocal pending
+        if pending:
+            calls.append('flush')
+            if failed:return 1
+            pending=False
+        return 0
+    @find_type
+    def cache_find(context,address,at,out):calls.append('find');out[0]=library.json_tokener_parse(b'{"id":2,"kind":"cache","scope":{"kind":"session"},"createdAt":1}');return 0
+    @read_type
+    def cache_read(context,id,at,out):calls.append('read');out[0]=library.json_tokener_parse(b'{"record":{"id":2,"kind":"cache","scope":{"kind":"session"},"createdAt":1},"version":1,"value":{"text":"old"},"deltasSinceBase":3}');return 0
+    hooks=Hooks(None,ctypes.cast(clock,ctypes.c_void_p),ctypes.cast(flush,ctypes.c_void_p),None);storage=Documents(None,ctypes.cast(cache_find,ctypes.c_void_p),ctypes.cast(cache_read,ctypes.c_void_p));cache=Cache();keep=[]
+    native.pg_document_cache_open.argtypes=[ctypes.POINTER(Cache),ctypes.POINTER(Documents),ctypes.POINTER(Hooks),ctypes.c_uint64];native.pg_document_cache_get.argtypes=[ctypes.POINTER(Cache),ctypes.POINTER(Definition),ctypes.POINTER(Address),ctypes.POINTER(ctypes.POINTER(Loaded))];native.pg_document_cache_close.argtypes=[ctypes.POINTER(Cache)]
+    assert not native.pg_document_cache_open(ctypes.byref(cache),ctypes.byref(storage),ctypes.byref(hooks),100000)
+    try:
+        for step,want in zip(sequence,expected,strict=True):
+            if step.get('hold'):pending=True
+            failed=step.get('fail',False);buffer=ctypes.create_string_buffer(b'cache');definition=Definition(Slice(ctypes.addressof(buffer),5),step['version'],0,0,0,0,None,ctypes.cast(migrate,ctypes.c_void_p) if step['migration'] else None);address=Address(Slice(ctypes.addressof(buffer),5),Slice(),0,0,0);keep.append((buffer,definition));out=ctypes.POINTER(Loaded)();status=native.pg_document_cache_get(ctypes.byref(cache),ctypes.byref(definition),ctypes.byref(address),ctypes.byref(out));actual=dict(ok=status==0,calls=list(calls))
+            if not status:actual.update(stored=out.contents.stored,version=out.contents.version,value=json.loads(library.json_object_to_json_string_ext(out.contents.value,0)))
+            else:assert not out
+            assert actual==want,(step,status,actual,want)
+    finally:assert not native.pg_document_cache_close(ctypes.byref(cache))
+    print(f'PASS: {len(sequence)} cache reuse/version/held-flush steps match actual Pi loadDocument body')
+
 
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):

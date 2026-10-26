@@ -251,7 +251,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 loaded文档写入规划：`pg_document_plan_change` 对照Transaction `planDocument` loaded分支及`#assemble` checkpoint选择；迁移写base（含空ops），同版非空ops按提供的checkpoint决策选base/delta，同版空ops不写，拒绝newer stored version。planner为纯构造，不执行predicate；完整Doc结算须在所有验证后计算决策。72条执行实际Pi原函数/分支一致，输入/payload隔离与逐分配插入复制故障通过；实际Storage验证迁移materialize→空编辑→base、checkpoint base、普通delta与空编辑不提交。O0/O2内存专项及完整Runtime结果见当前实现记录。
 - K03文档载入句柄：documents.h/.S的record_decode/loaded_open/loaded_close与loaded_begin对照Session #loadDocument未命中缓存分支及Transaction #acquire的loaded分支，注入find/read，检查current实例身份/scope/version并物化迁移，保留stored/value version与deltasSinceBase。句柄独立拥有record/value；Memory提供24字节绑定descriptor。编辑复制当前物化值，关闭/失败清理metadata。
 - K03载入验证：128条新鲜载入执行实际Pi原方法体及实际materializeDocument/track，匹配Storage调用顺序，含scope/history/fork/family NUL、版本/迁移与缺失读。真实Memory验证迁移载入→空编辑→base提交、版本拒绝、Storage关闭后独立持有与逐分配/读取/部分复制故障；O0/O2内存专项通过。缓存命中/驱逐、holds和adoption版本协调尚待控制层；完整Runtime见当前实现记录。
-- 下一完整行为：接入按地址复用/版本仲裁、Doc所有权与验证后的checkpoint回调及统一结算，接入当前消息投影。
+- K03文档缓存：documents.h/.S的cache接口对照Session #loadDocument/#touchDocument/#dropDocument/#sweepDocuments/#pinDocument；完整地址（含NUL family key）使用json-c linkhash，手写节点/idle链与生命周期。相同valueVersion复用并检查definition语义，不同version先held flush再drop/reload，失败保留旧句柄；pin由观察/holds服务提供，变更后touch，sweep由Session执行线显式调用。缓存借用Definition，句柄只读借用期限明确。
+- K03缓存验证：11步复用/版本切换/hold flush执行实际Pi原方法体一致；160个NUL family地址跨哈希扩容，重复获取无额外find/read。触摸粒度、101ms retention、pin/unpin、零retention、条件驱逐、close/reopen及直接分配/插入/读取失败O0/O2通过。完整Runtime通过，最后新增命中definition不符专项在最终源O2通过。统一Session mutation/adoption、holds与自动timer调度尚待接入。
+- 下一完整行为：接入文档adoption、Doc所有权与验证后的checkpoint回调及统一结算，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

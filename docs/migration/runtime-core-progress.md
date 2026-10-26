@@ -253,3 +253,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：Assembly record_decode及120字节loaded handle，注入24字节find/read服务，current find→current read→身份/定义scope/version检查→隔离物化迁移，保存stored_version/value_version/deltasSinceBase。record_owner持有NativeRecord字符串来源，value独立拥有；Memory提供GOT函数绑定。loaded_begin生成独立操作日志；close/失败清空句柄，Definition按契约借用。
 - 实际验证：128条执行实际上游未命中缓存方法体及实际materializeDocument/track，匹配元数据、物化值与find/read顺序，含NUL kind/key、scope/history/fork、版本/迁移、find missing与find后read missing。实际MemoryStorage完成迁移载入→空编辑→base提交、版本拒绝、Storage关闭后独立持有及逐直接分配/读取/部分复制错误清理；O0/O2 ASan/UBSan与完整Runtime通过。原5262条Storage、72条规划、448条编辑等对照继续通过（3条已有ABI拒绝单列）。隔离核心暂存树G00、Assembly清单、产品构建及共享G00通过。
 - 同一实施Agent自审：新增实际导出/loaded服务布局与MISSING/STORAGE_FAILED错误登记，不调整门禁/预算。10个候选路径/暂存内容清单SHA256摘要（本记录加入前）`ccc604ec16573fae1fd929ab6d6d731fe086f49a4d9171d6ded8e85117c24227`。结论为本地候选通过；缓存命中/版本仲裁/holds、Doc获取后的统一adoption与checkpoint仍待实现，K03未完成。
+
+## K03 按地址缓存与版本仲裁（2026-10-26）
+
+- 来源：固定Pi Session的loadDocument/touchDocument/dropDocument/sweepDocuments/pinDocument及session-document-cache-bench长期工作负载。Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly 112字节cache，以成熟json-c linkhash索引完整地址，节点拥有loaded句柄，idle链维护使用时间与pin变化。相同valueVersion复用并检查definition语义，版本切换flush后drop/reload，flush失败保留旧值。时钟/pin服务注入，sweep由Session执行线显式调度；retention可更新，close释放节点/索引。借用期限、Definition生命周期及holds flush分工在头文件明确。
+- 实际验证：11步缓存/版本/held-flush与实际Pi原方法体一致；160个NUL family地址跨哈希扩容重复读取无额外Storage调用。101ms触摸粒度、pin/unpin、零retention、条件驱逐和重开通过。O0/O2 ASan/UBSan枚举table/node/insert/读取/部分复制故障；完整Runtime退出0，最后补充definition命中不符最终源O2通过。隔离核心暂存树G00、Assembly清单、产品构建及共享G00通过。
+- 同一实施Agent自审：扩展已有实际导出/来源登记，故障注入覆盖linkhash分配/插入，无门禁/预算变更。7个候选路径/暂存内容清单摘要（加入本记录前）：682825f75f16283d8bf4d5900e705578088f2edae871df99b91e292a5faae4c5。结论为本地候选通过；完整adoption、holds持久队列、Doc统一结算及应用接入仍待实现，K03未完成。
