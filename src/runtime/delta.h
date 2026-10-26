@@ -60,4 +60,25 @@ pg_document_status pg_document_plan_change(uint64_t id,uint64_t stored_version,u
  const pg_document_prepared *,unsigned checkpoint,struct json_object **);
 /* Begin an independent explicit-op edit from an active loaded handle. */
 pg_document_status pg_document_loaded_begin(pg_document_loaded *,pg_document_change *);
+typedef enum {PG_ADOPTION_NO_WRITE,PG_ADOPTION_BASE,PG_ADOPTION_DELTA} pg_document_adoption_kind;
+typedef struct {
+ pg_document_loaded *loaded;
+ struct json_object *expected,*candidate;
+ uint64_t stored_version,value_version,deltas_since_base,incarnation,next_stored_version,next_deltas_since_base;
+ unsigned busy,state;
+} pg_document_adoption;
+/* Prepare runs before Storage admission: detaches Prepared value, retains the
+   expected loaded value to prevent pointer reuse, and captures metadata. Inputs
+   remain borrowed and unchanged. Empty same-version ops require NO_WRITE;
+   migration uses BASE even when ops are empty. The target remains alive through
+   apply/discard, under the Session mutation line.
+   Apply allocates nothing, verifies the expected value/metadata, swaps only for
+   nonempty ops and updates persisted version/replay counters. Duplicate use is
+   invalid; stale target returns SEMANTICS without modifying either candidate.
+   Discard releases unpublished values and is idempotent. State is API-private.
+   This handles a loaded incarnation; creation/retirement install/evict are
+   coordinated by the Session host. */
+pg_document_status pg_document_adoption_prepare(pg_document_adoption *,pg_document_loaded *,const pg_document_prepared *,pg_document_adoption_kind);
+pg_document_status pg_document_adoption_apply(pg_document_adoption *);
+pg_document_status pg_document_adoption_discard(pg_document_adoption *);
 #endif

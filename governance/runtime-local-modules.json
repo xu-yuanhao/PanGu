@@ -1001,7 +1001,10 @@
         "pg_document_change_prepare",
         "pg_document_change_discard",
         "pg_document_plan_change",
-        "pg_document_loaded_begin"
+        "pg_document_loaded_begin",
+        "pg_document_adoption_prepare",
+        "pg_document_adoption_apply",
+        "pg_document_adoption_discard"
       ],
       "reference_basis": [
         {
@@ -1014,7 +1017,7 @@
             "packages/chord/src/delta/tracker.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation"
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters"
         }
       ]
     }

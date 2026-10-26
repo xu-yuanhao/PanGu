@@ -130,6 +130,37 @@ for(const c of JSON.parse(readFileSync(0,'utf8'))){const loaded={record:{id:c.id
         finally:library.json_object_put(out);library.json_object_put(ops);library.json_object_put(value)
     print(f'PASS: {len(cases)} document change plans match actual Pi planDocument/checkpoint branch')
 
+def adoption_cases(native,library):
+    path=ROOT/'references/pi/packages/durable/src/session/transaction.ts'
+    assert path.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':packages/durable/src/session/transaction.ts'])
+    cases=[dict(stored=stored,version=version,changed=changed,checkpoint=checkpoint) for stored,version in [(1,1),(1,2),(2,2)] for changed in [False,True] for checkpoint in [False,True]]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {pathToFileURL} from 'node:url';
+const {track}=await import(pathToFileURL(process.argv[2]));const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('adopt(seq: Seq): AdoptedDocuments'),end=source.indexOf('async #assemble()',start);const describe=()=>undefined;const text='class Probe{#plans;#host={install(){throw Error("install")},evict(){throw Error("evict")}};constructor(plan){this.#plans=[plan]}'+source.slice(start,end)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){const tracker=track({n:1}),old=tracker.value,change=tracker.beginChange();if(c.changed)change.state.n=2;const prepared=change.prepare(),loaded={record:{id:2,createdAt:1},storedVersion:c.stored,valueVersion:c.version,deltasSinceBase:3,tracker};const kind=c.stored<c.version||c.checkpoint?'base':'delta';const plan={record:loaded.record,retire:false,change:{tracker,prepared,loaded,version:c.version},...(c.changed||c.stored<c.version?{content:{type:'document.change',id:2,content:{kind}}}:{})};new Probe(plan).adopt(2);out.push({stored:loaded.storedVersion,deltas:loaded.deltasSinceBase,value:tracker.value,same:old===tracker.value});}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path),str(ROOT/'references/pi/packages/chord/src/delta/tracker.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Loaded(ctypes.Structure):
+        _fields_=[('owner',ctypes.c_void_p),('value',ctypes.c_void_p),('definition',ctypes.c_void_p),('record',ctypes.c_byte*64),('stored',ctypes.c_uint64),('version',ctypes.c_uint64),('deltas',ctypes.c_uint64),('busy',ctypes.c_uint),('active',ctypes.c_uint)]
+    class Adoption(ctypes.Structure):
+        _fields_=[('loaded',ctypes.c_void_p),('expected',ctypes.c_void_p),('candidate',ctypes.c_void_p),('stored',ctypes.c_uint64),('version',ctypes.c_uint64),('deltas',ctypes.c_uint64),('id',ctypes.c_uint64),('next_stored',ctypes.c_uint64),('next_deltas',ctypes.c_uint64),('busy',ctypes.c_uint),('state',ctypes.c_uint)]
+    native.pg_document_adoption_prepare.argtypes=[ctypes.POINTER(Adoption),ctypes.POINTER(Loaded),ctypes.POINTER(Prepared),ctypes.c_uint]
+    native.pg_document_adoption_apply.argtypes=[ctypes.POINTER(Adoption)]
+    native.pg_document_adoption_discard.argtypes=[ctypes.POINTER(Adoption)]
+    for case,want in zip(cases,expected,strict=True):
+        base=library.json_tokener_parse(b'{"n":1}');value=library.json_tokener_parse(b'{"n":2}' if case['changed'] else b'{"n":1}');ops=library.json_tokener_parse(b'[["s",["n"],2]]' if case['changed'] else b'[]');loaded=Loaded();loaded.value=base;loaded.stored=case['stored'];loaded.version=case['version'];loaded.deltas=3;loaded.active=1;ctypes.c_uint64.from_buffer(loaded,72).value=2;prepared=Prepared(value,ops);adoption=Adoption()
+        kind=1 if case['stored']<case['version'] or (case['changed'] and case['checkpoint']) else 2 if case['changed'] else 0
+        try:
+            assert not native.pg_document_adoption_prepare(ctypes.byref(adoption),ctypes.byref(loaded),ctypes.byref(prepared),kind)
+            assert loaded.value==base and loaded.stored==case['stored'] and loaded.deltas==3
+            assert not native.pg_document_adoption_apply(ctypes.byref(adoption))
+            actual=dict(stored=loaded.stored,deltas=loaded.deltas,value=json.loads(library.json_object_to_json_string_ext(loaded.value,0)),same=loaded.value==base)
+            assert actual==want,(case,actual,want)
+        finally:
+            assert not native.pg_document_adoption_discard(ctypes.byref(adoption))
+            for pointer in [loaded.value,value,ops]:library.json_object_put(pointer)
+    print(f'PASS: {len(cases)} loaded adoption value/version/counter outcomes match actual Pi adopt body and Chord tracker')
+
 def main():
     reference=ROOT/'references/pi/packages/chord/src/delta/index.ts'
     for name in ('index.ts','diff.ts','tracker.ts','pending.ts','draft.ts'):
@@ -149,6 +180,7 @@ def main():
         native.pg_document_delta_batches.argtypes=native.pg_document_delta_apply.argtypes;native.pg_document_delta_batches.restype=ctypes.c_int
         revision_cases(native,library)
         plan_cases(native,library)
+        adoption_cases(native,library)
         native.pg_document_change_open.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
         native.pg_document_change_append.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
         native.pg_document_change_prepare.argtypes=[ctypes.POINTER(Change),ctypes.POINTER(Prepared)]

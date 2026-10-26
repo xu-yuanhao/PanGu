@@ -260,3 +260,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly 112字节cache，以成熟json-c linkhash索引完整地址，节点拥有loaded句柄，idle链维护使用时间与pin变化。相同valueVersion复用并检查definition语义，版本切换flush后drop/reload，flush失败保留旧值。时钟/pin服务注入，sweep由Session执行线显式调度；retention可更新，close释放节点/索引。借用期限、Definition生命周期及holds flush分工在头文件明确。
 - 实际验证：11步缓存/版本/held-flush与实际Pi原方法体一致；160个NUL family地址跨哈希扩容重复读取无额外Storage调用。101ms触摸粒度、pin/unpin、零retention、条件驱逐和重开通过。O0/O2 ASan/UBSan枚举table/node/insert/读取/部分复制故障；完整Runtime退出0，最后补充definition命中不符最终源O2通过。隔离核心暂存树G00、Assembly清单、产品构建及共享G00通过。
 - 同一实施Agent自审：扩展已有实际导出/来源登记，故障注入覆盖linkhash分配/插入，无门禁/预算变更。7个候选路径/暂存内容清单摘要（加入本记录前）：682825f75f16283d8bf4d5900e705578088f2edae871df99b91e292a5faae4c5。结论为本地候选通过；完整adoption、holds持久队列、Doc统一结算及应用接入仍待实现，K03未完成。
+
+## K03 loaded文档adoption（2026-10-26）
+
+- 来源：固定Pi Transaction.adopt的loaded分支、Session.runCommit的同步adopt/发布顺序，Chord Tracker.adopt的base/revision检查与指针交换。Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly 80字节adoption，准入前复制Prepared值并保留expected值引用，记录stored/value version、deltas、incarnation，避免引用地址复用。apply仅验证预期状态并交换已准备值、调整持久版本/重放计数；空ops不替换物化值，迁移base仍更新stored version并重置计数。重复/过期候选拒绝；discard释放未发布所有权。目标loaded句柄由Session执行线保持有效。
+- 实际验证：12个结果执行实际Pi adopt方法体及实际Chord tracker一致；O0/O2 ASan/UBSan覆盖竞争候选、重复采纳、迁移/无编辑identity、输入隔离及准备阶段逐直接分配/部分复制故障。真实MemoryStorage与records adopt/publish组合验证成功、adopt前失败、adopt后后端报错；失败前保留旧值，失败后保留已采纳值并锁存Session，不发布伪成功。apply内启用故障注入记录到0次分配。完整Runtime、隔离核心暂存树G00/Assembly清单/产品构建及共享G00通过。
+- 同一实施Agent自审：扩展现有模块实际导出/adoption布局与参考登记，无门禁预算修改。7个候选路径/暂存内容清单摘要（加入本记录前）：1f1597f4aa0a9dd22af0bcb71b8c1c8279b5c250f71f14f8fdba01fd6cd20a42。结论为本地候选通过；统一Doc事务、creation install/retirement evict、checkpoint回调及holds仍待完成，K03未完成。

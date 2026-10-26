@@ -245,7 +245,24 @@ static void cache_many_addresses(void){
  assert(cache.count==160&&f.finds==160&&f.reads==160);f.now=10;char key0[]={'k','e','y','0',0,(char)0xe4,(char)0xb8,(char)0xad};pg_document_address first={.kind={"family",6},.key={key0,sizeof(key0)},.scope=PG_DOC_SESSION,.has_key=1};assert(!pg_document_cache_touch(&cache,&first));f.now=101;assert(!pg_document_cache_sweep(&cache)&&!cache.count);/* 10ms touch is inside ceil(101/10), so it does not postpone expiry. */
  f.now=200;pg_document_loaded *value=0;assert(!pg_document_cache_get(&cache,&definition,&first,&value));f.pin=1;assert(!pg_document_cache_touch(&cache,&first)&&!cache.idle_head);f.now=1000;assert(!pg_document_cache_sweep(&cache)&&cache.count==1);f.pin=0;assert(!pg_document_cache_touch(&cache,&first));f.now=1101;assert(!pg_document_cache_sweep(&cache)&&!cache.count&&!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
 }
+typedef struct {pg_record_memory memory;pg_record_storage storage;pg_document_loaded loaded;pg_document_adoption adoption;unsigned mode,adopted,published;} document_commit_fixture;
+static int document_adopt_callback(void *context,const struct json_object *writes,uint64_t seq){document_commit_fixture *f=context;(void)writes;assert(f->memory.next_sequence==seq+1&&!f->published);++f->adopted;
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=1;doc_calls=0;doc_fail=1;
+#endif
+ int status=pg_document_adoption_apply(&f->adoption);
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=0;assert(doc_calls==0);doc_fail=0;
+#endif
+ return status;}
+static void document_publish_callback(void *context,const struct json_object *writes,uint64_t seq){document_commit_fixture *f=context;(void)writes;assert(seq==2&&f->adopted==1&&!strcmp(json_object_get_string(json_object_object_get(f->loaded.value,"text")),"new"));++f->published;}
+static int document_storage_callback(void *context,const struct json_object *writes,pg_records_adopt adopt,void *owner,uint64_t *seq){document_commit_fixture *f=context;if(f->mode==1)return 2;int status=f->storage.commit(&f->memory,writes,adopt,owner,seq);return f->mode==2?2:status;}
+static void document_adoption_commit(void){
+ for(unsigned mode=0;mode<3;++mode){document_commit_fixture f={.mode=mode};assert(!pg_record_memory_open(&f.memory)&&!doc_commit(&f.memory,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"adopt\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}]"));f.storage=pg_record_memory_storage(&f.memory);pg_document_storage docs;pg_record_memory_documents(&f.memory,&docs);pg_document_definition definition={.kind={"adopt",5},.version=1,.scope=PG_DOC_SESSION};pg_document_address address={.kind={"adopt",5},.scope=PG_DOC_SESSION};assert(!pg_document_loaded_open(&f.loaded,&docs,&definition,&address));pg_document_change edit={0};struct json_object *ops=json_tokener_parse("[[\"s\",[\"text\"],\"new\"]]");assert(ops&&!pg_document_loaded_begin(&f.loaded,&edit)&&!pg_document_change_append(&edit,ops));pg_document_prepared prepared={0};assert(!pg_document_change_prepare(&edit,&prepared));struct json_object *write=0;assert(!pg_document_plan_change(2,1,1,&prepared,0,&write)&&!pg_document_adoption_prepare(&f.adoption,&f.loaded,&prepared,PG_ADOPTION_DELTA));pg_record_session session={.storage={&f,document_storage_callback},.context=&f,.adopt=document_adopt_callback,.publish=document_publish_callback};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&f.memory,tx_read)&&!pg_record_tx_stage(&tx,PG_TX_DOCUMENT_CHANGE,write));json_object_object_add(prepared.value,"text",json_object_new_string("external"));int result=pg_record_tx_commit(&tx);assert(result==(mode?PG_TX_COMMIT_FAILED:PG_TX_OK)&&f.adopted==(mode==1?0u:1u)&&f.published==(mode?0u:1u)&&session.failed==(mode?PG_RECORDS_STORAGE_FAILED:0)&&!strcmp(json_object_get_string(json_object_object_get(f.loaded.value,"text")),mode==1?"old":"new")&&f.loaded.deltas_since_base==(mode==1?0u:1u));assert(!pg_document_adoption_discard(&f.adoption)&&!pg_document_change_discard(&edit)&&!pg_document_loaded_close(&f.loaded)&&!pg_record_memory_close(&f.memory));json_object_put(write);json_object_put(prepared.value);json_object_put(prepared.ops);json_object_put(ops);
+ }
+}
 int main(void){
+ document_adoption_commit();
  cache_many_addresses();
  document_cache();
  loaded_documents();

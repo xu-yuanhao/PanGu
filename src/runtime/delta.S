@@ -1681,3 +1681,246 @@ pg_document_loaded_begin:
  pop rbx
  ret
 .size pg_document_loaded_begin,.-pg_document_loaded_begin
+.text
+.globl pg_document_adoption_prepare
+.type pg_document_adoption_prepare,@function
+pg_document_adoption_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14d,ecx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test rbx,rbx
+ jz .Ladoption_prepare_return
+ test r12,r12
+ jz .Ladoption_prepare_return
+ test r13,r13
+ jz .Ladoption_prepare_return
+ cmp dword ptr [rbx+72],0
+ jne .Ladoption_prepare_return
+ mov eax,[rbx+76]
+ and eax,0xfffffffb
+ cmp eax,1
+ je .Ladoption_prepare_return
+ cmp dword ptr [r12+112],0
+ jne .Ladoption_prepare_return
+ cmp dword ptr [r12+116],1
+ jne .Ladoption_prepare_return
+ cmp r14d,2
+ ja .Ladoption_prepare_return
+ mov dword ptr [rbx+72],1
+ mov dword ptr [r12+112],1
+ mov rdi,[r13+8]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ladoption_prepare_cleanup
+ mov rdi,[r13+8]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ladoption_prepare_cleanup
+ mov rdi,[r13+8]
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ cmp qword ptr [r12+96],0
+ je .Ladoption_prepare_cleanup
+ mov rcx,9007199254740991
+ cmp [r12+96],rcx
+ ja .Ladoption_prepare_cleanup
+ mov rdx,[r12+88]
+ test rdx,rdx
+ jz .Ladoption_prepare_cleanup
+ cmp rdx,[r12+96]
+ ja .Ladoption_prepare_cleanup
+ cmp [r12+104],rcx
+ ja .Ladoption_prepare_cleanup
+ cmp r14d,0
+ jne .Ladoption_prepare_written
+ test rax,rax
+ jnz .Ladoption_prepare_cleanup
+ cmp rdx,[r12+96]
+ jne .Ladoption_prepare_cleanup
+ jmp .Ladoption_prepare_value
+.Ladoption_prepare_written:
+ cmp r14d,1
+ je .Ladoption_prepare_base
+ test rax,rax
+ jz .Ladoption_prepare_cleanup
+ cmp rdx,[r12+96]
+ jne .Ladoption_prepare_cleanup
+ cmp [r12+104],rcx
+ jae .Ladoption_prepare_cleanup
+ jmp .Ladoption_prepare_value
+.Ladoption_prepare_base:
+ test rax,rax
+ jnz .Ladoption_prepare_value
+ cmp rdx,[r12+96]
+ je .Ladoption_prepare_cleanup
+.Ladoption_prepare_value:
+ mov rdi,[r13]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ladoption_prepare_cleanup
+ cmp qword ptr [rsp+8],0
+ je .Ladoption_prepare_install
+ mov rdi,[r13]
+ test rdi,rdi
+ jz .Ladoption_prepare_install
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ladoption_prepare_allocation
+.Ladoption_prepare_install:
+ mov [rbx],r12
+ mov rdi,[r12+8]
+ call json_object_get@PLT
+ mov [rbx+8],rax
+ mov rax,[rsp]
+ mov [rbx+16],rax
+ mov qword ptr [rsp],0
+ mov rax,[r12+88]
+ mov [rbx+24],rax
+ mov rax,[r12+96]
+ mov [rbx+32],rax
+ mov [rbx+56],rax
+ mov rax,[r12+104]
+ mov [rbx+40],rax
+ test r14d,r14d
+ jz .Ladoption_prepare_count
+ cmp r14d,1
+ je .Ladoption_prepare_reset
+ inc rax
+ jmp .Ladoption_prepare_count
+.Ladoption_prepare_reset:
+ xor eax,eax
+.Ladoption_prepare_count:
+ mov [rbx+64],rax
+ mov rax,[r12+72]
+ mov [rbx+48],rax
+ mov dword ptr [rbx+76],1
+ cmp qword ptr [rsp+8],0
+ je .Ladoption_prepare_ready
+ mov dword ptr [rbx+76],5
+.Ladoption_prepare_ready:
+ xor ebp,ebp
+ jmp .Ladoption_prepare_cleanup
+.Ladoption_prepare_allocation:
+ mov ebp,3
+.Ladoption_prepare_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov dword ptr [r12+112],0
+ mov dword ptr [rbx+72],0
+.Ladoption_prepare_return:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_adoption_prepare,.-pg_document_adoption_prepare
+
+.globl pg_document_adoption_apply
+.type pg_document_adoption_apply,@function
+pg_document_adoption_apply:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Ladoption_apply_return
+ cmp dword ptr [rbx+72],0
+ jne .Ladoption_apply_return
+ mov ecx,[rbx+76]
+ and ecx,0xfffffffb
+ cmp ecx,1
+ jne .Ladoption_apply_return
+ mov r12,[rbx]
+ test r12,r12
+ jz .Ladoption_apply_return
+ cmp dword ptr [r12+112],0
+ jne .Ladoption_apply_return
+ cmp dword ptr [r12+116],1
+ jne .Ladoption_apply_return
+ mov rax,[rbx+8]
+ cmp [r12+8],rax
+ jne .Ladoption_apply_stale
+ mov rax,[rbx+24]
+ cmp [r12+88],rax
+ jne .Ladoption_apply_stale
+ mov rax,[rbx+32]
+ cmp [r12+96],rax
+ jne .Ladoption_apply_stale
+ mov rax,[rbx+40]
+ cmp [r12+104],rax
+ jne .Ladoption_apply_stale
+ mov rax,[rbx+48]
+ cmp [r12+72],rax
+ jne .Ladoption_apply_stale
+ mov dword ptr [rbx+72],1
+ mov dword ptr [r12+112],1
+ test dword ptr [rbx+76],4
+ jz .Ladoption_apply_metadata
+ mov rdi,[r12+8]
+ mov rax,[rbx+16]
+ mov [r12+8],rax
+ mov qword ptr [rbx+16],0
+ call json_object_put@PLT
+.Ladoption_apply_metadata:
+ mov rax,[rbx+56]
+ mov [r12+88],rax
+ mov rax,[rbx+64]
+ mov [r12+104],rax
+ mov dword ptr [rbx+76],2
+ mov rdi,[rbx+8]
+ mov qword ptr [rbx+8],0
+ call json_object_put@PLT
+ mov dword ptr [r12+112],0
+ mov dword ptr [rbx+72],0
+ xor eax,eax
+ jmp .Ladoption_apply_return
+.Ladoption_apply_stale:
+ mov eax,4
+.Ladoption_apply_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_document_adoption_apply,.-pg_document_adoption_apply
+
+.globl pg_document_adoption_discard
+.type pg_document_adoption_discard,@function
+pg_document_adoption_discard:
+ mov eax,1
+ test rdi,rdi
+ jz .Ladoption_discard_return
+ cmp dword ptr [rdi+72],0
+ jne .Ladoption_discard_return
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+72],1
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov dword ptr [rbx+76],2
+ xor eax,eax
+ pop rbx
+.Ladoption_discard_return:
+ ret
+.size pg_document_adoption_discard,.-pg_document_adoption_discard

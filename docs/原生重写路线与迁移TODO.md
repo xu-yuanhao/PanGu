@@ -253,7 +253,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03载入验证：128条新鲜载入执行实际Pi原方法体及实际materializeDocument/track，匹配Storage调用顺序，含scope/history/fork/family NUL、版本/迁移与缺失读。真实Memory验证迁移载入→空编辑→base提交、版本拒绝、Storage关闭后独立持有与逐分配/读取/部分复制故障；O0/O2内存专项通过。缓存命中/驱逐、holds和adoption版本协调尚待控制层；完整Runtime见当前实现记录。
 - K03文档缓存：documents.h/.S的cache接口对照Session #loadDocument/#touchDocument/#dropDocument/#sweepDocuments/#pinDocument；完整地址（含NUL family key）使用json-c linkhash，手写节点/idle链与生命周期。相同valueVersion复用并检查definition语义，不同version先held flush再drop/reload，失败保留旧句柄；pin由观察/holds服务提供，变更后touch，sweep由Session执行线显式调用。缓存借用Definition，句柄只读借用期限明确。
 - K03缓存验证：11步复用/版本切换/hold flush执行实际Pi原方法体一致；160个NUL family地址跨哈希扩容，重复获取无额外find/read。触摸粒度、101ms retention、pin/unpin、零retention、条件驱逐、close/reopen及直接分配/插入/读取失败O0/O2通过。完整Runtime通过，最后新增命中definition不符专项在最终源O2通过。统一Session mutation/adoption、holds与自动timer调度尚待接入。
-- 下一完整行为：接入文档adoption、Doc所有权与验证后的checkpoint回调及统一结算，接入当前消息投影。
+- K03 loaded adoption：delta.h/.S的adoption_prepare/apply/discard对照Transaction.adopt与Chord Tracker.adopt，Storage前复制候选并保留预期base引用/版本/计数/ID，确认后无分配交换；空ops保留当前物化值，迁移更新storedVersion，base重置deltas、delta递增。过期或重复使用拒绝，discard释放未发布候选。目标句柄在apply/discard前保持有效并由Session执行线串行持有。
+- K03 adoption验证：12个场景执行实际Pi adopt与实际Chord tracker一致；O0/O2验证竞争候选失效、重复采纳、输入隔离和直接分配/部分复制失败。真实Storage/adopt/publish组合覆盖成功、采纳前失败、采纳后后端报错：后者保留已采纳值且锁存Session；apply期间故障注入计数为0。完整Runtime结果见当前实现记录。此处为loaded incarnation能力，统一Doc事务/创建安装/退役驱逐继续接入。
+- 下一完整行为：接通统一Doc获取/结算与checkpoint回调、创建安装/退役驱逐及延迟提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 
