@@ -37,7 +37,22 @@
  test eax,eax
  jnz .Ldocs_finalize_doc_error
  mov dword ptr [r14+144],1
- jmp .Ldocs_append_write
+ test dword ptr [r14+148],8
+ jz .Ldocs_append_write
+ mov rax,[r15+168]
+ mov [r14+120],rax
+ mov rdi,[r14+112]
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[r12+24]
+ mov rsi,[r14+120]
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jz .Ldocs_prepare_next
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ jmp .Ldocs_finalize_allocation
 .Ldocs_plan_loaded:
  mov rdi,[r15+72]
  mov rsi,[r15+88]
@@ -90,6 +105,32 @@
  inc r13
  jmp .Ldocs_prepare_each
 .Ldocs_validate:
+ xor r13d,r13d
+.Ldocs_validate_sources:
+ cmp r13,[rbx+8]
+ jae .Ldocs_validate_batch
+ imul r14,r13,152
+ add r14,[rbx]
+ test dword ptr [r14+148],8
+ jz .Ldocs_validate_source_next
+ mov rax,[r14]
+ mov rdi,[rax+160]
+ lea rsi,[rip+.Lcopy_source]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,r12
+ call pg_record_tx_check_copy_source@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_invalid
+.Ldocs_validate_source_next:
+ inc r13
+ jmp .Ldocs_validate_sources
+.Ldocs_validate_batch:
  mov rdi,r12
  call pg_record_tx_validate_batch@PLT
  test eax,eax
@@ -378,7 +419,9 @@ pg_document_tx_commit:
  je .Ldocs_commit_return
  cmp qword ptr [r15+8],0
  jne .Ldocs_commit_has_edit
- cmp dword ptr [r15+148],6
+ mov eax,[r15+148]
+ and eax,-9
+ cmp eax,6
  jne .Ldocs_commit_return
 .Ldocs_commit_has_edit:
  cmp qword ptr [r15+16],0
@@ -389,7 +432,7 @@ pg_document_tx_commit:
  jne .Ldocs_commit_return
  cmp dword ptr [r15+144],0
  jne .Ldocs_commit_return
- cmp dword ptr [r15+148],7
+ cmp dword ptr [r15+148],15
  ja .Ldocs_commit_return
  test dword ptr [r15+148],6
  jz .Ldocs_commit_flags_ready
@@ -565,6 +608,7 @@ pg_document_tx_get:
  mov ebp,1
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+48],0
  test r14,r14
  jz .Ldoc_scope_get_return
  mov qword ptr [r14],0
@@ -649,6 +693,19 @@ pg_document_tx_get:
  xor ebp,ebp
  jmp .Ldoc_scope_get_cleanup
 .Ldoc_scope_get_load:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,rsp
+ call .Ldocs_copy_load
+ mov ebp,eax
+ cmp eax,8
+ je .Ldoc_scope_get_committed
+ test eax,eax
+ jnz .Ldoc_scope_get_cleanup
+ mov qword ptr [rsp+48],9
+ jmp .Ldoc_scope_get_edit
+.Ldoc_scope_get_committed:
  mov rdi,[rbx+8]
  mov rsi,r12
  mov rdx,r13
@@ -657,6 +714,7 @@ pg_document_tx_get:
  mov ebp,eax
  test eax,eax
  jnz .Ldoc_scope_get_cleanup
+.Ldoc_scope_get_edit:
  mov ebp,3
  mov edi,1
  mov esi,32
@@ -675,7 +733,7 @@ pg_document_tx_get:
  mov rdx,[rsp+8]
  mov rcx,[rsp+24]
  mov r8,[rsp+32]
- xor r9d,r9d
+ mov r9d,[rsp+48]
  call .Ldoc_scope_append
  mov ebp,eax
  test eax,eax
@@ -683,6 +741,7 @@ pg_document_tx_get:
  mov rax,[rsp+8]
  mov [r14],rax
  mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+48],0
 .Ldoc_scope_get_cleanup:
  cmp qword ptr [rsp+8],0
  je .Ldoc_scope_get_clear
@@ -691,6 +750,16 @@ pg_document_tx_get:
  mov rdi,[rsp+8]
  call free@PLT
 .Ldoc_scope_get_clear:
+ cmp qword ptr [rsp+48],0
+ je .Ldoc_scope_get_unlock
+ mov rdi,[rsp]
+ mov rdi,[rdi+160]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call pg_document_loaded_close@PLT
+ mov rdi,[rsp]
+ call free@PLT
+.Ldoc_scope_get_unlock:
  mov dword ptr [r15+32],0
  mov dword ptr [rbx+40],0
 .Ldoc_scope_get_return:
@@ -727,6 +796,11 @@ pg_document_tx_get:
  test dword ptr [rax+148],5
  jz .Ldoc_scope_release_next
  mov r13,[rax]
+ test dword ptr [rax+148],8
+ jz .Ldoc_scope_release_install
+ mov rdi,[r13+160]
+ call json_object_put@PLT
+.Ldoc_scope_release_install:
  lea rdi,[r13+120]
  call pg_document_install_discard@PLT
  mov rdi,r13
@@ -1225,6 +1299,7 @@ pg_document_tx_retire:
  mov r13,rdx
  mov ebp,1
  mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],6
  test rbx,rbx
  jz .Ldoc_retire_return
  test r12,r12
@@ -1282,6 +1357,39 @@ pg_document_tx_retire:
  xor ebp,ebp
  jmp .Ldoc_retire_cleanup
 .Ldoc_retire_lookup:
+ mov rdi,r15
+ mov rsi,r13
+ lea rdx,[rsp+8]
+ lea rcx,[rsp+16]
+ call .Ldocs_copy_find
+ mov ebp,eax
+ cmp eax,8
+ je .Ldoc_retire_committed
+ test eax,eax
+ jnz .Ldoc_retire_cleanup
+ mov edi,1
+ mov esi,176
+ call calloc@PLT
+ mov ebp,3
+ test rax,rax
+ jz .Ldoc_retire_cleanup
+ mov [rsp],rax
+ mov r14,rax
+ mov rax,[rsp+16]
+ mov [r14+168],rax
+ mov qword ptr [rsp+16],14
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ mov [r14+160],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [r14],rax
+ jmp .Ldoc_retire_record
+.Ldoc_retire_committed:
+ mov qword ptr [rsp+16],6
  mov edi,1
  mov esi,160
  call calloc@PLT
@@ -1298,6 +1406,7 @@ pg_document_tx_retire:
  je .Ldoc_retire_missing
  test eax,eax
  jnz .Ldoc_retire_cleanup
+.Ldoc_retire_record:
  mov r14,[rsp]
  mov rdi,[r14]
  lea rsi,[r14+24]
@@ -1326,7 +1435,7 @@ pg_document_tx_retire:
  xor edx,edx
  xor ecx,ecx
  xor r8d,r8d
- mov r9d,6
+ mov r9d,[rsp+16]
  call .Ldoc_scope_append
  mov ebp,eax
  test eax,eax
@@ -1339,6 +1448,12 @@ pg_document_tx_retire:
  mov rdi,[rsp]
  test rdi,rdi
  jz .Ldoc_retire_unlock
+ test dword ptr [rsp+16],8
+ jz .Ldoc_retire_close_loaded
+ mov rdi,[rdi+160]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+.Ldoc_retire_close_loaded:
  call pg_document_loaded_close@PLT
  mov rdi,[rsp]
  call free@PLT
@@ -1733,3 +1848,281 @@ pg_document_tx_retire:
 .Lterminal_status: .asciz "status"
 .Lterminal_name: .asciz "terminal"
 .Lterminal_conversation: .asciz "conversationId"
+
+.text
+/* Locate a borrowed staged copy; its array index remains stable until settle. */
+.Ldocs_copy_find:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,8
+ mov qword ptr [r13],0
+ mov qword ptr [r14],0
+ cmp dword ptr [r12+40],1
+ jne .Lcopy_find_return
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r15,rax
+.Lcopy_find_each:
+ test r15,r15
+ jz .Lcopy_find_return
+ dec r15
+ mov rdi,[rbx+24]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ cmp eax,13
+ jne .Lcopy_find_each
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Ldoc_write_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcopy_find_each
+ mov rdi,rax
+ lea rsi,[rip+.Lcopy_name]
+ mov edx,13
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lcopy_find_each
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Ldoc_write_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,rsp
+ call pg_document_record_decode@PLT
+ test eax,eax
+ jnz .Lcopy_find_invalid
+ mov rdi,rsp
+ mov rsi,r12
+ call pg_document_address_equal@PLT
+ test eax,eax
+ jz .Lcopy_find_each
+ mov rax,[rsp+64]
+ mov [r13],rax
+ mov [r14],r15
+ xor ebp,ebp
+ jmp .Lcopy_find_return
+.Lcopy_find_invalid:
+ mov ebp,1
+.Lcopy_find_return:
+ mov eax,ebp
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Created copy handle: loaded/install/cache, owned original write, index. */
+.Ldocs_copy_load:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,120
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ xor r15d,r15d
+ mov qword ptr [r14],0
+ mov qword ptr [rsp+16],0
+ mov rdi,[rbx]
+ mov rsi,r13
+ mov rdx,rsp
+ lea rcx,[rsp+8]
+ call .Ldocs_copy_find
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcopy_load_done
+ mov edi,1
+ mov esi,176
+ call calloc@PLT
+ test rax,rax
+ jz .Lcopy_load_allocation
+ mov r15,rax
+ mov rcx,[rbx+8]
+ mov [rax+152],rcx
+ mov rax,[rsp+8]
+ mov [r15+168],rax
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov [r15+160],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [r15],rax
+ mov rdi,rax
+ lea rsi,[r15+24]
+ call pg_document_record_decode@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcopy_load_done
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcopy_source]
+ call json_object_object_get@PLT
+ mov [rsp+112],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Lcopy_load_invalid
+ test rax,rax
+ jz .Lcopy_load_invalid
+ mov [rsp+24],rax
+ mov rdi,[rsp+112]
+ lea rsi,[rip+.Lcopy_at]
+ call json_object_object_get@PLT
+ mov [rsp+112],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,6
+ je .Lcopy_load_current
+ mov rdi,[rsp+112]
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Lcopy_load_invalid
+ jmp .Lcopy_load_point
+.Lcopy_load_current:
+ mov rdi,[rsp+112]
+ call json_object_get_string_len@PLT
+ cmp eax,7
+ jne .Lcopy_load_invalid
+ mov rdi,[rsp+112]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcopy_current]
+ mov edx,7
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lcopy_load_invalid
+ mov rax,-1
+.Lcopy_load_point:
+ mov [rsp+32],rax
+ mov rax,[rbx+8]
+ mov rdi,[rax+40]
+ mov rsi,[rsp+24]
+ mov rdx,[rsp+32]
+ lea rcx,[rsp+16]
+ call [rax+56]
+ test eax,eax
+ jnz .Lcopy_load_storage
+ cmp qword ptr [rsp+16],0
+ je .Lcopy_load_storage
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ldoc_write_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rsp+40]
+ call pg_document_record_decode@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcopy_load_done
+ mov rax,[rsp+88]
+ cmp rax,[rsp+24]
+ jne .Lcopy_load_semantics
+ cmp dword ptr [rsp+80],1
+ jne .Lcopy_load_semantics
+ cmp dword ptr [r15+64],1
+ jne .Lcopy_load_semantics
+ mov rax,[rsp+96]
+ cmp rax,[r15+80]
+ jne .Lcopy_load_semantics
+ mov rax,[r15+56]
+ mov [rsp+72],rax
+ lea rdi,[rsp+40]
+ lea rsi,[r15+24]
+ call pg_document_address_equal@PLT
+ test eax,eax
+ jz .Lcopy_load_semantics
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ldoc_write_version]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Lcopy_load_invalid
+ test rax,rax
+ jz .Lcopy_load_invalid
+ mov [rsp+104],rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ldoc_write_value]
+ call json_object_object_get@PLT
+ mov rcx,rax
+ mov rdi,r12
+ lea rsi,[r15+24]
+ mov rdx,[rsp+104]
+ lea r8,[r15+8]
+ call pg_document_materialize@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcopy_load_done
+ mov [r15+16],r12
+ mov rax,[r12+16]
+ mov [r15+88],rax
+ mov [r15+96],rax
+ mov dword ptr [r15+116],1
+ mov [r14],r15
+ xor r15d,r15d
+ xor ebp,ebp
+ jmp .Lcopy_load_done
+.Lcopy_load_storage:
+ mov ebp,9
+ jmp .Lcopy_load_done
+.Lcopy_load_semantics:
+ mov ebp,4
+ jmp .Lcopy_load_done
+.Lcopy_load_invalid:
+ mov ebp,1
+ jmp .Lcopy_load_done
+.Lcopy_load_allocation:
+ mov ebp,3
+.Lcopy_load_done:
+ test r15,r15
+ jz .Lcopy_load_stored_cleanup
+ mov rdi,[r15+160]
+ call json_object_put@PLT
+ mov rdi,r15
+ call pg_document_loaded_close@PLT
+ mov rdi,r15
+ call free@PLT
+.Lcopy_load_stored_cleanup:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,120
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcopy_name: .asciz "document.copy"
+.Lcopy_source: .asciz "source"
+.Lcopy_at: .asciz "at"
+.Lcopy_current: .asciz "current"

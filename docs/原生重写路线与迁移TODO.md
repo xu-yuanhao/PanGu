@@ -86,6 +86,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通缺失Doc的owner检查、initializer、mint及事务内draft复用；新旧文档与普通表统一提交，确认后安装新incarnation。
 - [x] 接通显式retireDoc、仅record退休、同址新incarnation与同批创建后退休；最终内容和retire原子提交，确认后按ID驱逐/安装。
 - [x] 接通Task最终terminal候选的文档自动退休：事务内新旧Doc及已提交Doc分页发现/去重，与Task状态同批提交；通过独立scan服务结算。
+- [x] 接通同事务fork-copy的获取、源快照核对、迁移/编辑及单一create/base结算；保留复制源冲突校验，并支持副本退休/同址重建。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -204,6 +205,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 对应资料已保存到 `references/pi-rust-yannelli`、`pie`、`pi-rust-nktkt`、`pi-rust-bigfish`、`pi-python-vamsi`、`bun-porting`。功能与行为的实现依据为上表中的Pi和Harness源码。
 
 ## 核心交接区
+
+- K03 fork-copy获取：固定Pi d5b3de22 的Transaction.acquireForkCopy、planDocument(created)、rejectForkSourceWrites，以及session-forks.test.ts的typed migration/override、source writes和retire/recreate用例。document_tx.S在已登记copy中按地址获取选定source id/at，核对kind/key/history/fork，按目标版本物化并复用目标ID。结算原位将copy换成单一create/base，保留源身份在全部生成计划后校验；record-only退休保持copy写入。as-of/current、迁移、重复获取、无额外mint/initializer、退休后重建、源冲突与逐直接故障通过。既有scope/entry布局及外部函数表保持；私有copy句柄持有原始计划到清理。K03继续接holds与完整Session查询/事务整合。
+
 
 - K03 Task终态Doc生命周期：固定Pi d5b3de22 的Transaction.assemble terminalTaskIds/retiring、staged Task最终候选及session-tables.test.ts的terminal settlement场景；原生document_tx_settle(scope,scan)注入分页发现服务，已封存全部edit后验证committed Task、标记新旧draft、分页发现并追加definition-free退休。新Task无需committed scan；已提交Task使用scanner完整发现。pg_document_query原布局迁至documents.h，Memory扫描接收void*直接作为服务绑定。530个文档跨页，525个旧Doc+1个新Doc退休，另5个存活；只扫描record，hash去重使用成熟json-c。缺失服务/错误页/读失败、重复terminal和conversation变更拒绝；逐直接故障及O0/O2内存专项通过。K03的fork-copy获取、holds、完整查询/Session整合继续实施。
 

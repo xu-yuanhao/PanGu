@@ -2041,19 +2041,11 @@ pg_record_tx_fork_conversation:
  mov r14,rax
  test r14,r14
  jz .Ltx_conflict_bad
- xor r15d,r15d
-.Ltx_conflict_changed:
- cmp r15,r12
- jae .Ltx_conflict_next
  mov rdi,rbx
- mov rsi,r15
- call json_object_array_get_idx@PLT
- mov rdi,rax
- call .Ltx_changed_document
- cmp rax,r14
- je .Ltx_conflict_bad
- inc r15
- jmp .Ltx_conflict_changed
+ mov rsi,r14
+ call .Ltx_source_conflict
+ test eax,eax
+ jnz .Ltx_conflict_bad
 .Ltx_conflict_next:
  inc r13
  jmp .Ltx_conflict_each
@@ -2931,3 +2923,46 @@ pg_record_tx_terminal_next:
  pop rbp
  ret
 .size pg_record_tx_terminal_next,.-pg_record_tx_terminal_next
+
+.text
+.globl pg_record_tx_check_copy_source
+.hidden pg_record_tx_check_copy_source
+.type pg_record_tx_check_copy_source,@function
+pg_record_tx_check_copy_source:
+ mov rdi,[rdi+24]
+.Ltx_source_conflict:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ call json_object_array_length@PLT
+ mov r13,rax
+ xor r14d,r14d
+.Ltx_source_each:
+ cmp r14,r13
+ jae .Ltx_source_good
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call .Ltx_changed_document
+ cmp rax,r12
+ je .Ltx_source_bad
+ inc r14
+ jmp .Ltx_source_each
+.Ltx_source_good:
+ xor eax,eax
+ jmp .Ltx_source_return
+.Ltx_source_bad:
+ mov eax,1
+.Ltx_source_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_check_copy_source,.-pg_record_tx_check_copy_source

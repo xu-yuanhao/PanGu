@@ -38,7 +38,8 @@ typedef struct {
 } pg_document_tx;
 /* Bind one Doc scope to an open record Tx and cache on its mutation line.
    Scope fields are API-managed. get
-   acquires existing incarnations; missing addresses return PG_DOC_MISSING.
+   acquires committed incarnations or staged fork-copy drafts; missing addresses
+   return PG_DOC_MISSING.
    Repeated addresses reuse the first edit and its definition/checkpoint,
    matching transaction-local draft identity. Returned edits are owned by this
    scope and remain stable across entry-array growth, until finish/abort.
@@ -63,8 +64,11 @@ typedef struct {
    its owner, initialize a detached value, then mint and stage a private new
    incarnation. Initialization/mint only run on first missing acquisition.
    All callbacks run with scope/record Tx busy. Failure returns no edit and
-   leaves prior candidates intact; minted IDs remain consumed. New incarnations
-   install during Storage confirmation; admitted backend/adoption errors follow
+   leaves prior candidates intact; minted IDs remain consumed. Staged fork
+   copies materialize their selected source/version without invoking
+   initializer or mint; settlement replaces the copy with the edited base and
+   preserves source-write conflict validation. New incarnations install during
+   Storage confirmation; admitted backend/adoption errors follow
    the Session fail-stop contract. */
 pg_document_status pg_document_tx_doc(pg_document_tx *,const pg_document_request *,pg_document_change **);
 /* Idempotently retire the latest incarnation. Prior edits still settle their

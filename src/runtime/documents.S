@@ -566,6 +566,10 @@ pg_document_materialize:
  pop rbx
  ret
 /* Nonnegative safe integral JSON number; RDX indicates validity. */
+.globl pg_document_safe_number
+.hidden pg_document_safe_number
+.type pg_document_safe_number,@function
+pg_document_safe_number:
 .Laccess_number:
  push rbx
  mov rbx,rdi
@@ -599,6 +603,7 @@ pg_document_materialize:
  xor edx,edx
  pop rbx
  ret
+.size pg_document_safe_number,.-pg_document_safe_number
 .macro AGET object,key
  mov rdi,\object
  lea rsi,[rip+.La_\key]
