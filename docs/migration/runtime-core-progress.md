@@ -344,3 +344,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：新增手写holds.S与独立holds.h；动态持有项借用cache-owned loaded，自有PendingOps。prepare复制旧队列引用并以既有原子push准备新快照，持久状态和旧队列不变；apply转移全部准备队列并touch缓存，全程不分配。候选锁保持到discard，拒绝重入/重复采纳。每实例累积操作、sticky base及最早期限；uint64溢出和Infinity饱和为UINT64_MAX。pin查询供组合cache hooks使用，确认持久化后release释放队列和pin，失败Session可discard_all后关闭缓存。所有新接口独立，旧ABI和TUI入口保持。
 - 实际验证：24个文档两轮连续编辑，结果/折叠队列/所有权、最早deadline/Infinity/溢出、pin阻止sweep、重入prepare及取消候选、checkpoint sticky base通过；真实MemoryStorage保存base后释放pin。新建/已有holds两种路径共52个直接分配/插入/部分复制故障，失败保留旧值、队列、期限及Session健康，O0/O2 ASan/UBSan通过。最终完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；既有3条delta ABI拒绝继续单列。共享及隔离暂存核心树G00/Assembly清单通过，隔离产品构建通过。首次隔离产品命令把输出设在checkout内被构建器拒绝，改为独立临时输出后通过。
 - 同一实施Agent自审：仅新增holds服务及实际汇编构建/导出/来源登记、Runtime专项与TODO，检查器/预算未变。8个候选路径内容清单摘要（加入本记录前）：5e00a8d947245c7ca6aaf829e7b8516f3413d6727fdcccc3a84f38e2ad748457。结论为本地候选通过。后续接正常事务takeHeld合并、批量持久flush及版本切换/关闭/timer服务；K03尚未完成。TUI未交接文件与登记保留工作树。
+
+## K03 holds统一持久flush（2026-10-26）
+
+- 来源：Pi d5b3de22 Session.#storeHolds/#release、runCommit调用Transaction.takeHeld，session-deferred-commits.test.ts的base/delta选择、存储失败与stored subscribers场景。本批fetch后Pi/Harness仍为d5b3de22 / 22ddee37。
+- 实现：holds.S新增独立pg_document_holds_flush。先复制PendingOps准备完整document.change数组及持久计数，统一records.commit；准备失败不排空旧队列。同步adopt只更新已持有loaded的持久重放计数，内存值指针/版本保持；成功settlement后释放所有队列与pin并touch缓存，再调用原publish。内存observer不重复通知。Session hooks/context在所有路径恢复，准入后后端/采纳错误锁存Session、保留holds供失败清理；原生delta计数上限在准入前拒绝，选定base可重置。
+- 实际验证：24文档两轮延迟修改一次flush，逐文档读取真实MemoryStorage值和计数一致；base/delta、值身份、成功前pin/成功后解pin、adopt→release→publish顺序、回调重入拒绝、空holds/只读及计数上限通过。拒绝、漏adopt、重复adopt、错误序号、consumer失败及adopt后后端拒绝六类错误全部fail-stop，hooks恢复且值不回滚。新增37个直接分配/插入/部分复制故障逐个验证旧队列/值保留（准备失败健康，后端失败锁存）。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及原Pi/Chord差异基线通过；既有3条delta ABI边界单列。共享与最终隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：仅扩展holds接口/实现、实际records依赖和导出/来源、专项及TODO，无门禁或预算改动。5个候选路径内容清单摘要（本记录加入前）：9b568c9389f2374772c63712791dd874ffeba65b250b7a4b767355041f37dd8c。结论为本地候选通过；正常事务takeHeld合并、版本切换/关闭与timer服务继续接入，K03尚未完成。TUI未交接文件与登记保留工作树。

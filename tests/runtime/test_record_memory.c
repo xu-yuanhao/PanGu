@@ -804,6 +804,51 @@ static void native_hold_open(native_holds_fixture *n,pg_document_deferred *host)
  n->f.cache.context=n;n->f.cache.pinned=native_hold_pinned;assert(!pg_document_holds_bind(&n->holds,host));
 }
 static void native_hold_close(native_holds_fixture *n){assert(!pg_document_holds_discard_all(&n->holds)&&!pg_document_holds_close(&n->holds));deferred_close(&n->f);}
+
+typedef struct {native_holds_fixture *n;unsigned adopted,published,mode;} native_flush_fixture;
+static int native_flush_adopt(void *context,const struct json_object *writes,uint64_t seq){
+ native_flush_fixture *f=context;native_holds_fixture *n=f->n;assert(writes&&seq&&n->holds.busy&&n->f.session.busy&&n->holds.count&&!f->published);++f->adopted;
+ assert(pg_document_holds_flush(&n->holds,&n->f.session)==PG_RECORDS_INVALID);
+ for(size_t i=0;i<n->holds.count;++i)assert(n->holds.items[i].loaded->deltas_since_base==(n->holds.items[i].base?0:2));
+ return f->mode==5;
+}
+static void native_flush_publish(void *context,const struct json_object *writes,uint64_t seq){
+ native_flush_fixture *f=context;assert(writes&&seq&&f->adopted==1&&!f->n->holds.count&&f->n->holds.busy&&f->n->f.session.busy);++f->published;
+ assert(pg_document_holds_flush(&f->n->holds,&f->n->f.session)==PG_RECORDS_INVALID);
+}
+static int native_flush_backend(void *context,const struct json_object *writes,pg_records_adopt adopt,void *owner,uint64_t *seq){
+ native_flush_fixture *f=context;if(f->mode==1)return 1;if(f->mode==2){*seq=3;return 0;}
+ pg_record_storage real=pg_record_memory_storage(&f->n->f.memory);int status=real.commit(real.context,writes,adopt,owner,seq);if(status)return status;
+ if(f->mode==3)adopt(owner,*seq);if(f->mode==4)++*seq;return f->mode==6;
+}
+static void native_flush_tests(void){
+ native_holds_fixture n;pg_document_deferred host;
+ for(unsigned base=0;base<2;++base){native_hold_open(&n,&host);n.f.checkpoint=base;deferred_edit(&n.f,"a");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,10));deferred_edit(&n.f,"b");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,10));pg_document_loaded *loaded=n.holds.items[0].loaded;struct json_object *value=loaded->value;
+ native_flush_fixture f={.n=&n};n.f.session.context=&f;n.f.session.adopt=native_flush_adopt;n.f.session.publish=native_flush_publish;
+ assert(!pg_document_holds_flush(&n.holds,&n.f.session)&&!n.holds.count&&!n.holds.busy&&loaded->value==value&&loaded->stored_version==1&&loaded->deltas_since_base==(base?0:2)&&n.f.session.sequence==3&&f.adopted==1&&f.published==1&&n.f.observed==2&&n.f.session.context==&f&&n.f.session.adopt==native_flush_adopt&&n.f.session.publish==native_flush_publish);
+ struct json_object *stored=0;assert(!pg_record_memory_document(&n.f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"seedab"));json_object_put(stored);
+ n.f.session.read_only=1;assert(!pg_document_holds_flush(&n.holds,&n.f.session)&&f.published==1);native_hold_close(&n);
+ }
+ for(unsigned mode=1;mode<=6;++mode){native_hold_open(&n,&host);deferred_edit(&n.f,"a");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,10));pg_document_loaded *loaded=n.holds.items[0].loaded;struct json_object *value=loaded->value,*ops=n.holds.items[0].pending.ops;
+ native_flush_fixture f={.n=&n,.mode=mode};n.f.session.context=&f;n.f.session.adopt=native_flush_adopt;n.f.session.publish=native_flush_publish;n.f.session.storage=(pg_record_storage){&f,native_flush_backend};
+ unsigned expected=(mode==1||mode==6)?PG_RECORDS_STORAGE_FAILED:PG_RECORDS_ADOPTION_FAILED;
+ assert(pg_document_holds_flush(&n.holds,&n.f.session)==expected&&n.f.session.failed==expected&&n.holds.count==1&&!n.holds.busy&&!n.f.session.busy&&loaded->value==value&&n.holds.items[0].pending.ops==ops&&!f.published&&pg_document_holds_pinned(&n.holds,2)&&n.f.session.context==&f&&n.f.session.adopt==native_flush_adopt&&n.f.session.publish==native_flush_publish);
+ assert(pg_document_holds_flush(&n.holds,&n.f.session)==expected);native_hold_close(&n);
+ }
+ native_hold_open(&n,&host);deferred_edit(&n.f,"a");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,10));n.f.session.read_only=1;assert(pg_document_holds_flush(&n.holds,&n.f.session)==PG_RECORDS_READ_ONLY&&!n.f.session.failed&&n.holds.count==1);n.f.session.read_only=0;
+ pg_document_loaded *loaded=n.holds.items[0].loaded;loaded->deltas_since_base=UINT64_C(9007199254740991);assert(pg_document_holds_flush(&n.holds,&n.f.session)==PG_RECORDS_INVALID&&!n.f.session.failed&&n.holds.count==1);loaded->deltas_since_base=1;assert(!pg_document_holds_flush(&n.holds,&n.f.session));native_hold_close(&n);
+#ifdef PG_MEMORY_FAULTS
+ unsigned failures=0,total=0;
+ for(unsigned target=0;target<=total;++target){native_hold_open(&n,&host);deferred_edit(&n.f,"a");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,10));loaded=n.holds.items[0].loaded;struct json_object *value=loaded->value,*ops=n.holds.items[0].pending.ops;void *context=n.f.session.context;
+  doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_document_holds_flush(&n.holds,&n.f.session);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+  assert(!n.holds.busy&&!n.f.session.busy&&loaded->value==value&&n.f.session.context==context&&n.f.session.adopt==deferred_adopt&&n.f.session.publish==deferred_publish);
+  if(target){assert(status!=PG_RECORDS_OK&&n.holds.count==1&&n.holds.items[0].pending.ops==ops&&pg_document_holds_pinned(&n.holds,2)&&loaded->deltas_since_base==1);assert(n.f.session.failed==0||n.f.session.failed==PG_RECORDS_STORAGE_FAILED);++failures;}
+  else {assert(!status&&!n.holds.count&&loaded->deltas_since_base==2);total=calls;}
+  native_hold_close(&n);
+ }
+ printf("PASS: native holds flush, durable counters/observers, fail-stop and %u direct allocation/insert/clone failures\n",failures);
+#endif
+}
 static void native_holds_tests(void){
  _Static_assert(sizeof(pg_document_holds)==56&&sizeof(pg_document_hold)==56,"holds ABI");
  native_holds_fixture n;pg_document_deferred host;native_hold_open(&n,&host);
@@ -817,16 +862,9 @@ static void native_holds_tests(void){
  assert(n.holds.count==1&&n.holds.items[0].base&&pg_document_holds_deadline(&n.holds)==300&&n.f.observed==3&&!n.f.adopted&&!n.f.published&&n.f.session.sequence==2);
  assert(!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"seedabc")&&loaded->deltas_since_base==1);
  assert(!pg_document_cache_sweep(&n.f.cache)&&n.f.cache.count==1);
- struct json_object *empty=json_object_new_array();pg_document_held_content held={0};
- assert(empty&&!pg_document_store_held(&n.holds.items[0].pending,empty,loaded->value,loaded->value_version,n.holds.items[0].base,&held));json_object_put(empty);
- assert(!strcmp(json_object_get_string(json_object_object_get(held.content,"kind")),"base"));
- /* Exercise actual Storage settlement before releasing the native pin. */
- struct json_object *writes=json_object_new_array(),*write=json_object_new_object();assert(writes&&write);
- assert(!json_object_object_add(write,"type",json_object_new_string("document.change"))&&!json_object_object_add(write,"id",json_object_new_int64(2))&&!json_object_object_add(write,"content",held.content)&&!json_object_array_add(writes,write));
- assert(!pg_records_commit(&n.f.session,writes));loaded->deltas_since_base=0;json_object_put(writes);json_object_put(held.ops);
- assert(!pg_document_holds_release(&n.holds,loaded)&&!n.holds.count&&!pg_document_holds_pinned(&n.holds,2)&&pg_document_holds_deadline(&n.holds)==UINT64_MAX);
+ assert(!pg_document_holds_flush(&n.holds,&n.f.session)&&!n.holds.count&&loaded->deltas_since_base==0&&n.f.adopted==1&&n.f.published==1&&n.f.observed==3&&n.f.session.sequence==3);
+ assert(!pg_document_holds_pinned(&n.holds,2)&&pg_document_holds_deadline(&n.holds)==UINT64_MAX);
  assert(pg_document_holds_release(&n.holds,loaded)==PG_DOC_MISSING);native_hold_close(&n);
-
  native_hold_open(&n,&host);
  pg_document_definition definitions[24];pg_document_address addresses[24];char names[24][24];
  for(unsigned i=0;i<24;++i){int len=snprintf(names[i],sizeof(names[i]),"hold.%u",i);assert(len>0);char text[512];int size=snprintf(text,sizeof(text),"[{\"type\":\"document.create\",\"record\":{\"id\":%u,\"kind\":\"%s\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}]",i+3,names[i]);assert(size>0&&(size_t)size<sizeof(text)&&!doc_commit(&n.f.memory,text));definitions[i]=n.f.definition;definitions[i].kind=(pg_slice){names[i],(size_t)len};addresses[i]=n.f.address;addresses[i].kind=definitions[i].kind;}
@@ -838,6 +876,9 @@ static void native_holds_tests(void){
  assert(pg_document_holds_deadline(&n.holds)==150);
  for(unsigned i=0;i<24;++i){assert(pg_document_holds_pinned(&n.holds,i+3)&&n.holds.items[i].loaded->record.id==i+3&&!strcmp(json_object_get_string(json_object_object_get(n.holds.items[i].loaded->value,"text")),"xx")&&pg_pending_ops_size(&n.holds.items[i].pending)==1);}
  void *candidate=0,*refused=0;assert(!host.prepare(host.context,0,0,0,&candidate)&&candidate&&n.holds.busy);assert(host.prepare(host.context,0,0,0,&refused)==PG_DOC_INVALID&&!refused);host.discard(host.context,refused);assert(n.holds.busy);host.discard(host.context,candidate);assert(!n.holds.busy&&n.holds.count==24&&pg_document_holds_deadline(&n.holds)==150);
+ pg_document_loaded *retained[24];for(unsigned i=0;i<24;++i)retained[i]=n.holds.items[i].loaded;
+ assert(!pg_document_holds_flush(&n.holds,&n.f.session)&&!n.holds.count&&n.f.published==1&&n.f.adopted==1&&n.f.observed==2);
+ for(unsigned i=0;i<24;++i){struct json_object *stored=0;assert(retained[i]->deltas_since_base==1&&!pg_document_holds_pinned(&n.holds,i+3)&&!pg_record_memory_document(&n.f.memory,i+3,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"xx"));json_object_put(stored);}
  native_hold_close(&n);
  for(unsigned mode=0;mode<2;++mode){native_hold_open(&n,&host);n.f.now=UINT64_MAX-5;deferred_edit(&n.f,"x");assert(!pg_document_tx_deferred(&n.f.scope,0,&host,mode?UINT64_MAX:10)&&pg_document_holds_deadline(&n.holds)==UINT64_MAX);native_hold_close(&n);}
 #ifdef PG_MEMORY_FAULTS
@@ -857,6 +898,7 @@ static void native_holds_tests(void){
 
 int main(void){
  native_holds_tests();
+ native_flush_tests();
  deferred_memory_transactions();
  deferred_other_reads_and_documents();
  deferred_fallbacks();

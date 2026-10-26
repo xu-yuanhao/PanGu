@@ -35,4 +35,12 @@ uint64_t pg_document_holds_deadline(const pg_document_holds *);
 pg_document_status pg_document_holds_release(pg_document_holds *,const pg_document_loaded *);
 pg_document_status pg_document_holds_discard_all(pg_document_holds *);
 pg_document_status pg_document_holds_close(pg_document_holds *);
+/* Persist all held incarnations in one Storage batch. Preparation snapshots
+   queues without draining them; pre-admission failures preserve them. Adoption
+   changes only durable replay counters, preserving loaded values/identities.
+   Success releases queues/pins before the existing durable publish hook;
+   memory observers are silent. Existing Session hooks/context are restored on
+   every result. Backend/adoption failure follows Session fail-stop and keeps
+   the holds for failed-Session teardown. Serialized with all Doc transactions. */
+pg_records_status pg_document_holds_flush(pg_document_holds *,pg_record_session *);
 #endif

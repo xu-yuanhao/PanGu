@@ -90,6 +90,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植Chord PendingOps的跨路径折叠/结构屏障/溢出状态与Pi storeHeld内容构造；验证owned输入输出和失败时保留队列。
 - [x] 接通deferred资格判断与同版本内存采纳路由：符合条件时交给注入的holds服务，保留持久版本/计数/序号；混合写入等整批落盘。
 - [x] 接通原生holds宿主：候选队列所有权、连续编辑折叠、最早期限/Infinity、缓存pin及持久确认后的release。
+- [x] 接通holds整批持久flush：统一Storage提交、确认时更新持久计数、成功后释放pin并通知持久订阅者；失败遵循Session fail-stop。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -320,3 +321,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 本批阅读Pi d5b3de22 session.ts的#hold/#release/#armHoldTimer、runCommit调用路径及session-deferred-commits.test.ts的holding场景；Pi/Harness fetch旧新提交一致：d5b3de22 / 22ddee37。
 - 原生映射：holds.h/.S提供56字节宿主与56字节持有项，bind注入既有deferred接口。prepare拥有独立PendingOps快照，apply转移队列并touch缓存，discard释放准备资源；pin查询并入宿主cache hooks。deadline提供最早饱和期限；release用于持久确认后的单实例释放，失败Session通过discard_all完成资源清理。旧接口和布局保持。
 - 下一行为：Session正常提交takeHeld合并及批量持久flush，随后接版本切换/关闭与timer服务。K03整体验收仍按原有条目执行。
+
+### K03 holds持久flush交接（2026-10-26）
+
+- 阅读固定Pi d5b3de22 Session.#storeHolds/#release及runCommit→takeHeld调用路径，session-deferred-commits.test.ts的base/delta、存储失败与stored subscribers用例；本批Pi/Harness fetch前后仍为d5b3de22 / 22ddee37。
+- holds.h/.S新增pg_document_holds_flush：私有PendingOps快照准备全部document.change，统一records.commit；adopt只更新deltasSinceBase，保留loaded值身份；成功结算后释放队列/pin，再调用原有publish，内存observer保持静默。原Session hooks/context在所有路径恢复。准备失败保留原队列，已准入失败锁存Session并保留holds用于失败清理。
+- 验证：24个文档一次保存、base/delta与值身份、通知顺序、只读/空holds、持久计数上限、六种后端/采纳故障、37个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan专项、完整Runtime与原Pi/Chord基线通过。
+- 下一行为：正常事务takeHeld合并，接版本切换/关闭与timer服务；K03仍按全部验收执行。

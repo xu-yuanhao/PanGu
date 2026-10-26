@@ -491,3 +491,340 @@ pg_document_holds_close:
  ret
 .size pg_document_holds_close,.-pg_document_holds_close
 .section .note.GNU-stack,"",@progbits
+.text
+/* Add an owned field, releasing it when json-c refuses insertion. */
+.Lflush_field:
+ push rbx
+ mov rbx,rdx
+ test rdx,rdx
+ jz .Lflush_field_bad
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lflush_field_done
+ mov rdi,rbx
+ call json_object_put@PLT
+.Lflush_field_bad:
+ mov eax,-1
+.Lflush_field_done:
+ pop rbx
+ ret
+
+.globl pg_document_holds_flush
+.type pg_document_holds_flush,@function
+pg_document_holds_flush:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,168
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,21
+ rep stosq
+ mov ebp,1
+ test rbx,rbx
+ jz .Lflush_return
+ test r12,r12
+ jz .Lflush_return
+ cmp dword ptr [rbx+52],1
+ jne .Lflush_return
+ cmp dword ptr [rbx+48],0
+ jne .Lflush_return
+ cmp dword ptr [r12+48],0
+ jne .Lflush_return
+ mov eax,[r12+52]
+ test eax,eax
+ jnz .Lflush_existing_failure
+ cmp qword ptr [r12+8],0
+ je .Lflush_return
+ mov rax,9007199254740991
+ cmp [r12+16],rax
+ ja .Lflush_return
+ cmp qword ptr [rbx+16],0
+ je .Lflush_empty
+ cmp dword ptr [r12+56],0
+ jne .Lflush_readonly
+ cmp qword ptr [rbx+16],0x7fffffff
+ ja .Lflush_return
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lflush_return
+ cmp qword ptr [rax+104],0
+ jne .Lflush_return
+ mov [rsp],rbx
+ mov [rsp+8],r12
+ mov rax,[r12+24]
+ mov [rsp+16],rax
+ mov rax,[r12+32]
+ mov [rsp+24],rax
+ mov rax,[r12+40]
+ mov [rsp+32],rax
+ mov dword ptr [rbx+48],1
+ mov dword ptr [r12+48],1
+ mov ebp,5
+ mov rdi,[rbx+16]
+ mov esi,8
+ call calloc@PLT
+ test rax,rax
+ jz .Lflush_cleanup
+ mov [rsp+40],rax
+ mov edi,dword ptr [rbx+16]
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lflush_cleanup
+ mov [rsp+48],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lflush_cleanup
+ mov [rsp+72],rax
+ xor r13d,r13d
+.Lflush_plan_loop:
+ cmp r13,[rbx+16]
+ jae .Lflush_submit
+ imul r14,r13,56
+ add r14,[rbx+8]
+ mov r15,[r14]
+ lea rdi,[rsp+80]
+ lea rsi,[r14+8]
+ mov edx,32
+ call memcpy@PLT
+ mov rdi,[rsp+80]
+ call json_object_get@PLT
+ mov rdi,[rsp+88]
+ call json_object_get@PLT
+ lea rdi,[rsp+80]
+ mov rsi,[rsp+72]
+ mov rdx,[r15+8]
+ mov rcx,[r15+96]
+ mov r8d,[r14+48]
+ lea r9,[rsp+112]
+ call pg_document_store_held@PLT
+ test eax,eax
+ jnz .Lflush_plan_error
+ lea rdi,[rsp+80]
+ call pg_pending_ops_close@PLT
+ mov rdi,[rsp+112]
+ lea rsi,[rip+.Lflush_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lflush_invalid_plan
+ xor edx,edx
+ cmp byte ptr [rax],'b'
+ je .Lflush_counter
+ mov rdx,[r15+104]
+ mov rax,9007199254740991
+ cmp rdx,rax
+ jae .Lflush_invalid_plan
+ inc rdx
+.Lflush_counter:
+ mov rax,[rsp+40]
+ mov [rax+r13*8],rdx
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lflush_cleanup
+ mov [rsp+128],rax
+ lea rdi,[rip+.Lflush_change]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+128]
+ lea rsi,[rip+.Lflush_type]
+ mov rdx,rax
+ call .Lflush_field
+ test eax,eax
+ jnz .Lflush_cleanup
+ mov rdi,[r15+72]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+128]
+ lea rsi,[rip+.Lflush_id]
+ mov rdx,rax
+ call .Lflush_field
+ test eax,eax
+ jnz .Lflush_cleanup
+ mov rdi,[rsp+128]
+ lea rsi,[rip+.Lflush_content]
+ mov rdx,[rsp+112]
+ mov qword ptr [rsp+112],0
+ call .Lflush_field
+ test eax,eax
+ jnz .Lflush_cleanup
+ mov rdi,[rsp+48]
+ mov rsi,[rsp+128]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lflush_cleanup
+ mov qword ptr [rsp+128],0
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov qword ptr [rsp+120],0
+ inc r13
+ jmp .Lflush_plan_loop
+.Lflush_plan_error:
+ cmp eax,3
+ je .Lflush_cleanup
+.Lflush_invalid_plan:
+ mov ebp,1
+ jmp .Lflush_cleanup
+.Lflush_submit:
+ mov [r12+24],rsp
+ lea rax,[rip+.Lflush_adopt]
+ mov [r12+32],rax
+ lea rax,[rip+.Lflush_publish]
+ mov [r12+40],rax
+ mov qword ptr [rsp+144],1
+ mov dword ptr [r12+48],0
+ mov rdi,r12
+ mov rsi,[rsp+48]
+ call pg_records_commit@PLT
+ mov ebp,eax
+ cmp dword ptr [rsp+56],0
+ je .Lflush_cleanup
+ mov ebp,4
+.Lflush_cleanup:
+ cmp qword ptr [rsp+144],0
+ je .Lflush_hooks_restored
+ mov rax,[rsp+16]
+ mov [r12+24],rax
+ mov rax,[rsp+24]
+ mov [r12+32],rax
+ mov rax,[rsp+32]
+ mov [r12+40],rax
+.Lflush_hooks_restored:
+ mov dword ptr [r12+48],1
+ lea rdi,[rsp+80]
+ call pg_pending_ops_close@PLT
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov rdi,[rsp+128]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call free@PLT
+ mov dword ptr [r12+48],0
+ mov dword ptr [rbx+48],0
+ jmp .Lflush_return
+.Lflush_existing_failure:
+ mov ebp,eax
+ jmp .Lflush_return
+.Lflush_readonly:
+ mov ebp,2
+ jmp .Lflush_return
+.Lflush_empty:
+ xor ebp,ebp
+.Lflush_return:
+ mov eax,ebp
+ add rsp,168
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_holds_flush,.-pg_document_holds_flush
+
+/* Storage adoption updates only metadata: held values are already visible. */
+.Lflush_adopt:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov [rsp],rsi
+ mov [rsp+8],rdx
+ mov r12,[rbx]
+ xor ecx,ecx
+ mov r8,[r12+8]
+ mov r9,[rbx+40]
+.Lflush_adopt_loop:
+ cmp rcx,[r12+16]
+ jae .Lflush_adopt_chain
+ mov rax,[r8]
+ mov rdx,[r9+rcx*8]
+ mov [rax+104],rdx
+ add r8,56
+ inc rcx
+ jmp .Lflush_adopt_loop
+.Lflush_adopt_chain:
+ xor eax,eax
+ cmp qword ptr [rbx+24],0
+ je .Lflush_adopt_end
+ mov rdi,[rbx+16]
+ mov rsi,[rsp]
+ mov rdx,[rsp+8]
+ call qword ptr [rbx+24]
+.Lflush_adopt_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+
+/* Successful settlement drops pins before notifying durable subscribers. */
+.Lflush_publish:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov rbx,rdi
+ mov [rsp],rsi
+ mov [rsp+8],rdx
+ mov r12,[rbx]
+ mov r13,[r12+8]
+ mov r14,[r12+16]
+ mov qword ptr [r12+8],0
+ mov qword ptr [r12+16],0
+ xor r15d,r15d
+.Lflush_unpin_loop:
+ cmp r15,r14
+ jae .Lflush_unpin_done
+ imul rax,r15,56
+ mov rax,[r13+rax]
+ lea rsi,[rax+24]
+ mov rdi,[r12]
+ call pg_document_cache_touch@PLT
+ test eax,eax
+ jz .Lflush_unpin_next
+ mov dword ptr [rbx+56],1
+ mov rax,[rbx+8]
+ mov dword ptr [rax+52],4
+.Lflush_unpin_next:
+ inc r15
+ jmp .Lflush_unpin_loop
+.Lflush_unpin_done:
+ mov rdi,r13
+ mov rsi,r14
+ call .Lfree_items
+ cmp dword ptr [rbx+56],0
+ jne .Lflush_publish_end
+ cmp qword ptr [rbx+32],0
+ je .Lflush_publish_end
+ mov rdi,[rbx+16]
+ mov rsi,[rsp]
+ mov rdx,[rsp+8]
+ call qword ptr [rbx+32]
+.Lflush_publish_end:
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lflush_type: .asciz "type"
+.Lflush_id: .asciz "id"
+.Lflush_kind: .asciz "kind"
+.Lflush_content: .asciz "content"
+.Lflush_change: .asciz "document.change"
+.section .note.GNU-stack,"",@progbits

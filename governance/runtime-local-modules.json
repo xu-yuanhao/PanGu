@@ -1096,9 +1096,10 @@
         "session.documents.delta.local.v0",
         "session.documents.local.v0",
         "json-c",
-        "libc"
+        "libc",
+        "session.records.local.v0"
       ],
-      "role": "Session mutation-line native deferred host: owned dynamic incarnation registry, detached PendingOps snapshots, atomic prepared transfer, cache pin integration and earliest saturated deadlines; confirmed-persistence release and failed-Session teardown",
+      "role": "Session mutation-line native deferred host: owned dynamic incarnation registry, detached PendingOps snapshots, atomic prepared transfer, cache pin integration and earliest saturated deadlines; confirmed-persistence release and failed-Session teardown; atomic whole-registry flush through uniform Storage settlement, durable counter adoption and release-before-publish",
       "exports": [
         "pg_document_holds_open",
         "pg_document_holds_bind",
@@ -1106,7 +1107,8 @@
         "pg_document_holds_deadline",
         "pg_document_holds_release",
         "pg_document_holds_discard_all",
-        "pg_document_holds_close"
+        "pg_document_holds_close",
+        "pg_document_holds_flush"
       ],
       "reference_basis": [
         {
@@ -1115,7 +1117,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "#hold accumulates per-incarnation PendingOps, sticky base and minimum deadline; #release drops holds and unpins; #armHoldTimer minimum deadline selection exposed to injected timer host; native prepare before value adoption makes allocation failures atomic",
+          "semantics": "#hold accumulates per-incarnation PendingOps, sticky base and minimum deadline; #release drops holds and unpins; #armHoldTimer minimum deadline selection exposed to injected timer host; native prepare before value adoption makes allocation failures atomic; #storeHolds submits one document.change batch, changes only durable counters in adoption, releases pins after successful settlement and emits durable publication without another memory observation; native fallible preparation preserves queues until successful settlement",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts"
           ]
