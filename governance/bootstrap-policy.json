@@ -626,6 +626,8 @@
     "src/runtime/hold_timer.h": "native-source",
     "src/runtime/hold_timer.S": "native-source",
     "src/runtime/durable_session.h": "native-source",
-    "src/runtime/durable_session.S": "native-source"
+    "src/runtime/durable_session.S": "native-source",
+    "src/runtime/document_reader.h": "native-source",
+    "src/runtime/document_reader.S": "native-source"
   }
 }

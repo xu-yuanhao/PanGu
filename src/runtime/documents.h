@@ -77,6 +77,9 @@ typedef struct {
    Fields are API-managed; consumers borrow them read-only while active. This
    is a loaded handle; Session cache/revision arbitration owns its lifetime. */
 pg_document_status pg_document_loaded_open(pg_document_loaded *,const pg_document_storage *,const pg_document_definition *,const pg_document_address *);
+/* Same ownership as open; point is a safe sequence or UINT64_MAX=current.
+   Historical access requires a rewindable incarnation; it never uses cache. */
+pg_document_status pg_document_loaded_open_at(pg_document_loaded *,const pg_document_storage *,const pg_document_definition *,const pg_document_address *,uint64_t point);
 pg_document_status pg_document_loaded_close(pg_document_loaded *);
 typedef struct {
  void *context;
@@ -110,6 +113,10 @@ typedef struct {
    close releases resources; Session stores holds before invoking it. */
 pg_document_status pg_document_cache_open(pg_document_cache *,const pg_document_storage *,const pg_document_cache_hooks *,uint64_t retention);
 pg_document_status pg_document_cache_get(pg_document_cache *,const pg_document_definition *,const pg_document_address *,pg_document_loaded **);
+/* Matching cached version only: no load, migration, flush or eviction.
+   MISSING also means a different cached version. Success touches the node and
+   borrows its handle under the same mutation-line lifetime as get. */
+pg_document_status pg_document_cache_peek(pg_document_cache *,const pg_document_definition *,const pg_document_address *,pg_document_loaded **);
 pg_document_status pg_document_cache_touch(pg_document_cache *,const pg_document_address *);
 /* Only inside this cache's version-reload flush callback, after confirmed
    persistence/unpin. Preserves the mutation guard; all public cache reentry

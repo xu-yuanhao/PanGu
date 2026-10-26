@@ -849,7 +849,7 @@
         "system libc",
         "json-c"
       ],
-      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention; preadmission new-incarnation installation plans and reserved index capacity for synchronous Storage adoption; record-only retirement lookup and incarnation eviction preserving preadmission index reservation; guarded touch/unpin during version-reload flush without reopening public cache mutation",
+      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention; preadmission new-incarnation installation plans and reserved index capacity for synchronous Storage adoption; record-only retirement lookup and incarnation eviction preserving preadmission index reservation; guarded touch/unpin during version-reload flush without reopening public cache mutation; shared current/historical loaded materialization and matching-version cache peek without reload",
       "exports": [
         "pg_document_address_valid",
         "pg_document_address_equal",
@@ -875,7 +875,9 @@
         "pg_document_install_discard",
         "pg_document_cache_find_record",
         "pg_document_cache_evict_reserved",
-        "pg_document_cache_touch_flushing"
+        "pg_document_cache_touch_flushing",
+        "pg_document_loaded_open_at",
+        "pg_document_cache_peek"
       ],
       "reference_basis": [
         {
@@ -889,7 +891,7 @@
             "packages/durable/src/session/session.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install; findRetirement cached record before current find without value load/migration; reserved conditional eviction preserves install capacity; reload flush callback retains exclusive mutation guard, dedicated allocation-free touch preserves guard and refuses nested flush-touch from clock/pin callbacks"
+          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install; findRetirement cached record before current find without value load/migration; reserved conditional eviction preserves install capacity; reload flush callback retains exclusive mutation guard, dedicated allocation-free touch preserves guard and refuses nested flush-touch from clock/pin callbacks; point-aware find/document reuse identical decode/materialize ownership, historical current-only refusal; Session.snapshot cached-version fast access only touches and checks semantics"
         }
       ]
     },
@@ -1196,6 +1198,39 @@
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-documents.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "session.documents.reader.local.v0",
+      "sources": [
+        "src/runtime/document_reader.h",
+        "src/runtime/document_reader.S"
+      ],
+      "dependencies": [
+        "session.durable.lifecycle.local.v0",
+        "session.documents.local.v0",
+        "json-c",
+        "libc"
+      ],
+      "role": "Current detached snapshots include deferred adoption; matching cache version fast path while a Tx is admitted, miss/version change waits for mutation line; Entry historical snapshots resolve visible ancestor conversation and committed sequence without cache or migration writes; guarded synchronous backend reads and close-waits admission",
+      "exports": [
+        "pg_durable_snapshot",
+        "pg_durable_snapshot_as_of"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/documents.ts"
+          ],
+          "semantics": "snapshot/cache-version fast path, snapshotAsOf resolves storage.entry(conversation,id), finds document at Entry original conversation+commitSeq and materializes detached version; missing record is absent, invisible Entry throws; GuardedStorage first-failure before/after calls, failed call suppresses subsequent reads; native owned JSON outputs and explicit pending retry on busy mutation line",
+          "tests_to_read": [
+            "packages/durable/test/session-document-retention.test.ts",
+            "packages/durable/test/session-checkpoints-migrations.test.ts"
           ]
         }
       ]

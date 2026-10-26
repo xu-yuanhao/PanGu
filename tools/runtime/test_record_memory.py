@@ -278,6 +278,70 @@ for(const c of steps){if(c.hold)p.hold(2);p.failFlush=!!c.fail;const d={kind:'ca
     print(f'PASS: {len(sequence)} cache reuse/version/held-flush steps match actual Pi loadDocument body')
 
 
+def historical_snapshots(native,library):
+    cases=[]
+    for key in [None,'','k\0中']:
+        for stored,version in [(1,1),(1,2),(2,1)]:
+            for migration in [False,True]:
+                for mode in ['normal','invisible','absent','missing_read','entry_error','find_error','read_error']:
+                    record=dict(id=2,kind='history\0中',scope=dict(kind='conversation',conversationId=7),createdAt=1,history='rewindable',fork='asOf')
+                    if key is not None:record['key']=key
+                    cases.append(dict(record=record,stored=stored,version=version,migration=migration,mode=mode))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';
+const base=pathToFileURL(process.argv[1]+'/');registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};return n(s,c)}});
+const {materializeDocument,resolveAddress}=await import(new URL('packages/durable/src/documents.ts',base));const {idFromNumber}=await import(new URL('packages/durable/src/ids.ts',base));const {SessionFailed,StorageRequestError}=await import(new URL('packages/durable/src/errors.ts',base));
+const source=readFileSync(new URL('packages/durable/src/session/session.ts',base),'utf8');const Guard=eval('('+stripTypeScriptTypes(source.slice(source.indexOf('class GuardedStorage')))+')');const start=source.indexOf('async snapshotAsOf(token:'),end=source.indexOf('\n\tclose(context:',start);
+const text='class Probe{#storage;constructor(storage){this.#storage=storage}assertUsable(){}#assertHealthy(){}#enqueue(fn){return fn()}'+source.slice(start,end)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){const calls=[];const latch={failure:undefined,fail(error){this.failure??={error}}};const backend={entry:async(owner,id)=>{calls.push(['entry',owner,id]);if(c.mode==='entry_error')throw Error('entry');return c.mode==='invisible'?undefined:{entry:{id:20,conversationId:7},commitSeq:9}},findDocument:async(a,p)=>{calls.push(['find',a.scope.conversationId,p]);if(c.mode==='find_error')throw Error('find');return c.mode==='absent'?undefined:c.record},document:async(id,p)=>{calls.push(['read',id,p]);if(c.mode==='read_error')throw Error('read');return c.mode==='missing_read'?undefined:{record:c.record,version:c.stored,value:{text:'old'},deltasSinceBase:3}}};
+ const d={kind:c.record.kind,scope:'conversation',history:'rewindable',fork:'asOf',version:c.version,...('key'in c.record?{family:true}:{}),...(c.migration?{migrate:(value,from)=>({...value,from})}:{})};const args=[42,...('key'in c.record?[c.record.key]:[]),20,{}];try{const value=await new Probe(new Guard(backend,latch)).snapshotAsOf({definition:d},...args);out.push({ok:true,value:value??null,calls,failed:!!latch.failure})}catch{out.push({ok:false,calls,failed:!!latch.failure})}}
+console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Definition(ctypes.Structure):
+        _fields_=[('kind',Slice),('version',ctypes.c_uint64),('scope',ctypes.c_uint),('history',ctypes.c_uint),('fork',ctypes.c_uint),('family',ctypes.c_uint),('context',ctypes.c_void_p),('migrate',ctypes.c_void_p)]
+    class History(ctypes.Structure):
+        _fields_=[('doc_context',ctypes.c_void_p),('find',ctypes.c_void_p),('read',ctypes.c_void_p),('entry_context',ctypes.c_void_p),('entry',ctypes.c_void_p)]
+    find_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(Address),ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    entry_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p),ctypes.POINTER(ctypes.c_uint64))
+    migrate_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    native.pg_durable_snapshot_as_of.argtypes=[ctypes.c_void_p,ctypes.POINTER(History),ctypes.POINTER(Definition),ctypes.POINTER(Address),ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
+    for case,want in zip(cases,expected,strict=True):
+        calls=[];record=case['record'];kind=record['kind'].encode();key=record.get('key','').encode();kb=ctypes.create_string_buffer(kind);vb=ctypes.create_string_buffer(key)
+        @entry_type
+        def entry(context,owner,id,out,seq):
+            calls.append(['entry',owner,id])
+            if case['mode']=='entry_error':return 7
+            if case['mode']=='invisible':return 1
+            out[0]=library.json_tokener_parse(b'{"id":20,"conversationId":7}');seq[0]=9;return 0
+        @find_type
+        def find(context,address,point,out):
+            calls.append(['find',address.contents.owner,point])
+            if case['mode']=='find_error':return 7
+            if case['mode']=='absent':return 1
+            out[0]=library.json_tokener_parse(json.dumps(record).encode());return 0
+        @read_type
+        def read(context,id,point,out):
+            calls.append(['read',id,point])
+            if case['mode']=='read_error':return 7
+            if case['mode']=='missing_read':return 1
+            out[0]=library.json_tokener_parse(json.dumps(dict(record=record,version=case['stored'],value={'text':'old'},deltasSinceBase=3)).encode());return 0
+        @migrate_type
+        def migrate(context,value,version,out):
+            data=json.loads(library.json_object_to_json_string_ext(value,0));data['from']=version;out[0]=library.json_tokener_parse(json.dumps(data).encode());return 0
+        definition=Definition(Slice(ctypes.addressof(kb),len(kind)),case['version'],1,2,3,int('key'in record),None,ctypes.cast(migrate,ctypes.c_void_p) if case['migration'] else None)
+        address=Address(Slice(ctypes.addressof(kb),len(kind)),Slice(ctypes.addressof(vb),len(key)),42,1,int('key'in record));history=History(None,ctypes.cast(find,ctypes.c_void_p),ctypes.cast(read,ctypes.c_void_p),None,ctypes.cast(entry,ctypes.c_void_p))
+        session=ctypes.create_string_buffer(192);records=ctypes.create_string_buffer(88);ctypes.c_void_p.from_buffer(session,0).value=ctypes.addressof(records);ctypes.c_uint.from_buffer(session,172).value=1;value=ctypes.c_void_p()
+        try:
+            status=native.pg_durable_snapshot_as_of(session,ctypes.byref(history),ctypes.byref(definition),ctypes.byref(address),20,ctypes.byref(value));actual=dict(ok=status in (0,8),calls=calls,failed=bool(ctypes.c_uint.from_buffer(records,52).value))
+            if actual['ok']:actual['value']=json.loads(library.json_object_to_json_string_ext(value,0)) if value.value else None
+            else:assert not value.value
+            assert actual==want,(case,status,actual,want)
+            assert ctypes.c_uint.from_buffer(session,168).value==0
+        finally:library.json_object_put(value)
+    print(f'PASS: {len(cases)} historical snapshot value/point/owner/failure results match actual Pi snapshotAsOf and GuardedStorage')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -420,7 +484,7 @@ def main():
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
-        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/records.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
+        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/document_reader.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/records.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
         native=ctypes.CDLL(str(path));library=ctypes.CDLL(ctypes.util.find_library('json-c'))
         library.json_tokener_parse.argtypes=[ctypes.c_char_p];library.json_tokener_parse.restype=ctypes.c_void_p
         library.json_object_put.argtypes=[ctypes.c_void_p]
@@ -535,5 +599,6 @@ def main():
         finally:assert native.pg_record_memory_close(ctypes.byref(memory))==0
         owner_validation(native,library)
         loaded_access(native,library)
+        historical_snapshots(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

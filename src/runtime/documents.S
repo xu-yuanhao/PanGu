@@ -774,6 +774,19 @@ pg_document_record_decode:
 .globl pg_document_loaded_open
 .type pg_document_loaded_open,@function
 pg_document_loaded_open:
+ mov r8,-1
+ jmp .Lloaded_open_common
+.globl pg_document_loaded_open_at
+.type pg_document_loaded_open_at,@function
+pg_document_loaded_open_at:
+ cmp r8,-1
+ je .Lloaded_open_common
+ mov rax,9007199254740991
+ cmp r8,rax
+ jbe .Lloaded_open_common
+ mov eax,1
+ ret
+.Lloaded_open_common:
  push rbp
  push rbx
  push r12
@@ -789,6 +802,7 @@ pg_document_loaded_open:
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  mov qword ptr [rsp+16],0
+ mov [rsp+32],r8
  test rbx,rbx
  jz .Lloaded_open_return
  cmp dword ptr [rbx+112],0
@@ -829,7 +843,7 @@ pg_document_loaded_open:
 .Lloaded_open_kind_ready:
  mov rdi,[r12]
  mov rsi,r14
- mov rdx,-1
+ mov rdx,[rsp+32]
  mov rcx,rsp
  call [r12+8]
  test eax,eax
@@ -849,10 +863,15 @@ pg_document_loaded_open:
  call pg_document_address_equal
  test eax,eax
  jz .Lloaded_open_cleanup
+ cmp qword ptr [rsp+32],-1
+ je .Lloaded_point_ready
+ cmp dword ptr [rbx+80],2
+ jne .Lloaded_point_semantics
+.Lloaded_point_ready:
  mov r15,[rbx+72]
  mov rdi,[r12]
  mov rsi,r15
- mov rdx,-1
+ mov rdx,[rsp+32]
  lea rcx,[rsp+8]
  call [r12+16]
  test eax,eax
@@ -905,6 +924,9 @@ pg_document_loaded_open:
  mov dword ptr [rbx+116],1
  xor ebp,ebp
  jmp .Lloaded_open_cleanup
+.Lloaded_point_semantics:
+ mov ebp,4
+ jmp .Lloaded_open_cleanup
 .Lloaded_open_storage:
  mov ebp,9
 .Lloaded_open_cleanup:
@@ -934,6 +956,7 @@ pg_document_loaded_open:
  pop rbp
  ret
 .size pg_document_loaded_open,.-pg_document_loaded_open
+.size pg_document_loaded_open_at,.-pg_document_loaded_open_at
 
 .globl pg_document_loaded_close
 .type pg_document_loaded_close,@function
@@ -1225,6 +1248,13 @@ pg_document_cache_open:
 .globl pg_document_cache_get
 .type pg_document_cache_get,@function
 pg_document_cache_get:
+ xor r8d,r8d
+ jmp .Lcache_get_common
+.globl pg_document_cache_peek
+.type pg_document_cache_peek,@function
+pg_document_cache_peek:
+ mov r8d,1
+.Lcache_get_common:
  push rbp
  push rbx
  push r12
@@ -1239,6 +1269,7 @@ pg_document_cache_get:
  mov ebp,1
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ mov [rsp+144],r8
  lea rdi,[rsp+16]
  xor eax,eax
  mov ecx,15
@@ -1286,6 +1317,8 @@ pg_document_cache_get:
  mov rax,[r12+16]
  cmp rax,[r15+144]
  je .Lcache_get_hit
+ cmp qword ptr [rsp+144],0
+ jne .Lcache_get_missing
  cmp qword ptr [rbx+88],0
  je .Lcache_get_drop
  mov rdi,[rbx+64]
@@ -1301,6 +1334,8 @@ pg_document_cache_get:
  call .Lcache_drop_node
  mov qword ptr [rsp],0
 .Lcache_get_load:
+ cmp qword ptr [rsp+144],0
+ jne .Lcache_get_missing
  cmp qword ptr [rbx+32],0x3fffffff
  jae .Lcache_get_capacity
  lea rdi,[rsp+16]
@@ -1358,6 +1393,9 @@ pg_document_cache_get:
 .Lcache_get_check_failed:
  mov ebp,eax
  jmp .Lcache_get_cleanup
+.Lcache_get_missing:
+ mov ebp,8
+ jmp .Lcache_get_cleanup
 .Lcache_get_flush_failed:
  mov ebp,9
  jmp .Lcache_get_cleanup
@@ -1389,6 +1427,7 @@ pg_document_cache_get:
  pop rbp
  ret
 .size pg_document_cache_get,.-pg_document_cache_get
+.size pg_document_cache_peek,.-pg_document_cache_peek
 
 .globl pg_document_cache_touch
 .type pg_document_cache_touch,@function

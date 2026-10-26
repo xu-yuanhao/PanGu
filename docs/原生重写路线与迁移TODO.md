@@ -95,6 +95,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通按incarnation的版本重载前flush及holds结束服务：只保存目标队列、保持其它期限；健康时排空、失败时清理、保留首个错误。
 - [x] 移植holds最早期限定时器控制器：前台定时/串行入队服务注入、已触发ticket保留、到期批量保存与关闭时排空。
 - [x] 组合Durable Session事务admission、holds/cache/timer服务与分阶段关闭：封闭新工作、完成已接收事务、排空timer job、保存/清理后关闭缓存及后端，保留首因。
+- [x] 接通当前与Entry历史只读快照：已采纳内存值、缓存同版本快路径、fork原会话/序号解析、隔离迁移、历史生命周期与读取失败守卫。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -363,3 +364,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 验证：自动设定/取消deadline、忙时阻止派发、关闭后的admission拒绝、关闭期间既有事务deferred/正常结算/abort、timer pending清理、观察者回调内close、后端pending/错误与原hooks恢复通过。21个deferred/定时同步、37个close清理、71个合并采纳后重设timer故障点，另3个records首因回归通过；专项/完整Runtime结果记入当前实现记录。
 - 上游检查：Pi origin/main从d5b3de22前进至f9daca3480732d0042b1df3a6e27221f597a620d；本批Session/Transaction/Timers文件diff为0，固定源码与差异基线仍使用d5b3de22。新增ae823bc的Bm25Ranker工具全名/双下划线后缀归一化优先排序及对应测试映射K11。Harness仍为22ddee37。
 - 下一行为：K03历史/只读视图与事务查询服务；具体Timers/队列提供者按K06接入，完整产品组合按K14接入，K03总验收保持未勾选。
+
+### K03 当前与Entry历史快照交接
+
+- 阅读Pi d5b3de22 Session.snapshot/snapshotAsOf/GuardedStorage、documents.materializeDocument，以及session-document-retention/session-checkpoints-migrations测试。本批origin/main仍为f9daca3，本批相关源码相对d5b3de22无差异；Harness仍为22ddee37。
+- document_reader.h/.S提供当前/历史只读快照；共享documents.loaded_open_at与cache_peek复用原生地址核对/版本迁移/缓存实现。当前同版本缓存可在已有事务期间读已采纳值，miss/版本变化返回PENDING供Session队列重试；历史读取始终等待执行线，按可见Entry的原会话和commitSeq查找，返回独立owned JSON，缺失Doc与不可见Entry分开处理。
+- 读取守卫保留首因、阻止失败后的后续backend调用，并让关闭等待已接收的同步读取完成；临时current Storage代理在所有路径恢复。Storage正常返回missing content只使该快照报错，迁移/调用者复制失败保持Session健康；真正backend错误锁存失败。当前definition遵循cache借用至eviction/close，历史definition/provider只借用到返回。
+- 验证：126组直接执行实际snapshotAsOf及GuardedStorage类、materializeDocument的差异结果，值/原会话/提交点/失败状态一致。真实MemoryStorage验证分叉不可见Entry、创建前/退休/同址重建、family空/NUL键、迁移不写回、deferred内存快照与重载保存、只读读取、输出隔离及关闭后仍拥有返回值。冷当前21、热当前1、历史22个直接分配/插入/部分复制故障通过；完整Runtime结果记入当前实现记录。
+- 下一行为：K03剩余事务查询/只读边界及验收覆盖，按原TODO继续；Harness视图按K13移植。
