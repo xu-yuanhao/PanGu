@@ -912,9 +912,10 @@
         "session.records.local.v0",
         "session.documents.local.v0",
         "json-c",
-        "system libc"
+        "system libc",
+        "session.documents.delta.local.v0"
       ],
-      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption",
+      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption; atomic document create/change/retire and detached revision snapshots",
       "exports": [
         "pg_record_memory_open",
         "pg_record_memory_close",
@@ -923,7 +924,8 @@
         "pg_record_memory_read",
         "pg_record_memory_scan",
         "pg_record_memory_entry",
-        "pg_record_memory_head"
+        "pg_record_memory_head",
+        "pg_record_memory_document"
       ],
       "reference_basis": [
         {
@@ -934,7 +936,7 @@
             "packages/durable/src/types.ts",
             "packages/durable/src/storage/scan.ts"
           ],
-          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker",
+          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker; prepareDocumentActions/checkDocumentActions/applyDocumentActions and document materialization with live address uniqueness",
           "tests_to_read": [
             "packages/durable/test/memory-storage.test.ts",
             "packages/durable/test/session-adoption.test.ts"

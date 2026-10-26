@@ -2,7 +2,7 @@
 #define PANGU_RECORD_MEMORY_H
 #include "records.h"
 #include <stddef.h>
-typedef enum { PG_TABLE_CONVERSATION,PG_TABLE_ENTRY,PG_TABLE_TASK,PG_TABLE_SUBMISSION } pg_record_table;
+typedef enum { PG_TABLE_CONVERSATION,PG_TABLE_ENTRY,PG_TABLE_TASK,PG_TABLE_SUBMISSION,PG_TABLE_DOCUMENT } pg_record_table;
 typedef struct {uint64_t id;struct json_object *value;uint64_t sequence;unsigned table,reserved;} pg_memory_row;
 typedef struct {
  pg_memory_row *rows;
@@ -15,7 +15,9 @@ typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCA
    values; rows are private. Serialized use, no retained Storage callbacks.
    IDs are positive safe integers; integral JSON floats share the same namespace.
    Table writes use Pi StorageWrite JSON objects; conversation/entry IDs cannot
-   be replaced; task/submission replacement keeps the same global record type. */
+   be replaced; task/submission replacement keeps the same global record type.
+   Document create/change/retire share batch atomicity and the global ID index;
+   only one live incarnation may occupy an exact logical address. */
 pg_memory_status pg_record_memory_open(pg_record_memory *);
 pg_memory_status pg_record_memory_close(pg_record_memory *);
 pg_record_storage pg_record_memory_storage(pg_record_memory *);
@@ -46,4 +48,9 @@ pg_memory_status pg_record_memory_entry(pg_record_memory *,uint64_t id,uint64_t 
 /* max_entry_id=UINT64_MAX is unbounded; zero is a real inclusive cutoff. */
 pg_memory_status pg_record_memory_head(pg_record_memory *,uint64_t conversation_id,uint64_t max_entry_id,
                                       struct json_object **);
+/* Detached StoredDocument JSON result; at=UINT64_MAX selects current.
+   Historical current-only reads are invalid; missing/lifetime absence is MISSING.
+   Document rows are private; generic read/scan accept the four ordinary tables.
+   This reader may be used in adopt, after the batch has been fully applied. */
+pg_memory_status pg_record_memory_document(pg_record_memory *,uint64_t id,uint64_t at,struct json_object **);
 #endif

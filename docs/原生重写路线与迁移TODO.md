@@ -77,6 +77,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [x] 完成已提交revision的current/as-of快照读取、生命周期截点、最近base选择与同版本delta尾重放。
+- [x] 将Document create/change/retire与其余四类表接入同一原子内存批次，维护全局ID、live地址唯一性及revision历史，提供current/as-of物化读取。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -222,7 +223,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 revision重放候选：`delta.h/.S` 对照Chord固定提交的 `assertValidOp/assertSafePath/applyOps/applyImmutable/applyImmutableBatches/resolve/copyContainers`，以及MemoryStorage的 `documentDeltaBatches/materializeDocument`；采用decoded r/s/d/a/t/p/m、稠密数组、reserved path拒绝、UTF-16计数及最终值重放。原生在私有JSON副本应用操作，输入与ops不变，单次多批重放复用同一工作根；对照pending.ts:merge的追加合并语义，同路径连续a一次拼接，ASCII截断使用直接计数。
 - K03 delta验证：449个单/多批实际Chord结果一致；C专项覆盖失败原子性和每个直接分配/插入/复制故障。三条已识别ABI差异单独验证：非BMP字符内部UTF-16截点、含NUL属性路径、超safe整数数字路径会被当前候选拒绝，仍纳入K03/K15兼容核对；候选用于Document值还原，Storage revision接入继续推进。
 - K03 revision读取：`delta.h/.S:pg_document_revision_read` 对照Pi `MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly/documentDeltaBatches` 和 `storage-conformance.ts` 的历史/长尾/拷贝场景，原生view借用已提交revision数组，snapshot拥有独立JSON值。historical current-only先拒绝，再检查[createdAt,retiredAt)；current只读未退役，最近base后的delta版本必须一致。96条实际MemoryStorage读取对照一致，含退役/未退役、Session/Task/Conversation、latest/rewindable与base版本切换。O0/O2 ASan/UBSan覆盖逐个直接分配/插入/部分复制故障，失败输出清空。接口暂供Storage集成，未声明Document写入完成。
-- 下一完整行为：同一内存提供者补Document revision/地址查询，接事务暂存及当前消息投影。
+- K03 Document提供者：`record_memory.S` 对照同版Pi `prepareDocumentActions/checkDocumentActions/applyDocumentActions/materializeDocument`，Document与四类表共用全局行索引、预留后无分配应用及adopt；同批content/retire先按ID合并并检查，live地址在批次最终状态中唯一。latest新base替换历史、退役清空；rewindable保留revision。`pg_record_memory_document` 返回独立StoredDocument JSON。公开Memory结构及既有表查询ABI不变。
+- K03 Document验证：累计2048条实际MemoryStorage操作对照一致，增加四类scope/history组合、连续delta与版本base、退役/重建、重复命令、混合表失败、历史截点读取。O0/O2内存专项验证创建、已有值更新、退役+同址重建、读取时逐直接分配/插入/部分复制失败；失败不改变已存记录/ID/序号，不采纳，输出归零。完整Runtime检查通过，新增故障场景后的全量复验见当前实现记录。
+- 下一完整行为：补Document.copy、地址find/scan，再接事务暂存及当前消息投影。
 
 ### K01 当前落点与补齐映射
 

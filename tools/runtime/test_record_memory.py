@@ -16,6 +16,7 @@ const {MemoryStorage}=await import(new URL('packages/durable/src/storage/memory.
 const storage=new MemoryStorage(),out=[];
 for(const op of JSON.parse(readFileSync(0,'utf8'))){
  if(op.op==='commit'){const adopted=[];try{const seq=await storage.commit(op.writes,s=>adopted.push(s),{});out.push({ok:true,seq,adopted});}catch{out.push({ok:false,adopted});}}
+ if(op.op==='document'){try{out.push({ok:true,value:await storage.document(op.id,op.at,{})??null});}catch{out.push({ok:false});}}
  if(op.op==='mint'){try{out.push({ok:true,id:await storage.mintId()});}catch{out.push({ok:false});}}
  if(op.op==='entry'){try{out.push({ok:true,value:await (op.conversation===undefined?storage.entry(op.id,{}):storage.entry(op.conversation,op.id,{}))??null});}catch{out.push({ok:false});}}
  if(op.op==='head'){try{out.push({ok:true,value:await storage.findLatestHeadMarker(op.conversation,op.at,{})??null});}catch{out.push({ok:false});}}
@@ -108,10 +109,33 @@ def main():
                 op=dict(op='head',conversation=conversation)
                 if at is not None:op['at']=at
                 operations.append(op)
+    start=100000
+    for scope,history in [('session',None),('task',None),('conversation','latest'),('conversation','rewindable')]:
+        id=start;start+=100
+        owner={'kind':scope,**({'conversationId':1} if scope=='conversation' else {'taskId':4000} if scope=='task' else {})}
+        definition=dict(id=id,kind='doc.中',scope=owner,**({'history':history,'fork':'current'} if history else {}))
+        create=dict(type='document.create',record=definition,content=dict(kind='base',version=1,value=dict(text='a',xs=[])))
+        operations.append(dict(op='commit',writes=[create]))
+        for index in range(8):
+            content=dict(kind='base',version=2,value=dict(text='base',xs=[])) if index==4 else dict(kind='delta',version=1 if index<4 else 2,ops=[['a',['text'],'中😀'],['p',['xs'],0,0,[index]]])
+            operations.append(dict(op='commit',writes=[dict(type='document.change',id=id,content=content)]))
+            for at in ('current',0,100,150,200):operations.append(dict(op='document',id=id,at=at))
+        operations.extend([
+            dict(op='commit',writes=[create]),
+            dict(op='commit',writes=[dict(type='document.change',id=id,content=dict(kind='delta',version=3,ops=[])),record('task',id+9,0)]),
+            dict(op='read',table='task',id=id+9),
+            dict(op='commit',writes=[dict(type='document.create',record=dict(definition,id=id+1),content=create['content'])]),
+            dict(op='commit',writes=[dict(type='document.retire',id=id),dict(type='document.create',record=dict(definition,id=id+1),content=create['content'])]),
+            dict(op='document',id=id,at='current'),dict(op='document',id=id,at=150),dict(op='document',id=id+1,at='current'),
+            dict(op='commit',writes=[dict(type='document.retire',id=id)]),
+            dict(op='commit',writes=[dict(type='document.retire',id=id+1),dict(type='document.retire',id=id+1)]),
+            dict(op='document',id=id+1,at='current')])
+    for id in range(100000,100400,100):
+        for at in range(121):operations.append(dict(op='document',id=id,at=at))
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
-        path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c'],text=True).split()
-        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/record_memory.S'),*flags,'-o',str(path)],check=True)
+        path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
+        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
         native=ctypes.CDLL(str(path));library=ctypes.CDLL(ctypes.util.find_library('json-c'))
         library.json_tokener_parse.argtypes=[ctypes.c_char_p];library.json_tokener_parse.restype=ctypes.c_void_p
         library.json_object_put.argtypes=[ctypes.c_void_p]
@@ -123,6 +147,7 @@ def main():
         native.pg_record_memory_head.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
         native.pg_record_memory_scan.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(Query),ctypes.POINTER(Page)]
         native.pg_record_memory_storage.argtypes=[ctypes.POINTER(Memory)];native.pg_record_memory_storage.restype=Storage
+        native.pg_record_memory_document.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
         adopt_type=ctypes.CFUNCTYPE(None,ctypes.c_void_p,ctypes.c_uint64)
         commit_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,adopt_type,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
         memory=Memory();assert native.pg_record_memory_open(ctypes.byref(memory))==0
@@ -141,6 +166,12 @@ def main():
                     finally:library.json_object_put(batch)
                     actual=dict(ok=status==0,adopted=adopted)
                     if not status:actual['seq']=seq.value
+                elif op['op']=='document':
+                    value=ctypes.c_void_p();status=native.pg_record_memory_document(ctypes.byref(memory),op['id'],2**64-1 if op['at']=='current' else op['at'],ctypes.byref(value))
+                    try:
+                        actual=dict(ok=status in (0,1))
+                        if status in (0,1):actual['value']=json.loads(library.json_object_to_json_string_ext(value,0)) if not status else None
+                    finally:library.json_object_put(value)
                 elif op['op'] in ('entry','head'):
                     value=ctypes.c_void_p();seq=ctypes.c_uint64()
                     if op['op']=='entry':status=native.pg_record_memory_entry(ctypes.byref(memory),op['id'],op.get('conversation',0),ctypes.byref(value),ctypes.byref(seq))
@@ -179,5 +210,5 @@ def main():
                     finally:library.json_object_put(value)
                 assert actual==answer,(index,op,actual,answer)
         finally:assert native.pg_record_memory_close(ctypes.byref(memory))==0
-    print(f'PASS: {len(operations)} table batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
+    print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

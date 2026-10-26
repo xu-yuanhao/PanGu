@@ -103,7 +103,7 @@ pg_record_memory_storage:
  jz .Lmemory_table_found
 .Lmemory_table_next:
  inc r13d
- cmp r13d,4
+ cmp r13d,5
  jb .Lmemory_table_loop
 .Lmemory_table_bad:
  mov eax,-1
@@ -164,7 +164,19 @@ pg_record_memory_storage:
  call json_object_deep_copy@PLT
  test eax,eax
  jnz .Lmemory_allocation_cleanup
+ mov qword ptr [rsp+64],0
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rbx+32]
+ lea rcx,[rsp+64]
+ call .Lmemory_prepare_documents
+ test eax,eax
+ jnz .Lmemory_prepare_failed
  mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rax,[rsp+64]
+ mov [rsp],rax
+ mov rdi,rax
  call json_object_array_length@PLT
  mov [rsp+16],rax
  mov rcx,0x07ffffffffffffff
@@ -196,7 +208,7 @@ pg_record_memory_storage:
  call json_object_object_get@PLT
  mov rdi,rax
  call .Lmemory_table
- cmp eax,3
+ cmp eax,4
  ja .Lmemory_invalid_cleanup
  mov [rsp+48],eax
  mov rdi,r15
@@ -420,6 +432,9 @@ pg_record_memory_storage:
  mov [r14],rax
  xor r15d,r15d
  jmp .Lmemory_commit_cleanup
+.Lmemory_prepare_failed:
+ cmp eax,3
+ je .Lmemory_allocation_cleanup
 .Lmemory_invalid_cleanup:
  mov r15d,2
  jmp .Lmemory_commit_cleanup
@@ -580,8 +595,8 @@ pg_record_memory_close:
  ret
 .size pg_record_memory_close,.-pg_record_memory_close
 .section .rodata
-.Ltable_names: .long .Lconversation-.Ltable_names,.Lentry-.Ltable_names,.Ltask-.Ltable_names,.Lsubmission-.Ltable_names
-.Ltable_lengths: .long 12,5,4,10
+.Ltable_names: .long .Lconversation-.Ltable_names,.Lentry-.Ltable_names,.Ltask-.Ltable_names,.Lsubmission-.Ltable_names,.Ld_prepared-.Ltable_names
+.Ltable_lengths: .long 12,5,4,10,17
 .Lconversation: .asciz "conversation"
 .Lentry: .asciz "entry"
 .Ltask: .asciz "task"
@@ -1504,3 +1519,1099 @@ pg_record_memory_head:
 .size pg_record_memory_head,.-pg_record_memory_head
 .section .rodata
 .Lhead_name: .asciz "head"
+.text
+/* Internal document states share the provider's sorted global row index. */
+.macro DGET object,key
+ mov rdi,\object
+ lea rsi,[rip+.Ld_\key]
+ call json_object_object_get@PLT
+.endm
+.macro DADD object,key,value
+ mov rdi,\object
+ lea rsi,[rip+.Ld_\key]
+ mov rdx,\value
+ call .Ld_attach
+.endm
+/* Always consumes the supplied owned value. */
+.Ld_attach:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Ld_attach_ok
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,3
+ pop rbx
+ ret
+.Ld_attach_ok:
+ xor eax,eax
+ pop rbx
+ ret
+/* Exact JSON string equality with a static C string. */
+.Ld_string:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ld_string_return
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ mov [rsp],eax
+ mov rdi,r12
+ call strlen@PLT
+ cmp eax,[rsp]
+ jne .Ld_string_bad
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ jmp .Ld_string_return
+.Ld_string_bad:
+ xor eax,eax
+.Ld_string_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Positive safe JSON number; zero denotes invalid. */
+.Ld_integer:
+ push rbx
+ mov rbx,rdi
+ call json_object_get_type@PLT
+ cmp eax,3
+ je .Ld_integer_int
+ cmp eax,2
+ jne .Ld_integer_bad
+ mov rdi,rbx
+ call json_object_get_double@PLT
+ cvttsd2si rax,xmm0
+ cvtsi2sd xmm1,rax
+ ucomisd xmm0,xmm1
+ jp .Ld_integer_bad
+ jne .Ld_integer_bad
+ jmp .Ld_integer_check
+.Ld_integer_int:
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+.Ld_integer_check:
+ test rax,rax
+ jle .Ld_integer_bad
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Ld_integer_bad
+ pop rbx
+ ret
+.Ld_integer_bad:
+ xor eax,eax
+ pop rbx
+ ret
+/* Parse a borrowed record identity into the existing 48-byte native address. */
+.Ld_address:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ pxor xmm0,xmm0
+ movups [r12],xmm0
+ movups [r12+16],xmm0
+ movups [r12+32],xmm0
+ DGET rbx,kind
+ mov r13,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ld_address_bad
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov [r12],rax
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov [r12+8],rax
+ mov rdi,rbx
+ lea rsi,[rip+.Ld_key]
+ lea rdx,[r12+16]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ld_address_scope
+ mov dword ptr [r12+44],1
+ mov r13,[r12+16]
+ mov rdi,r13
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ld_address_bad
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov [r12+16],rax
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov [r12+24],rax
+.Ld_address_scope:
+ DGET rbx,scope
+ mov rbx,rax
+ DGET rbx,kind
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ld_session]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_address_valid
+ mov rdi,r13
+ lea rsi,[rip+.Ld_conversation]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_address_task
+ mov dword ptr [r12+40],1
+ DGET rbx,conversation_id
+ jmp .Ld_address_owner
+.Ld_address_task:
+ mov rdi,r13
+ lea rsi,[rip+.Ld_task]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_address_bad
+ mov dword ptr [r12+40],2
+ DGET rbx,task_id
+.Ld_address_owner:
+ mov rdi,rax
+ call .Ld_integer
+ test rax,rax
+ jz .Ld_address_bad
+ mov [r12+32],rax
+.Ld_address_valid:
+ mov rdi,r12
+ call pg_document_address_valid
+ test eax,eax
+ jz .Ld_address_bad
+ xor eax,eax
+ jmp .Ld_address_return
+.Ld_address_bad:
+ mov eax,2
+.Ld_address_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+/* Action: id/create/content/retire/new_state, five qwords; state is owned. */
+.Ld_compare:
+ mov rax,[rdi]
+ cmp rax,[rsi]
+ seta al
+ setb dl
+ movzx eax,al
+ movzx edx,dl
+ sub eax,edx
+ ret
+
+/* memory, detached writes, sequence, result; result owns a normalized array. */
+.Lmemory_prepare_documents:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,120
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp+16],rdx
+ mov [rsp+24],rcx
+ mov qword ptr [rcx],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+32],0
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+ mov ebp,2
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov r14,rax
+ mov rdi,rax
+ mov esi,40
+ call calloc@PLT
+ test rax,rax
+ jnz .Ld_prepare_array
+ test r14,r14
+ jnz .Ld_prepare_alloc
+.Ld_prepare_array:
+ mov [rsp],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ld_prepare_alloc
+ mov [rsp+8],rax
+ xor r15d,r15d
+.Ld_prepare_each:
+ cmp r15,r14
+ jae .Ld_prepare_sort
+ mov rdi,r12
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov [rsp+56],rax
+ DGET rax,type
+ mov [rsp+64],rax
+ lea rsi,[rip+.Ld_create]
+ mov rdi,rax
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_prepare_create
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Ld_change]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_prepare_change
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Ld_retire]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_prepare_retire
+ mov rdi,[rsp+64]
+ call .Lmemory_table
+ cmp eax,3
+ ja .Ld_prepare_cleanup
+ mov rdi,[rsp+56]
+ call json_object_get@PLT
+ mov [rsp+72],rax
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Ld_prepare_next
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ jmp .Ld_prepare_alloc
+.Ld_prepare_create:
+ mov rax,[rsp+32]
+ imul rax,40
+ add rax,[rsp]
+ mov [rsp+80],rax
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Ld_record]
+ call json_object_object_get@PLT
+ mov rcx,[rsp+80]
+ mov [rcx+8],rax
+ DGET rax,id
+ jmp .Ld_prepare_id
+.Ld_prepare_change:
+ mov rax,[rsp+32]
+ imul rax,40
+ add rax,[rsp]
+ mov [rsp+80],rax
+ DGET "qword ptr [rsp+56]",id
+ jmp .Ld_prepare_id
+.Ld_prepare_retire:
+ mov rax,[rsp+32]
+ imul rax,40
+ add rax,[rsp]
+ mov [rsp+80],rax
+ mov qword ptr [rax+24],1
+ DGET "qword ptr [rsp+56]",id
+.Ld_prepare_id:
+ mov rdi,rax
+ call .Ld_integer
+ test rax,rax
+ jz .Ld_prepare_cleanup
+ mov rcx,[rsp+80]
+ mov [rcx],rax
+ cmp qword ptr [rcx+24],0
+ jne .Ld_prepare_action
+ DGET "qword ptr [rsp+56]",content
+ mov rcx,[rsp+80]
+ mov [rcx+16],rax
+ test rax,rax
+ jz .Ld_prepare_cleanup
+.Ld_prepare_action:
+ inc qword ptr [rsp+32]
+.Ld_prepare_next:
+ inc r15
+ jmp .Ld_prepare_each
+.Ld_prepare_sort:
+ mov rdi,[rsp]
+ mov rsi,[rsp+32]
+ mov edx,40
+ lea rcx,[rip+.Ld_compare]
+ call qsort@PLT
+ xor r15d,r15d
+.Ld_prepare_compact:
+ cmp r15,[rsp+32]
+ jae .Ld_prepare_build_start
+ mov rax,r15
+ imul rax,40
+ add rax,[rsp]
+ mov r12,rax
+ mov rcx,[rsp+40]
+ test rcx,rcx
+ jz .Ld_prepare_compact_new
+ dec rcx
+ imul rcx,40
+ add rcx,[rsp]
+ mov rax,[r12]
+ cmp rax,[rcx]
+ jne .Ld_prepare_compact_new
+ mov rax,[r12+16]
+ test rax,rax
+ jz .Ld_prepare_merge_retire
+ cmp qword ptr [rcx+16],0
+ jne .Ld_prepare_cleanup
+ mov [rcx+16],rax
+ mov rax,[r12+8]
+ mov [rcx+8],rax
+.Ld_prepare_merge_retire:
+ mov rax,[r12+24]
+ test rax,rax
+ jz .Ld_prepare_compact_next
+ cmp qword ptr [rcx+24],0
+ jne .Ld_prepare_cleanup
+ mov [rcx+24],rax
+ jmp .Ld_prepare_compact_next
+.Ld_prepare_compact_new:
+ mov rcx,[rsp+40]
+ imul rcx,40
+ add rcx,[rsp]
+ movups xmm0,[r12]
+ movups xmm1,[r12+16]
+ movups [rcx],xmm0
+ movups [rcx+16],xmm1
+ mov rax,[r12+32]
+ mov [rcx+32],rax
+ inc qword ptr [rsp+40]
+.Ld_prepare_compact_next:
+ inc r15
+ jmp .Ld_prepare_compact
+.Ld_prepare_build_start:
+ xor r15d,r15d
+.Ld_prepare_build:
+ cmp r15,[rsp+40]
+ jae .Ld_prepare_addresses
+ imul r12,r15,40
+ add r12,[rsp]
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp+16]
+ call .Ld_build_state
+ test eax,eax
+ jnz .Ld_prepare_status
+ inc r15
+ jmp .Ld_prepare_build
+.Ld_prepare_addresses:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rsp+40]
+ call .Ld_check_addresses
+ test eax,eax
+ jnz .Ld_prepare_status
+ xor r15d,r15d
+.Ld_prepare_emit:
+ cmp r15,[rsp+40]
+ jae .Ld_prepare_success
+ imul r12,r15,40
+ add r12,[rsp]
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ld_prepare_alloc
+ mov [rsp+48],rax
+ lea rdi,[rip+.Ld_prepared]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ld_prepare_alloc
+ DADD "qword ptr [rsp+48]",type,rax
+ test eax,eax
+ jnz .Ld_prepare_alloc
+ mov rdi,[r12+32]
+ call json_object_get@PLT
+ DADD "qword ptr [rsp+48]",value,rax
+ test eax,eax
+ jnz .Ld_prepare_alloc
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+48]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ld_prepare_alloc
+ mov qword ptr [rsp+48],0
+ inc r15
+ jmp .Ld_prepare_emit
+.Ld_prepare_success:
+ mov rcx,[rsp+24]
+ mov rax,[rsp+8]
+ mov [rcx],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Ld_prepare_cleanup
+.Ld_prepare_alloc:
+ mov ebp,3
+ jmp .Ld_prepare_cleanup
+.Ld_prepare_status:
+ mov ebp,eax
+.Ld_prepare_cleanup:
+ xor r15d,r15d
+.Ld_prepare_free_states:
+ cmp r15,[rsp+40]
+ jae .Ld_prepare_free
+ imul rax,r15,40
+ add rax,[rsp]
+ mov rdi,[rax+32]
+ call json_object_put@PLT
+ inc r15
+ jmp .Ld_prepare_free_states
+.Ld_prepare_free:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,120
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Allocate one detached replacement state; the provider is unchanged. */
+.Ld_build_state:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,152
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+112],0
+ mov dword ptr [rsp+80],-1
+ mov ebp,2
+ mov rsi,[r12]
+ call .Lmemory_lower
+ cmp rax,[rbx+8]
+ jae .Ld_build_missing
+ shl rax,5
+ add rax,[rbx]
+ mov rcx,[r12]
+ cmp [rax],rcx
+ jne .Ld_build_missing
+ cmp dword ptr [rax+24],4
+ jne .Ld_build_cleanup
+ cmp qword ptr [r12+8],0
+ jne .Ld_build_cleanup
+ mov rax,[rax+8]
+ mov [rsp],rax
+ DGET rax,record
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ld_retired_at]
+ lea rdx,[rsp+128]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Ld_build_cleanup
+ DGET "qword ptr [rsp]",revisions
+ mov [rsp+104],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov [rsp+112],rax
+ jmp .Ld_build_record
+.Ld_build_missing:
+ mov r15,[r12+8]
+ test r15,r15
+ jz .Ld_build_cleanup
+.Ld_build_record:
+ mov rdi,r15
+ lea rsi,[rsp+32]
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_build_cleanup
+ mov dword ptr [rsp+88],1
+ cmp dword ptr [rsp+72],1
+ jne .Ld_build_copy_record
+ DGET r15,history
+ mov rbx,rax
+ lea rsi,[rip+.Ld_latest]
+ mov rdi,rax
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_build_fork
+ mov rdi,rbx
+ lea rsi,[rip+.Ld_rewindable]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_build_cleanup
+ mov dword ptr [rsp+88],0
+.Ld_build_fork:
+ DGET r15,fork
+ mov rbx,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ld_current]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_build_copy_record
+ mov rdi,rbx
+ lea rsi,[rip+.Ld_initial]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_build_copy_record
+ cmp dword ptr [rsp+88],0
+ jne .Ld_build_cleanup
+ mov rdi,rbx
+ lea rsi,[rip+.Ld_asof]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_build_cleanup
+.Ld_build_copy_record:
+ mov rdi,r15
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ld_build_alloc
+ cmp qword ptr [r12+8],0
+ je .Ld_build_retire_stamp
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ DADD "qword ptr [rsp+8]",created_at,rax
+ test eax,eax
+ jnz .Ld_build_alloc
+.Ld_build_retire_stamp:
+ cmp qword ptr [r12+24],0
+ je .Ld_build_content
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ DADD "qword ptr [rsp+8]",retired_at,rax
+ test eax,eax
+ jnz .Ld_build_alloc
+.Ld_build_content:
+ mov r14,[r12+16]
+ test r14,r14
+ jz .Ld_build_revisions
+ DGET r14,kind
+ mov rbx,rax
+ lea rsi,[rip+.Ld_base]
+ mov rdi,rax
+ call .Ld_string
+ test eax,eax
+ jz .Ld_build_delta
+ mov dword ptr [rsp+80],0
+ DGET r14,value
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ld_build_cleanup
+ jmp .Ld_build_version
+.Ld_build_delta:
+ mov rdi,rbx
+ lea rsi,[rip+.Ld_delta]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_build_cleanup
+ cmp qword ptr [r12+8],0
+ jne .Ld_build_cleanup
+ mov dword ptr [rsp+80],1
+ DGET r14,ops
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ld_build_cleanup
+.Ld_build_version:
+ DGET r14,version
+ mov rdi,rax
+ call .Ld_integer
+ test rax,rax
+ jz .Ld_build_cleanup
+ mov [rsp+96],rax
+ cmp dword ptr [rsp+80],1
+ jne .Ld_build_stamp_revision
+ mov rsi,[rsp+112]
+ test rsi,rsi
+ jz .Ld_build_cleanup
+ dec rsi
+ mov rdi,[rsp+104]
+ call json_object_array_get_idx@PLT
+ DGET rax,version
+ mov rdi,rax
+ call .Ld_integer
+ cmp rax,[rsp+96]
+ jne .Ld_build_cleanup
+.Ld_build_stamp_revision:
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ DADD r14,seq,rax
+ test eax,eax
+ jnz .Ld_build_alloc
+.Ld_build_revisions:
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ mov [rsp+16],rax
+ cmp dword ptr [rsp+88],0
+ je .Ld_build_keep_history
+ cmp qword ptr [r12+24],0
+ jne .Ld_build_state_object
+ cmp dword ptr [rsp+80],0
+ je .Ld_build_append_content
+.Ld_build_keep_history:
+ xor r15d,r15d
+.Ld_build_copy_revisions:
+ cmp r15,[rsp+112]
+ jae .Ld_build_append_content
+ mov rdi,[rsp+104]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rbx,rax
+ mov rdi,[rsp+16]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ld_build_revision_failed
+ inc r15
+ jmp .Ld_build_copy_revisions
+.Ld_build_append_content:
+ test r14,r14
+ jz .Ld_build_state_object
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rbx,rax
+ mov rdi,[rsp+16]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ld_build_revision_failed
+.Ld_build_state_object:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ mov [rsp+24],rax
+ mov rdi,[r12]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_build_alloc
+ DADD "qword ptr [rsp+24]",id,rax
+ test eax,eax
+ jnz .Ld_build_alloc
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ DADD "qword ptr [rsp+24]",record,rdx
+ test eax,eax
+ jnz .Ld_build_alloc
+ mov rdx,[rsp+16]
+ mov qword ptr [rsp+16],0
+ DADD "qword ptr [rsp+24]",revisions,rdx
+ test eax,eax
+ jnz .Ld_build_alloc
+ mov rax,[rsp+24]
+ mov [r12+32],rax
+ mov qword ptr [rsp+24],0
+ xor ebp,ebp
+ jmp .Ld_build_cleanup
+.Ld_build_revision_failed:
+ mov rdi,rbx
+ call json_object_put@PLT
+.Ld_build_alloc:
+ mov ebp,3
+.Ld_build_cleanup:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,152
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Only candidate live incarnations can increase address occupancy. */
+.Ld_check_addresses:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,136
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ mov ebp,2
+.Ld_check_action:
+ cmp r14,r13
+ jae .Ld_check_success
+ imul rax,r14,40
+ add rax,r12
+ cmp qword ptr [rax+24],0
+ jne .Ld_check_next
+ DGET "qword ptr [rax+32]",record
+ mov rdi,rax
+ mov rsi,rsp
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_check_return
+ xor r15d,r15d
+.Ld_check_old:
+ cmp r15,[rbx+8]
+ jae .Ld_check_prior_start
+ mov rax,r15
+ shl rax,5
+ add rax,[rbx]
+ cmp dword ptr [rax+24],4
+ jne .Ld_check_old_next
+ mov rcx,[rax]
+ xor edx,edx
+.Ld_check_changed:
+ cmp rdx,r13
+ jae .Ld_check_old_live
+ imul rsi,rdx,40
+ cmp [r12+rsi],rcx
+ je .Ld_check_old_next
+ inc rdx
+ jmp .Ld_check_changed
+.Ld_check_old_live:
+ DGET "qword ptr [rax+8]",record
+ mov [rsp+112],rax
+ DGET rax,retired_at
+ test rax,rax
+ jnz .Ld_check_old_next
+ mov rdi,[rsp+112]
+ lea rsi,[rsp+48]
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_check_return
+ mov rdi,rsp
+ lea rsi,[rsp+48]
+ call pg_document_address_equal
+ test eax,eax
+ jnz .Ld_check_return
+.Ld_check_old_next:
+ inc r15
+ jmp .Ld_check_old
+.Ld_check_prior_start:
+ xor r15d,r15d
+.Ld_check_prior:
+ cmp r15,r14
+ jae .Ld_check_next
+ imul rax,r15,40
+ add rax,r12
+ cmp qword ptr [rax+24],0
+ jne .Ld_check_prior_next
+ DGET "qword ptr [rax+32]",record
+ mov rdi,rax
+ lea rsi,[rsp+48]
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_check_return
+ mov rdi,rsp
+ lea rsi,[rsp+48]
+ call pg_document_address_equal
+ test eax,eax
+ jnz .Ld_check_return
+.Ld_check_prior_next:
+ inc r15
+ jmp .Ld_check_prior
+.Ld_check_next:
+ inc r14
+ jmp .Ld_check_action
+.Ld_check_success:
+ xor ebp,ebp
+.Ld_check_return:
+ mov eax,ebp
+ add rsp,136
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Ld_type: .asciz "type"
+.Ld_id: .asciz "id"
+.Ld_record: .asciz "record"
+.Ld_content: .asciz "content"
+.Ld_value: .asciz "value"
+.Ld_revisions: .asciz "revisions"
+.Ld_kind: .asciz "kind"
+.Ld_key: .asciz "key"
+.Ld_scope: .asciz "scope"
+.Ld_conversation_id: .asciz "conversationId"
+.Ld_task_id: .asciz "taskId"
+.Ld_history: .asciz "history"
+.Ld_fork: .asciz "fork"
+.Ld_version: .asciz "version"
+.Ld_ops: .asciz "ops"
+.Ld_seq: .asciz "seq"
+.Ld_created_at: .asciz "createdAt"
+.Ld_retired_at: .asciz "retiredAt"
+.Ld_create: .asciz "document.create"
+.Ld_change: .asciz "document.change"
+.Ld_retire: .asciz "document.retire"
+.Ld_prepared: .asciz "document.prepared"
+.Ld_session: .asciz "session"
+.Ld_conversation: .asciz "conversation"
+.Ld_task: .asciz "task"
+.Ld_base: .asciz "base"
+.Ld_delta: .asciz "delta"
+.Ld_latest: .asciz "latest"
+.Ld_rewindable: .asciz "rewindable"
+.Ld_current: .asciz "current"
+.Ld_initial: .asciz "initial"
+.Ld_asof: .asciz "asOf"
+.text
+/* Build a temporary native revision view over borrowed stored JSON. */
+.globl pg_record_memory_document
+.type pg_record_memory_document,@function
+pg_record_memory_document:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,136
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,2
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],0
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+ test r14,r14
+ jz .Ld_read_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ld_read_return
+ cmp dword ptr [rbx+44],0
+ jne .Ld_read_return
+ cmp dword ptr [rbx+40],1
+ je .Ld_read_return
+ cmp qword ptr [rbx+24],0
+ je .Ld_read_return
+ test r12,r12
+ jz .Ld_read_return
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Ld_read_return
+ cmp r13,-1
+ je .Ld_read_lookup
+ cmp r13,rax
+ ja .Ld_read_return
+.Ld_read_lookup:
+ mov rsi,r12
+ call .Lmemory_lower
+ cmp rax,[rbx+8]
+ jae .Ld_read_missing
+ shl rax,5
+ add rax,[rbx]
+ cmp [rax],r12
+ jne .Ld_read_missing
+ cmp dword ptr [rax+24],4
+ jne .Ld_read_missing
+ DGET "qword ptr [rax+8]",record
+ mov [rsp+104],rax
+ DGET rax,created_at
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+56],rax
+ DGET "qword ptr [rsp+104]",retired_at
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+64],rax
+ mov qword ptr [rsp+72],1
+ DGET "qword ptr [rsp+104]",scope
+ DGET rax,kind
+ mov rdi,rax
+ lea rsi,[rip+.Ld_conversation]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_read_view
+ DGET "qword ptr [rsp+104]",history
+ mov rdi,rax
+ lea rsi,[rip+.Ld_rewindable]
+ call .Ld_string
+ test eax,eax
+ setz al
+ movzx eax,al
+ mov [rsp+72],rax
+.Ld_read_view:
+ /* Lookup again after library calls; stored record remains borrowed. */
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lmemory_lower
+ shl rax,5
+ add rax,[rbx]
+ DGET "qword ptr [rax+8]",revisions
+ mov rbx,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov [rsp+88],rax
+ mov rdi,rax
+ mov esi,32
+ call calloc@PLT
+ mov [rsp+80],rax
+ test rax,rax
+ jnz .Ld_read_decode
+ cmp qword ptr [rsp+88],0
+ jne .Ld_read_alloc
+.Ld_read_decode:
+ xor r15d,r15d
+.Ld_read_revision:
+ cmp r15,[rsp+88]
+ jae .Ld_read_replay
+ mov rdi,rbx
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov r12,rax
+ mov rax,r15
+ shl rax,5
+ add rax,[rsp+80]
+ mov [rsp+112],rax
+ DGET r12,seq
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rcx,[rsp+112]
+ mov [rcx],rax
+ DGET r12,version
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rcx,[rsp+112]
+ mov [rcx+8],rax
+ DGET r12,kind
+ mov rdi,rax
+ lea rsi,[rip+.Ld_base]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_read_delta
+ DGET r12,value
+ jmp .Ld_read_content
+.Ld_read_delta:
+ mov rcx,[rsp+112]
+ mov dword ptr [rcx+16],1
+ DGET r12,ops
+.Ld_read_content:
+ mov rcx,[rsp+112]
+ mov [rcx+24],rax
+ inc r15
+ jmp .Ld_read_revision
+.Ld_read_replay:
+ lea rdi,[rsp+56]
+ mov rsi,r13
+ lea rdx,[rsp+24]
+ call pg_document_revision_read
+ test eax,eax
+ jnz .Ld_read_replay_error
+ cmp qword ptr [rsp+32],0
+ je .Ld_read_missing_cleanup
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ld_read_alloc
+ mov [rsp],rax
+ mov rdi,[rsp+104]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ld_read_alloc
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ DADD "qword ptr [rsp]",record,rdx
+ test eax,eax
+ jnz .Ld_read_alloc
+ mov rdx,[rsp+24]
+ mov qword ptr [rsp+24],0
+ DADD "qword ptr [rsp]",value,rdx
+ test eax,eax
+ jnz .Ld_read_alloc
+ mov rdi,[rsp+32]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_read_alloc
+ DADD "qword ptr [rsp]",version,rax
+ test eax,eax
+ jnz .Ld_read_alloc
+ mov rdi,[rsp+40]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ld_read_alloc
+ DADD "qword ptr [rsp]",deltas_since_base,rax
+ test eax,eax
+ jnz .Ld_read_alloc
+ mov rax,[rsp]
+ mov [r14],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Ld_read_cleanup
+.Ld_read_replay_error:
+ cmp eax,3
+ je .Ld_read_alloc
+ jmp .Ld_read_cleanup
+.Ld_read_missing:
+ mov ebp,1
+ jmp .Ld_read_return
+.Ld_read_missing_cleanup:
+ mov ebp,1
+ jmp .Ld_read_cleanup
+.Ld_read_alloc:
+ mov ebp,3
+.Ld_read_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+80]
+ call free@PLT
+.Ld_read_return:
+ mov eax,ebp
+ add rsp,136
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_document,.-pg_record_memory_document
+.section .rodata
+.Ld_deltas_since_base: .asciz "deltasSinceBase"

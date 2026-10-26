@@ -10,17 +10,26 @@
 _Static_assert(sizeof(pg_memory_row)==32&&offsetof(pg_memory_row,table)==24,"row ABI");
 _Static_assert(sizeof(pg_record_memory)==48&&offsetof(pg_record_memory,next_id)==24&&offsetof(pg_record_memory,busy)==40,"memory ABI");
 #ifdef PG_MEMORY_FAULTS
-static unsigned allocation_failure,array_add_calls;
+static unsigned allocation_failure,array_add_calls,doc_tracking,doc_calls,doc_fail;
+static int doc_fault(void){return doc_tracking&&++doc_calls==doc_fail;}
 int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
 void *__real_calloc(size_t,size_t);
 void *__real_reallocarray(void *,size_t,size_t);
 struct json_object *__real_json_object_new_array_ext(int);
 int __real_json_object_array_add(struct json_object *,struct json_object *);
-int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **dst,json_c_shallow_copy_fn *fn){if(allocation_failure==1){allocation_failure=0;*dst=json_object_new_object();return -1;}return __real_json_object_deep_copy(src,dst,fn);}
-void *__wrap_calloc(size_t n,size_t size){if(allocation_failure==2){allocation_failure=0;return 0;}return __real_calloc(n,size);}
-void *__wrap_reallocarray(void *p,size_t n,size_t size){if(allocation_failure==3){allocation_failure=0;return 0;}return __real_reallocarray(p,n,size);}
-struct json_object *__wrap_json_object_new_array_ext(int size){if(allocation_failure==4){allocation_failure=0;return 0;}return __real_json_object_new_array_ext(size);}
-int __wrap_json_object_array_add(struct json_object *array,struct json_object *value){if(allocation_failure==6&&++array_add_calls==2){allocation_failure=0;return -1;}if(allocation_failure==5){allocation_failure=0;return -1;}return __real_json_object_array_add(array,value);}
+int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **dst,json_c_shallow_copy_fn *fn){if(doc_fault()){*dst=json_object_new_object();return -1;}if(allocation_failure==1){allocation_failure=0;*dst=json_object_new_object();return -1;}return __real_json_object_deep_copy(src,dst,fn);}
+void *__wrap_calloc(size_t n,size_t size){if(doc_fault())return 0;if(allocation_failure==2){allocation_failure=0;return 0;}return __real_calloc(n,size);}
+void *__wrap_reallocarray(void *p,size_t n,size_t size){if(doc_fault())return 0;if(allocation_failure==3){allocation_failure=0;return 0;}return __real_reallocarray(p,n,size);}
+struct json_object *__wrap_json_object_new_array_ext(int size){if(doc_fault())return 0;if(allocation_failure==4){allocation_failure=0;return 0;}return __real_json_object_new_array_ext(size);}
+int __wrap_json_object_array_add(struct json_object *array,struct json_object *value){if(doc_fault())return -1;if(allocation_failure==6&&++array_add_calls==2){allocation_failure=0;return -1;}if(allocation_failure==5){allocation_failure=0;return -1;}return __real_json_object_array_add(array,value);}
+struct json_object *__real_json_object_new_object(void);
+struct json_object *__real_json_object_new_int64(int64_t);
+struct json_object *__real_json_object_new_string(const char *);
+int __real_json_object_object_add(struct json_object *,const char *,struct json_object *);
+struct json_object *__wrap_json_object_new_object(void){return doc_fault()?0:__real_json_object_new_object();}
+struct json_object *__wrap_json_object_new_int64(int64_t n){return doc_fault()?0:__real_json_object_new_int64(n);}
+struct json_object *__wrap_json_object_new_string(const char *s){return doc_fault()?0:__real_json_object_new_string(s);}
+int __wrap_json_object_object_add(struct json_object *o,const char *key,struct json_object *v){return doc_fault()?-1:__real_json_object_object_add(o,key,v);}
 #endif
 static unsigned adopted;
 static void adopt(void *ctx,uint64_t sequence){pg_record_memory *memory=ctx;assert(sequence==memory->next_sequence-1);++adopted;uint64_t id;assert(pg_record_memory_mint(memory,&id)==PG_MEMORY_INVALID);assert(pg_record_memory_close(memory)==PG_MEMORY_INVALID);struct json_object *record=0;assert(!pg_record_memory_read(memory,PG_TABLE_ENTRY,3,&record));json_object_put(record);}
@@ -44,7 +53,36 @@ static void scan_tests(void){
  q.limit=0;assert(pg_record_memory_scan(&memory,&q,&p)==PG_MEMORY_INVALID&&!p.items);q.limit=1;q.has_cursor=2;assert(pg_record_memory_scan(&memory,&q,&p)==PG_MEMORY_INVALID);q.has_cursor=1;q.after=INT64_MIN;assert(pg_record_memory_scan(&memory,&q,&p)==PG_MEMORY_INVALID);q.has_cursor=0;q.conversation_id=999;assert(pg_record_memory_scan(&memory,&q,&p)==PG_MEMORY_INVALID);q.conversation_id=10;
  long page=sysconf(_SC_PAGESIZE);char *guard=mmap(0,(size_t)page*4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(guard!=MAP_FAILED&&!mprotect(guard+page,(size_t)page,PROT_NONE)&&!mprotect(guard+page*3,(size_t)page,PROT_NONE));pg_memory_query *last_query=(pg_memory_query*)(guard+page-sizeof(q));pg_memory_page *last_page=(pg_memory_page*)(guard+page*3-sizeof(p));*last_query=q;memset(last_page,0,sizeof(*last_page));assert(!pg_record_memory_scan(&memory,last_query,last_page));assert(!pg_record_memory_close(&memory)&&json_object_array_length(last_page->items)==1);json_object_put(last_page->items);assert(!munmap(guard,(size_t)page*4));
 }
+static void doc_adopt(void *context,uint64_t seq){(void)context;assert(seq);}
+static int doc_commit(pg_record_memory *memory,const char *text){struct json_object *batch=json_tokener_parse(text);assert(batch);uint64_t seq=0;pg_record_storage service=pg_record_memory_storage(memory);int result=service.commit(memory,batch,doc_adopt,0,&seq);json_object_put(batch);return result;}
+static void document_writes(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));
+ assert(!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]"));
+ assert(m.count==1&&m.rows[0].table==4&&m.next_id==3);struct json_object *state=m.rows[0].value,*record=json_object_object_get(state,"record"),*revisions=json_object_object_get(state,"revisions");assert(json_object_get_int(json_object_object_get(record,"createdAt"))==1&&json_object_array_length(revisions)==1);
+ assert(!doc_commit(&m,"[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":1,\"ops\":[[\"s\",[\"x\"],2]]}}]"));
+ assert(json_object_array_length(json_object_object_get(m.rows[0].value,"revisions"))==2);
+ assert(doc_commit(&m,"[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":2,\"ops\":[]}}]")==PG_MEMORY_INVALID&&m.next_sequence==3);
+ assert(doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{}}}]")==PG_MEMORY_INVALID&&m.count==1);
+ assert(!doc_commit(&m,"[{\"type\":\"document.retire\",\"id\":2},{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{}}}]"));
+ assert(m.count==2&&json_object_array_length(json_object_object_get(m.rows[0].value,"revisions"))==0&&json_object_get_int(json_object_object_get(json_object_object_get(m.rows[0].value,"record"),"retiredAt"))==3);
+ assert(doc_commit(&m,"[{\"type\":\"document.retire\",\"id\":2}]")==PG_MEMORY_INVALID);
+ assert(!pg_record_memory_close(&m));
+#ifdef PG_MEMORY_FAULTS
+ const char *source="[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]";
+ struct json_object *batch=json_tokener_parse(source);assert(batch);pg_record_storage service=pg_record_memory_storage(&m);uint64_t seq;
+ assert(!pg_record_memory_open(&m));doc_tracking=1;doc_calls=doc_fail=0;assert(!service.commit(&m,batch,doc_adopt,0,&seq));doc_tracking=0;unsigned count=doc_calls;assert(!pg_record_memory_close(&m));
+ for(unsigned i=1;i<=count;++i){assert(!pg_record_memory_open(&m));doc_tracking=1;doc_calls=0;doc_fail=i;int status=service.commit(&m,batch,doc_adopt,0,&seq);doc_tracking=0;assert(status==PG_MEMORY_ALLOCATION&&!seq&&!m.count&&m.next_sequence==1&&m.next_id==2&&!m.busy);assert(!pg_record_memory_close(&m));}
+ doc_fail=0;json_object_put(batch);
+ const char *updates[]={
+ "[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":1,\"ops\":[[\"s\",[\"x\"],2]]}},{\"type\":\"task\",\"value\":{\"id\":8}}]",
+ "[{\"type\":\"document.retire\",\"id\":2},{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"test\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{}}}]"};
+ for(unsigned mode=0;mode<2;++mode){batch=json_tokener_parse(updates[mode]);assert(batch);assert(!pg_record_memory_open(&m)&&!doc_commit(&m,source));doc_tracking=1;doc_calls=doc_fail=0;assert(!service.commit(&m,batch,doc_adopt,0,&seq));doc_tracking=0;count=doc_calls;assert(!pg_record_memory_close(&m));
+ for(unsigned i=1;i<=count;++i){assert(!pg_record_memory_open(&m)&&!doc_commit(&m,source));struct json_object *before=0;assert(!json_object_deep_copy(m.rows[0].value,&before,0));doc_tracking=1;doc_calls=0;doc_fail=i;int status=service.commit(&m,batch,doc_adopt,0,&seq);doc_tracking=0;assert(status==PG_MEMORY_ALLOCATION&&!seq&&m.count==1&&m.next_sequence==2&&m.next_id==3&&!m.busy&&json_object_equal(before,m.rows[0].value));json_object_put(before);assert(!pg_record_memory_close(&m));}doc_fail=0;json_object_put(batch);}
+
+#endif
+}
 int main(void){
+ document_writes();
  pg_record_memory memory={0};assert(!pg_record_memory_open(&memory)&&pg_record_memory_open(&memory)==PG_MEMORY_INVALID);uint64_t id=0,seq=0;assert(!pg_record_memory_mint(&memory,&id)&&id==2);
  assert(!commit_text(&memory,"[{\"type\":\"task\",\"value\":{\"id\":5,\"conversationId\":1,\"kind\":\"test\",\"state\":{\"status\":\"pending\"}}},{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\",\"data\":{\"x\":1}}},{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"submission\",\"value\":{\"id\":7,\"conversationId\":1,\"status\":\"queued\"}},{\"type\":\"task\",\"value\":{\"id\":5,\"conversationId\":1,\"kind\":\"test\",\"state\":{\"status\":\"running\"}}}]",&seq));
  assert(seq==1&&adopted==1&&memory.count==4&&memory.next_id==8);check(&memory,PG_TABLE_CONVERSATION,1,"{\"id\":1}");check(&memory,PG_TABLE_ENTRY,3,"{\"id\":3,\"conversationId\":1,\"kind\":\"test\",\"data\":{\"x\":1}}");check(&memory,PG_TABLE_TASK,5,"{\"id\":5,\"conversationId\":1,\"kind\":\"test\",\"state\":{\"status\":\"running\"}}");
