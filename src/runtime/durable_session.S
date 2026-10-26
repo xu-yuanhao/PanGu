@@ -1723,3 +1723,190 @@ pg_document_publication_prepare:
 .Lnotice_value_key: .asciz "value"
 .Lnotice_ops: .asciz "ops"
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_publications_confirm
+.type pg_session_publications_confirm,@function
+pg_session_publications_confirm:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov r12,rsi
+ mov eax,1
+ test rbx,rbx
+ jz .Lconfirm_end
+ test r12,r12
+ jz .Lconfirm_end
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Lconfirm_invalid
+ cmp qword ptr [rbx+8],0
+ je .Lconfirm_invalid
+ mov dword ptr [rsp+32],0
+.Lconfirm_pass:
+ xor ebp,ebp
+.Lconfirm_channel:
+ mov r13,[rbx+rbp*8]
+ test r13,r13
+ jz .Lconfirm_next_channel
+ mov rdi,r13
+ lea rsi,[rip+.Lpublication_seq]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lconfirm_invalid
+ cmp dword ptr [rsp+32],0
+ je .Lconfirm_changes
+ mov rdi,r15
+ mov rsi,r12
+ call json_object_set_uint64@PLT
+.Lconfirm_changes:
+ mov rdi,r13
+ lea rsi,[rip+.Lpublication_changes]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lconfirm_invalid
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ xor r14d,r14d
+.Lconfirm_change:
+ cmp r14,[rsp+8]
+ jae .Lconfirm_next_channel
+ mov rdi,[rsp]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_type]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+36],eax
+ mov rdi,r15
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lconfirm_invalid
+ mov r15,rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp eax,[rsp+36]
+ jne .Lconfirm_next_change
+ mov rdi,r15
+ lea rsi,[rip+.Lnotice_document]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lconfirm_record
+ mov rdi,r15
+ lea rsi,[rip+.Lnotice_document_copy]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lconfirm_next_change
+.Lconfirm_record:
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lnotice_record]
+ call json_object_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lconfirm_invalid
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lconfirm_created]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,[rsp+32]
+ mov rdx,r12
+ call .Lconfirm_stamp
+ test eax,eax
+ jnz .Lconfirm_invalid
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lconfirm_retired]
+ lea rdx,[rsp+16]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lconfirm_next_change
+ mov rdi,[rsp+16]
+ mov esi,[rsp+32]
+ mov rdx,r12
+ call .Lconfirm_stamp
+ test eax,eax
+ jnz .Lconfirm_invalid
+.Lconfirm_next_change:
+ inc r14
+ jmp .Lconfirm_change
+.Lconfirm_next_channel:
+ inc ebp
+ cmp ebp,2
+ jb .Lconfirm_channel
+ cmp dword ptr [rsp+32],0
+ jne .Lconfirm_ok
+ mov dword ptr [rsp+32],1
+ jmp .Lconfirm_pass
+.Lconfirm_ok:
+ xor eax,eax
+ jmp .Lconfirm_end
+.Lconfirm_invalid:
+ mov eax,1
+.Lconfirm_end:
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_session_publications_confirm,.-pg_session_publications_confirm
+.Lconfirm_stamp:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lconfirm_stamp_bad
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lconfirm_stamp_bad
+ mov rdx,9007199254740991
+ cmp rax,rdx
+ ja .Lconfirm_stamp_bad
+ test rax,rax
+ jnz .Lconfirm_stamp_ok
+ test r12d,r12d
+ jz .Lconfirm_stamp_ok
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_set_uint64@PLT
+.Lconfirm_stamp_ok:
+ xor eax,eax
+ jmp .Lconfirm_stamp_end
+.Lconfirm_stamp_bad:
+ mov eax,1
+.Lconfirm_stamp_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lconfirm_created: .asciz "createdAt"
+.Lconfirm_retired: .asciz "retiredAt"
+.section .note.GNU-stack,"",@progbits

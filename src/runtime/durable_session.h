@@ -164,4 +164,13 @@ enum {PG_NOTICE_RETIRE=1,PG_NOTICE_COPY=2,PG_NOTICE_CREATED=4,PG_NOTICE_PUBLISHE
    Failure leaves NULL. Prepare lifecycle stamps before calling; do not retain
    a loaded handle across retirement eviction. */
 int pg_document_publication_prepare(const pg_document_publication_request *,struct json_object **);
+/* Confirm prepared stored publications without allocating. Existing seq
+   scalars are replaced; zero createdAt/retiredAt placeholders in Document
+   records become the confirmed sequence. Positive lifecycle stamps are kept.
+   Both channels are validated before any mutation. Memory-only publications,
+   missing seq/stamps, invalid JSON shapes or unsafe sequence reject unchanged.
+   Call at most once on each prepared pair, before delivery. Outputs belong
+   to prepare; no concurrent
+   readers may borrow them during confirmation. */
+int pg_session_publications_confirm(pg_session_publications *,uint64_t sequence);
 #endif

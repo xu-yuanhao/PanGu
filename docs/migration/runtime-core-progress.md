@@ -499,3 +499,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_document_tx_observed与40字节通知宿主，持久结算可组合held merge；finalizer末尾Storage前prepare，确认时无分配adopt补seq，native采纳/安装/驱逐后publish，任何已尝试prepare的路径都discard。既有原Session adopt/publish钩子保留，旧结构布局不变；内部结算上下文显式持有descriptor/token/attempted标志。
 - 实际验证：真实MemoryStorage编辑、退休、partial prepare失败、adopt失败和Storage失败五条路径；准备实际Document通知、确认时原地补退休stamp、驱逐后仍可发布独立record，失败不发布且token清理一次，首因/Storage序号符合实际结果。测试最初误写错误枚举名及json-c setter成功值，按公开头修正后重新验证。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享与隔离核心G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有DocTx独立服务/导出/来源、专项和TODO；公开旧ABI、门禁、预算保持。5个候选路径内容清单摘要（本记录加入前）：98e5534713256962f5bd4be4d709efddeb129d4035528fc16df5a5344575ae30；隔离核心树d0f4f829e37264e10ecaa78212ece4178a165b0e。结论为持久DocTx通知管线本地通过；默认Session通知宿主、deferred/holds通知集合及Document watch继续接入，K03总验收未完成。TUI工作树保留。
+
+## K03 publication无分配确认
+
+- 来源：Pi d5b3de22 Transaction.adopt创建/退休生命周期字段与Session.#publish seq，实际DocTx通知管线；fetch后Pi origin保持89c921d、Harness保持22ddee37。
+- 实现：手写publication确认，先校验两个owned通道和Document生命周期字段，再更新seq及零createdAt/retiredAt占位值；已有正数stamp保留，shared对象可重复遍历而不改变原stamp。确认不分配，调用者在准备/发布之间仅确认一次。类型匹配按完整字节，NUL伪前缀不作Document处理；memory-only无stored通道拒绝。
+- 实际验证：共享/分离通道的新建/退休/copy stamp、输入隔离、损坏后通道/非法seq拒绝且前通道保持，确认期间分配计数0。真实DocTx通知host已组合Document notice→完整publication prepare→confirm，覆盖编辑、退休、partial prepare失败、adoption失败、Storage失败与一次清理。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有Session独立确认导出/契约、DocTx组合专项、来源与TODO；旧ABI、门禁和预算保持。5个候选路径内容清单摘要（本记录加入前）：4e00f76b9c2a9edca095693474a93a598d349d77b4cb731dcbf1ea6486c00ac2；隔离核心树93a86ba590a10551d46f70d6d26f2221171a78f7。结论为确认阶段本地通过；默认宿主自动计划枚举/任务owner解析/held集合捕获和Document watch继续，K03总验收未完成。TUI工作树保留。
