@@ -150,7 +150,8 @@ typedef struct {
  /* Allocation-free confirmation before native loaded/install/retire adoption.
     Stamp only prepared notification state; do not publish here. */
  int (*adopt)(void *,void *,uint64_t sequence);
- /* After successful settlement/adoption. All JSON is borrowed until return.
+ /* During successful Storage adoption, after native loaded/install/retire
+    adoption. All JSON is borrowed until return.
     Callback contains its own subscriber errors; cannot fail the stored commit. */
  void (*publish)(void *,void *,const struct json_object *writes,uint64_t sequence);
  void (*discard)(void *,void *);
@@ -158,6 +159,7 @@ typedef struct {
 /* Stored settlement with optional held merge and a borrowed notification host.
    Existing scope/scan/merge semantics apply. Preparation failures precede
    Storage and preserve Session health; adopt failures latch Session failure.
+   Publication remains visible if Storage rejects after adoption.
    discard runs once after any attempted prepare, before candidate cleanup,
    including Storage failure and partial prepare. Existing hooks are preserved.
    The host/its token remain valid only through this synchronous call. */

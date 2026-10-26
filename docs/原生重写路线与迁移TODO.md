@@ -117,6 +117,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 默认通知宿主接通deferred内存采纳与落盘回退：准入前准备双路payload、零序号选择memory、仅内部通知、原timer/holds与错误清理保持。
 - [x] 捕获独立holds flush的完整持久通知：复用已折叠ops、选中incarnation、无重复memory通知与全部路径清理（固定d5b3de22基线）。
 - [x] 移植8b0caef host通知队列：准入前预分配、adopt可无分配入队、microtask边界FIFO分发、按派发时订阅集合执行与关闭排空。
+- [x] DocTx/flush接通8b0caef adopt内发布：同步内部观察、先排队host通知、Storage结算后锁存观察错误，adopt后拒绝仍保留通知且Storage错误优先。
 - [ ] 采用Pi 8b0caef的adoption发布语义：同步内部观察、排队host dispatch、adopt后Storage拒绝时已发布状态保持、异步观察者拒绝；Document watch跟随逻辑地址并支持同步observeDoc。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
@@ -538,3 +539,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S:pg_session_dispatch_*`以独立40字节caller-owned队列实现prepare/enqueue/drain/discard/close。prepare保留immutable publication并分配token；enqueue只转交所有权/更新FIFO，不分配也不调用订阅者；drain是显式原生microtask边界，逐事件使用派发时的订阅集合。允许回调追加排队，拒绝reentrant drain/close和跨队列token，分配失败保留事件供重试；prepared/queued资源未排空时close拒绝完成。
 - 执行实际8b0caef notifyHosts方法，Native与Pi的FIFO/late subscription/callback取消与追加事件顺序一致；原生验证无分配enqueue、publication独立持有、重复入队/取消queued拒绝、预备/分发分配故障、retry和关闭资源规则。专项/完整Runtime见当前实现记录。
 - 下一行为：将队列接入DocTx/flush adopt并延迟host dispatch，内部同步observer错误在Storage结算后处理，验证adopt后Storage拒绝仍已发布；本批只验收队列，不将新adoption总语义勾选。
+
+### K03 新adoption发布与错误结算
+
+- 固定来源Pi 8b0caef #runCommit/#publish/#notifyHosts/#storeHolds及session-adoption/session-observers。fetch后origin推进6c384aa（pi-ai workspace测试解析），Durable/Chord本批函数无变化；旧基础数据差异仍固定d5b3de22，Harness保持22ddee37。
+- DocTx/holds通知publish原地移入native adopt成功之后，普通底层清理/发布钩子保持其结算职责。`pg_session_deliver_observed`捕获首个同步观察者错误而不在Storage内锁存；`pg_session_adoption_*_bind`组合既有payload准备和dispatch队列，在内部观察前无分配入队，Storage结算后按错误优先级处理。`pg_session_dispatch_storage_commit`在后端同步步骤外、错误分类前排空host微任务；原后端状态保持。caller-owned adoption配置/queue生命周期明确，旧公开布局不变。
+- 验证真实MemoryStorage的adopt→observed→adopted→host→resolve顺序，adopt前/后拒绝、内部观察错误、二者并发的Storage主因/observer报告。直接执行8b0caef实际#runCommit/#publish/#notifyHosts方法，五组结果/顺序/优先级与原生矩阵一致。held flush三组及实际Session stored/memory/混合三组通过。新绑定的普通/memory/held故障测试分别73/62/65次拒绝或fail-stop，另两次host snapshot分配故障在回调前安全重试成功；未把重试记成拒绝。
+- 一个旧Session故障用例原先要求任何故障都使commit返回失败，已按新语义限定为：成功memory采纳后的observer/timer错误可保留提交结果，同时Session失败且holds仍持有。最终专项/完整Runtime见当前实现记录。
+- 下一行为：自动timer/reload/close接入queued adoption通知服务，继续地址跟随watch与同步observeDoc；K03总验收未完成。

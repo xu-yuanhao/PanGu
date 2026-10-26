@@ -475,11 +475,24 @@
 .Ldocs_adopt_host:
  xor eax,eax
  cmp qword ptr [rbx+24],0
- je .Ldocs_adopt_return
+ je .Ldocs_adopt_notice
  mov rdi,[rbx+16]
  mov rsi,r12
  mov rdx,r13
  call [rbx+24]
+ test eax,eax
+ jnz .Ldocs_adopt_return
+.Ldocs_adopt_notice:
+ cmp qword ptr [rbx+176],0
+ je .Ldocs_adopt_ok
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,[rbx+184]
+ mov rdx,r12
+ mov rcx,r13
+ call [rax+24]
+.Ldocs_adopt_ok:
+ xor eax,eax
 .Ldocs_adopt_return:
  pop r15
  pop r14
@@ -494,14 +507,6 @@
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
- cmp qword ptr [rbx+176],0
- je .Ldocs_publish_host
- mov rax,[rbx+176]
- mov rdi,[rax]
- mov rsi,[rbx+184]
- mov rdx,r12
- mov rcx,r13
- call [rax+24]
 .Ldocs_publish_host:
  mov rax,[rbx+32]
  test rax,rax

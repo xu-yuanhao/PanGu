@@ -329,6 +329,9 @@ pg_durable_session_settle_notified:
  mov qword ptr [rbx+160],0
  cmp dword ptr [rbx+172],1
  jne .Ldurable_settle_unlock
+ mov rax,[rbx]
+ cmp dword ptr [rax+52],0
+ jne .Ldurable_settle_unlock
  mov rdi,[rbx+24]
  call pg_hold_timer_sync@PLT
  test eax,eax
@@ -1046,6 +1049,24 @@ pg_session_unlisten:
 .globl pg_session_deliver
 .type pg_session_deliver,@function
 pg_session_deliver:
+ xor r8d,r8d
+ jmp .Ldeliver_common
+.globl pg_session_deliver_observed
+.type pg_session_deliver_observed,@function
+pg_session_deliver_observed:
+ mov eax,1
+ test rcx,rcx
+ jz .Lobserved_deliver_invalid
+ mov dword ptr [rcx],0
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ xor esi,esi
+ jmp .Ldeliver_common
+.Lobserved_deliver_invalid:
+ ret
+.size pg_session_deliver_observed,.-pg_session_deliver_observed
+.Ldeliver_common:
  push rbp
  push rbx
  push r12
@@ -1053,6 +1074,7 @@ pg_session_deliver:
  push r14
  push r15
  sub rsp,24
+ mov [rsp+16],r8
  mov rbx,rdi
  mov ebp,esi
  mov r12,rdx
@@ -1101,6 +1123,14 @@ pg_session_deliver:
  jz .Ldeliver_next
  test ebp,ebp
  jnz .Ldeliver_report
+ mov rdx,[rsp+16]
+ test rdx,rdx
+ jz .Ldeliver_latch_internal
+ cmp dword ptr [rdx],0
+ jne .Ldeliver_next
+ mov [rdx],eax
+ jmp .Ldeliver_next
+.Ldeliver_latch_internal:
  mov rdx,[rbx]
  cmp dword ptr [rdx+52],0
  jne .Ldeliver_next
@@ -2953,4 +2983,379 @@ pg_session_dispatch_close:
 .Ldispatch_close_end:
  ret
 .size pg_session_dispatch_close,.-pg_session_dispatch_close
+.section .note.GNU-stack,"",@progbits
+.text
+/* Adoption wrapper: inner token, prepared dispatch token, first observer error. */
+.globl pg_session_adoption_notifications_bind
+.type pg_session_adoption_notifications_bind,@function
+pg_session_adoption_notifications_bind:
+ xor edx,edx
+ jmp .Ladoption_bind
+.size pg_session_adoption_notifications_bind,.-pg_session_adoption_notifications_bind
+.globl pg_session_adoption_deferred_bind
+.type pg_session_adoption_deferred_bind,@function
+pg_session_adoption_deferred_bind:
+ mov edx,1
+.Ladoption_bind:
+ mov eax,1
+ test rdi,rdi
+ jz .Ladoption_bind_end
+ test rsi,rsi
+ jz .Ladoption_bind_end
+ mov rax,[rdi+24]
+ test rax,rax
+ jz .Ladoption_bind_bad
+ mov rcx,[rdi]
+ test rcx,rcx
+ jz .Ladoption_bind_bad
+ cmp [rax],rcx
+ jne .Ladoption_bind_bad
+ cmp dword ptr [rax+36],0
+ jne .Ladoption_bind_bad
+ mov [rsi],rdi
+ lea rax,[rip+.Ladoption_prepare_stored]
+ test edx,edx
+ jz .Ladoption_bind_prepare
+ lea rax,[rip+.Ladoption_prepare_deferred]
+.Ladoption_bind_prepare:
+ mov [rsi+8],rax
+ lea rax,[rip+.Ladoption_adopt]
+ mov [rsi+16],rax
+ lea rax,[rip+.Ladoption_publish]
+ mov [rsi+24],rax
+ lea rax,[rip+.Ladoption_discard]
+ mov [rsi+32],rax
+ xor eax,eax
+ ret
+.Ladoption_bind_bad:
+ mov eax,1
+.Ladoption_bind_end:
+ ret
+.size pg_session_adoption_deferred_bind,.-pg_session_adoption_deferred_bind
+.Ladoption_prepare_stored:
+ xor eax,eax
+ jmp .Ladoption_prepare
+.Ladoption_prepare_deferred:
+ mov eax,1
+.Ladoption_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov [rsp],eax
+ mov rbx,rdi
+ mov r12,r8
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,rsi
+ mov qword ptr [r12],0
+ mov ebp,3
+ mov edi,1
+ mov esi,32
+ call calloc@PLT
+ test rax,rax
+ jz .Ladoption_prepare_end
+ mov [r12],rax
+ mov r8,rax
+ mov rdi,rbx
+ mov rsi,r15
+ mov rdx,r13
+ mov rcx,r14
+ cmp dword ptr [rsp],0
+ jne .Ladoption_prepare_dual
+ call .Lhost_prepare
+ jmp .Ladoption_prepared_inner
+.Ladoption_prepare_dual:
+ call .Lhost_prepare_deferred
+.Ladoption_prepared_inner:
+ mov ebp,eax
+ test eax,eax
+ jnz .Ladoption_prepare_end
+ mov rsi,[r12]
+ mov rdi,rbx
+ call .Ladoption_reserve
+ mov ebp,eax
+.Ladoption_prepare_end:
+ mov eax,ebp
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ladoption_reserve:
+ mov rax,[rsi]
+ test rax,rax
+ jz .Ladoption_reserve_empty
+ lea rcx,[rsi+8]
+ mov rsi,[rax+8]
+ mov rdx,[rdi+16]
+ mov rdi,[rdi+24]
+ sub rsp,8
+ call pg_session_dispatch_prepare
+ add rsp,8
+ test eax,eax
+ jz .Ladoption_reserve_empty
+ mov eax,3
+ ret
+.Ladoption_reserve_empty:
+ xor eax,eax
+ ret
+.Ladoption_adopt:
+ test rsi,rsi
+ jz .Lhost_adopt_empty
+ mov rsi,[rsi]
+ jmp .Lhost_adopt_deferred
+.Ladoption_publish:
+ test rsi,rsi
+ jz .Lhost_publish_empty
+ cmp qword ptr [rsi],0
+ je .Lhost_publish_empty
+ test rcx,rcx
+ jnz .Ladoption_publish_stored
+ mov rsi,[rsi]
+ jmp .Lhost_publish_deferred
+.Ladoption_publish_stored:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ cmp dword ptr [r12+20],0
+ jne .Ladoption_publish_end
+ mov dword ptr [r12+20],1
+ mov rax,[rbx]
+ mov rcx,[rax+16]
+ mov rax,[rax+8]
+.Ladoption_host_interest:
+ test rcx,rcx
+ jz .Ladoption_observe
+ cmp dword ptr [rax+16],1
+ je .Ladoption_enqueue
+ add rax,24
+ dec rcx
+ jmp .Ladoption_host_interest
+.Ladoption_enqueue:
+ mov rdi,[rbx+24]
+ mov rsi,[r12+8]
+ call pg_session_dispatch_enqueue
+ test eax,eax
+ jnz .Ladoption_enqueue_failed
+ mov qword ptr [r12+8],0
+ jmp .Ladoption_observe
+.Ladoption_enqueue_failed:
+ mov dword ptr [r12+16],5
+.Ladoption_observe:
+ mov r13,[rbx+24]
+ mov eax,[r13+32]
+ mov [rsp],eax
+ mov dword ptr [rsp+8],0
+ mov dword ptr [r13+32],1
+ mov rdi,[rbx]
+ mov rax,[r12]
+ mov rsi,[rax]
+ test rsi,rsi
+ jz .Ladoption_observed
+ mov rdx,[rbx+16]
+ lea rcx,[rsp+8]
+ call pg_session_deliver_observed
+ test eax,eax
+ jz .Ladoption_observed
+ cmp dword ptr [r12+16],0
+ jne .Ladoption_observed
+ mov dword ptr [r12+16],5
+.Ladoption_observed:
+ cmp dword ptr [r12+16],0
+ jne .Ladoption_observer_saved
+ mov eax,[rsp+8]
+ mov [r12+16],eax
+.Ladoption_observer_saved:
+ mov eax,[rsp]
+ mov [r13+32],eax
+.Ladoption_publish_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Ladoption_discard:
+ test rsi,rsi
+ jz .Lhost_discard_end
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[rbx+24]
+ call pg_session_dispatch_drain
+ mov r13d,eax
+ cmp qword ptr [r12+8],0
+ je .Ladoption_unused_released
+ mov rdi,[rbx+24]
+ mov rsi,[r12+8]
+ call pg_session_dispatch_discard
+.Ladoption_unused_released:
+ mov eax,[r12+16]
+ test eax,eax
+ jnz .Ladoption_handle_observer
+ test r13d,r13d
+ jz .Ladoption_free
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ladoption_free
+ mov dword ptr [rax+52],4
+ jmp .Ladoption_free
+.Ladoption_handle_observer:
+ mov rdx,[rbx]
+ mov rcx,[rdx]
+ cmp dword ptr [rcx+52],0
+ jne .Ladoption_report
+ mov dword ptr [rcx+52],4
+ jmp .Ladoption_free
+.Ladoption_report:
+ cmp qword ptr [rdx+40],0
+ je .Ladoption_free
+ mov esi,eax
+ mov rdi,[rdx+32]
+ call [rdx+40]
+.Ladoption_free:
+ mov rdi,rbx
+ mov rsi,[r12]
+ call .Lhost_discard
+ mov rdi,r12
+ call free@PLT
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.globl pg_session_adoption_hold_bind
+.type pg_session_adoption_hold_bind,@function
+pg_session_adoption_hold_bind:
+ mov eax,1
+ test rdi,rdi
+ jz .Ladoption_hold_bind_end
+ test rsi,rsi
+ jz .Ladoption_hold_bind_end
+ mov rax,[rdi+24]
+ test rax,rax
+ jz .Ladoption_hold_bad
+ mov rcx,[rdi]
+ test rcx,rcx
+ jz .Ladoption_hold_bad
+ cmp [rax],rcx
+ jne .Ladoption_hold_bad
+ cmp dword ptr [rax+36],0
+ jne .Ladoption_hold_bad
+ cmp qword ptr [rdi+8],0
+ je .Ladoption_hold_bad
+ mov [rsi],rdi
+ lea rax,[rip+.Ladoption_hold_open]
+ mov [rsi+8],rax
+ lea rax,[rip+.Ladoption_hold_append]
+ mov [rsi+16],rax
+ lea rax,[rip+.Ladoption_hold_prepare]
+ mov [rsi+24],rax
+ lea rax,[rip+.Ladoption_adopt]
+ mov [rsi+32],rax
+ lea rax,[rip+.Ladoption_publish]
+ mov [rsi+40],rax
+ lea rax,[rip+.Ladoption_discard]
+ mov [rsi+48],rax
+ xor eax,eax
+ ret
+.Ladoption_hold_bad:
+ mov eax,1
+.Ladoption_hold_bind_end:
+ ret
+.size pg_session_adoption_hold_bind,.-pg_session_adoption_hold_bind
+.Ladoption_hold_open:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx,rdi
+ mov r12,rcx
+ mov r13,rsi
+ mov r14,rdx
+ mov qword ptr [r12],0
+ mov edi,1
+ mov esi,32
+ call calloc@PLT
+ test rax,rax
+ jz .Ladoption_hold_open_bad
+ mov [r12],rax
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,r14
+ mov rcx,rax
+ call .Lhold_notice_open
+ jmp .Ladoption_hold_open_end
+.Ladoption_hold_open_bad:
+ mov eax,3
+.Ladoption_hold_open_end:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Ladoption_hold_append:
+ test rsi,rsi
+ jz .Lhold_notice_append_empty
+ mov rsi,[rsi]
+ jmp .Lhold_notice_append
+.Ladoption_hold_prepare:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rsi,[rsi]
+ call .Lhold_notice_prepare
+ test eax,eax
+ jnz .Ladoption_hold_prepare_end
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ladoption_reserve
+.Ladoption_hold_prepare_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_dispatch_storage_commit
+.type pg_session_dispatch_storage_commit,@function
+pg_session_dispatch_storage_commit:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Ldispatch_storage_end
+ cmp qword ptr [rbx+8],0
+ je .Ldispatch_storage_end
+ cmp qword ptr [rbx+16],0
+ je .Ldispatch_storage_end
+ mov rdi,[rbx]
+ call [rbx+8]
+ mov r12d,eax
+ mov rdi,[rbx+16]
+ call pg_session_dispatch_drain
+ mov eax,r12d
+.Ldispatch_storage_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_session_dispatch_storage_commit,.-pg_session_dispatch_storage_commit
 .section .note.GNU-stack,"",@progbits

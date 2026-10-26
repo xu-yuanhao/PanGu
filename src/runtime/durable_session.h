@@ -222,4 +222,25 @@ int pg_session_dispatch_enqueue(pg_session_dispatch *,void *);
 int pg_session_dispatch_discard(pg_session_dispatch *,void *);
 int pg_session_dispatch_drain(pg_session_dispatch *);
 int pg_session_dispatch_close(pg_session_dispatch *);
+/* Synchronous stored observers: capture the first callback error without
+   failing Session inside Storage.adopt. Delivery infrastructure failure is
+   returned separately. Caller resolves observer-vs-Storage failure precedence
+   after backend settlement; remaining observers still run. */
+int pg_session_deliver_observed(pg_session_listeners *,const void *,void *,int *first_error);
+typedef struct {pg_session_notification_host base;pg_session_dispatch *dispatch;} pg_session_adoption_host;
+/* New adoption semantics: queue host dispatch before synchronous observation.
+   The queue and delivery context remain borrowed until drained. Cleanup drains
+   the explicit microtask queue outside Storage; providers may drain it earlier
+   after their synchronous adopt callback returns. Observer failures are latched
+   after settlement; an existing Storage failure wins and observer error reports.
+   All token/payload allocation precedes adoption. */
+int pg_session_adoption_notifications_bind(pg_session_adoption_host *,pg_document_notifications *);
+int pg_session_adoption_deferred_bind(pg_session_adoption_host *,pg_document_notifications *);
+int pg_session_adoption_hold_bind(pg_session_adoption_host *,pg_hold_notifications *);
+typedef struct {pg_record_storage backend;pg_session_dispatch *dispatch;} pg_session_dispatch_storage;
+/* Synchronous native backend adapter: drain adopted host notifications outside
+   the backend's commit/adopt step, before its result reaches failure policy.
+   Return the backend's exact status. A queue snapshot allocation failure leaves
+   work for the notification cleanup's retry, without inventing Storage errors. */
+int pg_session_dispatch_storage_commit(void *,const struct json_object *,pg_records_adopt,void *,uint64_t *);
 #endif

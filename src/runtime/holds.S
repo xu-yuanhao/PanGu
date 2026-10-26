@@ -863,11 +863,24 @@ pg_document_holds_flush_one:
 .Lflush_adopt_chain:
  xor eax,eax
  cmp qword ptr [rbx+24],0
- je .Lflush_adopt_end
+ je .Lflush_adopt_notify
  mov rdi,[rbx+16]
  mov rsi,[rsp]
  mov rdx,[rsp+8]
  call qword ptr [rbx+24]
+ test eax,eax
+ jnz .Lflush_adopt_end
+.Lflush_adopt_notify:
+ cmp qword ptr [rbx+160],0
+ je .Lflush_adopt_ok
+ mov rax,[rbx+160]
+ mov rdi,[rax]
+ mov rsi,[rbx+168]
+ mov rdx,[rsp]
+ mov rcx,[rsp+8]
+ call [rax+40]
+.Lflush_adopt_ok:
+ xor eax,eax
 .Lflush_adopt_end:
  add rsp,24
  pop r12
@@ -941,14 +954,6 @@ pg_document_holds_flush_one:
 .Lflush_publish_chain:
  cmp dword ptr [rbx+56],0
  jne .Lflush_publish_end
- cmp qword ptr [rbx+160],0
- je .Lflush_notice_published
- mov rax,[rbx+160]
- mov rdi,[rax]
- mov rsi,[rbx+168]
- mov rdx,[rsp]
- mov rcx,[rsp+8]
- call [rax+40]
 .Lflush_notice_published:
  cmp qword ptr [rbx+32],0
  je .Lflush_publish_end

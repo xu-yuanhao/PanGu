@@ -689,6 +689,18 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert not native.pg_session_dispatch_close(ctypes.byref(queue)) and not native.pg_session_listeners_close(ctypes.byref(listeners),None)
     print('PASS: native FIFO host dispatch and dispatch-time subscription mutations match actual Pi 8b0caef notifyHosts')
 
+def adoption_source_order():
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776';source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8');function method(marker){const a=source.indexOf(marker),b=source.indexOf('\n\t/**',a);return source.slice(a,b)}const SETTLED=Promise.resolve(),NO_HOLDS=[],LISTENER={};const withoutAbortSignal=c=>c,addressId=()=>'';class ReadOnlySession extends Error{}function contained(fn,onError){try{fn()}catch(e){onError(e)}}const docs=[{type:'document',record:{id:2,createdAt:1},version:1,value:{text:'seedobserve'},ops:[]}];class Transaction{constructor(){}async settleSuccess(){return [{type:'document.change',id:2}]}async settleFailure(){}discard(){}adopt(){return {observed:docs,stored:docs}}takeHeld(){return []}}
+const text=`class Probe{#readOnly=false;#host={};#holds=new Map();#failure;#storage;#internalListeners=new Set();#commitListeners=new Set();order=[];reports=0;constructor(mode){this.#internalListeners.add(()=>{this.order.push(2);if(mode===3||mode===4)throw Error('observer')});this.#internalListeners.add(()=>this.order.push(3));this.#commitListeners.add(()=>this.order.push(5));this.#storage={commit:async(writes,adopt)=>{if(mode===1){this.order.push(6);this.fail(Error('storage'));throw Error('storage')}this.order.push(1);adopt(3);this.order.push(4);await Promise.resolve();this.order.push(6);if(mode===2||mode===4){this.fail(Error('storage'));throw Error('storage')}return 3}}}#assertHealthy(){if(this.#failure)throw this.#failure.error}#hold(){}#sweepDocuments(){}#touchDocument(){}#release(){}#event(){}fail(error){this.#failure??={error}}report(){this.reports++}async run(){let ok;try{await this.#runCommit(()=> 'done',{telemetry:{addEvent(){}}},undefined,undefined);ok=true}catch{ok=false}return {ok,order:this.order,reports:this.reports,failure:this.#failure?.error.message??null}}
+`+method('\n\tasync #runCommit<')+method('\n\t#publish(')+method('\n\t#notifyHosts(')+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(let mode=0;mode<5;mode++)out.push(await new Probe(mode).run());console.log(JSON.stringify(out));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    expected=[dict(ok=mode in [0,3],order=[6] if mode==1 else [1,2,3,4,5,6],reports=int(mode==4),failure='storage' if mode in [1,2,4] else 'observer' if mode==3 else None) for mode in range(5)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi 8b0caef runCommit/publish/notifyHosts adoption order and Storage-over-observer failure precedence match native trace matrix')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -979,5 +991,6 @@ def main():
         publications(native,library)
         document_notices(native,library)
         dispatch_notifications(native,library)
+        adoption_source_order()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

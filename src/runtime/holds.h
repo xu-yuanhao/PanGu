@@ -64,7 +64,7 @@ typedef struct {
 } pg_hold_notifications;
 /* Capture folded operations during normal flush preparation. open/append/
    prepare return pg_document_status and may return partial owned tokens;
-   adopt is allocation-free. publish follows confirmed release of pins, and
+   adopt is allocation-free. publish runs during adoption after counters, and
    discard runs once after any attempted open. Existing hooks are preserved.
    id=0 flushes all; otherwise selected-incarnation/cache-reload rules apply.
    Services and inputs remain borrowed only through this synchronous call. */

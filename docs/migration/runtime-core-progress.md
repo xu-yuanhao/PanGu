@@ -534,3 +534,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写独立40字节dispatch owner，prepare保留immutable publication并分配owned token，enqueue无分配/无回调转交FIFO；显式drain是原生microtask边界，按派发时订阅集合执行，回调可追加后续事件。prepared与queued所有权区分，跨队列/重复入队/取消queued/reentry拒绝，snapshot分配失败原事件保留可retry；所有资源排空后才能close，listeners必须覆盖此借用期。
 - 实际验证：执行真实8b0caef #notifyHosts方法，Native的FIFO、late subscription、callback内取消/新增及追加事件顺序逐项一致。原生测试enqueue分配计数0且不内联回调、publication引用存活、外队列token、重入、准备/dispatch分配故障和retry、prepared未提交时close等待及discard清理。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有Session独立队列契约/导出、新提交来源、专项与TODO，旧ABI、门禁和预算保持。6个候选路径内容清单摘要（本记录加入前）：e0be5092809e2ef7aeb9e64d5b453bb9eb098e0e1716e66e63c99e4cb55777f7；隔离核心树48f903c8a15081259d61d8a518965902edb7e7e4。结论为新host dispatch队列本地通过；实际DocTx/flush adoption发布、观察者错误结算与新watch继续接入，未将新adoption总语义/K03总验收勾选。TUI工作树保留。
+
+## K03 8b0caef实际adoption发布与错误优先级
+
+- 固定来源：Pi 8b0caef #runCommit/#publish/#notifyHosts/#storeHolds、session-adoption/session-observers；fetch后origin为6c384aa（ai workspace解析），本批Durable/Chord函数无变化；Harness保持22ddee37。
+- 实现：DocTx与holds通知publish原地进入native adopt之后；新增同步observer首错捕获与queued adoption服务，内部观察前无分配排队host通知，在Storage同步步骤外派发。后端适配器保持真实Storage状态，在错误分类前排空微任务；observer错误留到结算后处理，Storage错误优先并报告observer错误。adopt后拒绝保留已发布结果，队列own publication至派发；memory通知同步、混合落盘复用相同服务，旧ABI保持。
+- 实际验证：五组真实MemoryStorage adopt/observed/adopted/host/resolve顺序、adopt前/后拒绝、observer错误及双错误优先级；三组held flush及三组实际Session stored/memory/混合路径。直接执行新Pi实际#runCommit/#publish/#notifyHosts方法，五组矩阵一致。普通/memory/held故障分别73/62/65次fail-stop或拒绝，另2次host snapshot失败在回调前安全重试并完整派发，未作为拒绝或遗漏。一个旧故障断言按成功memory采纳后Session失败但提交结果保留的语义修正。差异probe首次缺少未执行分支的私有#hold声明，补齐测试stub后重跑；调试导入产生的空__pycache__目录由G00拦截，清理后检查通过。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线与新8b0caef方法矩阵通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有DocTx/holds通知时点、Session独立queued服务/错误捕获/Storage适配器、来源/专项/TODO；公开旧布局、门禁和预算保持。10个候选路径内容清单摘要（本记录加入前）：8feb50c8bbf8a460235f9a2744730a55ba8a64babb900dd420202f2a405c40e6；隔离核心树7bd21f05ab4bc8ec228b504225436f886583eb08。结论为实际adoption发布与错误结算本地通过；自动timer/reload/close通知接线、地址跟随watch/observeDoc继续，K03总验收未完成。TUI工作树保留。
