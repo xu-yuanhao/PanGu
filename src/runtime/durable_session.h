@@ -107,4 +107,28 @@ int pg_durable_document_scan(void *,const pg_document_query *,pg_memory_page *);
 /* Frontend takes conversation,id for pg_document_history_reader; the backend
    callback above takes id,conversation like MemoryStorage. */
 int pg_durable_document_entry(void *,uint64_t conversation,uint64_t id,struct json_object **,uint64_t *);
+typedef int (*pg_session_listener)(void *,const void *publication,void *delivery_context);
+typedef struct {pg_session_listener callback;void *context;unsigned kind,reserved;} pg_session_listener_entry;
+typedef struct {
+ pg_record_session *records;
+ pg_session_listener_entry *entries;
+ size_t count,capacity;
+ void *context;
+ void (*report)(void *,int);
+ unsigned busy,closed;
+} pg_session_listeners;
+/* Zeroed caller storage with records and optional report initialized. kind:
+   0 internal adoption, 1 durable publication, 2 close. Callback/context identity
+   is deduplicated per kind. Mutations during dispatch affect future snapshots;
+   a removed callback already in the snapshot still runs. Delivery borrows
+   publication/context only until return; callbacks are synchronous and return
+   an error code instead of throwing. Internal errors latch adoption failure;
+   host/close errors are reported and never stop remaining callbacks. Report
+   callbacks must return normally. All descriptor use is serialized.
+   close snapshots kind 2 once, clears registrations and seals admission; it
+   releases storage, with no resources retained after success. */
+int pg_session_listen(pg_session_listeners *,unsigned,pg_session_listener,void *);
+void pg_session_unlisten(pg_session_listeners *,unsigned,pg_session_listener,void *);
+int pg_session_deliver(pg_session_listeners *,unsigned,const void *,void *);
+int pg_session_listeners_close(pg_session_listeners *,void *);
 #endif

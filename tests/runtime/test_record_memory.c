@@ -270,6 +270,20 @@ static void guarded_query_fault_tests(void){
  printf("PASS: guarded Storage queries, partial page cleanup and %u direct allocation/clone failures latch first failure\n",failures);
 #endif
 }
+typedef struct {pg_session_listeners *listeners;unsigned kind,id,fail,mutate,calls;unsigned *log,*used;} listener_fixture;
+static int session_test_listener(void *ctx,const void *publication,void *delivery);
+static int session_late_listener(void *ctx,const void *publication,void *delivery){listener_fixture *f=ctx;assert(publication==f->log&&delivery==f->used);f->log[(*f->used)++]=99;return 0;}
+static int session_test_listener(void *ctx,const void *publication,void *delivery){listener_fixture *f=ctx;assert((f->kind==2?publication==0:publication==f->log)&&delivery==f->used);++f->calls;f->log[(*f->used)++]=f->id;if(f->mutate){pg_session_unlisten(f->listeners,f->kind,session_test_listener,f+1);if(f->kind!=2)assert(!pg_session_listen(f->listeners,f->kind,session_late_listener,f));assert(pg_session_deliver(f->listeners,f->kind,publication,delivery)!=0&&pg_session_listeners_close(f->listeners,delivery)!=0);}return f->fail?7:0;}
+static void session_listener_report(void *ctx,int error){unsigned *reported=ctx;assert(error==7);++*reported;}
+static void session_listener_tests(void){
+ _Static_assert(sizeof(pg_session_listeners)==56&&sizeof(pg_session_listener_entry)==24,"listener ABI");
+ for(unsigned kind=0;kind<3;++kind){pg_record_session records={0};unsigned log[32]={0},used=0,reports=0;pg_session_listeners listeners={.records=&records,.context=&reports,.report=session_listener_report};listener_fixture fixtures[3];for(unsigned i=0;i<3;++i){fixtures[i]=(listener_fixture){&listeners,kind,i+1,i==0,i==0,0,log,&used};assert(!pg_session_listen(&listeners,kind,session_test_listener,&fixtures[i]));assert(!pg_session_listen(&listeners,kind,session_test_listener,&fixtures[i]));}assert(listeners.count==3);assert(!(kind==2?pg_session_listeners_close(&listeners,&used):pg_session_deliver(&listeners,kind,log,&used)));assert(used==3&&log[0]==1&&log[1]==2&&log[2]==3&&reports==(kind!=0)&&records.failed==(kind==0?PG_RECORDS_ADOPTION_FAILED:0));if(kind!=2){fixtures[0].mutate=0;assert(!pg_session_deliver(&listeners,kind,log,&used)&&used==6&&log[3]==1&&log[4]==3&&log[5]==99);}assert(!pg_session_listeners_close(&listeners,&used)&&!listeners.entries&&!listeners.count&&listeners.closed);assert(pg_session_listen(&listeners,kind,session_test_listener,&fixtures[0])!=0);}
+ pg_record_session records={0};pg_session_listeners listeners={.records=&records};unsigned log[1],used=0;listener_fixture fixture={&listeners,1,1,0,0,0,log,&used};for(unsigned i=0;i<1000;++i){assert(!pg_session_listen(&listeners,1,session_test_listener,&fixture));pg_session_unlisten(&listeners,1,session_test_listener,&fixture);}assert(!listeners.count&&listeners.capacity==8&&!pg_session_listeners_close(&listeners,&used));
+#ifdef PG_MEMORY_FAULTS
+ for(unsigned mode=0;mode<3;++mode){listeners=(pg_session_listeners){.records=&records};fixture.listeners=&listeners;if(mode)assert(!pg_session_listen(&listeners,1,session_test_listener,&fixture));doc_calls=0;doc_fail=1;doc_tracking=1;int status=mode==2?pg_session_listeners_close(&listeners,&used):mode?pg_session_deliver(&listeners,1,log,&used):pg_session_listen(&listeners,1,session_test_listener,&fixture);doc_tracking=0;doc_fail=0;assert(status&&!listeners.busy&&!used&&listeners.count==(mode!=0)&&!listeners.closed&&!records.failed);assert(!pg_session_listeners_close(&listeners,&used));}
+#endif
+ puts("PASS: listener identity/order, dispatch snapshots, mutation/cancellation, contained errors, close and allocation failures");
+}
 static void storage_guard_tests(void){
  _Static_assert(sizeof(pg_durable_storage)==56&&offsetof(pg_durable_storage,busy)==48,"guard descriptor ABI");
  for(unsigned mint=0;mint<2;++mint)for(unsigned mode=0;mode<9;++mode){pg_record_session records={0};pg_durable_session session={.records=&records,.phase=1};guard_fixture f={.mode=mode};pg_durable_storage guard={.session=&session,.context=&f,.read=guard_read,.mint=guard_mint,.request_error=guard_error,.cancelled=guard_cancelled};f.guard=&guard;struct json_object *out=0;uint64_t id=999;int status=mint?pg_durable_storage_mint(&guard,&id):pg_durable_storage_read(&guard,2,10,&out);unsigned failed=mode==5?PG_RECORDS_ADOPTION_FAILED:mode==2||(mint&&(mode==3||mode==4||mode==8))?PG_RECORDS_STORAGE_FAILED:0;int want=mode==5?64:mint&&mode==8?66:mode==2||mode==4?7:mode==3?8:!mint&&mode==1?1:0;assert(status==want&&records.failed==failed&&!guard.busy&&!session.busy&&f.calls==1);if(!status){if(mint)assert(id==100);else assert(out);}else{assert(!out);if(mint)assert(!id);}json_object_put(out);out=0;
@@ -1471,6 +1485,7 @@ int main(void){
  task_create_tests();
  task_family_tests();
  storage_guard_tests();
+ session_listener_tests();
  guarded_transaction_tests();
  guarded_query_tests();
  guarded_memory_query_tests();

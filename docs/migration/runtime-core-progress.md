@@ -471,3 +471,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 来源：Pi d5b3de22 Session.#runCommit空写入/readOnly/deferred分支及harness-read-only测试的事务拒绝/保持健康场景；fetch后origin为89c921d，Session来源无差异，Harness保持22ddee37。
 - 实际验证：16组真实Durable Session普通/deferred事务：空批成功；文档编辑/Entry/Task/Submission/retire/new Doc/混合写入拒绝，MemoryStorage内容与序号、Session采纳/发布、holds/timer均保持。拒绝后旧快照、空事务和关闭成功，新Doc不可见；创建时消费ID符合现有源语义。O0/O2 ASan/UBSan专项及共享G00/Assembly检查通过。
 - 本批仅补充现有Session实现的完整只读事务验证，产品源码与模块登记未变；不重复产品构建。2个候选路径内容清单摘要（本记录加入前）：c8e20794e115800f4f8dec50c3d60415d39b79eda46adc51d267919fc9bb0b69。自审结论为只读事务边界通过；Harness只读打开/暂停调度/恢复随对应步骤验证，K03总验收保持未完成。TUI工作树保留。
+
+## K03 同步listener宿主
+
+- 来源：Pi d5b3de22 subscribeCommits/observeCommits/subscribeClose、#publish/#notifyClose与contained，以及session-documents同步/取消/关闭用例。fetch后Pi origin为89c921d，固定Session来源无差异，Harness保持22ddee37。
+- 实现：手写listener注册/取消/独立channel分发/一次关闭；callback+context身份去重，取消紧缩保持顺序，容量按几何增长，通知先复制snapshot。internal错误保留首因并锁存adoption失败，外部和close错误报告且继续通知；callback同步返回错误码，publication/context仅借用。分配失败保留注册/closed状态可重试；旧ABI保持。
+- 实际验证：三类通知身份/顺序/快照，callback内增删、已取消仍执行本轮而下一轮消失、内部首因/外部报告、重入拒绝、close一次及注册/分发/close三个直接分配失败。1000次注册/取消容量保持8，无空槽累计。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：既有Session独立类型/导出/来源、专项与TODO；门禁、预算、既有ABI保持。5个候选路径内容清单摘要（本记录加入前）：ce68835540ea7a58dfc3a60526d68a7715118c83aef57906e5b309dce421b849；隔离核心树75d1b232131aa5e79d40a3a190331e09aec9229f。结论为listener宿主本地通过；observed/stored publication构造、Session接线与Document watch继续推进，完整观察与K03总验收保持未完成。TUI工作树保留。

@@ -893,3 +893,240 @@ pg_durable_document_entry:
  ret
 .size pg_durable_document_entry,.-pg_durable_document_entry
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_listen
+.type pg_session_listen,@function
+pg_session_listen:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov r14,rcx
+ mov eax,1
+ test rbx,rbx
+ jz .Llisten_end
+ test r13,r13
+ jz .Llisten_end
+ cmp r12d,2
+ ja .Llisten_end
+ cmp dword ptr [rbx+52],0
+ jne .Llisten_end
+ mov rax,[rbx]
+ test rax,rax
+ jz .Llisten_invalid
+ cmp dword ptr [rax+52],0
+ jne .Llisten_invalid
+ xor r15d,r15d
+.Llisten_find:
+ cmp r15,[rbx+16]
+ jae .Llisten_capacity
+ imul rax,r15,24
+ add rax,[rbx+8]
+ cmp [rax],r13
+ jne .Llisten_next
+ cmp [rax+8],r14
+ jne .Llisten_next
+ cmp [rax+16],r12d
+ je .Llisten_ok
+.Llisten_next:
+ inc r15
+ jmp .Llisten_find
+.Llisten_capacity:
+ cmp r15,[rbx+24]
+ jb .Llisten_append
+ mov rsi,[rbx+24]
+ add rsi,rsi
+ jc .Llisten_invalid
+ add rsi,8
+ jc .Llisten_invalid
+ mov [rsp],rsi
+ mov rdi,[rbx+8]
+ mov edx,24
+ call reallocarray@PLT
+ test rax,rax
+ jz .Llisten_invalid
+ mov [rbx+8],rax
+ mov rax,[rsp]
+ mov [rbx+24],rax
+.Llisten_append:
+ imul rax,r15,24
+ add rax,[rbx+8]
+ mov [rax],r13
+ mov [rax+8],r14
+ mov [rax+16],r12d
+ mov dword ptr [rax+20],0
+ inc qword ptr [rbx+16]
+.Llisten_ok:
+ xor eax,eax
+ jmp .Llisten_end
+.Llisten_invalid:
+ mov eax,1
+.Llisten_end:
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_session_listen,.-pg_session_listen
+.globl pg_session_unlisten
+.type pg_session_unlisten,@function
+pg_session_unlisten:
+ test rdi,rdi
+ jz .Lunlisten_end
+ xor r8d,r8d
+.Lunlisten_each:
+ cmp r8,[rdi+16]
+ jae .Lunlisten_end
+ imul rax,r8,24
+ add rax,[rdi+8]
+ cmp [rax],rdx
+ jne .Lunlisten_next
+ cmp [rax+8],rcx
+ jne .Lunlisten_next
+ cmp [rax+16],esi
+ jne .Lunlisten_next
+ dec qword ptr [rdi+16]
+ mov rdx,[rdi+16]
+ sub rdx,r8
+ imul rdx,rdx,24
+ mov rdi,rax
+ lea rsi,[rax+24]
+ jmp memmove@PLT
+.Lunlisten_next:
+ inc r8
+ jmp .Lunlisten_each
+.Lunlisten_end:
+ ret
+.size pg_session_unlisten,.-pg_session_unlisten
+.globl pg_session_deliver
+.type pg_session_deliver,@function
+pg_session_deliver:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov ebp,esi
+ mov r12,rdx
+ mov r13,rcx
+ mov qword ptr [rsp],0
+ mov eax,1
+ test rbx,rbx
+ jz .Ldeliver_end
+ cmp qword ptr [rbx],0
+ je .Ldeliver_invalid
+ cmp ebp,2
+ ja .Ldeliver_end
+ cmp dword ptr [rbx+48],0
+ jne .Ldeliver_end
+ mov r15,[rbx+16]
+ test r15,r15
+ jz .Ldeliver_ok
+ mov rdi,r15
+ mov esi,24
+ call calloc@PLT
+ test rax,rax
+ jz .Ldeliver_invalid
+ mov [rsp],rax
+ mov rdi,rax
+ mov rsi,[rbx+8]
+ imul rdx,r15,24
+ call memcpy@PLT
+ mov dword ptr [rbx+48],1
+ xor r14d,r14d
+.Ldeliver_each:
+ cmp r14,r15
+ jae .Ldeliver_release
+ imul rax,r14,24
+ add rax,[rsp]
+ cmp [rax+16],ebp
+ jne .Ldeliver_next
+ mov rdx,[rax]
+ test rdx,rdx
+ jz .Ldeliver_next
+ mov rdi,[rax+8]
+ mov [rsp+8],rdx
+ mov rsi,r12
+ mov rdx,r13
+ call [rsp+8]
+ test eax,eax
+ jz .Ldeliver_next
+ test ebp,ebp
+ jnz .Ldeliver_report
+ mov rdx,[rbx]
+ cmp dword ptr [rdx+52],0
+ jne .Ldeliver_next
+ mov dword ptr [rdx+52],4
+ jmp .Ldeliver_next
+.Ldeliver_report:
+ cmp qword ptr [rbx+40],0
+ je .Ldeliver_next
+ mov esi,eax
+ mov rdi,[rbx+32]
+ call [rbx+40]
+.Ldeliver_next:
+ inc r14
+ jmp .Ldeliver_each
+.Ldeliver_release:
+ mov dword ptr [rbx+48],0
+ mov rdi,[rsp]
+ call free@PLT
+.Ldeliver_ok:
+ xor eax,eax
+ jmp .Ldeliver_end
+.Ldeliver_invalid:
+ mov eax,1
+.Ldeliver_end:
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_session_deliver,.-pg_session_deliver
+.globl pg_session_listeners_close
+.type pg_session_listeners_close,@function
+pg_session_listeners_close:
+ push rbx
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Llisteners_close_end
+ cmp dword ptr [rbx+48],0
+ jne .Llisteners_close_end
+ cmp dword ptr [rbx+52],0
+ jne .Llisteners_close_ok
+ mov dword ptr [rbx+52],1
+ mov rcx,rsi
+ mov esi,2
+ xor edx,edx
+ call pg_session_deliver
+ test eax,eax
+ jz .Llisteners_close_release
+ mov dword ptr [rbx+52],0
+ jmp .Llisteners_close_end
+.Llisteners_close_release:
+ mov rdi,[rbx+8]
+ call free@PLT
+ mov qword ptr [rbx+8],0
+ mov qword ptr [rbx+16],0
+ mov qword ptr [rbx+24],0
+.Llisteners_close_ok:
+ xor eax,eax
+.Llisteners_close_end:
+ pop rbx
+ ret
+.size pg_session_listeners_close,.-pg_session_listeners_close
+.section .note.GNU-stack,"",@progbits

@@ -108,6 +108,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 将分页/head/request/fork-aware Entry查询接入共享Storage失败守卫，错误时释放partial页/记录并清空游标和提交序号。
 - [x] 将Document find/read/scan与历史Entry接入统一失败守卫，参数错误/取消在快照外层保持非致命，允许随后重试。
 - [x] 验证原生只读Session的普通/deferred事务：空批成功、所有记录/文档写入拒绝、无采纳/发布/持久序号变化，拒绝后读取与关闭正常。
+- [x] 移植同步listener注册/取消/分发宿主：身份去重、通知快照、内部失败锁存、外部错误报告和一次关闭清理。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -464,3 +465,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 对照Pi d5b3de22 Session.#runCommit的空写入/readOnly/deferred顺序和harness-read-only.test.ts的空事务成功、写入拒绝后健康场景。Pi origin保持89c921d，固定Session源码无差异，Harness保持22ddee37。
 - 在既有真实Durable Session组合上增加16组普通/deferred×空/文档编辑/Entry/Task/Submission/retire/new Doc/混合事务验证；写入拒绝前可以产生临时候选和已消费ID，但不改变Storage内容/提交序号、不采纳、不发布、不建立hold或timer。随后快照、空事务和关闭仍成功。
 - 实现无需修改；验收覆盖的是Session事务边界。Harness层暂停调度、root恢复与只读打开随K04/K06/K10/K14接入，不以本测试代替这些步骤。专项结果见当前实现记录；下一行为继续公开观察与K03总验收。
+
+### K03 listener宿主交接
+
+- 阅读固定Pi d5b3de22 Session.subscribeCommits/observeCommits/subscribeClose、#publish/#notifyClose和contained，及session-documents同步发布/取消/关闭用例；Pi origin保持89c921d，Harness保持22ddee37。
+- `durable_session.h/.S`独立listener宿主按internal/durable/close三类身份去重，取消保持顺序；分发先复制快照，callback内增删不影响本轮。内部错误锁存adoption失败并继续本轮，外部/close错误交report；close一次通知、释放注册存储，快照分配失败保留注册供重试。重复注册/取消1000次保持容量，不累积空槽。原生callback同步返回错误码，借用publication/context到返回为止。
+- 验证：三类通知的顺序、取消后当前/下一轮差异、增订阅、重入拒绝、错误隔离、一次关闭及注册/分发/关闭分配失败保留；专项/完整Runtime结果见当前实现记录。
+- 下一行为：构造Pi observed/stored publication（含held差异）并把该宿主接入Session采纳、持久发布和close；Document watch使用这些通知。此项只验收listener宿主，不作为完整Session观察能力通过。
