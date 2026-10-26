@@ -27,4 +27,26 @@ typedef struct {
    retirement and deferred holds are handled by the surrounding Doc transaction.
    Callers must finish through this entry once loaded edits were acquired. */
 pg_record_tx_status pg_document_tx_commit(pg_record_tx *,pg_document_tx_entry *,size_t);
+typedef struct {
+ pg_record_tx *records;
+ pg_document_cache *cache;
+ pg_document_tx_entry *entries;
+ size_t count,capacity;
+ unsigned busy,sealed;
+} pg_document_tx;
+/* Bind one Doc scope to an open record Tx and cache on its mutation line.\n   Scope fields are API-managed. get currently
+   acquires existing incarnations; missing addresses return PG_DOC_MISSING.
+   Repeated addresses reuse the first edit and its definition/checkpoint,
+   matching transaction-local draft identity. Returned edits are owned by this
+   scope and remain stable across entry-array growth, until finish/abort.
+   Callers must not prepare/discard them separately. Cache sweep/eviction/close
+   must not run while the mutation line holds these borrowed loaded handles.
+   finish seals edits, commits through uniform settlement and frees them;
+   abort discards the whole record Tx and frees edits. Neither leaves handles
+   valid after return. New incarnations and retirement are added by Doc access. */
+pg_document_status pg_document_tx_open(pg_document_tx *,pg_record_tx *,pg_document_cache *);
+pg_document_status pg_document_tx_get(pg_document_tx *,const pg_document_definition *,const pg_document_address *,void *,
+ int (*checkpoint)(void *,const struct json_object *,const struct json_object *,uint64_t),pg_document_change **);
+pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
+pg_record_tx_status pg_document_tx_abort(pg_document_tx *);
 #endif

@@ -274,3 +274,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly document_tx模块以152字节entry描述借用的loaded/edit及内部Prepared/adoption/write所有权。records提供sealed settlement finalizer；Doc finalizer生成写入并在checkpoint前验证owner/复制源约束，准备完再交Storage。同步adopt依次采纳全部loaded值，再调用原Session adopt；publish保持原回调并在返回时恢复context/hooks。成功/失败均释放未转交候选并封闭编辑；调用参数前置拒绝不改调用者状态。空编辑不提交Storage。
 - 实际验证：真实MemoryStorage验证双文档base、delta+普通表混合、空编辑identity、checkpoint拒绝、owner/生成计划复制源错误不调用predicate、原回调恢复。O0/O2 ASan/UBSan逐直接分配/插入/部分复制故障遍历通过，失败保留旧文档且无存储半批；Prepared/编辑清理。补充连续提交时将测试断言从仅首次发布改为每次adopt计数先于publish计数（原顺序要求保留）；最终完整Runtime退出0，原Pi/Chord各对照继续通过。隔离暂存核心树G00、Assembly清单与产品构建、共享G00通过。
 - 同一实施Agent自审：新增两个实际产品文件/模块、构建依赖与导出登记，不修改门禁或预算。10个候选路径/暂存内容清单摘要（加入本记录前）：8cda625dcdeb1c1094fca7f0b534d4e6ea2e92f71aaf7fecb01bd96d70a8e80e。TUI待交接登记保留工作树，未混入本核心提交。结论为本地候选通过；自动Doc获取、创建安装/退役驱逐、holds与应用消息投影仍待接入，K03未完成。
+
+## K03 已有Doc自动获取与事务作用域（2026-10-26）
+
+- 来源：固定Pi Transaction.doc的latestDocumentByAddress/draftPromise复用、assertTaskDocumentsOpen，以及loaded acquire/settleSuccess/discard。Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：document_tx新增48字节scope，open绑定当前record Tx/cache，get按本事务地址复用首次编辑，首次访问从cache取得loaded并分配独立稳定change；结算数组扩展不移动change。finish复用多文档结算，abort丢弃record Tx，均释放scope编辑。显式身份与Definition校验保留；同址有效版本token重复访问采用首次draft及checkpoint，与Pi memoization对应。Task候选terminal先拒绝，包含已获取地址。每个record Tx只绑定一个Doc scope，loaded借用由mutation line保证，scope字段API管理。
+- 实际验证：16个family实例跨数组扩容、句柄稳定、重复获取无额外find、批量提交及缓存值更新通过；普通表写后Doc获取仍允许。abort/missing/terminal候选/逐直接分配读取扩容错误清理在O0/O2 ASan/UBSan通过；完整Runtime退出0，原全部Pi/Chord专项继续通过。隔离核心暂存树G00、Assembly清单与产品构建、共享G00通过。
+- 同一实施Agent自审：扩展实际导出/作用域契约和来源，无门禁/预算变更。6个候选路径/暂存内容清单摘要（加入本记录前）：4d02e9ed34e2e03ae2982f2f5f4f80b1972a2ec49fdb78f8aebe9d1e48db162f。结论为本地候选通过；缺失地址初始化创建/安装、retirement与holds尚待接入，当前get返回MISSING而非创建；K03整体未完成。TUI未提交工作保持原样。

@@ -2685,3 +2685,66 @@ pg_record_tx_validate_batch:
  pop rbx
  ret
 .size pg_record_tx_validate_batch,.-pg_record_tx_validate_batch
+.text
+/* Internal Doc acquisition guard: only a staged terminal task blocks access. */
+.globl pg_record_tx_check_document_task
+.hidden pg_record_tx_check_document_task
+.type pg_record_tx_check_document_task,@function
+pg_record_tx_check_document_task:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r13,rax
+.Ldocument_task_each:
+ test r13,r13
+ jz .Ldocument_task_allowed
+ dec r13
+ mov rdi,[rbx+24]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Ldocument_task_each
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ldocument_task_each
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_terminal]
+ call .Ls_string
+ jmp .Ldocument_task_return
+.Ldocument_task_allowed:
+ xor eax,eax
+.Ldocument_task_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_check_document_task,.-pg_record_tx_check_document_task

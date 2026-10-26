@@ -81,6 +81,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 将Document create/change/retire与其余四类表接入同一原子内存批次，维护全局ID、live地址唯一性及revision历史，提供current/as-of物化读取。
 - [x] 完成Document逻辑地址查找、精确scope/kind过滤与升序分页；current及历史成员关系返回独立生命周期record。
 - [x] 完成definition-free Document.copy：已提交源快照转为目标base，核对kind/key/history/fork并拒绝同批变更复制源。
+- [x] 接通已存在Doc的事务内编辑获取/地址复用、统一checkpoint提交与loaded adoption；包含迁移版本写回和失败清理。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -257,7 +258,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 adoption验证：12个场景执行实际Pi adopt与实际Chord tracker一致；O0/O2验证竞争候选失效、重复采纳、输入隔离和直接分配/部分复制失败。真实Storage/adopt/publish组合覆盖成功、采纳前失败、采纳后后端报错：后者保留已采纳值且锁存Session；apply期间故障注入计数为0。完整Runtime结果见当前实现记录。此处为loaded incarnation能力，统一Doc事务/创建安装/退役驱逐继续接入。
 - K03多loaded文档统一结算：document_tx.h/.S的pg_document_tx_commit接收同一mutation line上的已载入句柄与编辑集合，统一prepare、生成写入、校验后checkpoint、准备adoption及Storage确认后的采纳，最后调用原Session adopt/publish并恢复其context/hooks。records增加sealed finalizer与批次验证入口，避免checkpoint早于生成计划验证。空编辑不产生Storage提交；重复incarnation/edit拒绝。
 - K03统一结算验证：实际MemoryStorage验证双文档base、delta与普通表混合、空编辑保持identity、checkpoint失败、owner/复制源错误不调用predicate、回调恢复及每个直接分配/插入/复制故障；旧值在失败时保持，编辑与Prepared全部清理。O0/O2专项通过，完整Runtime见当前实现记录。该入口处理loaded文档，Doc自动获取/创建/退役/holds仍待上层接入。
-- 下一完整行为：接入Doc自动获取及创建安装/退役驱逐与延迟提交，接入当前消息投影。
+- K03 loaded自动获取：document_tx的open/get/finish/abort管理48字节Doc scope，按当前事务地址复用首次编辑/definition/checkpoint，调用cache载入已有实例，独立分配稳定编辑句柄、动态扩展结算数组，finish复用统一提交并释放编辑，abort丢弃整个record Tx。普通表写后仍可获取Doc；任务候选terminal先拒绝，包含已获取地址的再次访问。
+- K03自动获取验证：16个family实例跨结算数组扩容，原句柄稳定，同址不同version token仍复用首次draft（对应Pi memoization）；重复获取无额外find，批量提交更新各loaded值。验证abort、missing、表写后获取、terminal候选及逐直接分配/读取/扩容失败清理。O0/O2内存专项通过；完整Runtime见当前实现记录。当前get对缺失地址返回MISSING，初始化创建/retirement/holds继续接入；缓存和loaded借用受同一Session执行线保护。
+- 下一完整行为：补缺失Doc初始化创建及安装、退役驱逐与延迟提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 
