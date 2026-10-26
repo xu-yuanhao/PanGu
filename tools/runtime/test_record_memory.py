@@ -58,6 +58,30 @@ def record(table,id,index):
     if table=='submission':value.update(status=['queued','placed','done','unanswered'][index%4],requestId='request-'+str(id))
     if table=='conversation' and id!=1 and index%2==0:value['owner']=dict(conversationId=1,taskId=5)
     return dict(type=table,value=value)
+def submission_transitions(native,library):
+    relative='packages/durable/src/session/transaction.ts';path=ROOT/'references/pi'/relative
+    assert path.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+relative])
+    cases=[dict(current=dict(id=3,type=type,status=status,entry=5,nested={'x':[1]}),change=dict(status=change,entry=7,answer={'nested':[2]},reason='test')) for type in ['input','write'] for status in ['queued','placed','done','unanswered'] for change in ['placed','done','unanswered']]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('function applySubmissionChange('),end=source.indexOf('const INTERNAL_SCAN_PAGE_SIZE',start);const fn=runInNewContext('('+stripTypeScriptTypes(source.slice(start,end))+')');
+console.log(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(c=>{try{return {ok:true,value:fn(c.current,c.change)}}catch{return {ok:false}}})));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path)],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    native.pg_records_submission_change.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)]
+    for case,want in zip(cases,expected,strict=True):
+        current=library.json_tokener_parse(json.dumps(case['current']).encode());change=library.json_tokener_parse(json.dumps(case['change']).encode());out=ctypes.c_void_p()
+        try:
+            status=native.pg_records_submission_change(current,change,ctypes.byref(out));actual=dict(ok=status==0)
+            if not status:actual['value']=json.loads(library.json_object_to_json_string_ext(out,0))
+            else:assert not out.value
+            assert actual==want,(case,actual,want)
+            assert json.loads(library.json_object_to_json_string_ext(current,0))==case['current']
+            assert json.loads(library.json_object_to_json_string_ext(change,0))==case['change']
+        finally:
+            for value in [out,current,change]:library.json_object_put(value)
+    print(f'PASS: {len(cases)} submission transitions match actual Pi transaction function body')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -189,11 +213,12 @@ def main():
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
-        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
+        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/records.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
         native=ctypes.CDLL(str(path));library=ctypes.CDLL(ctypes.util.find_library('json-c'))
         library.json_tokener_parse.argtypes=[ctypes.c_char_p];library.json_tokener_parse.restype=ctypes.c_void_p
         library.json_object_put.argtypes=[ctypes.c_void_p]
         library.json_object_to_json_string_ext.argtypes=[ctypes.c_void_p,ctypes.c_int];library.json_object_to_json_string_ext.restype=ctypes.c_char_p
+        submission_transitions(native,library)
         native.pg_record_memory_open.argtypes=[ctypes.POINTER(Memory)];native.pg_record_memory_close.argtypes=[ctypes.POINTER(Memory)]
         native.pg_record_memory_mint.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(ctypes.c_uint64)]
         native.pg_record_memory_read.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]

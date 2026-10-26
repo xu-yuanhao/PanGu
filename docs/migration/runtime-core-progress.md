@@ -169,3 +169,9 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly在私有输入中先解析copy，检查源ID在全批document命令中不变，读取已提交current/as-of快照；两个scope必须为Conversation，保留kind/key/history/fork，允许目标owner不同。生成独立base后复用现有动作/地址/ID校验和原子应用。内部读取仅用于prepare的既存源；公开读取仍拒绝prepare重入。
 - 实际验证：5254条实际MemoryStorage混合操作对照一致；O0/O2 ASan/UBSan专项通过，含逐直接分配/插入/部分复制故障，失败保持源记录/ID/序号和调用者输入。完整Runtime最终树退出0。隔离核心暂存树G00、Assembly inventory及产品构建通过；共享G00仍为4个TUI候选未登记。
 - 同一Agent自审：扩展现有Storage职责/参考登记，无新公开布局或门禁变更。6个候选路径与暂存内容清单SHA256摘要（加入本记录前）`f165b21a5ee8c812e89e0f570902a4d3e31c2b4eb4051574d217e97b49b26545`。结论为本地集成候选通过；完整Tx、所有权、迁移提交及三条既有delta ABI差异仍待K03/K15，未声明K03完成。
+
+## K03 事务submission转换候选（2026-10-26）
+
+- 阅读固定Pi `transaction.ts` 的构造/暂存表、submissionChanges、applySubmissionChange、settleSuccess/discard和read/write admission。当前先移植实际转换函数到 `records.S:pg_records_submission_change`；完整事务组装尚待实现和接入。终态保留、input/write放置及done/unanswered结算均使用独立owned JSON候选。
+- 实际验证：24组状态与固定上游原函数体一致；测试读取固定源码并只剥离TS类型执行该函数体，未替换行为。5254条现有MemoryStorage操作仍通过。O0/O2 ASan/UBSan验证两段复制及部分复制失败清理、输入不变；完整Runtime退出0。暂存核心树G00、Assembly清单及产品构建通过，共享G00仍为4个TUI候选未登记。
+- 同一Agent自审：扩展现有模块导出/职责，未修改门禁；6个候选路径/内容摘要（本记录加入前）`325f9ac708ceae61a206b5d28b64b262388fd31ce6d08020a80b802d913c52a0`。结论为本地候选通过，尚未声称事务实际调用完成或K03完成。Pi/Harness fetch结果仍为固定 `d5b3de22` / `22ddee37`。

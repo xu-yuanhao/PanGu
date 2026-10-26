@@ -29,15 +29,30 @@ static int commit(void *ctx,const struct json_object *batch,pg_records_adopt acc
  return f->mode==7?1:0;
 }
 #ifdef PG_RECORD_FAULTS
-static unsigned copy_failure;
+static unsigned copy_failure,copy_skip;
 int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
 int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **dst,json_c_shallow_copy_fn *fn){
+ if(copy_failure&&copy_skip){--copy_skip;return __real_json_object_deep_copy(src,dst,fn);}
  if(copy_failure){unsigned mode=copy_failure;copy_failure=0;if(mode==2)*dst=json_object_new_object();return -1;}
  return __real_json_object_deep_copy(src,dst,fn);
 }
 #endif
 static int simple_commit(void *ctx,const struct json_object *writes,pg_records_adopt adopt,void *owner,uint64_t *seq){(void)ctx;(void)writes;adopt(owner,1);*seq=1;return 0;}
+static void submission_changes(void){
+ const char *states[]={"queued","placed","done","unanswered"};const char *types[]={"input","write"};
+ for(unsigned type=0;type<2;++type)for(unsigned state=0;state<4;++state)for(unsigned change=1;change<4;++change){
+ struct json_object *current=json_object_new_object(),*next=json_object_new_object(),*result=0;assert(current&&next);json_object_object_add(current,"type",json_object_new_string(types[type]));json_object_object_add(current,"status",json_object_new_string(states[state]));json_object_object_add(next,"status",json_object_new_string(states[change]));json_object_object_add(next,"entry",json_object_new_int(4));json_object_object_add(next,"answer",json_object_new_string("answer"));
+ int allowed=state>=2||(change==1?state==0:change==2?state==1:1);pg_records_status status=pg_records_submission_change(current,next,&result);assert((status==PG_RECORDS_OK)==allowed);
+ if(allowed){const char *expected=state>=2?states[state]:change==1?(type?"done":"placed"):states[change];assert(result!=current&&!strcmp(json_object_get_string(json_object_object_get(result,"status")),expected));if(state>=2)assert(json_object_equal(result,current));else if(change==1)assert(!json_object_object_get(result,"answer"));}else assert(!result);
+ json_object_put(result);result=0;
+#ifdef PG_RECORD_FAULTS
+ if(allowed)for(unsigned skip=0;skip<((state<2)?2u:1u);++skip)for(unsigned mode=1;mode<=2;++mode){copy_failure=mode;copy_skip=skip;assert(pg_records_submission_change(current,next,&result)==PG_RECORDS_ALLOCATION&&!result&&!copy_failure);}
+#endif
+ json_object_put(current);json_object_put(next);
+ }
+}
 int main(void){
+ submission_changes();
  for(unsigned mode=0;mode<=7;++mode){fixture f={.mode=mode};f.input=json_tokener_parse("[{\"type\":\"entry\",\"value\":{\"id\":2}},{\"type\":\"document.retire\",\"id\":3}]");assert(f.input);f.session=(pg_record_session){.storage={&f,commit},.context=&f,.adopt=adopt,.publish=publish};
  pg_records_status result=pg_records_commit(&f.session,f.input);assert(!f.session.busy&&!f.session.pending_batch);
  if(!mode)assert(result==PG_RECORDS_OK&&f.session.sequence==1&&f.publications==1);

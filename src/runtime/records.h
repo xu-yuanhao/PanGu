@@ -31,4 +31,9 @@ typedef enum { PG_RECORDS_OK,PG_RECORDS_INVALID,PG_RECORDS_READ_ONLY,
    Failure before admission leaves Session healthy. Admitted backend/adoption
    failure latches Session; adopted state is never rolled back. */
 pg_records_status pg_records_commit(pg_record_session *,const struct json_object *);
+/* Durable transaction submission transition over borrowed typed JSON records.
+   Returns a detached owned candidate; terminal records retain their value.
+   Placement accepts queued records; done accepts placed inputs; unanswered
+   accepts queued/placed. Failure clears output and leaves inputs unchanged. */
+pg_records_status pg_records_submission_change(const struct json_object *,const struct json_object *,struct json_object **);
 #endif

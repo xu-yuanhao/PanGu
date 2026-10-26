@@ -231,6 +231,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03查询验证：4922条累计实际MemoryStorage对照一致；新增singleton/空key、NUL kind/key、同址新旧实例、scope/kind过滤、0～120截点、负/正after及分页。O0/O2 ASan/UBSan验证输出隔离、缺失、无效limit、复制部分结果/分配/插入失败清理。完整Runtime复验结果见当前实现记录。K03仍待copy及完整Tx。
 - K03 Document复制：`record_memory.S:.Ld_resolve_copies` 对照Pi固定版 `MemoryStorage.resolveDocumentCopies` 与 `storage-conformance.ts` 的独立base/ambiguous source场景。先在私有输入中解析所有copy，拒绝源ID在本批任何document命令中变化，源按current/as-of物化；Conversation owner可变而kind/key/history/fork保持一致，生成create/base后复用同一原子准备路径。公开读取仍拒绝prepare期间重入，内部只读路径仅用于解析已提交源。
 - K03复制验证：累计5254条实际MemoryStorage操作一致，含历史/current、latest/rewindable、NUL family key、定义不符、退役目标/源、源后续变化、两种顺序的同批修改及链式copy拒绝；O0/O2 ASan/UBSan验证复制独立、输入不变与每个直接分配/插入/部分复制失败的源状态/ID/序号不变。完整Runtime结果见当前实现记录。
+- K03事务submission候选：`records.S/h:pg_records_submission_change` 对照 `transaction.ts:applySubmissionChange`，阅读Transaction的submissionChanges暂存、`settleSuccess/discard`和`#read/#write`调用规则。手写转换保留终态、区分input/write放置、要求done从placed结算；输出独立拥有，输入不变。24个组合与固定上游实际函数体直接对照一致（仅剥离TS类型后执行原函数体），O0/O2 ASan/UBSan覆盖两段复制/部分复制故障。该入口等待完整事务组装调用，尚未提供完整Tx。
 - 下一完整行为：接通事务暂存、文档所有权/迁移提交及当前消息投影。
 
 ### K01 当前落点与补齐映射
