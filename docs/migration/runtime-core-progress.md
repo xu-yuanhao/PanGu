@@ -520,3 +520,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写deferred observed结算、默认双路通知服务和实际Session入口。准备阶段持有独立memory/stored payload，seq=0确认只选memory，不分配/改持久序号；值与holds采纳、既有observer/timer衔接后只通知内部。混合写入/held回退走普通seq确认和完整持久通知。所有partial与已选token由现有生命周期一次释放，旧ABI保持。
 - 实际验证：实际Session memory-only/混合/已有held回退/空事务/只读拒绝五组流程与关闭，memory无seq且不通知durable，持久版本/Storage序号保持，fallback通知完整。首次内存/混合回退/已有held三个故障组合分别60/83/77，共220个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有DocTx/Session独立接口与默认服务、私有token双payload、专项/来源/TODO；公开旧ABI、门禁、预算保持。7个候选路径内容清单摘要（本记录加入前）：47e4d850297794c522b62fc4761702435e5dd780de465059b165d39be68420c1；隔离核心树bce5e133691cd6d591a055ae4df5cdddcde6b6f0。结论为deferred内存通知与回退本地通过；独立holds flush/close通知、Document watch继续，K03总验收未完成。TUI工作树保留。
+
+## K03 独立holds flush持久通知
+
+- 本批固定来源：Pi d5b3de22 #storeHolds，holds规划/采纳/释放路径。手写通用flush观察宿主，在每个选中hold的既有storeHeld结果上捕获完整ops，不额外重放PendingOps；默认服务生成owned stored-only通知，确认后按固定基线在释放pin后发布，原Session hooks保持。partial open/append/prepare/adopt/Storage结果统一discard。
+- 实际验证：base/delta×all/selected/missing六组与64个直接分配/插入/部分复制故障，内部memory观察不重复，payload值/ops/seq正确，失败前保留held队列或遵循Storage fail-stop。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
+- 上游检查发现8b0caefc2260a28d2cec0a7ce3daef1d3de24776，已核对新Session #runCommit/#publish/#storeHolds/#attachDocument/#observeDocument：发布转至Storage adopt，内部观察同步、host microtask dispatch；watch跟随地址并新增observeDoc。来源/必要采用点及新测试入口已列入TODO下一优先项。本批保留d5b3de22固定证据，不声称符合这一新语义，后续将原地调整通知时序后再做自动timer/reload/close接线与watch。Harness保持22ddee37。
+- 同一实施Agent自审：既有holds/Session独立通知接口/默认服务、专项及来源/TODO；旧ABI、门禁和预算保持。7个候选路径内容清单摘要（本记录加入前）：1f142ec46e6de18ed19a5d1d83f72b1459d926d9c3e72667bfb22705d54c28e3；隔离核心树f3d9ee95a51a5587bac7d5ca7bbeac4a67058dee。结论为固定基线独立flush捕获通过，K03总验收保持未完成。TUI工作树保留。

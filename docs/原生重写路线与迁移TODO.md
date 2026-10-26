@@ -115,6 +115,8 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通prepared publication的无分配确认：先校验双通道、再补seq与新生命周期占位值，失败前不修改通知；真实DocTx确认路径验证。
 - [x] 默认通知宿主自动捕获持久DocTx计划：三种scope/任务所属会话、创建/退休/copy、held observed/stored ops分离；接入实际Session持久结算与timer同步。
 - [x] 默认通知宿主接通deferred内存采纳与落盘回退：准入前准备双路payload、零序号选择memory、仅内部通知、原timer/holds与错误清理保持。
+- [x] 捕获独立holds flush的完整持久通知：复用已折叠ops、选中incarnation、无重复memory通知与全部路径清理（固定d5b3de22基线）。
+- [ ] 采用Pi 8b0caef的adoption发布语义：同步内部观察、排队host dispatch、adopt后Storage拒绝时已发布状态保持、异步观察者拒绝；Document watch跟随逻辑地址并支持同步observeDoc。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -521,3 +523,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `pg_document_tx_deferred_observed`在现有通知宿主下扩展deferred路由：准入前准备，memory adopt/publish以seq=0标识，普通落盘以实际seq确认，hold队列/值与既有observer成功后才通知。`pg_session_deferred_notifications_bind`提前准备独立memory和stored payload，确认时只选择已持有对象；`pg_durable_session_defer_notified`接入实际Session mutation line、timer同步和active Tx释放。
 - 验证：实际Session memory-only、混合写入、已有held回退、空事务、只读拒绝五组流程，memory无seq/无durable回调且Storage版本保持，回退持久通知完整。60/83/77共220个首次内存、混合回退、已有held内存通知分配/插入/部分复制故障验证，所有partial token清理；最终专项/完整Runtime见当前实现记录。
 - 下一行为：独立holds flush与close通知接线，之后继续Document watch；本批未勾选K03整体验收。
+
+### K03 独立holds通知与上游观察更新
+
+- 固定批次对照Pi d5b3de22 Session.#storeHolds：`holds.h/.S:pg_document_holds_flush_observed`在正常flush规划中捕获每个选中incarnation的完整折叠ops，prepare/adopt/publish/discard注入服务；`pg_session_hold_notifications_bind`生成owned stored-only通知。权威PendingOps不额外重放，释放pin后按固定基线通知，原Session钩子保留。新接口支持all/指定id/missing，既有ABI不变。
+- 验证六组base/delta×all/selected/missing，内部memory回调不重复，值/ops/seq正确；64个直接分配/插入/部分复制故障验证token和holds清理。专项/完整Runtime见当前实现记录。
+- 本批fetch发现Pi origin从363ad78推进到8b0caefc2260a28d2cec0a7ce3daef1d3de24776。已读Session.#runCommit/#publish/#storeHolds/#attachDocument/#observeDocument变更及Chord Watch差异概况；这一提交改变当前观察工作的目标。下一批优先原地调整为adopt内同步internal观察、microtask host dispatch、adopt后拒绝仍保留已发布状态；随后实现跟随地址的watch/observeDoc和task owner终态结束语义。核对新session-adoption/session-observers/session-watches/session-deferred-commits与Chord watch测试。固定工作树仍为d5b3de22，本批证据只覆盖该基线，不当作新语义通过。
+- timer/version reload/close的自动通知接线在采用新发布语义时统一处理，K03总验收未完成；Harness origin保持22ddee37。

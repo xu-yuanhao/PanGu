@@ -518,11 +518,13 @@ pg_document_holds_close:
 .globl pg_document_holds_flush
 .type pg_document_holds_flush,@function
 pg_document_holds_flush:
+ xor r8d,r8d
  xor edx,edx
  jmp .Lflush_common
 .globl pg_document_holds_flush_one
 .type pg_document_holds_flush_one,@function
 pg_document_holds_flush_one:
+ xor r8d,r8d
  test rdx,rdx
  jz .Linvalid
  mov rax,9007199254740991
@@ -535,14 +537,15 @@ pg_document_holds_flush_one:
  push r13
  push r14
  push r15
- sub rsp,168
+ sub rsp,184
  mov rbx,rdi
  mov r12,rsi
  mov rdi,rsp
  xor eax,eax
- mov ecx,21
+ mov ecx,23
  rep stosq
  mov [rsp+152],rdx
+ mov [rsp+160],r8
  mov ebp,1
  test rbx,rbx
  jz .Lflush_return
@@ -604,6 +607,18 @@ pg_document_holds_flush_one:
  mov dword ptr [rbx+48],1
  mov dword ptr [r12+48],1
  mov ebp,5
+ cmp qword ptr [rsp+160],0
+ je .Lflush_notifications_opened
+ mov qword ptr [rsp+176],1
+ mov rax,[rsp+160]
+ mov rdi,[rax]
+ mov rsi,rbx
+ mov rdx,r12
+ lea rcx,[rsp+168]
+ call [rax+8]
+ test eax,eax
+ jnz .Lflush_plan_error
+.Lflush_notifications_opened:
  mov rdi,[rbx+16]
  mov esi,8
  call calloc@PLT
@@ -703,6 +718,17 @@ pg_document_holds_flush_one:
  test eax,eax
  jnz .Lflush_cleanup
  mov qword ptr [rsp+128],0
+ cmp qword ptr [rsp+160],0
+ je .Lflush_notice_appended
+ mov rax,[rsp+160]
+ mov rdi,[rax]
+ mov rsi,[rsp+168]
+ mov rdx,r15
+ mov rcx,[rsp+120]
+ call [rax+16]
+ test eax,eax
+ jnz .Lflush_plan_error
+.Lflush_notice_appended:
  mov rdi,[rsp+120]
  call json_object_put@PLT
  mov qword ptr [rsp+120],0
@@ -716,6 +742,16 @@ pg_document_holds_flush_one:
  mov ebp,1
  jmp .Lflush_cleanup
 .Lflush_submit:
+ cmp qword ptr [rsp+160],0
+ je .Lflush_notice_prepared
+ mov rax,[rsp+160]
+ mov rdi,[rax]
+ mov rsi,[rsp+168]
+ mov rdx,[rsp+48]
+ call [rax+24]
+ test eax,eax
+ jnz .Lflush_plan_error
+.Lflush_notice_prepared:
  mov [r12+24],rsp
  lea rax,[rip+.Lflush_adopt]
  mov [r12+32],rax
@@ -741,6 +777,13 @@ pg_document_holds_flush_one:
  mov [r12+40],rax
 .Lflush_hooks_restored:
  mov dword ptr [r12+48],1
+ cmp qword ptr [rsp+176],0
+ je .Lflush_notifications_discarded
+ mov rax,[rsp+160]
+ mov rdi,[rax]
+ mov rsi,[rsp+168]
+ call [rax+48]
+.Lflush_notifications_discarded:
  lea rdi,[rsp+80]
  call pg_pending_ops_close@PLT
  mov rdi,[rsp+112]
@@ -768,7 +811,7 @@ pg_document_holds_flush_one:
  xor ebp,ebp
 .Lflush_return:
  mov eax,ebp
- add rsp,168
+ add rsp,184
  pop r15
  pop r14
  pop r13
@@ -788,6 +831,16 @@ pg_document_holds_flush_one:
  mov [rsp],rsi
  mov [rsp+8],rdx
  mov r12,[rbx]
+ cmp qword ptr [rbx+160],0
+ je .Lflush_notice_adopted
+ mov rax,[rbx+160]
+ mov rdi,[rax]
+ mov rsi,[rbx+168]
+ mov rdx,[rsp+8]
+ call [rax+32]
+ test eax,eax
+ jnz .Lflush_adopt_end
+.Lflush_notice_adopted:
  xor ecx,ecx
  mov r8,[r12+8]
  mov r9,[rbx+40]
@@ -888,6 +941,15 @@ pg_document_holds_flush_one:
 .Lflush_publish_chain:
  cmp dword ptr [rbx+56],0
  jne .Lflush_publish_end
+ cmp qword ptr [rbx+160],0
+ je .Lflush_notice_published
+ mov rax,[rbx+160]
+ mov rdi,[rax]
+ mov rsi,[rbx+168]
+ mov rdx,[rsp]
+ mov rcx,[rsp+8]
+ call [rax+40]
+.Lflush_notice_published:
  cmp qword ptr [rbx+32],0
  je .Lflush_publish_end
  mov rdi,[rbx+16]
@@ -1469,4 +1531,34 @@ pg_document_holds_finish:
  pop rbx
  ret
 .size pg_document_holds_finish,.-pg_document_holds_finish
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_holds_flush_observed
+.type pg_document_holds_flush_observed,@function
+pg_document_holds_flush_observed:
+ mov eax,1
+ test rcx,rcx
+ jz .Lobserved_flush_invalid
+ cmp qword ptr [rcx+8],0
+ je .Lobserved_flush_invalid
+ cmp qword ptr [rcx+16],0
+ je .Lobserved_flush_invalid
+ cmp qword ptr [rcx+24],0
+ je .Lobserved_flush_invalid
+ cmp qword ptr [rcx+32],0
+ je .Lobserved_flush_invalid
+ cmp qword ptr [rcx+40],0
+ je .Lobserved_flush_invalid
+ cmp qword ptr [rcx+48],0
+ je .Lobserved_flush_invalid
+ mov rax,9007199254740991
+ cmp rdx,rax
+ ja .Lobserved_flush_invalid
+ mov r8,rcx
+ jmp .Lflush_common
+.Lobserved_flush_invalid:
+ mov eax,1
+ ret
+.size pg_document_holds_flush_observed,.-pg_document_holds_flush_observed
 .section .note.GNU-stack,"",@progbits

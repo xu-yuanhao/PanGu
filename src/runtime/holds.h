@@ -53,4 +53,21 @@ pg_records_status pg_document_holds_flush_one(pg_document_holds *,pg_record_sess
    Storage remain owned by the host and close after return. Preserve first
    Session failure. Repeated finish returns the same Session result. */
 pg_records_status pg_document_holds_finish(pg_document_holds *,pg_record_session *);
+typedef struct {
+ void *context;
+ int (*open)(void *,pg_document_holds *,pg_record_session *,void **);
+ int (*append)(void *,void *,const pg_document_loaded *,const struct json_object *ops);
+ int (*prepare)(void *,void *,const struct json_object *writes);
+ int (*adopt)(void *,void *,uint64_t sequence);
+ void (*publish)(void *,void *,const struct json_object *writes,uint64_t sequence);
+ void (*discard)(void *,void *);
+} pg_hold_notifications;
+/* Capture folded operations during normal flush preparation. open/append/
+   prepare return pg_document_status and may return partial owned tokens;
+   adopt is allocation-free. publish follows confirmed release of pins, and
+   discard runs once after any attempted open. Existing hooks are preserved.
+   id=0 flushes all; otherwise selected-incarnation/cache-reload rules apply.
+   Services and inputs remain borrowed only through this synchronous call. */
+pg_records_status pg_document_holds_flush_observed(pg_document_holds *,pg_record_session *,
+ uint64_t id,const pg_hold_notifications *);
 #endif

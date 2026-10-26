@@ -196,4 +196,8 @@ pg_record_tx_status pg_durable_session_settle_notified(pg_durable_session *,
 int pg_session_deferred_notifications_bind(pg_session_notification_host *,pg_document_notifications *);
 pg_record_tx_status pg_durable_session_defer_notified(pg_durable_session *,uint64_t within_ms,
  const pg_document_scan *,const pg_document_notifications *);
+/* Capture the exact folded ops already prepared by holds flush, then deliver
+   only a durable publication after pins are released. No duplicate memory
+   observation; host.holds must identify the flushed owner. */
+int pg_session_hold_notifications_bind(pg_session_notification_host *,pg_hold_notifications *);
 #endif

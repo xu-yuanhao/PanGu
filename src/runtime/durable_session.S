@@ -2605,3 +2605,167 @@ pg_durable_session_defer_notified:
  jmp .Ldurable_settle_common
 .size pg_durable_session_defer_notified,.-pg_durable_session_defer_notified
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_hold_notifications_bind
+.type pg_session_hold_notifications_bind,@function
+pg_session_hold_notifications_bind:
+ mov eax,1
+ test rdi,rdi
+ jz .Lhold_notice_bind_end
+ test rsi,rsi
+ jz .Lhold_notice_bind_end
+ cmp qword ptr [rdi],0
+ je .Lhold_notice_bind_end
+ cmp qword ptr [rdi+8],0
+ je .Lhold_notice_bind_end
+ mov [rsi],rdi
+ lea rax,[rip+.Lhold_notice_open]
+ mov [rsi+8],rax
+ lea rax,[rip+.Lhold_notice_append]
+ mov [rsi+16],rax
+ lea rax,[rip+.Lhold_notice_prepare]
+ mov [rsi+24],rax
+ lea rax,[rip+.Lhost_adopt]
+ mov [rsi+32],rax
+ lea rax,[rip+.Lhost_publish]
+ mov [rsi+40],rax
+ lea rax,[rip+.Lhost_discard]
+ mov [rsi+48],rax
+ xor eax,eax
+.Lhold_notice_bind_end:
+ ret
+.size pg_session_hold_notifications_bind,.-pg_session_hold_notifications_bind
+.Lhold_notice_open:
+ push rbp
+ push rbx
+ push r12
+ mov rbx,rdi
+ mov r12,rcx
+ mov ebp,1
+ mov qword ptr [r12],0
+ cmp [rbx+8],rsi
+ jne .Lhold_notice_open_end
+ mov rax,[rbx]
+ cmp [rax],rdx
+ jne .Lhold_notice_open_end
+ mov rcx,[rax+16]
+ mov rax,[rax+8]
+.Lhold_notice_interest:
+ test rcx,rcx
+ jz .Lhold_notice_no_interest
+ cmp dword ptr [rax+16],1
+ je .Lhold_notice_allocate
+ add rax,24
+ dec rcx
+ jmp .Lhold_notice_interest
+.Lhold_notice_no_interest:
+ xor ebp,ebp
+ jmp .Lhold_notice_open_end
+.Lhold_notice_allocate:
+ mov ebp,3
+ mov edi,1
+ mov esi,64
+ call calloc@PLT
+ test rax,rax
+ jz .Lhold_notice_open_end
+ mov [r12],rax
+ mov rbx,rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lhold_notice_open_end
+ mov [rbx+16],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lhold_notice_open_end
+ mov [rbx+24],rax
+ xor ebp,ebp
+.Lhold_notice_open_end:
+ mov eax,ebp
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lhold_notice_append:
+ test rsi,rsi
+ jz .Lhold_notice_append_empty
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rsi
+ mov r12,rdx
+ mov r13,rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ mov ebp,1
+ cmp dword ptr [r12+64],1
+ jne .Lhold_notice_append_end
+ mov rax,[r12]
+ mov [rsp],rax
+ mov rax,[r12+8]
+ mov [rsp+16],rax
+ mov [rsp+24],r13
+ mov rax,[r12+56]
+ mov [rsp+32],rax
+ mov rax,[r12+96]
+ mov [rsp+40],rax
+ mov dword ptr [rsp+48],8
+ mov rdi,rsp
+ lea rsi,[rsp+56]
+ call pg_document_publication_prepare
+ test eax,eax
+ jnz .Lhold_notice_append_bad
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+56]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhold_notice_append_bad
+ xor ebp,ebp
+ jmp .Lhold_notice_append_clear
+.Lhold_notice_append_bad:
+ mov ebp,3
+.Lhold_notice_append_clear:
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+.Lhold_notice_append_end:
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lhold_notice_append_empty:
+ xor eax,eax
+ ret
+.Lhold_notice_prepare:
+ test rsi,rsi
+ jz .Lhold_notice_append_empty
+ push rbx
+ sub rsp,48
+ mov rbx,rsi
+ mov [rsp],rdx
+ mov rax,[rbx+16]
+ mov [rsp+8],rax
+ mov rax,[rbx+24]
+ mov [rsp+16],rax
+ mov qword ptr [rsp+24],1
+ mov qword ptr [rsp+32],2
+ mov rdi,rsp
+ mov rsi,rbx
+ call pg_session_publications_prepare
+ test eax,eax
+ jz .Lhold_notice_prepare_end
+ mov eax,3
+.Lhold_notice_prepare_end:
+ add rsp,48
+ pop rbx
+ ret
+.section .note.GNU-stack,"",@progbits
