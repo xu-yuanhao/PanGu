@@ -157,4 +157,11 @@ pg_record_tx_status pg_record_tx_commit_finalized(pg_record_tx *,int (*finalize)
 /* Internal mutation-line validation used during a settlement finalizer;
    may invoke injected committed reads. 0 valid, nonzero invalid. */
 int pg_record_tx_validate_batch(pg_record_tx *);
+/* Session settlement routing after final validation, before Storage.
+   route runs for a nonempty writable batch with Session/Tx busy; 0 chooses
+   Storage, 1 means a prepared memory-only adoption, other values reject.
+   A successful memory route consumes candidates without Storage hooks/sequence.
+   A route must prepare all fallible state before its first adoption. */
+pg_record_tx_status pg_record_tx_commit_routed(pg_record_tx *,
+ int (*finalize)(void *,pg_record_tx *),void *,int (*route)(void *,pg_record_tx *));
 #endif

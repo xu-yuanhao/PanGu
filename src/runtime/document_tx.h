@@ -89,6 +89,32 @@ typedef struct {
    All edits are sealed before Storage reads/scan; callbacks cannot reenter.
    Scanner and context are borrowed only for this synchronous call. */
 pg_record_tx_status pg_document_tx_settle(pg_document_tx *,const pg_document_scan *);
+typedef struct {
+ void *context;
+ /* Prepare detached hold queues/pins without changing authoritative state.
+    Entries include unchanged reads; only entries with write!=NULL are held.
+    within_ms=UINT64_MAX denotes an infinite window. A partial token returned
+    on error is discarded. Return a pg_document_status. */
+ int (*prepare)(void *,const pg_document_tx_entry *,size_t,uint64_t within_ms,void **token);
+ /* Allocation-free install of prepared queues/pins after value adoption.
+    Nonzero is an internal adoption failure and fails the Session. */
+ int (*apply)(void *,void *token);
+ /* Always after an attempted prepare; release token, preserving applied state. */
+ void (*discard)(void *,void *token);
+ /* Optional memory-only observer after successful queue/value adoption.
+    Entries are borrowed through return; only write!=NULL entries changed.
+    Retain any JSON independently. */
+ void (*observe)(void *,const pg_document_tx_entry *,size_t);
+} pg_document_deferred;
+/* Deferred when every write is an existing latest/initial conversation Doc at
+   its stored version; otherwise submit the whole batch normally. Checkpoint
+   selection precedes this decision. Memory adoption leaves Storage sequence,
+   stored versions/delta counts and durable publish hooks untouched.
+   Host owns queue/pin/deadline lifetime and drains/merges held changes before
+   later durable operations. prepare/apply/discard are required and cannot
+   reenter the Session; scanner has settle's contract. */
+pg_record_tx_status pg_document_tx_deferred(pg_document_tx *,const pg_document_scan *,
+ const pg_document_deferred *,uint64_t within_ms);
 /* finish delegates to settle with no committed-document scanner. */
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);

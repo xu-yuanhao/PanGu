@@ -612,16 +612,23 @@ pg_record_tx_discard:
 pg_record_tx_commit:
  xor esi,esi
  xor edx,edx
+ xor ecx,ecx
  jmp .Ltx_commit_common
 .globl pg_record_tx_commit_finalized
 .type pg_record_tx_commit_finalized,@function
 pg_record_tx_commit_finalized:
+ xor ecx,ecx
+ jmp .Ltx_commit_common
+.globl pg_record_tx_commit_routed
+.type pg_record_tx_commit_routed,@function
+pg_record_tx_commit_routed:
 .Ltx_commit_common:
  push rbx
  push r12
  push r13
  push r14
  sub rsp,8
+ mov [rsp],rcx
  mov rbx,rdi
  mov r13,rsi
  mov r14,rdx
@@ -660,10 +667,43 @@ pg_record_tx_commit_finalized:
  test eax,eax
  jnz .Ltx_commit_plan_failed
 .Ltx_commit_storage:
+ cmp qword ptr [rsp],0
+ je .Ltx_commit_admit
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ltx_commit_admit
+ mov r12,[rbx]
+ cmp dword ptr [r12+48],0
+ jne .Ltx_commit_admit
+ cmp qword ptr [r12+52],0
+ jne .Ltx_commit_admit
+ cmp qword ptr [r12+8],0
+ je .Ltx_commit_admit
+ mov rax,9007199254740991
+ cmp [r12+16],rax
+ ja .Ltx_commit_admit
+ mov rdi,[rbx+24]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ltx_commit_admit
+ mov dword ptr [r12+48],1
+ mov rdi,r14
+ mov rsi,rbx
+ call [rsp]
+ mov dword ptr [r12+48],0
+ test eax,eax
+ jz .Ltx_commit_admit
+ cmp eax,1
+ jne .Ltx_commit_plan_failed
+ xor r12d,r12d
+ jmp .Ltx_commit_consumed
+.Ltx_commit_admit:
  mov rdi,[rbx]
  mov rsi,[rbx+24]
  call pg_records_commit
  mov r12d,eax
+.Ltx_commit_consumed:
  mov rdi,[rbx+24]
  mov qword ptr [rbx+24],0
  call json_object_put@PLT
@@ -688,6 +728,7 @@ pg_record_tx_commit_finalized:
  ret
 .size pg_record_tx_commit,.-pg_record_tx_commit
 .size pg_record_tx_commit_finalized,.-pg_record_tx_commit_finalized
+.size pg_record_tx_commit_routed,.-pg_record_tx_commit_routed
 .section .rodata
 .Ltx_types: .long .Ltx_conversation-.Ltx_types,.Ltx_entry-.Ltx_types,.Ltx_task-.Ltx_types,.Ltx_submission-.Ltx_types,.Ltx_create-.Ltx_types,.Ltx_copy-.Ltx_types,.Ltx_change-.Ltx_types,.Ltx_retire-.Ltx_types
 .Ltx_conversation: .asciz "conversation"

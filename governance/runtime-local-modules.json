@@ -902,7 +902,7 @@
         "session.documents.local.v0",
         "json-c"
       ],
-      "role": "prepared StorageWrite batch admission; detached immutable payload, synchronous backend adoption, post-settlement publication and fail-stop session contract; detached transaction submission placement/settlement transitions; synchronous private transaction batch owner, committed read barrier, seal/discard and Storage settlement",
+      "role": "prepared StorageWrite batch admission; detached immutable payload, synchronous backend adoption, post-settlement publication and fail-stop session contract; detached transaction submission placement/settlement transitions; synchronous private transaction batch owner, committed read barrier, seal/discard and Storage settlement; validated writable-batch routing to Session-owned memory adoption with reentry guard and unchanged durable hooks",
       "exports": [
         "pg_records_commit",
         "pg_records_submission_change",
@@ -920,7 +920,8 @@
         "pg_record_tx_latest_head",
         "pg_record_tx_create",
         "pg_record_tx_commit_finalized",
-        "pg_record_tx_validate_batch"
+        "pg_record_tx_validate_batch",
+        "pg_record_tx_commit_routed"
       ],
       "reference_basis": [
         {
@@ -933,7 +934,7 @@
             "packages/durable/src/session/forks.ts",
             "packages/durable/src/harness/harness.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again; Session.runCommit nonempty/read-only validation before hold-vs-Storage selection; routed memory success consumes Tx candidates without changing Storage sequence or durable publication",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-forks.test.ts",
@@ -1002,7 +1003,7 @@
         "utf8proc",
         "system libc"
       ],
-      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup; committed revision snapshots with lifetime and current-only policy; native document change journal and prepared value/op ownership; owned PendingOps queue with staged atomic folding, leaf index, structural barriers and source 10000-op replacement threshold; held operation folding to owned base/delta content with overflow replacement and atomic pending drain",
+      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup; committed revision snapshots with lifetime and current-only policy; native document change journal and prepared value/op ownership; owned PendingOps queue with staged atomic folding, leaf index, structural barriers and source 10000-op replacement threshold; held operation folding to owned base/delta content with overflow replacement and atomic pending drain; same-version memory-only adoption keeps persisted versions and delta counters",
       "exports": [
         "pg_document_delta_apply",
         "pg_document_delta_batches",
@@ -1022,7 +1023,9 @@
         "pg_pending_ops_size",
         "pg_pending_ops_take",
         "pg_pending_ops_close",
-        "pg_document_store_held"
+        "pg_document_store_held",
+        "pg_document_adoption_defer",
+        "pg_document_adoption_prepare_memory"
       ],
       "reference_basis": [
         {
@@ -1035,7 +1038,7 @@
             "packages/chord/src/delta/tracker.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters; PendingOps push/size/take: first batch, indexed cross-path a/s merges, structural index clearing, root resets, 10000 folded-op overflow and replace recovery; native owned inputs/results and atomic allocation failure; storeHeld folds additional ops and chooses delta, selected base or overflow base/root op; native preparation preserves original queue on error and drains it only after content construction"
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters; PendingOps push/size/take: first batch, indexed cross-path a/s merges, structural index clearing, root resets, 10000 folded-op overflow and replace recovery; native owned inputs/results and atomic allocation failure; storeHeld folds additional ops and chooses delta, selected base or overflow base/root op; native preparation preserves original queue on error and drains it only after content construction; Transaction.adoptHeld retargets an already prepared value swap without advancing persisted metadata; independent memory preparation avoids reserving a durable delta increment even at its native counter cap"
         }
       ]
     },
@@ -1051,7 +1054,7 @@
         "json-c",
         "session.documents.local.v0"
       ],
-      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation; explicit retirement and same-address incarnation replacement, final edits persisted, conditional post-confirmation eviction; injected paginated terminal-Task document discovery, automatic retirement of acquired/new/unloaded incarnations before checkpoints and Storage admission; staged fork-copy materialization/editing/migration, atomic copy-to-base replacement and retained source conflict checks",
+      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation; explicit retirement and same-address incarnation replacement, final edits persisted, conditional post-confirmation eviction; injected paginated terminal-Task document discovery, automatic retirement of acquired/new/unloaded incarnations before checkpoints and Storage admission; staged fork-copy materialization/editing/migration, atomic copy-to-base replacement and retained source conflict checks; Source holdable eligibility and injected prepare/apply/discard/observe service for memory-only transaction settlement",
       "exports": [
         "pg_document_tx_commit",
         "pg_document_tx_open",
@@ -1060,7 +1063,8 @@
         "pg_document_tx_abort",
         "pg_document_tx_doc",
         "pg_document_tx_retire",
-        "pg_document_tx_settle"
+        "pg_document_tx_settle",
+        "pg_document_tx_deferred"
       ],
       "reference_basis": [
         {
@@ -1070,12 +1074,13 @@
             "packages/durable/src/session/transaction.ts",
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation; retireDoc/findRetirement handles acquired or record-only incarnations and absent no-op; subsequent doc skips retired target and creates a new incarnation; native adopt applies loaded edits then evicts retired IDs then installs live new nodes; assemble terminalTaskIds/latest candidates, committed-task terminal/conversation validation, current task-document pages and seen-ID deduplication; explicit scanner service and sealed edits; newly created tasks skip committed scan; acquireForkCopy reads selected source point, checks kind/key/history/fork with owner change, materializes to target definition version and reuses minted incarnation; edited copy becomes create/base while original source identity remains guarded; retire-only copied plans preserve document.copy without value load",
+          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation; retireDoc/findRetirement handles acquired or record-only incarnations and absent no-op; subsequent doc skips retired target and creates a new incarnation; native adopt applies loaded edits then evicts retired IDs then installs live new nodes; assemble terminalTaskIds/latest candidates, committed-task terminal/conversation validation, current task-document pages and seen-ID deduplication; explicit scanner service and sealed edits; newly created tasks skip committed scan; acquireForkCopy reads selected source point, checks kind/key/history/fork with owner change, materializes to target definition version and reuses minted incarnation; edited copy becomes create/base while original source identity remains guarded; retire-only copied plans preserve document.copy without value load; holdable accepts only writes to loaded latest/initial conversation documents at stored version, including checkpoint bases; migrations/creation/retirement/mixed writes submit whole batch; memory-only adoption precedes held-queue apply and memory observers, durable hooks remain untouched",
           "tests_to_read": [
             "packages/durable/test/session-documents.test.ts",
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-tables.test.ts",
-            "packages/durable/test/session-forks.test.ts"
+            "packages/durable/test/session-forks.test.ts",
+            "packages/durable/test/session-deferred-commits.test.ts"
           ]
         }
       ]

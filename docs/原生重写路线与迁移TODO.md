@@ -88,6 +88,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通Task最终terminal候选的文档自动退休：事务内新旧Doc及已提交Doc分页发现/去重，与Task状态同批提交；通过独立scan服务结算。
 - [x] 接通同事务fork-copy的获取、源快照核对、迁移/编辑及单一create/base结算；保留复制源冲突校验，并支持副本退休/同址重建。
 - [x] 移植Chord PendingOps的跨路径折叠/结构屏障/溢出状态与Pi storeHeld内容构造；验证owned输入输出和失败时保留队列。
+- [x] 接通deferred资格判断与同版本内存采纳路由：符合条件时交给注入的holds服务，保留持久版本/计数/序号；混合写入等整批落盘。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -206,6 +207,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 对应资料已保存到 `references/pi-rust-yannelli`、`pie`、`pi-rust-nktkt`、`pi-rust-bigfish`、`pi-python-vamsi`、`bun-porting`。功能与行为的实现依据为上表中的Pi和Harness源码。
 
 ## 核心交接区
+
+- K03 deferred路由：固定Pi d5b3de22 的Transaction.holdable/adoptHeld与Session.runCommit hold-vs-Storage分支；records.h/.S新增校验后Session-owned routing，document_tx_deferred注入40字节prepare/apply/discard/observe服务，独立prepare_memory与adoption_defer保留值交换而不预留持久计数增量，回退落盘时恢复base/delta计数。全批仅已存在latest/initial Conversation Doc、同stored版本才延迟；迁移/新增/退休/混合写入整批走原Storage。强制所有prepare完成后才内存采纳，内存通知与持久hooks分离；服务回调的Session重入拒绝。24条采纳结果（含计数上限）对照实际Pi adopt/adoptHeld及Chord，原生PendingOps provider夹具验证累计变化、只读/回退、多文档/空编辑、已有hold失败保留与后续真实MemoryStorage flush。产品holds宿主、版本切换前flush、正常提交takeHeld合并及timer/pin生命周期继续实现；K03尚未完成。
+
 
 - K03 holds队列/内容：固定Pi d5b3de22 的Chord PendingOps、merge/pathKey、Durable.storeHeld及delta-pending/session-deferred-commits用例；手写pending.S与delta.h的32字节PendingOps、16字节take/held content映射push/size/take和内容构造。901次队列结果、54组base/delta/overflow/root结果执行实际上游一致；先构造候选再清空队列，分配失败保留原状态。JSON索引用成熟json-c，操作数组浅复制与索引副本保证Native错误回滚，输入批次按owned契约脱离。Memory实际落盘验证delta、root delta和选定base重放计数。Source MIT许可保留在docs/licenses/pi.md。下一批接Session deferred eligibility、内存采纳、pin/deadline及实际flush；完整K03保持待完成。
 

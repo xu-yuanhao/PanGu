@@ -1685,6 +1685,15 @@ pg_document_loaded_begin:
 .globl pg_document_adoption_prepare
 .type pg_document_adoption_prepare,@function
 pg_document_adoption_prepare:
+ cmp ecx,2
+ jbe .Ladoption_prepare_common
+ mov eax,1
+ ret
+.globl pg_document_adoption_prepare_memory
+.type pg_document_adoption_prepare_memory,@function
+pg_document_adoption_prepare_memory:
+ mov ecx,3
+.Ladoption_prepare_common:
  push rbp
  push rbx
  push r12
@@ -1713,7 +1722,7 @@ pg_document_adoption_prepare:
  jne .Ladoption_prepare_return
  cmp dword ptr [r12+116],1
  jne .Ladoption_prepare_return
- cmp r14d,2
+ cmp r14d,3
  ja .Ladoption_prepare_return
  mov dword ptr [rbx+72],1
  mov dword ptr [r12+112],1
@@ -1749,6 +1758,12 @@ pg_document_adoption_prepare:
  jne .Ladoption_prepare_cleanup
  jmp .Ladoption_prepare_value
 .Ladoption_prepare_written:
+ cmp r14d,3
+ jne .Ladoption_prepare_persisted
+ cmp rdx,[r12+96]
+ jne .Ladoption_prepare_cleanup
+ jmp .Ladoption_prepare_value
+.Ladoption_prepare_persisted:
  cmp r14d,1
  je .Ladoption_prepare_base
  test rax,rax
@@ -1795,6 +1810,8 @@ pg_document_adoption_prepare:
  mov [rbx+40],rax
  test r14d,r14d
  jz .Ladoption_prepare_count
+ cmp r14d,3
+ je .Ladoption_prepare_count
  cmp r14d,1
  je .Ladoption_prepare_reset
  inc rax
@@ -1829,6 +1846,7 @@ pg_document_adoption_prepare:
  pop rbp
  ret
 .size pg_document_adoption_prepare,.-pg_document_adoption_prepare
+.size pg_document_adoption_prepare_memory,.-pg_document_adoption_prepare_memory
 
 .globl pg_document_adoption_apply
 .type pg_document_adoption_apply,@function
@@ -1924,3 +1942,30 @@ pg_document_adoption_discard:
 .Ladoption_discard_return:
  ret
 .size pg_document_adoption_discard,.-pg_document_adoption_discard
+
+.text
+.globl pg_document_adoption_defer
+.type pg_document_adoption_defer,@function
+pg_document_adoption_defer:
+ mov eax,1
+ test rdi,rdi
+ jz .Ladoption_defer_return
+ cmp dword ptr [rdi+72],0
+ jne .Ladoption_defer_return
+ mov ecx,[rdi+76]
+ and ecx,-5
+ cmp ecx,1
+ jne .Ladoption_defer_return
+ mov rax,[rdi+24]
+ cmp rax,[rdi+32]
+ jne .Ladoption_defer_semantics
+ mov [rdi+56],rax
+ mov rax,[rdi+40]
+ mov [rdi+64],rax
+ xor eax,eax
+ ret
+.Ladoption_defer_semantics:
+ mov eax,4
+.Ladoption_defer_return:
+ ret
+.size pg_document_adoption_defer,.-pg_document_adoption_defer

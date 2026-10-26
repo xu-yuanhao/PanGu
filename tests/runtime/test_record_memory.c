@@ -703,7 +703,100 @@ static void held_content_storage(void){
  }
  assert(!pg_pending_ops_close(&q)&&!pg_record_memory_close(&m));
 }
+typedef struct {pg_document_loaded *loaded;pg_pending_ops pending;uint64_t deadline;unsigned base;} deferred_slot;
+typedef struct {deferred_slot slots[8];size_t count;} deferred_token;
+typedef struct {
+ pg_record_memory memory;pg_document_cache cache;pg_record_session session;pg_record_tx tx;pg_document_tx scope;pg_document_definition definition;pg_document_address address;
+ deferred_slot slots[8];size_t count;uint64_t now,within;unsigned prepared,applied,discarded,observed,adopted,published,fail_prepare,fail_apply,checkpoint,flushing,flush_base[8];
+} deferred_fixture;
+static uint64_t deferred_clock(void *context){deferred_fixture *f=context;assert(f->cache.busy);return f->now;}
+static int deferred_pinned(void *context,uint64_t id){deferred_fixture *f=context;for(size_t i=0;i<f->count;++i)if(f->slots[i].loaded->record.id==id)return 1;return 0;}
+static int deferred_prepare(void *context,const pg_document_tx_entry *entries,size_t count,uint64_t within,void **out){
+ deferred_fixture *f=context;++f->prepared;f->within=within;assert(f->session.busy&&f->tx.busy&&f->tx.sealed&&f->scope.busy);*out=0;
+ deferred_token *token=calloc(1,sizeof(*token));if(!token)return PG_DOC_ALLOCATION;*out=token;token->count=f->count;
+ for(size_t i=0;i<f->count;++i){token->slots[i]=f->slots[i];json_object_get(token->slots[i].pending.ops);json_object_get(token->slots[i].pending.leaves);}
+ for(size_t i=0;i<count;++i){const pg_document_tx_entry *entry=entries+i;if(!entry->write)continue;size_t at=0;while(at<token->count&&token->slots[at].loaded!=entry->loaded)++at;
+  if(at==token->count){if(at==8)return PG_DOC_CAPACITY;token->slots[at].loaded=entry->loaded;token->slots[at].deadline=UINT64_MAX;if(pg_pending_ops_open(&token->slots[at].pending))return PG_DOC_INVALID;++token->count;}
+  int status=pg_pending_ops_push(&token->slots[at].pending,entry->prepared.ops);if(status)return status;token->slots[at].base|=entry->kind==1;uint64_t deadline=UINT64_MAX;if(within!=UINT64_MAX&&f->now<=UINT64_MAX-within)deadline=f->now+within;if(deadline<token->slots[at].deadline)token->slots[at].deadline=deadline;
+ }
+ if(f->fail_prepare==2){f->session.failed=PG_RECORDS_STORAGE_FAILED;return PG_DOC_OK;}return f->fail_prepare?PG_DOC_ALLOCATION:PG_DOC_OK;
+}
+static int deferred_apply(void *context,void *candidate){
+ deferred_fixture *f=context;deferred_token *token=candidate;assert(f->session.busy&&f->tx.busy);if(f->fail_apply)return 7;
+ for(size_t i=0;i<f->count;++i)assert(!pg_pending_ops_close(&f->slots[i].pending));f->count=token->count;
+ for(size_t i=0;i<token->count;++i){f->slots[i]=token->slots[i];memset(&token->slots[i].pending,0,sizeof(pg_pending_ops));}token->count=0;++f->applied;
+ for(size_t i=0;i<f->count;++i)assert(!pg_document_cache_touch(&f->cache,&f->slots[i].loaded->record.address));return 0;
+}
+static void deferred_discard(void *context,void *candidate){deferred_fixture *f=context;assert(f->session.busy&&f->scope.busy);++f->discarded;deferred_token *token=candidate;if(token){for(size_t i=0;i<token->count;++i)assert(!pg_pending_ops_close(&token->slots[i].pending));free(token);}}
+static void deferred_observe(void *context,const pg_document_tx_entry *entries,size_t count){
+ deferred_fixture *f=context;assert(f->session.busy&&f->tx.sealed&&f->scope.busy&&f->count);pg_record_tx other={0};assert(pg_record_tx_begin(&other,&f->session,&f->memory,tx_read)==PG_TX_INVALID);
+ for(size_t i=0;i<count;++i)if(entries[i].write)assert(entries[i].loaded->stored_version==entries[i].adoption.stored_version&&entries[i].loaded->deltas_since_base==entries[i].adoption.deltas_since_base);++f->observed;
+}
+static int deferred_adopt(void *context,const struct json_object *writes,uint64_t seq){deferred_fixture *f=context;assert(writes&&seq==f->memory.next_sequence-1);++f->adopted;if(f->flushing)for(size_t i=0;i<f->count;++i){if(f->flush_base[i])f->slots[i].loaded->deltas_since_base=0;else ++f->slots[i].loaded->deltas_since_base;}return 0;}
+static void deferred_publish(void *context,const struct json_object *writes,uint64_t seq){deferred_fixture *f=context;assert(writes&&f->session.sequence==seq);++f->published;if(f->flushing){size_t count=f->count;f->count=0;for(size_t i=0;i<count;++i){assert(!pg_pending_ops_close(&f->slots[i].pending)&&!pg_document_cache_touch(&f->cache,&f->slots[i].loaded->record.address));}}}
+static int deferred_checkpoint(void *context,const struct json_object *value,const struct json_object *ops,uint64_t deltas){deferred_fixture *f=context;assert(value&&ops&&(deltas==1||deltas==UINT64_C(9007199254740991))&&f->tx.sealed);return (int)f->checkpoint;}
+static pg_document_deferred deferred_service(deferred_fixture *f){return (pg_document_deferred){f,deferred_prepare,deferred_apply,deferred_discard,deferred_observe};}
+static void deferred_open(deferred_fixture *f,unsigned scope,unsigned history,unsigned fork){
+ memset(f,0,sizeof(*f));f->now=100;assert(!pg_record_memory_open(&f->memory));char text[1024];const char *scope_text=scope==PG_DOC_SESSION?"{\"kind\":\"session\"}":scope==PG_DOC_TASK?"{\"kind\":\"task\",\"taskId\":100}":"{\"kind\":\"conversation\",\"conversationId\":1}";char policies[96]="";if(scope==PG_DOC_CONVERSATION){int n=snprintf(policies,sizeof(policies),",\"history\":\"%s\",\"fork\":\"%s\"",history==PG_DOC_LATEST?"latest":"rewindable",fork==PG_DOC_INITIAL?"initial":fork==PG_DOC_CURRENT?"current":"asOf");assert(n>0&&(size_t)n<sizeof(policies));}
+ int n=snprintf(text,sizeof(text),"[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"task\",\"value\":{\"id\":100,\"conversationId\":1,\"state\":{\"status\":\"running\"}}},{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"defer\",\"scope\":%s%s},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}]",scope_text,policies);assert(n>0&&(size_t)n<sizeof(text)&&!doc_commit(&f->memory,text)&&!doc_commit(&f->memory,"[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":1,\"ops\":[[\"a\",[\"text\"],\"seed\"]]}}]"));
+ pg_document_storage storage;pg_record_memory_documents(&f->memory,&storage);pg_document_cache_hooks hooks={f,deferred_clock,0,deferred_pinned};assert(!pg_document_cache_open(&f->cache,&storage,&hooks,0));f->session=(pg_record_session){.storage=pg_record_memory_storage(&f->memory),.sequence=2,.context=f,.adopt=deferred_adopt,.publish=deferred_publish};
+ f->definition=(pg_document_definition){.kind={"defer",5},.version=1,.scope=scope,.history=history,.fork=fork};f->address=(pg_document_address){.kind={"defer",5},.owner=scope==PG_DOC_SESSION?0:scope==PG_DOC_TASK?100:1,.scope=scope};
+}
+static void deferred_edit(deferred_fixture *f,const char *suffix){
+ assert(!pg_record_tx_begin(&f->tx,&f->session,&f->memory,tx_read)&&!pg_document_tx_open(&f->scope,&f->tx,&f->cache));pg_document_change *edit=0;assert(!pg_document_tx_get(&f->scope,&f->definition,&f->address,f,deferred_checkpoint,&edit));if(suffix){struct json_object *op=json_object_new_array(),*tuple=json_object_new_array(),*path=json_tokener_parse("[\"text\"]");assert(op&&tuple&&path&&!json_object_array_add(tuple,json_object_new_string("a"))&&!json_object_array_add(tuple,path)&&!json_object_array_add(tuple,json_object_new_string(suffix))&&!json_object_array_add(op,tuple)&&!pg_document_change_append(edit,op));json_object_put(op);}
+}
+static void deferred_flush(deferred_fixture *f){
+ struct json_object *writes=json_object_new_array();assert(writes);for(size_t i=0;i<f->count;++i){pg_document_held_content content={0};struct json_object *empty=json_object_new_array();assert(empty&&!pg_document_store_held(&f->slots[i].pending,empty,f->slots[i].loaded->value,f->slots[i].loaded->value_version,f->slots[i].base,&content));json_object_put(empty);f->flush_base[i]=!strcmp(json_object_get_string(json_object_object_get(content.content,"kind")),"base");struct json_object *write=json_object_new_object();assert(write&&!json_object_object_add(write,"type",json_object_new_string("document.change"))&&!json_object_object_add(write,"id",json_object_new_int64((int64_t)f->slots[i].loaded->record.id))&&!json_object_object_add(write,"content",content.content)&&!json_object_array_add(writes,write));json_object_put(content.ops);}
+ f->flushing=1;assert(!pg_records_commit(&f->session,writes)&&!f->count);f->flushing=0;json_object_put(writes);
+}
+static void deferred_close(deferred_fixture *f){for(size_t i=0;i<f->count;++i)assert(!pg_pending_ops_close(&f->slots[i].pending));f->count=0;assert(!pg_document_cache_close(&f->cache)&&!pg_record_memory_close(&f->memory));}
+static void deferred_memory_transactions(void){
+ _Static_assert(sizeof(pg_document_deferred)==40,"Deferred host ABI");deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);
+ deferred_edit(&f,"a");assert(!pg_document_tx_deferred(&f.scope,0,&host,500)&&f.count==1&&f.observed==1&&!f.adopted&&!f.published&&f.session.sequence==2&&f.memory.next_sequence==3&&f.slots[0].deadline==600&&!f.cache.idle_head);
+ f.now=150;deferred_edit(&f,"b");f.checkpoint=1;assert(!pg_document_tx_deferred(&f.scope,0,&host,1000)&&f.count==1&&f.slots[0].base&&f.slots[0].deadline==600&&f.slots[0].loaded->deltas_since_base==1&&!strcmp(json_object_get_string(json_object_object_get(f.slots[0].loaded->value,"text")),"seedab"));
+ f.now=200;deferred_edit(&f,"c");assert(!pg_document_tx_deferred(&f.scope,0,&host,50)&&f.slots[0].deadline==250&&f.within==50&&pg_pending_ops_size(&f.slots[0].pending)==1);deferred_edit(&f,0);assert(!pg_document_tx_deferred(&f.scope,0,&host,0)&&f.observed==3&&f.prepared==3);
+ deferred_edit(&f,"d");assert(!pg_document_tx_deferred(&f.scope,0,&host,UINT64_MAX)&&f.within==UINT64_MAX&&f.slots[0].deadline==250&&!pg_document_cache_sweep(&f.cache)&&f.cache.count==1);
+ struct json_object *stored=0;assert(!pg_record_memory_document(&f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"seed"));json_object_put(stored);
+ f.fail_prepare=1;deferred_edit(&f,"rejected");assert(pg_document_tx_deferred(&f.scope,0,&host,10)==PG_TX_ALLOCATION&&!f.session.failed&&f.count==1&&!strcmp(json_object_get_string(json_object_object_get(f.slots[0].loaded->value,"text")),"seedabcd"));f.fail_prepare=0;
+ deferred_flush(&f);assert(f.adopted==1&&f.published==1&&f.observed==4&&f.session.sequence==3&&!f.count&&!pg_record_memory_document(&f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"seedabcd")&&!json_object_get_uint64(json_object_object_get(stored,"deltasSinceBase")));json_object_put(stored);deferred_close(&f);
+}
+static void deferred_other_reads_and_documents(void){
+ for(unsigned multiple=0;multiple<2;++multiple){deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);const char *scope=multiple?"{\"kind\":\"conversation\",\"conversationId\":1}":"{\"kind\":\"session\"}";char write[512];int n=snprintf(write,sizeof(write),"[{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"other\",\"scope\":%s%s},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}]",scope,multiple?",\"history\":\"latest\",\"fork\":\"initial\"":"");assert(n>0&&(size_t)n<sizeof(write)&&!doc_commit(&f.memory,write));f.session.sequence=3;
+  pg_document_definition other={.kind={"other",5},.version=1,.scope=multiple?PG_DOC_CONVERSATION:PG_DOC_SESSION,.history=multiple?PG_DOC_LATEST:0,.fork=multiple?PG_DOC_INITIAL:0};pg_document_address address={.kind=other.kind,.scope=other.scope,.owner=multiple?1:0};pg_document_deferred host=deferred_service(&f);f.checkpoint=multiple;deferred_edit(&f,"a");pg_document_change *edit=0;assert(!pg_document_tx_get(&f.scope,&other,&address,0,0,&edit));if(multiple){struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"x\"]]");assert(ops&&!pg_document_change_append(edit,ops));json_object_put(ops);}
+  assert(!pg_document_tx_deferred(&f.scope,0,&host,100)&&f.count==1+multiple&&!f.published&&f.observed==1&&f.memory.next_sequence==4&&!pg_document_cache_sweep(&f.cache)&&f.cache.count==1+multiple);deferred_flush(&f);assert(f.session.sequence==4&&!f.count);deferred_close(&f);
+ }
+}
+static void deferred_counter_cap(void){
+ for(unsigned mixed=0;mixed<2;++mixed){deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);deferred_edit(&f,"a");pg_document_loaded *loaded=f.scope.entries[0].loaded;loaded->deltas_since_base=UINT64_C(9007199254740991);
+  if(mixed){struct json_object *draft=json_tokener_parse("{\"kind\":\"mixed\"}"),*entry=0;assert(draft&&!pg_record_tx_append_entry(&f.tx,1,draft,0,tx_mint,&entry));json_object_put(draft);json_object_put(entry);}
+  int status=pg_document_tx_deferred(&f.scope,0,&host,100);assert(status==(mixed?PG_TX_INVALID:PG_TX_OK)&&!f.session.failed&&f.memory.next_sequence==3&&loaded->deltas_since_base==UINT64_C(9007199254740991)&&f.observed==!mixed&&f.count==!mixed);deferred_close(&f);
+ }
+}
+static void deferred_fallbacks(void){
+ for(unsigned mode=0;mode<9;++mode){deferred_fixture f;deferred_open(&f,mode==0?PG_DOC_SESSION:mode==1?PG_DOC_TASK:PG_DOC_CONVERSATION,mode<2?0:mode==2?PG_DOC_REWINDABLE:PG_DOC_LATEST,mode<2?0:mode==3?PG_DOC_CURRENT:PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);if(mode==4){f.definition.version=2;f.definition.migrate=migrate_document;}
+  pg_document_definition fresh=f.definition;fresh.kind=(pg_slice){"fresh",5};
+  deferred_edit(&f,"!");if(mode==8){struct json_object *seed=json_tokener_parse("{\"text\":\"fresh\"}");assert(seed);pg_document_initializer initial={seed,fork_replacement_initial};pg_document_address address=f.address;address.kind=fresh.kind;pg_document_request request={.definition=&fresh,.address=&address,.initializer=&initial,.mint=tx_mint};pg_document_change *edit=0;assert(!pg_document_tx_doc(&f.scope,&request,&edit));json_object_put(seed);}if(mode==5){struct json_object *draft=json_tokener_parse("{\"kind\":\"extra\"}"),*entry=0;assert(draft&&!pg_record_tx_append_entry(&f.tx,1,draft,0,tx_mint,&entry));json_object_put(draft);json_object_put(entry);}if(mode==6)assert(!pg_document_tx_retire(&f.scope,&f.definition,&f.address));if(mode==7){f.session.read_only=1;}
+  int status=pg_document_tx_deferred(&f.scope,0,&host,100);assert(status==(mode==7?PG_TX_COMMIT_FAILED:PG_TX_OK)&&!f.prepared&&!f.applied&&!f.discarded&&!f.observed&&!f.count&&!f.session.failed&&f.published==(mode==7?0u:1u)&&f.memory.next_sequence==(mode==7?3u:4u));deferred_close(&f);
+ }
+ deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);deferred_edit(&f,"memory");f.fail_apply=1;assert(pg_document_tx_deferred(&f.scope,0,&host,0)==PG_TX_COMMIT_FAILED&&f.session.failed==PG_RECORDS_ADOPTION_FAILED&&!f.observed&&!f.adopted&&!f.published&&f.memory.next_sequence==3&&f.discarded==1);deferred_close(&f);
+ deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);host=deferred_service(&f);deferred_edit(&f,"failed");f.fail_prepare=2;assert(pg_document_tx_deferred(&f.scope,0,&host,0)==PG_TX_COMMIT_FAILED&&f.session.failed==PG_RECORDS_STORAGE_FAILED&&!f.applied&&!f.observed&&!f.adopted&&!f.published&&f.memory.next_sequence==3&&f.discarded==1);deferred_close(&f);
+}
+#ifdef PG_MEMORY_FAULTS
+static void deferred_faults(void){
+ unsigned totals[2]={0};for(unsigned mode=0;mode<2;++mode)for(unsigned attempt=0;attempt<=totals[mode];++attempt){deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);if(mode){deferred_edit(&f,"a");assert(!pg_document_tx_deferred(&f.scope,0,&host,1000));}deferred_edit(&f,"b");
+  doc_tracking=1;doc_calls=0;doc_fail=attempt;int status=pg_document_tx_deferred(&f.scope,0,&host,100);doc_tracking=0;if(!attempt){assert(!status);totals[mode]=doc_calls;}else{assert(status!=PG_TX_OK&&!f.session.failed&&f.count==mode&&f.observed==mode&&f.memory.next_sequence==3&&!f.session.busy&&f.scope.sealed&&!f.scope.entries);if(mode)assert(f.slots[0].deadline==1100&&!strcmp(json_object_get_string(json_object_object_get(f.slots[0].loaded->value,"text")),"seeda")&&!strcmp(json_object_get_string(json_object_array_get_idx(json_object_array_get_idx(f.slots[0].pending.ops,0),2)),"a"));}
+  doc_fail=0;deferred_close(&f);
+ }
+}
+#endif
 int main(void){
+ deferred_memory_transactions();
+ deferred_other_reads_and_documents();
+ deferred_fallbacks();
+ deferred_counter_cap();
+#ifdef PG_MEMORY_FAULTS
+ deferred_faults();
+#endif
  held_content_storage();
  fork_document_acquisition();
  fork_document_rejections();

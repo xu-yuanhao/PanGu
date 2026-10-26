@@ -2,7 +2,7 @@
 
 来源：earendil-works/pi，提交 d5b3de22d0e24a3e9c38a9410d3329b099717283。
 
-本批移植来源：packages/chord/src/delta/pending.ts、packages/durable/src/session/transaction.ts:storeHeld；原生实现为 src/runtime/pending.S。
+本批移植来源：packages/chord/src/delta/pending.ts、packages/durable/src/session/transaction.ts 的 storeHeld/holdable/adoptHeld、session/session.ts 的提交选择；原生实现为 src/runtime/pending.S、document_tx.S、delta.S、records.S。
 
 MIT License
 

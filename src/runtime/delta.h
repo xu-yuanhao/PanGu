@@ -81,6 +81,12 @@ typedef struct {
 pg_document_status pg_document_adoption_prepare(pg_document_adoption *,pg_document_loaded *,const pg_document_prepared *,pg_document_adoption_kind);
 pg_document_status pg_document_adoption_apply(pg_document_adoption *);
 pg_document_status pg_document_adoption_discard(pg_document_adoption *);
+/* Prepare a same-version memory-only value swap without reserving a durable
+   delta increment. Persistent metadata is preserved, including at its cap. */
+pg_document_status pg_document_adoption_prepare_memory(pg_document_adoption *,pg_document_loaded *,const pg_document_prepared *);
+/* Retarget an unconsumed same-version adoption to memory-only metadata;
+   prepared value/expected-state guards remain. Persistent counters stay put. */
+pg_document_status pg_document_adoption_defer(pg_document_adoption *);
 #define PG_PENDING_MAX_OPS 10000
 typedef struct {
  struct json_object *ops,*leaves;

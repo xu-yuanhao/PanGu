@@ -223,8 +223,17 @@
  lea rdi,[r14+32]
  mov rsi,r15
  lea rdx,[r14+16]
+ cmp qword ptr [rbx+120],0
+ je .Ldocs_adoption_durable
+ mov rax,[r15+88]
+ cmp rax,[r15+96]
+ jne .Ldocs_adoption_durable
+ call pg_document_adoption_prepare_memory@PLT
+ jmp .Ldocs_adoption_prepared
+.Ldocs_adoption_durable:
  mov ecx,[r14+144]
  call pg_document_adoption_prepare@PLT
+.Ldocs_adoption_prepared:
  test eax,eax
  jnz .Ldocs_finalize_doc_error
 .Ldocs_adoption_next:
@@ -377,6 +386,8 @@ pg_document_tx_commit:
  xor ecx,ecx
  xor r8d,r8d
  xor r9d,r9d
+ xor r10d,r10d
+ xor r11d,r11d
 .Ldocs_commit_common:
  push rbp
  push rbx
@@ -384,7 +395,11 @@ pg_document_tx_commit:
  push r13
  push r14
  push r15
- sub rsp,120
+ sub rsp,152
+ mov [rsp+120],r10
+ mov [rsp+128],r11
+ mov qword ptr [rsp+136],0
+ mov qword ptr [rsp+144],0
  mov [rsp+104],r8
  mov [rsp+112],r9
  mov [rsp+48],rcx
@@ -497,7 +512,12 @@ pg_document_tx_commit:
  mov rdi,rbx
  lea rsi,[rip+.Ldocs_finalize]
  mov rdx,rsp
- call pg_record_tx_commit_finalized@PLT
+ xor ecx,ecx
+ cmp qword ptr [rsp+120],0
+ je .Ldocs_commit_route_ready
+ lea rcx,[rip+.Ldocs_defer_route]
+.Ldocs_commit_route_ready:
+ call pg_record_tx_commit_routed@PLT
  mov ebp,eax
  test eax,eax
  jz .Ldocs_commit_restore
@@ -513,6 +533,15 @@ pg_document_tx_commit:
  mov [r15+32],rax
  mov rax,[rsp+32]
  mov [r15+40],rax
+ cmp dword ptr [rsp+144],0
+ je .Ldocs_commit_host_done
+ mov dword ptr [r15+48],1
+ mov rax,[rsp+120]
+ mov rdi,[rax]
+ mov rsi,[rsp+136]
+ call [rax+24]
+ mov dword ptr [r15+48],0
+.Ldocs_commit_host_done:
  xor r14d,r14d
 .Ldocs_commit_cleanup:
  cmp r14,r13
@@ -543,7 +572,7 @@ pg_document_tx_commit:
  jmp .Ldocs_commit_cleanup
 .Ldocs_commit_return:
  mov eax,ebp
- add rsp,120
+ add rsp,152
  pop r15
  pop r14
  pop r13
@@ -832,9 +861,31 @@ pg_document_tx_finish:
 .globl pg_document_tx_settle
 .type pg_document_tx_settle,@function
 pg_document_tx_settle:
+ xor edx,edx
+ xor ecx,ecx
+ jmp .Ldoc_scope_settle_common
+.size pg_document_tx_settle,.-pg_document_tx_settle
+.globl pg_document_tx_deferred
+.type pg_document_tx_deferred,@function
+pg_document_tx_deferred:
+ mov eax,1
+ test rdx,rdx
+ jz .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+24],0
+ je .Ldoc_scope_deferred_invalid
+ jmp .Ldoc_scope_settle_common
+.Ldoc_scope_deferred_invalid:
+ ret
+.Ldoc_scope_settle_common:
  push rbx
  push r12
- sub rsp,8
+ sub rsp,24
+ mov [rsp+8],rdx
+ mov [rsp+16],rcx
  mov [rsp],rsi
  mov rbx,rdi
  mov eax,1
@@ -855,17 +906,19 @@ pg_document_tx_settle:
  mov rcx,[rbx+8]
  mov r8,rbx
  mov r9,[rsp]
+ mov r10,[rsp+8]
+ mov r11,[rsp+16]
  call .Ldocs_commit_common
  mov r12d,eax
  mov rdi,rbx
  call .Ldoc_scope_release
  mov eax,r12d
 .Ldoc_scope_finish_return:
- add rsp,8
+ add rsp,24
  pop r12
  pop rbx
  ret
-.size pg_document_tx_settle,.-pg_document_tx_settle
+.size pg_document_tx_deferred,.-pg_document_tx_deferred
 
 .globl pg_document_tx_abort
 .type pg_document_tx_abort,@function
@@ -2126,3 +2179,173 @@ pg_document_tx_retire:
 .Lcopy_source: .asciz "source"
 .Lcopy_at: .asciz "at"
 .Lcopy_current: .asciz "current"
+
+.text
+/* Memory-only routing reuses prepared value guards, then queues its ops through
+   the injected hold service. No Storage/durable publication hooks run here. */
+.Ldocs_defer_route:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r15,[rbx+120]
+ mov rdi,[r12+24]
+ call json_object_array_length@PLT
+ mov [rsp],rax
+ xor r13d,r13d
+ xor r14d,r14d
+.Ldefer_eligible_each:
+ cmp r13,[rbx+8]
+ jae .Ldefer_eligible_count
+ imul rax,r13,152
+ add rax,[rbx]
+ test dword ptr [rax+148],2
+ jnz .Ldefer_fallback
+ cmp qword ptr [rax+112],0
+ je .Ldefer_eligible_next
+ cmp qword ptr [rax+8],0
+ je .Ldefer_fallback
+ test dword ptr [rax+148],1
+ jnz .Ldefer_fallback
+ mov rdx,[rax]
+ cmp dword ptr [rdx+64],1
+ jne .Ldefer_fallback
+ cmp dword ptr [rdx+80],1
+ jne .Ldefer_fallback
+ cmp dword ptr [rdx+84],2
+ jne .Ldefer_fallback
+ mov rcx,[rdx+88]
+ cmp rcx,[rdx+96]
+ jne .Ldefer_fallback
+ inc r14
+.Ldefer_eligible_next:
+ inc r13
+ jmp .Ldefer_eligible_each
+.Ldefer_eligible_count:
+ cmp r14,[rsp]
+ jne .Ldefer_fallback
+ test r14,r14
+ jz .Ldefer_fallback
+ xor r13d,r13d
+.Ldefer_retarget_each:
+ cmp r13,[rbx+8]
+ jae .Ldefer_host_prepare
+ imul rax,r13,152
+ add rax,[rbx]
+ cmp qword ptr [rax+112],0
+ je .Ldefer_retarget_next
+ lea rdi,[rax+32]
+ call pg_document_adoption_defer@PLT
+ test eax,eax
+ jnz .Ldefer_invalid
+.Ldefer_retarget_next:
+ inc r13
+ jmp .Ldefer_retarget_each
+.Ldefer_host_prepare:
+ mov dword ptr [rbx+144],1
+ mov rdi,[r15]
+ mov rsi,[rbx]
+ mov rdx,[rbx+8]
+ mov rcx,[rbx+128]
+ lea r8,[rbx+136]
+ call [r15+8]
+ cmp eax,3
+ je .Ldefer_allocation
+ test eax,eax
+ jnz .Ldefer_invalid
+ mov rax,[r12]
+ cmp dword ptr [rax+52],0
+ jne .Ldefer_adoption_error
+ xor r13d,r13d
+.Ldefer_adopt_each:
+ cmp r13,[rbx+8]
+ jae .Ldefer_host_apply
+ imul rax,r13,152
+ add rax,[rbx]
+ cmp qword ptr [rax+112],0
+ je .Ldefer_adopt_next
+ lea rdi,[rax+32]
+ call pg_document_adoption_apply@PLT
+ test eax,eax
+ jnz .Ldefer_adoption_error
+.Ldefer_adopt_next:
+ inc r13
+ jmp .Ldefer_adopt_each
+.Ldefer_host_apply:
+ mov rdi,[r15]
+ mov rsi,[rbx+136]
+ call [r15+16]
+ test eax,eax
+ jnz .Ldefer_adoption_error
+ cmp qword ptr [r15+32],0
+ je .Ldefer_ok
+ mov rdi,[r15]
+ mov rsi,[rbx]
+ mov rdx,[rbx+8]
+ call [r15+32]
+.Ldefer_ok:
+ mov eax,1
+ jmp .Ldefer_return
+.Ldefer_fallback:
+ xor r13d,r13d
+.Ldefer_persist_each:
+ cmp r13,[rbx+8]
+ jae .Ldefer_persist_ready
+ imul rax,r13,152
+ add rax,[rbx]
+ test dword ptr [rax+148],5
+ jnz .Ldefer_persist_next
+ cmp qword ptr [rax+8],0
+ je .Ldefer_persist_next
+ mov rdx,[rax+72]
+ cmp dword ptr [rax+144],1
+ je .Ldefer_persist_base
+ cmp dword ptr [rax+144],2
+ jne .Ldefer_persist_count
+ mov rcx,9007199254740991
+ cmp rdx,rcx
+ jae .Ldefer_invalid
+ inc rdx
+ jmp .Ldefer_persist_count
+.Ldefer_persist_base:
+ xor edx,edx
+.Ldefer_persist_count:
+ mov [rax+96],rdx
+ mov rcx,[rax+64]
+ mov [rax+88],rcx
+.Ldefer_persist_next:
+ inc r13
+ jmp .Ldefer_persist_each
+.Ldefer_persist_ready:
+ xor eax,eax
+ jmp .Ldefer_return
+.Ldefer_adoption_error:
+ mov rax,[r12]
+ cmp dword ptr [rax+52],0
+ jne .Ldefer_adoption_failed
+ mov dword ptr [rax+52],4
+.Ldefer_adoption_failed:
+ mov dword ptr [rbx+40],6
+ mov eax,2
+ jmp .Ldefer_return
+.Ldefer_allocation:
+ mov dword ptr [rbx+40],4
+ mov eax,2
+ jmp .Ldefer_return
+.Ldefer_invalid:
+ mov dword ptr [rbx+40],1
+ mov eax,2
+.Ldefer_return:
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
