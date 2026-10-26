@@ -346,6 +346,19 @@
  test eax,eax
  jnz .Ldocs_finalize_doc_error
 .Ldocs_finalize_ok:
+ cmp qword ptr [rbx+176],0
+ je .Ldocs_finalize_notifications_ready
+ mov dword ptr [rbx+192],1
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,r12
+ mov rdx,[rbx]
+ mov rcx,[rbx+8]
+ lea r8,[rbx+184]
+ call [rax+8]
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+.Ldocs_finalize_notifications_ready:
  xor ebp,ebp
  jmp .Ldocs_finalize_return
 .Ldocs_finalize_doc_error:
@@ -381,6 +394,16 @@
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
+ cmp qword ptr [rbx+176],0
+ je .Ldocs_adopt_notifications_ready
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,[rbx+184]
+ mov rdx,r13
+ call [rax+16]
+ test eax,eax
+ jnz .Ldocs_adopt_return
+.Ldocs_adopt_notifications_ready:
  xor r14d,r14d
 .Ldocs_adopt_each:
  cmp r14,[rbx+8]
@@ -465,17 +488,38 @@
  pop rbx
  ret
 .Ldocs_publish:
- mov rax,[rdi+32]
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ cmp qword ptr [rbx+176],0
+ je .Ldocs_publish_host
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,[rbx+184]
+ mov rdx,r12
+ mov rcx,r13
+ call [rax+24]
+.Ldocs_publish_host:
+ mov rax,[rbx+32]
  test rax,rax
  jz .Ldocs_publish_return
- mov rdi,[rdi+16]
- jmp rax
+ mov rdi,[rbx+16]
+ mov rsi,r12
+ mov rdx,r13
+ call rax
 .Ldocs_publish_return:
+ pop r13
+ pop r12
+ pop rbx
  ret
 
 .globl pg_document_tx_commit
 .type pg_document_tx_commit,@function
 pg_document_tx_commit:
+ pxor xmm0,xmm0
  xor ecx,ecx
  xor r8d,r8d
  xor r9d,r9d
@@ -483,13 +527,18 @@ pg_document_tx_commit:
  xor r11d,r11d
  xor eax,eax
 .Ldocs_commit_common:
+ /* Internal entry carries the optional notification descriptor in xmm0;
+    capture before calling any provider. Public layouts remain unchanged. */
  push rbp
  push rbx
  push r12
  push r13
  push r14
  push r15
- sub rsp,184
+ sub rsp,216
+ movq [rsp+176],xmm0
+ mov qword ptr [rsp+184],0
+ mov dword ptr [rsp+192],0
  mov [rsp+152],rax
  mov qword ptr [rsp+160],0
  mov qword ptr [rsp+168],0
@@ -648,6 +697,13 @@ pg_document_tx_commit:
  call [rax+24]
  mov dword ptr [r15+48],0
 .Ldocs_commit_merge_done:
+ cmp dword ptr [rsp+192],0
+ je .Ldocs_commit_notifications_done
+ mov rax,[rsp+176]
+ mov rdi,[rax]
+ mov rsi,[rsp+184]
+ call [rax+32]
+.Ldocs_commit_notifications_done:
  xor r14d,r14d
 .Ldocs_commit_cleanup:
  cmp r14,r13
@@ -679,7 +735,7 @@ pg_document_tx_commit:
  jmp .Ldocs_commit_cleanup
 .Ldocs_commit_return:
  mov eax,ebp
- add rsp,184
+ add rsp,216
  pop r15
  pop r14
  pop r13
@@ -968,6 +1024,7 @@ pg_document_tx_finish:
 .globl pg_document_tx_settle
 .type pg_document_tx_settle,@function
 pg_document_tx_settle:
+ xor r9d,r9d
  xor r8d,r8d
  xor edx,edx
  xor ecx,ecx
@@ -976,6 +1033,7 @@ pg_document_tx_settle:
 .globl pg_document_tx_deferred
 .type pg_document_tx_deferred,@function
 pg_document_tx_deferred:
+ xor r9d,r9d
  xor r8d,r8d
 .Ldoc_scope_deferred_check:
  mov eax,1
@@ -993,6 +1051,7 @@ pg_document_tx_deferred:
 .globl pg_document_tx_deferred_merge
 .type pg_document_tx_deferred_merge,@function
 pg_document_tx_deferred_merge:
+ xor r9d,r9d
  mov eax,1
  test r8,r8
  jz .Ldoc_scope_deferred_invalid
@@ -1007,6 +1066,7 @@ pg_document_tx_deferred_merge:
 .globl pg_document_tx_merge
 .type pg_document_tx_merge,@function
 pg_document_tx_merge:
+ xor r9d,r9d
  mov eax,1
  test rdx,rdx
  jz .Ldoc_scope_deferred_invalid
@@ -1021,10 +1081,40 @@ pg_document_tx_merge:
  xor ecx,ecx
  jmp .Ldoc_scope_settle_common
 .size pg_document_tx_merge,.-pg_document_tx_merge
+.globl pg_document_tx_observed
+.type pg_document_tx_observed,@function
+pg_document_tx_observed:
+ mov eax,1
+ test rcx,rcx
+ jz .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rcx+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rcx+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rcx+24],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rcx+32],0
+ je .Ldoc_scope_deferred_invalid
+ mov r9,rcx
+ mov r8,rdx
+ test r8,r8
+ jz .Ldoc_scope_observed_ready
+ cmp qword ptr [r8+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+24],0
+ je .Ldoc_scope_deferred_invalid
+.Ldoc_scope_observed_ready:
+ xor edx,edx
+ xor ecx,ecx
+ jmp .Ldoc_scope_settle_common
+.size pg_document_tx_observed,.-pg_document_tx_observed
 .Ldoc_scope_settle_common:
  push rbx
  push r12
  sub rsp,40
+ mov [rsp+32],r9
  mov [rsp+24],r8
  mov [rsp+8],rdx
  mov [rsp+16],rcx
@@ -1051,6 +1141,7 @@ pg_document_tx_merge:
  mov r10,[rsp+8]
  mov r11,[rsp+16]
  mov rax,[rsp+24]
+ movq xmm0,[rsp+32]
  call .Ldocs_commit_common
  mov r12d,eax
  mov rdi,rbx

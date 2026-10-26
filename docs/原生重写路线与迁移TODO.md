@@ -111,6 +111,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植同步listener注册/取消/分发宿主：身份去重、通知快照、内部失败锁存、外部错误报告和一次关闭清理。
 - [x] 移植observed/stored publication构造：普通表过滤/顺序、observed与stored文档集合分离、memory与held-only通知、共享对象身份和内部先通知。
 - [x] 移植Document计划的通知描述：退休/复制优先级、创建空ops、迁移空ops保留、可选conversation与独立输出所有权。
+- [x] 接通DocTx持久提交的通知宿主：准入前准备、确认时补序号、退休前独立持有、成功后发布及全部路径清理，保留原钩子。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -488,3 +489,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S:pg_document_publication_prepare`以明确字段描述一个计划的通知，退休优先于复制，退休无version/null value/空ops；copy只带record/conversation/source；新内容空ops，loaded更新保留精确prepared ops，迁移即使ops为空也可发布。所有输入仅在调用中借用，结果独立持有record/value/ops；无发布标记返回空结果。
 - 36组执行实际Pi describe函数，数据与缺省字段一致；原生所有权和13个直接分配/插入/部分复制故障通过。专项/完整Runtime见当前实现记录。
 - 下一行为：在DocTx finalizer中准备通知及生命周期stamp，adopt时无分配补seq；保留退休前的独立数据，再经Session发布。当前描述入口消费最终record，不宣称已经自动捕获DocTx/holds通知；task-scope conversation仍由上层计划解析提供。
+
+### K03 DocTx实际通知管线交接
+
+- 阅读固定Pi d5b3de22 Transaction.adopt/describe与Session.#runCommit/#publish；原生DocTx finalizer、adoption、retirement eviction和publish路径逐一核对。Pi origin保持89c921d，Harness保持22ddee37。
+- `document_tx.h/.S:pg_document_tx_observed`以独立40字节通知宿主扩展持久结算，既有公开布局不变；可组合原held merge。finalizer在准备/校验/checkpoint/merge/adoption reservation后调用prepare，Storage确认先调用无分配adopt补序号，原生采纳/退休/安装之后才publish；尝试prepare后任何失败或成功都discard，原Session adopt/publish钩子保留。
+- 真实MemoryStorage验证编辑、退休、partial prepare失败、adopt失败和Storage失败五条路径；prepare构造实际Document通知，退休预备stamp在确认时原地补seq，驱逐后publish仍持有独立record，成功才通知，所有路径清理一次。专项/完整Runtime见当前实现记录。
+- 下一行为：提供Session通知宿主的默认实现，捕获完整DocTx/held observed与stored集合、table batch和关闭；deferred memory及holds单独flush继续接线。当前接口已进入实际DocTx，但默认Session通知服务/Document watch仍未完成。

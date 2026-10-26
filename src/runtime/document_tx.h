@@ -141,4 +141,26 @@ pg_record_tx_status pg_document_tx_deferred_merge(pg_document_tx *,const pg_docu
 /* finish delegates to settle with no committed-document scanner. */
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);
+typedef struct {
+ void *context;
+ /* After checkpoint/merge/adoption preparation, before Storage. Capture owned
+    notifications here, before retirement can evict loaded handles. A partial
+    token is always discarded. 0 success, otherwise pg_document_status. */
+ int (*prepare)(void *,pg_record_tx *,const pg_document_tx_entry *,size_t,void **);
+ /* Allocation-free confirmation before native loaded/install/retire adoption.
+    Stamp only prepared notification state; do not publish here. */
+ int (*adopt)(void *,void *,uint64_t sequence);
+ /* After successful settlement/adoption. All JSON is borrowed until return.
+    Callback contains its own subscriber errors; cannot fail the stored commit. */
+ void (*publish)(void *,void *,const struct json_object *writes,uint64_t sequence);
+ void (*discard)(void *,void *);
+} pg_document_notifications;
+/* Stored settlement with optional held merge and a borrowed notification host.
+   Existing scope/scan/merge semantics apply. Preparation failures precede
+   Storage and preserve Session health; adopt failures latch Session failure.
+   discard runs once after any attempted prepare, before candidate cleanup,
+   including Storage failure and partial prepare. Existing hooks are preserved.
+   The host/its token remain valid only through this synchronous call. */
+pg_record_tx_status pg_document_tx_observed(pg_document_tx *,const pg_document_scan *,
+ const pg_document_merge *,const pg_document_notifications *);
 #endif

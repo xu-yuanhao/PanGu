@@ -492,3 +492,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写独立通知描述入口，退休优先于copy，退休null value/空ops/无version；copy保留source；创建空ops，loaded更新与迁移保留prepared ops；Session-scope省略conversation。输出独立拥有record/value/ops，避免退休驱逐后读取已释放loaded句柄。入口接收最终record与上层解析的conversation，生命周期stamp/自动计划捕获继续接入。
 - 实际验证：36组执行实际Pi describe函数，对照创建/更新/空ops迁移/退休/copy及优先级、缺省字段；原生输入/输出隔离和13个直接分配/插入/部分复制故障通过。最初局部代码label与rodata同名，汇编器拒绝后改为独立key label，最终树重跑通过。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan与固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有Session独立描述契约/导出/来源、专项和TODO；旧ABI、门禁、预算保持。6个候选路径内容清单摘要（本记录加入前）：38208b691ed1723b676568ecf23c927c8563b9103dac6ca8b3282233fb3d787a；隔离核心树2cccbb834825ccbe65a70f34d6a021e51603cc1b。结论为计划通知描述本地通过；finalizer预备、adoption补stamp与Session/holds实际通知接线、Document watch继续，K03总验收未完成。TUI工作树保留。
+
+## K03 DocTx持久提交实际通知管线
+
+- 来源：Pi d5b3de22 Transaction.adopt/describe与Session.#runCommit/#publish，对照原生DocTx finalizer/adoption/install/retire/publish生命周期。fetch后Pi origin保持89c921d，Harness保持22ddee37。
+- 实现：手写pg_document_tx_observed与40字节通知宿主，持久结算可组合held merge；finalizer末尾Storage前prepare，确认时无分配adopt补seq，native采纳/安装/驱逐后publish，任何已尝试prepare的路径都discard。既有原Session adopt/publish钩子保留，旧结构布局不变；内部结算上下文显式持有descriptor/token/attempted标志。
+- 实际验证：真实MemoryStorage编辑、退休、partial prepare失败、adopt失败和Storage失败五条路径；准备实际Document通知、确认时原地补退休stamp、驱逐后仍可发布独立record，失败不发布且token清理一次，首因/Storage序号符合实际结果。测试最初误写错误枚举名及json-c setter成功值，按公开头修正后重新验证。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享与隔离核心G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：既有DocTx独立服务/导出/来源、专项和TODO；公开旧ABI、门禁、预算保持。5个候选路径内容清单摘要（本记录加入前）：98e5534713256962f5bd4be4d709efddeb129d4035528fc16df5a5344575ae30；隔离核心树d0f4f829e37264e10ecaa78212ece4178a165b0e。结论为持久DocTx通知管线本地通过；默认Session通知宿主、deferred/holds通知集合及Document watch继续接入，K03总验收未完成。TUI工作树保留。

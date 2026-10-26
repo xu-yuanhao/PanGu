@@ -969,6 +969,17 @@ static void deferred_flush(deferred_fixture *f){
  f->flushing=1;assert(!pg_records_commit(&f->session,writes)&&!f->count);f->flushing=0;json_object_put(writes);
 }
 static void deferred_close(deferred_fixture *f){for(size_t i=0;i<f->count;++i)assert(!pg_pending_ops_close(&f->slots[i].pending));f->count=0;assert(!pg_document_cache_close(&f->cache)&&!pg_record_memory_close(&f->memory));}
+typedef struct {deferred_fixture *fixture;unsigned mode,prepared,adopted,published,discarded;struct json_object *notice,*stamp;uint64_t sequence;} notification_fixture;
+static int notification_prepare(void *ctx,pg_record_tx *tx,const pg_document_tx_entry *entries,size_t count,void **token){notification_fixture *f=ctx;assert(tx->busy&&tx->sealed&&count==1&&entries[0].prepared.ops&&entries[0].loaded);++f->prepared;*token=f;struct json_object *record=0;assert(!json_object_deep_copy(entries[0].loaded->record_owner,&record,0));unsigned flags=PG_NOTICE_PUBLISHES;if(entries[0].reserved&2){flags|=PG_NOTICE_RETIRE;assert(!json_object_object_add(record,"retiredAt",json_object_new_int64(0)));}pg_document_publication_request request={record,0,entries[0].prepared.value,entries[0].prepared.ops,1,entries[0].loaded->value_version,flags,0};int status=pg_document_publication_prepare(&request,&f->notice);json_object_put(record);if(status)return PG_DOC_ALLOCATION;if(flags&PG_NOTICE_RETIRE)f->stamp=json_object_object_get(json_object_object_get(f->notice,"record"),"retiredAt");return f->mode==1?PG_DOC_INITIAL_FAILED:0;}
+static int notification_adopt(void *ctx,void *token,uint64_t seq){notification_fixture *f=ctx;assert(token==f&&f->notice&&!f->published);++f->adopted;f->sequence=seq;if(f->stamp)assert(json_object_set_int64(f->stamp,(int64_t)seq));return f->mode==2?1:0;}
+static void notification_publish(void *ctx,void *token,const struct json_object *writes,uint64_t seq){notification_fixture *f=ctx;assert(token==f&&f->adopted&&f->sequence==seq&&json_object_array_length(writes));++f->published;if(f->stamp)assert(json_object_get_uint64(f->stamp)==seq);else assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(f->notice,"value"),"text")),"seednotice"));}
+static void notification_discard(void *ctx,void *token){notification_fixture *f=ctx;assert(token==f);++f->discarded;json_object_put(f->notice);f->notice=0;f->stamp=0;}
+static int notification_storage_failure(void *ctx,const struct json_object *writes,pg_records_adopt adopt,void *owner,uint64_t *seq){(void)ctx;(void)writes;(void)adopt;(void)owner;(void)seq;return 7;}
+static void document_notification_pipeline_tests(void){
+ _Static_assert(sizeof(pg_document_notifications)==40,"notification host ABI");
+ for(unsigned mode=0;mode<5;++mode){deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);notification_fixture fixture={.fixture=&f,.mode=mode};pg_document_notifications host={&fixture,notification_prepare,notification_adopt,notification_publish,notification_discard};deferred_edit(&f,"notice");if(mode==3)assert(!pg_document_tx_retire(&f.scope,&f.definition,&f.address));if(mode==4)f.session.storage.commit=notification_storage_failure;uint64_t seq=f.memory.next_sequence;int status=pg_document_tx_observed(&f.scope,0,0,&host);assert(fixture.prepared==1&&fixture.discarded==1&&!fixture.notice&&!f.tx.busy&&!f.scope.entries);if(mode==1){assert(status!=PG_TX_OK&&!fixture.adopted&&!fixture.published&&!f.session.failed&&f.memory.next_sequence==seq);}else if(mode==4){assert(status==PG_TX_COMMIT_FAILED&&!fixture.adopted&&!fixture.published&&f.session.failed==PG_RECORDS_STORAGE_FAILED&&f.memory.next_sequence==seq);}else if(mode==2){assert(status==PG_TX_COMMIT_FAILED&&fixture.adopted==1&&!fixture.published&&f.session.failed==PG_RECORDS_ADOPTION_FAILED&&f.memory.next_sequence==seq+1);}else{assert(!status&&fixture.adopted==1&&fixture.published==1&&!f.session.failed&&f.memory.next_sequence==seq+1);if(mode==3)assert(!f.cache.count);}deferred_close(&f);}
+ puts("PASS: real DocTx notifications prepare before Storage, sequence adoption, publish, retirement ownership and failure cleanup");
+}
 static void deferred_memory_transactions(void){
  _Static_assert(sizeof(pg_document_deferred)==40,"Deferred host ABI");deferred_fixture f;deferred_open(&f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);pg_document_deferred host=deferred_service(&f);
  deferred_edit(&f,"a");assert(!pg_document_tx_deferred(&f.scope,0,&host,500)&&f.count==1&&f.observed==1&&!f.adopted&&!f.published&&f.session.sequence==2&&f.memory.next_sequence==3&&f.slots[0].deadline==600&&!f.cache.idle_head);
@@ -1425,6 +1436,7 @@ int main(void){
  reader_faults();
 #endif
  deferred_memory_transactions();
+ document_notification_pipeline_tests();
  deferred_other_reads_and_documents();
  deferred_fallbacks();
  deferred_counter_cap();
