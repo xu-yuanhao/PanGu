@@ -267,3 +267,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly 80字节adoption，准入前复制Prepared值并保留expected值引用，记录stored/value version、deltas、incarnation，避免引用地址复用。apply仅验证预期状态并交换已准备值、调整持久版本/重放计数；空ops不替换物化值，迁移base仍更新stored version并重置计数。重复/过期候选拒绝；discard释放未发布所有权。目标loaded句柄由Session执行线保持有效。
 - 实际验证：12个结果执行实际Pi adopt方法体及实际Chord tracker一致；O0/O2 ASan/UBSan覆盖竞争候选、重复采纳、迁移/无编辑identity、输入隔离及准备阶段逐直接分配/部分复制故障。真实MemoryStorage与records adopt/publish组合验证成功、adopt前失败、adopt后后端报错；失败前保留旧值，失败后保留已采纳值并锁存Session，不发布伪成功。apply内启用故障注入记录到0次分配。完整Runtime、隔离核心暂存树G00/Assembly清单/产品构建及共享G00通过。
 - 同一实施Agent自审：扩展现有模块实际导出/adoption布局与参考登记，无门禁预算修改。7个候选路径/暂存内容清单摘要（加入本记录前）：1f1597f4aa0a9dd22af0bcb71b8c1c8279b5c250f71f14f8fdba01fd6cd20a42。结论为本地候选通过；统一Doc事务、creation install/retirement evict、checkpoint回调及holds仍待完成，K03未完成。
+
+## K03 多loaded文档统一结算（2026-10-26）
+
+- 来源：固定Pi Transaction.settleSuccess/assemble/adopt/discard、Session.runCommit同步adopt与发布。先prepare所有编辑，再检查生成计划，最后执行checkpoint并准备adoption；Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly document_tx模块以152字节entry描述借用的loaded/edit及内部Prepared/adoption/write所有权。records提供sealed settlement finalizer；Doc finalizer生成写入并在checkpoint前验证owner/复制源约束，准备完再交Storage。同步adopt依次采纳全部loaded值，再调用原Session adopt；publish保持原回调并在返回时恢复context/hooks。成功/失败均释放未转交候选并封闭编辑；调用参数前置拒绝不改调用者状态。空编辑不提交Storage。
+- 实际验证：真实MemoryStorage验证双文档base、delta+普通表混合、空编辑identity、checkpoint拒绝、owner/生成计划复制源错误不调用predicate、原回调恢复。O0/O2 ASan/UBSan逐直接分配/插入/部分复制故障遍历通过，失败保留旧文档且无存储半批；Prepared/编辑清理。补充连续提交时将测试断言从仅首次发布改为每次adopt计数先于publish计数（原顺序要求保留）；最终完整Runtime退出0，原Pi/Chord各对照继续通过。隔离暂存核心树G00、Assembly清单与产品构建、共享G00通过。
+- 同一实施Agent自审：新增两个实际产品文件/模块、构建依赖与导出登记，不修改门禁或预算。10个候选路径/暂存内容清单摘要（加入本记录前）：8cda625dcdeb1c1094fca7f0b534d4e6ea2e92f71aaf7fecb01bd96d70a8e80e。TUI待交接登记保留工作树，未混入本核心提交。结论为本地候选通过；自动Doc获取、创建安装/退役驱逐、holds与应用消息投影仍待接入，K03未完成。

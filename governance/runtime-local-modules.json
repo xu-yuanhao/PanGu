@@ -909,7 +909,9 @@
         "pg_record_tx_fork_conversation",
         "pg_record_tx_scan",
         "pg_record_tx_latest_head",
-        "pg_record_tx_create"
+        "pg_record_tx_create",
+        "pg_record_tx_commit_finalized",
+        "pg_record_tx_validate_batch"
       ],
       "reference_basis": [
         {
@@ -922,7 +924,7 @@
             "packages/durable/src/session/forks.ts",
             "packages/durable/src/harness/harness.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-forks.test.ts",
@@ -1018,6 +1020,37 @@
             "packages/durable/src/session/transaction.ts"
           ],
           "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation; Transaction.adopt loaded incarnation and Chord Tracker.adopt: pre-admission detached candidate, expected-base metadata guard, allocation-free value swap, migration/no-op identity and persisted replay counters"
+        }
+      ]
+    },
+    {
+      "id": "session.documents.transaction.local.v0",
+      "sources": [
+        "src/runtime/document_tx.h",
+        "src/runtime/document_tx.S"
+      ],
+      "dependencies": [
+        "session.records.local.v0",
+        "session.documents.delta.local.v0",
+        "json-c"
+      ],
+      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup",
+      "exports": [
+        "pg_document_tx_commit"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/session/transaction.ts",
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI",
+          "tests_to_read": [
+            "packages/durable/test/session-documents.test.ts",
+            "packages/durable/test/session-adoption.test.ts"
+          ]
         }
       ]
     }

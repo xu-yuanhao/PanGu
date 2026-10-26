@@ -610,10 +610,21 @@ pg_record_tx_discard:
 .globl pg_record_tx_commit
 .type pg_record_tx_commit,@function
 pg_record_tx_commit:
+ xor esi,esi
+ xor edx,edx
+ jmp .Ltx_commit_common
+.globl pg_record_tx_commit_finalized
+.type pg_record_tx_commit_finalized,@function
+pg_record_tx_commit_finalized:
+.Ltx_commit_common:
  push rbx
  push r12
+ push r13
+ push r14
  sub rsp,8
  mov rbx,rdi
+ mov r13,rsi
+ mov r14,rdx
  mov eax,1
  test rbx,rbx
  jz .Ltx_commit_return
@@ -637,6 +648,18 @@ pg_record_tx_commit:
  call .Ltx_validate_owners
  test eax,eax
  jnz .Ltx_commit_plan_failed
+ test r13,r13
+ jz .Ltx_commit_storage
+ mov rdi,r14
+ mov rsi,rbx
+ call r13
+ test eax,eax
+ jnz .Ltx_commit_plan_failed
+ mov rdi,rbx
+ call pg_record_tx_validate_batch
+ test eax,eax
+ jnz .Ltx_commit_plan_failed
+.Ltx_commit_storage:
  mov rdi,[rbx]
  mov rsi,[rbx+24]
  call pg_records_commit
@@ -658,10 +681,13 @@ pg_record_tx_commit:
  mov eax,1
 .Ltx_commit_return:
  add rsp,8
+ pop r14
+ pop r13
  pop r12
  pop rbx
  ret
 .size pg_record_tx_commit,.-pg_record_tx_commit
+.size pg_record_tx_commit_finalized,.-pg_record_tx_commit_finalized
 .section .rodata
 .Ltx_types: .long .Ltx_conversation-.Ltx_types,.Ltx_entry-.Ltx_types,.Ltx_task-.Ltx_types,.Ltx_submission-.Ltx_types,.Ltx_create-.Ltx_types,.Ltx_copy-.Ltx_types,.Ltx_change-.Ltx_types,.Ltx_retire-.Ltx_types
 .Ltx_conversation: .asciz "conversation"
@@ -2637,3 +2663,25 @@ pg_record_tx_create:
 .Ltx_state: .asciz "state"
 .Ltx_terminal: .asciz "terminal"
 .Ltx_completing: .asciz "completing"
+
+.text
+.globl pg_record_tx_validate_batch
+.type pg_record_tx_validate_batch,@function
+pg_record_tx_validate_batch:
+ push rbx
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Ltx_validate_batch_return
+ cmp qword ptr [rbx+24],0
+ je .Ltx_validate_batch_return
+ mov rdi,[rbx+24]
+ call .Ltx_copy_conflicts
+ test eax,eax
+ jnz .Ltx_validate_batch_return
+ mov rdi,rbx
+ call .Ltx_validate_owners
+.Ltx_validate_batch_return:
+ pop rbx
+ ret
+.size pg_record_tx_validate_batch,.-pg_record_tx_validate_batch

@@ -149,4 +149,12 @@ typedef struct {
    matching a failed creating callback. Commit/discard are refused while a
    creation callback (including nested creations) is active. */
 pg_record_tx_status pg_record_tx_create(pg_record_tx *,const pg_conversation_request *,const pg_conversation_host *,struct json_object **);
+/* Session-owned settlement extension. finalize runs once with Tx sealed/busy,
+   after existing plans validate, and must prepare any added writes privately.
+   Returns 0 on success; nonzero rejects before Storage without failing Session.
+   The final batch is validated again before admission. */
+pg_record_tx_status pg_record_tx_commit_finalized(pg_record_tx *,int (*finalize)(void *,pg_record_tx *),void *);
+/* Internal mutation-line validation used during a settlement finalizer;
+   may invoke injected committed reads. 0 valid, nonzero invalid. */
+int pg_record_tx_validate_batch(pg_record_tx *);
 #endif

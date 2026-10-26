@@ -140,6 +140,10 @@
     "src/runtime/delta.S": {
       "role": "assembly-core",
       "reason": "手写Chord解码delta路径校验、七种操作与单/多批私有值重放；json-c和utf8proc承担成熟基础能力"
+    },
+    "src/runtime/document_tx.S": {
+      "role": "assembly-core",
+      "reason": "手写多文档事务准备、验证后的checkpoint、同步adoption和失败清理；复用已有records/delta服务"
     }
   }
 }
