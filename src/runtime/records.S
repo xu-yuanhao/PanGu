@@ -3081,3 +3081,78 @@ pg_record_tx_submission_by_request:
  ret
 .size pg_record_tx_submission_by_request,.-pg_record_tx_submission_by_request
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_entry
+.type pg_record_tx_entry,@function
+pg_record_tx_entry:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdx
+ mov r12,rcx
+ mov r13,rdi
+ mov eax,1
+ test r12,r12
+ jz .Ltyped_entry_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Ltyped_entry_read
+ cmp qword ptr [rbx+8],0x7fffffff
+ ja .Ltyped_entry_end
+ cmp qword ptr [rbx+8],0
+ je .Ltyped_entry_read
+ cmp qword ptr [rbx],0
+ je .Ltyped_entry_end
+.Ltyped_entry_read:
+ mov rdx,rsi
+ mov esi,1
+ mov rcx,r12
+ call pg_record_tx_read@PLT
+ test eax,eax
+ jnz .Ltyped_entry_end
+ test rbx,rbx
+ jz .Ltyped_entry_end
+ mov dword ptr [r13+32],1
+ mov rdi,[r12]
+ lea rsi,[rip+.Ltyped_entry_kind]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,6
+ jne .Ltyped_entry_missing
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ cmp rax,[rbx+8]
+ jne .Ltyped_entry_missing
+ test rax,rax
+ jz .Ltyped_entry_match
+ mov rdi,[rsp]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,[rbx]
+ mov rdx,[rbx+8]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Ltyped_entry_missing
+.Ltyped_entry_match:
+ xor eax,eax
+ jmp .Ltyped_entry_unlock
+.Ltyped_entry_missing:
+ mov rdi,[r12]
+ mov qword ptr [r12],0
+ call json_object_put@PLT
+ mov eax,7
+.Ltyped_entry_unlock:
+ mov dword ptr [r13+32],0
+.Ltyped_entry_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_entry,.-pg_record_tx_entry
+.section .rodata
+.Ltyped_entry_kind: .asciz "kind"
+.section .note.GNU-stack,"",@progbits

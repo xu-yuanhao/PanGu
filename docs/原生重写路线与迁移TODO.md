@@ -97,6 +97,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 组合Durable Session事务admission、holds/cache/timer服务与分阶段关闭：封闭新工作、完成已接收事务、排空timer job、保存/清理后关闭缓存及后端，保留首因。
 - [x] 接通当前与Entry历史只读快照：已采纳内存值、缓存同版本快路径、fork原会话/序号解析、隔离迁移、历史生命周期与读取失败守卫。
 - [x] 接通conversation/request ID的提交态索引与Tx查询：按批次原顺序覆盖/移除，保留写后读屏障和owned结果。
+- [x] 接通类型化Entry提交态读取：可选精确kind过滤、缺失/不匹配、owned结果及原事务读屏障。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -380,3 +381,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - records提供独立request query/provider和Tx查询入口；record_memory原地维护私有json-c请求索引，逐原批次写入顺序更新，再压缩最终ID候选。旧key仅在此ID仍为winner时删除；winner改名不恢复被覆盖记录。索引在准备阶段构造，随rows确认后一起安装；索引由row allocation私有头持有，公开Memory48/Row32与原ABI保持，关闭统一释放。
 - 验证：80轮随机批次和640次查找并入实际Pi MemoryStorage差异测试，总5982操作通过；同batch重复ID、改名、移除、空/NUL key、conversation变化、事务屏障/partial错误与输出隔离通过。新索引/rows33、已有索引更新60、Storage/Tx读取各8故障点；专项和完整Runtime结果见当前实现记录。
 - 下一行为：补齐类型化Entry读取及剩余K03事务构造/查询覆盖，总验收保持未勾选。
+
+### K03 类型化Entry交接
+
+- 阅读固定Pi d5b3de22 Transaction.entry(first,second)与#read调用；records.S新增pg_record_tx_entry，复用既有committed read后执行精确长度/字节kind筛选。NULL kind接受任意类型，空kind与缺省分离，NUL保留；结果/错误清理、table-write barrier和sealed规则复用既有读取。
+- 验证：20组实际Pi Transaction.entry方法差异；真实MemoryStorage的NUL/空kind、missing、table-write/sealed、部分复制错误和owned输出清理通过。专项与完整Runtime结果记入当前实现记录；原ABI保持。
+- 下一行为：K03剩余事务构造、状态候选与整体验收继续对照源码补齐。

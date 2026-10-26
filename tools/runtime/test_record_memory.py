@@ -343,6 +343,30 @@ console.log(JSON.stringify(out));
         finally:library.json_object_put(value)
     print(f'PASS: {len(cases)} historical snapshot value/point/owner/failure results match actual Pi snapshotAsOf and GuardedStorage')
 
+def typed_entries(native,library):
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('entry(first:'),end=source.indexOf('\n\ttask(',start);const text='class Probe{#host;#context={};constructor(value){this.#host={storage:{entry:async()=>value===null?undefined:{entry:value}}}}#read(name,fn){return fn()}'+source.slice(start,end)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8')))out.push((await new Probe(c.value).entry(c.kind===null?3:{kind:c.kind},3))??null);console.log(JSON.stringify(out));
+'''
+    cases=[dict(value=value,kind=kind) for value in [None,dict(id=3,kind=''),dict(id=3,kind='k\0中'),dict(id=3,kind='k')] for kind in [None,'','k','k\0中','other']]
+    want=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    native.pg_record_tx_entry.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint64,ctypes.POINTER(Slice),ctypes.POINTER(ctypes.c_void_p)]
+    for case,expected in zip(cases,want,strict=True):
+        @read_type
+        def read(ctx,table,id,out):
+            assert table==1 and id==3
+            if case['value'] is None:return 1
+            out[0]=library.json_tokener_parse(json.dumps(case['value']).encode());return 0
+        writes=library.json_tokener_parse(b'[]');tx=Tx(None,None,ctypes.cast(read,ctypes.c_void_p),writes);output=ctypes.c_void_p();key=(case['kind']or'').encode();buffer=ctypes.create_string_buffer(key);kind=Slice(ctypes.addressof(buffer),len(key))
+        try:
+            status=native.pg_record_tx_entry(ctypes.byref(tx),3,ctypes.byref(kind) if case['kind'] is not None else None,ctypes.byref(output));assert status in (0,7)
+            actual=json.loads(library.json_object_to_json_string_ext(output,0)) if output.value else None
+            assert actual==expected and not tx.busy,(case,actual,expected)
+        finally:library.json_object_put(output);library.json_object_put(writes)
+    print(f'PASS: {len(cases)} typed Entry lookups match actual Pi Transaction.entry body')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -622,5 +646,6 @@ def main():
         owner_validation(native,library)
         loaded_access(native,library)
         historical_snapshots(native,library)
+        typed_entries(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

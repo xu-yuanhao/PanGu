@@ -65,6 +65,12 @@ typedef struct {
    synchronous batch owner; these calls retain no asynchronous operation. */
 pg_record_tx_status pg_record_tx_begin(pg_record_tx *,pg_record_session *,void *,int (*)(void *,unsigned,uint64_t,struct json_object **));
 pg_record_tx_status pg_record_tx_read(pg_record_tx *,unsigned,uint64_t,struct json_object **);
+typedef struct {const char *data;size_t size;} pg_entry_kind;
+/* Committed Entry lookup. NULL kind accepts every kind; an explicit empty
+   slice matches only the empty kind. Exact UTF-8 bytes include embedded NUL.
+   Missing/wrong kind returns MISSING, with no owned output. The existing Tx
+   read barrier and provider ownership/error rules apply. */
+pg_record_tx_status pg_record_tx_entry(pg_record_tx *,uint64_t id,const pg_entry_kind *,struct json_object **);
 pg_record_tx_status pg_record_tx_stage(pg_record_tx *,pg_record_tx_write,const struct json_object *);
 pg_record_tx_status pg_record_tx_commit(pg_record_tx *);
 pg_record_tx_status pg_record_tx_discard(pg_record_tx *);

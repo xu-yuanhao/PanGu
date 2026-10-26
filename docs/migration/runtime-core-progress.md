@@ -394,3 +394,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写record_memory按原始submission写入顺序准备json-c索引，先删本ID仍持有的旧key，再安装新conversation/request key；ID候选压缩不改变索引覆盖顺序，winner移除不恢复历史被覆盖项。成熟json-c承载索引，canonical JSON tuple编码分段/NUL键；数值conversation归一化。rows私有allocation prefix拥有索引，容量预留/索引构造在采纳前完成，成功一起安装并在close释放；公开Memory48/Row32保持。独立request query/provider及Tx入口复用table-write barrier、sealed/reentry拒绝与partial输出清理，返回独立owned记录。
 - 实际验证：实际Pi MemoryStorage新增80轮随机批次、640次conversation/request查询；总5982操作差异通过，覆盖相同ID多次写入、乱序ID、覆盖winner后改名/移除、conversation变化、空/NUL/Unicode key。Tx在普通文档写后仍可读，任何table-write尝试后拒绝，sealed/partial错误/reentry/输出隔离通过。新索引/row分配33、旧索引原子更新60、Storage查询8、Tx查询8，共109个直接分配/插入/序列化/部分复制故障保持旧rows/index/sequence；新增string_len与序列化故障包装也扩展既有Runtime路径覆盖。最终O0/O2 ASan/UBSan专项通过；完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过，新增首次索引专项随后两优化级复验；既有3条delta ABI边界保持单列。共享与隔离核心树G00/Assembly清单、隔离产品构建通过。共享DSO首次构建发现函数地址PC-relative relocation，改用GOTPCREL后实际差异复验通过。
 - 同一实施Agent自审：仅扩展既有模块/导出/来源登记，旧布局及门禁/预算保持。9个候选路径内容清单摘要（本记录加入前）：4d4c0267ef094408ce92098d797e64b8e61cf8d9a0034bd7386e332864f5c5d8。结论为本地候选通过；K03类型化Entry与剩余构造/查询边界继续推进，总验收未完成。TUI未交接文件与登记保留工作树。
+
+## K03 类型化Entry提交态读取
+
+- 来源：固定Pi d5b3de22 Transaction.entry(first,second)和#read；本批fetch后origin/main仍为f9daca3，Harness为22ddee37，固定源保持d5b3de22。
+- 实现：手写pg_record_tx_entry复用通用提交态读取，仅在可选kind指定时按JSON字符串类型、长度和字节过滤；空kind区别于不指定，嵌入NUL不截断。错误/不匹配释放结果，保持table-write barrier、sealed和provider reentry约束。独立slice/导出，原ABI保持。
+- 实际验证：20组执行实际Pi Transaction.entry方法结果一致；真实MemoryStorage覆盖空/NUL kind、缺失/错误类型、不指定kind、write-after-read barrier、sealed与部分深复制失败清理。O0/O2 ASan/UBSan专项及完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线通过；既有3条delta ABI边界继续单列。隔离核心树G00/Assembly清单和产品构建通过。
+- 同一实施Agent自审：仅扩展既有records导出/来源、专项和TODO，门禁/预算保持。6个候选路径内容清单摘要（本记录加入前）：a981a0833623b8f010a187c2b367e4fe5cc4292454f53c7f3ffb4b23a2e47200。结论为本地候选通过；K03剩余构造/候选状态/查询及整体验收继续推进。TUI工作树保持独立。
