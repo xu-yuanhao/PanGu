@@ -828,3 +828,500 @@ pg_document_holds_flush:
 .Lflush_content: .asciz "content"
 .Lflush_change: .asciz "document.change"
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_document_holds_merge_bind
+.type pg_document_holds_merge_bind,@function
+pg_document_holds_merge_bind:
+ test rdi,rdi
+ jz .Linvalid
+ test rsi,rsi
+ jz .Linvalid
+ cmp dword ptr [rdi+52],1
+ jne .Linvalid
+ cmp dword ptr [rdi+48],0
+ jne .Linvalid
+ mov [rsi],rdi
+ lea rax,[rip+.Lmerge_prepare]
+ mov [rsi+8],rax
+ lea rax,[rip+.Lmerge_adopt]
+ mov [rsi+16],rax
+ lea rax,[rip+.Lmerge_discard]
+ mov [rsi+24],rax
+ xor eax,eax
+ ret
+.size pg_document_holds_merge_bind,.-pg_document_holds_merge_bind
+
+/* Owned StorageWrite from a borrowed content object. */
+.Lmerge_write:
+ push rbx
+ push r12
+ push r13
+ mov r12,rdi
+ mov r13,rsi
+ call json_object_new_object@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lmerge_write_end
+ lea rdi,[rip+.Lflush_change]
+ call json_object_new_string@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lflush_type]
+ mov rdx,rax
+ call .Lflush_field
+ test eax,eax
+ jnz .Lmerge_write_bad
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lflush_id]
+ mov rdx,rax
+ call .Lflush_field
+ test eax,eax
+ jnz .Lmerge_write_bad
+ mov rdi,r13
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lflush_content]
+ mov rdx,rax
+ call .Lflush_field
+ test eax,eax
+ jnz .Lmerge_write_bad
+ mov rax,rbx
+ jmp .Lmerge_write_end
+.Lmerge_write_bad:
+ mov rdi,rbx
+ call json_object_put@PLT
+ xor eax,eax
+.Lmerge_write_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.Lmerge_array_ref:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov r12,rax
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lmerge_array_end
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,-1
+.Lmerge_array_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+/* Replace the old write by identity, or insert before this ID's retirement.
+   A wholly private rebuilt array is swapped into Tx only on success. */
+.Lmerge_splice:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp+8],-1
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov [rsp],rax
+ cmp rax,0x7ffffffe
+ ja .Lsplice_no_array
+ lea edi,[rax+1]
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lsplice_no_array
+ mov r15,rax
+ xor ebp,ebp
+.Lsplice_loop:
+ cmp rbp,[rsp]
+ jae .Lsplice_tail
+ mov rdi,[rbx+24]
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ test r12,r12
+ jz .Lsplice_retire
+ cmp rax,r12
+ jne .Lsplice_original
+ mov rdi,r15
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ mov rdi,r15
+ mov rsi,r13
+ call .Lmerge_array_ref
+ test eax,eax
+ jnz .Lsplice_bad
+ jmp .Lsplice_next
+.Lsplice_retire:
+ cmp qword ptr [rsp+8],-1
+ jne .Lsplice_original
+ mov rdi,rax
+ lea rsi,[rip+.Lflush_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsplice_original
+ mov rdi,rax
+ lea rsi,[rip+.Lmerge_retire]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsplice_original
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lflush_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r14
+ jne .Lsplice_original
+ mov rdi,r15
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ mov rdi,r15
+ mov rsi,r13
+ call .Lmerge_array_ref
+ test eax,eax
+ jnz .Lsplice_bad
+.Lsplice_original:
+ mov rdi,r15
+ mov rsi,[rsp+16]
+ call .Lmerge_array_ref
+ test eax,eax
+ jnz .Lsplice_bad
+.Lsplice_next:
+ inc rbp
+ jmp .Lsplice_loop
+.Lsplice_tail:
+ cmp qword ptr [rsp+8],-1
+ jne .Lsplice_install
+ test r12,r12
+ jnz .Lsplice_bad
+ mov rdi,r15
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ mov rdi,r15
+ mov rsi,r13
+ call .Lmerge_array_ref
+ test eax,eax
+ jnz .Lsplice_bad
+.Lsplice_install:
+ mov rdi,[rbx+24]
+ mov [rbx+24],r15
+ call json_object_put@PLT
+ mov rdx,[rsp+8]
+ xor eax,eax
+ jmp .Lsplice_end
+.Lsplice_bad:
+ mov rdi,r15
+ call json_object_put@PLT
+.Lsplice_no_array:
+ mov eax,3
+.Lsplice_end:
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Token owns only the selected incarnation pointers; queues remain pinned
+   and unchanged through fallible planning and Storage admission. */
+.Lmerge_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,104
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov [rsp+96],r8
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,12
+ rep stosq
+ mov ebp,1
+ test r8,r8
+ jz .Lmerge_prepare_end
+ mov qword ptr [r8],0
+ test rbx,rbx
+ jz .Lmerge_prepare_end
+ cmp dword ptr [rbx+52],1
+ jne .Lmerge_prepare_end
+ cmp dword ptr [rbx+48],0
+ jne .Lmerge_prepare_end
+ cmp qword ptr [rbx+16],0
+ je .Lmerge_prepare_noop
+ mov rdi,[r12+24]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lmerge_prepare_noop
+ mov dword ptr [rbx+48],1
+ mov ebp,3
+ mov edi,1
+ mov esi,32
+ call calloc@PLT
+ test rax,rax
+ jz .Lmerge_prepare_unlock
+ mov [rsp],rax
+ mov [rax],rbx
+ mov rcx,[rsp+96]
+ mov [rcx],rax
+ mov rdi,r14
+ test rdi,rdi
+ jnz .Lmerge_match_alloc
+ inc rdi
+.Lmerge_match_alloc:
+ mov esi,8
+ call calloc@PLT
+ test rax,rax
+ jz .Lmerge_prepare_clean
+ mov rcx,[rsp]
+ mov [rcx+8],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lmerge_prepare_clean
+ mov [rsp+56],rax
+ xor r15d,r15d
+.Lmerge_entry_loop:
+ cmp r15,r14
+ jae .Lmerge_prepare_ok
+ imul rax,r15,152
+ add rax,r13
+ mov [rsp+80],rax
+ test dword ptr [rax+148],1
+ jnz .Lmerge_entry_next
+ mov rdx,[rax]
+ mov rdx,[rdx+72]
+ mov rcx,[rbx+16]
+ mov rdi,[rbx+8]
+.Lmerge_find_hold:
+ test rcx,rcx
+ jz .Lmerge_entry_next
+ mov rsi,[rdi]
+ cmp [rsi+72],rdx
+ je .Lmerge_hold_found
+ add rdi,56
+ dec rcx
+ jmp .Lmerge_find_hold
+.Lmerge_hold_found:
+ mov [rsp+88],rdi
+ test dword ptr [rax+148],4
+ jnz .Lmerge_pointer_ready
+ cmp [rax],rsi
+ jne .Lmerge_prepare_invalid
+.Lmerge_pointer_ready:
+ lea rsi,[rdi+8]
+ lea rdi,[rsp+8]
+ mov edx,32
+ call memcpy@PLT
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov rax,[rsp+80]
+ mov rsi,[rsp+56]
+ mov rcx,[rsp+88]
+ mov rcx,[rcx]
+ mov rdx,[rcx+8]
+ cmp qword ptr [rax+8],0
+ je .Lmerge_store_inputs
+ mov rdx,[rax+16]
+ mov rsi,[rax+24]
+.Lmerge_store_inputs:
+ mov rax,[rsp+88]
+ mov r8d,[rax+48]
+ mov rcx,[rcx+96]
+ lea rdi,[rsp+8]
+ lea r9,[rsp+40]
+ call pg_document_store_held@PLT
+ test eax,eax
+ jnz .Lmerge_prepare_error
+ lea rdi,[rsp+8]
+ call pg_pending_ops_close@PLT
+ mov rdx,[rsp+40]
+ mov rax,[rsp+80]
+ cmp dword ptr [rax+144],1
+ jne .Lmerge_choose_content
+ mov rdi,[rax+112]
+ lea rsi,[rip+.Lflush_content]
+ call json_object_object_get@PLT
+ mov rdx,rax
+.Lmerge_choose_content:
+ mov [rsp+72],rdx
+ mov rdi,rdx
+ lea rsi,[rip+.Lflush_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov ecx,1
+ cmp byte ptr [rax],'b'
+ je .Lmerge_kind_ready
+ inc ecx
+ mov rax,[rsp+88]
+ mov rax,[rax]
+ mov rax,[rax+104]
+ mov rdx,9007199254740991
+ cmp rax,rdx
+ jae .Lmerge_prepare_invalid
+.Lmerge_kind_ready:
+ mov rax,[rsp+80]
+ mov [rax+144],ecx
+ mov rax,[rsp+88]
+ mov rax,[rax]
+ mov rdi,[rax+72]
+ mov rsi,[rsp+72]
+ call .Lmerge_write
+ test rax,rax
+ jz .Lmerge_prepare_clean
+ mov [rsp+64],rax
+ mov rcx,[rsp+88]
+ mov rcx,[rcx]
+ mov rcx,[rcx+72]
+ mov rdx,rax
+ mov rax,[rsp+80]
+ mov rsi,[rax+112]
+ mov rdi,r12
+ call .Lmerge_splice
+ test eax,eax
+ jnz .Lmerge_prepare_error
+ mov rax,[rsp+80]
+ mov [rax+120],rdx
+ mov rdi,[rax+112]
+ call json_object_put@PLT
+ mov rax,[rsp+80]
+ mov rdx,[rsp+64]
+ mov [rax+112],rdx
+ mov qword ptr [rsp+64],0
+ or dword ptr [rax+148],16
+ mov rax,[rsp]
+ mov rcx,[rax+16]
+ mov rdx,[rax+8]
+ mov rsi,[rsp+88]
+ mov rsi,[rsi]
+ mov [rdx+rcx*8],rsi
+ inc qword ptr [rax+16]
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov qword ptr [rsp+40],0
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov qword ptr [rsp+48],0
+.Lmerge_entry_next:
+ inc r15
+ jmp .Lmerge_entry_loop
+.Lmerge_prepare_ok:
+ xor ebp,ebp
+ jmp .Lmerge_prepare_clean
+.Lmerge_prepare_error:
+ mov ebp,eax
+ jmp .Lmerge_prepare_clean
+.Lmerge_prepare_invalid:
+ mov ebp,4
+.Lmerge_prepare_clean:
+ lea rdi,[rsp+8]
+ call pg_pending_ops_close@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ jmp .Lmerge_prepare_end
+.Lmerge_prepare_unlock:
+ mov dword ptr [rbx+48],0
+ jmp .Lmerge_prepare_end
+.Lmerge_prepare_noop:
+ xor ebp,ebp
+.Lmerge_prepare_end:
+ mov eax,ebp
+ add rsp,104
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.Lmerge_adopt:
+ test rsi,rsi
+ jz .Lmerge_adopt_noop
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ cmp qword ptr [r12+24],0
+ jne .Lmerge_adopt_bad
+ xor r13d,r13d
+.Lmerge_release_loop:
+ cmp r13,[r12+16]
+ jae .Lmerge_released
+ mov rax,[r12+8]
+ mov rsi,[rax+r13*8]
+ mov dword ptr [rbx+48],0
+ mov rdi,rbx
+ call pg_document_holds_release@PLT
+ mov dword ptr [rbx+48],1
+ test eax,eax
+ jnz .Lmerge_adopt_end
+ inc r13
+ jmp .Lmerge_release_loop
+.Lmerge_released:
+ mov qword ptr [r12+24],1
+ xor eax,eax
+ jmp .Lmerge_adopt_end
+.Lmerge_adopt_bad:
+ mov eax,1
+.Lmerge_adopt_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lmerge_adopt_noop:
+ xor eax,eax
+ ret
+.Lmerge_discard:
+ test rsi,rsi
+ jz .Lmerge_discard_end
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[r12+8]
+ call free@PLT
+ mov rdi,r12
+ call free@PLT
+ mov dword ptr [rbx+48],0
+ add rsp,8
+ pop r12
+ pop rbx
+.Lmerge_discard_end:
+ ret
+.section .rodata
+.Lmerge_retire: .asciz "document.retire"
+.section .note.GNU-stack,"",@progbits

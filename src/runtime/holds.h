@@ -30,6 +30,7 @@ typedef struct {
 pg_document_status pg_document_holds_open(pg_document_holds *,pg_document_cache *,void *,
  uint64_t (*clock)(void *),void (*observe)(void *,const pg_document_tx_entry *,size_t));
 pg_document_status pg_document_holds_bind(pg_document_holds *,pg_document_deferred *);
+pg_document_status pg_document_holds_merge_bind(pg_document_holds *,pg_document_merge *);
 int pg_document_holds_pinned(void *,uint64_t id);
 uint64_t pg_document_holds_deadline(const pg_document_holds *);
 pg_document_status pg_document_holds_release(pg_document_holds *,const pg_document_loaded *);

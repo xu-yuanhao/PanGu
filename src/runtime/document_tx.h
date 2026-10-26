@@ -115,6 +115,29 @@ typedef struct {
    reenter the Session; scanner has settle's contract. */
 pg_record_tx_status pg_document_tx_deferred(pg_document_tx *,const pg_document_scan *,
  const pg_document_deferred *,uint64_t within_ms);
+typedef struct {
+ void *context;
+ /* After checkpoints, before adoption preparation, with Tx sealed/busy.
+    Rebuild only private writes; entry.write owns its separate reference.
+    Matched existing entries use kind=1 base/2 delta and reserved bit 16,
+    requesting same-version value adoption plus persistent replay counters.
+    Validate delta counter capacity before returning. Prepared values/ops stay
+    borrowed/read-only. No Session reentry. Failure consumes/discards Tx. */
+ int (*prepare)(void *,pg_record_tx *,pg_document_tx_entry *,size_t,void **token);
+ /* After value adoption, before cache retirement. Allocation-free release of
+    matched holds; nonzero fails Session. */
+ int (*adopt)(void *,void *token);
+ void (*discard)(void *,void *token);
+} pg_document_merge;
+/* Normal Storage settlement with an injected held-change merge service.
+   Only acquired/retired incarnations join the batch; unrelated holds remain.
+   Callback tokens are borrowed through synchronous settlement and always
+   discarded after attempted preparation, including partial failures. */
+pg_record_tx_status pg_document_tx_merge(pg_document_tx *,const pg_document_scan *,const pg_document_merge *);
+/* Same deferred eligibility as deferred(); ineligible batches merge prior
+   holds before normal Storage settlement. Both services remain borrowed. */
+pg_record_tx_status pg_document_tx_deferred_merge(pg_document_tx *,const pg_document_scan *,
+ const pg_document_deferred *,uint64_t within_ms,const pg_document_merge *);
 /* finish delegates to settle with no committed-document scanner. */
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);

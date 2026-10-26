@@ -351,3 +351,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：holds.S新增独立pg_document_holds_flush。先复制PendingOps准备完整document.change数组及持久计数，统一records.commit；准备失败不排空旧队列。同步adopt只更新已持有loaded的持久重放计数，内存值指针/版本保持；成功settlement后释放所有队列与pin并touch缓存，再调用原publish。内存observer不重复通知。Session hooks/context在所有路径恢复，准入后后端/采纳错误锁存Session、保留holds供失败清理；原生delta计数上限在准入前拒绝，选定base可重置。
 - 实际验证：24文档两轮延迟修改一次flush，逐文档读取真实MemoryStorage值和计数一致；base/delta、值身份、成功前pin/成功后解pin、adopt→release→publish顺序、回调重入拒绝、空holds/只读及计数上限通过。拒绝、漏adopt、重复adopt、错误序号、consumer失败及adopt后后端拒绝六类错误全部fail-stop，hooks恢复且值不回滚。新增37个直接分配/插入/部分复制故障逐个验证旧队列/值保留（准备失败健康，后端失败锁存）。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及原Pi/Chord差异基线通过；既有3条delta ABI边界单列。共享与最终隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：仅扩展holds接口/实现、实际records依赖和导出/来源、专项及TODO，无门禁或预算改动。5个候选路径内容清单摘要（本记录加入前）：9b568c9389f2374772c63712791dd874ffeba65b250b7a4b767355041f37dd8c。结论为本地候选通过；正常事务takeHeld合并、版本切换/关闭与timer服务继续接入，K03尚未完成。TUI未交接文件与登记保留工作树。
+
+## K03 正常事务takeHeld与延迟回退合并（2026-10-26）
+
+- 来源：Pi d5b3de22 Transaction.takeHeld/#insertBeforeRetirement/adopt、Session.runCommit与session-deferred-commits.test.ts的storing held changes。Pi/Harness本批fetch前后仍为d5b3de22 / 22ddee37。
+- 实现：新增32字节注入merge服务；Doc Tx完成所有checkpoint后准备合并，再准备值采纳。手写holds服务复制待写队列，与own ops折叠，使用最终prepared值；本次checkpoint base覆盖队列内容。私有Storage数组按旧write身份替换，或在同ID退休之前插入。read-only acquired Doc仅随其它写入落盘；空批次及无关holds保持。合并后复核转换副本的源冲突。确认后按原value guard采纳值/持久计数，在cache eviction前释放匹配holds，维持原生loaded借用有效期；准入后失败遵循Session fail-stop且不回滚已采纳事实。原有结构/字段/枚举保持，独立merge/deferred_merge入口提供服务组合。deferred在合并前判定holdable，符合条件继续内存采纳，混合/退休整批合并落盘，固定回退决定。
+- 实际验证：继续编辑的held+own折叠、read+Entry、纯读和无关Entry保留holds、仅record退休/编辑后退休、本次base优先/held sticky base、多个文档部分释放及最早剩余期限、先插入退休写再按身份替换后续write、deferred继续与混合/退休回退通过。真实MemoryStorage校验最终值/计数/退休身份，退休释放无悬空cache借用。六种后端/采纳失败保持fail-stop，adopt后的事实不回滚。单编辑69、仅record退休45、多编辑131个直接分配/插入/部分复制故障，失败保留旧值/队列/pin并恢复原hooks。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及原Pi/Chord差异基线通过，既有3条delta ABI边界单列；隔离核心暂存树G00/Assembly清单与产品构建通过。
+- 同一实施Agent自审：新增独立服务与结算导出、来源/实际依赖登记及专项，检查器/预算未改。7个候选路径内容清单摘要（本记录加入前）：8ac98702f1f19dd0d90eeaf8b4dbfd618c092fccb3025d66f9e697581bb64bcd。结论为本地候选通过；版本切换前flush、正常关闭及deadline/timer服务继续接入，K03尚未完成。TUI未交接文件与登记保留工作树。

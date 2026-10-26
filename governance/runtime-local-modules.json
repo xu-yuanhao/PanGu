@@ -1054,7 +1054,7 @@
         "json-c",
         "session.documents.local.v0"
       ],
-      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation; explicit retirement and same-address incarnation replacement, final edits persisted, conditional post-confirmation eviction; injected paginated terminal-Task document discovery, automatic retirement of acquired/new/unloaded incarnations before checkpoints and Storage admission; staged fork-copy materialization/editing/migration, atomic copy-to-base replacement and retained source conflict checks; Source holdable eligibility and injected prepare/apply/discard/observe service for memory-only transaction settlement",
+      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation; explicit retirement and same-address incarnation replacement, final edits persisted, conditional post-confirmation eviction; injected paginated terminal-Task document discovery, automatic retirement of acquired/new/unloaded incarnations before checkpoints and Storage admission; staged fork-copy materialization/editing/migration, atomic copy-to-base replacement and retained source conflict checks; Source holdable eligibility and injected prepare/apply/discard/observe service for memory-only transaction settlement; injected held merge after all checkpoints and before adoption preparation, selected incarnation Storage writes and allocation-free hold release before retirement; deferred fallback shares the same pre-merge holdable decision",
       "exports": [
         "pg_document_tx_commit",
         "pg_document_tx_open",
@@ -1064,7 +1064,9 @@
         "pg_document_tx_doc",
         "pg_document_tx_retire",
         "pg_document_tx_settle",
-        "pg_document_tx_deferred"
+        "pg_document_tx_deferred",
+        "pg_document_tx_merge",
+        "pg_document_tx_deferred_merge"
       ],
       "reference_basis": [
         {
@@ -1074,7 +1076,7 @@
             "packages/durable/src/session/transaction.ts",
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation; retireDoc/findRetirement handles acquired or record-only incarnations and absent no-op; subsequent doc skips retired target and creates a new incarnation; native adopt applies loaded edits then evicts retired IDs then installs live new nodes; assemble terminalTaskIds/latest candidates, committed-task terminal/conversation validation, current task-document pages and seen-ID deduplication; explicit scanner service and sealed edits; newly created tasks skip committed scan; acquireForkCopy reads selected source point, checks kind/key/history/fork with owner change, materializes to target definition version and reuses minted incarnation; edited copy becomes create/base while original source identity remains guarded; retire-only copied plans preserve document.copy without value load; holdable accepts only writes to loaded latest/initial conversation documents at stored version, including checkpoint bases; migrations/creation/retirement/mixed writes submit whole batch; memory-only adoption precedes held-queue apply and memory observers, durable hooks remain untouched",
+          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation; retireDoc/findRetirement handles acquired or record-only incarnations and absent no-op; subsequent doc skips retired target and creates a new incarnation; native adopt applies loaded edits then evicts retired IDs then installs live new nodes; assemble terminalTaskIds/latest candidates, committed-task terminal/conversation validation, current task-document pages and seen-ID deduplication; explicit scanner service and sealed edits; newly created tasks skip committed scan; acquireForkCopy reads selected source point, checks kind/key/history/fork with owner change, materializes to target definition version and reuses minted incarnation; edited copy becomes create/base while original source identity remains guarded; retire-only copied plans preserve document.copy without value load; holdable accepts only writes to loaded latest/initial conversation documents at stored version, including checkpoint bases; migrations/creation/retirement/mixed writes submit whole batch; memory-only adoption precedes held-queue apply and memory observers, durable hooks remain untouched; takeHeld folds held/own ops, respects current checkpoint base, inserts before retirement, flushes acquired read-only documents only alongside other writes, and leaves unrelated or write-free holds; prepare services run before Storage, release after value adoption before native cache eviction",
           "tests_to_read": [
             "packages/durable/test/session-documents.test.ts",
             "packages/durable/test/session-adoption.test.ts",
@@ -1099,7 +1101,7 @@
         "libc",
         "session.records.local.v0"
       ],
-      "role": "Session mutation-line native deferred host: owned dynamic incarnation registry, detached PendingOps snapshots, atomic prepared transfer, cache pin integration and earliest saturated deadlines; confirmed-persistence release and failed-Session teardown; atomic whole-registry flush through uniform Storage settlement, durable counter adoption and release-before-publish",
+      "role": "Session mutation-line native deferred host: owned dynamic incarnation registry, detached PendingOps snapshots, atomic prepared transfer, cache pin integration and earliest saturated deadlines; confirmed-persistence release and failed-Session teardown; atomic whole-registry flush through uniform Storage settlement, durable counter adoption and release-before-publish; native bound merge service builds private combined Storage candidates while preserving pinned queues until adoption",
       "exports": [
         "pg_document_holds_open",
         "pg_document_holds_bind",
@@ -1108,7 +1110,8 @@
         "pg_document_holds_release",
         "pg_document_holds_discard_all",
         "pg_document_holds_close",
-        "pg_document_holds_flush"
+        "pg_document_holds_flush",
+        "pg_document_holds_merge_bind"
       ],
       "reference_basis": [
         {
@@ -1117,7 +1120,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "#hold accumulates per-incarnation PendingOps, sticky base and minimum deadline; #release drops holds and unpins; #armHoldTimer minimum deadline selection exposed to injected timer host; native prepare before value adoption makes allocation failures atomic; #storeHolds submits one document.change batch, changes only durable counters in adoption, releases pins after successful settlement and emits durable publication without another memory observation; native fallible preparation preserves queues until successful settlement",
+          "semantics": "#hold accumulates per-incarnation PendingOps, sticky base and minimum deadline; #release drops holds and unpins; #armHoldTimer minimum deadline selection exposed to injected timer host; native prepare before value adoption makes allocation failures atomic; #storeHolds submits one document.change batch, changes only durable counters in adoption, releases pins after successful settlement and emits durable publication without another memory observation; native fallible preparation preserves queues until successful settlement; Transaction.takeHeld uses the final prepared value and own ops, own base wins, selected holds release before native incarnation destruction; prepared failure retains old queue/deadline/value",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts"
           ]

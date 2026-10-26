@@ -91,6 +91,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通deferred资格判断与同版本内存采纳路由：符合条件时交给注入的holds服务，保留持久版本/计数/序号；混合写入等整批落盘。
 - [x] 接通原生holds宿主：候选队列所有权、连续编辑折叠、最早期限/Infinity、缓存pin及持久确认后的release。
 - [x] 接通holds整批持久flush：统一Storage提交、确认时更新持久计数、成功后释放pin并通知持久订阅者；失败遵循Session fail-stop。
+- [x] 接通正常事务及deferred混合回退的takeHeld合并：当前编辑/只读与其他写入/退休同批保存，保留无关holds，支持checkpoint base覆盖。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -328,3 +329,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - holds.h/.S新增pg_document_holds_flush：私有PendingOps快照准备全部document.change，统一records.commit；adopt只更新deltasSinceBase，保留loaded值身份；成功结算后释放队列/pin，再调用原有publish，内存observer保持静默。原Session hooks/context在所有路径恢复。准备失败保留原队列，已准入失败锁存Session并保留holds用于失败清理。
 - 验证：24个文档一次保存、base/delta与值身份、通知顺序、只读/空holds、持久计数上限、六种后端/采纳故障、37个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan专项、完整Runtime与原Pi/Chord基线通过。
 - 下一行为：正常事务takeHeld合并，接版本切换/关闭与timer服务；K03仍按全部验收执行。
+
+### K03 takeHeld合并交接（2026-10-26）
+
+- 阅读Pi d5b3de22 Transaction.takeHeld/#insertBeforeRetirement/adopt、Session.runCommit及session-deferred-commits.test.ts的storing held changes用例；本批Pi/Harness fetch旧新提交一致：d5b3de22 / 22ddee37。
+- 原生映射：document_tx.h新增32字节merge服务及merge/deferred_merge结算入口；既有结构与函数表保持。checkpoint统一完成后，由holds_merge_bind提供的原生服务折叠held+own、以最终prepared值构造StorageWrite；本次选定base覆盖队列内容。无编辑退休只使用已有held值，写在retire前；只读获取随其他写入保存，空批次及无关holds保持。prepare失败保留原队列，确认后采纳值/计数，退休驱逐前释放匹配holds以维持原生借用有效期。deferred eligibility在合并前判断，合格批次继续内存采纳，不合格批次采用同一路径合并后落盘。
+- 验证：正常编辑、只读加Entry、纯读/无关事务、仅record退休/编辑后退休、本次base及已有sticky base、多文档选择/部分保留/先插入再替换、deferred继续及混合/退休回退通过；六类已准入后端/采纳错误保持fail-stop。单编辑69、仅record退休45、多编辑131个直接分配/插入/部分复制故障保留旧值/队列/pin。专项与完整Runtime检查结果记入当前实现记录。
+- 下一行为：版本切换前flush、正常关闭及deadline/timer服务接入，随后继续K03查询/视图与整机组合。K03总验收仍未完成。

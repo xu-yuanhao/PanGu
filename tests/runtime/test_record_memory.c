@@ -896,9 +896,76 @@ static void native_holds_tests(void){
 #endif
 }
 
+
+typedef struct {native_holds_fixture *n;struct json_object *batch;unsigned adopts,publishes,fail;} native_merge_fixture;
+static int native_merge_adopt(void *context,const struct json_object *writes,uint64_t seq){native_merge_fixture *f=context;assert(writes&&seq&&f->n->f.session.busy&&f->n->holds.busy);++f->adopts;return f->fail;}
+static void native_merge_publish(void *context,const struct json_object *writes,uint64_t seq){native_merge_fixture *f=context;assert(writes&&seq&&f->adopts==1&&f->n->f.session.busy&&f->n->holds.busy);++f->publishes;f->batch=json_object_get((struct json_object*)writes);}
+static void native_merge_entry(deferred_fixture *f){struct json_object *entry=json_tokener_parse("{\"type\":\"entry\",\"value\":{\"id\":30,\"conversationId\":1,\"kind\":\"derived\"}}");assert(entry&&!pg_record_tx_stage(&f->tx,PG_TX_ENTRY,entry));json_object_put(entry);}
+static void native_merge_open(native_holds_fixture *n,pg_document_deferred *deferred,pg_document_merge *merge,unsigned base){native_hold_open(n,deferred);n->f.checkpoint=base;deferred_edit(&n->f,"held");assert(!pg_document_tx_deferred(&n->f.scope,0,deferred,100)&&!pg_document_holds_merge_bind(&n->holds,merge));n->f.checkpoint=0;}
+
+static const pg_document_definition merge_other_def={.kind={"other",5},.version=1,.scope=PG_DOC_CONVERSATION,.history=PG_DOC_LATEST,.fork=PG_DOC_INITIAL};
+static const pg_document_address merge_other_address={.kind={"other",5},.owner=1,.scope=PG_DOC_CONVERSATION};
+static void native_merge_other_get(native_holds_fixture *n,unsigned edit){pg_document_change *change=0;assert(!pg_document_tx_get(&n->f.scope,&merge_other_def,&merge_other_address,0,0,&change));if(edit){struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"b\"]]");assert(ops&&!pg_document_change_append(change,ops));json_object_put(ops);}}
+static void native_merge_other_hold(native_holds_fixture *n,pg_document_deferred *host){assert(!doc_commit(&n->f.memory,"[{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"other\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}]"));n->f.session.sequence=n->f.memory.next_sequence-1;assert(!pg_record_tx_begin(&n->f.tx,&n->f.session,&n->f.memory,tx_read)&&!pg_document_tx_open(&n->f.scope,&n->f.tx,&n->f.cache));native_merge_other_get(n,1);assert(!pg_document_tx_deferred(&n->f.scope,0,host,500)&&n->holds.count==2);}
+static void native_merge_tests(void){
+ _Static_assert(sizeof(pg_document_merge)==32,"merge service ABI");
+ for(unsigned mode=0;mode<8;++mode){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,mode==7);pg_document_loaded *loaded=n.holds.items[0].loaded;
+ native_merge_fixture f={.n=&n};n.f.session.context=&f;n.f.session.adopt=native_merge_adopt;n.f.session.publish=native_merge_publish;
+ if(mode==4||mode==2){assert(!pg_record_tx_begin(&n.f.tx,&n.f.session,&n.f.memory,tx_read)&&!pg_document_tx_open(&n.f.scope,&n.f.tx,&n.f.cache));}
+ else deferred_edit(&n.f,(mode==1||mode==3)?0:"+now");
+ if(mode==1||mode==2)native_merge_entry(&n.f);
+ if(mode==4||mode==5)assert(!pg_document_tx_retire(&n.f.scope,&n.f.definition,&n.f.address));
+ if(mode==6)n.f.checkpoint=1;
+ assert(!pg_document_tx_merge(&n.f.scope,0,&merge)&&!n.holds.busy&&!n.f.session.busy&&!n.f.session.failed&&n.f.session.context==&f&&n.f.session.adopt==native_merge_adopt&&n.f.session.publish==native_merge_publish);
+ if(mode==2||mode==3){assert(n.holds.count==1&&n.holds.items[0].loaded==loaded&&loaded->deltas_since_base==1&&n.f.session.sequence==(mode==2?3u:2u)&&f.publishes==(mode==2?1u:0u));}
+ else {assert(!n.holds.count&&n.f.session.sequence==3&&f.adopts==1&&f.publishes==1&&f.batch);struct json_object *first=json_object_array_get_idx(f.batch,mode==1?1:0);assert(!strcmp(json_object_get_string(json_object_object_get(first,"type")),"document.change"));
+  if(mode==4||mode==5){assert(n.f.cache.count==0&&json_object_array_length(f.batch)==2&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(f.batch,1),"type")),"document.retire"));struct json_object *record=0;assert(pg_record_memory_find_document(&n.f.memory,&n.f.address,UINT64_MAX,&record)==PG_MEMORY_MISSING&&!record);}
+  else {struct json_object *stored=0;const char *expected=mode==1?"seedheld":"seedheld+now";assert(!pg_record_memory_document(&n.f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),expected)&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),expected)&&loaded->deltas_since_base==((mode==6||mode==7)?0:2));json_object_put(stored);}
+ }
+ json_object_put(f.batch);native_hold_close(&n);
+ }
+
+ for(unsigned mode=0;mode<4;++mode){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);pg_document_loaded *other=n.holds.items[1].loaded;
+ if(mode>=2){assert(!pg_record_tx_begin(&n.f.tx,&n.f.session,&n.f.memory,tx_read)&&!pg_document_tx_open(&n.f.scope,&n.f.tx,&n.f.cache)&&!pg_document_tx_retire(&n.f.scope,&n.f.definition,&n.f.address));}else deferred_edit(&n.f,mode?"+now":0);
+ if(mode&1)native_merge_other_get(&n,mode==3);native_merge_entry(&n.f);
+ assert(!pg_document_tx_merge(&n.f.scope,0,&merge)&&!n.holds.busy&&!n.f.session.failed&&n.holds.count==((mode&1)?0u:1u)&&n.f.published==1&&n.f.adopted==1&&n.f.observed==2);
+ if(!(mode&1)){assert(n.holds.items[0].loaded==other&&pg_document_holds_pinned(&n.holds,3)&&pg_document_holds_deadline(&n.holds)==600&&other->deltas_since_base==0);assert(!pg_document_holds_flush(&n.holds,&n.f.session));}
+ else assert(!pg_document_holds_pinned(&n.holds,3)&&other->deltas_since_base==1);
+ native_hold_close(&n);
+ }
+
+ for(unsigned mode=0;mode<3;++mode){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);deferred_edit(&n.f,"+now");if(mode==1)native_merge_entry(&n.f);if(mode==2)assert(!pg_document_tx_retire(&n.f.scope,&n.f.definition,&n.f.address));
+ assert(!pg_document_tx_deferred_merge(&n.f.scope,0,&deferred,10,&merge)&&!n.holds.busy&&!n.f.session.failed&&n.holds.count==(mode?0u:1u)&&n.f.session.sequence==(mode?3u:2u));
+ if(!mode){assert(n.f.observed==2&&!n.f.adopted&&!n.f.published&&pg_document_holds_deadline(&n.holds)==110);assert(!pg_document_holds_flush(&n.holds,&n.f.session));}
+ else assert(n.f.observed==1&&n.f.adopted==1&&n.f.published==1);
+ native_hold_close(&n);
+ }
+ for(unsigned mode=1;mode<=6;++mode){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);pg_document_loaded *loaded=n.holds.items[0].loaded;deferred_edit(&n.f,"+now");native_flush_fixture storage={.n=&n,.mode=mode};native_merge_fixture f={.n=&n,.fail=mode==5};n.f.session.storage=(pg_record_storage){&storage,native_flush_backend};n.f.session.context=&f;n.f.session.adopt=native_merge_adopt;n.f.session.publish=native_merge_publish;
+ assert(pg_document_tx_merge(&n.f.scope,0,&merge)==PG_TX_COMMIT_FAILED&&n.f.session.failed&&!n.holds.busy&&!f.publishes);
+ if(mode==1||mode==2){assert(n.holds.count==1&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"seedheld"));}
+ else assert(!n.holds.count&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"seedheld+now"));
+ native_hold_close(&n);
+ }
+#ifdef PG_MEMORY_FAULTS
+ for(unsigned retire=0;retire<3;++retire){unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);pg_document_loaded *loaded=n.holds.items[0].loaded;struct json_object *value=loaded->value,*ops=n.holds.items[0].pending.ops;
+ if(retire==2)native_merge_other_hold(&n,&deferred);
+ if(retire==1){assert(!pg_record_tx_begin(&n.f.tx,&n.f.session,&n.f.memory,tx_read)&&!pg_document_tx_open(&n.f.scope,&n.f.tx,&n.f.cache)&&!pg_document_tx_retire(&n.f.scope,&n.f.definition,&n.f.address));}else deferred_edit(&n.f,"+now");
+ if(retire==2)native_merge_other_get(&n,1);
+ doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_document_tx_merge(&n.f.scope,0,&merge);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+ assert(!n.holds.busy&&!n.f.session.busy&&n.f.session.context==&n.f&&n.f.session.adopt==deferred_adopt&&n.f.session.publish==deferred_publish);
+ if(target){assert(status!=PG_TX_OK&&n.holds.count==(retire==2?2u:1u)&&n.holds.items[0].pending.ops==ops&&loaded->value==value&&loaded->deltas_since_base==1&&pg_document_holds_pinned(&n.holds,2));++failures;}else {assert(!status&&!n.holds.count);total=calls;}
+ native_hold_close(&n);
+ }
+ printf("PASS: held merge %s; %u direct allocation/insert/clone failures\n",retire==2?"multiple edits":retire?"record-only retirement":"loaded edit",failures);
+ }
+#endif
+}
+
 int main(void){
  native_holds_tests();
  native_flush_tests();
+ native_merge_tests();
  deferred_memory_transactions();
  deferred_other_reads_and_documents();
  deferred_fallbacks();

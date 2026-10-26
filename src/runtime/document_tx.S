@@ -1,7 +1,8 @@
 .intel_syntax noprefix
 .text
 /* Settlement context: entries/count, original hooks, error, cache,
-   reservation[32], monotonic time, new-incarnation count, managed scope/scan. */
+   reservation[32], monotonic time, new-incarnation count, managed scope/scan,
+   deferred and held-merge service tokens. */
 .Ldocs_finalize:
  push rbp
  push rbx
@@ -150,16 +151,16 @@
  xor r13d,r13d
 .Ldocs_checkpoint_each:
  cmp r13,[rbx+8]
- jae .Ldocs_finalize_reserve
+ jae .Ldocs_merge_prepare
  imul r14,r13,152
  add r14,[rbx]
  mov r15,[r14]
  cmp qword ptr [r14+8],0
- je .Ldocs_adoption_next
+ je .Ldocs_checkpoint_next
  cmp dword ptr [r14+144],2
- jne .Ldocs_prepare_adoption
+ jne .Ldocs_checkpoint_next
  cmp qword ptr [r14+136],0
- je .Ldocs_prepare_adoption
+ je .Ldocs_checkpoint_next
  mov rdi,[r14+128]
  mov rsi,[r14+16]
  mov rdx,[r14+24]
@@ -168,7 +169,7 @@
  cmp eax,1
  ja .Ldocs_finalize_invalid
  test eax,eax
- jz .Ldocs_prepare_adoption
+ jz .Ldocs_checkpoint_next
  mov rdi,[r15+72]
  mov rsi,[r15+88]
  mov rdx,[r15+96]
@@ -197,6 +198,65 @@
  mov [r14+112],rax
  mov qword ptr [rsp],0
  mov dword ptr [r14+144],1
+.Ldocs_checkpoint_next:
+ inc r13
+ jmp .Ldocs_checkpoint_each
+.Ldocs_merge_prepare:
+ cmp qword ptr [rbx+152],0
+ je .Ldocs_adoption_begin
+ cmp qword ptr [rbx+120],0
+ je .Ldocs_merge_required
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ldocs_holdable
+ test eax,eax
+ jnz .Ldocs_adoption_begin
+.Ldocs_merge_required:
+ mov dword ptr [rbx+168],1
+ mov rax,[rbx+152]
+ mov rdi,[rax]
+ mov rsi,r12
+ mov rdx,[rbx]
+ mov rcx,[rbx+8]
+ lea r8,[rbx+160]
+ call [rax+8]
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+ xor r13d,r13d
+.Ldocs_merged_copy_check:
+ cmp r13,[rbx+8]
+ jae .Ldocs_adoption_begin
+ imul r14,r13,152
+ add r14,[rbx]
+ test dword ptr [r14+148],8
+ jz .Ldocs_merged_copy_next
+ mov rax,[r14]
+ mov rdi,[rax+160]
+ lea rsi,[rip+.Lcopy_source]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_write_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,r12
+ call pg_record_tx_check_copy_source@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_invalid
+.Ldocs_merged_copy_next:
+ inc r13
+ jmp .Ldocs_merged_copy_check
+.Ldocs_adoption_begin:
+ xor r13d,r13d
+.Ldocs_adoption_each:
+ cmp r13,[rbx+8]
+ jae .Ldocs_finalize_reserve
+ imul r14,r13,152
+ add r14,[rbx]
+ mov r15,[r14]
+ cmp qword ptr [r14+8],0
+ je .Ldocs_adoption_next
 .Ldocs_prepare_adoption:
  test dword ptr [r14+148],1
  jz .Ldocs_adoption_loaded
@@ -223,12 +283,36 @@
  lea rdi,[r14+32]
  mov rsi,r15
  lea rdx,[r14+16]
+ test dword ptr [r14+148],16
+ jnz .Ldocs_adoption_held
  cmp qword ptr [rbx+120],0
  je .Ldocs_adoption_durable
  mov rax,[r15+88]
  cmp rax,[r15+96]
  jne .Ldocs_adoption_durable
  call pg_document_adoption_prepare_memory@PLT
+ jmp .Ldocs_adoption_prepared
+.Ldocs_adoption_held:
+ call pg_document_adoption_prepare_memory@PLT
+ test eax,eax
+ jnz .Ldocs_adoption_prepared
+ mov rax,[r14+64]
+ mov [r14+88],rax
+ mov rax,[r14+72]
+ cmp dword ptr [r14+144],1
+ jne .Ldocs_adoption_held_delta
+ xor eax,eax
+ jmp .Ldocs_adoption_held_ready
+.Ldocs_adoption_held_delta:
+ cmp dword ptr [r14+144],2
+ jne .Ldocs_finalize_invalid
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ jae .Ldocs_finalize_invalid
+ inc rax
+.Ldocs_adoption_held_ready:
+ mov [r14+96],rax
+ xor eax,eax
  jmp .Ldocs_adoption_prepared
 .Ldocs_adoption_durable:
  mov ecx,[r14+144]
@@ -238,7 +322,7 @@
  jnz .Ldocs_finalize_doc_error
 .Ldocs_adoption_next:
  inc r13
- jmp .Ldocs_checkpoint_each
+ jmp .Ldocs_adoption_each
 .Ldocs_finalize_reserve:
  cmp qword ptr [rbx+96],0
  jne .Ldocs_need_reserve
@@ -300,7 +384,7 @@
  xor r14d,r14d
 .Ldocs_adopt_each:
  cmp r14,[rbx+8]
- jae .Ldocs_retire_begin
+ jae .Ldocs_merge_adopt
  imul r15,r14,152
  add r15,[rbx]
  test dword ptr [r15+148],5
@@ -312,6 +396,15 @@
 .Ldocs_adopt_next:
  inc r14
  jmp .Ldocs_adopt_each
+.Ldocs_merge_adopt:
+ cmp qword ptr [rbx+152],0
+ je .Ldocs_retire_begin
+ mov rax,[rbx+152]
+ mov rdi,[rax]
+ mov rsi,[rbx+160]
+ call [rax+16]
+ test eax,eax
+ jnz .Ldocs_adopt_return
 .Ldocs_retire_begin:
  xor r14d,r14d
 .Ldocs_retire_each:
@@ -388,6 +481,7 @@ pg_document_tx_commit:
  xor r9d,r9d
  xor r10d,r10d
  xor r11d,r11d
+ xor eax,eax
 .Ldocs_commit_common:
  push rbp
  push rbx
@@ -395,7 +489,10 @@ pg_document_tx_commit:
  push r13
  push r14
  push r15
- sub rsp,152
+ sub rsp,184
+ mov [rsp+152],rax
+ mov qword ptr [rsp+160],0
+ mov qword ptr [rsp+168],0
  mov [rsp+120],r10
  mov [rsp+128],r11
  mov qword ptr [rsp+136],0
@@ -542,6 +639,15 @@ pg_document_tx_commit:
  call [rax+24]
  mov dword ptr [r15+48],0
 .Ldocs_commit_host_done:
+ cmp dword ptr [rsp+168],0
+ je .Ldocs_commit_merge_done
+ mov dword ptr [r15+48],1
+ mov rax,[rsp+152]
+ mov rdi,[rax]
+ mov rsi,[rsp+160]
+ call [rax+24]
+ mov dword ptr [r15+48],0
+.Ldocs_commit_merge_done:
  xor r14d,r14d
 .Ldocs_commit_cleanup:
  cmp r14,r13
@@ -562,6 +668,7 @@ pg_document_tx_commit:
  call json_object_put@PLT
  mov qword ptr [r15+112],0
  mov dword ptr [r15+144],0
+ and dword ptr [r15+148],-17
  test dword ptr [r15+148],1
  jz .Ldocs_cleanup_next
  mov rdi,[r15]
@@ -572,7 +679,7 @@ pg_document_tx_commit:
  jmp .Ldocs_commit_cleanup
 .Ldocs_commit_return:
  mov eax,ebp
- add rsp,152
+ add rsp,184
  pop r15
  pop r14
  pop r13
@@ -861,6 +968,7 @@ pg_document_tx_finish:
 .globl pg_document_tx_settle
 .type pg_document_tx_settle,@function
 pg_document_tx_settle:
+ xor r8d,r8d
  xor edx,edx
  xor ecx,ecx
  jmp .Ldoc_scope_settle_common
@@ -868,6 +976,8 @@ pg_document_tx_settle:
 .globl pg_document_tx_deferred
 .type pg_document_tx_deferred,@function
 pg_document_tx_deferred:
+ xor r8d,r8d
+.Ldoc_scope_deferred_check:
  mov eax,1
  test rdx,rdx
  jz .Ldoc_scope_deferred_invalid
@@ -880,10 +990,42 @@ pg_document_tx_deferred:
  jmp .Ldoc_scope_settle_common
 .Ldoc_scope_deferred_invalid:
  ret
+.globl pg_document_tx_deferred_merge
+.type pg_document_tx_deferred_merge,@function
+pg_document_tx_deferred_merge:
+ mov eax,1
+ test r8,r8
+ jz .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+24],0
+ je .Ldoc_scope_deferred_invalid
+ jmp .Ldoc_scope_deferred_check
+.size pg_document_tx_deferred_merge,.-pg_document_tx_deferred_merge
+.globl pg_document_tx_merge
+.type pg_document_tx_merge,@function
+pg_document_tx_merge:
+ mov eax,1
+ test rdx,rdx
+ jz .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [rdx+24],0
+ je .Ldoc_scope_deferred_invalid
+ mov r8,rdx
+ xor edx,edx
+ xor ecx,ecx
+ jmp .Ldoc_scope_settle_common
+.size pg_document_tx_merge,.-pg_document_tx_merge
 .Ldoc_scope_settle_common:
  push rbx
  push r12
- sub rsp,24
+ sub rsp,40
+ mov [rsp+24],r8
  mov [rsp+8],rdx
  mov [rsp+16],rcx
  mov [rsp],rsi
@@ -908,13 +1050,14 @@ pg_document_tx_deferred:
  mov r9,[rsp]
  mov r10,[rsp+8]
  mov r11,[rsp+16]
+ mov rax,[rsp+24]
  call .Ldocs_commit_common
  mov r12d,eax
  mov rdi,rbx
  call .Ldoc_scope_release
  mov eax,r12d
 .Ldoc_scope_finish_return:
- add rsp,24
+ add rsp,40
  pop r12
  pop rbx
  ret
@@ -2194,42 +2337,12 @@ pg_document_tx_retire:
  mov rbx,rdi
  mov r12,rsi
  mov r15,[rbx+120]
- mov rdi,[r12+24]
- call json_object_array_length@PLT
- mov [rsp],rax
- xor r13d,r13d
- xor r14d,r14d
-.Ldefer_eligible_each:
- cmp r13,[rbx+8]
- jae .Ldefer_eligible_count
- imul rax,r13,152
- add rax,[rbx]
- test dword ptr [rax+148],2
- jnz .Ldefer_fallback
- cmp qword ptr [rax+112],0
- je .Ldefer_eligible_next
- cmp qword ptr [rax+8],0
- je .Ldefer_fallback
- test dword ptr [rax+148],1
- jnz .Ldefer_fallback
- mov rdx,[rax]
- cmp dword ptr [rdx+64],1
+ cmp dword ptr [rbx+168],0
  jne .Ldefer_fallback
- cmp dword ptr [rdx+80],1
- jne .Ldefer_fallback
- cmp dword ptr [rdx+84],2
- jne .Ldefer_fallback
- mov rcx,[rdx+88]
- cmp rcx,[rdx+96]
- jne .Ldefer_fallback
- inc r14
-.Ldefer_eligible_next:
- inc r13
- jmp .Ldefer_eligible_each
-.Ldefer_eligible_count:
- cmp r14,[rsp]
- jne .Ldefer_fallback
- test r14,r14
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ldocs_holdable
+ test eax,eax
  jz .Ldefer_fallback
  xor r13d,r13d
 .Ldefer_retarget_each:
@@ -2349,3 +2462,59 @@ pg_document_tx_retire:
  pop rbx
  pop rbp
  ret
+
+.text
+/* Shared holdable predicate before merge preparation and memory routing. */
+.Ldocs_holdable:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[r12+24]
+ call json_object_array_length@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lholdable_no
+ xor ecx,ecx
+ xor r8d,r8d
+.Lholdable_each:
+ cmp rcx,[rbx+8]
+ jae .Lholdable_count
+ imul rax,rcx,152
+ add rax,[rbx]
+ test dword ptr [rax+148],2
+ jnz .Lholdable_no
+ cmp qword ptr [rax+112],0
+ je .Lholdable_next
+ cmp qword ptr [rax+8],0
+ je .Lholdable_no
+ test dword ptr [rax+148],1
+ jnz .Lholdable_no
+ mov rdx,[rax]
+ cmp dword ptr [rdx+64],1
+ jne .Lholdable_no
+ cmp dword ptr [rdx+80],1
+ jne .Lholdable_no
+ cmp dword ptr [rdx+84],2
+ jne .Lholdable_no
+ mov rax,[rdx+88]
+ cmp rax,[rdx+96]
+ jne .Lholdable_no
+ inc r8
+.Lholdable_next:
+ inc rcx
+ jmp .Lholdable_each
+.Lholdable_count:
+ xor eax,eax
+ cmp r8,r13
+ sete al
+ jmp .Lholdable_end
+.Lholdable_no:
+ xor eax,eax
+.Lholdable_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .note.GNU-stack,"",@progbits
