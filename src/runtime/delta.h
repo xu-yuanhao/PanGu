@@ -50,4 +50,12 @@ pg_document_status pg_document_change_append(pg_document_change *,const struct j
 pg_document_status pg_document_change_snapshot(pg_document_change *,struct json_object **);
 pg_document_status pg_document_change_prepare(pg_document_change *,pg_document_prepared *);
 pg_document_status pg_document_change_discard(pg_document_change *);
+/* Build an owned document.change from a borrowed Prepared: version migration
+   selects base even with no ops; equal-version empty ops is an OK no-op with
+   *output=NULL; otherwise checkpoint selects base or delta. The checkpoint
+   decision is supplied by settlement after Tx validation, not executed here.
+   Inputs remain unchanged and output payload is detached. Safe positive IDs
+   and versions; stored_version>version returns PG_DOC_NEWER_VERSION. */
+pg_document_status pg_document_plan_change(uint64_t id,uint64_t stored_version,uint64_t version,
+ const pg_document_prepared *,unsigned checkpoint,struct json_object **);
 #endif

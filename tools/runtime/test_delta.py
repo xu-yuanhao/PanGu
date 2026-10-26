@@ -109,6 +109,27 @@ class Change(ctypes.Structure):
     _fields_=[('base',ctypes.c_void_p),('ops',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('active',ctypes.c_uint),('reserved',ctypes.c_uint)]
 class Prepared(ctypes.Structure):
     _fields_=[('value',ctypes.c_void_p),('ops',ctypes.c_void_p)]
+def plan_cases(native,library):
+    path=ROOT/'references/pi/packages/durable/src/session/transaction.ts'
+    assert path.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':packages/durable/src/session/transaction.ts'])
+    cases=[dict(id=id,stored=stored,version=version,checkpoint=checkpoint,value={'text':'same','items':[1]},ops=ops) for id in [1,123,9007199254740991] for stored in [1,2] for version in [stored,stored+1] for checkpoint in [False,True] for ops in [[],[['s',['text'],'same']],[['p',['items'],0,0,[]]]]]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';
+const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('function planDocument('),end=source.indexOf('/** The publication',start);const planDocument=eval('('+stripTypeScriptTypes(source.slice(start,end))+')');const cs=source.indexOf('if (plan.content?.type === "document.change"',source.indexOf('// Checkpoint predicates run last')),ce=source.indexOf('if (plan.content !== undefined) writes.push',cs);const finish=eval('('+stripTypeScriptTypes('function finish(plan){const change=plan.change;'+source.slice(cs,ce)+'return plan.content??null;}')+')');const out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){const loaded={record:{id:c.id},storedVersion:c.stored,tracker:null,deltasSinceBase:3};const document={addressId:'test',retireOnCommit:false,target:{kind:'loaded',document:loaded},definition:{version:c.version,checkpointWhen:()=>c.checkpoint},prepared:{value:c.value,ops:c.ops}};out.push(finish(planDocument(document)));}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path)],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    native.pg_document_plan_change.argtypes=[ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(Prepared),ctypes.c_uint,ctypes.POINTER(ctypes.c_void_p)]
+    for case,want in zip(cases,expected,strict=True):
+        value=library.json_tokener_parse(json.dumps(case['value']).encode());ops=library.json_tokener_parse(json.dumps(case['ops']).encode());prepared=Prepared(value,ops);out=ctypes.c_void_p()
+        try:
+            assert not native.pg_document_plan_change(case['id'],case['stored'],case['version'],ctypes.byref(prepared),case['checkpoint'],ctypes.byref(out))
+            actual=json.loads(library.json_object_to_json_string_ext(out,0)) if out.value else None
+            assert actual==want,(case,actual,want)
+            assert json.loads(library.json_object_to_json_string_ext(value,0))==case['value'] and json.loads(library.json_object_to_json_string_ext(ops,0))==case['ops']
+        finally:library.json_object_put(out);library.json_object_put(ops);library.json_object_put(value)
+    print(f'PASS: {len(cases)} document change plans match actual Pi planDocument/checkpoint branch')
+
 def main():
     reference=ROOT/'references/pi/packages/chord/src/delta/index.ts'
     for name in ('index.ts','diff.ts','tracker.ts','pending.ts','draft.ts'):
@@ -127,6 +148,7 @@ def main():
         native.pg_document_delta_apply.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_document_delta_apply.restype=ctypes.c_int
         native.pg_document_delta_batches.argtypes=native.pg_document_delta_apply.argtypes;native.pg_document_delta_batches.restype=ctypes.c_int
         revision_cases(native,library)
+        plan_cases(native,library)
         native.pg_document_change_open.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
         native.pg_document_change_append.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
         native.pg_document_change_prepare.argtypes=[ctypes.POINTER(Change),ctypes.POINTER(Prepared)]

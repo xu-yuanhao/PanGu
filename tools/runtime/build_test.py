@@ -98,7 +98,7 @@ def main():
                             '-DPG_DELTA_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/documents'), implementation('src/runtime/delta'),
                             str(ROOT / 'tests/runtime/test_delta.c'),
-                            '-Wl,--wrap=json_object_deep_copy,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_array_add,--wrap=json_object_array_put_idx,--wrap=json_object_object_add,--wrap=malloc,--wrap=calloc',
+                            '-Wl,--wrap=json_object_deep_copy,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_array_add,--wrap=json_object_array_put_idx,--wrap=json_object_object_add,--wrap=malloc,--wrap=calloc,--wrap=json_object_new_object,--wrap=json_object_new_int64',
                             *delta_flags, '-o', delta_test], check=True)
             subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')

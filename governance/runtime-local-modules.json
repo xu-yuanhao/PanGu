@@ -987,7 +987,8 @@
         "pg_document_change_append",
         "pg_document_change_snapshot",
         "pg_document_change_prepare",
-        "pg_document_change_discard"
+        "pg_document_change_discard",
+        "pg_document_plan_change"
       ],
       "reference_basis": [
         {
@@ -997,9 +998,10 @@
             "packages/chord/src/delta/index.ts",
             "packages/durable/src/storage/memory.ts",
             "packages/chord/src/delta/pending.ts",
-            "packages/chord/src/delta/tracker.ts"
+            "packages/chord/src/delta/tracker.ts",
+            "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes"
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail; native explicit-op change journal with detached base/batches, owned snapshot, sealed prepare/discard; operation/path replay occurs at snapshot/prepare rather than JS proxy writes; loaded planDocument base on version migration, delta for nonempty same-version ops, no write for empty ops; supplied checkpoint decision selects base after validation"
         }
       ]
     }

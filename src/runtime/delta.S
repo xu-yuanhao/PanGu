@@ -1461,3 +1461,201 @@ pg_document_change_discard:
 .Lchange_discard_return:
  ret
 .size pg_document_change_discard,.-pg_document_change_discard
+.text
+.globl pg_document_plan_change
+.type pg_document_plan_change,@function
+pg_document_plan_change:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov [rsp+24],rsi
+ mov r12,rdx
+ mov r13,rcx
+ mov r14d,r8d
+ mov r15,r9
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ test r15,r15
+ jz .Ldoc_plan_return
+ mov qword ptr [r15],0
+ test r13,r13
+ jz .Ldoc_plan_return
+ test rbx,rbx
+ jz .Ldoc_plan_return
+ mov rax,9007199254740991
+ cmp rbx,rax
+ ja .Ldoc_plan_return
+ test r12,r12
+ jz .Ldoc_plan_return
+ cmp r12,rax
+ ja .Ldoc_plan_return
+ cmp qword ptr [rsp+24],0
+ je .Ldoc_plan_return
+ cmp [rsp+24],rax
+ ja .Ldoc_plan_return
+ cmp r14d,1
+ ja .Ldoc_plan_return
+ mov ebp,5
+ cmp [rsp+24],r12
+ ja .Ldoc_plan_return
+ mov ebp,1
+ mov rdi,[r13]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ldoc_plan_return
+ mov rdi,[r13+8]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldoc_plan_return
+ mov rdi,[r13+8]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ldoc_plan_return
+ cmp [rsp+24],r12
+ jb .Ldoc_plan_base
+ mov rdi,[r13+8]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldoc_plan_noop
+ test r14d,r14d
+ jnz .Ldoc_plan_base
+ mov r14,[r13+8]
+ lea rax,[rip+.Ldoc_plan_ops]
+ mov [rsp+32],rax
+ mov edx,5
+ lea rdi,[rip+.Ldoc_plan_delta]
+ jmp .Ldoc_plan_kind
+.Ldoc_plan_base:
+ mov r14,[r13]
+ lea rax,[rip+.Ldoc_plan_value]
+ mov [rsp+32],rax
+ mov edx,4
+ lea rdi,[rip+.Ldoc_plan_base_name]
+.Ldoc_plan_kind:
+ mov esi,edx
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp+16],rax
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldoc_plan_kind_name]
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp+16],0
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp+16],rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldoc_plan_version]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp+16],0
+ test r14,r14
+ jz .Ldoc_plan_payload
+ mov rdi,r14
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+.Ldoc_plan_payload:
+ mov rdi,[rsp]
+ mov rsi,[rsp+32]
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp+16],0
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp+8],rax
+ lea rdi,[rip+.Ldoc_plan_change]
+ mov esi,15
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp+16],rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ldoc_plan_type]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp+16],0
+ mov rdi,rbx
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ldoc_plan_allocation
+ mov [rsp+16],rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ldoc_plan_id]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp+16],0
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ldoc_plan_content]
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldoc_plan_allocation
+ mov qword ptr [rsp],0
+ mov rax,[rsp+8]
+ mov [r15],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Ldoc_plan_cleanup
+.Ldoc_plan_noop:
+ xor ebp,ebp
+ jmp .Ldoc_plan_return
+.Ldoc_plan_allocation:
+ mov ebp,3
+.Ldoc_plan_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+.Ldoc_plan_return:
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_plan_change,.-pg_document_plan_change
+.section .rodata
+.Ldoc_plan_ops: .asciz "ops"
+.Ldoc_plan_value: .asciz "value"
+.Ldoc_plan_delta: .asciz "delta"
+.Ldoc_plan_base_name: .asciz "base"
+.Ldoc_plan_kind_name: .asciz "kind"
+.Ldoc_plan_version: .asciz "version"
+.Ldoc_plan_change: .asciz "document.change"
+.Ldoc_plan_type: .asciz "type"
+.Ldoc_plan_id: .asciz "id"
+.Ldoc_plan_content: .asciz "content"

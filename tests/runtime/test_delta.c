@@ -23,6 +23,10 @@ int __wrap_json_object_array_put_idx(struct json_object *a,size_t i,struct json_
 int __wrap_json_object_object_add(struct json_object *o,const char *key,struct json_object *v){return fault()?-1:__real_json_object_object_add(o,key,v);}
 void *__wrap_malloc(size_t n){return fault()?0:__real_malloc(n);}
 void *__wrap_calloc(size_t n,size_t size){return fault()?0:__real_calloc(n,size);}
+struct json_object *__real_json_object_new_object(void);
+struct json_object *__real_json_object_new_int64(int64_t);
+struct json_object *__wrap_json_object_new_object(void){return fault()?0:__real_json_object_new_object();}
+struct json_object *__wrap_json_object_new_int64(int64_t n){return fault()?0:__real_json_object_new_int64(n);}
 static void failures(void){
  struct json_object *value=json_tokener_parse("{\"text\":\"abc\",\"xs\":[1,2,3]}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"def\"],[\"a\",[\"text\"],\"more\"],[\"t\",[\"text\"],1],[\"s\",[\"new\"],{\"x\":2}],[\"s\",[\"xs\",3],4],[\"p\",[\"xs\"],1,1,[7,8]],[\"m\",[\"xs\"],[4,3,2,1,0]]]");
  struct json_object *saved_value=0,*saved_ops=0,*batches=json_object_new_array(),*out=0;assert(value&&ops&&batches&&!json_object_deep_copy(value,&saved_value,0)&&!json_object_deep_copy(ops,&saved_ops,0)&&!json_object_array_add(batches,json_object_get(ops)));
@@ -62,7 +66,17 @@ static void changes(void){
 #endif
  json_object_put(base);json_object_put(ops);
 }
+static void plans(void){
+ pg_document_prepared prepared={json_tokener_parse("{\"text\":\"x\"}"),json_tokener_parse("[]")};struct json_object *write=0;assert(prepared.value&&prepared.ops&&!pg_document_plan_change(2,1,1,&prepared,0,&write)&&!write&&!pg_document_plan_change(2,1,1,&prepared,1,&write)&&!write);assert(!pg_document_plan_change(2,1,2,&prepared,0,&write)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(write,"content"),"kind")),"base"));json_object_object_add(prepared.value,"text",json_object_new_string("outside"));assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(json_object_object_get(write,"content"),"value"),"text")),"x"));json_object_put(write);assert(pg_document_plan_change(2,2,1,&prepared,0,&write)==PG_DOC_NEWER_VERSION&&!write);assert(pg_document_plan_change(0,1,1,&prepared,0,&write)==PG_DOC_INVALID&&!write);json_object_put(prepared.ops);prepared.ops=json_tokener_parse("[[\"s\",[\"text\"],\"outside\"]]");assert(prepared.ops);
+ for(unsigned checkpoint=0;checkpoint<2;++checkpoint){assert(!pg_document_plan_change(2,1,1,&prepared,checkpoint,&write));struct json_object *content=json_object_object_get(write,"content");assert(!strcmp(json_object_get_string(json_object_object_get(content,"kind")),checkpoint?"base":"delta")&&json_object_object_get(content,checkpoint?"value":"ops"));json_object_put(write);
+#ifdef PG_DELTA_FAULTS
+ tracking=1;calls=fail_at=0;assert(!pg_document_plan_change(2,1,1,&prepared,checkpoint,&write));tracking=0;unsigned count=calls;json_object_put(write);for(unsigned i=1;i<=count;++i){tracking=1;calls=0;fail_at=i;pg_document_status status=pg_document_plan_change(2,1,1,&prepared,checkpoint,&write);tracking=0;assert(status==PG_DOC_ALLOCATION&&!write);}fail_at=0;
+#endif
+ }
+ json_object_put(prepared.value);json_object_put(prepared.ops);
+}
 int main(void){
+ plans();
  changes();
  revisions();
  run("{\"text\":\"\"}","[[\"a\",[\"text\"],\"中\"],[\"a\",[\"text\"],\"😀\"],[\"t\",[\"text\"],1]]","{\"text\":\"😀\"}");

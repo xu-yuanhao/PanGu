@@ -239,3 +239,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：现有delta模块新增32字节显式操作日志与16字节Prepared。open/append脱离输入，append只入有限JSON数组、路径/操作在snapshot/prepare重放；snapshot返回独立值，prepare成功或失败都封闭句柄，成功转交value/ops；discard不释放已转交对象。每次追加只复制新批次，最终重放复用已有相邻追加合并。该原生边界明确区别JS proxy与其错误时点，不宣称代理/ops规范化兼容。
 - 实际验证：448条编辑日志重放与实际Chord oracle一致，3条已登记ABI拒绝另行验证；原449条delta/96条revision对照通过。O0/O2 ASan/UBSan枚举open/append/prepare直接分配/插入/部分复制故障，输入/快照隔离、追加失败保留原操作、prepare封闭与转交所有权通过。真实MemoryStorage完成编辑→Prepared→Tx document.change→提交，旧快照保持原值。完整Runtime退出0；最后补充非空旧操作前缀回退专项在最终源O0/O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00通过。
 - 同一实施Agent自审：扩展实际导出/原生change布局与参考登记，未改门禁或预算。7个候选路径/暂存内容清单SHA256摘要（本记录加入前）`13ccb0e68b9de89eff46db025c532c5d219ce7f4d6a7cbec9dad90e65f5b2f30`。结论为本地候选通过；版本/checkpoint规划、Doc获取缓存/所有权和完整Tx自动结算尚待接入，K03未完成。
+
+## K03 loaded文档base/delta规划（2026-10-26）
+
+- 来源：Pi固定 `Transaction.planDocument` loaded分支、`#assemble` checkpoint选择、`session-documents.test.ts` 的迁移/非空structural no-op场景。Pi/Harness fetch仍为 `d5b3de22` / `22ddee37`。
+- 实现：Assembly `pg_document_plan_change` 将借用Prepared转为独立owned document.change；版本升级必选base，即使ops空；同版非空ops按传入checkpoint决策选base/delta，同版空ops返回无写入。拒绝newer stored version，payload复制与输入隔离。planner不调用predicate，后续统一Doc结算在验证之后计算决策，保持上游回调时序要求。
+- 实际验证：72条执行固定上游实际planDocument与checkpoint选择分支一致；O0/O2 ASan/UBSan枚举直接分配/插入/部分复制故障、safe ID/version、新er拒绝和payload隔离。实际MemoryStorage执行迁移materialize→空编辑→v2 base、checkpoint base、普通delta及空编辑不提交，旧快照保持稳定。完整Runtime退出0，原448条change journal/449条delta/96条revision及5262条Storage对照通过（3条既有ABI拒绝单列）。隔离核心暂存树G00、Assembly清单和产品构建通过；共享G00通过。
+- 同一实施Agent自审：扩展现有实际导出/来源登记及直接故障注入检查，无门禁预算变更。8个候选路径/暂存内容清单SHA256摘要（加入本记录前）`1818fc0ff5f6821da3a1cb0ee490a451746f30322e54c129fa8ecef452563314`。结论为本地候选通过；Doc获取缓存/所有权、predicate统一调用和自动结算仍待接入，K03未完成。
