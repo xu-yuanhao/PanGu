@@ -511,8 +511,70 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
         finally:library.json_object_put(value);library.json_object_put(out);assert not native.pg_record_tx_discard(ctypes.byref(tx))
     print(f'PASS: {len(cases)} createTask submission trace/link derivations match actual Pi function body')
 
+def task_creation(native,library):
+    cases=[]
+    options=[{'ownership':{'kind':'conversation'}}, {'ownership':{'kind':'conversation'},'conversationId':2,'background':True,'abandonOnRestart':True}, {'ownership':{'kind':'task','taskId':10}}, {'ownership':{'kind':'task','taskId':10},'conversationId':2}, {'ownership':{'kind':'task','taskId':99}}, {'ownership':{'kind':'task','taskId':10},'background':True}, {'ownership':{'kind':'conversation'},'conversationId':99}]
+    for opt in options:
+        for trace in ['absent','root',None,{'parent':'explicit'}]:
+            for staged in [False,True]:
+                cases.append(dict(options={**opt,**({} if trace=='absent' else {'trace':trace})},staged=staged,scope=1,input={'text':'测试'},failure=''))
+    for failure in ['','initial','mint','inject']:
+        for ids in [None,[],[20,21],[99,21]]:
+            cases.append(dict(options={'ownership':{'kind':'conversation'},**({} if ids is None else {'submissionIds':ids})},staged=False,scope=1,input=None,failure=failure))
+    cases.append(dict(options={'ownership':{'kind':'conversation'}},staged=False,scope=0,input=[],failure=''))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const s=readFileSync(process.argv[1],'utf8');const a=s.indexOf('\tcreateTask<I,'),b=s.indexOf('\n\t/** Create a raw submission',a);const copyJson=v=>JSON.parse(JSON.stringify(v)),TABLE_JSON_COPY_OPTIONS={};
+const text=`class Probe{#submissions=new Map();#tasksById=new Map();#scope;#context;#host;calls=[];c;
+constructor(c){this.c=c;this.#scope={conversationId:c.scope||undefined};this.#context={telemetry:{propagation:{inject:()=>{this.calls.push('inject');if(c.failure==='inject')throw Error();return {parent:'context'}}}}};this.#host={storage:{submission:async(id)=>{this.calls.push('submission:'+id);return ({20:{trace:{parent:'submission'}},21:{trace:{parent:'link'}}})[id]},mintId:async()=>{this.calls.push('mint');if(c.failure==='mint')throw Error();return 100}}};if(c.staged)this.#tasksById.set(10,{write:{record:{id:10,conversationId:2,state:{status:'pending'}}}})}
+#write(fn){return fn()}#assertOpen(){}async #currentTask(id){const staged=this.#tasksById.get(id);if(staged)return staged.write.record;this.calls.push('task:'+id);return id===10?{id:10,conversationId:1,state:{status:'running'}}:undefined}async #requireConversation(id){this.calls.push('conversation:'+id);if(id!==1&&id!==2)throw Error()}
+`+s.slice(a,b)+`async run(){const id=await this.createTask({definition:{name:'work\\u0000任务',version:2,initial:(input)=>{this.calls.push('initial');if(this.c.failure==='initial')throw Error();return {phase:'start',input}}}},this.c.input,this.c.options);return this.#tasksById.get(id).write.record}}`;
+const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c);try{out.push({ok:true,value:await p.run(),calls:p.calls})}catch{out.push({ok:false,calls:p.calls})}}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    init_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p))
+    mint_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
+    inject_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p))
+    class Services(ctypes.Structure):
+        _fields_=[('ctx',ctypes.c_void_p),('initial',init_type),('mint',mint_type),('inject',inject_type),('scope',ctypes.c_uint64)]
+    native.pg_record_tx_create_task.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(Services),ctypes.POINTER(ctypes.c_uint64)]
+    native.pg_record_tx_staged_tasks.argtypes=[ctypes.POINTER(Tx),ctypes.POINTER(ctypes.c_void_p)]
+    native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
+    def encode(v):return library.json_tokener_parse(json.dumps(v).encode())
+    for case,want in zip(cases,expected,strict=True):
+        calls=[]
+        @read_type
+        def read(ctx,table,id,out):
+            assert tx.busy;calls.append(f'{("conversation","entry","task","submission")[table]}:{id}')
+            value=({'id':id} if table==0 and id in [1,2] else {'id':10,'conversationId':1,'state':{'status':'running'}} if table==2 and id==10 else {20:{'trace':{'parent':'submission'}},21:{'trace':{'parent':'link'}}}.get(id) if table==3 else None)
+            if value is None:return 1
+            out[0]=encode(value);return 0
+        @init_type
+        def initial(ctx,input,out):
+            assert tx.busy;calls.append('initial');out[0]=encode({'phase':'start','input':case['input']});return 7 if case['failure']=='initial' else 0
+        @mint_type
+        def mint(ctx,out):
+            assert tx.busy;calls.append('mint');out[0]=100;return 7 if case['failure']=='mint' else 0
+        @inject_type
+        def inject(ctx,out):
+            assert tx.busy;calls.append('inject');out[0]=encode({'parent':'context'});return 7 if case['failure']=='inject' else 0
+        writes=[{'type':'task','value':{'id':10,'conversationId':2,'state':{'status':'pending'}}}] if case['staged'] else []
+        tx=Tx(None,None,ctypes.cast(read,ctypes.c_void_p),encode(writes));services=Services(None,initial,mint,inject,case['scope']);definition=encode({'name':'work\u0000任务','version':2});input=encode(case['input']);options=encode(case['options']);id=ctypes.c_uint64();snapshot=ctypes.c_void_p()
+        try:
+            status=native.pg_record_tx_create_task(ctypes.byref(tx),definition,input,options,ctypes.byref(services),ctypes.byref(id));actual=dict(ok=status==0,calls=calls)
+            if not status:
+                assert id.value==100 and not native.pg_record_tx_staged_tasks(ctypes.byref(tx),ctypes.byref(snapshot));actual['value']=json.loads(library.json_object_to_json_string_ext(snapshot,0))[-1]
+            else:assert not id.value and json.loads(library.json_object_to_json_string_ext(tx.writes,0))==writes
+            assert actual==want and tx.barrier and not tx.busy,(case,status,actual,want)
+        finally:
+            for value in [definition,input,options,snapshot]:library.json_object_put(value)
+            assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print(f'PASS: {len(cases)} full createTask records, owner/conversation, callback order and failures match actual Pi method')
+
 def main():
-    for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
+    for name in ('packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
         assert (ROOT/'references/pi'/name).read_bytes()==frozen,name+' drift'
     tables=('conversation','entry','task','submission');rng=random.Random(1049)
@@ -796,5 +858,6 @@ def main():
         task_cache_order(native,library)
         task_replacement(native,library)
         task_options(native,library)
+        task_creation(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

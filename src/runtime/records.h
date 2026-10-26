@@ -92,6 +92,22 @@ pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct j
    This is the write-attempt preparation phase of createTask, so it sets the
    table-read barrier and calls providers with Tx busy. */
 pg_record_tx_status pg_record_tx_task_options(pg_record_tx *,const struct json_object *,struct json_object **);
+typedef struct {
+ void *context;
+ /* Callbacks run with Tx busy. initial/inject transfer owned JSON, including
+    partial outputs on error; mint IDs stay consumed after later failures. */
+ int (*initial)(void *,const struct json_object *input,struct json_object **checkpoint);
+ int (*mint)(void *,uint64_t *);
+ int (*inject)(void *,struct json_object **trace);
+ uint64_t conversation_id; /* Default scope, zero means absent. */
+} pg_task_creation;
+/* Definition contains name/version. Options follow Durable TaskCreationOptions;
+   ownership is conversation or task. Resolve submissions, owner/conversation,
+   initialize, mint, propagate trace, then stage a detached pending Task. Output
+   ID is zero on failure. All inputs/services are borrowed only during call.
+   Final owner state is revalidated by transaction assembly. */
+pg_record_tx_status pg_record_tx_create_task(pg_record_tx *,const struct json_object *definition,
+ const struct json_object *input,const struct json_object *options,const pg_task_creation *,uint64_t *);
 /* Replace a Task candidate with a detached final record. Reject an already
    terminal candidate or a changed candidate conversation. Candidate timestamps
    take precedence, then input timestamps; now() supplies missing startedAt on

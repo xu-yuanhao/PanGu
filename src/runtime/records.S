@@ -4326,3 +4326,413 @@ pg_record_tx_task_options:
 .Ltask_links: .asciz "links"
 .Ltask_root: .asciz "root"
 .section .note.GNU-stack,"",@progbits
+.text
+/* A null JSON value is valid; clone/attach consumes only its private copy. */
+.Lcreate_task_copy:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ test rdx,rdx
+ jz .Lcreate_task_copy_attach
+ mov rdi,rdx
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcreate_task_copy_bad
+.Lcreate_task_copy_attach:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lcreate_task_copy_end
+.Lcreate_task_copy_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,1
+.Lcreate_task_copy_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.globl pg_record_tx_create_task
+.type pg_record_tx_create_task,@function
+pg_record_tx_create_task:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,136
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,r8
+ mov r15,r9
+ mov [rsp+128],rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,16
+ rep stosq
+ mov ebp,1
+ test r15,r15
+ jz .Lcreate_task_end
+ mov qword ptr [r15],0
+ test r14,r14
+ jz .Lcreate_task_end
+ cmp qword ptr [r14+8],0
+ je .Lcreate_task_end
+ cmp qword ptr [r14+16],0
+ je .Lcreate_task_end
+ mov rdi,rbx
+ mov rsi,[rsp+128]
+ mov rdx,rsp
+ call pg_record_tx_task_options
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcreate_task_end
+ mov dword ptr [rbx+32],1
+ mov ebp,1
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcreate_task_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcreate_ownership]
+ call json_object_object_get@PLT
+ lea rsi,[rip+.Lcreate_kind]
+ mov rdi,rax
+ call json_object_object_get@PLT
+ mov [rsp+120],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Lcreate_task_conversation_owned
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcreate_ownership]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcreate_task_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Lcreate_task_cleanup
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rsp+8]
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Lcreate_task_cleanup
+ mov [rsp+112],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ mov [rsp+56],rax
+ mov rdi,[rsp+112]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ mov [rsp+96],rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcreate_background]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_conversation_id]
+ lea rdx,[rsp+120]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lcreate_task_require
+ mov rdi,[rsp+120]
+ call pg_document_safe_number
+ cmp rax,[rsp+96]
+ jne .Lcreate_task_cleanup
+ jmp .Lcreate_task_require
+.Lcreate_task_conversation_owned:
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Ltx_conversation]
+ call .Ls_string
+ test eax,eax
+ jz .Lcreate_task_cleanup
+ mov rax,[r14+32]
+ mov [rsp+96],rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lcreate_task_require
+ mov rdi,rax
+ call pg_document_safe_number
+ mov [rsp+96],rax
+.Lcreate_task_require:
+ cmp qword ptr [rsp+96],0
+ je .Lcreate_task_cleanup
+ mov dword ptr [rsp+104],1
+ mov rdi,rbx
+ lea rsi,[rsp+64]
+ call pg_record_tx_require_document_owner
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[r14]
+ mov rsi,r13
+ lea rdx,[rsp+16]
+ call [r14+8]
+ mov ebp,8
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[r14]
+ lea rsi,[rsp+48]
+ call [r14+16]
+ mov ebp,5
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rax,[rsp+48]
+ test rax,rax
+ jz .Lcreate_task_cleanup
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lcreate_task_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_trace]
+ call json_object_object_get@PLT
+ mov [rsp+120],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltask_root]
+ call .Ls_string
+ mov [rsp+80],eax
+ test eax,eax
+ jnz .Lcreate_task_record
+ cmp qword ptr [rsp+120],0
+ jne .Lcreate_task_record
+ cmp qword ptr [r14+24],0
+ je .Lcreate_task_record
+ mov rdi,[r14]
+ lea rsi,[rsp+24]
+ call [r14+24]
+ mov ebp,8
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rax,[rsp+24]
+ mov [rsp+120],rax
+.Lcreate_task_record:
+ mov ebp,4
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lcreate_task_cleanup
+ mov [rsp+32],rax
+ mov rdi,[rsp+48]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp+96]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,r12
+ lea rsi,[rip+.Lcreate_name]
+ call json_object_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_kind]
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,r12
+ lea rsi,[rip+.Lcreate_version]
+ call json_object_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_version]
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_input]
+ mov rdx,r13
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ cmp dword ptr [rsp+80],0
+ jne .Lcreate_task_links
+ cmp qword ptr [rsp+120],0
+ je .Lcreate_task_links
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltask_trace]
+ mov rdx,[rsp+120]
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+.Lcreate_task_links:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_links]
+ lea rdx,[rsp+120]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lcreate_task_owner
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltask_links]
+ mov rdx,[rsp+120]
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+.Lcreate_task_owner:
+ cmp qword ptr [rsp+56],0
+ je .Lcreate_task_background
+ mov rdi,[rsp+56]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_owner]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+.Lcreate_task_background:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcreate_background]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov edi,eax
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_background]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ xor edi,edi
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_abort]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcreate_abandon]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lcreate_task_state
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcreate_abandon]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+.Lcreate_task_state:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lcreate_task_cleanup
+ mov [rsp+40],rax
+ lea rdi,[rip+.Lcreate_pending]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ls_status]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lcreate_checkpoint]
+ mov rdx,[rsp+16]
+ call .Lcreate_task_copy
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_state]
+ mov rdx,[rsp+40]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov qword ptr [rsp+40],0
+ mov rdi,[rsp+32]
+ call pg_document_value_valid@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Lcreate_task_cleanup
+ call json_object_new_object@PLT
+ mov ebp,4
+ test rax,rax
+ jz .Lcreate_task_cleanup
+ mov [rsp+40],rax
+ lea rdi,[rip+.Ltx_task]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ls_type]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ltx_value]
+ mov rdx,[rsp+32]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov qword ptr [rsp+32],0
+ mov dword ptr [rbx+32],0
+ mov rdi,rbx
+ mov esi,2
+ mov rdx,[rsp+40]
+ call pg_record_tx_stage
+ mov ebp,eax
+ test eax,eax
+ jnz .Lcreate_task_cleanup
+ mov rax,[rsp+48]
+ mov [r15],rax
+.Lcreate_task_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Lcreate_task_end:
+ mov eax,ebp
+ add rsp,136
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_create_task,.-pg_record_tx_create_task
+.section .rodata
+.Lcreate_ownership: .asciz "ownership"
+.Lcreate_task_id: .asciz "taskId"
+.Lcreate_kind: .asciz "kind"
+.Lcreate_name: .asciz "name"
+.Lcreate_version: .asciz "version"
+.Lcreate_input: .asciz "input"
+.Lcreate_background: .asciz "background"
+.Lcreate_abort: .asciz "abortRequested"
+.Lcreate_abandon: .asciz "abandonOnRestart"
+.Lcreate_pending: .asciz "pending"
+.Lcreate_checkpoint: .asciz "checkpoint"
+.section .note.GNU-stack,"",@progbits

@@ -437,3 +437,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_record_tx_task_options按调用者submission顺序取最新staged候选或Storage提交态。首项trace缺失/null时选root，后续存在trace形成links（包含显式null），空列表移除原trace/links，省略submissionIds则保持原options。返回独立owned options，错误释放部分读取结果和候选输出，原writes保持；作为createTask的写尝试前置阶段固定table-read barrier。旧ABI保持。
 - 实际验证：18组执行实际createTask分支的options及provider调用序列，与Native一致；真实MemoryStorage验证候选覆盖、旧trace/links覆盖、missing/root/null/空列表与输出所有权。12个直接分配/插入/部分复制故障保留原候选/Session健康。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过（既有3条delta ABI边界单列）；共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有records独立导出/来源、专项和TODO，原结构/枚举及门禁/预算保持。6个候选路径内容清单摘要（本记录加入前）：e42c60320fa00d0dd53f1afcba58c0f835d9845501e9982f6545443432db818c。结论为本地候选通过；完整createTask仍需接owner/conversation、initializer、mint及pending记录构造，本批未将完整创建视为完成。K03总验收保持未完成，TUI工作树保持独立。
+
+## K03 完整createTask pending创建
+
+- 来源：固定Pi d5b3de22 Transaction.createTask/#currentTask/#requireConversation/#write，TaskCreationOptions、session-tables测试及Generation/Tool创建调用者。本批fetch后Pi HEAD/origin=d5b3de22/f9daca3，相关Durable事务/Session无差异；Harness为22ddee37。
+- 实现：手写pg_record_tx_create_task，以独立40字节服务描述符注入initial/mint/telemetry/default scope；先准备submission追踪，再取最新候选/缓存owner，检查child background/conversation，核对conversation，然后initial→mint→trace inject→pending记录→私有暂存。输入、checkpoint和trace均隔离，null输入与可选trace提供者可用；异常清理partial callback/JSON输出，保留旧候选，已mint的ID保持消费。既有ABI不变，最终owner状态继续通过统一提交核验。
+- 实际验证：73组执行实际Pi完整createTask方法，完整record、Storage/initial/mint/inject顺序及错误一致；前批18组submission选项对照保留。真实MemoryStorage完成创建→统一提交→独立读取、同批owner/child、无注入器、null输入，以及同批owner变terminal时子任务提交拒绝。49个直接分配/插入/部分复制故障保留prior候选/健康Session，增加boolean分配故障包装。最初测试initializer对局部deep-copy partial输出漏清理，ASan定位后修复测试callback，最终O0/O2 ASan/UBSan专项和完整Runtime O0/O2 UBSan均通过；固定Pi/Chord基线保持通过。共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：仅records独立接口/导出/来源、相关专项与布尔分配测试包装、核心TODO；既有布局、门禁、预算保持。7个候选路径内容清单摘要（本记录加入前）：c81f87b31d4bdc1d6237daa5daca48352460e5d348ae574a17b773c39dd7bf49。隔离核心树fec483c1d72e95005d4c084106f5701e1cfd6496验证。结论为本地候选通过；已勾选类型化Task创建/替换，K03整体验收与任务phase/调度、整机组合继续按TODO执行。TUI工作树保持独立。

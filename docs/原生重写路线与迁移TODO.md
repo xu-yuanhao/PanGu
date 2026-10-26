@@ -75,6 +75,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 完成conversation/entry/task/submission四类记录的内存批次准备、原子应用、全局ID分配与独立点读；接通通用提交入口。
 - [x] 完成四类表过滤/分页/游标顺序、fork-aware Entry可见范围、提交序号及latest head marker读取。
 - [x] 接通私有StorageWrite事务批次、普通表read-after-write屏障、seal/commit/discard与有序submission候选结算，提交复用现有Storage/adopt契约。
+- [x] 完成Task的类型化pending创建与候选替换：submission追踪派生、owner/conversation、initializer/mint顺序、输入/checkpoint隔离、background/abandon与生命周期时间戳；最终owner状态由统一提交再次核验。
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [x] 完成已提交revision的current/as-of快照读取、生命周期截点、最近base选择与同版本delta尾重放。
@@ -424,3 +425,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 阅读固定Pi d5b3de22 Transaction.createTask的submissionIds分支，必须先于ownership/initial/mint执行。records新增pg_record_tx_task_options，以最新staged submission覆盖提交态读取；首项trace或root，后续存在的trace组成links，空列表去掉原trace/links，缺省submissionIds保持原options。保持读取顺序、显式null后续link与owned输出，任何错误不改变候选，只固定createTask写尝试的读屏障。
 - 验证：18组执行实际createTask分支的options及provider调用序列差异，真实MemoryStorage的候选覆盖、missing/null/空列表、旧options覆盖与12个分配/插入/部分复制故障通过。专项和完整Runtime见当前实现记录。
 - 下一行为：完整createTask入口消费该准备结果，再依源顺序接owner/conversation、initializer、mint及pending记录构造；本批未勾选完整Task创建。
+
+### K03 完整Task创建交接
+
+- 阅读固定Pi d5b3de22 `Transaction.createTask/#requireConversation/#currentTask/#write`、TaskCreationOptions，`session-tables.test.ts`创建/父子任务场景，以及Generation.createToolTask和Tool runtime.createTask调用者。本批fetch后Pi HEAD/origin仍为d5b3de22/f9daca3，相关Durable事务/Session无新增差异；Harness HEAD/origin为22ddee37。
+- `records.h/.S:pg_record_tx_create_task`消费已移植options准备，按源顺序解析最新候选/缓存owner、确定conversation并验证、调用initial、mint、追踪注入，最后构造和暂存独立pending Task。独立40字节服务描述符注入initializer/mint/trace/default scope，既有ABI保持；失败清理partial输出并保留先前候选，mint后的错误不回收ID。父子background/conversation约束在创建时检查，owner终态等继续由提交时统一校验。
+- 验证：73组执行实际Pi createTask方法，对照完整record、Storage/initial/mint/inject次序及错误；真实MemoryStorage验证创建→统一提交→独立读、同批父子创建、无追踪提供者、null输入、owner最终terminal拒绝。49个直接分配/插入/部分复制故障覆盖prior候选保留、partial callback清理和ID消费；完整运行结果见当前实现记录。
+- 下一行为：核对K03剩余事务查询、只读Session与会话级公开能力，补齐后总验收；任务phase/调度按K06接入，整机组合按K14执行。
