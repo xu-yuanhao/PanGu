@@ -1279,3 +1279,365 @@ pg_record_tx_create_conversation:
 .section .rodata
 .Ltx_owner: .asciz "owner"
 .Ltx_task_id: .asciz "taskId"
+.text
+.globl pg_records_prepare_fork
+.type pg_records_prepare_fork,@function
+pg_records_prepare_fork:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,168
+ mov rbx,rdi
+ mov r12,rsi
+ mov r14,rdx
+ mov r13,rcx
+ mov r15,r8
+ mov ebp,1
+ xor eax,eax
+ mov [rsp],rax
+ mov [rsp+8],rax
+ mov [rsp+16],rax
+ mov [rsp+24],rax
+ mov [rsp+32],rax
+ mov [rsp+40],rax
+ mov [rsp+112],rax
+ test r15,r15
+ jz .Lfork_return
+ mov qword ptr [r15],0
+ test rbx,rbx
+ jz .Lfork_return
+ cmp qword ptr [rbx+8],0
+ je .Lfork_return
+ cmp qword ptr [rbx+16],0
+ je .Lfork_return
+ cmp qword ptr [rbx+24],0
+ je .Lfork_return
+ mov rax,9007199254740991
+ test r12,r12
+ jz .Lfork_return
+ cmp r12,rax
+ ja .Lfork_return
+ test r13,r13
+ jz .Lfork_return
+ cmp r13,rax
+ ja .Lfork_return
+ test r14,r14
+ jz .Lfork_return
+ cmp r14,rax
+ ja .Lfork_return
+ mov qword ptr [rsp+64],0
+ mov rdi,[rbx]
+ mov rsi,r12
+ mov rdx,r14
+ lea rcx,[rsp+8]
+ lea r8,[rsp+64]
+ call [rbx+8]
+ test eax,eax
+ jnz .Lfork_read_failed
+ cmp qword ptr [rsp+8],0
+ je .Lfork_read_failed
+ mov rax,[rsp+64]
+ test rax,rax
+ jz .Lfork_read_failed
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lfork_read_failed
+ mov [rsp+88],rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Lfork_cleanup
+ mov [rsp+80],rax
+ mov qword ptr [rsp+96],0
+ mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+56],0
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lfork_allocation
+ mov [rsp],rax
+.Lfork_scan:
+ mov qword ptr [rsp+112],0
+ mov qword ptr [rsp+120],0
+ mov qword ptr [rsp+128],0
+ mov rdi,[rbx]
+ lea rsi,[rsp+80]
+ lea rdx,[rsp+112]
+ call [rbx+16]
+ test eax,eax
+ jnz .Lfork_read_failed
+ cmp dword ptr [rsp+128],1
+ ja .Lfork_read_failed
+ cmp dword ptr [rsp+132],0
+ jne .Lfork_read_failed
+ mov rdi,[rsp+112]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lfork_read_failed
+ mov qword ptr [rsp+48],0
+.Lfork_each:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp [rsp+48],rax
+ jae .Lfork_page_done
+ mov rdi,[rsp+112]
+ mov rsi,[rsp+48]
+ call json_object_array_get_idx@PLT
+ mov [rsp+136],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_scope]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_conversation]
+ call .Ls_string
+ test eax,eax
+ jz .Lfork_next
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Lfork_policy]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_asof]
+ cmp qword ptr [rsp+56],0
+ je .Lfork_policy_selected
+ lea rsi,[rip+.Lfork_current]
+.Lfork_policy_selected:
+ call .Ls_string
+ test eax,eax
+ jz .Lfork_next
+ mov qword ptr [rsp+144],0
+ mov rdi,[rbx]
+ lea rsi,[rsp+144]
+ call [rbx+24]
+ test eax,eax
+ jnz .Lfork_read_failed
+ mov rax,[rsp+144]
+ test rax,rax
+ jz .Lfork_read_failed
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lfork_read_failed
+ mov rdi,[rsp+136]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lfork_allocation
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lfork_created]
+ call json_object_object_del@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lfork_retired]
+ call json_object_object_del@PLT
+ mov rdi,[rsp+144]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ltx_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lfork_allocation
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lfork_allocation
+ mov [rsp+40],rax
+ lea rdi,[rip+.Ltx_conversation]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lfork_kind]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lfork_allocation
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lfork_allocation
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lfork_scope]
+ mov rdx,[rsp+40]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lfork_allocation
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+152],0
+.Lfork_duplicate:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp [rsp+152],rax
+ jae .Lfork_source
+ mov rdi,[rsp]
+ mov rsi,[rsp+152]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_record]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_kind]
+ call json_object_object_get@PLT
+ mov [rsp+160],rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lfork_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,[rsp+160]
+ call json_object_equal@PLT
+ test eax,eax
+ jz .Lfork_duplicate_next
+ mov rdi,r14
+ lea rsi,[rip+.Lfork_key]
+ call json_object_object_get@PLT
+ mov [rsp+160],rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lfork_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,[rsp+160]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lfork_cleanup
+.Lfork_duplicate_next:
+ inc qword ptr [rsp+152]
+ jmp .Lfork_duplicate
+.Lfork_source:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lfork_allocation
+ mov [rsp+32],rax
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lfork_allocation
+ cmp qword ptr [rsp+56],0
+ jne .Lfork_current_point
+ mov rdi,[rsp+88]
+ call json_object_new_int64@PLT
+ jmp .Lfork_attach_point
+.Lfork_current_point:
+ lea rdi,[rip+.Lfork_current]
+ call json_object_new_string@PLT
+.Lfork_attach_point:
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lfork_at]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lfork_allocation
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lfork_allocation
+ mov [rsp+24],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lfork_record]
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lfork_allocation
+ mov qword ptr [rsp+16],0
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lfork_source_name]
+ mov rdx,[rsp+32]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lfork_allocation
+ mov qword ptr [rsp+32],0
+ mov rdi,[rsp]
+ mov rsi,[rsp+24]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lfork_allocation
+ mov qword ptr [rsp+24],0
+.Lfork_next:
+ inc qword ptr [rsp+48]
+ jmp .Lfork_each
+.Lfork_page_done:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ cmp dword ptr [rsp+128],0
+ je .Lfork_pass_done
+ mov rax,[rsp+120]
+ cmp dword ptr [rsp+104],0
+ je .Lfork_cursor_set
+ cmp rax,[rsp+96]
+ jle .Lfork_read_failed
+.Lfork_cursor_set:
+ mov [rsp+96],rax
+ mov dword ptr [rsp+104],1
+ jmp .Lfork_scan
+.Lfork_pass_done:
+ cmp qword ptr [rsp+56],0
+ jne .Lfork_success
+ mov qword ptr [rsp+56],1
+ mov [rsp+80],r12
+ mov qword ptr [rsp+88],-1
+ mov qword ptr [rsp+96],0
+ mov qword ptr [rsp+104],0
+ jmp .Lfork_scan
+.Lfork_success:
+ mov rax,[rsp]
+ mov [r15],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Lfork_cleanup
+.Lfork_read_failed:
+ mov ebp,5
+ jmp .Lfork_cleanup
+.Lfork_allocation:
+ mov ebp,4
+.Lfork_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+.Lfork_return:
+ mov eax,ebp
+ add rsp,168
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_records_prepare_fork,.-pg_records_prepare_fork
+.section .rodata
+.Lfork_scope: .asciz "scope"
+.Lfork_kind: .asciz "kind"
+.Lfork_key: .asciz "key"
+.Lfork_policy: .asciz "fork"
+.Lfork_asof: .asciz "asOf"
+.Lfork_current: .asciz "current"
+.Lfork_created: .asciz "createdAt"
+.Lfork_retired: .asciz "retiredAt"
+.Lfork_record: .asciz "record"
+.Lfork_source_name: .asciz "source"
+.Lfork_at: .asciz "at"

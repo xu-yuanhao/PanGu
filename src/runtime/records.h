@@ -81,4 +81,20 @@ pg_record_tx_status pg_record_tx_append_entry(pg_record_tx *,uint64_t conversati
    This primitive does not perform fork selection or extension creation hooks. */
 pg_record_tx_status pg_record_tx_create_conversation(pg_record_tx *,uint64_t owner_task_id,unsigned root,
  int (*mint)(void *,uint64_t *),struct json_object **);
+typedef struct {uint64_t conversation_id,at;int64_t after;unsigned has_cursor,reserved;} pg_fork_query;
+typedef struct {struct json_object *items;int64_t after;unsigned has_next,reserved;} pg_fork_page;
+typedef struct {
+ void *context;
+ /* Entry lookup is fork-aware; both read callbacks return owned snapshots.
+    0 means success. Scan uses ascending IDs and page size 256. */
+ int (*entry)(void *,uint64_t conversation,uint64_t id,struct json_object **,uint64_t *sequence);
+ int (*scan)(void *,const pg_fork_query *,pg_fork_page *);
+ int (*mint)(void *,uint64_t *);
+} pg_fork_storage;
+/* Ordered {record,source} copy plans, owned and detached. Select asOf documents
+   from the visible Entry's owning conversation at its actual commit sequence,
+   then current-policy documents from the requested parent. Duplicate target
+   logical addresses fail. IDs minted before failure remain consumed. Typed
+   DocumentRecord snapshots use only the fields declared by Durable. */
+pg_record_tx_status pg_records_prepare_fork(const pg_fork_storage *,uint64_t parent,uint64_t entry,uint64_t child,struct json_object **);
 #endif

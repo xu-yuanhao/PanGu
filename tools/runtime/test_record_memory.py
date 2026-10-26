@@ -11,14 +11,16 @@ COMMIT='d5b3de22d0e24a3e9c38a9410d3329b099717283'
 ORACLE=r'''
 import {registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';import {readFileSync} from 'node:fs';
 const base=pathToFileURL(process.argv[1]+'/');
-registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord/delta')return {url:new URL('packages/chord/src/delta/index.ts',base).href,shortCircuit:true};return n(s,c);}});
+registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};if(s==='@earendil-works/chord/delta')return {url:new URL('packages/chord/src/delta/index.ts',base).href,shortCircuit:true};return n(s,c);}});
 const {MemoryStorage}=await import(new URL('packages/durable/src/storage/memory.ts',base));
+const {prepareForkDocumentCopies}=await import(new URL('packages/durable/src/session/forks.ts',base));
 const storage=new MemoryStorage(),out=[];
 for(const op of JSON.parse(readFileSync(0,'utf8'))){
  if(op.op==='commit'){const adopted=[];try{const seq=await storage.commit(op.writes,s=>adopted.push(s),{});out.push({ok:true,seq,adopted});}catch{out.push({ok:false,adopted});}}
  if(op.op==='docscan'){try{out.push({ok:true,page:await storage.scanDocuments(op.query,op.limit,op.cursor,{})});}catch{out.push({ok:false});}}
  if(op.op==='find'){try{out.push({ok:true,value:await storage.findDocument(op.address,op.at,{})??null});}catch{out.push({ok:false});}}
  if(op.op==='document'){try{out.push({ok:true,value:await storage.document(op.id,op.at,{})??null});}catch{out.push({ok:false});}}
+ if(op.op==='forkplan'){try{out.push({ok:true,value:await prepareForkDocumentCopies(storage,op.parent,op.entry,op.child,{})});}catch{out.push({ok:false});}}
  if(op.op==='mint'){try{out.push({ok:true,id:await storage.mintId()});}catch{out.push({ok:false});}}
  if(op.op==='entry'){try{out.push({ok:true,value:await (op.conversation===undefined?storage.entry(op.id,{}):storage.entry(op.conversation,op.id,{}))??null});}catch{out.push({ok:false});}}
  if(op.op==='head'){try{out.push({ok:true,value:await storage.findLatestHeadMarker(op.conversation,op.at,{})??null});}catch{out.push({ok:false});}}
@@ -38,6 +40,12 @@ class Address(ctypes.Structure):
     _fields_=[('kind',Slice),('key',Slice),('owner',ctypes.c_int64),('scope',ctypes.c_uint),('has_key',ctypes.c_uint)]
 class DocumentQuery(ctypes.Structure):
     _fields_=[('scope',ctypes.c_uint),('has_kind',ctypes.c_uint),('owner',ctypes.c_uint64),('kind',Slice),('at',ctypes.c_uint64),('limit',ctypes.c_size_t),('after',ctypes.c_int64),('has_cursor',ctypes.c_uint),('reserved',ctypes.c_uint)]
+class ForkQuery(ctypes.Structure):
+    _fields_=[('conversation',ctypes.c_uint64),('at',ctypes.c_uint64),('after',ctypes.c_int64),('has_cursor',ctypes.c_uint),('reserved',ctypes.c_uint)]
+class ForkPage(ctypes.Structure):
+    _fields_=[('items',ctypes.c_void_p),('after',ctypes.c_int64),('has_next',ctypes.c_uint),('reserved',ctypes.c_uint)]
+class ForkStorage(ctypes.Structure):
+    _fields_=[('context',ctypes.c_void_p),('entry',ctypes.c_void_p),('scan',ctypes.c_void_p),('mint',ctypes.c_void_p)]
 class Query(ctypes.Structure):
     _fields_=[('table',ctypes.c_uint),('order',ctypes.c_uint),('has_cursor',ctypes.c_uint),('cursor_order',ctypes.c_uint),
               ('after',ctypes.c_int64),('limit',ctypes.c_size_t),('flags',ctypes.c_uint64),('conversation_id',ctypes.c_uint64),
@@ -133,7 +141,7 @@ const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('(
     print(f'PASS: {len(cases)} Entry and 4 Conversation constructions match actual Pi method bodies with fixed host')
 
 def main():
-    for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
+    for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
         assert (ROOT/'references/pi'/name).read_bytes()==frozen,name+' drift'
     tables=('conversation','entry','task','submission');rng=random.Random(1049)
@@ -260,6 +268,17 @@ def main():
         operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,id=doc_record['id']+2,scope=dict(kind='conversation',conversationId=3)),source=dict(id=doc_record['id'],at=100000))]))
         operations.append(dict(op='document',id=doc_record['id']+2,at='current'))
         operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,id=doc_record['id']+3),source=dict(id=doc_record['id'],at='current')),dict(type='document.copy',record=dict(target,id=doc_record['id']+4,scope=dict(kind='conversation',conversationId=4)),source=dict(id=doc_record['id']+3,at='current'))]))
+    fork_writes=[dict(type='conversation',value=dict(id=500000)),dict(type='conversation',value=dict(id=500001,parent=dict(conversationId=500000,at=500010))),dict(type='entry',value=dict(id=500010,conversationId=500000,kind='fork'))]
+    for index in range(600):
+        record_value=dict(id=500100+index,kind='fork.'+str(index),scope=dict(kind='conversation',conversationId=500000),history='rewindable',fork='initial' if index%7==0 else 'asOf')
+        if index%5==0:record_value['key']='key\0中'
+        fork_writes.append(dict(type='document.create',record=record_value,content=dict(kind='base',version=1,value=dict(index=index))))
+    fork_writes.append(dict(type='document.create',record=dict(id=500900,kind='current.parent',scope=dict(kind='conversation',conversationId=500001),history='latest',fork='current'),content=dict(kind='base',version=1,value={})))
+    operations.append(dict(op='commit',writes=fork_writes))
+    for parent,entry in [(500001,500010),(500000,500010),(500001,999999),(999999,500010)]:operations.append(dict(op='forkplan',parent=parent,entry=entry,child=999000))
+    operations.append(dict(op='commit',writes=[dict(type='document.retire',id=500101),dict(type='document.create',record=dict(id=501000,kind='fork.1',scope=dict(kind='conversation',conversationId=500000),history='latest',fork='current'),content=dict(kind='base',version=1,value={}))]))
+    operations.append(dict(op='forkplan',parent=500000,entry=500010,child=999001))
+    operations.append(dict(op='mint'))
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
@@ -284,6 +303,18 @@ def main():
         commit_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,adopt_type,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
         memory=Memory();assert native.pg_record_memory_open(ctypes.byref(memory))==0
         service=native.pg_record_memory_storage(ctypes.byref(memory));commit=commit_type(service.commit)
+        entry_callback=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p),ctypes.POINTER(ctypes.c_uint64))
+        scan_callback=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ForkQuery),ctypes.POINTER(ForkPage))
+        mint_callback=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
+        @entry_callback
+        def fork_entry(context,conversation,id,out,seq):return native.pg_record_memory_entry(ctypes.byref(memory),id,conversation,out,seq)
+        @scan_callback
+        def fork_scan(context,input,out):
+            source=input.contents;query=DocumentQuery(1,0,source.conversation,Slice(),source.at,256,source.after,source.has_cursor,0);page=Page();status=native.pg_record_memory_scan_documents(ctypes.byref(memory),ctypes.byref(query),ctypes.byref(page));out[0]=ForkPage(page.items,page.after,page.has_next,0);return status
+        @mint_callback
+        def fork_mint(context,out):return native.pg_record_memory_mint(ctypes.byref(memory),out)
+        fork_service=ForkStorage(None,ctypes.cast(fork_entry,ctypes.c_void_p),ctypes.cast(fork_scan,ctypes.c_void_p),ctypes.cast(fork_mint,ctypes.c_void_p))
+        native.pg_records_prepare_fork.argtypes=[ctypes.POINTER(ForkStorage),ctypes.c_uint64,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
         try:
             for index,(op,answer) in enumerate(zip(operations,expected,strict=True)):
                 if op['op']=='mint':
@@ -298,6 +329,12 @@ def main():
                     finally:library.json_object_put(batch)
                     actual=dict(ok=status==0,adopted=adopted)
                     if not status:actual['seq']=seq.value
+                elif op['op']=='forkplan':
+                    value=ctypes.c_void_p();status=native.pg_records_prepare_fork(ctypes.byref(fork_service),op['parent'],op['entry'],op['child'],ctypes.byref(value));actual=dict(ok=status==0)
+                    try:
+                        if not status:actual['value']=json.loads(library.json_object_to_json_string_ext(value,0))
+                        else:assert not value.value
+                    finally:library.json_object_put(value)
                 elif op['op']=='docscan':
                     definition=op['query'];scope=definition['scope'];kind=definition.get('kind','').encode();buffer=ctypes.create_string_buffer(kind);cursor=op.get('cursor',{});query=DocumentQuery(('session','conversation','task').index(scope['kind']),int('kind' in definition),scope.get('conversationId',scope.get('taskId',0)),Slice(ctypes.addressof(buffer),len(kind)),2**64-1 if definition['at']=='current' else definition['at'],op['limit'],cursor.get('after',0),int('cursor' in op),0);page=Page()
                     status=native.pg_record_memory_scan_documents(ctypes.byref(memory),ctypes.byref(query),ctypes.byref(page));actual=dict(ok=status==0)

@@ -196,3 +196,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：`pg_record_tx_create_conversation` 手写Assembly支持root保留ID1、ownerless与task-owned；普通创建先mint，再查最新暂存task或Storage，owner由task.conversationId/taskId派生；生成完整命令后一次追加，返回独立记录。mint后失败消耗ID符合上游顺序。
 - 实际验证：4种构造执行固定Pi实际私有方法体（parent未提供，mint/task/creation-hook固定host）一致；实际MemoryStorage验证同批task、committed task和更新候选优先级、missing owner、root及返回隔离。O0/O2 ASan/UBSan和逐直接分配/插入/部分复制故障通过；完整Runtime退出0，最后补充候选优先级用例另在最终源O0/O2执行通过。原10条Entry、24条submission及5254条Storage对照通过。隔离核心暂存树G00、Assembly清单、产品构建通过；共享G00仍报告4个TUI候选未登记。
 - 同一实施Agent自审：扩展实际导出/来源登记，不改变门禁或预算。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`ac445b23fbacbe99b99c73b3d0b24e143422bc72168e823f1c967dc933c17776`。结论为本地候选通过；fork文档选择/creation hook装配、完整Document Tx及当前应用接入仍待完成，K03未完成。
+
+## K03 fork文档选择（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `session/forks.ts:prepareForkDocumentCopies/collectCopies`，Transaction `#stageConversation` 调用，`session-forks.test.ts` 的隐藏Entry和重复asOf/current策略场景。Pi/Harness fetch仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：`pg_records_prepare_fork` 手写Assembly，通过32字节Storage服务表注入fork-aware Entry、256项Document scan和mint；第一遍取Entry实际owner/commitSeq的asOf，第二遍取请求parent的current，initial跳过。为child生成独立record/source plans，替换scope/ID并移除生命周期stamp，重复kind/key目标地址拒绝。IDs在错误时不回退。
+- 实际验证：5262条累计操作含直接执行固定Pi实际prepareForkDocumentCopies，600个文档分页、继承Entry、NUL family key、initial跳过、隐藏/缺失Entry、策略冲突及失败后mint结果一致。实际MemoryStorage消费plans完成document.copy，读取分叉时旧值。O0/O2 ASan/UBSan及逐直接分配/插入/部分复制和读失败清理通过，完整Runtime退出0；原10条Entry/4条Conversation构造和24条submission对照通过。暂存核心树G00、Assembly清单及产品构建通过；共享G00仍为4个TUI候选未登记。
+- 同一实施Agent自审：扩展实际导出/Storage回调布局/参考登记，未修改门禁或预算。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`321f7c6814c000d3c900966b948c908477eb89da2605d113cb9e6bdf59a1672c`。结论为本地候选通过。Tx fork parent/plan组装与creation hook仍待接入，K03未完成。
