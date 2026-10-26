@@ -25,6 +25,7 @@ for(const op of JSON.parse(readFileSync(0,'utf8'))){
  if(op.op==='entry'){try{out.push({ok:true,value:await (op.conversation===undefined?storage.entry(op.id,{}):storage.entry(op.conversation,op.id,{}))??null});}catch{out.push({ok:false});}}
  if(op.op==='head'){try{out.push({ok:true,value:await storage.findLatestHeadMarker(op.conversation,op.at,{})??null});}catch{out.push({ok:false});}}
  if(op.op==='scan'){try{const names={conversation:'scanConversations',entry:'scanEntries',task:'scanTasks',submission:'scanSubmissions'};out.push({ok:true,page:await storage[names[op.table]](op.query,op.limit,op.cursor,{})});}catch{out.push({ok:false});}}
+ if(op.op==='request'){out.push({ok:true,value:await storage.submissionByRequest(op.conversation,op.key,{})??null});}
  if(op.op==='read'){let value=await storage[op.table](op.id,{});if(op.table==='entry')value=value?.entry;out.push({ok:true,value:value??null});}
 }
 await storage.close({});console.log(JSON.stringify(out));
@@ -481,6 +482,17 @@ def main():
     operations.append(dict(op='commit',writes=[dict(type='document.retire',id=500101),dict(type='document.create',record=dict(id=501000,kind='fork.1',scope=dict(kind='conversation',conversationId=500000),history='latest',fork='current'),content=dict(kind='base',version=1,value={}))]))
     operations.append(dict(op='forkplan',parent=500000,entry=500010,child=999001))
     operations.append(dict(op='mint'))
+    request_rng=random.Random(5701)
+    for step in range(80):
+        writes=[]
+        for _ in range(request_rng.randint(1,4)):
+            value=dict(id=request_rng.randrange(700000,700008),conversationId=request_rng.choice([1,2]),status='queued')
+            key=request_rng.choice([None,'','r','s','k\0中'])
+            if key is not None:value['requestId']=key
+            writes.append(dict(type='submission',value=value))
+        operations.append(dict(op='commit',writes=writes))
+        for owner in [1,2]:
+            for key in ['', 'r','s','k\0中']:operations.append(dict(op='request',conversation=owner,key=key))
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
@@ -493,6 +505,9 @@ def main():
         entry_construction(native,library)
         native.pg_record_memory_open.argtypes=[ctypes.POINTER(Memory)];native.pg_record_memory_close.argtypes=[ctypes.POINTER(Memory)]
         native.pg_record_memory_mint.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(ctypes.c_uint64)]
+        class RequestQuery(ctypes.Structure):
+            _fields_=[('conversation',ctypes.c_uint64),('request',ctypes.c_void_p),('size',ctypes.c_size_t)]
+        native.pg_record_memory_submission_by_request.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(RequestQuery),ctypes.POINTER(ctypes.c_void_p)]
         native.pg_record_memory_read.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
         native.pg_record_memory_entry.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p),ctypes.POINTER(ctypes.c_uint64)]
         native.pg_record_memory_head.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
@@ -531,6 +546,13 @@ def main():
                     finally:library.json_object_put(batch)
                     actual=dict(ok=status==0,adopted=adopted)
                     if not status:actual['seq']=seq.value
+                elif op['op']=='request':
+                    key=op['key'].encode();buffer=ctypes.create_string_buffer(key);query=RequestQuery(op['conversation'],ctypes.addressof(buffer),len(key));value=ctypes.c_void_p()
+                    status=native.pg_record_memory_submission_by_request(ctypes.byref(memory),ctypes.byref(query),ctypes.byref(value))
+                    try:
+                        assert status in (0,1),(op,status)
+                        actual=dict(ok=True,value=json.loads(library.json_object_to_json_string_ext(value,0)) if value.value else None)
+                    finally:library.json_object_put(value)
                 elif op['op']=='forkplan':
                     value=ctypes.c_void_p();status=native.pg_records_prepare_fork(ctypes.byref(fork_service),op['parent'],op['entry'],op['child'],ctypes.byref(value));actual=dict(ok=status==0)
                     try:

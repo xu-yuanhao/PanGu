@@ -43,6 +43,10 @@ int __wrap_json_object_array_add(struct json_object *array,struct json_object *v
 struct json_object *__real_json_object_new_object(void);
 struct json_object *__real_json_object_new_int64(int64_t);
 struct json_object *__real_json_object_new_string(const char *);
+struct json_object *__real_json_object_new_string_len(const char *,int);
+const char *__real_json_object_to_json_string_ext(struct json_object *,int);
+struct json_object *__wrap_json_object_new_string_len(const char *s,int n){return doc_fault()?0:__real_json_object_new_string_len(s,n);}
+const char *__wrap_json_object_to_json_string_ext(struct json_object *o,int flags){return doc_fault()?0:__real_json_object_to_json_string_ext(o,flags);}
 int __real_json_object_object_add(struct json_object *,const char *,struct json_object *);
 struct json_object *__wrap_json_object_new_object(void){return doc_fault()?0:__real_json_object_new_object();}
 struct json_object *__wrap_json_object_new_int64(int64_t n){return doc_fault()?0:__real_json_object_new_int64(n);}
@@ -1132,6 +1136,36 @@ static void reader_guard_tests(void){
  puts("PASS: snapshot guarded reads, partial outputs, first failure, no further backend calls and close waits for an admitted read");
 }
 
+
+static uint64_t request_id(pg_record_memory *m,uint64_t conversation,const char *key,size_t size){pg_record_request_query query={conversation,key,size};struct json_object *out=0;int status=pg_record_memory_submission_by_request(m,&query,&out);assert(status==PG_MEMORY_OK||status==PG_MEMORY_MISSING);uint64_t id=out?json_object_get_uint64(json_object_object_get(out,"id")):0;json_object_put(out);return id;}
+static const char *request_seed="[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"conversation\",\"value\":{\"id\":2}},{\"type\":\"submission\",\"value\":{\"id\":10,\"conversationId\":1,\"requestId\":\"r\",\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":20,\"conversationId\":1,\"requestId\":\"s\",\"status\":\"queued\"}}]";
+static const char *request_replay="[{\"type\":\"submission\",\"value\":{\"id\":20,\"conversationId\":1,\"requestId\":\"r\",\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":10,\"conversationId\":1,\"requestId\":\"r\",\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":10,\"conversationId\":1,\"requestId\":\"t\",\"status\":\"queued\"}}]";
+static int request_bad(void *context,const pg_record_request_query *query,struct json_object **out){pg_record_tx *tx=context;assert(pg_record_tx_commit(tx)==PG_TX_INVALID&&pg_record_tx_discard(tx)==PG_TX_INVALID);(void)query;*out=json_object_new_object();assert(*out);return 9;}
+static void request_index_tests(void){
+ _Static_assert(sizeof(pg_record_request_query)==24&&sizeof(pg_record_requests)==16,"request query ABI");pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,request_seed)&&request_id(&m,1,"r",1)==10&&request_id(&m,1,"s",1)==20);
+ assert(!doc_commit(&m,request_replay)&&!request_id(&m,1,"r",1)&&!request_id(&m,1,"s",1)&&request_id(&m,1,"t",1)==10);
+ assert(!doc_commit(&m,"[{\"type\":\"submission\",\"value\":{\"id\":20,\"conversationId\":1,\"requestId\":\"r\",\"status\":\"queued\"}}]")&&request_id(&m,1,"r",1)==20);
+ assert(!doc_commit(&m,"[{\"type\":\"submission\",\"value\":{\"id\":20,\"conversationId\":2,\"requestId\":\"r\",\"status\":\"queued\"}}]")&&!request_id(&m,1,"r",1)&&request_id(&m,2,"r",1)==20);
+ assert(!doc_commit(&m,"[{\"type\":\"submission\",\"value\":{\"id\":20,\"conversationId\":2,\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":30,\"conversationId\":1,\"requestId\":\"\",\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":40,\"conversationId\":1.0,\"requestId\":\"k\\u0000中\",\"status\":\"queued\"}}]")&&!request_id(&m,2,"r",1)&&request_id(&m,1,0,0)==30&&request_id(&m,1,"k\0中",5)==40);
+ uint64_t seq=m.next_sequence;assert(doc_commit(&m,"[{\"type\":\"submission\",\"value\":{\"id\":30,\"conversationId\":1,\"requestId\":\"wrong\",\"status\":\"queued\"}},{\"type\":\"conversation\",\"value\":{\"id\":1}}]")==PG_MEMORY_INVALID&&m.next_sequence==seq&&request_id(&m,1,0,0)==30&&!request_id(&m,1,"wrong",5));
+ pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_record_requests service;pg_record_memory_requests(&m,&service);assert(service.context==&m&&service.find&&!pg_record_tx_begin(&tx,&session,&m,tx_read));pg_record_request_query query={1,"k\0中",5};struct json_object *out=0;assert(!pg_record_tx_submission_by_request(&tx,&service,&query,&out)&&json_object_get_int(json_object_object_get(out,"id"))==40);assert(!json_object_object_add(out,"outside",json_object_new_int64(1)));json_object_put(out);out=0;assert(!pg_record_tx_submission_by_request(&tx,&service,&query,&out)&&!json_object_object_get(out,"outside"));json_object_put(out);out=0;
+ pg_record_requests broken={&tx,request_bad};assert(pg_record_tx_submission_by_request(&tx,&broken,&query,&out)==PG_TX_READ_FAILED&&!out&&!tx.busy);
+ struct json_object *write=json_tokener_parse("{\"type\":\"document.retire\",\"id\":999}");assert(write&&!pg_record_tx_stage(&tx,PG_TX_DOCUMENT_RETIRE,write)&&!pg_record_tx_submission_by_request(&tx,&service,&query,&out));json_object_put(out);out=0;json_object_put(write);write=json_object_new_object();assert(pg_record_tx_stage(&tx,PG_TX_TASK,write)==PG_TX_INVALID&&pg_record_tx_submission_by_request(&tx,&service,&query,&out)==PG_TX_READ_AFTER_WRITE&&!out);json_object_put(write);assert(!pg_record_tx_discard(&tx)&&pg_record_tx_submission_by_request(&tx,&service,&query,&out)==PG_TX_SEALED);
+ assert(!pg_record_memory_close(&m)&&pg_record_memory_submission_by_request(&m,&query,&out)==PG_MEMORY_INVALID&&!out&&!pg_record_memory_open(&m)&&!request_id(&m,1,"t",1)&&!pg_record_memory_close(&m));
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){assert(!pg_record_memory_open(&m)&&!doc_commit(&m,request_seed));uint64_t before=m.next_sequence;doc_calls=0;doc_fail=target;doc_tracking=1;int status=doc_commit(&m,request_replay);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+ if(target){assert(status==PG_MEMORY_ALLOCATION&&m.next_sequence==before&&request_id(&m,1,"r",1)==10&&request_id(&m,1,"s",1)==20&&!request_id(&m,1,"t",1));assert(!doc_commit(&m,request_replay));++failures;}else {assert(!status);total=calls;}assert(!request_id(&m,1,"r",1)&&request_id(&m,1,"t",1)==10&&!pg_record_memory_close(&m));}
+ printf("PASS: atomic conversation/request index replay; %u direct allocation/insert/serialization/clone failures\n",failures);
+ total=0;failures=0;
+ for(unsigned target=0;target<=total;++target){assert(!pg_record_memory_open(&m));doc_calls=0;doc_fail=target;doc_tracking=1;int status=doc_commit(&m,request_seed);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+ if(target){assert(status==PG_MEMORY_ALLOCATION&&m.next_sequence==1&&!m.count&&!request_id(&m,1,"r",1));assert(!doc_commit(&m,request_seed));++failures;}else {assert(!status);total=calls;}assert(request_id(&m,1,"r",1)==10&&request_id(&m,1,"s",1)==20&&!pg_record_memory_close(&m));}
+ printf("PASS: first request index and row allocation; %u direct allocation/insert/serialization/clone failures\n",failures);
+
+ for(unsigned kind=0;kind<2;++kind){total=0;failures=0;for(unsigned target=0;target<=total;++target){assert(!pg_record_memory_open(&m)&&!doc_commit(&m,request_seed));session=(pg_record_session){.storage=pg_record_memory_storage(&m)};tx=(pg_record_tx){0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));pg_record_memory_requests(&m,&service);query=(pg_record_request_query){1,"r",1};doc_calls=0;doc_fail=target;doc_tracking=1;int status=kind?pg_record_tx_submission_by_request(&tx,&service,&query,&out):pg_record_memory_submission_by_request(&m,&query,&out);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;if(target){assert(status!=0&&!out&&!tx.busy&&!m.busy&&request_id(&m,1,"r",1)==10);++failures;}else{assert(!status&&out);json_object_put(out);out=0;total=calls;}assert(!pg_record_tx_discard(&tx)&&!pg_record_memory_close(&m));}printf("PASS: request %s lookup; %u direct allocation/serialization/clone failures\n",kind?"transaction":"Storage",failures);}
+#endif
+}
+
 int main(void){
  native_holds_tests();
  native_flush_tests();
@@ -1225,6 +1259,7 @@ int main(void){
  for(unsigned mode=1;mode<=3;++mode){assert(!pg_record_memory_open(&memory));allocation_failure=mode;assert(commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)==PG_MEMORY_ALLOCATION&&!memory.rows&&!memory.count&&!memory.busy&&memory.next_id==2&&memory.next_sequence==1);assert(!commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)&&seq==1);allocation_failure=1;assert(pg_record_memory_read(&memory,PG_TABLE_ENTRY,3,&out)==PG_MEMORY_ALLOCATION&&!out);assert(!pg_record_memory_close(&memory));}
 #endif
  long page=sysconf(_SC_PAGESIZE);char *guard=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(guard!=MAP_FAILED&&!mprotect(guard+page,(size_t)page,PROT_NONE));pg_record_memory *tail=(pg_record_memory*)(guard+page-sizeof(pg_record_memory));memset(tail,0,sizeof(*tail));assert(!pg_record_memory_open(tail)&&!commit_text(tail,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq));assert(!pg_record_memory_read(tail,PG_TABLE_ENTRY,3,&out)&&out);assert(!pg_record_memory_close(tail)&&json_object_get_int(json_object_object_get(out,"id"))==3);json_object_put(out);assert(!munmap(guard,(size_t)page*2));
+ request_index_tests();
  scan_tests();
  puts("PASS: real memory table writes, global IDs, fork-aware scans/entry/head, paging/filters, detached ownership, failure rollback and lifetime");return 0;
 }

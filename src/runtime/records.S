@@ -3013,3 +3013,71 @@ pg_record_tx_check_copy_source:
  pop rbx
  ret
 .size pg_record_tx_check_copy_source,.-pg_record_tx_check_copy_source
+.text
+.globl pg_record_tx_submission_by_request
+.type pg_record_tx_submission_by_request,@function
+pg_record_tx_submission_by_request:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp],0
+ mov eax,1
+ test r14,r14
+ jz .Ltx_request_end
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ltx_request_end
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_request_end
+ mov eax,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_request_end
+ mov eax,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_request_end
+ mov eax,2
+ cmp dword ptr [rbx+40],0
+ jne .Ltx_request_end
+ mov eax,1
+ test r12,r12
+ jz .Ltx_request_end
+ test r13,r13
+ jz .Ltx_request_end
+ cmp qword ptr [r12+8],0
+ je .Ltx_request_end
+ mov dword ptr [rbx+32],1
+ mov rdi,[r12]
+ mov rsi,r13
+ mov rdx,rsp
+ call [r12+8]
+ mov dword ptr [rbx+32],0
+ test eax,eax
+ jnz .Ltx_request_error
+ mov rax,[rsp]
+ mov [r14],rax
+ xor eax,eax
+ jmp .Ltx_request_end
+.Ltx_request_error:
+ mov r12d,5
+ cmp eax,1
+ jne .Ltx_request_release
+ mov r12d,7
+.Ltx_request_release:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r12d
+.Ltx_request_end:
+ add rsp,24
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_submission_by_request,.-pg_record_tx_submission_by_request
+.section .note.GNU-stack,"",@progbits

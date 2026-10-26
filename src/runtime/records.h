@@ -130,6 +130,15 @@ typedef struct {
    failures clear the output. Latest head is unbounded and fork-aware. */
 pg_record_tx_status pg_record_tx_scan(pg_record_tx *,const pg_record_queries *,const pg_memory_query *,pg_memory_page *);
 pg_record_tx_status pg_record_tx_latest_head(pg_record_tx *,const pg_record_queries *,uint64_t conversation,struct json_object **);
+typedef struct {uint64_t conversation;const char *request;size_t size;} pg_record_request_query;
+typedef struct {
+ void *context;
+ /* 0 owned record, 1 missing, other error; partial outputs remain owned. */
+ int (*find)(void *,const pg_record_request_query *,struct json_object **);
+} pg_record_requests;
+/* Committed lookup obeys the same read-after-table-write/sealed/reentry barrier
+   as other Tx queries. Request slices are valid UTF-8 and may contain NUL. */
+pg_record_tx_status pg_record_tx_submission_by_request(pg_record_tx *,const pg_record_requests *,const pg_record_request_query *,struct json_object **);
 typedef struct {
  uint64_t owner_task_id,parent,entry;
  unsigned root,reserved;

@@ -124,7 +124,7 @@ pg_record_memory_storage:
  push r13
  push r14
  push r15
- sub rsp,104
+ sub rsp,120
  mov rbx,rdi
  mov r12,rdx
  mov r13,rcx
@@ -132,6 +132,7 @@ pg_record_memory_storage:
  xor ebp,ebp
  mov [rsp+8],rsi
  mov qword ptr [rsp],0
+ mov qword ptr [rsp+104],0
  test r14,r14
  jz .Lmemory_commit_invalid
  mov qword ptr [r14],0
@@ -333,6 +334,12 @@ pg_record_memory_storage:
  inc qword ptr [rsp+24]
  jmp .Lmemory_check_id
 .Lmemory_reserve:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ lea rdx,[rsp+104]
+ call .Lrequests_prepare
+ test eax,eax
+ jnz .Lmemory_allocation_cleanup
  mov rdx,[rsp+40]
  mov rax,0x07ffffffffffffff
  cmp rdx,rax
@@ -356,10 +363,22 @@ pg_record_memory_storage:
 .Lmemory_allocate_rows:
  mov [rsp+40],rsi
  mov rdi,[rbx]
- mov edx,32
+ test rdi,rdi
+ jz .Lmemory_reserve_header
+ sub rdi,16
+.Lmemory_reserve_header:
+ shl rsi,5
+ add rsi,16
+ mov edx,1
  call reallocarray@PLT
  test rax,rax
  jz .Lmemory_allocation_cleanup
+ cmp qword ptr [rbx],0
+ jne .Lmemory_header_ready
+ mov qword ptr [rax],0
+ mov qword ptr [rax+8],0
+.Lmemory_header_ready:
+ add rax,16
  mov [rbx],rax
  mov rax,[rsp+40]
  mov [rbx+16],rax
@@ -421,6 +440,15 @@ pg_record_memory_storage:
  inc qword ptr [rsp+24]
  jmp .Lmemory_apply
 .Lmemory_applied:
+ cmp qword ptr [rsp+104],0
+ je .Lmemory_index_ready
+ mov rax,[rbx]
+ mov rdi,[rax-16]
+ mov rcx,[rsp+104]
+ mov [rax-16],rcx
+ mov qword ptr [rsp+104],0
+ call json_object_put@PLT
+.Lmemory_index_ready:
  mov rax,[rbx+32]
  mov [rsp+96],rax
  inc qword ptr [rbx+32]
@@ -446,13 +474,15 @@ pg_record_memory_storage:
  call json_object_put@PLT
  mov rdi,rbp
  call free@PLT
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
  mov dword ptr [rbx+40],0
  mov eax,r15d
  jmp .Lmemory_commit_return
 .Lmemory_commit_invalid:
  mov eax,2
 .Lmemory_commit_return:
- add rsp,104
+ add rsp,120
  pop r15
  pop r14
  pop r13
@@ -579,7 +609,14 @@ pg_record_memory_close:
  jmp .Lmemory_close_row
 .Lmemory_close_free:
  mov rdi,[rbx]
+ test rdi,rdi
+ jz .Lmemory_close_empty
+ mov rdi,[rdi-16]
+ call json_object_put@PLT
+ mov rdi,[rbx]
+ sub rdi,16
  call free@PLT
+.Lmemory_close_empty:
  mov qword ptr [rbx],0
  mov qword ptr [rbx+8],0
  mov qword ptr [rbx+16],0
@@ -3217,3 +3254,441 @@ pg_record_memory_documents:
 .Lmemory_documents_return:
  ret
 .size pg_record_memory_documents,.-pg_record_memory_documents
+.text
+/* Private row allocation prefix owns a json-c request-key -> submission ID map.
+   Keys are normalized [conversationId, requestId] JSON, including NUL strings. */
+.Lrequests_key:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ xor ebp,ebp
+ xor r14d,r14d
+ mov qword ptr [rsp],0
+ mov edi,2
+ call json_object_new_array_ext@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lrequest_key_bad
+ mov rdi,rbx
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lrequest_key_bad
+ mov [rsp],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lrequest_key_bad
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lrequest_key_bad
+ mov qword ptr [rsp],0
+ mov rdi,r13
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lrequest_key_bad
+ mov rdi,rax
+ call json_object_new_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jnz .Lrequest_key_done
+.Lrequest_key_bad:
+ mov r14d,3
+.Lrequest_key_done:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,r13
+ call json_object_put@PLT
+ mov rax,rbp
+ mov edx,r14d
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lrequests_record_key:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ lea rsi,[rip+.Lrq_request]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,6
+ jne .Lrequest_no_key
+ mov rdi,rbx
+ lea rsi,[rip+.Lrq_conversation]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Lrequest_no_key
+ mov rdi,rax
+ mov rsi,r12
+ call .Lrequests_key
+ jmp .Lrequest_record_end
+.Lrequest_no_key:
+ xor eax,eax
+ xor edx,edx
+.Lrequest_record_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+/* Replay every original submission write before ID compaction. A renamed
+   winner removes its old key without resurrecting an overshadowed record. */
+.Lrequests_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,88
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp+80],rdx
+ mov qword ptr [rdx],0
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov ebp,3
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov r13,rax
+ xor r14d,r14d
+.Lrequests_seek:
+ cmp r14,r13
+ jae .Lrequests_no_change
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltype]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lmemory_table
+ cmp eax,3
+ jne .Lrequests_seek_next
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lrequests_seek_string
+ cmp qword ptr [rax-16],0
+ jne .Lrequests_allocate
+.Lrequests_seek_string:
+ mov rdi,r15
+ lea rsi,[rip+.Lvalue_name]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrq_request]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,6
+ je .Lrequests_allocate
+.Lrequests_seek_next:
+ inc r14
+ jmp .Lrequests_seek
+.Lrequests_allocate:
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lrequests_new_map
+ mov rdi,[rax-16]
+ test rdi,rdi
+ jz .Lrequests_new_map
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lrequests_cleanup
+ jmp .Lrequests_latest
+.Lrequests_new_map:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lrequests_cleanup
+ mov [rsp],rax
+.Lrequests_latest:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lrequests_cleanup
+ mov [rsp+8],rax
+ xor r14d,r14d
+.Lrequests_replay:
+ cmp r14,r13
+ jae .Lrequests_success
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltype]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lmemory_table
+ cmp eax,3
+ jne .Lrequests_replay_next
+ mov rdi,r15
+ lea rsi,[rip+.Lvalue_name]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lid]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ mov [rsp+24],rax
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lrequests_cleanup
+ mov [rsp+32],rax
+ mov rdi,rax
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lrequests_cleanup
+ mov [rsp+40],rax
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lrequests_previous
+ mov rdi,rbx
+ mov rsi,[rsp+24]
+ call .Lmemory_lower
+ cmp rax,[rbx+8]
+ jae .Lrequests_current
+ shl rax,5
+ add rax,[rbx]
+ mov rcx,[rsp+24]
+ cmp [rax],rcx
+ jne .Lrequests_current
+ mov rax,[rax+8]
+.Lrequests_previous:
+ mov rdi,rax
+ call .Lrequests_record_key
+ test edx,edx
+ jnz .Lrequests_cleanup
+ test rax,rax
+ jz .Lrequests_current
+ mov [rsp+48],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+56],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ cmp rax,[rsp+24]
+ jne .Lrequests_previous_done
+ mov rdi,[rsp]
+ mov rsi,[rsp+56]
+ call json_object_object_del@PLT
+.Lrequests_previous_done:
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov qword ptr [rsp+48],0
+.Lrequests_current:
+ mov rdi,[rsp+16]
+ call .Lrequests_record_key
+ test edx,edx
+ jnz .Lrequests_cleanup
+ test rax,rax
+ jz .Lrequests_remember
+ mov [rsp+48],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+56],rax
+ mov rdi,[rsp+24]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lrequests_cleanup
+ mov [rsp+64],rax
+ mov rdi,[rsp]
+ mov rsi,[rsp+56]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrequests_cleanup
+ mov qword ptr [rsp+64],0
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov qword ptr [rsp+48],0
+.Lrequests_remember:
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov [rsp+64],rax
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+40]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrequests_cleanup
+ mov qword ptr [rsp+64],0
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov qword ptr [rsp+32],0
+.Lrequests_replay_next:
+ inc r14
+ jmp .Lrequests_replay
+.Lrequests_success:
+ mov rdx,[rsp+80]
+ mov rax,[rsp]
+ mov [rdx],rax
+ mov qword ptr [rsp],0
+.Lrequests_no_change:
+ xor ebp,ebp
+.Lrequests_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,88
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.globl pg_record_memory_submission_by_request
+.type pg_record_memory_submission_by_request,@function
+pg_record_memory_submission_by_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov ebp,2
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test r13,r13
+ jz .Lrq_read_end
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Lrq_read_end
+ test r12,r12
+ jz .Lrq_read_end
+ cmp dword ptr [rbx+44],0
+ jne .Lrq_read_end
+ cmp dword ptr [rbx+40],1
+ je .Lrq_read_end
+ cmp qword ptr [rbx+24],0
+ je .Lrq_read_end
+ mov rax,[r12]
+ test rax,rax
+ jz .Lrq_read_end
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lrq_read_end
+ cmp qword ptr [r12+16],0x7fffffff
+ ja .Lrq_read_end
+ cmp qword ptr [r12+16],0
+ je .Lrq_read_valid
+ cmp qword ptr [r12+8],0
+ je .Lrq_read_end
+.Lrq_read_valid:
+ mov ebp,1
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lrq_read_end
+ mov r14,[rax-16]
+ test r14,r14
+ jz .Lrq_read_end
+ mov ebp,3
+ mov rdi,[r12+8]
+ mov esi,[r12+16]
+ test rdi,rdi
+ jnz .Lrq_string_ready
+ lea rdi,[rip+.Lrq_empty]
+.Lrq_string_ready:
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Lrq_read_cleanup
+ mov [rsp],rax
+ mov rdi,[r12]
+ mov rsi,rax
+ call .Lrequests_key
+ test edx,edx
+ jnz .Lrq_read_cleanup
+ mov [rsp+8],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,r14
+ mov rsi,rax
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lrq_read_missing
+ mov rdi,rax
+ call pg_document_safe_number
+ mov rdx,rax
+ mov rdi,rbx
+ mov esi,3
+ mov rcx,r13
+ call pg_record_memory_read
+ mov ebp,eax
+ jmp .Lrq_read_cleanup
+.Lrq_read_missing:
+ mov ebp,1
+.Lrq_read_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+.Lrq_read_end:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_memory_submission_by_request,.-pg_record_memory_submission_by_request
+.section .rodata
+.Lrq_empty: .asciz ""
+.Lrq_request: .asciz "requestId"
+.Lrq_conversation: .asciz "conversationId"
+.section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_memory_requests
+.type pg_record_memory_requests,@function
+pg_record_memory_requests:
+ mov [rsi],rdi
+ mov rax,qword ptr [rip+pg_record_memory_submission_by_request@GOTPCREL]
+ mov [rsi+8],rax
+ ret
+.size pg_record_memory_requests,.-pg_record_memory_requests
+.section .note.GNU-stack,"",@progbits

@@ -96,6 +96,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植holds最早期限定时器控制器：前台定时/串行入队服务注入、已触发ticket保留、到期批量保存与关闭时排空。
 - [x] 组合Durable Session事务admission、holds/cache/timer服务与分阶段关闭：封闭新工作、完成已接收事务、排空timer job、保存/清理后关闭缓存及后端，保留首因。
 - [x] 接通当前与Entry历史只读快照：已采纳内存值、缓存同版本快路径、fork原会话/序号解析、隔离迁移、历史生命周期与读取失败守卫。
+- [x] 接通conversation/request ID的提交态索引与Tx查询：按批次原顺序覆盖/移除，保留写后读屏障和owned结果。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -372,3 +373,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 读取守卫保留首因、阻止失败后的后续backend调用，并让关闭等待已接收的同步读取完成；临时current Storage代理在所有路径恢复。Storage正常返回missing content只使该快照报错，迁移/调用者复制失败保持Session健康；真正backend错误锁存失败。当前definition遵循cache借用至eviction/close，历史definition/provider只借用到返回。
 - 验证：126组直接执行实际snapshotAsOf及GuardedStorage类、materializeDocument的差异结果，值/原会话/提交点/失败状态一致。真实MemoryStorage验证分叉不可见Entry、创建前/退休/同址重建、family空/NUL键、迁移不写回、deferred内存快照与重载保存、只读读取、输出隔离及关闭后仍拥有返回值。冷当前21、热当前1、历史22个直接分配/插入/部分复制故障通过；完整Runtime结果记入当前实现记录。
 - 下一行为：K03剩余事务查询/只读边界及验收覆盖，按原TODO继续；Harness视图按K13移植。
+
+### K03 request ID查询交接
+
+- 阅读Pi d5b3de22 Transaction.submissionByRequest/#read、MemoryStorage.commit的submissionIdsByRequest更新及submissionByRequest调用；上游HEAD仍d5b3de22，origin/main=f9daca3，Harness为22ddee37，本批使用固定提交。
+- records提供独立request query/provider和Tx查询入口；record_memory原地维护私有json-c请求索引，逐原批次写入顺序更新，再压缩最终ID候选。旧key仅在此ID仍为winner时删除；winner改名不恢复被覆盖记录。索引在准备阶段构造，随rows确认后一起安装；索引由row allocation私有头持有，公开Memory48/Row32与原ABI保持，关闭统一释放。
+- 验证：80轮随机批次和640次查找并入实际Pi MemoryStorage差异测试，总5982操作通过；同batch重复ID、改名、移除、空/NUL key、conversation变化、事务屏障/partial错误与输出隔离通过。新索引/rows33、已有索引更新60、Storage/Tx读取各8故障点；专项和完整Runtime结果见当前实现记录。
+- 下一行为：补齐类型化Entry读取及剩余K03事务构造/查询覆盖，总验收保持未勾选。

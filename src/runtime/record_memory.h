@@ -24,6 +24,10 @@ typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCA
 pg_memory_status pg_record_memory_open(pg_record_memory *);
 pg_memory_status pg_record_memory_close(pg_record_memory *);
 pg_record_storage pg_record_memory_storage(pg_record_memory *);
+/* Private row allocation metadata owns the conversation/request index; release
+   all rows/index state through close, never by freeing the borrowed rows. */
+pg_memory_status pg_record_memory_submission_by_request(void *,const pg_record_request_query *,struct json_object **);
+void pg_record_memory_requests(pg_record_memory *,pg_record_requests *);
 pg_memory_status pg_record_memory_mint(pg_record_memory *,uint64_t *);
 pg_memory_status pg_record_memory_read(pg_record_memory *,pg_record_table,uint64_t,struct json_object **);
 /* Status indices: tasks pending/running/waiting/sleeping/completing/terminal;

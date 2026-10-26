@@ -924,7 +924,8 @@
         "pg_record_tx_create",
         "pg_record_tx_commit_finalized",
         "pg_record_tx_validate_batch",
-        "pg_record_tx_commit_routed"
+        "pg_record_tx_commit_routed",
+        "pg_record_tx_submission_by_request"
       ],
       "reference_basis": [
         {
@@ -937,7 +938,7 @@
             "packages/durable/src/session/forks.ts",
             "packages/durable/src/harness/harness.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again; Session.runCommit nonempty/read-only validation before hold-vs-Storage selection; routed memory success consumes Tx candidates without changing Storage sequence or durable publication; Session.fail retains the first cause even when adoption/backend protocol checks subsequently fail",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again; Session.runCommit nonempty/read-only validation before hold-vs-Storage selection; routed memory success consumes Tx candidates without changing Storage sequence or durable publication; Session.fail retains the first cause even when adoption/backend protocol checks subsequently fail; Transaction.submissionByRequest committed service query under the same read-after-table-write, sealed and reentry barrier as other table reads",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-forks.test.ts",
@@ -960,7 +961,7 @@
         "system libc",
         "session.documents.delta.local.v0"
       ],
-      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption; atomic document create/change/retire and detached revision snapshots; definition-free document copy resolved into a detached base before commit",
+      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption; atomic document create/change/retire and detached revision snapshots; definition-free document copy resolved into a detached base before commit; atomic private conversation/request index replay in original batch order before ID compaction, detached submissionByRequest lookup",
       "exports": [
         "pg_record_memory_open",
         "pg_record_memory_close",
@@ -974,7 +975,9 @@
         "pg_record_memory_find_document",
         "pg_record_memory_scan_documents",
         "pg_record_memory_queries",
-        "pg_record_memory_documents"
+        "pg_record_memory_documents",
+        "pg_record_memory_submission_by_request",
+        "pg_record_memory_requests"
       ],
       "reference_basis": [
         {
@@ -985,7 +988,7 @@
             "packages/durable/src/types.ts",
             "packages/durable/src/storage/scan.ts"
           ],
-          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker; prepareDocumentActions/checkDocumentActions/applyDocumentActions and document materialization with live address uniqueness; findDocument and scanDocuments exact scope/kind/family identity and current/historical membership; resolveDocumentCopies rejects changed/ambiguous sources and preserves kind/key/history/fork across conversation owners",
+          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker; prepareDocumentActions/checkDocumentActions/applyDocumentActions and document materialization with live address uniqueness; findDocument and scanDocuments exact scope/kind/family identity and current/historical membership; resolveDocumentCopies rejects changed/ambiguous sources and preserves kind/key/history/fork across conversation owners; MemoryStorage submissionIdsByRequest: remove previous key only if this ID still wins, set each incoming request in write order, renaming the winner never resurrects an overshadowed row; native index owns canonical JSON tuple keys in a private row allocation prefix without changing public Memory/Row ABI",
           "tests_to_read": [
             "packages/durable/test/memory-storage.test.ts",
             "packages/durable/test/session-adoption.test.ts"
