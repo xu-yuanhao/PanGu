@@ -200,4 +200,26 @@ pg_record_tx_status pg_durable_session_defer_notified(pg_durable_session *,uint6
    only a durable publication after pins are released. No duplicate memory
    observation; host.holds must identify the flushed owner. */
 int pg_session_hold_notifications_bind(pg_session_notification_host *,pg_hold_notifications *);
+typedef struct {
+ pg_session_listeners *listeners;
+ void *head,*tail;
+ size_t prepared_count;
+ unsigned busy,closed;
+} pg_session_dispatch;
+/* Caller initializes a zeroed queue with borrowed listeners. Prepare retains
+   an immutable publication and allocates one token before adoption. Queue and
+   listener lifetimes include every prepared/queued token. enqueue transfers
+   its token without allocating/calling subscribers; discard releases only an
+   unqueued token. Both reject a token belonging to another queue or one already
+   enqueued. Calls are serialized on the host thread.
+   drain is the explicit native microtask boundary, outside Storage.adopt:
+   FIFO host notifications use the subscriptions present when each runs. A
+   snapshot allocation failure leaves that event queued for retry. Reentrant
+   drain/close return 1. close returns 1 until prepared and queued work drains,
+   then seals admission and returns 0. Keep listeners open through close. */
+int pg_session_dispatch_prepare(pg_session_dispatch *,const struct json_object *,void *,void **);
+int pg_session_dispatch_enqueue(pg_session_dispatch *,void *);
+int pg_session_dispatch_discard(pg_session_dispatch *,void *);
+int pg_session_dispatch_drain(pg_session_dispatch *);
+int pg_session_dispatch_close(pg_session_dispatch *);
 #endif

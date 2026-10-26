@@ -527,3 +527,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实际验证：base/delta×all/selected/missing六组与64个直接分配/插入/部分复制故障，内部memory观察不重复，payload值/ops/seq正确，失败前保留held队列或遵循Storage fail-stop。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
 - 上游检查发现8b0caefc2260a28d2cec0a7ce3daef1d3de24776，已核对新Session #runCommit/#publish/#storeHolds/#attachDocument/#observeDocument：发布转至Storage adopt，内部观察同步、host microtask dispatch；watch跟随地址并新增observeDoc。来源/必要采用点及新测试入口已列入TODO下一优先项。本批保留d5b3de22固定证据，不声称符合这一新语义，后续将原地调整通知时序后再做自动timer/reload/close接线与watch。Harness保持22ddee37。
 - 同一实施Agent自审：既有holds/Session独立通知接口/默认服务、专项及来源/TODO；旧ABI、门禁和预算保持。7个候选路径内容清单摘要（本记录加入前）：1f142ec46e6de18ed19a5d1d83f72b1459d926d9c3e72667bfb22705d54c28e3；隔离核心树f3d9ee95a51a5587bac7d5ca7bbeac4a67058dee。结论为固定基线独立flush捕获通过，K03总验收保持未完成。TUI工作树保留。
+
+## K03 Pi 8b0caef host dispatch队列
+
+- 新固定来源：Pi 8b0caefc2260a28d2cec0a7ce3daef1d3de24776 #notifyHosts/#publish/#runCommit，session-adoption/session-observers；fetch后origin保持8b0caef，基础/存储既有差异基线继续d5b3de22，Harness保持22ddee37。
+- 实现：手写独立40字节dispatch owner，prepare保留immutable publication并分配owned token，enqueue无分配/无回调转交FIFO；显式drain是原生microtask边界，按派发时订阅集合执行，回调可追加后续事件。prepared与queued所有权区分，跨队列/重复入队/取消queued/reentry拒绝，snapshot分配失败原事件保留可retry；所有资源排空后才能close，listeners必须覆盖此借用期。
+- 实际验证：执行真实8b0caef #notifyHosts方法，Native的FIFO、late subscription、callback内取消/新增及追加事件顺序逐项一致。原生测试enqueue分配计数0且不内联回调、publication引用存活、外队列token、重入、准备/dispatch分配故障和retry、prepared未提交时close等待及discard清理。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有Session独立队列契约/导出、新提交来源、专项与TODO，旧ABI、门禁和预算保持。6个候选路径内容清单摘要（本记录加入前）：e0be5092809e2ef7aeb9e64d5b453bb9eb098e0e1716e66e63c99e4cb55777f7；隔离核心树48f903c8a15081259d61d8a518965902edb7e7e4。结论为新host dispatch队列本地通过；实际DocTx/flush adoption发布、观察者错误结算与新watch继续接入，未将新adoption总语义/K03总验收勾选。TUI工作树保留。

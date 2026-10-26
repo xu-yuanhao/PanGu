@@ -1222,7 +1222,12 @@
         "pg_durable_session_settle_notified",
         "pg_session_deferred_notifications_bind",
         "pg_durable_session_defer_notified",
-        "pg_session_hold_notifications_bind"
+        "pg_session_hold_notifications_bind",
+        "pg_session_dispatch_prepare",
+        "pg_session_dispatch_enqueue",
+        "pg_session_dispatch_discard",
+        "pg_session_dispatch_drain",
+        "pg_session_dispatch_close"
       ],
       "reference_basis": [
         {
@@ -1237,6 +1242,18 @@
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-documents.test.ts",
             "packages/durable/test/harness-storage-failure.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "notifyHosts queues publication before internal observer work, callbacks use dispatch-time subscriptions; native preallocated token FIFO separates adoption enqueue from explicit microtask drain, retains owned immutable publication and caller context through delivery, prevents reentrant drain and retries pre-callback snapshot allocation failures",
+          "tests_to_read": [
+            "packages/durable/test/session-adoption.test.ts",
+            "packages/durable/test/session-observers.test.ts"
           ]
         }
       ]

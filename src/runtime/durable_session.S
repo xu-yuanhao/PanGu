@@ -2769,3 +2769,188 @@ pg_session_hold_notifications_bind:
  pop rbx
  ret
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_dispatch_prepare
+.type pg_session_dispatch_prepare,@function
+pg_session_dispatch_prepare:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov eax,1
+ test r14,r14
+ jz .Ldispatch_prepare_end
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ldispatch_prepare_end
+ cmp dword ptr [rbx+36],0
+ jne .Ldispatch_prepare_end
+ cmp qword ptr [rbx],0
+ je .Ldispatch_prepare_end
+ cmp qword ptr [rbx+24],-1
+ je .Ldispatch_prepare_end
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldispatch_prepare_bad
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ldispatch_prepare_bad
+ mov edi,1
+ mov esi,40
+ call calloc@PLT
+ test rax,rax
+ jz .Ldispatch_prepare_bad
+ mov [r14],rax
+ mov [rax+16],r13
+ mov [rax+24],rbx
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdx,[r14]
+ mov [rdx+8],rax
+ inc qword ptr [rbx+24]
+ xor eax,eax
+ jmp .Ldispatch_prepare_end
+.Ldispatch_prepare_bad:
+ mov eax,1
+.Ldispatch_prepare_end:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_session_dispatch_prepare,.-pg_session_dispatch_prepare
+.globl pg_session_dispatch_enqueue
+.type pg_session_dispatch_enqueue,@function
+pg_session_dispatch_enqueue:
+ mov eax,1
+ test rdi,rdi
+ jz .Ldispatch_enqueue_end
+ test rsi,rsi
+ jz .Ldispatch_enqueue_end
+ cmp [rsi+24],rdi
+ jne .Ldispatch_enqueue_end
+ cmp dword ptr [rsi+32],0
+ jne .Ldispatch_enqueue_end
+ cmp dword ptr [rdi+36],0
+ jne .Ldispatch_enqueue_end
+ cmp qword ptr [rdi+24],0
+ je .Ldispatch_enqueue_end
+ mov dword ptr [rsi+32],1
+ mov qword ptr [rsi],0
+ mov rax,[rdi+16]
+ test rax,rax
+ jz .Ldispatch_enqueue_first
+ mov [rax],rsi
+ jmp .Ldispatch_enqueue_tail
+.Ldispatch_enqueue_first:
+ mov [rdi+8],rsi
+.Ldispatch_enqueue_tail:
+ mov [rdi+16],rsi
+ dec qword ptr [rdi+24]
+ xor eax,eax
+.Ldispatch_enqueue_end:
+ ret
+.size pg_session_dispatch_enqueue,.-pg_session_dispatch_enqueue
+.globl pg_session_dispatch_discard
+.type pg_session_dispatch_discard,@function
+pg_session_dispatch_discard:
+ mov eax,1
+ test rdi,rdi
+ jz .Ldispatch_discard_end
+ test rsi,rsi
+ jz .Ldispatch_discard_end
+ cmp [rsi+24],rdi
+ jne .Ldispatch_discard_end
+ cmp dword ptr [rsi+32],0
+ jne .Ldispatch_discard_end
+ cmp qword ptr [rdi+24],0
+ je .Ldispatch_discard_end
+ dec qword ptr [rdi+24]
+ push rbx
+ mov rbx,rsi
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov rdi,rbx
+ call free@PLT
+ pop rbx
+ xor eax,eax
+.Ldispatch_discard_end:
+ ret
+.size pg_session_dispatch_discard,.-pg_session_dispatch_discard
+.globl pg_session_dispatch_drain
+.type pg_session_dispatch_drain,@function
+pg_session_dispatch_drain:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Ldispatch_drain_end
+ cmp dword ptr [rbx+32],0
+ jne .Ldispatch_drain_end
+ cmp qword ptr [rbx],0
+ je .Ldispatch_drain_end
+ mov dword ptr [rbx+32],1
+.Ldispatch_drain_each:
+ mov r12,[rbx+8]
+ test r12,r12
+ jz .Ldispatch_drain_done
+ mov rdi,[rbx]
+ mov esi,1
+ mov rdx,[r12+8]
+ mov rcx,[r12+16]
+ call pg_session_deliver
+ test eax,eax
+ jnz .Ldispatch_drain_pending
+ mov rax,[r12]
+ mov [rbx+8],rax
+ test rax,rax
+ jnz .Ldispatch_drain_release
+ mov qword ptr [rbx+16],0
+.Ldispatch_drain_release:
+ mov rdi,[r12+8]
+ call json_object_put@PLT
+ mov rdi,r12
+ call free@PLT
+ jmp .Ldispatch_drain_each
+.Ldispatch_drain_done:
+ xor eax,eax
+ jmp .Ldispatch_drain_unlock
+.Ldispatch_drain_pending:
+ mov eax,1
+.Ldispatch_drain_unlock:
+ mov dword ptr [rbx+32],0
+.Ldispatch_drain_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_session_dispatch_drain,.-pg_session_dispatch_drain
+.globl pg_session_dispatch_close
+.type pg_session_dispatch_close,@function
+pg_session_dispatch_close:
+ mov eax,1
+ test rdi,rdi
+ jz .Ldispatch_close_end
+ cmp dword ptr [rdi+32],0
+ jne .Ldispatch_close_end
+ cmp qword ptr [rdi+8],0
+ jne .Ldispatch_close_end
+ cmp qword ptr [rdi+24],0
+ jne .Ldispatch_close_end
+ mov dword ptr [rdi+36],1
+ xor eax,eax
+.Ldispatch_close_end:
+ ret
+.size pg_session_dispatch_close,.-pg_session_dispatch_close
+.section .note.GNU-stack,"",@progbits

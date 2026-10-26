@@ -658,6 +658,37 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
             for value in inputs:library.json_object_put(value)
     print(f'PASS: {len(cases)} Document creation/update/migration/retirement/copy notices match actual Pi describe function')
 
+def dispatch_notifications(native,library):
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776'
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8'),a=source.indexOf('\n\t#notifyHosts('),b=source.indexOf('\n\t/**',a);const SETTLED=Promise.resolve(),LISTENER={};function contained(fn,onError){try{fn()}catch(e){onError(e)}}const Probe=eval('('+stripTypeScriptTypes('class Probe{#commitListeners=new Set();report(e){throw e}add(fn){this.#commitListeners.add(fn)}remove(fn){this.#commitListeners.delete(fn)}publish(seq){this.#notifyHosts({seq},null)}'+source.slice(a,b)+'}')+')');const p=new Probe(),log=[];let first=true;const callbacks=[1,2,3,4].map(id=>pub=>{log.push(id*10+pub.seq);if(id===2&&pub.seq===1&&first){first=false;p.remove(callbacks[2]);p.add(callbacks[3]);p.publish(3)}});p.add(callbacks[0]);p.publish(1);p.publish(2);p.remove(callbacks[0]);p.add(callbacks[1]);p.add(callbacks[2]);await new Promise(resolve=>setImmediate(resolve));console.log(JSON.stringify(log));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    class Listeners(ctypes.Structure):
+        _fields_=[('records',ctypes.c_void_p),('entries',ctypes.c_void_p),('count',ctypes.c_size_t),('capacity',ctypes.c_size_t),('ctx',ctypes.c_void_p),('report',ctypes.c_void_p),('busy',ctypes.c_uint),('closed',ctypes.c_uint)]
+    class Queue(ctypes.Structure):
+        _fields_=[('listeners',ctypes.POINTER(Listeners)),('head',ctypes.c_void_p),('tail',ctypes.c_void_p),('prepared',ctypes.c_size_t),('busy',ctypes.c_uint),('closed',ctypes.c_uint)]
+    callback_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,ctypes.c_void_p)
+    native.pg_session_listen.argtypes=[ctypes.POINTER(Listeners),ctypes.c_uint,callback_type,ctypes.c_void_p];native.pg_session_unlisten.argtypes=native.pg_session_listen.argtypes;native.pg_session_listeners_close.argtypes=[ctypes.POINTER(Listeners),ctypes.c_void_p]
+    native.pg_session_dispatch_prepare.argtypes=[ctypes.POINTER(Queue),ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_session_dispatch_enqueue.argtypes=[ctypes.POINTER(Queue),ctypes.c_void_p];native.pg_session_dispatch_drain.argtypes=[ctypes.POINTER(Queue)];native.pg_session_dispatch_close.argtypes=[ctypes.POINTER(Queue)]
+    records=ctypes.create_string_buffer(88);listeners=Listeners(ctypes.addressof(records));queue=Queue(ctypes.pointer(listeners));actual=[];nodes=[]
+    @callback_type
+    def callback(context,publication,delivery):
+        id=int(context);seq=json.loads(library.json_object_to_json_string_ext(publication,0))['seq'];actual.append(id*10+seq)
+        if id==2 and seq==1:
+            native.pg_session_unlisten(ctypes.byref(listeners),1,callback,3);assert not native.pg_session_listen(ctypes.byref(listeners),1,callback,4);assert not native.pg_session_dispatch_enqueue(ctypes.byref(queue),nodes[2])
+        return 0
+    assert not native.pg_session_listen(ctypes.byref(listeners),1,callback,1)
+    for seq in range(1,4):
+        publication=library.json_tokener_parse(json.dumps(dict(seq=seq)).encode());node=ctypes.c_void_p();assert not native.pg_session_dispatch_prepare(ctypes.byref(queue),publication,None,ctypes.byref(node));nodes.append(node);library.json_object_put(publication)
+    for node in nodes[:2]:assert not native.pg_session_dispatch_enqueue(ctypes.byref(queue),node)
+    assert actual==[];native.pg_session_unlisten(ctypes.byref(listeners),1,callback,1)
+    for id in [2,3]:assert not native.pg_session_listen(ctypes.byref(listeners),1,callback,id)
+    assert not native.pg_session_dispatch_drain(ctypes.byref(queue)) and actual==expected,(actual,expected)
+    assert not native.pg_session_dispatch_close(ctypes.byref(queue)) and not native.pg_session_listeners_close(ctypes.byref(listeners),None)
+    print('PASS: native FIFO host dispatch and dispatch-time subscription mutations match actual Pi 8b0caef notifyHosts')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -947,5 +978,6 @@ def main():
         storage_guard(native,library)
         publications(native,library)
         document_notices(native,library)
+        dispatch_notifications(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

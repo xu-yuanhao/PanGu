@@ -116,6 +116,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 默认通知宿主自动捕获持久DocTx计划：三种scope/任务所属会话、创建/退休/copy、held observed/stored ops分离；接入实际Session持久结算与timer同步。
 - [x] 默认通知宿主接通deferred内存采纳与落盘回退：准入前准备双路payload、零序号选择memory、仅内部通知、原timer/holds与错误清理保持。
 - [x] 捕获独立holds flush的完整持久通知：复用已折叠ops、选中incarnation、无重复memory通知与全部路径清理（固定d5b3de22基线）。
+- [x] 移植8b0caef host通知队列：准入前预分配、adopt可无分配入队、microtask边界FIFO分发、按派发时订阅集合执行与关闭排空。
 - [ ] 采用Pi 8b0caef的adoption发布语义：同步内部观察、排队host dispatch、adopt后Storage拒绝时已发布状态保持、异步观察者拒绝；Document watch跟随逻辑地址并支持同步observeDoc。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
@@ -530,3 +531,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 验证六组base/delta×all/selected/missing，内部memory回调不重复，值/ops/seq正确；64个直接分配/插入/部分复制故障验证token和holds清理。专项/完整Runtime见当前实现记录。
 - 本批fetch发现Pi origin从363ad78推进到8b0caefc2260a28d2cec0a7ce3daef1d3de24776。已读Session.#runCommit/#publish/#storeHolds/#attachDocument/#observeDocument变更及Chord Watch差异概况；这一提交改变当前观察工作的目标。下一批优先原地调整为adopt内同步internal观察、microtask host dispatch、adopt后拒绝仍保留已发布状态；随后实现跟随地址的watch/observeDoc和task owner终态结束语义。核对新session-adoption/session-observers/session-watches/session-deferred-commits与Chord watch测试。固定工作树仍为d5b3de22，本批证据只覆盖该基线，不当作新语义通过。
 - timer/version reload/close的自动通知接线在采用新发布语义时统一处理，K03总验收未完成；Harness origin保持22ddee37。
+
+### K03 新观察语义：host dispatch队列
+
+- 固定新来源Pi 8b0caefc2260a28d2cec0a7ce3daef1d3de24776 `Session.#notifyHosts/#publish/#runCommit`与session-adoption/session-observers；fetch后origin保持8b0caef，旧基础/存储差异基线继续固定d5b3de22，Harness保持22ddee37。
+- `durable_session.h/.S:pg_session_dispatch_*`以独立40字节caller-owned队列实现prepare/enqueue/drain/discard/close。prepare保留immutable publication并分配token；enqueue只转交所有权/更新FIFO，不分配也不调用订阅者；drain是显式原生microtask边界，逐事件使用派发时的订阅集合。允许回调追加排队，拒绝reentrant drain/close和跨队列token，分配失败保留事件供重试；prepared/queued资源未排空时close拒绝完成。
+- 执行实际8b0caef notifyHosts方法，Native与Pi的FIFO/late subscription/callback取消与追加事件顺序一致；原生验证无分配enqueue、publication独立持有、重复入队/取消queued拒绝、预备/分发分配故障、retry和关闭资源规则。专项/完整Runtime见当前实现记录。
+- 下一行为：将队列接入DocTx/flush adopt并延迟host dispatch，内部同步observer错误在Storage结算后处理，验证adopt后Storage拒绝仍已发布；本批只验收队列，不将新adoption总语义勾选。
