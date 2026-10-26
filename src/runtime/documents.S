@@ -1576,3 +1576,303 @@ pg_document_cache_close:
  pop rbx
  ret
 .size pg_document_cache_close,.-pg_document_cache_close
+.text
+/* Attach allocated scalar RAX to object RDI/key RSI; consumes on either result. */
+.Lcreate_attach:
+ test rax,rax
+ jz .Lcreate_attach_missing
+ push rbx
+ mov rbx,rax
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lcreate_attach_return
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Lcreate_attach_return:
+ pop rbx
+ ret
+.Lcreate_attach_missing:
+ mov eax,1
+ ret
+
+.globl pg_document_record_create
+.type pg_document_record_create,@function
+pg_document_record_create:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,88
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test r14,r14
+ jz .Lrecord_create_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lrecord_create_return
+ mov rdi,r12
+ call pg_document_address_valid
+ test eax,eax
+ jz .Lrecord_create_return
+ test r13,r13
+ jz .Lrecord_create_return
+ mov rax,9007199254740991
+ cmp r13,rax
+ ja .Lrecord_create_return
+ movups xmm0,[r12]
+ movups xmm1,[r12+16]
+ movups xmm2,[r12+32]
+ movups [rsp+16],xmm0
+ movups [rsp+32],xmm1
+ movups [rsp+48],xmm2
+ mov [rsp+64],r13
+ mov rax,[rbx+28]
+ mov [rsp+72],rax
+ mov rdi,rbx
+ lea rsi,[rsp+16]
+ mov rdx,[rbx+16]
+ call pg_document_check
+ mov ebp,eax
+ test eax,eax
+ jnz .Lrecord_create_return
+ mov ebp,1
+ mov eax,[rbx+36]
+ cmp eax,[r12+44]
+ jne .Lrecord_create_return
+ mov rdx,[rbx+8]
+ cmp rdx,[r12+8]
+ jne .Lrecord_create_return
+ test rdx,rdx
+ jz .Lrecord_create_allocate
+ mov rdi,[rbx]
+ test rdi,rdi
+ jz .Lrecord_create_return
+ mov rsi,[r12]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lrecord_create_return
+.Lrecord_create_allocate:
+ mov ebp,3
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lrecord_create_return
+ mov [rsp],rax
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_id]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+ mov rdi,[r12]
+ mov esi,[r12+8]
+ test esi,esi
+ jnz .Lrecord_create_kind
+ lea rdi,[rip+.Lempty]
+.Lrecord_create_kind:
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_kind]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+ cmp dword ptr [r12+44],0
+ je .Lrecord_create_scope
+ mov rdi,[r12+16]
+ mov esi,[r12+24]
+ test esi,esi
+ jnz .Lrecord_create_key
+ lea rdi,[rip+.Lempty]
+.Lrecord_create_key:
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_key]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+.Lrecord_create_scope:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lrecord_create_cleanup
+ mov [rsp+8],rax
+ mov eax,[r12+40]
+ lea rcx,[rip+.Lscopes]
+ movsxd rdi,dword ptr [rcx+rax*4]
+ add rdi,rcx
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.La_kind]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+ cmp dword ptr [r12+40],0
+ je .Lrecord_create_attach_scope
+ mov rdi,[r12+32]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.La_conversation]
+ cmp dword ptr [r12+40],1
+ je .Lrecord_create_owner
+ lea rsi,[rip+.La_task]
+.Lrecord_create_owner:
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+.Lrecord_create_attach_scope:
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_scope]
+ mov rdx,[rsp+8]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+ mov qword ptr [rsp+8],0
+ cmp dword ptr [r12+40],1
+ jne .Lrecord_create_success
+ lea rdi,[rip+.La_latest]
+ cmp dword ptr [rbx+28],1
+ je .Lrecord_create_history
+ lea rdi,[rip+.La_rewindable]
+.Lrecord_create_history:
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_history]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+ mov eax,[rbx+32]
+ lea rcx,[rip+.Lcreate_forks]
+ movsxd rdi,dword ptr [rcx+rax*4-4]
+ add rdi,rcx
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.La_fork]
+ call .Lcreate_attach
+ test eax,eax
+ jnz .Lrecord_create_cleanup
+.Lrecord_create_success:
+ mov rax,[rsp]
+ mov [r14],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+.Lrecord_create_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+.Lrecord_create_return:
+ mov eax,ebp
+ add rsp,88
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_record_create,.-pg_document_record_create
+
+.globl pg_document_initialize
+.type pg_document_initialize,@function
+pg_document_initialize:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ test r14,r14
+ jz .Linitialize_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Linitialize_return
+ test r13,r13
+ jz .Linitialize_return
+ cmp qword ptr [r13+8],0
+ je .Linitialize_return
+ cmp dword ptr [rbx+36],1
+ ja .Linitialize_return
+ cmp qword ptr [rbx+16],0
+ je .Linitialize_return
+ mov rax,9007199254740991
+ cmp [rbx+16],rax
+ ja .Linitialize_return
+ cmp dword ptr [rbx+36],0
+ je .Linitialize_callback
+ mov rdi,r12
+ call pg_document_value_valid
+ test eax,eax
+ jz .Linitialize_return
+ test r12,r12
+ jz .Linitialize_callback
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Linitialize_allocation
+.Linitialize_callback:
+ mov rdi,[r13]
+ mov rsi,[rsp]
+ lea rdx,[rsp+8]
+ call [r13+8]
+ mov ebp,10
+ test eax,eax
+ jnz .Linitialize_cleanup
+ mov rdi,[rsp+8]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Linitialize_cleanup
+ mov rdi,[rsp+8]
+ call pg_document_value_valid
+ test eax,eax
+ jz .Linitialize_cleanup
+ mov rdi,[rsp+8]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Linitialize_allocation
+ mov rax,[rsp+16]
+ mov [r14],rax
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Linitialize_cleanup
+.Linitialize_allocation:
+ mov ebp,3
+.Linitialize_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+.Linitialize_return:
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_initialize,.-pg_document_initialize
+.section .rodata
+.Lcreate_forks: .long .La_current-.Lcreate_forks,.La_initial-.Lcreate_forks,.La_asof-.Lcreate_forks

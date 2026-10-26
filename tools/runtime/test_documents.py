@@ -18,10 +18,11 @@ registerHooks({resolve(specifier,context,next){
  if(specifier==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};
  return next(specifier,context);
 }});
-const {resolveAddress,addressId,materializeDocumentValue}=await import(new URL('packages/durable/src/documents.ts',base));
+const {resolveAddress,addressId,materializeDocumentValue,documentCreate}=await import(new URL('packages/durable/src/documents.ts',base));
 const {isJsonValue}=await import(new URL('packages/chord/src/json.ts',base));
 const cases=JSON.parse(readFileSync(0,'utf8'));
 console.log(JSON.stringify(cases.map(c=>{
+ if(c.recordCreate){return documentCreate(c.definition,c.address,c.id);}
  if(c.valueCheck){
   const value={item:1};
   if(c.shape==='nan')value.item=NaN;
@@ -135,6 +136,27 @@ def strict_values(native):
             library.json_object_put(root)
     print('PASS: finite/nonfinite, cyclic and shared JSON graphs match actual Chord isJsonValue')
 
+def creation_records(native):
+    cases=[]
+    semantics=[('session',None,None),('task',None,None),('conversation','latest','current'),('conversation','latest','initial'),('conversation','rewindable','current'),('conversation','rewindable','initial'),('conversation','rewindable','asOf')]
+    for scope,history,fork in semantics:
+        for kind,key,id in itertools.product(['','doc','nul\0中'],[None,'','key\0中'],[1,123,9007199254740991]):
+            address=dict(kind=kind,scope={'kind':scope,**({'conversationId':42} if scope=='conversation' else {'taskId':43} if scope=='task' else {})})
+            if key is not None:address['key']=key
+            definition=dict(kind=kind,scope=scope,version=1,family=key is not None)
+            if history:definition.update(history=history,fork=fork)
+            cases.append(dict(recordCreate=True,definition=definition,address=address,id=id))
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    library=ctypes.CDLL(ctypes.util.find_library('json-c'));library.json_object_put.argtypes=[ctypes.c_void_p];library.json_object_to_json_string_ext.argtypes=[ctypes.c_void_p,ctypes.c_int];library.json_object_to_json_string_ext.restype=ctypes.c_char_p
+    native.pg_document_record_create.argtypes=[ctypes.POINTER(Definition),ctypes.POINTER(Address),ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
+    for case,want in zip(cases,expected,strict=True):
+        a=case['address'];d=case['definition'];kind=a['kind'].encode();key=a.get('key','').encode();kb=ctypes.create_string_buffer(kind);vb=ctypes.create_string_buffer(key);scope=('session','conversation','task').index(d['scope']);address=Address(Slice(ctypes.addressof(kb),len(kind)),Slice(ctypes.addressof(vb),len(key)),a['scope'].get('conversationId',a['scope'].get('taskId',0)),scope,int('key' in a));definition=Definition(Slice(ctypes.addressof(kb),len(kind)),1,scope,{None:0,'latest':1,'rewindable':2}[d.get('history')],{None:0,'current':1,'initial':2,'asOf':3}[d.get('fork')],int('key' in a),None,None);out=ctypes.c_void_p()
+        try:
+            assert not native.pg_document_record_create(ctypes.byref(definition),ctypes.byref(address),case['id'],ctypes.byref(out))
+            assert json.loads(library.json_object_to_json_string_ext(out,0))==want,(case,want)
+        finally:library.json_object_put(out)
+    print(f'PASS: {len(cases)} document creation records match actual fixed Pi documentCreate')
+
 def main():
     for name in ('packages/durable/src/documents.ts', 'packages/durable/src/ids.ts', 'packages/chord/src/json.ts'):
         frozen = subprocess.check_output(['git', '-C', str(ROOT / 'references/pi'), 'show', COMMIT + ':' + name])
@@ -169,6 +191,7 @@ def main():
             size = ctypes.c_size_t()
             result = native.pg_document_address_encode(ctypes.byref(address), out, len(out), ctypes.byref(size))
             assert result == 0 and size.value == len(answer) and out.raw == answer + b'\0', index
+        creation_records(native)
         materialization(native)
         strict_values(native)
     print(f'PASS: {len(cases)} document addresses match actual fixed Pi Durable functions byte-for-byte')

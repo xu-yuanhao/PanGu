@@ -260,7 +260,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03统一结算验证：实际MemoryStorage验证双文档base、delta与普通表混合、空编辑保持identity、checkpoint失败、owner/复制源错误不调用predicate、回调恢复及每个直接分配/插入/复制故障；旧值在失败时保持，编辑与Prepared全部清理。O0/O2专项通过，完整Runtime见当前实现记录。该入口处理loaded文档，Doc自动获取/创建/退役/holds仍待上层接入。
 - K03 loaded自动获取：document_tx的open/get/finish/abort管理48字节Doc scope，按当前事务地址复用首次编辑/definition/checkpoint，调用cache载入已有实例，独立分配稳定编辑句柄、动态扩展结算数组，finish复用统一提交并释放编辑，abort丢弃整个record Tx。普通表写后仍可获取Doc；任务候选terminal先拒绝，包含已获取地址的再次访问。
 - K03自动获取验证：16个family实例跨结算数组扩容，原句柄稳定，同址不同version token仍复用首次draft（对应Pi memoization）；重复获取无额外find，批量提交更新各loaded值。验证abort、missing、表写后获取、terminal候选及逐直接分配/读取/扩容失败清理。O0/O2内存专项通过；完整Runtime见当前实现记录。当前get对缺失地址返回MISSING，初始化创建/retirement/holds继续接入；缓存和loaded借用受同一Session执行线保护。
-- 下一完整行为：补缺失Doc初始化创建及安装、退役驱逐与延迟提交，接入当前消息投影。
+- K03新Doc构造：documents的record_create对照Pi documentCreate，按definition/address生成owned DocumentCreate而不含生命周期stamp，验证identity/原生ID及scope/history/fork。initialize对照Transaction.doc/acquire：family seed先复制，initializer返回owned object经严格JSON校验与再次复制，singleton忽略seed，callback partial返回均释放；callback保留引用不影响最终候选。
+- K03创建基础验证：189条记录执行实际Pi documentCreate一致，含singleton/空family key/NUL、三类scope和所有history/fork组合；initializer输入/返回隔离、callback失败与逐直接分配/插入/复制故障O0/O2通过。真实Storage完成初始化→mint→记录构造→Tx document.create→重新loaded载入，生命周期stamp由Storage产生，原seed后续变化不影响内容。自动获取missing分支仍待接入这些服务。
+- 下一完整行为：接通missing Doc初始化创建、缓存安装及退役驱逐与延迟提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

@@ -9,7 +9,7 @@ typedef struct {
  unsigned scope,has_key;
 } pg_document_address;
 typedef enum { PG_DOC_OK,PG_DOC_INVALID,PG_DOC_CAPACITY,PG_DOC_ALLOCATION,
- PG_DOC_SEMANTICS,PG_DOC_NEWER_VERSION,PG_DOC_MIGRATION_REQUIRED,PG_DOC_MIGRATION_FAILED,PG_DOC_MISSING,PG_DOC_STORAGE_FAILED } pg_document_status;
+ PG_DOC_SEMANTICS,PG_DOC_NEWER_VERSION,PG_DOC_MIGRATION_REQUIRED,PG_DOC_MIGRATION_FAILED,PG_DOC_MISSING,PG_DOC_STORAGE_FAILED,PG_DOC_INITIAL_FAILED } pg_document_status;
 /* Slices borrow valid UTF-8, may contain NUL, lengths <=INT_MAX. Session owner
    is zero; conversation/task owners use the signed JS safe-integer range.
    has_key distinguishes an absent family key from an empty family key. */
@@ -104,4 +104,18 @@ pg_document_status pg_document_cache_evict(pg_document_cache *,const pg_document
 pg_document_status pg_document_cache_sweep(pg_document_cache *);
 pg_document_status pg_document_cache_retention(pg_document_cache *,uint64_t);
 pg_document_status pg_document_cache_close(pg_document_cache *);
+/* Durable documentCreate record, without storage lifecycle stamps. Definition
+   identity/semantics and native safe ID are checked; result owns all slices. */
+pg_document_status pg_document_record_create(const pg_document_definition *,const pg_document_address *,uint64_t id,struct json_object **);
+typedef struct {
+ void *context;
+ /* Family seed is a private borrowed copy, NULL for singleton. Return an owned
+    object even when identical to seed; callbacks may retain another reference. */
+ int (*initial)(void *,struct json_object *seed,struct json_object **);
+} pg_document_initializer;
+/* Detach family seed before calling initial, then validate/copy its object
+   result. Singleton ignores supplied seed. Failure releases partial results;
+   output is disjoint, initially unowned and cleared on failure. */
+pg_document_status pg_document_initialize(const pg_document_definition *,const struct json_object *seed,
+ const pg_document_initializer *,struct json_object **);
 #endif

@@ -14,7 +14,7 @@ _Static_assert(offsetof(pg_document_address,owner)==32,"owner");
 _Static_assert(offsetof(pg_document_address,scope)==40,"scope");
 #ifdef PG_DOC_FAULTS
 #include <json-c/json.h>
-static unsigned calls,fail_at;
+static unsigned calls,fail_at,creation_tracking;
 static int fault(void){return ++calls==fail_at;}
 struct json_object *__real_json_object_new_array_ext(int);
 struct json_object *__real_json_object_new_string_len(const char *,int);
@@ -30,6 +30,10 @@ int __wrap_json_object_array_add(struct json_object *o,struct json_object *v){re
 const char *__wrap_json_object_to_json_string_length(struct json_object *o,int flags,size_t *n){return fault()?0:__real_json_object_to_json_string_length(o,flags,n);}
 int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
 int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **dst,json_c_shallow_copy_fn *fn){return fault()?-1:__real_json_object_deep_copy(src,dst,fn);}
+struct json_object *__real_json_object_new_object(void);
+int __real_json_object_object_add(struct json_object *,const char *,struct json_object *);
+struct json_object *__wrap_json_object_new_object(void){return creation_tracking&&fault()?0:__real_json_object_new_object();}
+int __wrap_json_object_object_add(struct json_object *o,const char *key,struct json_object *v){return creation_tracking&&fault()?-1:__real_json_object_object_add(o,key,v);}
 static void allocation_failures(void){
  for(unsigned scope=0;scope<3;++scope){pg_document_address a={.kind={"kind",4},.scope=scope,.owner=scope?17:0,.has_key=scope!=0,.key={scope?"key":0,scope?3:0}};char out[256];size_t size;
  calls=0;fail_at=0;assert(!pg_document_address_encode(&a,out,sizeof(out),&size));unsigned count=calls;
@@ -86,7 +90,18 @@ static void value_admission(void){
  root=json_tokener_parse("[null,true,false,17,1.25,\"value\",{},[]]");assert(root&&pg_document_value_valid(root));json_object_put(root);
 }
 static void encode(pg_document_address a,const char *expected){char out[512],before[512];size_t size=999;memset(out,0xa7,sizeof(out));memcpy(before,out,sizeof(out));size_t n=strlen(expected);assert(pg_document_address_encode(&a,out,n,&size)==PG_DOC_CAPACITY&&!size&&!memcmp(out,before,sizeof(out)));assert(!pg_document_address_encode(&a,out,n+1,&size)&&size==n&&!strcmp(out,expected));}
+static struct json_object *initial_retained;
+static int initialize_value(void *context,struct json_object *seed,struct json_object **out){struct json_object *value=seed?json_object_get(seed):json_object_new_object();if(!value)return 1;struct json_object *number=json_object_new_int(7);if(!number){json_object_put(value);return 1;}if(json_object_object_add(value,"initialized",number)){json_object_put(number);json_object_put(value);return 1;}*out=value;initial_retained=json_object_get(value);return context?1:0;}
+static void creation(void){
+ pg_document_definition definition={.kind={"doc\0中",7},.version=1,.scope=PG_DOC_CONVERSATION,.history=PG_DOC_REWINDABLE,.fork=PG_DOC_AS_OF,.family=1};pg_document_address address={.kind=definition.kind,.key={"\0key",4},.owner=42,.scope=PG_DOC_CONVERSATION,.has_key=1};struct json_object *record=0;assert(!pg_document_record_create(&definition,&address,2,&record));assert(json_object_get_int(json_object_object_get(record,"id"))==2&&json_object_get_string_len(json_object_object_get(record,"kind"))==7&&json_object_get_string_len(json_object_object_get(record,"key"))==4&&!strcmp(json_object_get_string(json_object_object_get(record,"history")),"rewindable")&&!strcmp(json_object_get_string(json_object_object_get(record,"fork")),"asOf")&&!json_object_object_get(record,"createdAt"));pg_document_record decoded={0};assert(!pg_document_record_decode(record,&decoded)&&decoded.id==2&&pg_document_address_equal(&decoded.address,&address));json_object_put(record);assert(pg_document_record_create(&definition,&address,0,&record)==PG_DOC_INVALID&&!record);definition.family=0;assert(pg_document_record_create(&definition,&address,2,&record)==PG_DOC_INVALID&&!record);definition.family=1;
+ struct json_object *seed=json_tokener_parse("{\"text\":\"seed\"}"),*value=0;pg_document_initializer initializer={0,initialize_value};assert(seed&&!pg_document_initialize(&definition,seed,&initializer,&value)&&json_object_get_int(json_object_object_get(value,"initialized"))==7&&!json_object_object_get(seed,"initialized"));json_object_object_add(initial_retained,"text",json_object_new_string("retained"));assert(!strcmp(json_object_get_string(json_object_object_get(value,"text")),"seed"));json_object_put(initial_retained);initial_retained=0;json_object_put(value);initializer.context=&initializer;assert(pg_document_initialize(&definition,seed,&initializer,&value)==PG_DOC_INITIAL_FAILED&&!value&&!json_object_object_get(seed,"initialized"));json_object_put(initial_retained);initial_retained=0;initializer.context=0;
+#ifdef PG_DOC_FAULTS
+ creation_tracking=1;calls=fail_at=0;assert(!pg_document_record_create(&definition,&address,2,&record));unsigned count=calls;json_object_put(record);for(unsigned i=1;i<=count;++i){calls=0;fail_at=i;assert(pg_document_record_create(&definition,&address,2,&record)==PG_DOC_ALLOCATION&&!record);}fail_at=0;calls=0;assert(!pg_document_initialize(&definition,seed,&initializer,&value));count=calls;json_object_put(initial_retained);initial_retained=0;json_object_put(value);for(unsigned i=1;i<=count;++i){calls=0;fail_at=i;int status=pg_document_initialize(&definition,seed,&initializer,&value);assert(status!=PG_DOC_OK&&!value&&!json_object_object_get(seed,"initialized"));json_object_put(initial_retained);initial_retained=0;}creation_tracking=0;fail_at=0;
+#endif
+ definition.family=0;assert(!pg_document_initialize(&definition,seed,&initializer,&value)&&!json_object_object_get(value,"text"));json_object_put(value);json_object_put(initial_retained);initial_retained=0;json_object_put(seed);
+}
 int main(void){
+ creation();
 #ifdef PG_DOC_FAULTS
  allocation_failures();
 #endif

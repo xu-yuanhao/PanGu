@@ -74,7 +74,7 @@ def main():
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-DPG_DOC_FAULTS', '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/documents'), str(ROOT / 'tests/runtime/test_documents.c'),
-                            '-Wl,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_new_string,--wrap=json_object_new_int64,--wrap=json_object_array_add,--wrap=json_object_to_json_string_length,--wrap=json_object_deep_copy',
+                            '-Wl,--wrap=json_object_new_array_ext,--wrap=json_object_new_string_len,--wrap=json_object_new_string,--wrap=json_object_new_int64,--wrap=json_object_array_add,--wrap=json_object_to_json_string_length,--wrap=json_object_deep_copy,--wrap=json_object_new_object,--wrap=json_object_object_add',
                             *documents_flags, '-o', documents_test], check=True)
             subprocess.run([documents_test], check=True, timeout=15)
             records_test = str(Path(directory) / 'test-records')

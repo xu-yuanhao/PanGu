@@ -281,3 +281,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：document_tx新增48字节scope，open绑定当前record Tx/cache，get按本事务地址复用首次编辑，首次访问从cache取得loaded并分配独立稳定change；结算数组扩展不移动change。finish复用多文档结算，abort丢弃record Tx，均释放scope编辑。显式身份与Definition校验保留；同址有效版本token重复访问采用首次draft及checkpoint，与Pi memoization对应。Task候选terminal先拒绝，包含已获取地址。每个record Tx只绑定一个Doc scope，loaded借用由mutation line保证，scope字段API管理。
 - 实际验证：16个family实例跨数组扩容、句柄稳定、重复获取无额外find、批量提交及缓存值更新通过；普通表写后Doc获取仍允许。abort/missing/terminal候选/逐直接分配读取扩容错误清理在O0/O2 ASan/UBSan通过；完整Runtime退出0，原全部Pi/Chord专项继续通过。隔离核心暂存树G00、Assembly清单与产品构建、共享G00通过。
 - 同一实施Agent自审：扩展实际导出/作用域契约和来源，无门禁/预算变更。6个候选路径/暂存内容清单摘要（加入本记录前）：4d02e9ed34e2e03ae2982f2f5f4f80b1972a2ec49fdb78f8aebe9d1e48db162f。结论为本地候选通过；缺失地址初始化创建/安装、retirement与holds尚待接入，当前get返回MISSING而非创建；K03整体未完成。TUI未提交工作保持原样。
+
+## K03 新Doc创建记录与initializer服务（2026-10-26）
+
+- 来源：Pi documents.documentCreate、Transaction.doc的family seed复制与acquire初始化顺序；创建时scope owner检查和mint位于周围事务，当前实现记录/initializer两项基础能力。Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly record_create生成独立owned创建记录，保留scope/owner/history/fork/family身份，无createdAt/retiredAt；initialize通过显式initializer服务复制family seed、调用callback、验证并再次复制其object结果。singleton seed不进入callback，返回值/输入/保留引用所有权隔离，partial失败清理明确。INITIAL_FAILED枚举追加，旧状态值不变。
+- 实际验证：189条记录与固定Pi实际documentCreate一致；O0/O2 ASan/UBSan覆盖identity/版本/语义拒绝、seed及initializer保留引用隔离、callback失败和逐直接分配插入复制故障。实际MemoryStorage完成initializer→mint→RecordCreate→Tx create→loaded重读，Storage提供createdAt，调用者修改seed不影响数据。完整Runtime、隔离核心暂存树G00/Assembly清单/产品构建及共享G00通过。
+- 同一实施Agent自审：扩展已有实际导出/initializer ABI、故障注入与来源登记，不修改门禁或预算。8个候选路径/暂存内容清单摘要（加入本记录前）：09762ead4f9010272a5885c2e0eda5ac148dcf8b6c7996aa9c3faaebb1af287a。结论为本地候选通过；missing地址自动获取、owner检查串接、缓存安装/retirement/holds尚待实现，K03整体未完成。
