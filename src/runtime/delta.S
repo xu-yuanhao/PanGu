@@ -991,3 +991,207 @@ pg_document_delta_batches:
 .Lconstructor: .asciz "constructor"
 .Lprototype: .asciz "prototype"
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_revision_read
+.type pg_document_revision_read,@function
+pg_document_revision_read:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov ebp,1
+ test r13,r13
+ jz .Lrevision_return
+ mov qword ptr [r13],0
+ mov qword ptr [r13+8],0
+ mov qword ptr [r13+16],0
+ test rbx,rbx
+ jz .Lrevision_return
+ mov r15,9007199254740991
+ cmp r12,-1
+ je .Lrevision_point_valid
+ cmp r12,r15
+ ja .Lrevision_return
+.Lrevision_point_valid:
+ cmp qword ptr [rbx],0
+ je .Lrevision_return
+ cmp [rbx],r15
+ ja .Lrevision_return
+ mov rax,[rbx+8]
+ cmp rax,r15
+ ja .Lrevision_return
+ test rax,rax
+ jz .Lrevision_lifetime_valid
+ cmp rax,[rbx]
+ jb .Lrevision_return
+.Lrevision_lifetime_valid:
+ cmp dword ptr [rbx+16],1
+ ja .Lrevision_return
+ cmp dword ptr [rbx+20],0
+ jne .Lrevision_return
+ cmp r12,-1
+ je .Lrevision_current
+ cmp dword ptr [rbx+16],0
+ jne .Lrevision_semantics
+ cmp r12,[rbx]
+ jb .Lrevision_absent
+ mov rax,[rbx+8]
+ test rax,rax
+ jz .Lrevision_select
+ cmp r12,rax
+ jae .Lrevision_absent
+ jmp .Lrevision_select
+.Lrevision_current:
+ cmp qword ptr [rbx+8],0
+ jne .Lrevision_absent
+.Lrevision_select:
+ mov r14,[rbx+32]
+ mov rax,0x07ffffffffffffff
+ cmp r14,rax
+ ja .Lrevision_return
+ test r14,r14
+ jz .Lrevision_return
+ mov rbx,[rbx+24]
+ test rbx,rbx
+ jz .Lrevision_return
+ xor ecx,ecx
+ xor edx,edx
+ xor esi,esi
+.Lrevision_sequence_loop:
+ mov rax,rcx
+ shl rax,5
+ mov rdi,[rbx+rax]
+ cmp rdi,rdx
+ jbe .Lrevision_return
+ cmp rdi,r15
+ ja .Lrevision_return
+ mov rdx,rdi
+ cmp rdi,r12
+ ja .Lrevision_sequence_next
+ lea rsi,[rcx+1]
+.Lrevision_sequence_next:
+ inc rcx
+ cmp rcx,r14
+ jb .Lrevision_sequence_loop
+ mov r14,rsi
+ test r14,r14
+ jz .Lrevision_return
+ mov r15,r14
+.Lrevision_find_base:
+ dec r15
+ mov rax,r15
+ shl rax,5
+ cmp dword ptr [rbx+rax+16],0
+ je .Lrevision_base
+ test r15,r15
+ jnz .Lrevision_find_base
+ jmp .Lrevision_return
+.Lrevision_base:
+ mov rax,r15
+ shl rax,5
+ add rbx,rax
+ mov rax,[rbx+8]
+ test rax,rax
+ jz .Lrevision_return
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lrevision_return
+ mov [rsp+24],rax
+ cmp dword ptr [rbx+20],0
+ jne .Lrevision_return
+ mov rdi,[rbx+24]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrevision_return
+ sub r14,r15
+ dec r14
+ mov [rsp+32],r14
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lrevision_allocation
+ mov [rsp],rax
+ mov r15,rbx
+.Lrevision_collect:
+ test r14,r14
+ jz .Lrevision_replay
+ add r15,32
+ cmp dword ptr [r15+16],1
+ jne .Lrevision_cleanup
+ cmp dword ptr [r15+20],0
+ jne .Lrevision_cleanup
+ mov rax,[rsp+24]
+ cmp [r15+8],rax
+ jne .Lrevision_cleanup
+ mov rdi,[r15+24]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrevision_cleanup
+ mov rdi,[r15+24]
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lrevision_add_failed
+ dec r14
+ jmp .Lrevision_collect
+.Lrevision_add_failed:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ jmp .Lrevision_allocation
+.Lrevision_replay:
+ mov rdi,[rbx+24]
+ mov rsi,[rsp]
+ lea rdx,[rsp+8]
+ call pg_document_delta_batches
+ test eax,eax
+ jnz .Lrevision_replay_failed
+ mov rax,[rsp+8]
+ mov [r13],rax
+ mov qword ptr [rsp+8],0
+ mov rax,[rsp+24]
+ mov [r13+8],rax
+ mov rax,[rsp+32]
+ mov [r13+16],rax
+ xor ebp,ebp
+ jmp .Lrevision_cleanup
+.Lrevision_replay_failed:
+ mov ebp,eax
+ jmp .Lrevision_cleanup
+.Lrevision_allocation:
+ mov ebp,3
+.Lrevision_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ jmp .Lrevision_return
+.Lrevision_absent:
+ xor ebp,ebp
+ jmp .Lrevision_return
+.Lrevision_semantics:
+ mov ebp,4
+.Lrevision_return:
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_revision_read,.-pg_document_revision_read

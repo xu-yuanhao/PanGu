@@ -33,7 +33,27 @@ static void failures(void){
 }
 #endif
 static void run(const char *input,const char *operations,const char *answer){struct json_object *value=json_tokener_parse(input),*ops=json_tokener_parse(operations),*out=0;struct json_object *saved_value=0,*saved_ops=0;assert((!value||!json_object_deep_copy(value,&saved_value,0))&&!json_object_deep_copy(ops,&saved_ops,0));pg_document_status result=pg_document_delta_apply(value,ops,&out);if(answer){struct json_object *expected=json_tokener_parse(answer);assert(result==PG_DOC_OK&&json_object_equal(out,expected));json_object_put(expected);}else assert(result!=PG_DOC_OK&&!out);assert(json_object_equal(value,saved_value)&&json_object_equal(ops,saved_ops));json_object_put(value);json_object_put(ops);json_object_put(out);json_object_put(saved_value);json_object_put(saved_ops);}
+static void revisions(void){
+ _Static_assert(sizeof(pg_document_revision)==32,"revision ABI");
+ _Static_assert(sizeof(pg_document_revision_view)==40,"view ABI");
+ _Static_assert(sizeof(pg_document_snapshot)==24,"snapshot ABI");
+ struct json_object *base=json_tokener_parse("{\"text\":\"a\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"b\"]]"),*newbase=json_tokener_parse("{\"text\":\"new\"}");
+ pg_document_revision rev[]={{2,1,PG_REVISION_BASE,0,base},{4,1,PG_REVISION_DELTA,0,ops},{7,2,PG_REVISION_BASE,0,newbase},{9,2,PG_REVISION_DELTA,0,ops}};
+ pg_document_revision_view view={2,12,0,0,rev,4};pg_document_snapshot out;
+ for(uint64_t at=0;at<=13;++at){assert(!pg_document_revision_read(&view,at,&out));if(at<2||at>=12){assert(!out.value&&!out.version&&!out.deltas_since_base);continue;}const char *expected=at<4?"a":at<7?"ab":at<9?"new":"newb";assert(out.version==(at<7?1u:2u)&&out.deltas_since_base==((at>=4&&at<7)||at>=9));assert(!strcmp(json_object_get_string(json_object_object_get(out.value,"text")),expected));json_object_put(out.value);}
+ assert(!pg_document_revision_read(&view,UINT64_MAX,&out)&&!out.version);view.current_only=1;assert(pg_document_revision_read(&view,0,&out)==PG_DOC_SEMANTICS&&!out.value);view.retired_at=0;assert(!pg_document_revision_read(&view,UINT64_MAX,&out)&&out.version==2);json_object_put(out.value);view.current_only=0;
+ rev[3].version=3;assert(pg_document_revision_read(&view,9,&out)==PG_DOC_INVALID&&!out.value&&!out.version);assert(!pg_document_revision_read(&view,8,&out)&&out.version==2);json_object_put(out.value);rev[3].version=2;
+ rev[1].sequence=2;assert(pg_document_revision_read(&view,UINT64_MAX,&out)==PG_DOC_INVALID&&!out.value);rev[1].sequence=4;
+ view.count=1;rev[0].kind=PG_REVISION_DELTA;assert(pg_document_revision_read(&view,2,&out)==PG_DOC_INVALID&&!out.value);rev[0].kind=PG_REVISION_BASE;view.count=4;
+#ifdef PG_DELTA_FAULTS
+ tracking=1;calls=0;fail_at=0;assert(!pg_document_revision_read(&view,UINT64_MAX,&out));tracking=0;unsigned count=calls;json_object_put(out.value);
+ for(unsigned i=1;i<=count;++i){tracking=1;calls=0;fail_at=i;pg_document_status status=pg_document_revision_read(&view,UINT64_MAX,&out);tracking=0;assert(status!=PG_DOC_OK&&!out.value&&!out.version&&!out.deltas_since_base);}
+ fail_at=0;
+#endif
+ assert(!strcmp(json_object_get_string(json_object_object_get(base,"text")),"a"));json_object_put(base);json_object_put(ops);json_object_put(newbase);
+}
 int main(void){
+ revisions();
  run("{\"text\":\"\"}","[[\"a\",[\"text\"],\"中\"],[\"a\",[\"text\"],\"😀\"],[\"t\",[\"text\"],1]]","{\"text\":\"😀\"}");
  run("{}","[[\"s\",[\"text\"],\"abc\"],[\"a\",[\"text\"],\"def\"],[\"t\",[\"text\"],2]]","{\"text\":\"cdef\"}");
  run("{\"xs\":[0,1,2,3]}","[[\"p\",[\"xs\"],1,2,[8,9]],[\"m\",[\"xs\"],[3,2,1,0]]]","{\"xs\":[3,9,8,0]}");

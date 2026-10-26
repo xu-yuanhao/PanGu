@@ -954,10 +954,11 @@
         "utf8proc",
         "system libc"
       ],
-      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup",
+      "role": "decoded document delta r/s/d/a/t/p/m replay over private owned JSON values, with final-only multi-batch replay and failure cleanup; committed revision snapshots with lifetime and current-only policy",
       "exports": [
         "pg_document_delta_apply",
-        "pg_document_delta_batches"
+        "pg_document_delta_batches",
+        "pg_document_revision_read"
       ],
       "reference_basis": [
         {
@@ -968,7 +969,7 @@
             "packages/durable/src/storage/memory.ts",
             "packages/chord/src/delta/pending.ts"
           ],
-          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation"
+          "semantics": "assertValidOp/assertSafePath/applyImmutable/applyImmutableBatches and MemoryStorage.documentDeltaBatches; native detached snapshots and explicit UTF-8/C-string/safe numeric path boundaries; adjacent same-path appends use pending.merge semantics and one native concatenation; MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly select the nearest base and matching-version tail"
         }
       ]
     }

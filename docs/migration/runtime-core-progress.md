@@ -141,3 +141,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 449个实际Chord单/多批结果一致，包含10,000次连续追加；另三条原生ABI差异单列为拒绝验证（UTF-16内部截点、NUL属性路径、超safe数字路径），未计入兼容通过，继续K03/K15核对。O0/O2 ASan/UBSan和直接分配/复制/插入逐点故障通过，最终Runtime全专项退出0。暂存核心在已提交TUI基线的独立树中G00、assembly-first和产品构建通过。640KB/10,000追加的本机单次重放观测由0.3004s降至0.0118s，作为本批优化观测，未设性能门禁。
 
 同一Agent自审9文件源包摘要 `ea3a76d75a8059276f3c7784cbe348f0a8eb6316dc9a867ae30dfc3f2a7f185d`（排序[path, staged文件SHA256]紧凑UTF-8 JSON再取SHA256；本记录另存）。四个新增文件与实际依赖/构建/测试入口登记，复用既有json-c/utf8proc/libc。风险/差异：当前API接受C-string属性路径和safe数字路径、输出保持UTF-8标量；Doc revision存取及事务仍按K03推进。候选清单排除未交接TUI工具登记，工作区保留其登记与候选，K03整体验收仍未完成。
+
+## K03 已提交revision读取（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `MemoryStorage.materializeDocument/isAliveAt/isCurrentOnly/documentDeltaBatches`，实际调用 `document`；阅读 `testing/storage-conformance.ts` 的历史、长尾和拷贝场景。
+- 实现：现有delta模块新增 `pg_document_revision_read`，手写Assembly选择current/as-of生命周期、最近base和同版本delta尾；调用者借用revision数组，结果独立持有。原生有序revision布局与safe正整数版本明确在头文件。Document写入、地址索引与事务尚待接入。
+- 实际验证：96条读取与实际Pi MemoryStorage对照一致；原449条Chord对照及3条已记录原生差异检查仍成立。O0/O2 ASan/UBSan与逐直接分配/插入/部分复制失败检查通过，完整Runtime退出0；Assembly inventory通过。共享G00仍因TUI的4个未登记候选文件失败。
+- 控制登记自审：同一实施Agent自审；只扩展现有模块导出/职责及参考语义，未调整门禁或预算。6个候选文件（本记录之前暂存树）的路径/内容SHA256清单摘要为 `7d7aef696589affb0f3440f4451caecc8b8437b59219817de668d60799d4823c`。风险为新接口尚待Storage接入，三条delta ABI差异仍在K03/K15；结论为本地集成候选通过，不代表完整K03完成。

@@ -58,6 +58,53 @@ def corpus():
         dict(value={},ops=[['s',[18014398509481984],1]],native_boundary='safe numeric path segment')])
     return cases
 
+REVISION_ORACLE=r'''
+import {registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';
+const base=pathToFileURL(process.argv[1]+'/');
+registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord/delta')return {url:new URL('packages/chord/src/delta/index.ts',base).href,shortCircuit:true};return n(s,c);}});
+const {MemoryStorage}=await import(new URL('packages/durable/src/storage/memory.ts',base));const output=[];
+for(const scope of ['session','task','conversation'])for(const history of (scope==='conversation'?['latest','rewindable']:[undefined]))for(const retire of [false,true]){
+ const storage=new MemoryStorage();const record={id:2,kind:'test',scope:{kind:scope,...(scope==='conversation'?{conversationId:1}:scope==='task'?{taskId:3}:{})},...(history?{history,fork:'current'}:{})};
+ await storage.commit([{type:'document.create',record,content:{kind:'base',version:1,value:{text:'a',xs:[1]}}}],()=>{},{});
+ for(let i=0;i<7;i++)await storage.commit([{type:'document.change',id:2,content:i===3?{kind:'base',version:2,value:{text:'new',xs:[]}}:{kind:'delta',version:i<3?1:2,ops:[['a',['text'],'中😀'],['p',['xs'],0,0,[i]]]}}],()=>{},{});
+ if(retire)await storage.commit([{type:'document.retire',id:2}],()=>{},{});
+ const stored=storage.state.documents.get(2),answers=[];
+ for(const at of [0,1,2,3,4,5,6,7,8,9,10,'current'])try{const value=await storage.document(2,at,{});answers.push({at,ok:true,value:value??null});}catch{answers.push({at,ok:false});}
+ output.push({stored,answers});await storage.close({});
+}console.log(JSON.stringify(output));
+'''
+class Revision(ctypes.Structure):
+    _fields_=[('sequence',ctypes.c_uint64),('version',ctypes.c_uint64),('kind',ctypes.c_uint),('reserved',ctypes.c_uint),('content',ctypes.c_void_p)]
+class RevisionView(ctypes.Structure):
+    _fields_=[('created_at',ctypes.c_uint64),('retired_at',ctypes.c_uint64),('current_only',ctypes.c_uint),('reserved',ctypes.c_uint),('revisions',ctypes.POINTER(Revision)),('count',ctypes.c_size_t)]
+class Snapshot(ctypes.Structure):
+    _fields_=[('value',ctypes.c_void_p),('version',ctypes.c_uint64),('deltas',ctypes.c_size_t)]
+def revision_cases(native,library):
+    for relative in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts'):
+        assert (ROOT/'references/pi'/relative).read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+relative]),relative+' drift'
+    result=subprocess.run(['node','--input-type=module','-e',REVISION_ORACLE,str(ROOT/'references/pi')],text=True,capture_output=True,check=True,timeout=30)
+    native.pg_document_revision_read.argtypes=[ctypes.POINTER(RevisionView),ctypes.c_uint64,ctypes.POINTER(Snapshot)]
+    native.pg_document_revision_read.restype=ctypes.c_int
+    total=0
+    for fixture in json.loads(result.stdout):
+        stored=fixture['stored'];record=stored['record'];revisions=stored['revisions'];array=(Revision*len(revisions))();objects=[]
+        try:
+            for i,revision in enumerate(revisions):
+                value=library.json_tokener_parse(json.dumps(revision.get('value',revision.get('ops')),ensure_ascii=False).encode());objects.append(value)
+                array[i]=Revision(revision['seq'],revision['version'],int(revision['kind']=='delta'),0,value)
+            view=RevisionView(record['createdAt'],record.get('retiredAt',0),int(record['scope']['kind']!='conversation' or record.get('history')=='latest'),0,array,len(array))
+            for answer in fixture['answers']:
+                out=Snapshot();status=native.pg_document_revision_read(ctypes.byref(view),2**64-1 if answer['at']=='current' else answer['at'],ctypes.byref(out));actual=dict(ok=status==0)
+                try:
+                    if not status:actual['value']=None if not out.version else dict(record=record,version=out.version,value=json.loads(library.json_object_to_json_string_ext(out.value,0)),deltasSinceBase=out.deltas)
+                    else:assert not out.value and not out.version and not out.deltas
+                    assert actual=={k:v for k,v in answer.items() if k!='at'},(fixture,answer,actual)
+                    total+=1
+                finally:library.json_object_put(out.value)
+        finally:
+            for value in objects:library.json_object_put(value)
+    print(f'PASS: {total} revision/lifetime/current-only reads match actual Pi MemoryStorage')
+
 def main():
     reference=ROOT/'references/pi/packages/chord/src/delta/index.ts'
     for name in ('index.ts','diff.ts','tracker.ts','pending.ts','draft.ts'):
@@ -75,6 +122,7 @@ def main():
         library.json_object_to_json_string_ext.argtypes=[ctypes.c_void_p,ctypes.c_int];library.json_object_to_json_string_ext.restype=ctypes.c_char_p
         native.pg_document_delta_apply.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_document_delta_apply.restype=ctypes.c_int
         native.pg_document_delta_batches.argtypes=native.pg_document_delta_apply.argtypes;native.pg_document_delta_batches.restype=ctypes.c_int
+        revision_cases(native,library)
         for index,(case,answer) in enumerate(zip(cases,expected,strict=True)):
             value=library.json_tokener_parse(json.dumps(case['value'],ensure_ascii=False).encode());ops=library.json_tokener_parse(json.dumps(case.get('batches',case.get('ops')),ensure_ascii=False).encode());out=ctypes.c_void_p()
             try:
