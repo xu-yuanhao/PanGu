@@ -85,6 +85,13 @@ pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
    failures retain prior candidates and already minted IDs stay consumed. */
 pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct json_object *,
  int (*mint)(void *,uint64_t *),struct json_object **);
+/* Prepare createTask options from latest staged/committed submissions. A
+   present submissionIds array overrides trace/links: first trace or "root",
+   then present traces of later submissions as links. An empty array removes
+   both overrides. Output owns detached options; prior writes remain intact.
+   This is the write-attempt preparation phase of createTask, so it sets the
+   table-read barrier and calls providers with Tx busy. */
+pg_record_tx_status pg_record_tx_task_options(pg_record_tx *,const struct json_object *,struct json_object **);
 /* Replace a Task candidate with a detached final record. Reject an already
    terminal candidate or a changed candidate conversation. Candidate timestamps
    take precedence, then input timestamps; now() supplies missing startedAt on

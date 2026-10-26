@@ -430,3 +430,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_record_tx_set_task按同ID最新候选核对terminal/conversation，再复制并原地替换最新write；首次访问slot与原Tx ABI保持。时间戳candidate优先于input，null视为缺失，仅在running/terminal缺少对应字段时调用注入double时钟；有限小数/负值保持，非有限结果拒绝。clock回调在Tx busy下运行，失败保留旧候选并保持table-read barrier，返回/原记录不别名。
 - 实际验证：80组执行实际Pi setTask/#stampTimes，terminal/conversation拒绝、candidate/input/null优先、小数时间、clock调用次数及最终候选一致。真实MemoryStorage验证pending→running→waiting→running→terminal，仅两次clock且跨阶段保留startedAt/endedAt；旧候选terminal拒绝后最终统一提交。NaN clock拒绝保留waiting候选；10个直接分配/插入/部分复制故障保留先前write，包含新增json_object_new_double故障包装。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan与固定Pi/Chord差异基线通过，新增NaN用例随后两优化级专项复验；既有3条delta ABI边界单列。共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：仅既有records独立导出/来源、专项和TODO，旧结构/枚举及门禁/预算保持。7个候选路径内容清单摘要（本记录加入前）：739e2221795de02309107137cbf84638cf6e39515a58bbac04f4e5f38e449461。结论为本地候选通过；随后移植createTask初始化/owner/输入和时间来源，K03总验收未完成。TUI工作树保持独立。
+
+## K03 createTask submission trace/links准备
+
+- 来源：固定Pi d5b3de22 Transaction.createTask开始的submissionIds options派生分支，位于owner/conversation/initial/mint之前。本批fetch后Pi HEAD/origin=d5b3de22/f9daca3，Harness为22ddee37。
+- 实现：手写pg_record_tx_task_options按调用者submission顺序取最新staged候选或Storage提交态。首项trace缺失/null时选root，后续存在trace形成links（包含显式null），空列表移除原trace/links，省略submissionIds则保持原options。返回独立owned options，错误释放部分读取结果和候选输出，原writes保持；作为createTask的写尝试前置阶段固定table-read barrier。旧ABI保持。
+- 实际验证：18组执行实际createTask分支的options及provider调用序列，与Native一致；真实MemoryStorage验证候选覆盖、旧trace/links覆盖、missing/root/null/空列表与输出所有权。12个直接分配/插入/部分复制故障保留原候选/Session健康。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过（既有3条delta ABI边界单列）；共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：既有records独立导出/来源、专项和TODO，原结构/枚举及门禁/预算保持。6个候选路径内容清单摘要（本记录加入前）：e42c60320fa00d0dd53f1afcba58c0f835d9845501e9982f6545443432db818c。结论为本地候选通过；完整createTask仍需接owner/conversation、initializer、mint及pending记录构造，本批未将完整创建视为完成。K03总验收保持未完成，TUI工作树保持独立。

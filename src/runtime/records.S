@@ -4085,3 +4085,244 @@ pg_record_tx_set_task:
 .Ltask_ended: .asciz "endedAt"
 .Ltask_running: .asciz "running"
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_task_options
+.type pg_record_tx_task_options,@function
+pg_record_tx_task_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,9
+ rep stosq
+ mov ebp,1
+ test r13,r13
+ jz .Ltask_options_end
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Ltask_options_end
+ cmp dword ptr [rbx+32],0
+ jne .Ltask_options_end
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltask_options_end
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltask_options_end
+ mov dword ptr [rbx+40],1
+ mov dword ptr [rbx+32],1
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltask_options_cleanup
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ltask_options_cleanup
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+ mov rdi,r12
+ lea rsi,[rip+.Ltask_submission_ids]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ltask_options_success
+ mov rdi,[rsp+8]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltask_options_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_trace]
+ call json_object_object_del@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_links]
+ call json_object_object_del@PLT
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ mov [rsp+16],rax
+ xor r14d,r14d
+.Ltask_options_each:
+ cmp r14,[rsp+16]
+ jae .Ltask_options_success
+ mov rdi,[rsp+8]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Ltask_options_cleanup
+ mov [rsp+24],rax
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r15,rax
+.Ltask_options_find:
+ test r15,r15
+ jz .Ltask_options_read
+ dec r15
+ mov rdi,[rbx+24]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_submission]
+ call .Ls_string
+ test eax,eax
+ jz .Ltask_options_find
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov [rsp+32],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ cmp rax,[rsp+24]
+ jne .Ltask_options_find
+ jmp .Ltask_options_trace
+.Ltask_options_read:
+ cmp qword ptr [rbx+16],0
+ je .Ltask_options_read_error
+ mov rdi,[rbx+8]
+ mov esi,3
+ mov rdx,[rsp+24]
+ lea rcx,[rsp+40]
+ call [rbx+16]
+ test eax,eax
+ jz .Ltask_options_read_ok
+ cmp eax,1
+ jne .Ltask_options_read_error
+ mov qword ptr [rsp+32],0
+ jmp .Ltask_options_trace
+.Ltask_options_read_ok:
+ mov rax,[rsp+40]
+ mov [rsp+32],rax
+.Ltask_options_trace:
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltask_trace]
+ lea rdx,[rsp+48]
+ call json_object_object_get_ex@PLT
+ test r14,r14
+ jnz .Ltask_options_link
+ cmp qword ptr [rsp+48],0
+ je .Ltask_options_root
+ mov rdi,[rsp+48]
+ lea rsi,[rsp+56]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+ jmp .Ltask_options_set_trace
+.Ltask_options_root:
+ lea rdi,[rip+.Ltask_root]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ltask_options_allocation
+ mov [rsp+56],rax
+.Ltask_options_set_trace:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_trace]
+ mov rdx,[rsp+56]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+ mov qword ptr [rsp+56],0
+ jmp .Ltask_options_next
+.Ltask_options_link:
+ test eax,eax
+ jz .Ltask_options_next
+ cmp qword ptr [rsp+64],0
+ jne .Ltask_options_link_ready
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ltask_options_allocation
+ mov [rsp+64],rax
+.Ltask_options_link_ready:
+ cmp qword ptr [rsp+48],0
+ je .Ltask_options_link_null
+ mov rdi,[rsp+48]
+ lea rsi,[rsp+56]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+.Ltask_options_link_null:
+ mov rdi,[rsp+64]
+ mov rsi,[rsp+56]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+ mov qword ptr [rsp+56],0
+.Ltask_options_next:
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+ inc r14
+ jmp .Ltask_options_each
+.Ltask_options_success:
+ cmp qword ptr [rsp+64],0
+ je .Ltask_options_return_owned
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltask_links]
+ mov rdx,[rsp+64]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltask_options_allocation
+ mov qword ptr [rsp+64],0
+.Ltask_options_return_owned:
+ mov rax,[rsp]
+ mov [r13],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Ltask_options_cleanup
+.Ltask_options_read_error:
+ mov ebp,5
+ jmp .Ltask_options_cleanup
+.Ltask_options_allocation:
+ mov ebp,4
+.Ltask_options_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Ltask_options_end:
+ mov eax,ebp
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_task_options,.-pg_record_tx_task_options
+.section .rodata
+.Ltask_submission_ids: .asciz "submissionIds"
+.Ltask_trace: .asciz "trace"
+.Ltask_links: .asciz "links"
+.Ltask_root: .asciz "root"
+.section .note.GNU-stack,"",@progbits

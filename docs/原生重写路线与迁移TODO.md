@@ -102,6 +102,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 提供已写候选的隔离快照：Task按ID保留最新值，Conversation保持创建/分叉顺序；分配失败保留候选。
 - [x] 接通Task提交态读取缓存与首次访问定序：缓存成功/缺失/错误、独立返回值，候选快照保持先读后写顺序，重建批次转交私有元数据。
 - [x] 接通setTask候选替换：终态拒绝、conversation稳定、已有生命周期时间戳优先及按状态注入时钟。
+- [x] 移植createTask的submissionIds前置options派生：候选优先、首trace/root、后续links、空列表及失败清理。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -417,3 +418,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - startedAt/endedAt优先使用已有candidate，再使用输入；缺失时仅running/terminal调用注入double时钟，保留有限小数/负数语义，非有限结果拒绝且保留旧候选。复制候选与输入隔离，错误保持table-write barrier且不改变已存在的write。
 - 验证：80组实际setTask/stampTimes差异、pending→running→waiting→running→terminal连续转换、只调用两次时钟、终态覆盖/conversation改变拒绝、NaN拒绝和10个直接分配/插入/复制故障通过。专项/完整Runtime结果见当前实现记录。
 - 下一行为：createTask的初始化、owner/输入/状态与时间来源，继续K03/K06移植。
+
+### K03 createTask options准备交接
+
+- 阅读固定Pi d5b3de22 Transaction.createTask的submissionIds分支，必须先于ownership/initial/mint执行。records新增pg_record_tx_task_options，以最新staged submission覆盖提交态读取；首项trace或root，后续存在的trace组成links，空列表去掉原trace/links，缺省submissionIds保持原options。保持读取顺序、显式null后续link与owned输出，任何错误不改变候选，只固定createTask写尝试的读屏障。
+- 验证：18组执行实际createTask分支的options及provider调用序列差异，真实MemoryStorage的候选覆盖、missing/null/空列表、旧options覆盖与12个分配/插入/部分复制故障通过。专项和完整Runtime见当前实现记录。
+- 下一行为：完整createTask入口消费该准备结果，再依源顺序接owner/conversation、initializer、mint及pending记录构造；本批未勾选完整Task创建。

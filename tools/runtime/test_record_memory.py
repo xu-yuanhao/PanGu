@@ -484,6 +484,33 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks}
         finally:library.json_object_put(value);assert not native.pg_record_tx_discard(ctypes.byref(tx))
     print(f'PASS: {len(cases)} Task replacements and lifecycle timestamps match actual Pi setTask/stampTimes')
 
+def task_options(native,library):
+    choices=[None,[],[10],[11],[12],[10,13,12],[99,13],[10,88],[13,10,13]];cases=[dict(staged=staged,options=dict(trace={'parent':'given'},links=[{}],**({} if ids is None else {'submissionIds':ids}))) for staged in [False,True] for ids in choices]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const s=readFileSync(process.argv[1],'utf8');const a=s.indexOf('if (options.submissionIds !== undefined)'),b=s.indexOf('const ownership =',a);const text='class Probe{#submissions=new Map();#context={};calls=[];#host={storage:{submission:async(id)=>{this.calls.push(id);if(id===88)throw Error("read");return ({10:{trace:{parent:"old"}},11:{},12:{trace:null},13:{trace:{parent:"third"}}})[id]}}};constructor(staged){if(staged)this.#submissions.set(10,{trace:{parent:"new"}})}async run(options){'+s.slice(a,b)+'return options}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c.staged);try{out.push({ok:true,value:await p.run(c.options),calls:p.calls})}catch{out.push({ok:false,calls:p.calls})}}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));native.pg_record_tx_task_options.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
+    for case,want in zip(cases,expected,strict=True):
+        calls=[]
+        @read_type
+        def read(ctx,table,id,out):
+            assert table==3;calls.append(id)
+            if id==88:return 7
+            records={10:dict(trace=dict(parent='old')),11:{},12:dict(trace=None),13:dict(trace=dict(parent='third'))}
+            if id not in records:return 1
+            out[0]=library.json_tokener_parse(json.dumps(records[id]).encode());return 0
+        writes=[dict(type='submission',value=dict(id=10,trace=dict(parent='new')))] if case['staged'] else [];tx=Tx(None,None,ctypes.cast(read,ctypes.c_void_p),library.json_tokener_parse(json.dumps(writes).encode()));value=library.json_tokener_parse(json.dumps(case['options']).encode());out=ctypes.c_void_p()
+        try:
+            status=native.pg_record_tx_task_options(ctypes.byref(tx),value,ctypes.byref(out));actual=dict(ok=status==0,calls=calls)
+            if not status:actual['value']=json.loads(library.json_object_to_json_string_ext(out,0))
+            else:assert not out.value
+            assert actual==want and tx.barrier and not tx.busy,(case,status,actual,want)
+        finally:library.json_object_put(value);library.json_object_put(out);assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print(f'PASS: {len(cases)} createTask submission trace/link derivations match actual Pi function body')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -768,5 +795,6 @@ def main():
         candidate_snapshots(native,library)
         task_cache_order(native,library)
         task_replacement(native,library)
+        task_options(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()
