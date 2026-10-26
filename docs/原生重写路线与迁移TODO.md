@@ -249,7 +249,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03文档编辑内核：`delta.h/.S:pg_document_change_open/append/snapshot/prepare/discard` 对照Chord `ChangeImpl.prepare/abort`、Tracker `beginChange` 及Transaction `#acquire/planDocument/settleSuccess`。原生显式操作日志取代JS proxy：open/append脱离输入，snapshot/prepare才重放并检查路径/操作语义，snapshot独立拥有；prepare成功或失败均封闭句柄，成功转交value/ops，discard不释放已转交Prepared。追加只复制新批次，避免每次流式追加重放全文；prepare复用已有合并追加重放。
 - K03编辑验证：448条操作日志结果与实际Chord一致，3条既有ABI拒绝边界单列；O0/O2 ASan/UBSan覆盖open/append/prepare逐分配/插入/部分复制故障，追加失败回退本批、prepare失败清理/封闭、输入与快照隔离。实际MemoryStorage验证编辑→Prepared→Tx document.change→提交，旧快照稳定。此API不声称JS proxy或ops规范化兼容，原生操作/错误时点已写明；完整Runtime结果见当前实现记录。
 - K03 loaded文档写入规划：`pg_document_plan_change` 对照Transaction `planDocument` loaded分支及`#assemble` checkpoint选择；迁移写base（含空ops），同版非空ops按提供的checkpoint决策选base/delta，同版空ops不写，拒绝newer stored version。planner为纯构造，不执行predicate；完整Doc结算须在所有验证后计算决策。72条执行实际Pi原函数/分支一致，输入/payload隔离与逐分配插入复制故障通过；实际Storage验证迁移materialize→空编辑→base、checkpoint base、普通delta与空编辑不提交。O0/O2内存专项及完整Runtime结果见当前实现记录。
-- 下一完整行为：接入Doc获取缓存/所有权与验证后的checkpoint回调和统一结算，接入当前消息投影。
+- K03文档载入句柄：documents.h/.S的record_decode/loaded_open/loaded_close与loaded_begin对照Session #loadDocument未命中缓存分支及Transaction #acquire的loaded分支，注入find/read，检查current实例身份/scope/version并物化迁移，保留stored/value version与deltasSinceBase。句柄独立拥有record/value；Memory提供24字节绑定descriptor。编辑复制当前物化值，关闭/失败清理metadata。
+- K03载入验证：128条新鲜载入执行实际Pi原方法体及实际materializeDocument/track，匹配Storage调用顺序，含scope/history/fork/family NUL、版本/迁移与缺失读。真实Memory验证迁移载入→空编辑→base提交、版本拒绝、Storage关闭后独立持有与逐分配/读取/部分复制故障；O0/O2内存专项通过。缓存命中/驱逐、holds和adoption版本协调尚待控制层；完整Runtime见当前实现记录。
+- 下一完整行为：接入按地址复用/版本仲裁、Doc所有权与验证后的checkpoint回调及统一结算，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

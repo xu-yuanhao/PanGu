@@ -42,11 +42,11 @@ pg_memory_status pg_record_memory_head(void *,uint64_t conversation_id,uint64_t 
    Historical current-only reads are invalid; missing/lifetime absence is MISSING.
    Document rows are private; generic read/scan accept the four ordinary tables.
    This reader may be used in adopt, after the batch has been fully applied. */
-pg_memory_status pg_record_memory_document(pg_record_memory *,uint64_t id,uint64_t at,struct json_object **);
+pg_memory_status pg_record_memory_document(void *,uint64_t id,uint64_t at,struct json_object **);
 /* Logical identity lookup returns an owned DocumentRecord, without reading
    content. Historical membership also works for current-only documents.
    at=UINT64_MAX selects current. Absence returns PG_MEMORY_MISSING. */
-pg_memory_status pg_record_memory_find_document(pg_record_memory *,const pg_document_address *,uint64_t at,struct json_object **);
+pg_memory_status pg_record_memory_find_document(void *,const pg_document_address *,uint64_t at,struct json_object **);
 typedef struct {
  unsigned scope,has_kind;
  uint64_t owner;
@@ -62,4 +62,6 @@ typedef struct {
 pg_memory_status pg_record_memory_scan_documents(pg_record_memory *,const pg_document_query *,pg_memory_page *);
 /* Borrow a scan/head service descriptor; no resources are allocated. */
 void pg_record_memory_queries(pg_record_memory *,pg_record_queries *);
+/* Borrow find/read bindings for generic document acquisition. */
+void pg_record_memory_documents(pg_record_memory *,pg_document_storage *);
 #endif

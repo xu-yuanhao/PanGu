@@ -182,6 +182,63 @@ const text='class Probe{#writes;#tasksById;#task;constructor(c){this.#writes=c.k
             assert not native.pg_record_memory_close(ctypes.byref(memory))
     print(f'PASS: {len(cases)} final owner validations match actual Pi validateOwners body')
 
+def loaded_access(native,library):
+    for relative in ['packages/durable/src/session/session.ts','packages/durable/src/documents.ts','packages/chord/src/delta/tracker.ts','packages/chord/src/json.ts']:
+        assert (ROOT/'references/pi'/relative).read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+relative])
+    cases=[]
+    semantics=[('session',None,None),('task',None,None),('conversation','latest','current'),('conversation','latest','initial'),('conversation','rewindable','asOf'),('conversation','rewindable','current'),('conversation','rewindable','initial')]
+    for scope,history,fork in semantics:
+        for key in [None,'','key\0中']:
+            for stored,version in [(1,1),(1,2),(2,1)]:
+                for migration in [False,True]:
+                    record=dict(id=2,kind='load\0中',scope={'kind':scope,**({'conversationId':42} if scope=='conversation' else {'taskId':43} if scope=='task' else {})},createdAt=1)
+                    if key is not None:record['key']=key
+                    if history:record.update(history=history,fork=fork)
+                    cases.append(dict(record=record,stored=stored,version=version,migration=migration,find=True,read=True))
+    cases += [dict(cases[0],find=False),dict(cases[0],read=False)]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';
+const base=pathToFileURL(process.argv[1]+'/');registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};return n(s,c);}});const {materializeDocument}=await import(new URL('packages/durable/src/documents.ts',base));const {track}=await import(new URL('packages/chord/src/delta/tracker.ts',base));
+const source=readFileSync(new URL('packages/durable/src/session/session.ts',base),'utf8');const start=source.indexOf('async #loadDocument('),end=source.indexOf('#enqueue<',start);
+const text='class Probe{#documents=new Map();#holds=new Map();#storage;calls=[];constructor(c){this.#storage={findDocument:async()=>{this.calls.push("find");return c.find?c.record:undefined},document:async()=>{this.calls.push("read");return c.read?{record:c.record,version:c.stored,value:{text:"old"},deltasSinceBase:3}:undefined}}}#touchDocument(){}#dropDocument(){}async #storeHolds(){}'+source.slice(start,end)+'run(d,a){return this.#loadDocument(d,"test",a,{})}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c);const definition={kind:c.record.kind,scope:c.record.scope.kind,version:c.version,...(c.record.history?{history:c.record.history,fork:c.record.fork}:{}),...(c.migration?{migrate:(value,from)=>({...value,from})}:{})};try{const x=await p.run(definition,c.record);out.push({ok:true,value:x?{record:x.record,stored:x.storedVersion,version:x.valueVersion,deltas:x.deltasSinceBase,value:x.tracker.value}:null,calls:p.calls})}catch{out.push({ok:false,calls:p.calls})}}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Record(ctypes.Structure):
+        _fields_=[('address',Address),('id',ctypes.c_uint64),('history',ctypes.c_uint),('fork',ctypes.c_uint)]
+    class Definition(ctypes.Structure):
+        _fields_=[('kind',Slice),('version',ctypes.c_uint64),('scope',ctypes.c_uint),('history',ctypes.c_uint),('fork',ctypes.c_uint),('family',ctypes.c_uint),('context',ctypes.c_void_p),('migrate',ctypes.c_void_p)]
+    class Loaded(ctypes.Structure):
+        _fields_=[('record_owner',ctypes.c_void_p),('value',ctypes.c_void_p),('definition',ctypes.c_void_p),('record',Record),('stored',ctypes.c_uint64),('version',ctypes.c_uint64),('deltas',ctypes.c_uint64),('busy',ctypes.c_uint),('active',ctypes.c_uint)]
+    class Documents(ctypes.Structure):
+        _fields_=[('context',ctypes.c_void_p),('find',ctypes.c_void_p),('read',ctypes.c_void_p)]
+    find_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(Address),ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint64,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));migrate_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    native.pg_document_loaded_open.argtypes=[ctypes.POINTER(Loaded),ctypes.POINTER(Documents),ctypes.POINTER(Definition),ctypes.POINTER(Address)];native.pg_document_loaded_close.argtypes=[ctypes.POINTER(Loaded)]
+    for case,want in zip(cases,expected,strict=True):
+        calls=[];record=case['record'];kind=record['kind'].encode();key=record.get('key','').encode();kind_buffer=ctypes.create_string_buffer(kind);key_buffer=ctypes.create_string_buffer(key);scope=record['scope'];scope_index=('session','conversation','task').index(scope['kind']);history={None:0,'latest':1,'rewindable':2}[record.get('history')];fork={None:0,'current':1,'initial':2,'asOf':3}[record.get('fork')]
+        @find_type
+        def find(context,address,at,out):
+            calls.append('find');assert at==2**64-1
+            if not case['find']:return 1
+            out[0]=library.json_tokener_parse(json.dumps(record).encode());return 0
+        @read_type
+        def read(context,id,at,out):
+            calls.append('read');assert id==2 and at==2**64-1
+            if not case['read']:return 1
+            out[0]=library.json_tokener_parse(json.dumps(dict(record=record,version=case['stored'],value={'text':'old'},deltasSinceBase=3)).encode());return 0
+        @migrate_type
+        def migrate(context,value,version,out):
+            data=json.loads(library.json_object_to_json_string_ext(value,0));data['from']=version;out[0]=library.json_tokener_parse(json.dumps(data).encode());return 0
+        definition=Definition(Slice(ctypes.addressof(kind_buffer),len(kind)),case['version'],scope_index,history,fork,int('key' in record),None,ctypes.cast(migrate,ctypes.c_void_p) if case['migration'] else None);address=Address(Slice(ctypes.addressof(kind_buffer),len(kind)),Slice(ctypes.addressof(key_buffer),len(key)),scope.get('conversationId',scope.get('taskId',0)),scope_index,int('key' in record));storage=Documents(None,ctypes.cast(find,ctypes.c_void_p),ctypes.cast(read,ctypes.c_void_p));loaded=Loaded()
+        try:
+            status=native.pg_document_loaded_open(ctypes.byref(loaded),ctypes.byref(storage),ctypes.byref(definition),ctypes.byref(address));actual=dict(ok=status in (0,8),calls=calls)
+            if not status:actual['value']=dict(record=json.loads(library.json_object_to_json_string_ext(loaded.record_owner,0)),stored=loaded.stored,version=loaded.version,deltas=loaded.deltas,value=json.loads(library.json_object_to_json_string_ext(loaded.value,0)))
+            elif status==8:actual['value']=None
+            else:assert not loaded.active and not loaded.busy and not loaded.value and not loaded.record_owner
+            assert actual==want,(case,status,actual,want)
+        finally:assert not native.pg_document_loaded_close(ctypes.byref(loaded))
+    print(f'PASS: {len(cases)} loaded document acquisitions match actual Pi loadDocument body with injected Storage')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -438,5 +495,6 @@ def main():
                 assert actual==answer,(index,op,actual,answer)
         finally:assert native.pg_record_memory_close(ctypes.byref(memory))==0
         owner_validation(native,library)
+        loaded_access(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

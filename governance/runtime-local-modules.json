@@ -849,14 +849,17 @@
         "system libc",
         "json-c"
       ],
-      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership",
+      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership",
       "exports": [
         "pg_document_address_valid",
         "pg_document_address_equal",
         "pg_document_address_encode",
         "pg_document_check",
         "pg_document_materialize",
-        "pg_document_value_valid"
+        "pg_document_value_valid",
+        "pg_document_record_decode",
+        "pg_document_loaded_open",
+        "pg_document_loaded_close"
       ],
       "reference_basis": [
         {
@@ -866,9 +869,10 @@
             "packages/durable/src/documents.ts",
             "packages/durable/src/ids.ts",
             "packages/durable/src/types.ts",
-            "packages/chord/src/json.ts"
+            "packages/chord/src/json.ts",
+            "packages/durable/src/session/session.ts"
           ],
-          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256"
+          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership"
         }
       ]
     },
@@ -947,7 +951,8 @@
         "pg_record_memory_document",
         "pg_record_memory_find_document",
         "pg_record_memory_scan_documents",
-        "pg_record_memory_queries"
+        "pg_record_memory_queries",
+        "pg_record_memory_documents"
       ],
       "reference_basis": [
         {
@@ -988,7 +993,8 @@
         "pg_document_change_snapshot",
         "pg_document_change_prepare",
         "pg_document_change_discard",
-        "pg_document_plan_change"
+        "pg_document_plan_change",
+        "pg_document_loaded_begin"
       ],
       "reference_basis": [
         {

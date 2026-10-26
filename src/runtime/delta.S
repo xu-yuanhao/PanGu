@@ -1659,3 +1659,25 @@ pg_document_plan_change:
 .Ldoc_plan_type: .asciz "type"
 .Ldoc_plan_id: .asciz "id"
 .Ldoc_plan_content: .asciz "content"
+.text
+.globl pg_document_loaded_begin
+.type pg_document_loaded_begin,@function
+pg_document_loaded_begin:
+ push rbx
+ mov eax,1
+ test rdi,rdi
+ jz .Lloaded_begin_return
+ mov rbx,rdi
+ cmp dword ptr [rbx+112],0
+ jne .Lloaded_begin_return
+ cmp dword ptr [rbx+116],1
+ jne .Lloaded_begin_return
+ mov dword ptr [rbx+112],1
+ mov rdi,rsi
+ mov rsi,[rbx+8]
+ call pg_document_change_open
+ mov dword ptr [rbx+112],0
+.Lloaded_begin_return:
+ pop rbx
+ ret
+.size pg_document_loaded_begin,.-pg_document_loaded_begin

@@ -58,4 +58,6 @@ pg_document_status pg_document_change_discard(pg_document_change *);
    and versions; stored_version>version returns PG_DOC_NEWER_VERSION. */
 pg_document_status pg_document_plan_change(uint64_t id,uint64_t stored_version,uint64_t version,
  const pg_document_prepared *,unsigned checkpoint,struct json_object **);
+/* Begin an independent explicit-op edit from an active loaded handle. */
+pg_document_status pg_document_loaded_begin(pg_document_loaded *,pg_document_change *);
 #endif

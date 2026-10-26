@@ -3203,3 +3203,17 @@ pg_record_memory_queries:
 .Lmemory_queries_return:
  ret
 .size pg_record_memory_queries,.-pg_record_memory_queries
+.text
+.globl pg_record_memory_documents
+.type pg_record_memory_documents,@function
+pg_record_memory_documents:
+ test rsi,rsi
+ jz .Lmemory_documents_return
+ mov [rsi],rdi
+ mov rax,qword ptr [rip+pg_record_memory_find_document@GOTPCREL]
+ mov [rsi+8],rax
+ mov rax,qword ptr [rip+pg_record_memory_document@GOTPCREL]
+ mov [rsi+16],rax
+.Lmemory_documents_return:
+ ret
+.size pg_record_memory_documents,.-pg_record_memory_documents
