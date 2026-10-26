@@ -4,6 +4,7 @@
 #include "../../src/runtime/document_tx.h"
 #include "../../src/runtime/holds.h"
 #include "../../src/runtime/hold_timer.h"
+#include "../../src/runtime/durable_session.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -1033,6 +1034,43 @@ static void native_timer_tests(void){
 #endif
 }
 
+
+typedef struct {native_timer_fixture native;pg_durable_session session;unsigned closes,pending,fail_backend,close_on_publish,close_on_memory;const char *expected;} durable_fixture;
+static uint64_t durable_hold_clock(void *context){return ((durable_fixture*)context)->native.n.f.now;}
+static void durable_memory_observe(void *context,const pg_document_tx_entry *entries,size_t count){durable_fixture *f=context;native_hold_observe(&f->native.n,entries,count);if(f->close_on_memory)assert(f->native.armed&&pg_durable_session_close(&f->session)==1&&f->session.phase==2);}
+static int durable_backend_close(void *context){durable_fixture *f=context;++f->closes;assert(f->session.busy&&f->native.n.f.cache.closed&&!f->native.n.holds.active&&!f->native.timer.phase&&!f->native.pending&&!f->native.armed&&!f->session.active_documents);if(f->pending){--f->pending;return 1;}if(f->expected){struct json_object *stored=0;assert(!pg_record_memory_document(&f->native.n.f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),f->expected));json_object_put(stored);}assert(!pg_record_memory_close(&f->native.n.f.memory));return f->fail_backend?-1:0;}
+static int durable_adopt(void *context,const struct json_object *writes,uint64_t seq){durable_fixture *f=context;return deferred_adopt(&f->native.n.f,writes,seq);}
+static void durable_publish(void *context,const struct json_object *writes,uint64_t seq){durable_fixture *f=context;deferred_publish(&f->native.n.f,writes,seq);if(f->close_on_publish){assert(pg_durable_session_close(&f->session)==1&&f->session.phase==2);pg_record_tx tx={0};pg_document_tx docs={0};assert(pg_durable_session_begin(&f->session,&tx,&docs,&f->native.n.f.memory,tx_read)==PG_TX_INVALID&&!tx.writes);}}
+static void durable_open(durable_fixture *f){memset(f,0,sizeof(*f));pg_document_deferred deferred;native_hold_open(&f->native.n,&deferred);f->native.host=(pg_hold_timer_host){&f->native,native_foreground,native_timer_cancel,native_timer_enqueue};assert(!pg_hold_timer_open(&f->native.timer,&f->native.n.holds,&f->native.n.f.session,&f->native.host));f->native.n.holds.context=f;f->native.n.holds.clock=durable_hold_clock;f->native.n.holds.observe=durable_memory_observe;f->native.n.f.session.context=f;f->native.n.f.session.adopt=durable_adopt;f->native.n.f.session.publish=durable_publish;pg_durable_close backend={f,durable_backend_close};assert(!pg_durable_session_open(&f->session,&f->native.n.f.session,&f->native.n.f.cache,&f->native.n.holds,&f->native.timer,&backend)&&pg_durable_session_idle(&f->session));}
+static void durable_edit(durable_fixture *f,const char *suffix){deferred_fixture *n=&f->native.n.f;assert(!pg_durable_session_begin(&f->session,&n->tx,&n->scope,&n->memory,tx_read)&&!pg_durable_session_idle(&f->session));pg_document_change *edit=0;assert(!pg_document_tx_get(&n->scope,&n->definition,&n->address,0,0,&edit));if(suffix){char text[256];int size=snprintf(text,sizeof(text),"[[\"a\",[\"text\"],\"%s\"]]",suffix);assert(size>0&&(size_t)size<sizeof(text));struct json_object *ops=json_tokener_parse(text);assert(ops&&!pg_document_change_append(edit,ops));json_object_put(ops);}}
+static void durable_closed(durable_fixture *f,int result){unsigned calls=f->closes;assert(pg_durable_session_close(&f->session)==result&&f->closes==calls&&!pg_durable_session_idle(&f->session)&&!f->native.pending&&!f->native.armed&&f->native.n.f.memory.closed&&f->native.n.f.cache.closed&&!f->native.n.holds.active&&f->native.n.f.cache.context==&f->native.n&&f->native.n.f.cache.pinned==native_hold_pinned&&!f->native.n.f.cache.flush);pg_record_tx tx={0};pg_document_tx docs={0};assert(pg_durable_session_begin(&f->session,&tx,&docs,&f->native.n.f.memory,tx_read)==PG_TX_INVALID&&!tx.writes);}
+
+static void durable_merge_setup(durable_fixture *f){deferred_fixture *n=&f->native.n.f;assert(!pg_durable_session_begin(&f->session,&n->tx,&n->scope,&n->memory,tx_read));struct json_object *create=json_tokener_parse("{\"type\":\"document.create\",\"record\":{\"id\":3,\"kind\":\"other\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"\"}}}");assert(create&&!pg_record_tx_stage(&n->tx,PG_TX_DOCUMENT_CREATE,create));json_object_put(create);assert(!pg_durable_session_settle(&f->session,0,0,0));durable_edit(f,"held");assert(!pg_durable_session_settle(&f->session,1,10,0));assert(!pg_durable_session_begin(&f->session,&n->tx,&n->scope,&n->memory,tx_read));native_merge_other_get(&f->native.n,1);assert(!pg_durable_session_settle(&f->session,1,100,0)&&f->native.n.holds.count==2);durable_edit(f,"+now");}
+static void durable_session_tests(void){
+ _Static_assert(sizeof(pg_durable_session)==192&&offsetof(pg_durable_session,active_documents)==160&&offsetof(pg_durable_session,phase)==172,"durable Session ABI");
+ durable_fixture f;durable_open(&f);durable_edit(&f,"a");assert(!pg_durable_session_settle(&f.session,1,100,0)&&f.native.arms==1&&f.native.n.holds.count==1&&pg_durable_session_idle(&f.session));native_timer_fire(&f.native);durable_edit(&f,0);assert(!pg_durable_session_idle(&f.session)&&!pg_durable_session_abort(&f.session)&&pg_durable_session_idle(&f.session));native_timer_run(&f.native);assert(!f.native.n.holds.count&&f.native.n.f.session.sequence==3);durable_edit(&f,"b");assert(!pg_durable_session_settle(&f.session,0,0,0)&&f.native.n.f.session.sequence==4);f.expected="seedab";assert(!pg_durable_session_close(&f.session)&&f.closes==1);durable_closed(&f,0);
+
+ durable_open(&f);pg_durable_session duplicate={0};pg_durable_close duplicate_backend={&f,durable_backend_close};assert(pg_durable_session_open(&duplicate,&f.native.n.f.session,&f.native.n.f.cache,&f.native.n.holds,&f.native.timer,&duplicate_backend)==PG_RECORDS_INVALID&&!duplicate.phase&&f.native.n.f.cache.context==&f.session);
+ pg_record_tx bad_tx={0};pg_document_tx bad_docs={.busy=1};assert(pg_durable_session_begin(&f.session,&bad_tx,&bad_docs,&f.native.n.f.memory,tx_read)==PG_TX_INVALID&&!bad_tx.writes&&!f.session.active_documents&&!f.session.busy);assert(!pg_durable_session_close(&f.session));durable_closed(&f,0);
+ durable_open(&f);durable_edit(&f,"aborted");assert(pg_durable_session_close(&f.session)==1&&!pg_durable_session_abort(&f.session));f.expected="seed";assert(!pg_durable_session_close(&f.session)&&!f.native.n.f.published);durable_closed(&f,0);
+ durable_open(&f);durable_edit(&f,"admitted");assert(pg_durable_session_close(&f.session)==1&&f.session.phase==2&&!f.closes);pg_record_tx refused={0};pg_document_tx refused_docs={0};assert(pg_durable_session_begin(&f.session,&refused,&refused_docs,&f.native.n.f.memory,tx_read)==PG_TX_INVALID&&!refused.writes);assert(!pg_durable_session_settle(&f.session,1,0,0)&&f.native.n.holds.count==1&&!f.native.arms);f.expected="seedadmitted";assert(!pg_durable_session_close(&f.session));durable_closed(&f,0);
+ for(unsigned admitted=0;admitted<2;++admitted){durable_open(&f);durable_edit(&f,"a");assert(!pg_durable_session_settle(&f.session,1,100,0));native_timer_fire(&f.native);if(admitted)durable_edit(&f,"b");assert(pg_durable_session_close(&f.session)==1&&f.native.pending&&!f.closes);if(admitted)assert(!pg_durable_session_settle(&f.session,0,0,0));assert(pg_durable_session_idle(&f.session));native_timer_run(&f.native);f.expected=admitted?"seedab":"seeda";assert(!pg_durable_session_close(&f.session)&&f.native.n.f.published==1);durable_closed(&f,0);}
+ durable_open(&f);f.close_on_memory=1;durable_edit(&f,"memory");assert(!pg_durable_session_settle(&f.session,1,100,0)&&f.session.phase==2&&f.native.arms==1);f.expected="seedmemory";assert(!pg_durable_session_close(&f.session)&&f.native.cancels==1);durable_closed(&f,0);
+ durable_open(&f);f.close_on_publish=1;durable_edit(&f,"x");assert(!pg_durable_session_settle(&f.session,0,0,0)&&f.session.phase==2&&!f.closes);f.expected="seedx";assert(!pg_durable_session_close(&f.session));durable_closed(&f,0);
+ durable_open(&f);f.pending=2;assert(pg_durable_session_close(&f.session)==1&&f.session.phase==3&&!f.native.n.f.memory.closed&&!pg_durable_session_idle(&f.session));assert(pg_durable_session_close(&f.session)==1&&f.closes==2);assert(!pg_durable_session_close(&f.session)&&f.closes==3);durable_closed(&f,0);
+ for(unsigned failed=0;failed<2;++failed){durable_open(&f);durable_edit(&f,"unstored");assert(!pg_durable_session_settle(&f.session,1,100,0));if(failed)f.native.n.f.session.failed=PG_RECORDS_ADOPTION_FAILED;f.fail_backend=1;f.expected=failed?"seed":"seedunstored";assert(pg_durable_session_close(&f.session)==-1&&f.session.result==(failed?PG_RECORDS_ADOPTION_FAILED:PG_RECORDS_STORAGE_FAILED)&&f.closes==1);durable_closed(&f,-1);}
+ durable_open(&f);durable_edit(&f,"held");assert(!pg_durable_session_settle(&f.session,1,100,0));pg_document_definition two=f.native.n.f.definition;two.version=2;two.migrate=native_reload_migrate;pg_document_loaded *loaded=0;assert(!pg_document_cache_get(&f.native.n.f.cache,&two,&f.native.n.f.address,&loaded)&&loaded->value_version==2&&!f.native.n.holds.count&&!f.native.armed&&f.native.cancels==1);f.expected="seedheld";assert(!pg_durable_session_close(&f.session));durable_closed(&f,0);
+#ifdef PG_MEMORY_FAULTS
+ for(unsigned closing=0;closing<3;++closing){unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){durable_open(&f);if(closing==2)durable_merge_setup(&f);else durable_edit(&f,"fault");if(closing==1)assert(!pg_durable_session_settle(&f.session,1,100,0));doc_calls=0;doc_fail=target;doc_tracking=1;int status=closing==1?pg_durable_session_close(&f.session):pg_durable_session_settle(&f.session,closing==0,100,0);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+ if(target){assert(status!=0);if(closing==0&&!f.native.n.f.session.failed)assert(!f.native.n.holds.count);if(closing==2&&f.native.timer.error)assert(f.native.n.f.session.failed==f.native.timer.error);++failures;}else{assert(!status);total=calls;}
+ if(closing!=1){int expected=f.native.n.f.session.failed?-1:0;assert(pg_durable_session_close(&f.session)==expected);durable_closed(&f,expected);}else durable_closed(&f,status?-1:0);
+ }
+ printf("PASS: Durable Session %s; %u direct allocation/insert/clone failures\n",closing==2?"merged adoption/timer rearm":closing?"close cleanup":"deferred settlement/timer sync",failures);
+ }
+#endif
+}
+
 int main(void){
  native_holds_tests();
  native_flush_tests();
@@ -1040,6 +1078,7 @@ int main(void){
  native_reload_tests();
  native_finish_tests();
  native_timer_tests();
+ durable_session_tests();
  deferred_memory_transactions();
  deferred_other_reads_and_documents();
  deferred_fallbacks();

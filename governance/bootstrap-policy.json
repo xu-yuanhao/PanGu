@@ -624,6 +624,8 @@
     "src/runtime/holds.h": "native-source",
     "src/runtime/holds.S": "native-source",
     "src/runtime/hold_timer.h": "native-source",
-    "src/runtime/hold_timer.S": "native-source"
+    "src/runtime/hold_timer.S": "native-source",
+    "src/runtime/durable_session.h": "native-source",
+    "src/runtime/durable_session.S": "native-source"
   }
 }

@@ -935,7 +935,7 @@
             "packages/durable/src/session/forks.ts",
             "packages/durable/src/harness/harness.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again; Session.runCommit nonempty/read-only validation before hold-vs-Storage selection; routed memory success consumes Tx candidates without changing Storage sequence or durable publication",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission; scanConversations/scanEntries/scanTasks/latestHeadMarker use the same committed #read barrier and sealed lifecycle; Session/Transaction conversationCreated callback runs after staged Conversation/fork plans; synchronous host callback can stage nested records, active callbacks prevent premature commit/discard; validateOwners judges newly owned Conversation/Task work against final staged owner status and abort mark before Storage admission; existing owned tasks retaining their owner are not new work; Session-owned finalizer runs while sealed/busy between validation and Storage, generated plans validate again; Session.runCommit nonempty/read-only validation before hold-vs-Storage selection; routed memory success consumes Tx candidates without changing Storage sequence or durable publication; Session.fail retains the first cause even when adoption/backend protocol checks subsequently fail",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-forks.test.ts",
@@ -1158,6 +1158,44 @@
           "semantics": "#armHoldTimer arms minimum deadline, preserves fired timer until queued job, disarms replaced deadline, infinity has no timer, queued callback stores all held docs only while active/healthy; timer/queue services are injected native providers; queued tickets own callback storage through drain; foreground delivery and mutation-line enqueue are never inline",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "session.durable.lifecycle.local.v0",
+      "sources": [
+        "src/runtime/durable_session.h",
+        "src/runtime/durable_session.S"
+      ],
+      "dependencies": [
+        "session.records.local.v0",
+        "session.documents.local.v0",
+        "session.documents.transaction.local.v0",
+        "session.documents.holds.local.v0",
+        "session.documents.hold-timer.local.v0"
+      ],
+      "role": "Serialized Durable Session composition over borrowed initialized primitives: one admitted transaction, deferred/merged settlement, automatic deadline sync and version flush, admission seal, timer job drain, healthy hold flush/failed cleanup, cache close then injected backend close polling; timer arm/release synchronization precedes memory/durable observers",
+      "exports": [
+        "pg_durable_session_open",
+        "pg_durable_session_begin",
+        "pg_durable_session_settle",
+        "pg_durable_session_abort",
+        "pg_durable_session_idle",
+        "pg_durable_session_close"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts",
+            "packages/durable/test/session-adoption.test.ts",
+            "packages/durable/test/session-documents.test.ts"
           ]
         }
       ]

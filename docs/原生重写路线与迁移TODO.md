@@ -94,6 +94,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通正常事务及deferred混合回退的takeHeld合并：当前编辑/只读与其他写入/退休同批保存，保留无关holds，支持checkpoint base覆盖。
 - [x] 接通按incarnation的版本重载前flush及holds结束服务：只保存目标队列、保持其它期限；健康时排空、失败时清理、保留首个错误。
 - [x] 移植holds最早期限定时器控制器：前台定时/串行入队服务注入、已触发ticket保留、到期批量保存与关闭时排空。
+- [x] 组合Durable Session事务admission、holds/cache/timer服务与分阶段关闭：封闭新工作、完成已接收事务、排空timer job、保存/清理后关闭缓存及后端，保留首因。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -353,3 +354,12 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - hold_timer.h/.S消费前台定时/cancel/Session enqueue服务：sync在held变更/释放后设置最早有限deadline，仅期限改变才替换定时器；Infinity保持无定时器。timer回调只入队，已触发ticket保留到串行job运行，job保存全部holds且不重复内存通知。stop先封闭timer并取消handle，已入队job须排空且跳过写入，之后宿主调用holds_finish和Cache/Storage close。原ABI保持。
 - timer/队列提供者由宿主注入；实际Session组合须在deferred/merge/flush后调用sync，并保证enqueue不内联、cancel后无未来timer回调、已入队job恰好一次运行。K06实现可复用的原生Timers/队列服务，完整Session关闭组合继续衔接。
 - 验证：最早期限/相同期限复用/更早期限取消重设/Infinity/过期期限0 delay，回调只入队、fired期间不重设、批量保存最新值、stop pending/drain、既有失败及provider拒绝/partial handle/入队拒绝均通过；67个直接分配/插入/部分复制故障保留数据和首因。具体命令结果见当前实现记录。
+
+### K03 Durable Session组合与关闭交接
+
+- 阅读固定Pi d5b3de22 Session.runCommit/#loadDocument/close/fail，以及session-deferred-commits.test.ts、session-adoption.test.ts相关调用。新增durable_session.h/.S，以192字节原生组合体绑定既有records/cache/holds/timer与后端close提供者，原有ABI保持。
+- begin/settle/abort维持单一已接收事务及稳定Doc借用，deferred/merge选择复用现有服务；内存观察前设置timer，合并释放后同步期限，版本切换使用单实例flush并重设timer，保留原clock/pin服务。队列提供者通过idle确认Session执行线可派发。
+- close先封闭新admission，已接收事务可继续结算或abort；等待timer已入队job清理，再结束holds、关闭cache/恢复hooks，最后轮询后端关闭。失败Session跳过dirty写入，重复close复用最终结果，后端关闭错误保留早先原因。修复records采用后续错误覆盖首因的路径，对照Pi fail的first-wins语义。
+- 验证：自动设定/取消deadline、忙时阻止派发、关闭后的admission拒绝、关闭期间既有事务deferred/正常结算/abort、timer pending清理、观察者回调内close、后端pending/错误与原hooks恢复通过。21个deferred/定时同步、37个close清理、71个合并采纳后重设timer故障点，另3个records首因回归通过；专项/完整Runtime结果记入当前实现记录。
+- 上游检查：Pi origin/main从d5b3de22前进至f9daca3480732d0042b1df3a6e27221f597a620d；本批Session/Transaction/Timers文件diff为0，固定源码与差异基线仍使用d5b3de22。新增ae823bc的Bm25Ranker工具全名/双下划线后缀归一化优先排序及对应测试映射K11。Harness仍为22ddee37。
+- 下一行为：K03历史/只读视图与事务查询服务；具体Timers/队列提供者按K06接入，完整产品组合按K14接入，K03总验收保持未勾选。

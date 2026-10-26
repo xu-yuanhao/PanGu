@@ -91,7 +91,11 @@ pg_records_commit:
 .Lrecords_adoption_failed:
  mov r14d,4
 .Lrecords_fail:
+ cmp dword ptr [rbx+52],0
+ jne .Lrecords_first_failure
  mov [rbx+52],r14d
+.Lrecords_first_failure:
+ mov r14d,[rbx+52]
 .Lrecords_finish:
  mov qword ptr [rbx+80],0
  mov qword ptr [rbx+72],0
@@ -140,6 +144,8 @@ pg_records_commit:
  jmp .Lrecords_adopt_return
 .Lrecords_adopt_bad:
  mov dword ptr [rbx+64],1
+ cmp dword ptr [rbx+52],0
+ jne .Lrecords_adopt_return
  mov dword ptr [rbx+52],4
 .Lrecords_adopt_return:
  add rsp,8

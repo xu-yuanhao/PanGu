@@ -17,10 +17,10 @@ _Static_assert(offsetof(pg_record_session,busy)==48,"busy");
 _Static_assert(offsetof(pg_record_session,pending_sequence)==72,"pending sequence");
 _Static_assert(offsetof(pg_record_session,pending_batch)==80,"pending batch");
 typedef struct {pg_record_session session;struct json_object *input,*stored;unsigned calls,adoptions,publications,mode;} fixture;
-static int adopt(void *ctx,const struct json_object *batch,uint64_t seq){fixture *f=ctx;assert(f->calls==1&&!f->publications);++f->adoptions;assert(seq==1&&f->stored&&batch!=f->input);assert(pg_records_commit(&f->session,f->input)==PG_RECORDS_INVALID);return f->mode==6;}
+static int adopt(void *ctx,const struct json_object *batch,uint64_t seq){fixture *f=ctx;assert(f->calls==1&&!f->publications);++f->adoptions;assert(seq==1&&f->stored&&batch!=f->input);assert(pg_records_commit(&f->session,f->input)==PG_RECORDS_INVALID);if(f->mode==8){f->session.failed=PG_RECORDS_ALLOCATION;return 1;}if(f->mode==10)f->session.failed=PG_RECORDS_STORAGE_FAILED;return f->mode==6;}
 static void publish(void *ctx,const struct json_object *batch,uint64_t seq){fixture *f=ctx;++f->publications;assert(f->adoptions==1&&f->session.sequence==seq&&batch!=f->input);assert(pg_records_commit(&f->session,f->input)==PG_RECORDS_INVALID);}
 static int commit(void *ctx,const struct json_object *batch,pg_records_adopt accepted,void *owner,uint64_t *seq){fixture *f=ctx;++f->calls;assert(!f->adoptions&&!f->publications&&f->session.busy);assert(pg_records_commit(&f->session,f->input)==PG_RECORDS_INVALID);
- if(f->mode==1)return 1;
+ if(f->mode==1)return 1;if(f->mode==9){f->session.failed=PG_RECORDS_ADOPTION_FAILED;return 1;}
  assert(!json_object_deep_copy((struct json_object*)batch,&f->stored,0));
  if(f->mode!=2)accepted(owner,f->mode==5?0:1);
  if(f->mode==3)accepted(owner,1);
@@ -53,11 +53,11 @@ static void submission_changes(void){
 }
 int main(void){
  submission_changes();
- for(unsigned mode=0;mode<=7;++mode){fixture f={.mode=mode};f.input=json_tokener_parse("[{\"type\":\"entry\",\"value\":{\"id\":2}},{\"type\":\"document.retire\",\"id\":3}]");assert(f.input);f.session=(pg_record_session){.storage={&f,commit},.context=&f,.adopt=adopt,.publish=publish};
+ for(unsigned mode=0;mode<=10;++mode){fixture f={.mode=mode};f.input=json_tokener_parse("[{\"type\":\"entry\",\"value\":{\"id\":2}},{\"type\":\"document.retire\",\"id\":3}]");assert(f.input);f.session=(pg_record_session){.storage={&f,commit},.context=&f,.adopt=adopt,.publish=publish};
  pg_records_status result=pg_records_commit(&f.session,f.input);assert(!f.session.busy&&!f.session.pending_batch);
  if(!mode)assert(result==PG_RECORDS_OK&&f.session.sequence==1&&f.publications==1);
- else {assert(result==(mode==1||mode==7?PG_RECORDS_STORAGE_FAILED:PG_RECORDS_ADOPTION_FAILED));assert(f.session.failed&&(f.publications==0));assert(pg_records_commit(&f.session,f.input)==result&&f.calls==1);}
- if(mode==2||mode==5||mode==6||mode==1)assert(!f.session.sequence);else assert(f.session.sequence==1);
+ else {assert(result==(mode==8?PG_RECORDS_ALLOCATION:mode==1||mode==7||mode==10?PG_RECORDS_STORAGE_FAILED:PG_RECORDS_ADOPTION_FAILED));assert(f.session.failed&&(f.publications==0));assert(pg_records_commit(&f.session,f.input)==result&&f.calls==1);}
+ if(mode==2||mode==5||mode==6||mode==1||mode==8||mode==9)assert(!f.session.sequence);else assert(f.session.sequence==1);
  json_object_put(f.input);json_object_put(f.stored);
  }
  fixture f={0};f.session.storage=(pg_record_storage){&f,commit};struct json_object *empty=json_object_new_array();f.session.read_only=1;assert(!pg_records_commit(&f.session,empty)&&!f.calls&&!f.session.failed);json_object_put(empty);

@@ -30,7 +30,8 @@ typedef enum { PG_RECORDS_OK,PG_RECORDS_INVALID,PG_RECORDS_READ_ONLY,
    the backend validates table-specific constraints. Input is detached before
    admission. Empty batches are healthy no-ops, including in read-only mode.
    Failure before admission leaves Session healthy. Admitted backend/adoption
-   failure latches Session; adopted state is never rolled back. */
+   failure latches Session; a previously latched cause wins, including one set
+   inside an adoption callback. Adopted state is never rolled back. */
 pg_records_status pg_records_commit(pg_record_session *,const struct json_object *);
 /* Durable transaction submission transition over borrowed typed JSON records.
    Returns a detached owned candidate; terminal records retain their value.

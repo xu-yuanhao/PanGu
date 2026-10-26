@@ -156,6 +156,10 @@
     "src/runtime/hold_timer.S": {
       "role": "assembly-core",
       "reason": "手写holds最早期限定时器、仅入队回调、串行落盘、取消与关闭待排空生命周期"
+    },
+    "src/runtime/durable_session.S": {
+      "role": "assembly-core",
+      "reason": "手写Durable事务admission、缓存/holds/timer组合、已接收事务结算与分阶段资源关闭"
     }
   }
 }
