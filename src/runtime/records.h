@@ -55,7 +55,8 @@ typedef struct {
    A table-write attempt forbids subsequent public table reads, including if
    staging fails. Document writes do not set the table-write barrier.
    Commit seals before admission, submits through pg_records_commit and consumes
-   candidates on every result. Inspect Session for the underlying commit error.
+   candidates on every result. Copy/source conflicts fail before Storage admission
+   and leave Session healthy. Inspect Session for admitted backend errors.
    Typed creation, document tracking and async operation drainage layer on this
    synchronous batch owner; these calls retain no asynchronous operation. */
 pg_record_tx_status pg_record_tx_begin(pg_record_tx *,pg_record_session *,void *,int (*)(void *,unsigned,uint64_t,struct json_object **));
@@ -97,4 +98,10 @@ typedef struct {
    logical addresses fail. IDs minted before failure remain consumed. Typed
    DocumentRecord snapshots use only the fields declared by Durable. */
 pg_record_tx_status pg_records_prepare_fork(const pg_fork_storage *,uint64_t parent,uint64_t entry,uint64_t child,struct json_object **);
+/* Stage a child Conversation parent plus all selected document copies as one
+   private candidate batch. On error prior candidates remain unchanged, while
+   allocated IDs remain consumed. owner_task_id follows create semantics.
+   The fork Storage may use a different context than Tx committed table reads. */
+pg_record_tx_status pg_record_tx_fork_conversation(pg_record_tx *,uint64_t parent,uint64_t entry,uint64_t owner_task_id,
+ const pg_fork_storage *,struct json_object **);
 #endif

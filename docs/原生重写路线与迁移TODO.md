@@ -239,7 +239,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 typed Conversation：`pg_record_tx_create_conversation` 对照Pi `#stageConversation/#currentTask`，提供保留root ID、ownerless和task-owned记录构造；普通创建先mint再查同批最新task候选/committed task，归属从task.conversationId派生。返回值与暂存候选隔离；mint后错误保留ID消耗。4条构造语料使用实际上游方法体（无parent，固定mint/task/creation-hook host）直接对照一致；真实Storage验证同批/已提交owner和候选覆盖优先级。O0/O2内存专项枚举创建/owner读取/复制/插入故障，失败不追加记录。完整Runtime结果见当前实现记录。
 - K03 fork文档选择：`pg_records_prepare_fork` 对照Pi `session/forks.ts:prepareForkDocumentCopies/collectCopies` 及 `session-forks.test.ts` 的继承Entry/重复策略场景，注入entry/scan/mint服务，先按可见Entry实际owner与commitSeq选择asOf，再按请求父会话current选择current；initial跳过，分页256，去除生命周期stamp并替换目标scope/ID，重复kind/key目标地址拒绝。输出拥有独立copy plans；mint后错误保持ID消耗。
 - K03 fork验证：5262条累计实际MemoryStorage操作对照含直接调用实际prepareForkDocumentCopies，600个文档跨页、祖先Entry提交截点、NUL family key、initial跳过、缺失/不可见Entry、asOf/current冲突与后续mint一致。实际Storage将plans作为document.copy提交，读得分叉时旧值。O0/O2 ASan/UBSan及逐直接分配/插入/复制/读错误清理通过。完整Runtime结果见当前实现记录。
-- 下一完整行为：将fork plans与Conversation parent记录接入Tx并装配creation hook，再补typed表查询及文档所有权/迁移提交，接入当前消息投影。
+- K03 fork事务装配：`pg_record_tx_fork_conversation` 对照Pi `#stageConversation/#assemble/#rejectForkSourceWrites`，在独立候选数组中准备owner、parent与全部copy，成功才替换原Tx批次；保留原候选引用，失败仅消耗已分配ID。Tx committed-read与fork Storage可用不同context，局部桥接维持原服务注入。commit在Storage前拒绝copy源的同批变更及父会话新增current-policy文档，避免预备错误锁存Session。
+- K03 fork事务验证：实际Storage验证parent/文档同批落盘、历史值还原、task owner与不同回调context、返回parent隔离；选择失败/逐分配插入复制故障保留原候选，fork前/后修改源及新增父级current文档均在admission前拒绝且Session健康。O0/O2 ASan/UBSan、原5262条Storage/选择对照与完整Runtime通过；最后补充返回parent隔离专项在最终源O2通过。
+- 下一完整行为：装配Conversation creation hook与typed表查询，再补文档所有权/迁移提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

@@ -894,7 +894,8 @@
         "pg_record_tx_submission_change",
         "pg_record_tx_append_entry",
         "pg_record_tx_create_conversation",
-        "pg_records_prepare_fork"
+        "pg_records_prepare_fork",
+        "pg_record_tx_fork_conversation"
       ],
       "reference_basis": [
         {
@@ -906,7 +907,7 @@
             "packages/durable/src/session/transaction.ts",
             "packages/durable/src/session/forks.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference; prepareForkDocumentCopies/collectCopies, inherited Entry commitSeq as-of scope, parent current scope, 256-page scans and duplicate address rejection; stageConversation parent/copy plans integrated into a private replacement Tx batch; fork source changes reject before Storage admission",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-forks.test.ts"
