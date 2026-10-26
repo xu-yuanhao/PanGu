@@ -14,19 +14,22 @@
  mov r12,rsi
  xor r13d,r13d
  mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
 .Ldocs_prepare_each:
  cmp r13,[rbx+8]
  jae .Ldocs_validate
  imul r14,r13,152
  add r14,[rbx]
+ cmp qword ptr [r14+8],0
+ je .Ldocs_prepare_next
  mov rdi,[r14+8]
  lea rsi,[r14+16]
  call pg_document_change_prepare@PLT
  test eax,eax
  jnz .Ldocs_finalize_doc_error
  mov r15,[r14]
- cmp dword ptr [r14+148],0
- je .Ldocs_plan_loaded
+ test dword ptr [r14+148],1
+ jz .Ldocs_plan_loaded
  mov rdi,r15
  mov rsi,[r14+16]
  lea rdx,[r14+112]
@@ -68,6 +71,22 @@
  call json_object_put@PLT
  jmp .Ldocs_finalize_allocation
 .Ldocs_prepare_next:
+ test dword ptr [r14+148],2
+ jz .Ldocs_prepare_advance
+ mov rax,[r14]
+ mov rdi,[rax+72]
+ lea rsi,[rsp+16]
+ call .Ldocs_retire_write
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+ mov rdi,[r12+24]
+ mov rsi,[rsp+16]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_allocation
+ mov qword ptr [rsp+16],0
+ mov dword ptr [rbx+44],1
+.Ldocs_prepare_advance:
  inc r13
  jmp .Ldocs_prepare_each
 .Ldocs_validate:
@@ -82,6 +101,8 @@
  imul r14,r13,152
  add r14,[rbx]
  mov r15,[r14]
+ cmp qword ptr [r14+8],0
+ je .Ldocs_adoption_next
  cmp dword ptr [r14+144],2
  jne .Ldocs_prepare_adoption
  cmp qword ptr [r14+136],0
@@ -124,8 +145,10 @@
  mov qword ptr [rsp],0
  mov dword ptr [r14+144],1
 .Ldocs_prepare_adoption:
- cmp dword ptr [r14+148],0
- je .Ldocs_adoption_loaded
+ test dword ptr [r14+148],1
+ jz .Ldocs_adoption_loaded
+ test dword ptr [r14+148],2
+ jnz .Ldocs_adoption_next
  mov rax,[r15+152]
  cmp qword ptr [rbx+48],0
  je .Ldocs_install_cache
@@ -156,6 +179,11 @@
  jmp .Ldocs_checkpoint_each
 .Ldocs_finalize_reserve:
  cmp qword ptr [rbx+96],0
+ jne .Ldocs_need_reserve
+ cmp dword ptr [rbx+44],0
+ je .Ldocs_finalize_ok
+.Ldocs_need_reserve:
+ cmp qword ptr [rbx+48],0
  je .Ldocs_finalize_ok
  mov r15,[rbx+48]
  cmp qword ptr [r15+104],0
@@ -186,6 +214,8 @@
  mov [rbx+40],ebp
  mov rdi,[rsp]
  call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
  mov eax,ebp
  add rsp,24
  pop r15
@@ -208,26 +238,62 @@
  xor r14d,r14d
 .Ldocs_adopt_each:
  cmp r14,[rbx+8]
+ jae .Ldocs_retire_begin
+ imul r15,r14,152
+ add r15,[rbx]
+ test dword ptr [r15+148],5
+ jnz .Ldocs_adopt_next
+ lea rdi,[r15+32]
+ call pg_document_adoption_apply@PLT
+ test eax,eax
+ jnz .Ldocs_adopt_return
+.Ldocs_adopt_next:
+ inc r14
+ jmp .Ldocs_adopt_each
+.Ldocs_retire_begin:
+ xor r14d,r14d
+.Ldocs_retire_each:
+ cmp r14,[rbx+8]
+ jae .Ldocs_install_begin
+ imul r15,r14,152
+ add r15,[rbx]
+ mov eax,[r15+148]
+ and eax,3
+ cmp eax,2
+ jne .Ldocs_retire_next
+ mov rax,[r15]
+ mov rdi,[rbx+48]
+ lea rsi,[rax+24]
+ mov rdx,[rax+72]
+ lea rcx,[rbx+56]
+ call pg_document_cache_evict_reserved@PLT
+ test eax,eax
+ jnz .Ldocs_adopt_return
+.Ldocs_retire_next:
+ inc r14
+ jmp .Ldocs_retire_each
+.Ldocs_install_begin:
+ xor r14d,r14d
+.Ldocs_install_each:
+ cmp r14,[rbx+8]
  jae .Ldocs_adopt_host
  imul r15,r14,152
  add r15,[rbx]
- cmp dword ptr [r15+148],0
- je .Ldocs_apply_loaded
+ mov eax,[r15+148]
+ and eax,3
+ cmp eax,1
+ jne .Ldocs_install_next
  mov rdi,[r15]
  add rdi,120
  lea rsi,[rbx+56]
  mov rdx,r13
  mov rcx,[rbx+88]
  call pg_document_install_apply@PLT
- jmp .Ldocs_apply_result
-.Ldocs_apply_loaded:
- lea rdi,[r15+32]
- call pg_document_adoption_apply@PLT
-.Ldocs_apply_result:
  test eax,eax
  jnz .Ldocs_adopt_return
+.Ldocs_install_next:
  inc r14
- jmp .Ldocs_adopt_each
+ jmp .Ldocs_install_each
 .Ldocs_adopt_host:
  xor eax,eax
  cmp qword ptr [rbx+24],0
@@ -255,6 +321,8 @@
 .globl pg_document_tx_commit
 .type pg_document_tx_commit,@function
 pg_document_tx_commit:
+ xor ecx,ecx
+.Ldocs_commit_common:
  push rbp
  push rbx
  push r12
@@ -262,6 +330,7 @@ pg_document_tx_commit:
  push r14
  push r15
  sub rsp,104
+ mov [rsp+48],rcx
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -292,7 +361,10 @@ pg_document_tx_commit:
  cmp qword ptr [r15],0
  je .Ldocs_commit_return
  cmp qword ptr [r15+8],0
- je .Ldocs_commit_return
+ jne .Ldocs_commit_has_edit
+ cmp dword ptr [r15+148],6
+ jne .Ldocs_commit_return
+.Ldocs_commit_has_edit:
  cmp qword ptr [r15+16],0
  jne .Ldocs_commit_return
  cmp qword ptr [r15+24],0
@@ -301,8 +373,13 @@ pg_document_tx_commit:
  jne .Ldocs_commit_return
  cmp dword ptr [r15+144],0
  jne .Ldocs_commit_return
- cmp dword ptr [r15+148],1
+ cmp dword ptr [r15+148],7
  ja .Ldocs_commit_return
+ test dword ptr [r15+148],6
+ jz .Ldocs_commit_flags_ready
+ cmp qword ptr [rsp+48],0
+ je .Ldocs_commit_return
+.Ldocs_commit_flags_ready:
  cmp qword ptr [r15+40],0
  jne .Ldocs_commit_return
  cmp qword ptr [r15+48],0
@@ -318,8 +395,11 @@ pg_document_tx_commit:
  cmp [r12+rax],rdx
  je .Ldocs_commit_return
  mov rdx,[r15+8]
+ test rdx,rdx
+ jz .Ldocs_commit_unique_id
  cmp [r12+rax+8],rdx
  je .Ldocs_commit_return
+.Ldocs_commit_unique_id:
  mov rdx,[r15]
  mov rdx,[rdx+72]
  mov rax,[r12+rax]
@@ -346,7 +426,7 @@ pg_document_tx_commit:
  mov [rsp+32],rax
  mov qword ptr [rsp+40],0
  pxor xmm0,xmm0
- movups [rsp+48],xmm0
+ mov qword ptr [rsp+56],0
  movups [rsp+64],xmm0
  movups [rsp+80],xmm0
  mov qword ptr [rsp+96],0
@@ -392,8 +472,8 @@ pg_document_tx_commit:
  call json_object_put@PLT
  mov qword ptr [r15+112],0
  mov dword ptr [r15+144],0
- cmp dword ptr [r15+148],0
- je .Ldocs_cleanup_next
+ test dword ptr [r15+148],1
+ jz .Ldocs_cleanup_next
  mov rdi,[r15]
  add rdi,120
  call pg_document_install_discard@PLT
@@ -522,11 +602,13 @@ pg_document_tx_get:
  test eax,eax
  jnz .Ldoc_scope_get_cleanup
 .Ldoc_scope_get_search:
- mov qword ptr [rsp+16],0
+ mov rax,[rbx+24]
+ mov [rsp+16],rax
 .Ldoc_scope_get_existing:
+ cmp qword ptr [rsp+16],0
+ je .Ldoc_scope_get_load
+ dec qword ptr [rsp+16]
  mov rax,[rsp+16]
- cmp rax,[rbx+24]
- jae .Ldoc_scope_get_load
  imul rax,152
  add rax,[rbx+16]
  mov [rsp+40],rax
@@ -536,10 +618,14 @@ pg_document_tx_get:
  call pg_document_address_equal@PLT
  test eax,eax
  jnz .Ldoc_scope_get_reuse
- inc qword ptr [rsp+16]
  jmp .Ldoc_scope_get_existing
 .Ldoc_scope_get_reuse:
  mov rax,[rsp+40]
+ test dword ptr [rax+148],2
+ jz .Ldoc_scope_get_live
+ mov ebp,8
+ jmp .Ldoc_scope_get_cleanup
+.Ldoc_scope_get_live:
  mov rax,[rax+8]
  mov [r14],rax
  xor ebp,ebp
@@ -620,8 +706,8 @@ pg_document_tx_get:
  call free@PLT
  imul rax,r12,152
  add rax,[rbx+16]
- cmp dword ptr [rax+148],0
- je .Ldoc_scope_release_next
+ test dword ptr [rax+148],5
+ jz .Ldoc_scope_release_next
  mov r13,[rax]
  lea rdi,[r13+120]
  call pg_document_install_discard@PLT
@@ -667,7 +753,8 @@ pg_document_tx_finish:
  mov dword ptr [rbx+40],1
  mov rsi,[rbx+16]
  mov rdx,[rbx+24]
- call pg_document_tx_commit@PLT
+ mov rcx,[rbx+8]
+ call .Ldocs_commit_common
  mov r12d,eax
  mov rdi,rbx
  call .Ldoc_scope_release
@@ -1047,3 +1134,198 @@ pg_document_tx_doc:
 .Ldoc_write_version: .asciz "version"
 .Ldoc_write_value: .asciz "value"
 .Ldoc_write_content: .asciz "content"
+
+.text
+.Ldocs_retire_write:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov ebp,3
+ mov qword ptr [r12],0
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ldocs_retire_write_done
+ mov r13,rax
+ lea rdi,[rip+.Ldoc_write_retire]
+ call json_object_new_string@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Ldoc_write_type]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_retire_write_done
+ mov rdi,rbx
+ call json_object_new_int64@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Ldoc_write_id]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_retire_write_done
+ mov [r12],r13
+ xor r13d,r13d
+ xor ebp,ebp
+.Ldocs_retire_write_done:
+ mov rdi,r13
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,8
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldoc_write_retire: .asciz "document.retire"
+.Ldoc_write_id: .asciz "id"
+
+.text
+.globl pg_document_tx_retire
+.type pg_document_tx_retire,@function
+pg_document_tx_retire:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test rbx,rbx
+ jz .Ldoc_retire_return
+ test r12,r12
+ jz .Ldoc_retire_return
+ cmp qword ptr [rbx+40],0
+ jne .Ldoc_retire_return
+ mov r15,[rbx]
+ test r15,r15
+ jz .Ldoc_retire_return
+ cmp qword ptr [r15+32],0
+ jne .Ldoc_retire_return
+ cmp qword ptr [r15+24],0
+ je .Ldoc_retire_return
+ mov rdi,r13
+ call pg_document_address_valid@PLT
+ test eax,eax
+ jz .Ldoc_retire_return
+ mov eax,[r12+24]
+ cmp eax,[r13+40]
+ jne .Ldoc_retire_return
+ mov eax,[r12+36]
+ cmp eax,[r13+44]
+ jne .Ldoc_retire_return
+ mov rdx,[r12+8]
+ cmp rdx,[r13+8]
+ jne .Ldoc_retire_return
+ test rdx,rdx
+ jz .Ldoc_retire_identity
+ mov rdi,[r12]
+ test rdi,rdi
+ jz .Ldoc_retire_return
+ mov rsi,[r13]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Ldoc_retire_return
+.Ldoc_retire_identity:
+ mov dword ptr [rbx+40],1
+ mov dword ptr [r15+32],1
+ mov r14,[rbx+24]
+.Ldoc_retire_find:
+ test r14,r14
+ jz .Ldoc_retire_lookup
+ dec r14
+ imul rax,r14,152
+ add rax,[rbx+16]
+ mov [rsp+8],rax
+ mov rdi,[rax]
+ add rdi,24
+ mov rsi,r13
+ call pg_document_address_equal@PLT
+ test eax,eax
+ jz .Ldoc_retire_find
+ mov rax,[rsp+8]
+ or dword ptr [rax+148],2
+ xor ebp,ebp
+ jmp .Ldoc_retire_cleanup
+.Ldoc_retire_lookup:
+ mov edi,1
+ mov esi,160
+ call calloc@PLT
+ mov ebp,3
+ test rax,rax
+ jz .Ldoc_retire_cleanup
+ mov [rsp],rax
+ mov rdi,[rbx+8]
+ mov rsi,r13
+ mov rdx,rax
+ call pg_document_cache_find_record@PLT
+ mov ebp,eax
+ cmp eax,8
+ je .Ldoc_retire_missing
+ test eax,eax
+ jnz .Ldoc_retire_cleanup
+ mov r14,[rsp]
+ mov rdi,[r14]
+ lea rsi,[r14+24]
+ call pg_document_record_decode@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_retire_cleanup
+ lea rdi,[r14+24]
+ mov rsi,r13
+ call pg_document_address_equal@PLT
+ mov ebp,4
+ test eax,eax
+ jz .Ldoc_retire_cleanup
+ mov rdi,r12
+ lea rsi,[r14+24]
+ mov rdx,[r12+16]
+ call pg_document_check@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_retire_cleanup
+ mov [r14+16],r12
+ mov rax,[rbx+8]
+ mov [r14+152],rax
+ mov rdi,rbx
+ mov rsi,r14
+ xor edx,edx
+ xor ecx,ecx
+ xor r8d,r8d
+ mov r9d,6
+ call .Ldoc_scope_append
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_retire_cleanup
+ mov qword ptr [rsp],0
+ jmp .Ldoc_retire_cleanup
+.Ldoc_retire_missing:
+ xor ebp,ebp
+.Ldoc_retire_cleanup:
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Ldoc_retire_unlock
+ call pg_document_loaded_close@PLT
+ mov rdi,[rsp]
+ call free@PLT
+.Ldoc_retire_unlock:
+ mov dword ptr [r15+32],0
+ mov dword ptr [rbx+40],0
+.Ldoc_retire_return:
+ mov eax,ebp
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_tx_retire,.-pg_document_tx_retire

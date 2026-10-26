@@ -2225,3 +2225,154 @@ pg_document_install_discard:
 .section .rodata
 .Li_created: .asciz "createdAt"
 .Li_retired: .asciz "retiredAt"
+
+.text
+.globl pg_document_cache_find_record
+.type pg_document_cache_find_record,@function
+pg_document_cache_find_record:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test r13,r13
+ jz .Lcache_record_return
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Lcache_record_return
+ cmp qword ptr [rbx],0
+ je .Lcache_record_return
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_record_return
+ mov dword ptr [rbx+104],1
+ mov rdi,r12
+ call pg_document_address_valid
+ test eax,eax
+ jz .Lcache_record_done
+ mov rdi,[rbx]
+ mov rsi,r12
+ mov rdx,rsp
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Lcache_record_storage
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lcache_touch_node
+ mov rax,[rsp]
+ mov rdi,[rax+48]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcache_record_allocation
+ jmp .Lcache_record_ok
+.Lcache_record_storage:
+ mov rdi,[rbx+40]
+ mov rsi,r12
+ mov rdx,-1
+ lea rcx,[rsp+8]
+ call [rbx+48]
+ mov ebp,8
+ cmp eax,1
+ je .Lcache_record_done
+ mov ebp,9
+ test eax,eax
+ jnz .Lcache_record_done
+.Lcache_record_ok:
+ cmp qword ptr [rsp+8],0
+ je .Lcache_record_storage_bad
+ mov rax,[rsp+8]
+ mov [r13],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Lcache_record_done
+.Lcache_record_storage_bad:
+ mov ebp,9
+ jmp .Lcache_record_done
+.Lcache_record_allocation:
+ mov ebp,3
+.Lcache_record_done:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov dword ptr [rbx+104],0
+.Lcache_record_return:
+ mov eax,ebp
+ add rsp,24
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_cache_find_record,.-pg_document_cache_find_record
+
+.globl pg_document_cache_evict_reserved
+.type pg_document_cache_evict_reserved,@function
+pg_document_cache_evict_reserved:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13,rcx
+ mov eax,1
+ test rbx,rbx
+ jz .Levict_reserved_return
+ test r13,r13
+ jz .Levict_reserved_return
+ cmp rbx,[r13]
+ jne .Levict_reserved_return
+ mov rax,[rbx]
+ test rax,rax
+ jz .Levict_reserved_invalid
+ cmp rax,[r13+8]
+ jne .Levict_reserved_invalid
+ cmp qword ptr [rbx+104],0
+ jne .Levict_reserved_invalid
+ mov rax,[rbx+32]
+ cmp rax,[r13+24]
+ jne .Levict_reserved_invalid
+ mov [rsp+8],rsi
+ mov dword ptr [rbx+104],1
+ mov rdi,rsi
+ call pg_document_address_valid
+ test eax,eax
+ jz .Levict_reserved_bad_address
+ mov rdi,[rbx]
+ mov rsi,[rsp+8]
+ mov rdx,rsp
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Levict_reserved_ok
+ mov rsi,[rsp]
+ cmp [rsi+120],r12
+ jne .Levict_reserved_ok
+ /* Suppress empty-index shrinking while the prepared batch owns capacity. */
+ mov dword ptr [rbx+108],1
+ mov rdi,rbx
+ call .Lcache_drop_node
+ mov dword ptr [rbx+108],0
+ dec qword ptr [r13+24]
+.Levict_reserved_ok:
+ xor eax,eax
+ jmp .Levict_reserved_done
+.Levict_reserved_bad_address:
+ mov eax,1
+.Levict_reserved_done:
+ mov dword ptr [rbx+104],0
+ jmp .Levict_reserved_return
+.Levict_reserved_invalid:
+ mov eax,1
+.Levict_reserved_return:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_cache_evict_reserved,.-pg_document_cache_evict_reserved

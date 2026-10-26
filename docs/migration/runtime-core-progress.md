@@ -302,3 +302,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly pg_document_tx_doc使用56字节request注入initializer/mint/checkpoint；missing地址先验证conversation/task owner，再隔离初始化、mint、创建私有loaded和稳定edit。重复地址复用首次edit；统一finalizer为新Doc生成create/base，即使未编辑也写初值；在所有checkpoint后预备install并统一reserve，Storage确认后批量安装，再调用原Session adopt/publish。新Doc私有内存随finish/abort清理；scope48/entry152及旧函数表布局保持。抽出共用entry追加逻辑供已有/新建路径使用。
 - 实际验证：16个family文档跨数组扩容、同址重复只初始化/mint一次、批量提交后直接命中缓存、混合新旧Doc及普通表写通过。owner缺失/terminal在initializer前拒绝，同批新conversation/task允许创建；初始化失败、只读、abort及逐直接分配/插入/复制错误清理通过。后端adopt前失败无缓存安装，adopt后失败保留已提交/采纳状态并锁存Session，均不发布伪成功。O0/O2 ASan/UBSan专项、完整Runtime与原Pi/Chord对照退出0；最后补充后端失败用例两优化级均通过。共享G00/Assembly清单、隔离核心暂存树G00/Assembly清单/产品构建通过。
 - 同一实施Agent自审：扩展实际导出/来源，records新增隐藏owner查询仅供mutation line调用；未改门禁、预算或TUI文件。6个候选路径内容清单摘要（本记录加入前）：58e2e01a160ff262750abf00347c8301ba7d8da6e9b77586d3b69015fc73be86。结论为本地候选通过；retireDoc、同址替换、Task终态自动退休及holds仍待下一生命周期步骤完成，K03未完成。TUI候选及其待交接登记保持工作树。
+
+## K03 显式Doc退休与同址替换（2026-10-26）
+
+- 来源：固定Pi d5b3de22 的Transaction.retireDoc/findRetirement/planDocument/adopt、Session.cached/evict，以及session-documents.test.ts的“retires documents and creates a new incarnation”“retires without acquisition”用例。本批Pi/Harness fetch与本地仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly pg_document_tx_retire，事务条目区分已编辑/仅record退休，逆序查询最新incarnation；退休后doc跳过旧cache并初始化新draft。record-only查找优先缓存，只查find而不read/materialize/migrate。最终批次将每个旧incarnation的最终内容与retire一起写入；新建同批退休写create+retire而不安装。确认时先采纳所有已有编辑，再按ID驱逐退休节点，最后安装新live节点。新增reserved eviction保持索引容量并同步reservation计数；cache112/scope48/entry152等旧布局不变。
+- 实际验证：原地编辑→退休→替代、未获取值直接退休、新版本token退休而不迁移、缺失no-op、新建同批退休、8代同址替换、32地址整批替换通过。32节点采纳阶段拦截到32次insert，直接分配/复制/resize均0；索引清空后保留预留容量。只读/abort、逐直接分配/插入/部分复制故障，以及backend确认前/后报错通过；确认前保留旧cache，确认后保留新事实并锁存Session，不发布伪成功。批量测试发现空edit被重复指针检查误判，已改为只检查非空edit唯一性，原检查强度保留。O0/O2 ASan/UBSan、最终完整Runtime/原Pi-Chord对照、共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：扩展已有实际导出/来源与直接documents依赖，无门禁/预算变更。7个候选路径内容清单摘要（本记录加入前）：c8fa60ca3b0064f66f023a17d3f2d226b7ef5b8568b0747b6719fa12bef7ddb4。结论为本地候选通过；Task终态对全部Doc自动退休、fork-copy获取、holds及完整K03仍待接入。TUI候选及待交接登记保留工作树。

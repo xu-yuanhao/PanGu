@@ -84,6 +84,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通已存在Doc的事务内编辑获取/地址复用、统一checkpoint提交与loaded adoption；包含迁移版本写回和失败清理。
 - [x] 完成新Doc的缓存安装候选、索引容量预留和Storage确认后的createdAt/loaded安装；批量安装后直接命中缓存。
 - [x] 接通缺失Doc的owner检查、initializer、mint及事务内draft复用；新旧文档与普通表统一提交，确认后安装新incarnation。
+- [x] 接通显式retireDoc、仅record退休、同址新incarnation与同批创建后退休；最终内容和retire原子提交，确认后按ID驱逐/安装。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -202,6 +203,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 对应资料已保存到 `references/pi-rust-yannelli`、`pie`、`pi-rust-nktkt`、`pi-rust-bigfish`、`pi-python-vamsi`、`bun-porting`。功能与行为的实现依据为上表中的Pi和Harness源码。
 
 ## 核心交接区
+
+- K03 显式Doc生命周期：固定Pi d5b3de22 的retireDoc/findRetirement、planDocument/adopt以及session-documents.test.ts的同址退休/重建、未获取值退休和absent no-op；原生pg_document_tx_retire与cache_find_record/evict_reserved对应。仅record退休不读值或迁移；逆序查找最新事务incarnation，退休后doc创建新的稳定draft。原有edit先采纳，再按旧ID驱逐、安装新节点，共用提交前reservation。32个地址整批替换、8代同址替换、只读/放弃/前后端失败及分配故障验证通过。Task终态的批量自动退休、holds和完整K03继续按后续项实现。
+
 
 - K03 Doc自动创建：固定Pi d5b3de22 的Transaction.doc/acquire(created)、planDocument(created)、adopt/install及session-documents.test.ts的首次base/重复acquire/family seed用例；原生document_tx.h/.S新增56字节request与pg_document_tx_doc。get复用已存在/本事务draft，missing先验证owner，再initializer和mint；新Doc在统一finalizer生成create/base，准备install并统一reserve，Storage确认后安装。手写Assembly实现；scope48、entry152与现有公开布局保持。16个family文档跨数组扩容、同批新旧Doc/表、放弃/只读/initializer失败、逐直接故障和后端adopt前后错误通过。task终态导致Doc退休的源分支随下一生命周期步骤接入。
 

@@ -438,7 +438,96 @@ static void managed_creation_faults(void){
  }
 }
 #endif
+static void managed_document_retirement(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"life\",\"key\":\"k\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}]"));
+ pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+ pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"life",4},.version=1,.scope=PG_DOC_SESSION,.family=1};pg_document_address address={.kind={"life",4},.key={"k",1},.scope=PG_DOC_SESSION,.has_key=1};
+ struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"!\"]]");assert(seed&&ops);pg_document_request request={&def,&address,seed,&initial,tx_mint,&f,new_checkpoint};pg_document_change *old=0,*fresh=0,*again=0;
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_doc(&scope,&request,&old)&&!pg_document_change_append(old,ops));
+ assert(!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_retire(&scope,&def,&address)&&scope.count==1&&!pg_document_tx_doc(&scope,&request,&fresh)&&fresh!=old&&!pg_document_change_append(fresh,ops)&&!pg_document_tx_doc(&scope,&request,&again)&&again==fresh&&scope.count==2);
+ struct json_object *prior=0;assert(!pg_document_change_snapshot(old,&prior)&&!strcmp(json_object_get_string(json_object_object_get(prior,"text")),"old!"));json_object_put(prior);
+ assert(!pg_document_tx_finish(&scope)&&m.next_sequence==3&&cache.count==1&&f.initial_calls==1&&f.checkpoint_calls==1);
+ pg_document_loaded *loaded=0;unsigned finds=host.finds;assert(!pg_document_cache_get(&cache,&def,&address,&loaded)&&loaded->record.id==3&&host.finds==finds&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"new!")&&json_object_get_int(json_object_object_get(loaded->record_owner,"createdAt"))==2);
+ struct json_object *record=json_object_object_get(m.rows[0].value,"record");assert(json_object_get_int(json_object_object_get(record,"id"))==2&&json_object_get_int(json_object_object_get(record,"retiredAt"))==2);
+ /* Retire without acquiring: a newer token does not migrate/read the value. */
+ assert(!pg_document_cache_evict(&cache,&address,3)&&!cache.count);pg_document_definition newer=def;newer.version=2;unsigned reads=host.reads;
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_retire(&scope,&newer,&address)&&host.reads==reads&&scope.count==1&&!pg_document_tx_finish(&scope)&&!cache.count&&m.next_sequence==4);
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_retire(&scope,&def,&address)&&!scope.count&&!pg_document_tx_finish(&scope)&&m.next_sequence==4);
+ /* Retire a new incarnation in its creation commit: persist both, install none. */
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_doc(&scope,&request,&fresh)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_finish(&scope)&&!cache.count&&m.next_sequence==5&&m.count==3);
+ /* Repeated replacement keeps the latest draft and a single live address. */
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));
+ for(unsigned i=0;i<8;++i){assert(!pg_document_tx_doc(&scope,&request,&fresh));if(i<7)assert(!pg_document_tx_retire(&scope,&def,&address));}
+ assert(!pg_document_tx_finish(&scope)&&cache.count==1&&m.count==11&&m.next_sequence==6&&!pg_document_cache_get(&cache,&def,&address,&loaded)&&loaded->record.id==12);
+ session.read_only=1;assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_retire(&scope,&def,&address)&&pg_document_tx_finish(&scope)!=PG_TX_OK&&cache.count==1&&!session.failed&&m.next_sequence==6);session.read_only=0;
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_abort(&scope)&&cache.count==1&&m.next_sequence==6);
+ /* Clear an acquired incarnation without replacement, then recreate an absent address. */
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_doc(&scope,&request,&old)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_finish(&scope)&&!cache.count);
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_doc(&scope,&request,&fresh)&&!pg_document_tx_finish(&scope)&&cache.count==1);
+ json_object_put(seed);json_object_put(ops);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+}
+#ifdef PG_MEMORY_FAULTS
+static void managed_retirement_faults(void){
+ unsigned counts[3]={0};
+ for(unsigned mode=0;mode<3;++mode)for(unsigned attempt=0;attempt<=counts[mode];++attempt){
+  pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"life\",\"key\":\"k\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}]"));
+  pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+  pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};pg_document_tx scope={0};managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"life",4},.version=1,.scope=PG_DOC_SESSION,.family=1};pg_document_address address={.kind={"life",4},.key={"k",1},.scope=PG_DOC_SESSION,.has_key=1};
+  struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}");assert(seed);pg_document_request request={&def,&address,seed,&initial,tx_mint,0,0};pg_document_change *edit=0;assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));
+  if(mode==1)assert(!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_doc(&scope,&request,&edit));
+  if(mode==2){pg_document_loaded *loaded=0;assert(!pg_document_cache_get(&cache,&def,&address,&loaded));}
+  doc_tracking=1;doc_calls=0;doc_fail=attempt;int status=mode==1?pg_document_tx_finish(&scope):pg_document_tx_retire(&scope,&def,&address);doc_tracking=0;
+  if(!attempt){assert(!status);counts[mode]=doc_calls;}else{
+   assert(status!=0&&!scope.busy&&!tx.busy);
+   if(mode!=1)assert(!scope.count&&m.count==1&&m.next_sequence==2);
+   else if(m.next_sequence==3)assert(session.failed&&m.count==2&&!cache.count);
+   else assert(cache.count==1&&m.count==1&&m.next_sequence==2);
+  }
+  doc_fail=0;if(mode!=1)assert(!pg_document_tx_abort(&scope));else assert(scope.sealed&&!scope.entries);
+  json_object_put(seed);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+ }
+}
+#endif
+#ifdef PG_MEMORY_FAULTS
+typedef struct {pg_records_adopt adopt;void *context;unsigned calls;} retirement_probe;
+static void retirement_adopt_probe(void *context,uint64_t seq){
+ retirement_probe *p=context;doc_tracking=1;doc_calls=0;p->adopt(p->context,seq);doc_tracking=0;p->calls=doc_calls;
+}
+static int retirement_probe_storage(void *context,const struct json_object *writes,pg_records_adopt adopt,void *adopt_context,uint64_t *seq){
+ pg_record_storage *storage=context;retirement_probe probe={adopt,adopt_context,0};int status=storage->commit(storage->context,writes,retirement_adopt_probe,&probe,seq);assert(!status&&probe.calls==32);return status;
+}
+static void managed_retirement_many(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+ pg_record_storage provider=pg_record_memory_storage(&m);pg_record_session session={.storage={&provider,retirement_probe_storage}};pg_record_tx tx={0};pg_document_tx scope={0};managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"many",4},.version=1,.scope=PG_DOC_SESSION,.family=1};pg_document_address address={.kind={"many",4},.scope=PG_DOC_SESSION,.has_key=1};
+ struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}");assert(seed);pg_document_request request={&def,&address,seed,&initial,tx_mint,0,0};pg_document_change *edit=0;
+ for(unsigned pass=0;pass<2;++pass){
+  assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache));
+  for(unsigned i=0;i<32;++i){char key[16];int n=snprintf(key,sizeof(key),"k%u",i);address.key=(pg_slice){key,(size_t)n};if(pass)assert(!pg_document_tx_retire(&scope,&def,&address));assert(!pg_document_tx_doc(&scope,&request,&edit));}
+  assert(!pg_document_tx_finish(&scope)&&cache.count==32&&m.count==32*(pass+1)&&!session.failed);
+ }
+ json_object_put(seed);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+}
+#endif
+static void managed_retirement_backend_failure(void){
+ for(unsigned late=0;late<2;++late){
+  pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"life\",\"key\":\"k\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"old\"}}}]"));
+  pg_document_cache cache={0};cache_fixture host={.memory=&m,.cache=&cache};pg_document_storage storage={&host,cache_find,cache_read};pg_document_cache_hooks hooks={&host,cache_clock,0,0};assert(!pg_document_cache_open(&cache,&storage,&hooks,1000));
+  create_storage_fixture backend={pg_record_memory_storage(&m),late,0};pg_record_session session={.storage={&backend,create_storage_failure},.context=&backend,.publish=create_storage_publish};pg_record_tx tx={0};pg_document_tx scope={0};managed_create_fixture f={.scope=&scope};pg_document_initializer initial={&f,managed_initial};pg_document_definition def={.kind={"life",4},.version=1,.scope=PG_DOC_SESSION,.family=1};pg_document_address address={.kind={"life",4},.key={"k",1},.scope=PG_DOC_SESSION,.has_key=1};
+  struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}");assert(seed);pg_document_request request={&def,&address,seed,&initial,tx_mint,0,0};pg_document_change *edit=0;pg_document_loaded *loaded=0;
+  assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_document_tx_open(&scope,&tx,&cache)&&!pg_document_tx_doc(&scope,&request,&edit)&&!pg_document_tx_retire(&scope,&def,&address)&&!pg_document_tx_doc(&scope,&request,&edit)&&pg_document_tx_finish(&scope)!=PG_TX_OK&&session.failed&&!backend.published&&cache.count==1);
+  assert(!pg_document_cache_get(&cache,&def,&address,&loaded)&&loaded->record.id==2+late&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),late?"new":"old"));
+  json_object_put(seed);assert(!pg_document_cache_close(&cache)&&!pg_record_memory_close(&m));
+ }
+}
 int main(void){
+ managed_document_retirement();
+ managed_retirement_backend_failure();
+#ifdef PG_MEMORY_FAULTS
+ managed_retirement_many();
+#endif
+#ifdef PG_MEMORY_FAULTS
+ managed_retirement_faults();
+#endif
  managed_document_creation();
  managed_creation_backend_failure();
 #ifdef PG_MEMORY_FAULTS

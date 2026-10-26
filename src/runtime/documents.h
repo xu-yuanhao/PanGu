@@ -130,6 +130,13 @@ pg_document_status pg_document_install_prepare(pg_document_cache *,const pg_docu
 pg_document_status pg_document_cache_reserve(pg_document_cache *,size_t extra,pg_document_cache_reservation *);
 pg_document_status pg_document_install_apply(pg_document_install *,pg_document_cache_reservation *,uint64_t sequence,uint64_t now);
 pg_document_status pg_document_install_discard(pg_document_install *);
+/* Retirement lookup checks cached identity before Storage.find; it never
+   materializes or migrates a value. Success returns an owned record snapshot. */
+pg_document_status pg_document_cache_find_record(pg_document_cache *,const pg_document_address *,struct json_object **);
+/* Conditional eviction using a live reservation. Preserves reserved index
+   capacity and adjusts expected_count; missing/different incarnations are OK.
+   The address may borrow the evicted node and expires on success. */
+pg_document_status pg_document_cache_evict_reserved(pg_document_cache *,const pg_document_address *,uint64_t,pg_document_cache_reservation *);
 /* Durable documentCreate record, without storage lifecycle stamps. Definition
    identity/semantics and native safe ID are checked; result owns all slices. */
 pg_document_status pg_document_record_create(const pg_document_definition *,const pg_document_address *,uint64_t id,struct json_object **);

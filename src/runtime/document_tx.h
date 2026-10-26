@@ -17,7 +17,7 @@ typedef struct {
 } pg_document_tx_entry;
 /* Loaded handles and edits are borrowed, disjoint, unique per incarnation and
    alive for the whole synchronous mutation line. Entry internal fields start
-   zeroed; reserved is private to managed Doc creation. Seal and prepare all
+   zeroed; reserved is private to managed Doc lifecycle. Seal and prepare all
    edits, validate all generated plans, then invoke
    checkpoint predicates and prepare adoption before Storage admission.
    Storage confirmation applies all loaded values before the Session's existing
@@ -25,8 +25,8 @@ typedef struct {
    context are restored on return. No-op edits cause no Storage commit.
    After a valid admission every result discards prepared state and seals edits;
    argument/precondition refusal leaves caller state unchanged. Managed creation
-   stores a base and installs after confirmation; retirement and deferred holds
-   are coordinated by the surrounding Session host.
+   stores a base and installs after confirmation; managed retirement evicts the
+   matching incarnation. Deferred holds are coordinated by the Session host.
    Callers must finish through this entry once loaded edits were acquired. */
 pg_record_tx_status pg_document_tx_commit(pg_record_tx *,pg_document_tx_entry *,size_t);
 typedef struct {
@@ -63,9 +63,15 @@ typedef struct {
    its owner, initialize a detached value, then mint and stage a private new
    incarnation. Initialization/mint only run on first missing acquisition.
    All callbacks run with scope/record Tx busy. Failure returns no edit and
-   leaves prior candidates intact; minted IDs remain consumed. New values
-   become visible through Storage and cache only on successful finish. */
+   leaves prior candidates intact; minted IDs remain consumed. New incarnations
+   install during Storage confirmation; admitted backend/adoption errors follow
+   the Session fail-stop contract. */
 pg_document_status pg_document_tx_doc(pg_document_tx *,const pg_document_request *,pg_document_change **);
+/* Idempotently retire the latest incarnation. Prior edits still settle their
+   final content; a following doc call creates a fresh incarnation. Retirement
+   without an edit only resolves record identity/scope, without initialization,
+   migration or Storage.read. Missing addresses have no write. */
+pg_document_status pg_document_tx_retire(pg_document_tx *,const pg_document_definition *,const pg_document_address *);
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);
 #endif

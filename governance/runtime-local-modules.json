@@ -849,7 +849,7 @@
         "system libc",
         "json-c"
       ],
-      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention; preadmission new-incarnation installation plans and reserved index capacity for synchronous Storage adoption",
+      "role": "Durable document address identity plus scope/version compatibility and detached JSON materialization/migration; caller-owned outputs and explicit callback ownership; injected Storage document acquisition and loaded handle ownership; address-keyed loaded document cache, version-driven held-flush/reload, pin-aware idle retention; preadmission new-incarnation installation plans and reserved index capacity for synchronous Storage adoption; record-only retirement lookup and incarnation eviction preserving preadmission index reservation",
       "exports": [
         "pg_document_address_valid",
         "pg_document_address_equal",
@@ -872,7 +872,9 @@
         "pg_document_cache_reserve",
         "pg_document_install_prepare",
         "pg_document_install_apply",
-        "pg_document_install_discard"
+        "pg_document_install_discard",
+        "pg_document_cache_find_record",
+        "pg_document_cache_evict_reserved"
       ],
       "reference_basis": [
         {
@@ -886,7 +888,7 @@
             "packages/durable/src/session/session.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install"
+          "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install; findRetirement cached record before current find without value load/migration; reserved conditional eviction preserves install capacity"
         }
       ]
     },
@@ -1039,16 +1041,18 @@
       "dependencies": [
         "session.records.local.v0",
         "session.documents.delta.local.v0",
-        "json-c"
+        "json-c",
+        "session.documents.local.v0"
       ],
-      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation",
+      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation; explicit retirement and same-address incarnation replacement, final edits persisted, conditional post-confirmation eviction",
       "exports": [
         "pg_document_tx_commit",
         "pg_document_tx_open",
         "pg_document_tx_get",
         "pg_document_tx_finish",
         "pg_document_tx_abort",
-        "pg_document_tx_doc"
+        "pg_document_tx_doc",
+        "pg_document_tx_retire"
       ],
       "reference_basis": [
         {
@@ -1058,7 +1062,7 @@
             "packages/durable/src/session/transaction.ts",
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation",
+          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation; retireDoc/findRetirement handles acquired or record-only incarnations and absent no-op; subsequent doc skips retired target and creates a new incarnation; native adopt applies loaded edits then evicts retired IDs then installs live new nodes",
           "tests_to_read": [
             "packages/durable/test/session-documents.test.ts",
             "packages/durable/test/session-adoption.test.ts"
