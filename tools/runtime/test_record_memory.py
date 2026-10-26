@@ -140,6 +140,48 @@ const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('(
         finally:library.json_object_put(out);assert not native.pg_record_tx_discard(ctypes.byref(tx))
     print(f'PASS: {len(cases)} Entry and 4 Conversation constructions match actual Pi method bodies with fixed host')
 
+def owner_validation(native,library):
+    path=ROOT/'references/pi/packages/durable/src/session/transaction.ts'
+    assert path.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':packages/durable/src/session/transaction.ts'])
+    cases=[dict(kind=kind,status=status,abort=abort,missing=False) for kind in ['conversation','task'] for status in ['pending','running','waiting','sleeping','completing','terminal'] for abort in [False,True]]
+    cases += [dict(kind=kind,status='pending',abort=False,missing=True) for kind in ['conversation','task']]
+    cases += [dict(kind='existing',status='terminal',abort=True,missing=False)]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';
+const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('async #validateOwners()'),end=source.indexOf('#rejectForkSourceWrites(',start);
+const text='class Probe{#writes;#tasksById;#task;constructor(c){this.#writes=c.kind==="conversation"?[{type:"conversation",value:{owner:{taskId:20}}}]:[];this.#tasksById=new Map(c.kind!=="conversation"?[[21,{write:{kind:c.kind==="existing"?"replace":"create",record:{owner:20}}}]]:[]);this.#task=c.missing?undefined:{id:20,state:{status:c.status},abortRequested:c.abort}}async #currentTask(id){return id===20?this.#task:undefined}'+source.slice(start,end)+'run(){return this.#validateOwners()}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){try{await new Probe(c).run();out.push(true)}catch{out.push(false)}}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path)],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('has_write',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));adopt_type=ctypes.CFUNCTYPE(None,ctypes.c_void_p,ctypes.c_uint64);commit_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_void_p,adopt_type,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
+    @read_type
+    def read(context,table,id,out):return native.pg_record_memory_read(ctypes.cast(context,ctypes.POINTER(Memory)),table,id,out)
+    @adopt_type
+    def adopted(context,seq):pass
+    native.pg_record_tx_begin.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.c_void_p,read_type]
+    native.pg_record_tx_stage.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint,ctypes.c_void_p]
+    native.pg_record_tx_commit.argtypes=[ctypes.POINTER(Tx)];native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
+    for case,want in zip(cases,expected,strict=True):
+        memory=Memory();assert not native.pg_record_memory_open(ctypes.byref(memory));storage=native.pg_record_memory_storage(ctypes.byref(memory));session=ctypes.create_string_buffer(88);ctypes.memmove(session,ctypes.byref(storage),ctypes.sizeof(storage));tx=Tx();owned=[]
+        def parse(value):
+            pointer=library.json_tokener_parse(json.dumps(value).encode());owned.append(pointer);return pointer
+        try:
+            seed=[dict(type='conversation',value=dict(id=1))]
+            if not case['missing']:seed.append(dict(type='task',value=dict(id=20,conversationId=1,state=dict(status='pending'))))
+            if case['kind']=='existing':seed.append(dict(type='task',value=dict(id=21,conversationId=1,owner=20,state=dict(status='pending'))))
+            sequence=ctypes.c_uint64();assert not commit_type(storage.commit)(storage.context,parse(seed),adopted,None,ctypes.byref(sequence))
+            assert not native.pg_record_tx_begin(ctypes.byref(tx),session,ctypes.cast(ctypes.byref(memory),ctypes.c_void_p),read)
+            if not case['missing']:assert not native.pg_record_tx_stage(ctypes.byref(tx),2,parse(dict(type='task',value=dict(id=20,conversationId=1,state=dict(status=case['status']),abortRequested=case['abort']))))
+            write=dict(type='conversation',value=dict(id=21,owner=dict(conversationId=1,taskId=20))) if case['kind']=='conversation' else dict(type='task',value=dict(id=21,conversationId=1,owner=20,state=dict(status='waiting')))
+            assert not native.pg_record_tx_stage(ctypes.byref(tx),0 if case['kind']=='conversation' else 2,parse(write))
+            status=native.pg_record_tx_commit(ctypes.byref(tx));assert (status==0)==want,(case,status,want)
+        finally:
+            assert not native.pg_record_tx_discard(ctypes.byref(tx))
+            for pointer in owned:library.json_object_put(pointer)
+            assert not native.pg_record_memory_close(ctypes.byref(memory))
+    print(f'PASS: {len(cases)} final owner validations match actual Pi validateOwners body')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -395,5 +437,6 @@ def main():
                     finally:library.json_object_put(value)
                 assert actual==answer,(index,op,actual,answer)
         finally:assert native.pg_record_memory_close(ctypes.byref(memory))==0
+        owner_validation(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

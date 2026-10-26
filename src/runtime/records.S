@@ -633,6 +633,10 @@ pg_record_tx_commit:
  call .Ltx_copy_conflicts
  test eax,eax
  jnz .Ltx_commit_plan_failed
+ mov rdi,rbx
+ call .Ltx_validate_owners
+ test eax,eax
+ jnz .Ltx_commit_plan_failed
  mov rdi,[rbx]
  mov rsi,[rbx+24]
  call pg_records_commit
@@ -2398,3 +2402,238 @@ pg_record_tx_create:
  pop rbp
  ret
 .size pg_record_tx_create,.-pg_record_tx_create
+.text
+/* Latest staged task, otherwise an owned committed read in *owned. */
+.Ltx_current_task:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r13],0
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r14,rax
+.Ltx_current_task_each:
+ test r14,r14
+ jz .Ltx_current_task_read
+ dec r14
+ mov rdi,[rbx+24]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Ltx_current_task_each
+ mov rdi,r15
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ltx_current_task_each
+ mov rax,r15
+ xor edx,edx
+ jmp .Ltx_current_task_return
+.Ltx_current_task_read:
+ cmp qword ptr [rbx+16],0
+ je .Ltx_current_task_error
+ mov rdi,[rbx+8]
+ mov esi,2
+ mov rdx,r12
+ mov rcx,r13
+ call [rbx+16]
+ test eax,eax
+ jnz .Ltx_current_task_error
+ mov rax,[r13]
+ test rax,rax
+ jz .Ltx_current_task_error
+ xor edx,edx
+ jmp .Ltx_current_task_return
+.Ltx_current_task_error:
+ xor eax,eax
+ mov edx,1
+.Ltx_current_task_return:
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.Ltx_validate_owners:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov ebp,1
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r12,rax
+ xor r13d,r13d
+.Ltx_owner_each:
+ cmp r13,r12
+ jae .Ltx_owner_good
+ mov rdi,[rbx+24]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_conversation]
+ call .Ls_string
+ test eax,eax
+ jnz .Ltx_owner_conversation
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Ltx_owner_next
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_owner]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Ltx_owner_next
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r15,rax
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+24],rax
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rsp]
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Ltx_owner_cleanup
+ cmp rax,r14
+ jne .Ltx_owner_release_next
+ /* Existing tasks retaining an owner are not newly owned work. */
+ cmp qword ptr [rbx+16],0
+ je .Ltx_owner_cleanup
+ mov rdi,[rbx+8]
+ mov esi,2
+ mov rdx,[rsp+24]
+ lea rcx,[rsp+8]
+ call [rbx+16]
+ test eax,eax
+ jz .Ltx_owner_release_next
+ cmp eax,1
+ jne .Ltx_owner_cleanup
+ jmp .Ltx_owner_check
+.Ltx_owner_conversation:
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_owner]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Ltx_owner_next
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r15,rax
+.Ltx_owner_check:
+ test r15,r15
+ jz .Ltx_owner_cleanup
+ mov rax,9007199254740991
+ cmp r15,rax
+ ja .Ltx_owner_cleanup
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ mov rdi,rbx
+ mov rsi,r15
+ lea rdx,[rsp]
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Ltx_owner_cleanup
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_abort_requested]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltx_owner_cleanup
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_terminal]
+ call .Ls_string
+ test eax,eax
+ jnz .Ltx_owner_cleanup
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_completing]
+ call .Ls_string
+ test eax,eax
+ jnz .Ltx_owner_cleanup
+.Ltx_owner_release_next:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+.Ltx_owner_next:
+ inc r13
+ jmp .Ltx_owner_each
+.Ltx_owner_good:
+ xor ebp,ebp
+.Ltx_owner_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ltx_abort_requested: .asciz "abortRequested"
+.Ltx_state: .asciz "state"
+.Ltx_terminal: .asciz "terminal"
+.Ltx_completing: .asciz "completing"

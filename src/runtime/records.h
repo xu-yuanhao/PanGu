@@ -57,7 +57,9 @@ typedef struct {
    staging fails. Document writes do not set the table-write barrier.
    Commit seals before admission, submits through pg_records_commit and consumes
    candidates on every result. Copy/source conflicts fail before Storage admission
-   and leave Session healthy. Inspect Session for admitted backend errors.
+   and leave Session healthy. Final owner validation also rejects newly owned
+   work on terminal/completing/abort-marked tasks; Task creation is identified
+   by a fresh (not committed) ID. Inspect Session for admitted backend errors.
    Typed creation, document tracking and async operation drainage layer on this
    synchronous batch owner; these calls retain no asynchronous operation. */
 pg_record_tx_status pg_record_tx_begin(pg_record_tx *,pg_record_session *,void *,int (*)(void *,unsigned,uint64_t,struct json_object **));

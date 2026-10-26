@@ -245,6 +245,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 Tx查询验证：真实Memory组合通过fork分页/过滤/祖先head、无head与未知Conversation区分、各表查询、写后读/sealed拒绝；O0/O2 ASan/UBSan验证partial失败结果释放、输出归零、回调重入与逐直接分配复制插入故障。共享库对照初次因PC32重定位链接失败，改用GOT后原5262条Storage对照通过；完整Runtime结果见当前实现记录。
 - K03 Conversation host：`pg_record_tx_create` 对照Session/Transaction `conversationCreated` 调用，统一root/new/fork后调用注入host；callback在候选已暂存后运行，可追加记录/嵌套创建，活跃callback期间拒绝commit/discard。Tx原44字节offset预留字段改为creation_depth，整体48字节不变；回调错误返回CREATION_FAILED，由外层失败callback丢弃候选，尚未存储。实际Memory组合验证回调追加Entry、嵌套、fork、空hook、失败丢弃及逐分配插入复制故障；O0/O2内存专项通过，完整Runtime结果见当前实现记录。Harness内建Live/Inbox/Usage/Provider初始化继续按对应K步骤接入该host。
 - 已处理TUI登记请求：共享工作树登记tui_sink.h、tui_md.h/.S与test_tui_md.c，使用既有client-source/client-test范围，G00通过。相关登记（含之前PTY工具）暂留工作树，随TUI交接一并提交；未将未交接TUI文件混入本核心候选。
+- K03最终owner校验：对照Transaction `#validateOwners/#currentTask/#assemble` 与 `session-tables.test.ts`，在Storage准入前检查新Conversation/Task owned work：owner取最新暂存候选，拒绝missing/terminal/completing/abort；已有任务保留旧owner不当作新建work。原生Task新建按未提交ID识别，typed创建应使用mint新ID。48组实际Storage顺序/状态/abort组合及同批新owner结束场景通过；27组执行实际Pi校验方法体一致。owner读取分配失败/partial清理不锁存Session；O0/O2内存专项、原5262条Storage对照及完整Runtime通过，最后新增同批新owner专项在最终源O2通过。
 - 下一完整行为：补submission request查找与完整文档所有权/迁移提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射

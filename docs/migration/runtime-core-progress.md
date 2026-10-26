@@ -225,3 +225,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实际验证：实际MemoryStorage验证root/new/fork回调内追加Entry、嵌套创建、空hook及错误路径丢弃，候选阶段无存储写入。O0/O2 ASan/UBSan与逐直接分配/插入/部分复制故障通过；完整Runtime退出0，原5262条Storage/选择与构造对照通过。隔离核心暂存树G00、Assembly清单与产品构建通过。
 - TUI交接登记：已读当前U03请求，四个新文件在共享bootstrap清单按client-source/client-test登记，未修改守卫，当前共享G00通过。此工作树登记连同已有PTY工具登记待TUI整体交接后提交；TUI源码未进入本批暂存。登记仅证明文件已列入清单，不代表完整TUI/产品构建验收。
 - 同一实施Agent自审：新增实际导出/host类型/creation_depth语义登记，无门禁预算调整。5个核心候选路径/暂存内容清单SHA256摘要（本记录加入前）`64434fa17fed9691485aa373c8a8c799149882ee39004bc9b8444243e2c084e9`。结论为本地候选通过；完整Document Tx、request查询和实际应用接入仍待完成，K03未完成。
+
+## K03 新owned work的最终owner（2026-10-26）
+
+- 来源：Pi `Transaction.#validateOwners/#currentTask/#assemble`、`session-tables.test.ts` 的先创建子会话再abort/结束owner场景。核对Doc获取时发现该前置约束缺口，本批先修复。Pi/Harness fetch仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：手写Assembly在Storage commit前校验新Conversation/Task owned work，owner取最后暂存Task，缺失时读committed；missing/terminal/completing/abort-marked拒绝。现有Task更新保留旧owner不是新owned work。原生用未提交ID识别新Task，typed构造使用mint ID；完整Task写入生命周期仍待对应实现。
+- 实际验证：48组真实MemoryStorage顺序/状态/abort组合通过；同批新owner创建子会话后结束的整批拒绝、现有任务保留旧owner、owner读取partial分配失败清理通过。27组执行固定Pi原validateOwners方法体一致；原5262条Storage对照通过。O0/O2 ASan/UBSan及完整Runtime通过，最后补充的新owner同批结束专项在最终源O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00通过。
+- 同一实施Agent自审：扩展现有模块语义/来源登记，无新公开布局、门禁或预算调整。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`506d15da819549e3975944c60d0f2f4414f85d3610f1f154a6c4636638ce1b84`。结论为本地候选通过；完整Document Tx等仍待完成，K03未完成。
