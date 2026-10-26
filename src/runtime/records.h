@@ -67,4 +67,11 @@ pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
    append the transformed candidate in staging order. Internal committed lookup
    is allowed after the public table-read barrier. */
 pg_record_tx_status pg_record_tx_submission_change(pg_record_tx *,uint64_t id,const struct json_object *);
+/* Require a staged or committed Conversation, mint an Entry ID through the
+   borrowed Storage allocator, detach draft and override id/conversationId and
+   byTaskId (0 omits it). head="self" becomes the new ID. Success owns a result
+   independent of the staged record. Minted IDs remain consumed on later error.
+   mint uses read_context, returns 0 and a positive safe ID on success. */
+pg_record_tx_status pg_record_tx_append_entry(pg_record_tx *,uint64_t conversation_id,const struct json_object *draft,
+ uint64_t by_task_id,int (*mint)(void *,uint64_t *),struct json_object **);
 #endif

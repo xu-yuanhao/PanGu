@@ -182,3 +182,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：现有records模块新增48字节原生Tx，手写Assembly维护私有最终StorageWrite数组，普通表写尝试后禁止public表读，Document暂存保留表读；commit先seal并走现有 `pg_records_commit`，各结果均清理候选，discard可重复调用。注入committed-read同步服务；submission变更逆序查最新暂存候选再读Storage，转换后追加，实际接入上一批转换函数。整个Session mutation line由调用者串行持有。
 - 实际验证：真实MemoryStorage组合通过暂存不可见、混合批次采纳、丢弃/重用、read barrier、seal、readonly、Storage失败及Session锁存，queued→placed→done同批落盘与终态保持。O0/O2 ASan/UBSan枚举stage与submission组装直接分配/复制/插入故障；回调partial错误结果清理、Tx回调重入拒绝通过。完整Runtime退出0（最后补充的重入专项再以最终源O0/O2执行通过）；原24条转换函数和5254条MemoryStorage对照继续通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00仍报告4个TUI未登记候选。
 - 同一实施Agent自审：新增实际导出与模块职责登记，未调整门禁。5个候选路径/暂存内容清单SHA256摘要（加入本记录前）`f2ae287cc257ec6ce0ed5919abf873ef1243b18d065786fe97b4b1a7c3142650`。结论为本地组合候选通过；typed创建/ID/查询、Document tracker/所有权/迁移和异步操作drain尚待后续接入，当前应用消息投影尚未切到该通用Tx，不声明完整K03完成。
+
+## K03 typed Entry追加（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `Transaction.#appendEntry/#requireConversation`、重载入口、调用的Storage mint/copyJson，以及 `#stageConversation` 的created集合。Pi/Harness fetch后仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：手写Assembly `pg_record_tx_append_entry` 确认同批创建/已提交Conversation后mint；复制draft并覆盖id/conversationId/byTaskId，head=self使用新ID；先准备独立返回值和完整StorageWrite，再一次追加到Tx私有数组。失败不追加，已mint的ID保留消耗；读/分配失败清理全部partial值，纯原生状态与JSON库胶水编排均为Assembly。
+- 实际验证：10条构造语料执行固定上游原方法体和实际Chord copyJson（固定read/mint host）一致，仅证明记录构造；真实MemoryStorage验证同批Conversation追加、committed Conversation追加、缺失拒绝、归属、返回值隔离、丢弃及ID消耗。O0/O2 ASan/UBSan与每项直接分配/插入/复制故障通过，完整Runtime退出0；之后新增的构造对照再单独通过，原24条submission/5254条Storage对照保持通过。隔离核心暂存树G00、Assembly清单和产品构建通过。共享G00仍报告4个TUI候选未登记。
+- 同一实施Agent自审：扩展已有实际导出/来源，无门禁或预算变更。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`dff3402f59d963cc1e0a0ffb23074f13a9946246d85048ab3860dd3265df6b62`。结论为本地候选通过；Conversation typed ownership/fork与完整Document Tx仍待实现，新入口尚待应用消息投影接入，K03未完成。

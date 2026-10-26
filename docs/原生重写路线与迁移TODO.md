@@ -235,7 +235,8 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03事务submission候选：`records.S/h:pg_records_submission_change` 对照 `transaction.ts:applySubmissionChange`，阅读Transaction的submissionChanges暂存、`settleSuccess/discard`和`#read/#write`调用规则。手写转换保留终态、区分input/write放置、要求done从placed结算；输出独立拥有，输入不变。24个组合与固定上游实际函数体直接对照一致（仅剥离TS类型后执行原函数体），O0/O2 ASan/UBSan覆盖两段复制/部分复制故障。该入口等待完整事务组装调用，尚未提供完整Tx。
 - K03事务批次：`records.h/.S:pg_record_tx_begin/read/stage/commit/discard/submission_change` 对照Transaction构造、`#read/#write`、`settleSuccess/discard`及Session提交调用，采用私有候选、写后禁止公开表读、结算先seal与最终Storage/adopt。原生48字节Tx借用Session和注入的committed-read服务；同步回调期间拒绝Tx重入，整个Session mutation line由调用者串行持有。stage接收已构造的StorageWrite；typed创建/ID/文档tracker及异步drain继续由后续事务层实现。
 - K03事务验证：与真实MemoryStorage组合验证暂存不可见、混合批次提交、丢弃/重用、已seal拒绝、非法/失败表写后的read barrier、Document暂存后仍可读表、readonly和Storage失败、Session锁存、queued→placed→done连续候选及终态保持。O0/O2内存专项枚举暂存与submission转换的直接复制/插入/分配故障；读回调错误的partial结果释放及重入拒绝专项通过。原24条上游submission函数和5254条Storage对照继续通过。完整Runtime结果见当前实现记录。
-- 下一完整行为：补typed事务创建/ID与表查询、文档所有权/迁移提交，接入当前消息投影。
+- K03 typed Entry：`pg_record_tx_append_entry` 对照固定Pi `Transaction.#appendEntry/#requireConversation`，检查同批新Conversation或committed Conversation，调用注入Storage mint，覆盖id/conversationId/byTaskId并将head=self转为新ID；候选及返回记录分别持有，失败不插入半条Entry，mint后的错误不回退ID。10条构造语料执行实际上游方法体与实际Chord copyJson（固定mint/read host，仅核对构造）一致；真实MemoryStorage组合及O0/O2内存/逐分配插入故障通过。该入口尚待应用消息投影使用。
+- 下一完整行为：补Conversation typed创建/ownership/fork，再补typed表查询及文档所有权/迁移提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

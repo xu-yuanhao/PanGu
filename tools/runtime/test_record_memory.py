@@ -82,6 +82,43 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(c=>{try{return
             for value in [out,current,change]:library.json_object_put(value)
     print(f'PASS: {len(cases)} submission transitions match actual Pi transaction function body')
 
+def entry_construction(native,library):
+    relative='packages/durable/src/session/transaction.ts';path=ROOT/'references/pi'/relative
+    for relative in [relative,'packages/chord/src/json.ts']:
+        assert (ROOT/'references/pi'/relative).read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+relative])
+    cases=[]
+    for task in [0,7]:
+        for head in ['absent','self',3,None,'self\0x']:
+            draft=dict(kind='entry.中',id=999,conversationId=999,byTaskId=999,data={'x':[1]})
+            if head!='absent':draft['head']=head
+            cases.append(dict(draft=draft,task=task))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';import {pathToFileURL} from 'node:url';
+const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('#appendEntry(conversationId: ConversationId, value: EntryDraft)'),end=source.indexOf('createTask<',start);const {copyJson}=await import(pathToFileURL(process.argv[2]));
+const text='class Probe { #host={storage:{mintId:async()=>17}};#scope;#writes=[];constructor(task){this.#scope={taskId:task||undefined}} #assertOpen(){} async #requireConversation(){} #write(fn){return fn()} '+source.slice(start,end)+' run(value){return this.#appendEntry(9,value)} }';
+const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('('+stripTypeScriptTypes(text)+')');const answers=[];for(const c of JSON.parse(readFileSync(0,'utf8')))answers.push(await new Probe(c.task).run(c.draft));console.log(JSON.stringify(answers));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path),str(ROOT/'references/pi/packages/chord/src/json.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('has_write',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));mint_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
+    @read_type
+    def read(context,table,id,out):out[0]=library.json_tokener_parse(b'{"id":9}');return 0
+    @mint_type
+    def mint(context,out):out[0]=17;return 0
+    native.pg_record_tx_begin.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.c_void_p,read_type]
+    native.pg_record_tx_append_entry.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint64,ctypes.c_void_p,ctypes.c_uint64,mint_type,ctypes.POINTER(ctypes.c_void_p)]
+    native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
+    for case,want in zip(cases,expected,strict=True):
+        tx=Tx();session=ctypes.create_string_buffer(88);draft=library.json_tokener_parse(json.dumps(case['draft']).encode());out=ctypes.c_void_p()
+        try:
+            assert not native.pg_record_tx_begin(ctypes.byref(tx),session,None,read)
+            assert not native.pg_record_tx_append_entry(ctypes.byref(tx),9,draft,case['task'],mint,ctypes.byref(out))
+            assert json.loads(library.json_object_to_json_string_ext(out,0))==want,(case,want)
+            assert json.loads(library.json_object_to_json_string_ext(draft,0))==case['draft']
+        finally:library.json_object_put(out);library.json_object_put(draft);assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print(f'PASS: {len(cases)} Entry constructions match actual Pi appendEntry body with fixed mint/read host')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -219,6 +256,7 @@ def main():
         library.json_object_put.argtypes=[ctypes.c_void_p]
         library.json_object_to_json_string_ext.argtypes=[ctypes.c_void_p,ctypes.c_int];library.json_object_to_json_string_ext.restype=ctypes.c_char_p
         submission_transitions(native,library)
+        entry_construction(native,library)
         native.pg_record_memory_open.argtypes=[ctypes.POINTER(Memory)];native.pg_record_memory_close.argtypes=[ctypes.POINTER(Memory)]
         native.pg_record_memory_mint.argtypes=[ctypes.POINTER(Memory),ctypes.POINTER(ctypes.c_uint64)]
         native.pg_record_memory_read.argtypes=[ctypes.POINTER(Memory),ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)]
