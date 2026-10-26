@@ -210,3 +210,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：`pg_record_tx_fork_conversation` 手写Assembly在私有替换批次中复用typed owner创建、附parent及生成copy plans，成功才替换原Tx数组；既有候选只加引用，不改字段。read/mint局部桥接允许Tx与fork Storage使用不同context。准备失败保留原候选，IDs保持消耗。commit封闭后先检查复制源及parent current-policy冲突，预备错误不进入Storage、不锁存Session。
 - 实际验证：真实MemoryStorage完成parent+文档一次提交、历史内容、task-owned fork及不同服务context；返回parent修改不影响提交。missing Entry、fork前后变更源、fork前后新增parent current-policy文档均在准入前拒绝，Session健康。O0/O2 ASan/UBSan枚举fork装配每项直接分配/插入/复制/读取故障，原候选保留、输出清空、所有权清理通过。最终完整Runtime退出0；原5262条Storage/选择及构造对照通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00仍有4个TUI未登记候选。
 - 同一实施Agent自审：扩展现有实际导出/语义登记，未调整门禁/预算。5个候选路径/暂存内容清单SHA256摘要（本记录加入前）`d5ce6dedb839d07cc4aad4c375b221397088cdc101abcc547f2fc83108a7e882`。结论为本地候选通过；Conversation creation hook、typed查询、完整Document Tx及应用消息投影接入仍待完成，K03未完成。
+
+## K03 Tx分页与latest-head查询（2026-10-26）
+
+- 来源：固定Pi Transaction `scanConversations/scanEntries/scanTasks/latestHeadMarker`、`#read/#assertOpen`，实际调用的MemoryStorage scan/head仍复用原实现。Pi/Harness fetch仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：Assembly `pg_record_tx_scan/latest_head` 通过注入的24字节查询descriptor调用committed Storage；普通表写后与sealed拒绝、callback期间防重入、失败释放partial结果并清空输出。原Query/Page布局112/24字节移至共用records头，Memory提供 `pg_record_memory_queries`，其余实现与过滤/游标语义不变。
+- 实际验证：真实MemoryStorage通过各表扫描、fork分页及祖先head、无head/未知会话、read barrier/seal、callback partial错误清理与重入拒绝；O0/O2 ASan/UBSan及逐分配/复制/插入故障通过。初次全量因服务factory的PC32重定位不能链接shared object失败，改为GOT获取函数地址后5262条Storage对照及完整Runtime通过；最后补充无head专项在最终源O0/O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00仍为4个TUI候选未登记。
+- 同一实施Agent自审：新增实际导出/查询契约登记，移动现有类型定义，不保留双份布局，不修改门禁或预算。7个候选路径/暂存内容清单SHA256摘要（加入本记录前）`c3e2fb7f4114175cfdc1970470a03774ff4cc23e182184ecb17f9a0378d938fc`。结论为本地候选通过；creation hook、request查询与完整Document Tx等仍待实现，K03未完成。

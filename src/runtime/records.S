@@ -2150,3 +2150,144 @@ pg_record_tx_fork_conversation:
  pop r12
  pop rbx
  ret
+.text
+.globl pg_record_tx_scan
+.type pg_record_tx_scan,@function
+pg_record_tx_scan:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ test r14,r14
+ jz .Ltx_scan_return
+ mov qword ptr [r14],0
+ mov qword ptr [r14+8],0
+ mov qword ptr [r14+16],0
+ test rbx,rbx
+ jz .Ltx_scan_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_scan_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_scan_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_scan_return
+ mov ebp,2
+ cmp dword ptr [rbx+40],0
+ jne .Ltx_scan_return
+ mov ebp,1
+ test r12,r12
+ jz .Ltx_scan_return
+ test r13,r13
+ jz .Ltx_scan_return
+ cmp qword ptr [r12+8],0
+ je .Ltx_scan_return
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov dword ptr [rbx+32],1
+ mov rdi,[r12]
+ mov rsi,r13
+ mov rdx,rsp
+ call [r12+8]
+ test eax,eax
+ jnz .Ltx_scan_failed
+ movups xmm0,[rsp]
+ movups [r14],xmm0
+ mov rax,[rsp+16]
+ mov [r14+16],rax
+ xor ebp,ebp
+ jmp .Ltx_scan_settled
+.Ltx_scan_failed:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov ebp,5
+.Ltx_scan_settled:
+ mov dword ptr [rbx+32],0
+.Ltx_scan_return:
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_scan,.-pg_record_tx_scan
+
+.globl pg_record_tx_latest_head
+.type pg_record_tx_latest_head,@function
+pg_record_tx_latest_head:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ test r14,r14
+ jz .Ltx_latest_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ltx_latest_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_latest_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_latest_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_latest_return
+ mov ebp,2
+ cmp dword ptr [rbx+40],0
+ jne .Ltx_latest_return
+ mov ebp,1
+ test r12,r12
+ jz .Ltx_latest_return
+ cmp qword ptr [r12+16],0
+ je .Ltx_latest_return
+ mov qword ptr [rsp],0
+ mov dword ptr [rbx+32],1
+ mov rdi,[r12]
+ mov rsi,r13
+ mov rdx,-1
+ mov rcx,rsp
+ call [r12+16]
+ test eax,eax
+ jnz .Ltx_latest_failed
+ mov rax,[rsp]
+ mov [r14],rax
+ xor ebp,ebp
+ jmp .Ltx_latest_settled
+.Ltx_latest_failed:
+ mov ebp,5
+ cmp eax,1
+ jne .Ltx_latest_release
+ mov ebp,7
+.Ltx_latest_release:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ltx_latest_settled:
+ mov dword ptr [rbx+32],0
+.Ltx_latest_return:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_latest_head,.-pg_record_tx_latest_head

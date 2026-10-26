@@ -241,7 +241,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 fork验证：5262条累计实际MemoryStorage操作对照含直接调用实际prepareForkDocumentCopies，600个文档跨页、祖先Entry提交截点、NUL family key、initial跳过、缺失/不可见Entry、asOf/current冲突与后续mint一致。实际Storage将plans作为document.copy提交，读得分叉时旧值。O0/O2 ASan/UBSan及逐直接分配/插入/复制/读错误清理通过。完整Runtime结果见当前实现记录。
 - K03 fork事务装配：`pg_record_tx_fork_conversation` 对照Pi `#stageConversation/#assemble/#rejectForkSourceWrites`，在独立候选数组中准备owner、parent与全部copy，成功才替换原Tx批次；保留原候选引用，失败仅消耗已分配ID。Tx committed-read与fork Storage可用不同context，局部桥接维持原服务注入。commit在Storage前拒绝copy源的同批变更及父会话新增current-policy文档，避免预备错误锁存Session。
 - K03 fork事务验证：实际Storage验证parent/文档同批落盘、历史值还原、task owner与不同回调context、返回parent隔离；选择失败/逐分配插入复制故障保留原候选，fork前/后修改源及新增父级current文档均在admission前拒绝且Session健康。O0/O2 ASan/UBSan、原5262条Storage/选择对照与完整Runtime通过；最后补充返回parent隔离专项在最终源O2通过。
-- 下一完整行为：装配Conversation creation hook与typed表查询，再补文档所有权/迁移提交，接入当前消息投影。
+- K03 Tx查询服务：`pg_record_tx_scan/latest_head` 对照Transaction `scanConversations/scanEntries/scanTasks/latestHeadMarker` 共用 `#read` 规则；query/page原有112/24字节布局移入共用records契约，Memory通过24字节descriptor提供现有scan/head实现。普通表写尝试后拒绝，Document暂存不设barrier，sealed后拒绝，callback期间防重入。服务descriptor使用GOT兼容动态链接。
+- K03 Tx查询验证：真实Memory组合通过fork分页/过滤/祖先head、无head与未知Conversation区分、各表查询、写后读/sealed拒绝；O0/O2 ASan/UBSan验证partial失败结果释放、输出归零、回调重入与逐直接分配复制插入故障。共享库对照初次因PC32重定位链接失败，改用GOT后原5262条Storage对照通过；完整Runtime结果见当前实现记录。
+- 下一完整行为：装配Conversation creation hook、submission request查找与完整文档所有权/迁移提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

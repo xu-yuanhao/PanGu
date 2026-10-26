@@ -3189,3 +3189,17 @@ pg_record_memory_scan_documents:
 .Ld_copy: .asciz "document.copy"
 .Ld_source: .asciz "source"
 .Ld_at: .asciz "at"
+.text
+.globl pg_record_memory_queries
+.type pg_record_memory_queries,@function
+pg_record_memory_queries:
+ test rsi,rsi
+ jz .Lmemory_queries_return
+ mov [rsi],rdi
+ mov rax,qword ptr [rip+pg_record_memory_scan@GOTPCREL]
+ mov [rsi+8],rax
+ mov rax,qword ptr [rip+pg_record_memory_head@GOTPCREL]
+ mov [rsi+16],rax
+.Lmemory_queries_return:
+ ret
+.size pg_record_memory_queries,.-pg_record_memory_queries

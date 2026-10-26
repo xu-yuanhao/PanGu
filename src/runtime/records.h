@@ -1,6 +1,7 @@
 #ifndef PANGU_RECORDS_H
 #define PANGU_RECORDS_H
 #include <stdint.h>
+#include <stddef.h>
 struct json_object;
 typedef void (*pg_records_adopt)(void *,uint64_t);
 typedef struct {
@@ -104,4 +105,26 @@ pg_record_tx_status pg_records_prepare_fork(const pg_fork_storage *,uint64_t par
    The fork Storage may use a different context than Tx committed table reads. */
 pg_record_tx_status pg_record_tx_fork_conversation(pg_record_tx *,uint64_t parent,uint64_t entry,uint64_t owner_task_id,
  const pg_fork_storage *,struct json_object **);
+typedef enum { PG_SCAN_DEFAULT,PG_SCAN_ASCENDING,PG_SCAN_DESCENDING } pg_scan_order;
+enum { PG_SCAN_CONVERSATION=1,PG_SCAN_OWNER_CONVERSATION=2,PG_SCAN_OWNER_TASK=4,
+ PG_SCAN_MIN_ENTRY=8,PG_SCAN_MAX_ENTRY=16,PG_SCAN_KIND=32,PG_SCAN_STATUS=64,
+ PG_SCAN_ABORT_REQUESTED=128,PG_SCAN_BACKGROUND=256,PG_SCAN_HEAD_ONLY=512 };
+typedef struct {
+ unsigned table,order,has_cursor,cursor_order;
+ int64_t after;
+ size_t limit;
+ uint64_t flags,conversation_id,owner_conversation_id,owner_task_id,min_entry_id,max_entry_id;
+ struct {const char *data;size_t size;} kind;
+ unsigned status,abort_requested,background;
+} pg_memory_query;
+typedef struct {struct json_object *items;uint64_t after;unsigned order,has_next;} pg_memory_page;
+typedef struct {
+ void *context;
+ int (*scan)(void *,const pg_memory_query *,pg_memory_page *);
+ int (*head)(void *,uint64_t conversation,uint64_t max_entry,struct json_object **);
+} pg_record_queries;
+/* Committed queries share the public Tx read barrier. Page owns detached items;
+   failures clear the output. Latest head is unbounded and fork-aware. */
+pg_record_tx_status pg_record_tx_scan(pg_record_tx *,const pg_record_queries *,const pg_memory_query *,pg_memory_page *);
+pg_record_tx_status pg_record_tx_latest_head(pg_record_tx *,const pg_record_queries *,uint64_t conversation,struct json_object **);
 #endif
