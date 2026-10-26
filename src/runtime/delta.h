@@ -31,4 +31,23 @@ typedef struct {struct json_object *value;uint64_t version;size_t deltas_since_b
    reads of current-only records return PG_DOC_SEMANTICS before lifetime checks.
    Output is disjoint, initially unowned; failure clears all output fields. */
 pg_document_status pg_document_revision_read(const pg_document_revision_view *,uint64_t at,pg_document_snapshot *);
+typedef struct {
+ struct json_object *base,*ops;
+ unsigned busy,sealed,active,reserved;
+} pg_document_change;
+typedef struct {struct json_object *value,*ops;} pg_document_prepared;
+/* Native explicit-op change over an object/array root. Caller owns zeroed or
+   discarded storage. Open detaches the base; append detaches and atomically
+   queues an Op batch. Path/operation semantics replay at snapshot/prepare;
+   append only admits a finite JSON array. Snapshots own independent values.
+   Prepare seals on success or replay failure; success transfers owned value
+   and ops to the caller. No change access survives sealing. Discard is
+   idempotent and never frees an already transferred Prepared value/ops.
+   Serialized use; all output storage is disjoint from inputs and initially
+   unowned. Root replacement replay follows the delta API, including JSON null. */
+pg_document_status pg_document_change_open(pg_document_change *,const struct json_object *);
+pg_document_status pg_document_change_append(pg_document_change *,const struct json_object *);
+pg_document_status pg_document_change_snapshot(pg_document_change *,struct json_object **);
+pg_document_status pg_document_change_prepare(pg_document_change *,pg_document_prepared *);
+pg_document_status pg_document_change_discard(pg_document_change *);
 #endif

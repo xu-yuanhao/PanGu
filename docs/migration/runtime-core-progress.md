@@ -232,3 +232,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly在Storage commit前校验新Conversation/Task owned work，owner取最后暂存Task，缺失时读committed；missing/terminal/completing/abort-marked拒绝。现有Task更新保留旧owner不是新owned work。原生用未提交ID识别新Task，typed构造使用mint ID；完整Task写入生命周期仍待对应实现。
 - 实际验证：48组真实MemoryStorage顺序/状态/abort组合通过；同批新owner创建子会话后结束的整批拒绝、现有任务保留旧owner、owner读取partial分配失败清理通过。27组执行固定Pi原validateOwners方法体一致；原5262条Storage对照通过。O0/O2 ASan/UBSan及完整Runtime通过，最后补充的新owner同批结束专项在最终源O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00通过。
 - 同一实施Agent自审：扩展现有模块语义/来源登记，无新公开布局、门禁或预算调整。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`506d15da819549e3975944c60d0f2f4414f85d3610f1f154a6c4636638ce1b84`。结论为本地候选通过；完整Document Tx等仍待完成，K03未完成。
+
+## K03 原生文档编辑日志（2026-10-26）
+
+- 来源：Chord `TrackerImpl.beginChange/ChangeImpl.prepare/abort`，Pi Transaction `#acquire/planDocument/settleSuccess`，`session-documents.test.ts` 的structural no-op、prepare revocation及迁移场景。Pi/Harness fetch仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：现有delta模块新增32字节显式操作日志与16字节Prepared。open/append脱离输入，append只入有限JSON数组、路径/操作在snapshot/prepare重放；snapshot返回独立值，prepare成功或失败都封闭句柄，成功转交value/ops；discard不释放已转交对象。每次追加只复制新批次，最终重放复用已有相邻追加合并。该原生边界明确区别JS proxy与其错误时点，不宣称代理/ops规范化兼容。
+- 实际验证：448条编辑日志重放与实际Chord oracle一致，3条已登记ABI拒绝另行验证；原449条delta/96条revision对照通过。O0/O2 ASan/UBSan枚举open/append/prepare直接分配/插入/部分复制故障，输入/快照隔离、追加失败保留原操作、prepare封闭与转交所有权通过。真实MemoryStorage完成编辑→Prepared→Tx document.change→提交，旧快照保持原值。完整Runtime退出0；最后补充非空旧操作前缀回退专项在最终源O0/O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00通过。
+- 同一实施Agent自审：扩展实际导出/原生change布局与参考登记，未改门禁或预算。7个候选路径/暂存内容清单SHA256摘要（本记录加入前）`13ccb0e68b9de89eff46db025c532c5d219ce7f4d6a7cbec9dad90e65f5b2f30`。结论为本地候选通过；版本/checkpoint规划、Doc获取缓存/所有权和完整Tx自动结算尚待接入，K03未完成。

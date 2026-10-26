@@ -246,7 +246,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 Conversation host：`pg_record_tx_create` 对照Session/Transaction `conversationCreated` 调用，统一root/new/fork后调用注入host；callback在候选已暂存后运行，可追加记录/嵌套创建，活跃callback期间拒绝commit/discard。Tx原44字节offset预留字段改为creation_depth，整体48字节不变；回调错误返回CREATION_FAILED，由外层失败callback丢弃候选，尚未存储。实际Memory组合验证回调追加Entry、嵌套、fork、空hook、失败丢弃及逐分配插入复制故障；O0/O2内存专项通过，完整Runtime结果见当前实现记录。Harness内建Live/Inbox/Usage/Provider初始化继续按对应K步骤接入该host。
 - 已处理TUI登记请求：共享工作树登记tui_sink.h、tui_md.h/.S与test_tui_md.c，使用既有client-source/client-test范围，G00通过。相关登记（含之前PTY工具）暂留工作树，随TUI交接一并提交；未将未交接TUI文件混入本核心候选。
 - K03最终owner校验：对照Transaction `#validateOwners/#currentTask/#assemble` 与 `session-tables.test.ts`，在Storage准入前检查新Conversation/Task owned work：owner取最新暂存候选，拒绝missing/terminal/completing/abort；已有任务保留旧owner不当作新建work。原生Task新建按未提交ID识别，typed创建应使用mint新ID。48组实际Storage顺序/状态/abort组合及同批新owner结束场景通过；27组执行实际Pi校验方法体一致。owner读取分配失败/partial清理不锁存Session；O0/O2内存专项、原5262条Storage对照及完整Runtime通过，最后新增同批新owner专项在最终源O2通过。
-- 下一完整行为：补submission request查找与完整文档所有权/迁移提交，接入当前消息投影。
+- K03文档编辑内核：`delta.h/.S:pg_document_change_open/append/snapshot/prepare/discard` 对照Chord `ChangeImpl.prepare/abort`、Tracker `beginChange` 及Transaction `#acquire/planDocument/settleSuccess`。原生显式操作日志取代JS proxy：open/append脱离输入，snapshot/prepare才重放并检查路径/操作语义，snapshot独立拥有；prepare成功或失败均封闭句柄，成功转交value/ops，discard不释放已转交Prepared。追加只复制新批次，避免每次流式追加重放全文；prepare复用已有合并追加重放。
+- K03编辑验证：448条操作日志结果与实际Chord一致，3条既有ABI拒绝边界单列；O0/O2 ASan/UBSan覆盖open/append/prepare逐分配/插入/部分复制故障，追加失败回退本批、prepare失败清理/封闭、输入与快照隔离。实际MemoryStorage验证编辑→Prepared→Tx document.change→提交，旧快照稳定。此API不声称JS proxy或ops规范化兼容，原生操作/错误时点已写明；完整Runtime结果见当前实现记录。
+- 下一完整行为：补Document版本迁移后的base/delta规划与checkpoint结算、所有权及获取缓存，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

@@ -105,6 +105,10 @@ def revision_cases(native,library):
             for value in objects:library.json_object_put(value)
     print(f'PASS: {total} revision/lifetime/current-only reads match actual Pi MemoryStorage')
 
+class Change(ctypes.Structure):
+    _fields_=[('base',ctypes.c_void_p),('ops',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('active',ctypes.c_uint),('reserved',ctypes.c_uint)]
+class Prepared(ctypes.Structure):
+    _fields_=[('value',ctypes.c_void_p),('ops',ctypes.c_void_p)]
 def main():
     reference=ROOT/'references/pi/packages/chord/src/delta/index.ts'
     for name in ('index.ts','diff.ts','tracker.ts','pending.ts','draft.ts'):
@@ -123,6 +127,11 @@ def main():
         native.pg_document_delta_apply.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(ctypes.c_void_p)];native.pg_document_delta_apply.restype=ctypes.c_int
         native.pg_document_delta_batches.argtypes=native.pg_document_delta_apply.argtypes;native.pg_document_delta_batches.restype=ctypes.c_int
         revision_cases(native,library)
+        native.pg_document_change_open.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
+        native.pg_document_change_append.argtypes=[ctypes.POINTER(Change),ctypes.c_void_p]
+        native.pg_document_change_prepare.argtypes=[ctypes.POINTER(Change),ctypes.POINTER(Prepared)]
+        native.pg_document_change_discard.argtypes=[ctypes.POINTER(Change)]
+        change_count=0
         for index,(case,answer) in enumerate(zip(cases,expected,strict=True)):
             value=library.json_tokener_parse(json.dumps(case['value'],ensure_ascii=False).encode());ops=library.json_tokener_parse(json.dumps(case.get('batches',case.get('ops')),ensure_ascii=False).encode());out=ctypes.c_void_p()
             try:
@@ -133,10 +142,31 @@ def main():
                 if 'native_boundary' in case:
                     assert answer['ok'] and status==1 and not out.value,(index,case,actual,answer)
                 else:assert actual==answer,(index,case,actual,answer)
+                if isinstance(case['value'],(dict,list)):
+                    change=Change();prepared=Prepared();assert not native.pg_document_change_open(ctypes.byref(change),value)
+                    batches=case.get('batches',[case.get('ops')]);batches=batches if isinstance(batches,list) else [batches]
+                    admitted=True
+                    try:
+                        for batch in batches:
+                            pointer=library.json_tokener_parse(json.dumps(batch,ensure_ascii=False).encode())
+                            try:
+                                if native.pg_document_change_append(ctypes.byref(change),pointer):admitted=False;break
+                            finally:library.json_object_put(pointer)
+                        status=native.pg_document_change_prepare(ctypes.byref(change),ctypes.byref(prepared)) if admitted else 1
+                        replay=dict(ok=status==0)
+                        if not status:replay['value']=json.loads(library.json_object_to_json_string_ext(prepared.value,0))
+                        if 'native_boundary' in case:assert status==1
+                        else:assert replay==answer,(index,case,replay,answer)
+                        if admitted:assert change.sealed and not change.active and not change.base and not change.ops
+                        change_count+=1
+                    finally:
+                        library.json_object_put(prepared.value);library.json_object_put(prepared.ops);assert not native.pg_document_change_discard(ctypes.byref(change))
                 assert json.loads(library.json_object_to_json_string_ext(value,0))==case['value']
                 assert json.loads(library.json_object_to_json_string_ext(ops,0))==case.get('batches',case.get('ops'))
             finally:
                 library.json_object_put(out);library.json_object_put(ops);library.json_object_put(value)
+    change_boundaries=sum('native_boundary' in case and isinstance(case['value'],(dict,list)) for case in cases)
+    print(f'PASS: {change_count-change_boundaries} change journal cases match actual Chord; {change_boundaries} explicit ABI refusals; sealing/ownership checked')
     differences=sum('native_boundary' in case for case in cases)
     print(f'PASS: {len(cases)-differences} decoded single/multi-batch cases match actual Chord; {differences} explicit native ABI boundaries verified; inputs unchanged')
 if __name__=='__main__':main()

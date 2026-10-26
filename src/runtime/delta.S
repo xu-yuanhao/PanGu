@@ -1195,3 +1195,269 @@ pg_document_revision_read:
  pop rbp
  ret
 .size pg_document_revision_read,.-pg_document_revision_read
+.text
+.globl pg_document_change_open
+.type pg_document_change_open,@function
+pg_document_change_open:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test rbx,rbx
+ jz .Lchange_open_return
+ cmp dword ptr [rbx+16],0
+ jne .Lchange_open_return
+ cmp dword ptr [rbx+24],0
+ jne .Lchange_open_return
+ mov dword ptr [rbx+16],1
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lchange_open_cleanup
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lchange_open_copy
+ mov rdi,r12
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lchange_open_cleanup
+.Lchange_open_copy:
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lchange_open_allocation
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lchange_open_allocation
+ mov [rbx+8],rax
+ mov rax,[rsp]
+ mov [rbx],rax
+ mov qword ptr [rsp],0
+ mov dword ptr [rbx+20],0
+ mov dword ptr [rbx+24],1
+ mov dword ptr [rbx+28],0
+ xor ebp,ebp
+ jmp .Lchange_open_cleanup
+.Lchange_open_allocation:
+ mov ebp,3
+.Lchange_open_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov dword ptr [rbx+16],0
+.Lchange_open_return:
+ mov eax,ebp
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_change_open,.-pg_document_change_open
+
+.globl pg_document_change_append
+.type pg_document_change_append,@function
+pg_document_change_append:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test rbx,rbx
+ jz .Lchange_append_return
+ cmp dword ptr [rbx+16],0
+ jne .Lchange_append_return
+ cmp dword ptr [rbx+20],0
+ jne .Lchange_append_return
+ cmp dword ptr [rbx+24],1
+ jne .Lchange_append_return
+ mov dword ptr [rbx+16],1
+ mov rdi,r12
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lchange_append_cleanup
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lchange_append_cleanup
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lchange_append_allocation
+ mov rdi,[rbx+8]
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+ xor r13d,r13d
+.Lchange_append_each:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lchange_append_success
+ mov rdi,[rsp]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov r14,rax
+ mov rdi,[rbx+8]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lchange_append_failed
+ inc r13
+ jmp .Lchange_append_each
+.Lchange_append_failed:
+ mov rdi,r14
+ call json_object_put@PLT
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+8]
+ mov rdx,r13
+ call json_object_array_del_idx@PLT
+.Lchange_append_allocation:
+ mov ebp,3
+ jmp .Lchange_append_cleanup
+.Lchange_append_success:
+ xor ebp,ebp
+.Lchange_append_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov dword ptr [rbx+16],0
+.Lchange_append_return:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_change_append,.-pg_document_change_append
+
+.globl pg_document_change_snapshot
+.type pg_document_change_snapshot,@function
+pg_document_change_snapshot:
+ push rbx
+ mov eax,1
+ test rsi,rsi
+ jz .Lchange_snapshot_return
+ mov qword ptr [rsi],0
+ test rdi,rdi
+ jz .Lchange_snapshot_return
+ mov rbx,rdi
+ cmp dword ptr [rbx+16],0
+ jne .Lchange_snapshot_return
+ cmp dword ptr [rbx+20],0
+ jne .Lchange_snapshot_return
+ cmp dword ptr [rbx+24],1
+ jne .Lchange_snapshot_return
+ mov dword ptr [rbx+16],1
+ mov rdx,rsi
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ call pg_document_delta_apply
+ mov dword ptr [rbx+16],0
+.Lchange_snapshot_return:
+ pop rbx
+ ret
+.size pg_document_change_snapshot,.-pg_document_change_snapshot
+
+.globl pg_document_change_prepare
+.type pg_document_change_prepare,@function
+pg_document_change_prepare:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test r12,r12
+ jz .Lchange_prepare_return
+ mov qword ptr [r12],0
+ mov qword ptr [r12+8],0
+ test rbx,rbx
+ jz .Lchange_prepare_return
+ cmp dword ptr [rbx+16],0
+ jne .Lchange_prepare_return
+ cmp dword ptr [rbx+20],0
+ jne .Lchange_prepare_return
+ cmp dword ptr [rbx+24],1
+ jne .Lchange_prepare_return
+ mov dword ptr [rbx+16],1
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ mov rdx,rsp
+ call pg_document_delta_apply
+ mov ebp,eax
+ mov dword ptr [rbx+20],1
+ mov dword ptr [rbx+24],0
+ test eax,eax
+ jnz .Lchange_prepare_cleanup
+ mov rax,[rsp]
+ mov [r12],rax
+ mov qword ptr [rsp],0
+ mov rax,[rbx+8]
+ mov [r12+8],rax
+ mov qword ptr [rbx+8],0
+.Lchange_prepare_cleanup:
+ mov rdi,[rbx]
+ mov qword ptr [rbx],0
+ call json_object_put@PLT
+ mov rdi,[rbx+8]
+ mov qword ptr [rbx+8],0
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov dword ptr [rbx+16],0
+.Lchange_prepare_return:
+ mov eax,ebp
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_change_prepare,.-pg_document_change_prepare
+
+.globl pg_document_change_discard
+.type pg_document_change_discard,@function
+pg_document_change_discard:
+ mov eax,1
+ test rdi,rdi
+ jz .Lchange_discard_return
+ cmp dword ptr [rdi+16],0
+ jne .Lchange_discard_return
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+16],1
+ mov dword ptr [rbx+20],1
+ mov dword ptr [rbx+24],0
+ mov rdi,[rbx]
+ mov qword ptr [rbx],0
+ call json_object_put@PLT
+ mov rdi,[rbx+8]
+ mov qword ptr [rbx+8],0
+ call json_object_put@PLT
+ mov dword ptr [rbx+16],0
+ xor eax,eax
+ pop rbx
+.Lchange_discard_return:
+ ret
+.size pg_document_change_discard,.-pg_document_change_discard

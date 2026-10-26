@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "../../src/runtime/record_memory.h"
+#include "../../src/runtime/delta.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -199,7 +200,11 @@ static void final_owners(void){
  assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"task\",\"value\":{\"id\":20,\"conversationId\":1,\"state\":{\"status\":\"pending\"}}}]"));session=(pg_record_session){.storage=pg_record_memory_storage(&m)};struct json_object *record=0;assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_create_conversation(&tx,20,0,tx_mint,&record));json_object_put(record);allocation_failure=1;assert(pg_record_tx_commit(&tx)==PG_TX_INVALID&&!session.failed&&!tx.writes&&m.count==2&&m.next_sequence==2);assert(!pg_record_memory_close(&m));
 #endif
 }
+static void document_edit_commit(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"edit\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"text\":\"a\"}}}]"));struct json_object *snapshot=0,*ops=json_tokener_parse("[[\"a\",[\"text\"],\"b\"]]");assert(ops&&!pg_record_memory_document(&m,2,UINT64_MAX,&snapshot));pg_document_change edit={0};assert(!pg_document_change_open(&edit,json_object_object_get(snapshot,"value"))&&!pg_document_change_append(&edit,ops));pg_document_prepared prepared={0};assert(!pg_document_change_prepare(&edit,&prepared));struct json_object *write=json_tokener_parse("{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"delta\",\"version\":1}}"),*content=json_object_object_get(write,"content");assert(!json_object_object_add(content,"ops",json_object_get(prepared.ops)));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_stage(&tx,PG_TX_DOCUMENT_CHANGE,write));json_object_put(prepared.value);json_object_put(prepared.ops);assert(!pg_document_change_discard(&edit)&&!pg_record_tx_commit(&tx));struct json_object *after=0;assert(!pg_record_memory_document(&m,2,UINT64_MAX,&after)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(after,"value"),"text")),"ab")&&json_object_get_int(json_object_object_get(after,"deltasSinceBase"))==1);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(snapshot,"value"),"text")),"a"));json_object_put(after);json_object_put(snapshot);json_object_put(write);json_object_put(ops);assert(!pg_record_memory_close(&m));
+}
 int main(void){
+ document_edit_commit();
  final_owners();
  conversation_hooks();
  transaction_queries();

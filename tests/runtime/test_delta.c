@@ -52,7 +52,18 @@ static void revisions(void){
 #endif
  assert(!strcmp(json_object_get_string(json_object_object_get(base,"text")),"a"));json_object_put(base);json_object_put(ops);json_object_put(newbase);
 }
+static void changes(void){
+ _Static_assert(sizeof(pg_document_change)==32&&sizeof(pg_document_prepared)==16,"change ABI");pg_document_change change={0};struct json_object *base=json_tokener_parse("{\"text\":\"a\"}"),*ops=json_tokener_parse("[[\"a\",[\"text\"],\"b\"],[\"s\",[\"x\"],1]]"),*snapshot=0;assert(base&&ops&&!pg_document_change_open(&change,base));assert(pg_document_change_open(&change,base)==PG_DOC_INVALID);json_object_object_add(base,"text",json_object_new_string("outside"));assert(!pg_document_change_append(&change,ops));struct json_object *first=json_object_array_get_idx(ops,0);assert(!json_object_array_put_idx(first,2,json_object_new_string("changed")));assert(!pg_document_change_snapshot(&change,&snapshot)&&!strcmp(json_object_get_string(json_object_object_get(snapshot,"text")),"ab"));json_object_object_add(snapshot,"text",json_object_new_string("snapshot"));json_object_put(snapshot);pg_document_prepared prepared={0},extra={0};assert(!pg_document_change_prepare(&change,&prepared)&&!strcmp(json_object_get_string(json_object_object_get(prepared.value,"text")),"ab")&&json_object_array_length(prepared.ops)==2);assert(pg_document_change_snapshot(&change,&snapshot)==PG_DOC_INVALID&&!snapshot&&pg_document_change_append(&change,ops)==PG_DOC_INVALID&&pg_document_change_prepare(&change,&extra)==PG_DOC_INVALID&&!extra.value&&!extra.ops);assert(!pg_document_change_discard(&change)&&!pg_document_change_discard(&change)&&json_object_object_get(prepared.value,"x"));json_object_put(prepared.value);json_object_put(prepared.ops);
+ assert(!pg_document_change_open(&change,base));struct json_object *bad=json_tokener_parse("[[\"s\",[\"missing\",\"x\"],1]]");assert(bad&&!pg_document_change_append(&change,bad)&&pg_document_change_prepare(&change,&prepared)==PG_DOC_INVALID&&!prepared.value&&!prepared.ops&&change.sealed&&!change.active&&!change.base&&!change.ops);json_object_put(bad);
+#ifdef PG_DELTA_FAULTS
+ for(unsigned operation=0;operation<3;++operation){if(operation){assert(!pg_document_change_open(&change,base));assert(!pg_document_change_append(&change,ops));}tracking=1;calls=fail_at=0;pg_document_status status=operation==0?pg_document_change_open(&change,base):operation==1?pg_document_change_append(&change,ops):pg_document_change_prepare(&change,&prepared);tracking=0;assert(!status);unsigned count=calls;if(operation==2){json_object_put(prepared.value);json_object_put(prepared.ops);}assert(!pg_document_change_discard(&change));
+ for(unsigned i=1;i<=count;++i){if(operation){assert(!pg_document_change_open(&change,base));assert(!pg_document_change_append(&change,ops));}tracking=1;calls=0;fail_at=i;status=operation==0?pg_document_change_open(&change,base):operation==1?pg_document_change_append(&change,ops):pg_document_change_prepare(&change,&prepared);tracking=0;assert(status!=PG_DOC_OK&&!change.busy);if(operation==0)assert(!change.active&&!change.base&&!change.ops);if(operation==1)assert(change.active&&json_object_array_length(change.ops)==2&&json_object_equal(change.ops,ops));if(operation==2)assert(change.sealed&&!change.active&&!change.base&&!change.ops&&!prepared.value&&!prepared.ops);assert(!pg_document_change_discard(&change));}fail_at=0;
+ }
+#endif
+ json_object_put(base);json_object_put(ops);
+}
 int main(void){
+ changes();
  revisions();
  run("{\"text\":\"\"}","[[\"a\",[\"text\"],\"中\"],[\"a\",[\"text\"],\"😀\"],[\"t\",[\"text\"],1]]","{\"text\":\"😀\"}");
  run("{}","[[\"s\",[\"text\"],\"abc\"],[\"a\",[\"text\"],\"def\"],[\"t\",[\"text\"],2]]","{\"text\":\"cdef\"}");
