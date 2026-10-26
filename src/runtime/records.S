@@ -4736,3 +4736,45 @@ pg_record_tx_create_task:
 .Lcreate_pending: .asciz "pending"
 .Lcreate_checkpoint: .asciz "checkpoint"
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_task_conversation
+.hidden pg_record_tx_task_conversation
+.type pg_record_tx_task_conversation,@function
+pg_record_tx_task_conversation:
+ push rbx
+ push r12
+ sub rsp,8
+ mov r12,rdx
+ mov qword ptr [rsp],0
+ mov ebx,1
+ test r12,r12
+ jz .Ltask_conversation_end
+ mov qword ptr [r12],0
+ test rdi,rdi
+ jz .Ltask_conversation_end
+ cmp dword ptr [rdi+32],1
+ jne .Ltask_conversation_end
+ mov rdx,rsp
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Ltask_conversation_cleanup
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Ltask_conversation_cleanup
+ mov [r12],rax
+ xor ebx,ebx
+.Ltask_conversation_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ltask_conversation_end:
+ mov eax,ebx
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_task_conversation,.-pg_record_tx_task_conversation
+.section .note.GNU-stack,"",@progbits

@@ -173,4 +173,21 @@ int pg_document_publication_prepare(const pg_document_publication_request *,stru
    to prepare; no concurrent
    readers may borrow them during confirmation. */
 int pg_session_publications_confirm(pg_session_publications *,uint64_t sequence);
+typedef struct {
+ pg_session_listeners *listeners;
+ pg_document_holds *holds;
+ void *delivery_context;
+} pg_session_notification_host;
+/* Bind the default stored-transaction notification service. Host/listeners and
+   optional native holds stay borrowed through settlement. Task ownership is
+   resolved from the Tx's latest candidate/cache. Notification snapshots own
+   their lifecycle/value/ops before retirement; held queues remain unchanged
+   during preparation. Delivery uses host.delivery_context. */
+int pg_session_notifications_bind(pg_session_notification_host *,pg_document_notifications *);
+/* Stored settlement on the actual Session mutation line with a prepared
+   notification host. Merges held changes, restores ordinary hooks, syncs the
+   hold timer and releases the admitted Tx exactly as settle(deferred=0).
+   The notification descriptor is borrowed through return and mandatory. */
+pg_record_tx_status pg_durable_session_settle_notified(pg_durable_session *,
+ const pg_document_scan *,const pg_document_notifications *);
 #endif

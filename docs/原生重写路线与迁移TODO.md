@@ -113,6 +113,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植Document计划的通知描述：退休/复制优先级、创建空ops、迁移空ops保留、可选conversation与独立输出所有权。
 - [x] 接通DocTx持久提交的通知宿主：准入前准备、确认时补序号、退休前独立持有、成功后发布及全部路径清理，保留原钩子。
 - [x] 接通prepared publication的无分配确认：先校验双通道、再补seq与新生命周期占位值，失败前不修改通知；真实DocTx确认路径验证。
+- [x] 默认通知宿主自动捕获持久DocTx计划：三种scope/任务所属会话、创建/退休/copy、held observed/stored ops分离；接入实际Session持久结算与timer同步。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -504,3 +505,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S:pg_session_publications_confirm`先完整验证observed/stored的seq、changes与Document生命周期整数，再无分配写入确认seq及零占位createdAt/retiredAt，保留原有正数stamp。调用者只对尚未发布的owned准备结果确认一次；memory-only不进入此流程。
 - 验证共享/分离通道、新建/退休/copy stamp、原输入隔离、损坏后通道/非法seq拒绝且前通道不变；确认时分配拦截计数为0。真实DocTx通知host已使用完整publication prepare→confirm，覆盖成功、退休、prepare/adopt/Storage错误。专项与完整Runtime见当前实现记录。
 - 默认Session宿主仍需自动枚举entries/raw copy、解析task-owner conversation并捕获held observed/stored ops；本批完成其确认阶段，不宣称已完成默认服务或Document watch。
+
+### K03 默认持久通知宿主交接
+
+- 阅读固定Pi d5b3de22 Transaction.adopt/describe/takeHeld/#currentTask、Session.#publish/#storeHolds；对照原生DocTx计划、holds merge和Session settle。Pi origin保持89c921d，Harness保持22ddee37。
+- `durable_session.h/.S:pg_session_notifications_bind`提供默认通知服务：准入前枚举实际entries与未加载raw copy，独立捕获record/value/ops，解析Session/conversation/task的conversation；`records.S`内部owner解析复用最新Task候选/提交态缓存。创建/退休预留整数stamp，确认时无分配更新。合并held时克隆PendingOps重放本次ops，不排空权威队列；内部只观察本次操作，持久集合包含held操作。没有commit订阅者时不分配通知，拒绝将另一Session的listeners绑定到当前Tx。
+- `pg_durable_session_settle_notified`接入实际Session持久mutation line，保留旧adopt/publish hooks、held merge、active Tx清理和timer同步。默认服务借用配置，准备token与输出均owned，所有失败统一清理。
+- 验证：13组默认宿主行为（Session/conversation/task×编辑/退休、held读/写×base/delta、创建/同批退休/未加载copy），另有实际Session普通/held结算及关闭；no-subscriber分配计数0、跨Session配置拒绝。72个普通及141个held直接分配/插入/部分复制故障通过。最终专项/完整Runtime见当前实现记录。
+- 后续继续deferred memory、holds独立flush和Session close通知接线，再接Document watch；持久通知已可用，不据此勾选完整观察或K03总验收。

@@ -506,3 +506,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写publication确认，先校验两个owned通道和Document生命周期字段，再更新seq及零createdAt/retiredAt占位值；已有正数stamp保留，shared对象可重复遍历而不改变原stamp。确认不分配，调用者在准备/发布之间仅确认一次。类型匹配按完整字节，NUL伪前缀不作Document处理；memory-only无stored通道拒绝。
 - 实际验证：共享/分离通道的新建/退休/copy stamp、输入隔离、损坏后通道/非法seq拒绝且前通道保持，确认期间分配计数0。真实DocTx通知host已组合Document notice→完整publication prepare→confirm，覆盖编辑、退休、partial prepare失败、adoption失败、Storage失败与一次清理。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有Session独立确认导出/契约、DocTx组合专项、来源与TODO；旧ABI、门禁和预算保持。5个候选路径内容清单摘要（本记录加入前）：4e00f76b9c2a9edca095693474a93a598d349d77b4cb731dcbf1ea6486c00ac2；隔离核心树93a86ba590a10551d46f70d6d26f2221171a78f7。结论为确认阶段本地通过；默认宿主自动计划枚举/任务owner解析/held集合捕获和Document watch继续，K03总验收未完成。TUI工作树保留。
+
+## K03 默认持久通知宿主与实际Session接入
+
+- 来源：Pi d5b3de22 adopt/describe/takeHeld/#currentTask、Session.#publish/#storeHolds与deferred通知用例；fetch后Pi origin保持89c921d，Harness保持22ddee37。
+- 实现：手写默认通知宿主，自动枚举DocTx entries及未加载raw copy，独立record/value/ops，解析三种scope/任务所属会话，创建/退休stamp在Storage确认补seq。held合并克隆pending队列计算完整stored ops而不触动权威holds，观察集合只保留本次新操作；base/delta均保持源通知语义。无commit订阅者不分配通知，跨Session listeners拒绝。实际Durable Session持久结算新入口保持旧hooks、active Tx释放、held merge及timer同步。
+- 实际验证：13组默认宿主行为、2组实际Session普通/held提交与关闭；无订阅分配计数0、跨Session拒绝。72个普通及141个held分配/插入/部分复制故障通过。最初测试把Session/task定义错误附加conversation策略，按实际scope修正；仅读且无写事务按源为空提交，不冲刷held，测试加入真实Entry写入后验证takeHeld差异。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有Session默认服务/独立入口、records内部Task owner解析、专项与来源/TODO；旧ABI、门禁和预算保持。6个候选路径内容清单摘要（本记录加入前）：0f17a340af170e6038d8951d4b8f2752c9a199562a89615c927ce6ce88bd5c74；隔离核心树a7f5aac822c4452f6dc54dabe1de4980e66e9517。结论为默认持久通知本地通过；deferred memory、holds独立flush、close通知和Document watch继续接入，K03总验收未完成。TUI工作树保留。

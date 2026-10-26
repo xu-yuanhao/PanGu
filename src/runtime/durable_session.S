@@ -249,9 +249,35 @@ pg_durable_session_begin:
 .globl pg_durable_session_settle
 .type pg_durable_session_settle,@function
 pg_durable_session_settle:
+ xor r8d,r8d
+ jmp .Ldurable_settle_common
+.globl pg_durable_session_settle_notified
+.type pg_durable_session_settle_notified,@function
+pg_durable_session_settle_notified:
+ mov eax,1
+ test rdx,rdx
+ jz .Ldurable_notified_invalid
+ cmp qword ptr [rdx+8],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rdx+16],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rdx+24],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rdx+32],0
+ je .Ldurable_notified_invalid
+ mov r8,rdx
+ mov rcx,rsi
+ xor esi,esi
+ xor edx,edx
+ jmp .Ldurable_settle_common
+.Ldurable_notified_invalid:
+ ret
+.size pg_durable_session_settle_notified,.-pg_durable_session_settle_notified
+.Ldurable_settle_common:
  push rbx
  push r12
  sub rsp,8
+ mov [rsp],r8
  mov rbx,rdi
  mov eax,1
  test rbx,rbx
@@ -284,6 +310,12 @@ pg_durable_session_settle:
 .Ldurable_settle_stored:
  mov rsi,rcx
  lea rdx,[rbx+120]
+ cmp qword ptr [rsp],0
+ je .Ldurable_settle_unobserved
+ mov rcx,[rsp]
+ call pg_document_tx_observed@PLT
+ jmp .Ldurable_settled
+.Ldurable_settle_unobserved:
  call pg_document_tx_merge@PLT
 .Ldurable_settled:
  mov r12d,eax
@@ -1909,4 +1941,569 @@ pg_session_publications_confirm:
 .section .rodata
 .Lconfirm_created: .asciz "createdAt"
 .Lconfirm_retired: .asciz "retiredAt"
+.section .note.GNU-stack,"",@progbits
+.text
+/* Resolve a Document record's owning conversation on the transaction line. */
+.Lhost_conversation:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rdx
+ mov qword ptr [r12],0
+ mov rdi,rsi
+ lea rsi,[rip+.Lhost_scope]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhost_conversation_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_conversation]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lhost_conversation_task
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lnotice_conversation]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test rax,rax
+ jz .Lhost_conversation_bad
+ mov [r12],rax
+ xor eax,eax
+ jmp .Lhost_conversation_end
+.Lhost_conversation_task:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_task]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lhost_conversation_session
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lhost_task_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ mov rdi,rbx
+ mov rsi,rax
+ mov rdx,r12
+ call pg_record_tx_task_conversation
+ jmp .Lhost_conversation_end
+.Lhost_conversation_session:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lhost_session]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lhost_conversation_bad
+ xor eax,eax
+ jmp .Lhost_conversation_end
+.Lhost_conversation_bad:
+ mov eax,1
+.Lhost_conversation_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Clone lifecycle metadata, reserving integer placeholders for confirmation. */
+.Lhost_record:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13d,esi
+ mov qword ptr [r12],0
+ mov rdi,rbx
+ mov rsi,r12
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lhost_record_bad
+ mov rdi,[r12]
+ lea rsi,[rip+.Lconfirm_created]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lhost_record_retire
+ xor edi,edi
+ call json_object_new_int64@PLT
+ mov rdi,[r12]
+ lea rsi,[rip+.Lconfirm_created]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lhost_record_bad
+.Lhost_record_retire:
+ test r13d,r13d
+ jz .Lhost_record_ok
+ xor edi,edi
+ call json_object_new_int64@PLT
+ mov rdi,[r12]
+ lea rsi,[rip+.Lconfirm_retired]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lhost_record_bad
+.Lhost_record_ok:
+ xor eax,eax
+ jmp .Lhost_record_end
+.Lhost_record_bad:
+ mov eax,1
+.Lhost_record_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* Append a retained notice; keep the caller's owner for split-channel use. */
+.Lhost_append:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov r12,rax
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lhost_append_end
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,1
+.Lhost_append_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.globl pg_session_notifications_bind
+.type pg_session_notifications_bind,@function
+pg_session_notifications_bind:
+ mov eax,1
+ test rdi,rdi
+ jz .Lhost_bind_end
+ test rsi,rsi
+ jz .Lhost_bind_end
+ cmp qword ptr [rdi],0
+ je .Lhost_bind_end
+ mov [rsi],rdi
+ lea rax,[rip+.Lhost_prepare]
+ mov [rsi+8],rax
+ lea rax,[rip+.Lhost_adopt]
+ mov [rsi+16],rax
+ lea rax,[rip+.Lhost_publish]
+ mov [rsi+24],rax
+ lea rax,[rip+.Lhost_discard]
+ mov [rsi+32],rax
+ xor eax,eax
+.Lhost_bind_end:
+ ret
+.size pg_session_notifications_bind,.-pg_session_notifications_bind
+/* token: publications[16], observed/stored documents[16], split flag. */
+.Lhost_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,200
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,25
+ rep stosq
+ mov ebp,3
+ mov qword ptr [r15],0
+ mov rax,[rbx]
+ mov rdx,[rax]
+ cmp rdx,[r12]
+ jne .Lhost_prepare_invalid
+ mov rcx,[rax+16]
+ mov rax,[rax+8]
+.Lhost_interested:
+ test rcx,rcx
+ jz .Lhost_no_subscribers
+ cmp dword ptr [rax+16],1
+ jbe .Lhost_allocate
+ add rax,24
+ dec rcx
+ jmp .Lhost_interested
+.Lhost_no_subscribers:
+ xor ebp,ebp
+ jmp .Lhost_prepare_end
+.Lhost_allocate:
+ mov edi,1
+ mov esi,40
+ call calloc@PLT
+ test rax,rax
+ jz .Lhost_prepare_end
+ mov [r15],rax
+ mov [rsp+192],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lhost_prepare_cleanup
+ mov rdx,[rsp+192]
+ mov [rdx+16],rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lhost_prepare_cleanup
+ mov rdx,[rsp+192]
+ mov [rdx+24],rax
+ mov qword ptr [rsp+184],0
+.Lhost_entry:
+ mov rax,[rsp+184]
+ cmp rax,r14
+ jae .Lhost_copies
+ imul rax,rax,152
+ lea r15,[r13+rax]
+ mov rax,[r15]
+ mov [rsp+160],rax
+ mov edx,[r15+148]
+ test edx,2
+ jnz .Lhost_entry_ready
+ cmp qword ptr [r15+112],0
+ je .Lhost_next_entry
+.Lhost_entry_ready:
+ mov rdi,[rax]
+ mov esi,edx
+ and esi,2
+ lea rdx,[rsp+168]
+ call .Lhost_record
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+168]
+ mov [rsp],rax
+ mov rdi,r12
+ mov rsi,rax
+ lea rdx,[rsp+32]
+ call .Lhost_conversation
+ test eax,eax
+ jnz .Lhost_prepare_invalid
+ mov rax,[rsp+160]
+ mov rdx,[rax+96]
+ mov [rsp+40],rdx
+ mov rdx,[r15+16]
+ mov [rsp+16],rdx
+ mov rdx,[r15+24]
+ mov [rsp+24],rdx
+ mov dword ptr [rsp+48],8
+ test dword ptr [r15+148],1
+ jz .Lhost_entry_retire
+ or dword ptr [rsp+48],4
+.Lhost_entry_retire:
+ test dword ptr [r15+148],2
+ jz .Lhost_entry_value
+ or dword ptr [rsp+48],1
+.Lhost_entry_value:
+ cmp qword ptr [rsp+16],0
+ jne .Lhost_describe
+ mov rdx,[rax+8]
+ mov [rsp+16],rdx
+.Lhost_describe:
+ mov rdi,rsp
+ lea rsi,[rsp+176]
+ call pg_document_publication_prepare
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ test dword ptr [r15+148],16
+ jz .Lhost_same_notice
+ test dword ptr [r15+148],2
+ jnz .Lhost_same_notice
+ mov rax,[rsp+192]
+ mov dword ptr [rax+32],1
+ mov rax,[rsp+160]
+ mov rdx,[rax+88]
+ cmp rdx,[rax+96]
+ jb .Lhost_held_observed
+ mov rdi,[r15+24]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lhost_held_stored
+.Lhost_held_observed:
+ mov rax,[rsp+192]
+ mov rdi,[rax+16]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+.Lhost_held_stored:
+ mov rdi,[rsp+176]
+ lea rsi,[rsp+56]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rdi,[rsp+176]
+ call json_object_put@PLT
+ mov rax,[rsp+56]
+ mov [rsp+176],rax
+ mov qword ptr [rsp+56],0
+ mov rdi,[rbx+8]
+ test rdi,rdi
+ jz .Lhost_prepare_invalid
+ mov rcx,[rdi+16]
+ mov rdi,[rdi+8]
+ mov rax,[rsp+160]
+ mov rdx,[rax+72]
+.Lhost_find_hold:
+ test rcx,rcx
+ jz .Lhost_prepare_invalid
+ mov rax,[rdi]
+ cmp [rax+72],rdx
+ je .Lhost_hold_found
+ add rdi,56
+ dec rcx
+ jmp .Lhost_find_hold
+.Lhost_hold_found:
+ mov [rsp+152],rdi
+ movups xmm0,[rdi+8]
+ movups [rsp+64],xmm0
+ movups xmm0,[rdi+24]
+ movups [rsp+80],xmm0
+ mov rdi,[rsp+64]
+ call json_object_get@PLT
+ mov rdi,[rsp+72]
+ call json_object_get@PLT
+ mov rsi,[r15+24]
+ test rsi,rsi
+ jnz .Lhost_hold_inputs
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lhost_prepare_cleanup
+ mov [rsp+144],rax
+ mov rsi,rax
+.Lhost_hold_inputs:
+ lea rdi,[rsp+64]
+ mov rdx,[rsp+16]
+ mov rcx,[rsp+40]
+ mov rax,[rsp+152]
+ mov r8d,[rax+48]
+ lea r9,[rsp+96]
+ call pg_document_store_held@PLT
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rdi,[rsp+176]
+ lea rsi,[rip+.Lnotice_ops]
+ mov rdx,[rsp+104]
+ call .Lnotice_copy
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+192]
+ mov rdi,[rax+24]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ jmp .Lhost_entry_clear
+.Lhost_same_notice:
+ mov rax,[rsp+192]
+ mov rdi,[rax+16]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+192]
+ mov rdi,[rax+24]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+.Lhost_entry_clear:
+ call .Lhost_locals_clear
+.Lhost_next_entry:
+ inc qword ptr [rsp+184]
+ jmp .Lhost_entry
+.Lhost_copies:
+ mov qword ptr [rsp+184],0
+ mov rdi,[r12+24]
+ call json_object_array_length@PLT
+ mov r14,rax
+.Lhost_copy_each:
+ mov rsi,[rsp+184]
+ cmp rsi,r14
+ jae .Lhost_build
+ mov rdi,[r12+24]
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhost_copy_next
+ mov rdi,rax
+ lea rsi,[rip+.Lnotice_document_copy]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lhost_copy_next
+ mov rdi,r15
+ lea rsi,[rip+.Lnotice_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ lea rdx,[rsp+168]
+ call .Lhost_record
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+168]
+ mov [rsp],rax
+ mov rdi,r12
+ mov rsi,rax
+ lea rdx,[rsp+32]
+ call .Lhost_conversation
+ test eax,eax
+ jnz .Lhost_prepare_invalid
+ mov rdi,r15
+ lea rsi,[rip+.Lnotice_source]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ mov dword ptr [rsp+48],2
+ mov rdi,rsp
+ lea rsi,[rsp+176]
+ call pg_document_publication_prepare
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+192]
+ mov rdi,[rax+16]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ mov rax,[rsp+192]
+ mov rdi,[rax+24]
+ mov rsi,[rsp+176]
+ call .Lhost_append
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ call .Lhost_locals_clear
+.Lhost_copy_next:
+ inc qword ptr [rsp+184]
+ jmp .Lhost_copy_each
+.Lhost_build:
+ mov rdi,[r12+24]
+ mov [rsp+112],rdi
+ mov rax,[rsp+192]
+ mov rdx,[rax+16]
+ mov [rsp+120],rdx
+ cmp dword ptr [rax+32],0
+ je .Lhost_build_stored
+ mov rdx,[rax+24]
+.Lhost_build_stored:
+ mov [rsp+128],rdx
+ mov qword ptr [rsp+136],1
+ mov qword ptr [rsp+144],0
+ lea rdi,[rsp+112]
+ mov rsi,rax
+ call pg_session_publications_prepare
+ test eax,eax
+ jnz .Lhost_prepare_cleanup
+ xor ebp,ebp
+ jmp .Lhost_prepare_cleanup
+.Lhost_prepare_invalid:
+ mov ebp,1
+.Lhost_prepare_cleanup:
+ call .Lhost_locals_clear
+.Lhost_prepare_end:
+ mov eax,ebp
+ add rsp,200
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Called only with the enclosing prepare frame intact. */
+.Lhost_locals_clear:
+ sub rsp,8
+ mov rdi,[rsp+192]
+ call json_object_put@PLT
+ mov rdi,[rsp+184]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ lea rdi,[rsp+80]
+ call pg_pending_ops_close@PLT
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov rdi,[rsp+160]
+ call json_object_put@PLT
+ mov qword ptr [rsp+192],0
+ mov qword ptr [rsp+184],0
+ mov qword ptr [rsp+72],0
+ mov qword ptr [rsp+112],0
+ mov qword ptr [rsp+120],0
+ mov qword ptr [rsp+160],0
+ add rsp,8
+ ret
+.Lhost_adopt:
+ test rsi,rsi
+ jz .Lhost_adopt_empty
+ mov rdi,rsi
+ mov rsi,rdx
+ jmp pg_session_publications_confirm
+.Lhost_adopt_empty:
+ xor eax,eax
+ ret
+.Lhost_publish:
+ test rsi,rsi
+ jz .Lhost_publish_empty
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rbx]
+ mov rdx,[rbx+16]
+ call pg_session_publications_deliver
+ test eax,eax
+ jz .Lhost_publish_end
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Lhost_publish_end
+ mov dword ptr [rax+52],4
+.Lhost_publish_end:
+ pop rbx
+.Lhost_publish_empty:
+ ret
+.Lhost_discard:
+ test rsi,rsi
+ jz .Lhost_discard_end
+ push rbx
+ mov rbx,rsi
+ mov rdi,rsi
+ call pg_session_publications_discard
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rdi,[rbx+24]
+ call json_object_put@PLT
+ mov rdi,rbx
+ call free@PLT
+ pop rbx
+.Lhost_discard_end:
+ ret
+.section .rodata
+.Lhost_scope: .asciz "scope"
+.Lhost_task_id: .asciz "taskId"
+.Lhost_session: .asciz "session"
 .section .note.GNU-stack,"",@progbits
