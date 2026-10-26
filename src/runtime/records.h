@@ -54,7 +54,11 @@ typedef struct {
    line on its Session. Callbacks cannot reenter this Tx. Begin borrows Session
    and read service; discard releases private candidates and is idempotent.
    stage accepts a final StorageWrite of the declared kind and deep-copies it.
-   A table-write attempt forbids subsequent public table reads, including if
+   Committed Task reads are cached per ID, including missing/provider errors;
+   caller outputs are detached. Task first read/write establishes candidate
+   enumeration order. Private metadata is owned by the Tx candidate array,
+   carried through native batch rebuilds and explicitly released at settle or
+   discard. A table-write attempt forbids subsequent public table reads, including if
    staging fails. Document writes do not set the table-write barrier.
    Commit seals before admission, submits through pg_records_commit and consumes
    candidates on every result. Copy/source conflicts fail before Storage admission
@@ -82,7 +86,7 @@ pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
 pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct json_object *,
  int (*mint)(void *,uint64_t *),struct json_object **);
 /* Detached candidate snapshots of an open Tx, permitted after table writes.
-   Tasks retain first-staged ID order and expose the latest value per ID;
+   Tasks retain first-accessed ID order and expose the latest value per ID;
    conversations retain staged creation/fork order. No Storage calls. Partial
    allocation failure returns no output and preserves all Tx candidates. */
 pg_record_tx_status pg_record_tx_staged_tasks(pg_record_tx *,struct json_object **);

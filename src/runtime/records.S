@@ -49,8 +49,14 @@ pg_records_commit:
  jne .Lrecords_finish
  mov r14d,5
  mov rdi,r12
- lea rsi,[rsp+8]
+ call json_object_get_userdata@PLT
  xor edx,edx
+ test rax,rax
+ jz .Lrecords_copy_ready
+ lea rdx,[rip+.Ltask_copy_plain]
+.Lrecords_copy_ready:
+ mov rdi,r12
+ lea rsi,[rsp+8]
  call json_object_deep_copy@PLT
  mov r13,[rsp+8]
  test eax,eax
@@ -482,11 +488,20 @@ pg_record_tx_read:
  je .Ltx_read_return
  mov qword ptr [rsp],0
  mov dword ptr [rbx+32],1
+ cmp dword ptr [rsp+8],2
+ jne .Ltx_read_provider
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,rsp
+ call .Ltask_cached_read
+ jmp .Ltx_read_provider_done
+.Ltx_read_provider:
  mov rdi,[rbx+8]
  mov esi,[rsp+8]
  mov rdx,[rsp+16]
  mov rcx,rsp
  call [rbx+16]
+.Ltx_read_provider_done:
  mov dword ptr [rbx+32],0
  test eax,eax
  jnz .Ltx_read_error
@@ -559,6 +574,24 @@ pg_record_tx_stage:
  call .Ls_string
  test eax,eax
  jz .Ltx_stage_cleanup
+ cmp r12d,2
+ jne .Ltask_stage_slot_ready
+ mov rdi,r13
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Ltx_stage_cleanup
+ mov rsi,rax
+ mov rdi,rbx
+ call .Ltask_slot
+ test rax,rax
+ jz .Ltx_stage_allocation
+.Ltask_stage_slot_ready:
  mov rdi,r13
  mov rsi,rsp
  xor edx,edx
@@ -605,7 +638,7 @@ pg_record_tx_discard:
  mov dword ptr [rbx+36],1
  mov rdi,[rbx+24]
  mov qword ptr [rbx+24],0
- call json_object_put@PLT
+ call pg_record_tx_array_release
  mov dword ptr [rbx+32],0
  xor eax,eax
  pop rbx
@@ -712,7 +745,7 @@ pg_record_tx_commit_routed:
 .Ltx_commit_consumed:
  mov rdi,[rbx+24]
  mov qword ptr [rbx+24],0
- call json_object_put@PLT
+ call pg_record_tx_array_release
  mov dword ptr [rbx+32],0
  xor eax,eax
  test r12d,r12d
@@ -722,7 +755,7 @@ pg_record_tx_commit_routed:
 .Ltx_commit_plan_failed:
  mov rdi,[rbx+24]
  mov qword ptr [rbx+24],0
- call json_object_put@PLT
+ call pg_record_tx_array_release
  mov dword ptr [rbx+32],0
  mov eax,1
 .Ltx_commit_return:
@@ -1963,6 +1996,9 @@ pg_record_tx_fork_conversation:
  test eax,eax
  jnz .Ltx_fork_cleanup
  mov rdi,[rbx+24]
+ mov rsi,[rsp+88]
+ call pg_record_tx_array_transfer
+ mov rdi,[rbx+24]
  mov rax,[rsp+88]
  mov [rbx+24],rax
  mov qword ptr [rsp+88],0
@@ -2516,11 +2552,10 @@ pg_record_tx_create:
 .Ltx_current_task_read:
  cmp qword ptr [rbx+16],0
  je .Ltx_current_task_error
- mov rdi,[rbx+8]
- mov esi,2
- mov rdx,r12
- mov rcx,r13
- call [rbx+16]
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ call .Ltask_cached_read
  test eax,eax
  jnz .Ltx_current_task_error
  mov rax,[r13]
@@ -3433,6 +3468,19 @@ pg_record_tx_staged_conversations:
  inc r14
  jmp .Lcandidates_each
 .Lcandidates_copy:
+ test r13d,r13d
+ jz .Lcandidates_order_ready
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rsp+8]
+ call .Ltask_order_candidates
+ test rax,rax
+ jz .Lcandidates_cleanup
+ mov r13,rax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov [rsp],r13
+.Lcandidates_order_ready:
  mov rdi,[rsp]
  lea rsi,[rsp+16]
  xor edx,edx
@@ -3471,4 +3519,329 @@ pg_record_tx_staged_conversations:
  ret
 .size pg_record_tx_staged_tasks,.-pg_record_tx_staged_tasks
 .size pg_record_tx_staged_conversations,.-pg_record_tx_staged_conversations
+.section .note.GNU-stack,"",@progbits
+.text
+/* The candidate JSON array owns ordered Task read metadata as userdata. */
+.Ltask_slot:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r14d,r14d
+ xor ebp,ebp
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,[rbx+24]
+ call json_object_get_userdata@PLT
+ mov r13,rax
+ test rax,rax
+ jnz .Lslot_index_ready
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lslot_done
+ mov r13,rax
+ mov rdi,[rbx+24]
+ mov rsi,rax
+ xor edx,edx
+ call json_object_set_userdata@PLT
+.Lslot_index_ready:
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lslot_done
+ mov [rsp],rax
+ mov rdi,rax
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lslot_done
+ mov r12,rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lslot_create
+ mov rbp,rax
+ jmp .Lslot_done
+.Lslot_create:
+ mov edi,2
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lslot_done
+ mov r14,rax
+ xor edi,edi
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lslot_done
+ mov [rsp+8],rax
+ mov rdi,r14
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lslot_done
+ mov qword ptr [rsp+8],0
+ mov rdi,r14
+ xor esi,esi
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lslot_done
+ mov rdi,r13
+ mov rsi,r12
+ mov rdx,r14
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lslot_done
+ mov rbp,r14
+ xor r14d,r14d
+.Lslot_done:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,r14
+ call json_object_put@PLT
+ mov rax,rbp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Read once per ID; cache missing and provider errors as well as successful
+   committed records. Returned records are detached from the retained cache. */
+.Ltask_cached_read:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r13],0
+ mov qword ptr [rsp],0
+ mov ebp,2
+ call .Ltask_slot
+ test rax,rax
+ jz .Ltask_read_end
+ mov r14,rax
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+8],rax
+ mov rdi,rax
+ call json_object_get_int@PLT
+ test eax,eax
+ jnz .Ltask_read_status
+ mov rdi,[rbx+8]
+ mov esi,2
+ mov rdx,r12
+ mov rcx,rsp
+ call [rbx+16]
+ test eax,eax
+ jz .Ltask_read_success
+ cmp eax,1
+ je .Ltask_read_missing
+ mov ebp,3
+ jmp .Ltask_read_record_status
+.Ltask_read_missing:
+ mov ebp,2
+ jmp .Ltask_read_record_status
+.Ltask_read_success:
+ mov rdi,r14
+ mov esi,1
+ mov rdx,[rsp]
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Ltask_read_end
+ mov qword ptr [rsp],0
+ mov ebp,1
+.Ltask_read_record_status:
+ mov rdi,[rsp+8]
+ mov esi,ebp
+ call json_object_set_int@PLT
+ mov eax,ebp
+.Ltask_read_status:
+ dec eax
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltask_read_end
+ mov rdi,r14
+ mov esi,1
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,r13
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jz .Ltask_read_end
+ mov rdi,[r13]
+ call json_object_put@PLT
+ mov qword ptr [r13],0
+ mov ebp,2
+.Ltask_read_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .note.GNU-stack,"",@progbits
+
+.text
+.Ltask_copy_plain:
+ sub rsp,8
+ call json_c_shallow_copy_default@PLT
+ add rsp,8
+ test eax,eax
+ js .Ltask_copy_plain_end
+ mov eax,2
+.Ltask_copy_plain_end:
+ ret
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_record_tx_array_release
+.hidden pg_record_tx_array_release
+pg_record_tx_array_release:
+ test rdi,rdi
+ jz .Larray_release_end
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ call json_object_get_userdata@PLT
+ mov r12,rax
+ mov rdi,rbx
+ xor esi,esi
+ xor edx,edx
+ call json_object_set_userdata@PLT
+ mov rdi,r12
+ call json_object_put@PLT
+ mov rdi,rbx
+ call json_object_put@PLT
+ add rsp,8
+ pop r12
+ pop rbx
+.Larray_release_end:
+ ret
+.globl pg_record_tx_array_transfer
+.hidden pg_record_tx_array_transfer
+pg_record_tx_array_transfer:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ call json_object_get_userdata@PLT
+ mov r13,rax
+ mov rdi,rbx
+ xor esi,esi
+ xor edx,edx
+ call json_object_set_userdata@PLT
+ mov rdi,r12
+ mov rsi,r13
+ xor edx,edx
+ call json_object_set_userdata@PLT
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .note.GNU-stack,"",@progbits
+.text
+.Ltask_order_candidates:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rsi
+ mov r12,rdx
+ xor ebp,ebp
+ mov qword ptr [rsp+24],0
+ mov rdi,[rdi+24]
+ call json_object_get_userdata@PLT
+ test rax,rax
+ jnz .Ltask_order_map
+ mov rdi,rbx
+ call json_object_get@PLT
+ mov rbp,rax
+ jmp .Ltask_order_end
+.Ltask_order_map:
+ mov r14,rax
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ltask_order_end
+ mov r13,rax
+ mov rdi,r14
+ call json_object_iter_begin@PLT
+ mov [rsp],rax
+ mov rdi,r14
+ call json_object_iter_end@PLT
+ mov [rsp+8],rax
+.Ltask_order_each:
+ mov rdi,rsp
+ lea rsi,[rsp+8]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Ltask_order_success
+ mov rdi,rsp
+ call json_object_iter_peek_name@PLT
+ mov rdi,rax
+ xor esi,esi
+ mov edx,10
+ call strtoull@PLT
+ mov rdi,r12
+ mov rsi,rax
+ lea rdx,[rsp+16]
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Ltask_order_next
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ dec rsi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltask_order_failed
+ mov qword ptr [rsp+24],0
+.Ltask_order_next:
+ mov rdi,rsp
+ call json_object_iter_next@PLT
+ jmp .Ltask_order_each
+.Ltask_order_failed:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,r13
+ call json_object_put@PLT
+ jmp .Ltask_order_end
+.Ltask_order_success:
+ mov rbp,r13
+.Ltask_order_end:
+ mov rax,rbp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
 .section .note.GNU-stack,"",@progbits

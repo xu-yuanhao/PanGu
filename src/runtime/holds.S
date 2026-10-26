@@ -1101,6 +1101,9 @@ pg_document_holds_merge_bind:
  jnz .Lsplice_bad
 .Lsplice_install:
  mov rdi,[rbx+24]
+ mov rsi,r15
+ call pg_record_tx_array_transfer@PLT
+ mov rdi,[rbx+24]
  mov [rbx+24],r15
  call json_object_put@PLT
  mov rdx,[rsp+8]

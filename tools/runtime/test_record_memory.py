@@ -421,6 +421,45 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
         finally:library.json_object_put(batch)
     print('PASS: 10 staged candidate arrays match actual Pi stagedTasks/stagedConversations with write-established Task order')
 
+def task_cache_order(native,library):
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const s=readFileSync(process.argv[1],'utf8');const a=s.indexOf('#taskEntry(id:'),b=s.indexOf('\n}',a),c=s.indexOf('stagedTasks()'),d=s.indexOf('\n\t/**',c);const text='class Probe{#tasksById=new Map();#context={};calls=0;#host={storage:{task:async(id)=>{this.calls++;if(id===9)throw Error("read");return id===99?undefined:{id,n:this.calls}}}};'+s.slice(a,b)+s.slice(c,d)+'read(id){return this.#committedTask(id)}stage(record){this.#taskEntry(record.id).write={record}}}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const ids of [[2,3],[3,2],[99,2],[9,2]]){const p=new Probe(),reads=[];for(const id of ids)for(let i=0;i<2;i++){try{reads.push({ok:true,value:(await p.read(id))??null})}catch{reads.push({ok:false})}}p.stage({id:2,n:20});p.stage({id:3,n:30});out.push({reads,calls:p.calls,staged:p.stagedTasks()})}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p))
+    native.pg_record_tx_read.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)];native.pg_record_tx_stage.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint,ctypes.c_void_p];native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)];native.pg_record_tx_staged_tasks.argtypes=[ctypes.POINTER(Tx),ctypes.POINTER(ctypes.c_void_p)]
+    for ids,want in zip([[2,3],[3,2],[99,2],[9,2]],expected,strict=True):
+        calls=[]
+        @read_type
+        def read(ctx,table,id,out):
+            calls.append(id);assert table==2
+            if id==9:return 7
+            if id==99:return 1
+            out[0]=library.json_tokener_parse(json.dumps(dict(id=id,n=len(calls))).encode());return 0
+        tx=Tx(None,None,ctypes.cast(read,ctypes.c_void_p),library.json_tokener_parse(b'[]'));actual=dict(reads=[])
+        try:
+            for id in ids:
+                for _ in range(2):
+                    out=ctypes.c_void_p();status=native.pg_record_tx_read(ctypes.byref(tx),2,id,ctypes.byref(out))
+                    try:
+                        item=dict(ok=status in (0,7))
+                        if item['ok']:item['value']=json.loads(library.json_object_to_json_string_ext(out,0)) if out.value else None
+                        actual['reads'].append(item)
+                    finally:library.json_object_put(out)
+            for id in [2,3]:
+                value=library.json_tokener_parse(json.dumps(dict(type='task',value=dict(id=id,n=id*10))).encode())
+                try:assert not native.pg_record_tx_stage(ctypes.byref(tx),2,value)
+                finally:library.json_object_put(value)
+            out=ctypes.c_void_p()
+            try:
+                assert not native.pg_record_tx_staged_tasks(ctypes.byref(tx),ctypes.byref(out));actual['staged']=json.loads(library.json_object_to_json_string_ext(out,0))
+            finally:library.json_object_put(out)
+            actual['calls']=len(calls);assert actual==want,(ids,actual,want)
+        finally:assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print('PASS: cached Task success/missing/rejection and first-read candidate order match actual Pi Task cache methods')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -703,5 +742,6 @@ def main():
         typed_entries(native,library)
         submission_creation(native,library)
         candidate_snapshots(native,library)
+        task_cache_order(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

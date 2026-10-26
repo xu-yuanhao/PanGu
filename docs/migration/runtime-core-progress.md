@@ -415,3 +415,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写records候选快照入口，Task以json-c kptr hash映射ID至输出位置，首次写入定序、后续替换最新记录；Conversation顺序保留。内部临时数组仅持有候选引用，最终深复制后返回owned输出，所有分配失败保留原Tx状态。查询不触发Storage，允许table writes后的候选检查；旧ABI保持。
 - 实际验证：10组执行实际Pi stagedTasks/stagedConversations方法，Task顺序由写入建立，候选值和顺序一致。100次Task写入覆盖40个ID以及3个Conversation，验证最新值、输入/输出隔离、empty/sealed及Task143/Conversation5共148个直接分配/插入/部分复制故障。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；既有3条delta ABI边界单列。共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有模块独立导出/来源登记、专项和TODO，无门禁/预算变化。6个候选路径内容清单摘要（本记录加入前）：1729dcf375fb0f30d865882455bcfaa38ac1aa9b5935500f126a74b0b15ddbb5。结论为本地候选通过；完整Task缓存顺序仍待接入：Pi committedTask先读可预插入#tasksById，当前仅首次写入定序，此边界未作为完全等价通过。随后补Task读取缓存/候选状态及K03总验收。TUI工作树保持独立。
+
+## K03 Task提交态缓存与首次访问顺序
+
+- 来源：Pi d5b3de22 Transaction.#taskEntry/#committedTask/#currentTask/stagedTasks；本批fetch后Pi HEAD/origin=d5b3de22/f9daca3，Harness为22ddee37。
+- 实现：公开Task读与内部currentTask fallback复用每ID缓存，成功/missing/provider拒绝各只读一次；返回独立副本，读写首次访问建立候选枚举顺序。json-c有序私有slot绑定事务候选数组，保持Tx48 ABI；Task最新候选按slot顺序输出，只读过而未写的ID不输出。分叉与holds批次重建转交私有元数据，Storage深复制省略元数据，commit/discard在候选数组删除前显式释放。先读后写候选顺序与Pi的差异已接通。
+- 所有权修复：最初在json-c userdata destructor内递归释放元数据触发引用计数断言，独立非空array探针也复现此重入问题；改为Tx显式清理/转交并在Storage拷贝时排除内部metadata。故障路径及最终树重新验证，无该问题残留。对照脚本的TypeScript拼接与ctypes局部Tx类型声明错误均在工具中修正，未计入通过结果。
+- 实际验证：执行实际Pi #taskEntry/#committedTask/stagedTasks方法对照四种先读顺序，重复成功/缺失/拒绝的值、provider次数和最终候选顺序一致；已有10组候选数组、5982个MemoryStorage操作与其余固定Pi/Chord基线保持通过。原生验证返回隔离、busy/reentry、缺失和错误缓存、分叉批次重建后顺序/释放；10个缓存直接分配/插入/部分复制故障通过，候选枚举故障范围扩展Task184/Conversation5。最终O0/O2 ASan/UBSan专项及完整Runtime O0/O2 UBSan通过，分叉保留用例随后两优化级补充复验；既有3条delta ABI边界继续单列。共享及隔离核心树G00/Assembly清单与隔离产品构建通过。
+- 同一实施Agent自审：仅既有records/holds内部元数据生命周期、来源/实际模块登记、专项及TODO，公开布局保持，门禁/预算未改。7个候选路径内容清单摘要（本记录加入前）：9ca4cf7d56daf26f7c2d7754fd0949437f007d4a82f811eba7e1982238125300。结论为本地候选通过；后续补Task setTask终态/conversation/时间戳与createTask，K03总验收尚未完成。TUI工作树保持独立。

@@ -100,6 +100,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通类型化Entry提交态读取：可选精确kind过滤、缺失/不匹配、owned结果及原事务读屏障。
 - [x] 接通原始Submission创建：先核对conversation再mint，隔离draft/返回值，候选可继续place/settle并统一提交。
 - [x] 提供已写候选的隔离快照：Task按ID保留最新值，Conversation保持创建/分叉顺序；分配失败保留候选。
+- [x] 接通Task提交态读取缓存与首次访问定序：缓存成功/缺失/错误、独立返回值，候选快照保持先读后写顺序，重建批次转交私有元数据。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -400,4 +401,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 
 - 阅读固定Pi d5b3de22 Transaction.stagedTasks/stagedConversations及#taskEntry/#committedTask调用。新增records的两个独立入口，以json-c kptr索引保留本批首次写入位置、更新同Task ID最新值；Conversation按候选顺序返回，输出deep-copy隔离。原Tx布局保持，查询不触发Storage、允许table writes后的内部候选读取。
 - 验证：10组执行实际stagedTasks/stagedConversations的候选数组差异，Task顺序由写入建立；100次Task候选覆盖40个ID和3个Conversation，结果/隔离及Task143、Conversation5个直接分配/插入/复制故障通过。专项与完整Runtime见当前实现记录。
-- 待衔接：Pi的committedTask读取会预先插入#tasksById；原生Task读取缓存尚未接入，先读后写时须按该插入顺序枚举。该边界随Task候选缓存一起补齐；K03总验收保持未完成。
+- Task缓存衔接结果见下方交接；K03总验收保持未完成。
+
+### K03 Task读取缓存与候选顺序交接
+
+- 阅读固定Pi d5b3de22 Transaction.#taskEntry/#committedTask/#currentTask/stagedTasks；公开Task读与内部currentTask提交态fallback复用每ID缓存，成功、missing及provider拒绝均只读取一次。保留原Tx48字节，私有有序json-c元数据绑定候选数组；返回值独立复制，Task staged快照按首次读/写建立的slot顺序过滤实际候选。
+- 批次的分叉拼接与holds合并重建转移元数据；Storage复制省略该元数据，commit/discard在删除候选前显式释放，错误路径保持所有权。该策略避开json-c userdata destructor内递归释放带来的重入问题，测试发现的失败已修复并重跑。
+- 验证：实际Pi #taskEntry/#committedTask/stagedTasks的成功/缺失/拒绝、重复读取次数与四种先读后写顺序一致；独立返回值、read barrier、候选隔离和10个缓存直接分配/插入/部分复制故障通过，候选枚举故障范围扩展为184/5。专项/完整Runtime结果见当前实现记录。
+- 下一行为：Task候选setTask的终态拒绝、conversation稳定与时间戳，以及createTask原生构造，继续K03/K06来源映射。
