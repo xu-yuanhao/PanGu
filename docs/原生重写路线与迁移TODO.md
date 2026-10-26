@@ -104,6 +104,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通Task提交态读取缓存与首次访问定序：缓存成功/缺失/错误、独立返回值，候选快照保持先读后写顺序，重建批次转交私有元数据。
 - [x] 接通setTask候选替换：终态拒绝、conversation稳定、已有生命周期时间戳优先及按状态注入时钟。
 - [x] 移植createTask的submissionIds前置options派生：候选优先、首trace/root、后续links、空列表及失败清理。
+- [x] 接通可注入的Storage点读/ID分配失败守卫：首因锁存、跨失败结果丢弃、读取参数错误/取消豁免、活跃调用阻止后端关闭。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -432,3 +433,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `records.h/.S:pg_record_tx_create_task`消费已移植options准备，按源顺序解析最新候选/缓存owner、确定conversation并验证、调用initial、mint、追踪注入，最后构造和暂存独立pending Task。独立40字节服务描述符注入initializer/mint/trace/default scope，既有ABI保持；失败清理partial输出并保留先前候选，mint后的错误不回收ID。父子background/conversation约束在创建时检查，owner终态等继续由提交时统一校验。
 - 验证：73组执行实际Pi createTask方法，对照完整record、Storage/initial/mint/inject次序及错误；真实MemoryStorage验证创建→统一提交→独立读、同批父子创建、无追踪提供者、null输入、owner最终terminal拒绝。49个直接分配/插入/部分复制故障覆盖prior候选保留、partial callback清理和ID消费；完整运行结果见当前实现记录。
 - 下一行为：核对K03剩余事务查询、只读Session与会话级公开能力，补齐后总验收；任务phase/调度按K06接入，整机组合按K14执行。
+
+### K03 Storage点读与ID失败守卫交接
+
+- 阅读固定Pi d5b3de22 SessionImpl/GuardedStorage.#call/close及harness-storage-failure的invalid request、取消读取与失败Storage场景。本批Pi/Harness fetch后参考提交保持d5b3de22/f9daca3与22ddee37，事务/Session源码无新增差异。
+- `durable_session.h/.S:pg_durable_storage_read/mint`以独立56字节描述符适配既有Tx回调，点读正常missing不失败、请求错误/读取取消仅拒绝当前调用，其余读错误与所有mint错误锁存Storage失败；回调跨越既有失败时丢弃partial结果并保留首因。调用期间临时持有Session busy，close只能封闭准入并等待；已准入Tx在closing仍可完成读/mint。提供者按调用借用，旧结构布局保持。
+- 56组执行实际Pi GuardedStorage类对照首次/后续调用结果、provider次数和首因；原生验证重入、close回调、closing已准入Tx、mint无效ID和partial输出释放。真实MemoryStorage接入guard作为Tx.read_context，Submission创建→commit及read/mint错误锁存均验证。专项和完整Runtime结果见当前实现记录。
+- 后续继续将相同守卫语义接入分页/head/request/document提供者和整机服务组合，Session失败后的有序关闭由宿主执行；本批只完成点读/mint适配，不据此勾选K03总验收。

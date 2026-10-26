@@ -236,6 +236,25 @@ static void task_family_tests(void){
  if(terminal){struct json_object *write=json_tokener_parse("{\"type\":\"task\",\"value\":{\"conversationId\":1,\"state\":{\"status\":\"terminal\"}}}");assert(!json_object_object_add(json_object_object_get(write,"value"),"id",json_object_new_int64((int64_t)owner))&&!pg_record_tx_stage(&tx,PG_TX_TASK,write));json_object_put(write);assert(pg_record_tx_commit(&tx)!=PG_TX_OK&&!session.failed&&m.count==1);}else{assert(!pg_record_tx_commit(&tx)&&m.count==3);struct json_object *saved=0;assert(!pg_record_memory_read(&m,PG_TABLE_TASK,child,&saved)&&json_object_equal(value,saved));json_object_put(saved);}
  json_object_put(tasks);json_object_put(options);json_object_put(definition);assert(!pg_record_memory_close(&m));}
 }
+typedef struct {pg_durable_storage *guard;unsigned mode,calls,cancel_checks,error_checks;} guard_fixture;
+static int guard_error(void *ctx,int status){guard_fixture *f=ctx;++f->error_checks;return status==8;}
+static int guard_cancelled(void *ctx){guard_fixture *f=ctx;++f->cancel_checks;return f->mode==4;}
+static int guard_read(void *ctx,unsigned table,uint64_t id,struct json_object **out){guard_fixture *f=ctx;++f->calls;assert(table==2&&id==10&&f->guard->busy&&f->guard->session->busy);*out=json_object_new_object();assert(*out);if(f->mode==5)f->guard->session->records->failed=PG_RECORDS_ADOPTION_FAILED;if(f->mode==6){struct json_object *nested=0;assert(pg_durable_storage_read(f->guard,table,id,&nested)==PG_GUARDED_STORAGE_REENTRY&&!nested);}if(f->mode==7)assert(pg_durable_session_close(f->guard->session)==1);return f->mode==1?1:f->mode==2||f->mode==4?7:f->mode==3?8:0;}
+static int guard_mint(void *ctx,uint64_t *out){guard_fixture *f=ctx;++f->calls;assert(f->guard->busy&&f->guard->session->busy);*out=f->mode==8?0:100;if(f->mode==5)f->guard->session->records->failed=PG_RECORDS_ADOPTION_FAILED;return f->mode==2||f->mode==4?7:f->mode==3?8:0;}
+typedef struct {pg_record_memory *memory;unsigned fail_read,fail_mint;} guarded_memory_fixture;
+static int guarded_memory_read(void *ctx,unsigned table,uint64_t id,struct json_object **out){guarded_memory_fixture *f=ctx;if(f->fail_read){*out=json_object_new_object();return 7;}return pg_record_memory_read(f->memory,(pg_record_table)table,id,out);}
+static int guarded_memory_mint(void *ctx,uint64_t *out){guarded_memory_fixture *f=ctx;return f->fail_mint?7:pg_record_memory_mint(f->memory,out);}
+static void guarded_transaction_tests(void){
+ for(unsigned mode=0;mode<3;++mode){pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}}]"));pg_record_session records={.storage=pg_record_memory_storage(&m)};pg_durable_session session={.records=&records,.phase=1};guarded_memory_fixture f={&m,mode==1,mode==2};pg_durable_storage guard={.session=&session,.context=&f,.read=guarded_memory_read,.mint=guarded_memory_mint};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&records,&guard,pg_durable_storage_read));session.active_records=&tx;struct json_object *draft=json_tokener_parse("{\"conversationId\":1,\"status\":\"queued\"}"),*out=0;int status=pg_record_tx_create_submission(&tx,draft,pg_durable_storage_mint,&out);assert(!tx.busy&&!guard.busy&&!session.busy);if(mode){assert(status!=PG_TX_OK&&!out&&records.failed==PG_RECORDS_STORAGE_FAILED&&m.count==1&&!json_object_array_length(tx.writes));assert(!pg_record_tx_discard(&tx));}else{assert(!status&&out&&!records.failed);assert(!pg_record_tx_commit(&tx)&&m.count==2);}json_object_put(out);json_object_put(draft);assert(!pg_record_memory_close(&m));}
+}
+static void storage_guard_tests(void){
+ _Static_assert(sizeof(pg_durable_storage)==56&&offsetof(pg_durable_storage,busy)==48,"guard descriptor ABI");
+ for(unsigned mint=0;mint<2;++mint)for(unsigned mode=0;mode<9;++mode){pg_record_session records={0};pg_durable_session session={.records=&records,.phase=1};guard_fixture f={.mode=mode};pg_durable_storage guard={.session=&session,.context=&f,.read=guard_read,.mint=guard_mint,.request_error=guard_error,.cancelled=guard_cancelled};f.guard=&guard;struct json_object *out=0;uint64_t id=999;int status=mint?pg_durable_storage_mint(&guard,&id):pg_durable_storage_read(&guard,2,10,&out);unsigned failed=mode==5?PG_RECORDS_ADOPTION_FAILED:mode==2||(mint&&(mode==3||mode==4||mode==8))?PG_RECORDS_STORAGE_FAILED:0;int want=mode==5?64:mint&&mode==8?66:mode==2||mode==4?7:mode==3?8:!mint&&mode==1?1:0;assert(status==want&&records.failed==failed&&!guard.busy&&!session.busy&&f.calls==1);if(!status){if(mint)assert(id==100);else assert(out);}else{assert(!out);if(mint)assert(!id);}json_object_put(out);out=0;
+ if(failed){unsigned before=f.calls;assert(pg_durable_storage_read(&guard,2,10,&out)==PG_GUARDED_STORAGE_FAILED&&!out&&f.calls==before);assert(pg_durable_storage_mint(&guard,&id)==PG_GUARDED_STORAGE_FAILED&&!id&&f.calls==before);}
+ if(mint)assert(!f.error_checks&&!f.cancel_checks);else if(mode==3)assert(f.error_checks==1&&!f.cancel_checks);else if(mode==2||mode==4)assert(f.error_checks==1&&f.cancel_checks==1);
+ }
+ pg_record_session records={0};pg_durable_session session={.records=&records,.phase=2};guard_fixture f={0};pg_durable_storage guard={.session=&session,.context=&f,.read=guard_read,.mint=guard_mint};f.guard=&guard;struct json_object *out=0;assert(pg_durable_storage_read(&guard,2,10,&out)==PG_GUARDED_STORAGE_CLOSED&&!out&&!f.calls);pg_record_tx tx={0};session.active_records=&tx;session.busy=1;assert(!pg_durable_storage_read(&guard,2,10,&out)&&out&&session.busy==1);json_object_put(out);out=0;assert(pg_durable_storage_read(0,0,0,&out)==PG_GUARDED_STORAGE_INVALID&&!out);
+}
 static void task_options_tests(void){
  pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"submission\",\"value\":{\"id\":10,\"conversationId\":1,\"status\":\"queued\",\"trace\":{\"parent\":\"old\"}}},{\"type\":\"submission\",\"value\":{\"id\":11,\"conversationId\":1,\"status\":\"queued\"}},{\"type\":\"submission\",\"value\":{\"id\":12,\"conversationId\":1,\"status\":\"queued\",\"trace\":null}},{\"type\":\"submission\",\"value\":{\"id\":13,\"conversationId\":1,\"status\":\"queued\",\"trace\":{\"parent\":\"third\"}}}]"));
  const char *inputs[]={"{\"trace\":{\"parent\":\"given\"},\"links\":[{}]}","{\"submissionIds\":[],\"trace\":{},\"links\":[{}]}","{\"submissionIds\":[10,11,13,12],\"trace\":{},\"links\":[{}]}","{\"submissionIds\":[99,13]}","{\"submissionIds\":[12]}"};
@@ -1395,6 +1414,8 @@ int main(void){
  task_options_tests();
  task_create_tests();
  task_family_tests();
+ storage_guard_tests();
+ guarded_transaction_tests();
  set_task_tests();
  task_cache_tests();
  task_cache_rebuild();

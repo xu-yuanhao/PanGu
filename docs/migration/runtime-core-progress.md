@@ -444,3 +444,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_record_tx_create_task，以独立40字节服务描述符注入initial/mint/telemetry/default scope；先准备submission追踪，再取最新候选/缓存owner，检查child background/conversation，核对conversation，然后initial→mint→trace inject→pending记录→私有暂存。输入、checkpoint和trace均隔离，null输入与可选trace提供者可用；异常清理partial callback/JSON输出，保留旧候选，已mint的ID保持消费。既有ABI不变，最终owner状态继续通过统一提交核验。
 - 实际验证：73组执行实际Pi完整createTask方法，完整record、Storage/initial/mint/inject顺序及错误一致；前批18组submission选项对照保留。真实MemoryStorage完成创建→统一提交→独立读取、同批owner/child、无注入器、null输入，以及同批owner变terminal时子任务提交拒绝。49个直接分配/插入/部分复制故障保留prior候选/健康Session，增加boolean分配故障包装。最初测试initializer对局部deep-copy partial输出漏清理，ASan定位后修复测试callback，最终O0/O2 ASan/UBSan专项和完整Runtime O0/O2 UBSan均通过；固定Pi/Chord基线保持通过。共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：仅records独立接口/导出/来源、相关专项与布尔分配测试包装、核心TODO；既有布局、门禁、预算保持。7个候选路径内容清单摘要（本记录加入前）：c81f87b31d4bdc1d6237daa5daca48352460e5d348ae574a17b773c39dd7bf49。隔离核心树fec483c1d72e95005d4c084106f5701e1cfd6496验证。结论为本地候选通过；已勾选类型化Task创建/替换，K03整体验收与任务phase/调度、整机组合继续按TODO执行。TUI工作树保持独立。
+
+## K03 Storage点读/ID失败守卫
+
+- 来源：Pi d5b3de22 SessionImpl与GuardedStorage.#call/close，harness-storage-failure参数错误/取消/失败场景。fetch后Pi HEAD/origin=d5b3de22/f9daca3，Session/Transaction无差异；Harness为22ddee37。
+- 实现：手写pg_durable_storage_read/mint，独立56字节借用服务描述符适配既有Tx读取/分配回调。读取参数错误与取消豁免由服务分类，其他异常锁存Storage失败；mint异常与无效ID不豁免。调用前后检查首因，跨失败结果释放，正常missing的partial结果也释放。busy阻止provider回调中关闭后端和同描述符重入；closing已准入事务仍能完成读取/分配，回调结束恢复原Session busy。旧ABI保持。
+- 实际验证：56组执行实际Pi GuardedStorage完整类，对照首次及后续结果、provider次数、request/cancel豁免与跨失败首因一致。原生补充close回调、closing已准入事务、重入、mint无效ID、partial owned结果清理；MemoryStorage通过guard作为Tx.read_context验证Submission创建/提交、读取和mint故障锁存。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord基线通过；共享和隔离核心树G00/Assembly、隔离产品构建通过。差异工具初次未链接durable_session及其依赖，补齐专项共享库构建输入后重跑通过。
+- 同一实施Agent自审：既有Session模块独立导出/服务类型、json-c依赖登记、专项和TODO，门禁/预算及旧布局保持。6个候选路径内容清单摘要（本记录加入前）：0e0ad7a336a7f020541482255bb0f3a3c9aabe1589a2d1fcda681c021ebc5a64；隔离核心树e5e8bc041591b24b1ff11d9f0b9d57f7b3907801。结论为本地候选通过。分页/head/request/document统一守卫、宿主失败关闭与整机服务仍按后续步骤接入，K03总验收保持未完成。TUI工作树独立保留。

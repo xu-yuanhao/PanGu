@@ -43,4 +43,33 @@ pg_record_tx_status pg_durable_session_settle(pg_durable_session *,unsigned defe
 pg_record_tx_status pg_durable_session_abort(pg_durable_session *);
 int pg_durable_session_idle(const pg_durable_session *);
 int pg_durable_session_close(pg_durable_session *);
+/* Descriptor borrowed by Tx.read_context. Synchronous providers return 0 owned
+   read value / positive safe minted ID, 1 missing (reads only), other error.
+   A partial read output is consumed on every unsuccessful result. Classifier
+   marks StorageRequestError equivalents; cancelled is checked only on read
+   errors. Mint errors are never exempt. Descriptor calls are serialized and
+   callbacks may not mutate its fields. Initialized Session and services stay
+   alive through return. Closing still permits calls for an admitted Tx.
+   Initializing descriptors with designated fields leaves private busy state 0. */
+typedef struct {
+ pg_durable_session *session;
+ void *context;
+ int (*read)(void *,unsigned,uint64_t,struct json_object **);
+ int (*mint)(void *,uint64_t *);
+ int (*request_error)(void *,int backend_status);
+ int (*cancelled)(void *);
+ unsigned busy,previous_busy;
+} pg_durable_storage;
+#define PG_GUARDED_STORAGE_FAILED 64
+#define PG_GUARDED_STORAGE_CLOSED 65
+#define PG_GUARDED_STORAGE_INVALID 66
+#define PG_GUARDED_STORAGE_REENTRY 67
+/* First nonexempt provider error returns its status and latches Session;
+   crossing an already latched failure returns FAILED and discards the result.
+   Subsequent calls fail before invoking providers; first Session cause wins.
+   Healthy success transfers the read value / minted ID to caller. Host drives
+   the Session's ordered close after a failure, as for other native fail-stop
+   primitives. Existing record read/mint callback signatures are preserved. */
+int pg_durable_storage_read(void *,unsigned,uint64_t,struct json_object **);
+int pg_durable_storage_mint(void *,uint64_t *);
 #endif

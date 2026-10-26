@@ -573,8 +573,48 @@ const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of
             assert not native.pg_record_tx_discard(ctypes.byref(tx))
     print(f'PASS: {len(cases)} full createTask records, owner/conversation, callback order and failures match actual Pi method')
 
+def storage_guard(native,library):
+    cases=[dict(mint=mint,kind=kind,cancel=cancel,cross=cross,failed=failed) for mint in [False,True] for kind in ['ok','missing','request','error'] if not(mint and kind=='missing') for cancel in [False,True] for cross in [False,True] for failed in [False,True]]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';class SessionFailed extends Error{}class StorageRequestError extends Error{}const s=readFileSync(process.argv[1],'utf8');const GuardedStorage=eval('('+stripTypeScriptTypes(s.slice(s.indexOf('class GuardedStorage implements Storage')))+')');const out=[];
+for(const c of JSON.parse(readFileSync(0,'utf8'))){let calls=0;const latch={failure:c.failed?{error:'prior'}:undefined,fail(e){this.failure??={error:'backend'}}};const run=async()=>{calls++;if(c.cross)latch.failure??={error:'crossed'};if(c.kind==='error')throw Error('backend');if(c.kind==='request')throw new StorageRequestError();return c.kind==='missing'?undefined:c.mint?100:{id:10}};const storage=new GuardedStorage({task:run,mintId:run},latch);const results=[];for(let n=0;n<2;n++){try{const value=await(c.mint?storage.mintId():storage.task(10,{abortSignal:{aborted:c.cancel}}));results.push(value===undefined?'missing':'ok')}catch(e){results.push(e instanceof SessionFailed?'failed':e instanceof StorageRequestError?'request':'error')}}out.push({results,calls,failure:latch.failure?.error??null})}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/session.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));mint_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64));error_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_int);cancel_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p)
+    class Guard(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('ctx',ctypes.c_void_p),('read',read_type),('mint',mint_type),('error',error_type),('cancel',cancel_type),('busy',ctypes.c_uint),('previous',ctypes.c_uint)]
+    native.pg_durable_storage_read.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p)];native.pg_durable_storage_mint.argtypes=[ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64)]
+    for case,want in zip(cases,expected,strict=True):
+        records=ctypes.create_string_buffer(88);session=ctypes.create_string_buffer(192);ctypes.c_void_p.from_buffer(session).value=ctypes.addressof(records);ctypes.c_uint.from_buffer(session,172).value=1;failed=ctypes.c_uint.from_buffer(records,52);failed.value=5 if case['failed'] else 0;calls=0
+        def run():
+            nonlocal calls
+            calls+=1;assert guard.busy and ctypes.c_uint.from_buffer(session,168).value
+            if case['cross'] and not failed.value:failed.value=4
+            return {'ok':0,'missing':1,'request':8,'error':7}[case['kind']]
+        @read_type
+        def read(ctx,table,id,out):
+            assert table==2 and id==10;out[0]=library.json_tokener_parse(b'{"id":10}');return run()
+        @mint_type
+        def mint(ctx,out):out[0]=100;return run()
+        @error_type
+        def error(ctx,status):return status==8
+        @cancel_type
+        def cancel(ctx):return case['cancel']
+        guard=Guard(ctypes.addressof(session),None,read,mint,error,cancel,0,0);results=[]
+        for n in range(2):
+            value=ctypes.c_void_p();id=ctypes.c_uint64()
+            if case['mint']:status=native.pg_durable_storage_mint(ctypes.byref(guard),ctypes.byref(id))
+            else:status=native.pg_durable_storage_read(ctypes.byref(guard),2,10,ctypes.byref(value))
+            results.append({0:'ok',1:'missing',8:'request',7:'error',64:'failed'}[status]);assert not guard.busy and not ctypes.c_uint.from_buffer(session,168).value
+            if status:assert not value.value and not id.value
+            elif case['mint']:assert id.value==100
+            else:assert json.loads(library.json_object_to_json_string_ext(value,0))=={'id':10}
+            library.json_object_put(value)
+        actual=dict(results=results,calls=calls,failure={0:None,3:'backend',4:'crossed',5:'prior'}[failed.value]);assert actual==want,(case,actual,want)
+    print(f'PASS: {len(cases)} read/mint failure, request-error/cancellation exemptions and crossed failure cases match actual Pi GuardedStorage')
+
 def main():
-    for name in ('packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
+    for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
         assert (ROOT/'references/pi'/name).read_bytes()==frozen,name+' drift'
     tables=('conversation','entry','task','submission');rng=random.Random(1049)
@@ -726,7 +766,7 @@ def main():
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()
-        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),str(ROOT/'src/runtime/document_reader.S'),str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/records.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
+        subprocess.run(['/usr/bin/clang-23','-shared','-fPIC','-O2','-fsanitize=undefined','-fno-sanitize-recover=all',str(ROOT/'src/runtime/documents.S'),*[str(ROOT/'src/runtime'/f'{name}.S') for name in ['document_reader','durable_session','hold_timer','holds','document_tx','pending']],str(ROOT/'src/runtime/record_memory.S'),str(ROOT/'src/runtime/records.S'),str(ROOT/'src/runtime/delta.S'),*flags,'-o',str(path)],check=True)
         native=ctypes.CDLL(str(path));library=ctypes.CDLL(ctypes.util.find_library('json-c'))
         library.json_tokener_parse.argtypes=[ctypes.c_char_p];library.json_tokener_parse.restype=ctypes.c_void_p
         library.json_object_put.argtypes=[ctypes.c_void_p]
@@ -859,5 +899,6 @@ def main():
         task_replacement(native,library)
         task_options(native,library)
         task_creation(native,library)
+        storage_guard(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

@@ -465,3 +465,211 @@ pg_durable_session_close:
  ret
 .size pg_durable_session_close,.-pg_durable_session_close
 .section .note.GNU-stack,"",@progbits
+.text
+/* Storage read/mint provider adapter. Descriptor and Session guards prevent
+   backend close or nested descriptor use while a synchronous call is underway. */
+.Lstorage_enter:
+ mov eax,66
+ test rdi,rdi
+ jz .Lstorage_enter_end
+ mov rax,[rdi]
+ test rax,rax
+ jz .Lstorage_enter_invalid
+ mov rdx,[rax]
+ test rdx,rdx
+ jz .Lstorage_enter_invalid
+ cmp dword ptr [rdx+52],0
+ jne .Lstorage_enter_failed
+ cmp dword ptr [rax+172],1
+ je .Lstorage_enter_busy
+ cmp dword ptr [rax+172],2
+ jne .Lstorage_enter_closed
+ cmp qword ptr [rax+152],0
+ je .Lstorage_enter_closed
+.Lstorage_enter_busy:
+ cmp dword ptr [rdi+48],0
+ jne .Lstorage_enter_reentry
+ mov dword ptr [rdi+48],1
+ mov edx,[rax+168]
+ mov [rdi+52],edx
+ mov dword ptr [rax+168],1
+ xor eax,eax
+ ret
+.Lstorage_enter_invalid:
+ mov eax,66
+ ret
+.Lstorage_enter_failed:
+ mov eax,64
+ ret
+.Lstorage_enter_closed:
+ mov eax,65
+ ret
+.Lstorage_enter_reentry:
+ mov eax,67
+.Lstorage_enter_end:
+ ret
+.Lstorage_leave:
+ mov rax,[rdi]
+ mov edx,[rdi+52]
+ mov [rax+168],edx
+ mov dword ptr [rdi+48],0
+ ret
+.Lstorage_health:
+ mov rax,[rdi]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ setne al
+ movzx eax,al
+ ret
+.Lstorage_fail:
+ mov rax,[rdi]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Lstorage_fail_end
+ mov dword ptr [rax+52],3
+.Lstorage_fail_end:
+ ret
+.globl pg_durable_storage_read
+.type pg_durable_storage_read,@function
+pg_durable_storage_read:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,66
+ test r14,r14
+ jz .Lstorage_read_end
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lstorage_read_end
+ cmp qword ptr [rbx+16],0
+ je .Lstorage_read_end
+ call .Lstorage_enter
+ mov ebp,eax
+ test eax,eax
+ jnz .Lstorage_read_end
+ mov qword ptr [rsp],0
+ mov rdi,[rbx+8]
+ mov esi,r12d
+ mov rdx,r13
+ mov rcx,rsp
+ call [rbx+16]
+ mov ebp,eax
+ mov rdi,rbx
+ call .Lstorage_health
+ test eax,eax
+ jnz .Lstorage_read_crossed
+ cmp ebp,1
+ jbe .Lstorage_read_result
+ cmp qword ptr [rbx+32],0
+ je .Lstorage_read_cancel
+ mov rdi,[rbx+8]
+ mov esi,ebp
+ call [rbx+32]
+ test eax,eax
+ jnz .Lstorage_read_result
+.Lstorage_read_cancel:
+ cmp qword ptr [rbx+40],0
+ je .Lstorage_read_fail
+ mov rdi,[rbx+8]
+ call [rbx+40]
+ test eax,eax
+ jnz .Lstorage_read_result
+.Lstorage_read_fail:
+ mov rdi,rbx
+ call .Lstorage_fail
+ jmp .Lstorage_read_cleanup
+.Lstorage_read_crossed:
+ mov ebp,64
+ jmp .Lstorage_read_cleanup
+.Lstorage_read_result:
+ mov rdi,rbx
+ call .Lstorage_health
+ test eax,eax
+ jnz .Lstorage_read_crossed
+ test ebp,ebp
+ jnz .Lstorage_read_cleanup
+ mov rax,[rsp]
+ mov [r14],rax
+ mov qword ptr [rsp],0
+.Lstorage_read_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,rbx
+ call .Lstorage_leave
+.Lstorage_read_end:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_storage_read,.-pg_durable_storage_read
+.globl pg_durable_storage_mint
+.type pg_durable_storage_mint,@function
+pg_durable_storage_mint:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,66
+ test r12,r12
+ jz .Lstorage_mint_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Lstorage_mint_end
+ cmp qword ptr [rbx+24],0
+ je .Lstorage_mint_end
+ call .Lstorage_enter
+ mov ebp,eax
+ test eax,eax
+ jnz .Lstorage_mint_end
+ mov qword ptr [rsp],0
+ mov rdi,[rbx+8]
+ mov rsi,rsp
+ call [rbx+24]
+ mov ebp,eax
+ mov rdi,rbx
+ call .Lstorage_health
+ test eax,eax
+ jnz .Lstorage_mint_crossed
+ test ebp,ebp
+ jnz .Lstorage_mint_fail
+ mov rax,[rsp]
+ test rax,rax
+ jz .Lstorage_mint_protocol
+ mov rdx,9007199254740991
+ cmp rax,rdx
+ ja .Lstorage_mint_protocol
+ mov [r12],rax
+ jmp .Lstorage_mint_leave
+.Lstorage_mint_protocol:
+ mov ebp,66
+.Lstorage_mint_fail:
+ mov rdi,rbx
+ call .Lstorage_fail
+ jmp .Lstorage_mint_leave
+.Lstorage_mint_crossed:
+ mov ebp,64
+.Lstorage_mint_leave:
+ mov rdi,rbx
+ call .Lstorage_leave
+.Lstorage_mint_end:
+ mov eax,ebp
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_storage_mint,.-pg_durable_storage_mint
+.section .note.GNU-stack,"",@progbits
