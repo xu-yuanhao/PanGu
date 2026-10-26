@@ -395,6 +395,32 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks}
         finally:library.json_object_put(out);library.json_object_put(draft);library.json_object_put(writes)
     print(f'PASS: {len(cases)} submission constructions match actual Pi createSubmission body')
 
+def candidate_snapshots(native,library):
+    rng=random.Random(743);cases=[]
+    for size in [0,1,8,70,140]:
+        writes=[]
+        for i in range(size):
+            task=i%4!=0;writes.append(dict(type='task' if task else 'conversation',value=dict(id=rng.randrange(10,30) if task else i+100,n=i)))
+        cases.append(writes)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('stagedTasks()'),end=source.indexOf('// ─── Documents',start);const text='class Probe{#writes;#tasksById=new Map();constructor(writes){this.#writes=writes;for(const w of writes)if(w.type==="task")this.#tasksById.set(w.value.id,{write:{record:w.value}})}'+source.slice(start,end)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');console.log(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(w=>{const p=new Probe(w);return [p.stagedTasks(),p.stagedConversations()]})));
+'''
+    want=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/transaction.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    for name in ['pg_record_tx_staged_tasks','pg_record_tx_staged_conversations']:getattr(native,name).argtypes=[ctypes.POINTER(Tx),ctypes.POINTER(ctypes.c_void_p)]
+    for writes,expected in zip(cases,want,strict=True):
+        batch=library.json_tokener_parse(json.dumps(writes).encode());tx=Tx(None,None,None,batch,0,0,1,0)
+        try:
+            for index,name in enumerate(['pg_record_tx_staged_tasks','pg_record_tx_staged_conversations']):
+                output=ctypes.c_void_p()
+                try:
+                    assert not getattr(native,name)(ctypes.byref(tx),ctypes.byref(output)) and not tx.busy
+                    actual=json.loads(library.json_object_to_json_string_ext(output,0));assert actual==expected[index],(writes,actual,expected[index])
+                finally:library.json_object_put(output)
+        finally:library.json_object_put(batch)
+    print('PASS: 10 staged candidate arrays match actual Pi stagedTasks/stagedConversations with write-established Task order')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -676,5 +702,6 @@ def main():
         historical_snapshots(native,library)
         typed_entries(native,library)
         submission_creation(native,library)
+        candidate_snapshots(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

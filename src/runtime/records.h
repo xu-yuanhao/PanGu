@@ -81,6 +81,12 @@ pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
    failures retain prior candidates and already minted IDs stay consumed. */
 pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct json_object *,
  int (*mint)(void *,uint64_t *),struct json_object **);
+/* Detached candidate snapshots of an open Tx, permitted after table writes.
+   Tasks retain first-staged ID order and expose the latest value per ID;
+   conversations retain staged creation/fork order. No Storage calls. Partial
+   allocation failure returns no output and preserves all Tx candidates. */
+pg_record_tx_status pg_record_tx_staged_tasks(pg_record_tx *,struct json_object **);
+pg_record_tx_status pg_record_tx_staged_conversations(pg_record_tx *,struct json_object **);
 /* Resolve against the newest staged submission, then committed Storage;
    append the transformed candidate in staging order. Internal committed lookup
    is allowed after the public table-read barrier. */

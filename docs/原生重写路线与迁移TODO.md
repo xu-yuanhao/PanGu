@@ -99,6 +99,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通conversation/request ID的提交态索引与Tx查询：按批次原顺序覆盖/移除，保留写后读屏障和owned结果。
 - [x] 接通类型化Entry提交态读取：可选精确kind过滤、缺失/不匹配、owned结果及原事务读屏障。
 - [x] 接通原始Submission创建：先核对conversation再mint，隔离draft/返回值，候选可继续place/settle并统一提交。
+- [x] 提供已写候选的隔离快照：Task按ID保留最新值，Conversation保持创建/分叉顺序；分配失败保留候选。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -394,3 +395,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 阅读固定Pi d5b3de22 Transaction.createSubmission/#requireConversation/#write及harness-submissions调用；records.S新增pg_record_tx_create_submission，复用已有staged/committed conversation所有权查询、scalar attach与统一候选提交。创建先owner检查再mint，复制draft覆盖ID，无额外submission admission策略；返回快照与候选隔离。失败保留既有候选和已消耗ID，写尝试保持table-read barrier。
 - 验证：16组实际createSubmission方法差异、已提交/同批root conversation、draft/返回值变化隔离、同批unanswered结算、owner缺失不mint及10个直接分配/插入/部分复制故障通过。专项和完整Runtime结果见当前实现记录。
 - 下一行为：K03剩余Task候选与事务构造语义，继续总验收覆盖。
+
+### K03 候选快照交接
+
+- 阅读固定Pi d5b3de22 Transaction.stagedTasks/stagedConversations及#taskEntry/#committedTask调用。新增records的两个独立入口，以json-c kptr索引保留本批首次写入位置、更新同Task ID最新值；Conversation按候选顺序返回，输出deep-copy隔离。原Tx布局保持，查询不触发Storage、允许table writes后的内部候选读取。
+- 验证：10组执行实际stagedTasks/stagedConversations的候选数组差异，Task顺序由写入建立；100次Task候选覆盖40个ID和3个Conversation，结果/隔离及Task143、Conversation5个直接分配/插入/复制故障通过。专项与完整Runtime见当前实现记录。
+- 待衔接：Pi的committedTask读取会预先插入#tasksById；原生Task读取缓存尚未接入，先读后写时须按该插入顺序枚举。该边界随Task候选缓存一起补齐；K03总验收保持未完成。

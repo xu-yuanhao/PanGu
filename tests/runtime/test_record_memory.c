@@ -190,6 +190,27 @@ static int bad_tx_scan(void *context,const pg_memory_query *query,pg_memory_page
 static int bad_tx_head(void *context,uint64_t conversation,uint64_t max,struct json_object **out){(void)conversation;assert(max==UINT64_MAX&&pg_record_tx_discard(context)==PG_TX_INVALID);*out=json_object_new_object();assert(*out);return 3;}
 
 
+
+static void candidate_snapshots(void){
+ for(unsigned mode=0;mode<2;++mode){unsigned count=0;
+ for(unsigned attempt=0;attempt<=count;++attempt){pg_record_memory m={0};assert(!pg_record_memory_open(&m));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));struct json_object *out=0;assert(!pg_record_tx_staged_tasks(&tx,&out)&&!json_object_array_length(out));json_object_put(out);out=0;
+ for(unsigned i=0;i<100;++i){char text[256];unsigned id=i%40+100;int n=snprintf(text,sizeof(text),"{\"type\":\"task\",\"value\":{\"id\":%u,\"conversationId\":1,\"state\":{\"status\":\"pending\"},\"n\":%u}}",id,i);assert(n>0&&(size_t)n<sizeof(text));struct json_object *write=json_tokener_parse(text);assert(write&&!pg_record_tx_stage(&tx,PG_TX_TASK,write));json_object_put(write);}
+ for(unsigned i=0;i<3;++i){char text[96];int n=snprintf(text,sizeof(text),"{\"type\":\"conversation\",\"value\":{\"id\":%u}}",i+1);assert(n>0);struct json_object *write=json_tokener_parse(text);assert(write&&!pg_record_tx_stage(&tx,PG_TX_CONVERSATION,write));json_object_put(write);}
+#ifdef PG_MEMORY_FAULTS
+ doc_calls=0;doc_fail=attempt;doc_tracking=1;
+#endif
+ int status=mode?pg_record_tx_staged_conversations(&tx,&out):pg_record_tx_staged_tasks(&tx,&out);
+#ifdef PG_MEMORY_FAULTS
+ doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+#else
+ unsigned calls=0;
+#endif
+ assert(!tx.busy&&json_object_array_length(tx.writes)==103&&tx.has_table_write&&!session.failed);
+ if(attempt){assert(status==PG_TX_ALLOCATION&&!out);}else{assert(!status&&out&&json_object_array_length(out)==(mode?3:40));count=calls;for(unsigned i=0;i<(mode?3u:40u);++i){struct json_object *record=json_object_array_get_idx(out,i);assert(json_object_get_uint64(json_object_object_get(record,"id"))==(mode?i+1:i+100));if(!mode)assert(json_object_get_uint64(json_object_object_get(record,"n"))==(i<20?i+80:i+40));}assert(!json_object_object_add(json_object_array_get_idx(out,0),"local",json_object_new_int64(1)));json_object_put(out);out=0;assert(!(mode?pg_record_tx_staged_conversations(&tx,&out):pg_record_tx_staged_tasks(&tx,&out))&&!json_object_object_get(json_object_array_get_idx(out,0),"local"));json_object_put(out);out=0;}
+ assert(!pg_record_tx_discard(&tx)&&pg_record_tx_staged_tasks(&tx,&out)==PG_TX_SEALED&&!out&&!pg_record_memory_close(&m));
+ }printf("PASS: staged %s latest/order/ownership; %u direct allocation/insert/clone failures\n",mode?"Conversations":"Tasks",count);
+ }
+}
 static void create_submission_tests(void){
  for(unsigned staged=0;staged<2;++staged){pg_record_memory m={0};assert(!pg_record_memory_open(&m));if(!staged)assert(!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}}]"));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));if(staged){struct json_object *c=0;assert(!pg_record_tx_create_conversation(&tx,0,1,tx_mint,&c));json_object_put(c);}
  struct json_object *draft=json_tokener_parse("{\"id\":999,\"conversationId\":1,\"requestId\":\"r\",\"type\":\"write\",\"status\":\"queued\",\"data\":{\"x\":1}}"),*out=0;uint64_t minted=m.next_id;assert(draft&&!pg_record_tx_create_submission(&tx,draft,tx_mint,&out)&&json_object_get_uint64(json_object_object_get(out,"id"))==minted&&tx.has_table_write&&m.next_id==minted+1);assert(!json_object_object_add(json_object_object_get(out,"data"),"x",json_object_new_int64(9)));assert(!json_object_object_add(json_object_object_get(draft,"data"),"x",json_object_new_int64(8)));json_object_put(out);out=0;struct json_object *change=json_tokener_parse("{\"status\":\"unanswered\"}");assert(change&&!pg_record_tx_submission_change(&tx,minted,change));json_object_put(change);assert(!pg_record_tx_commit(&tx)&&!pg_record_memory_read(&m,PG_TABLE_SUBMISSION,minted,&out)&&json_object_get_int(json_object_object_get(json_object_object_get(out,"data"),"x"))==1&&!strcmp(json_object_get_string(json_object_object_get(out,"status")),"unanswered"));json_object_put(out);json_object_put(draft);assert(!pg_record_memory_close(&m));}
@@ -1282,6 +1303,7 @@ int main(void){
  for(unsigned mode=1;mode<=3;++mode){assert(!pg_record_memory_open(&memory));allocation_failure=mode;assert(commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)==PG_MEMORY_ALLOCATION&&!memory.rows&&!memory.count&&!memory.busy&&memory.next_id==2&&memory.next_sequence==1);assert(!commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)&&seq==1);allocation_failure=1;assert(pg_record_memory_read(&memory,PG_TABLE_ENTRY,3,&out)==PG_MEMORY_ALLOCATION&&!out);assert(!pg_record_memory_close(&memory));}
 #endif
  long page=sysconf(_SC_PAGESIZE);char *guard=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(guard!=MAP_FAILED&&!mprotect(guard+page,(size_t)page,PROT_NONE));pg_record_memory *tail=(pg_record_memory*)(guard+page-sizeof(pg_record_memory));memset(tail,0,sizeof(*tail));assert(!pg_record_memory_open(tail)&&!commit_text(tail,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq));assert(!pg_record_memory_read(tail,PG_TABLE_ENTRY,3,&out)&&out);assert(!pg_record_memory_close(tail)&&json_object_get_int(json_object_object_get(out,"id"))==3);json_object_put(out);assert(!munmap(guard,(size_t)page*2));
+ candidate_snapshots();
  create_submission_tests();
  typed_entry_tests();
  request_index_tests();

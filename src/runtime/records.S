@@ -3298,3 +3298,177 @@ pg_record_tx_create_submission:
  ret
 .size pg_record_tx_create_submission,.-pg_record_tx_create_submission
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_staged_tasks
+.type pg_record_tx_staged_tasks,@function
+pg_record_tx_staged_tasks:
+ mov edx,2
+ jmp .Lcandidates
+.globl pg_record_tx_staged_conversations
+.type pg_record_tx_staged_conversations,@function
+pg_record_tx_staged_conversations:
+ xor edx,edx
+.Lcandidates:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,56
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,edx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov ebp,1
+ test r12,r12
+ jz .Lcandidates_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Lcandidates_end
+ cmp dword ptr [rbx+32],0
+ jne .Lcandidates_end
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Lcandidates_end
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Lcandidates_end
+ mov dword ptr [rbx+32],1
+ mov ebp,4
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lcandidates_cleanup
+ mov [rsp],rax
+ test r13d,r13d
+ jz .Lcandidates_start
+ mov edi,16
+ xor esi,esi
+ call lh_kptr_table_new@PLT
+ test rax,rax
+ jz .Lcandidates_cleanup
+ mov [rsp+8],rax
+.Lcandidates_start:
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r15,rax
+ xor r14d,r14d
+.Lcandidates_each:
+ cmp r14,r15
+ jae .Lcandidates_copy
+ mov rdi,[rbx+24]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ lea rsi,[rip+.Ltx_conversation]
+ test r13d,r13d
+ jz .Lcandidates_name
+ lea rsi,[rip+.Ltx_task]
+.Lcandidates_name:
+ mov rdi,rax
+ call .Ls_string
+ test eax,eax
+ jz .Lcandidates_next
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov [rsp+24],rax
+ test r13d,r13d
+ jz .Lcandidates_append
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Lcandidates_invalid
+ mov [rsp+40],rax
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ lea rdx,[rsp+32]
+ call lh_table_lookup_ex@PLT
+ test eax,eax
+ jz .Lcandidates_first
+ mov rsi,[rsp+32]
+ dec rsi
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov [rsp+48],rax
+ mov rdi,[rsp]
+ mov rsi,[rsp+32]
+ dec rsi
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lcandidates_cleanup
+ mov qword ptr [rsp+48],0
+ jmp .Lcandidates_next
+.Lcandidates_first:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ lea rdx,[rax+1]
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+40]
+ call lh_table_insert@PLT
+ test eax,eax
+ jnz .Lcandidates_cleanup
+.Lcandidates_append:
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov [rsp+48],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lcandidates_cleanup
+ mov qword ptr [rsp+48],0
+.Lcandidates_next:
+ inc r14
+ jmp .Lcandidates_each
+.Lcandidates_copy:
+ mov rdi,[rsp]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcandidates_cleanup
+ mov rax,[rsp+16]
+ mov [r12],rax
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Lcandidates_cleanup
+.Lcandidates_invalid:
+ mov ebp,1
+.Lcandidates_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ test rdi,rdi
+ jz .Lcandidates_unlocked
+ call lh_table_free@PLT
+.Lcandidates_unlocked:
+ mov dword ptr [rbx+32],0
+.Lcandidates_end:
+ mov eax,ebp
+ add rsp,56
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_staged_tasks,.-pg_record_tx_staged_tasks
+.size pg_record_tx_staged_conversations,.-pg_record_tx_staged_conversations
+.section .note.GNU-stack,"",@progbits

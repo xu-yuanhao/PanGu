@@ -408,3 +408,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_record_tx_create_submission先通过已有owner查询核对提交态/本批新conversation，再mint、复制有限JSON draft并覆盖ID，准备独立返回快照和submission候选。失败不改变先前候选，已mint ID保持消耗；写尝试固定public table-read barrier。原始创建不执行额外admission策略，候选可继续placement/settlement，最终复用统一Storage批次。旧ABI保持。
 - 实际验证：16组实际Pi createSubmission方法差异结果及mint调用次数一致；真实MemoryStorage覆盖提交态/本批root、输入/返回值修改不污染候选、创建后同批unanswered、missing owner不mint及read barrier。10个直接分配/插入/部分复制故障释放全部部分输出并保持旧候选/Session健康。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过（既有3条delta ABI边界单列）；共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有模块新增独立导出/来源登记、专项和TODO，门禁/预算不变。6个候选路径内容清单摘要（本记录加入前）：a5c35d183c5c771573252e1d68093f3763889952edf5e35eb8adfd17831b0081。结论为本地候选通过；K03剩余Task候选、构造/查询语义继续推进，总验收未完成。TUI工作树保持独立。
+
+## K03 已写候选Task/Conversation快照
+
+- 来源：Pi d5b3de22 Transaction.stagedTasks/stagedConversations与#taskEntry/#committedTask；本批fetch后Pi HEAD/origin=d5b3de22/f9daca3，Harness=22ddee37。
+- 实现：手写records候选快照入口，Task以json-c kptr hash映射ID至输出位置，首次写入定序、后续替换最新记录；Conversation顺序保留。内部临时数组仅持有候选引用，最终深复制后返回owned输出，所有分配失败保留原Tx状态。查询不触发Storage，允许table writes后的候选检查；旧ABI保持。
+- 实际验证：10组执行实际Pi stagedTasks/stagedConversations方法，Task顺序由写入建立，候选值和顺序一致。100次Task写入覆盖40个ID以及3个Conversation，验证最新值、输入/输出隔离、empty/sealed及Task143/Conversation5共148个直接分配/插入/部分复制故障。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；既有3条delta ABI边界单列。共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：既有模块独立导出/来源登记、专项和TODO，无门禁/预算变化。6个候选路径内容清单摘要（本记录加入前）：1729dcf375fb0f30d865882455bcfaa38ac1aa9b5935500f126a74b0b15ddbb5。结论为本地候选通过；完整Task缓存顺序仍待接入：Pi committedTask先读可预插入#tasksById，当前仅首次写入定序，此边界未作为完全等价通过。随后补Task读取缓存/候选状态及K03总验收。TUI工作树保持独立。
