@@ -513,3 +513,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写默认通知宿主，自动枚举DocTx entries及未加载raw copy，独立record/value/ops，解析三种scope/任务所属会话，创建/退休stamp在Storage确认补seq。held合并克隆pending队列计算完整stored ops而不触动权威holds，观察集合只保留本次新操作；base/delta均保持源通知语义。无commit订阅者不分配通知，跨Session listeners拒绝。实际Durable Session持久结算新入口保持旧hooks、active Tx释放、held merge及timer同步。
 - 实际验证：13组默认宿主行为、2组实际Session普通/held提交与关闭；无订阅分配计数0、跨Session拒绝。72个普通及141个held分配/插入/部分复制故障通过。最初测试把Session/task定义错误附加conversation策略，按实际scope修正；仅读且无写事务按源为空提交，不冲刷held，测试加入真实Entry写入后验证takeHeld差异。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有Session默认服务/独立入口、records内部Task owner解析、专项与来源/TODO；旧ABI、门禁和预算保持。6个候选路径内容清单摘要（本记录加入前）：0f17a340af170e6038d8951d4b8f2752c9a199562a89615c927ce6ce88bd5c74；隔离核心树a7f5aac822c4452f6dc54dabe1de4980e66e9517。结论为默认持久通知本地通过；deferred memory、holds独立flush、close通知和Document watch继续接入，K03总验收未完成。TUI工作树保留。
+
+## K03 deferred实际内存通知与持久回退
+
+- 来源：Pi d5b3de22 adoptHeld/holdable和Session.#hold/#runCommit，deferred发布与只读用例。fetch后Pi origin由89c921d推进363ad78（模型配置），相关Session/Transaction无变化；K05后续采用点已登记。固定HEAD保持d5b3de22，Harness为22ddee37。
+- 实现：手写deferred observed结算、默认双路通知服务和实际Session入口。准备阶段持有独立memory/stored payload，seq=0确认只选memory，不分配/改持久序号；值与holds采纳、既有observer/timer衔接后只通知内部。混合写入/held回退走普通seq确认和完整持久通知。所有partial与已选token由现有生命周期一次释放，旧ABI保持。
+- 实际验证：实际Session memory-only/混合/已有held回退/空事务/只读拒绝五组流程与关闭，memory无seq且不通知durable，持久版本/Storage序号保持，fallback通知完整。首次内存/混合回退/已有held三个故障组合分别60/83/77，共220个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有DocTx/Session独立接口与默认服务、私有token双payload、专项/来源/TODO；公开旧ABI、门禁、预算保持。7个候选路径内容清单摘要（本记录加入前）：47e4d850297794c522b62fc4761702435e5dd780de465059b165d39be68420c1；隔离核心树bce5e133691cd6d591a055ae4df5cdddcde6b6f0。结论为deferred内存通知与回退本地通过；独立holds flush/close通知、Document watch继续，K03总验收未完成。TUI工作树保留。

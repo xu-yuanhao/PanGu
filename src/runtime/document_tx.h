@@ -163,4 +163,9 @@ typedef struct {
    The host/its token remain valid only through this synchronous call. */
 pg_record_tx_status pg_document_tx_observed(pg_document_tx *,const pg_document_scan *,
  const pg_document_merge *,const pg_document_notifications *);
+/* Deferred counterpart. The host prepares before routing and handles adopt
+   sequence 0 / publish sequence 0 as memory-only, positive as stored fallback.
+   Publication storage must be prepared for both routes before adoption. */
+pg_record_tx_status pg_document_tx_deferred_observed(pg_document_tx *,const pg_document_scan *,
+ const pg_document_deferred *,uint64_t within_ms,const pg_document_merge *,const pg_document_notifications *);
 #endif

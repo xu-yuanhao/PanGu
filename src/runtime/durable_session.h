@@ -190,4 +190,10 @@ int pg_session_notifications_bind(pg_session_notification_host *,pg_document_not
    The notification descriptor is borrowed through return and mandatory. */
 pg_record_tx_status pg_durable_session_settle_notified(pg_durable_session *,
  const pg_document_scan *,const pg_document_notifications *);
+/* Prepare both memory-only and persistent-fallback publications before
+   routing; confirmation only selects the already owned payload. Default
+   stored binding remains appropriate for stored-only settlement. */
+int pg_session_deferred_notifications_bind(pg_session_notification_host *,pg_document_notifications *);
+pg_record_tx_status pg_durable_session_defer_notified(pg_durable_session *,uint64_t within_ms,
+ const pg_document_scan *,const pg_document_notifications *);
 #endif

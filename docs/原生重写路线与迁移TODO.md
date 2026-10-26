@@ -114,6 +114,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通DocTx持久提交的通知宿主：准入前准备、确认时补序号、退休前独立持有、成功后发布及全部路径清理，保留原钩子。
 - [x] 接通prepared publication的无分配确认：先校验双通道、再补seq与新生命周期占位值，失败前不修改通知；真实DocTx确认路径验证。
 - [x] 默认通知宿主自动捕获持久DocTx计划：三种scope/任务所属会话、创建/退休/copy、held observed/stored ops分离；接入实际Session持久结算与timer同步。
+- [x] 默认通知宿主接通deferred内存采纳与落盘回退：准入前准备双路payload、零序号选择memory、仅内部通知、原timer/holds与错误清理保持。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -513,3 +514,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `pg_durable_session_settle_notified`接入实际Session持久mutation line，保留旧adopt/publish hooks、held merge、active Tx清理和timer同步。默认服务借用配置，准备token与输出均owned，所有失败统一清理。
 - 验证：13组默认宿主行为（Session/conversation/task×编辑/退休、held读/写×base/delta、创建/同批退休/未加载copy），另有实际Session普通/held结算及关闭；no-subscriber分配计数0、跨Session配置拒绝。72个普通及141个held直接分配/插入/部分复制故障通过。最终专项/完整Runtime见当前实现记录。
 - 后续继续deferred memory、holds独立flush和Session close通知接线，再接Document watch；持久通知已可用，不据此勾选完整观察或K03总验收。
+
+### K03 deferred实际通知交接
+
+- 阅读固定Pi d5b3de22 Transaction.adoptHeld/holdable与Session.#hold/#runCommit内存/持久路由，核对deferred通知与只读用例。fetch后Pi origin由89c921d更新363ad78bf0625e1dfbe848429782f5e07bb1584e（pi-ai模型/思考能力配置），Session/Transaction无差异；K05模型目录按后续步骤采用。固定HEAD保持d5b3de22，Harness保持22ddee37。
+- `pg_document_tx_deferred_observed`在现有通知宿主下扩展deferred路由：准入前准备，memory adopt/publish以seq=0标识，普通落盘以实际seq确认，hold队列/值与既有observer成功后才通知。`pg_session_deferred_notifications_bind`提前准备独立memory和stored payload，确认时只选择已持有对象；`pg_durable_session_defer_notified`接入实际Session mutation line、timer同步和active Tx释放。
+- 验证：实际Session memory-only、混合写入、已有held回退、空事务、只读拒绝五组流程，memory无seq/无durable回调且Storage版本保持，回退持久通知完整。60/83/77共220个首次内存、混合回退、已有held内存通知分配/插入/部分复制故障验证，所有partial token清理；最终专项/完整Runtime见当前实现记录。
+- 下一行为：独立holds flush与close通知接线，之后继续Document watch；本批未勾选K03整体验收。

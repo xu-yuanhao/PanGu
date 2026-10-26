@@ -305,6 +305,12 @@ pg_durable_session_settle_notified:
  mov rcx,rdx
  lea rdx,[rbx+80]
  lea r8,[rbx+120]
+ mov r9,[rsp]
+ test r9,r9
+ jz .Ldurable_defer_unobserved
+ call pg_document_tx_deferred_observed@PLT
+ jmp .Ldurable_settled
+.Ldurable_defer_unobserved:
  call pg_document_tx_deferred_merge@PLT
  jmp .Ldurable_settled
 .Ldurable_settle_stored:
@@ -2110,7 +2116,8 @@ pg_session_notifications_bind:
 .Lhost_bind_end:
  ret
 .size pg_session_notifications_bind,.-pg_session_notifications_bind
-/* token: publications[16], observed/stored documents[16], split flag. */
+/* Token: stored pair[16], document arrays[16], split at 32,
+   prepared memory pair at 40, memory-route selection at 56. */
 .Lhost_prepare:
  push rbp
  push rbx
@@ -2149,7 +2156,7 @@ pg_session_notifications_bind:
  jmp .Lhost_prepare_end
 .Lhost_allocate:
  mov edi,1
- mov esi,40
+ mov esi,64
  call calloc@PLT
  test rax,rax
  jz .Lhost_prepare_end
@@ -2493,6 +2500,8 @@ pg_session_notifications_bind:
  mov rbx,rsi
  mov rdi,rsi
  call pg_session_publications_discard
+ lea rdi,[rbx+40]
+ call pg_session_publications_discard
  mov rdi,[rbx+16]
  call json_object_put@PLT
  mov rdi,[rbx+24]
@@ -2506,4 +2515,93 @@ pg_session_notifications_bind:
 .Lhost_scope: .asciz "scope"
 .Lhost_task_id: .asciz "taskId"
 .Lhost_session: .asciz "session"
+.section .note.GNU-stack,"",@progbits
+.text
+.globl pg_session_deferred_notifications_bind
+.type pg_session_deferred_notifications_bind,@function
+pg_session_deferred_notifications_bind:
+ push rbx
+ mov rbx,rsi
+ call pg_session_notifications_bind
+ test eax,eax
+ jnz .Ldeferred_bind_end
+ lea rdx,[rip+.Lhost_prepare_deferred]
+ mov [rbx+8],rdx
+ lea rdx,[rip+.Lhost_adopt_deferred]
+ mov [rbx+16],rdx
+ lea rdx,[rip+.Lhost_publish_deferred]
+ mov [rbx+24],rdx
+.Ldeferred_bind_end:
+ pop rbx
+ ret
+.size pg_session_deferred_notifications_bind,.-pg_session_deferred_notifications_bind
+.Lhost_prepare_deferred:
+ push rbx
+ push r12
+ push r13
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,r8
+ mov r13,rsi
+ call .Lhost_prepare
+ test eax,eax
+ jnz .Lprepare_deferred_end
+ mov rax,[r12]
+ test rax,rax
+ jz .Lprepare_deferred_end
+ mov rdx,[r13+24]
+ mov [rsp],rdx
+ mov rdx,[rax+16]
+ mov [rsp+8],rdx
+ mov rdx,[rax+24]
+ mov [rsp+16],rdx
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],1
+ mov rdi,rsp
+ lea rsi,[rax+40]
+ call pg_session_publications_prepare
+ test eax,eax
+ jz .Lprepare_deferred_end
+ mov eax,3
+.Lprepare_deferred_end:
+ add rsp,48
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lhost_adopt_deferred:
+ test rsi,rsi
+ jz .Lhost_adopt_empty
+ test rdx,rdx
+ jnz .Lhost_adopt
+ mov dword ptr [rsi+56],1
+ xor eax,eax
+ ret
+.Lhost_publish_deferred:
+ test rsi,rsi
+ jz .Lhost_publish_empty
+ cmp dword ptr [rsi+56],0
+ je .Lhost_publish
+ add rsi,40
+ jmp .Lhost_publish
+.globl pg_durable_session_defer_notified
+.type pg_durable_session_defer_notified,@function
+pg_durable_session_defer_notified:
+ mov eax,1
+ test rcx,rcx
+ jz .Ldurable_notified_invalid
+ cmp qword ptr [rcx+8],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rcx+16],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rcx+24],0
+ je .Ldurable_notified_invalid
+ cmp qword ptr [rcx+32],0
+ je .Ldurable_notified_invalid
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ mov esi,1
+ jmp .Ldurable_settle_common
+.size pg_durable_session_defer_notified,.-pg_durable_session_defer_notified
 .section .note.GNU-stack,"",@progbits

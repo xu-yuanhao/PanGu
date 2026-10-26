@@ -1110,6 +1110,30 @@ pg_document_tx_observed:
  xor ecx,ecx
  jmp .Ldoc_scope_settle_common
 .size pg_document_tx_observed,.-pg_document_tx_observed
+.globl pg_document_tx_deferred_observed
+.type pg_document_tx_deferred_observed,@function
+pg_document_tx_deferred_observed:
+ mov eax,1
+ test r9,r9
+ jz .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r9+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r9+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r9+24],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r9+32],0
+ je .Ldoc_scope_deferred_invalid
+ test r8,r8
+ jz .Ldoc_scope_deferred_check
+ cmp qword ptr [r8+8],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+16],0
+ je .Ldoc_scope_deferred_invalid
+ cmp qword ptr [r8+24],0
+ je .Ldoc_scope_deferred_invalid
+ jmp .Ldoc_scope_deferred_check
+.size pg_document_tx_deferred_observed,.-pg_document_tx_deferred_observed
 .Ldoc_scope_settle_common:
  push rbx
  push r12
@@ -2465,6 +2489,16 @@ pg_document_tx_retire:
  mov rax,[r12]
  cmp dword ptr [rax+52],0
  jne .Ldefer_adoption_error
+ cmp qword ptr [rbx+176],0
+ je .Ldefer_notification_adopted
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,[rbx+184]
+ xor edx,edx
+ call [rax+16]
+ test eax,eax
+ jnz .Ldefer_adoption_error
+.Ldefer_notification_adopted:
  xor r13d,r13d
 .Ldefer_adopt_each:
  cmp r13,[rbx+8]
@@ -2487,11 +2521,20 @@ pg_document_tx_retire:
  test eax,eax
  jnz .Ldefer_adoption_error
  cmp qword ptr [r15+32],0
- je .Ldefer_ok
+ je .Ldefer_notifications
  mov rdi,[r15]
  mov rsi,[rbx]
  mov rdx,[rbx+8]
  call [r15+32]
+.Ldefer_notifications:
+ cmp qword ptr [rbx+176],0
+ je .Ldefer_ok
+ mov rax,[rbx+176]
+ mov rdi,[rax]
+ mov rsi,[rbx+184]
+ mov rdx,[r12+24]
+ xor ecx,ecx
+ call [rax+24]
 .Ldefer_ok:
  mov eax,1
  jmp .Ldefer_return
