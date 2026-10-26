@@ -74,6 +74,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 移植通用准备批次的Storage提交边界：脱离调用者输入、同步adopt、成功结算后发布、只读/空批次及失败锁存。
 - [x] 完成conversation/entry/task/submission四类记录的内存批次准备、原子应用、全局ID分配与独立点读；接通通用提交入口。
 - [x] 完成四类表过滤/分页/游标顺序、fork-aware Entry可见范围、提交序号及latest head marker读取。
+- [x] 接通私有StorageWrite事务批次、普通表read-after-write屏障、seal/commit/discard与有序submission候选结算，提交复用现有Storage/adopt契约。
 - [ ] 原生落点：现有 `session.S/h` 和明确归属的 documents/entries 模块。补齐 Entry、Conversation、Document/family、Task、Submission 与表查询的事务级存取、ID/版本、游标分页。
 - [x] 完成文档值的scope/history/fork兼容检查、版本拒绝/迁移要求与隔离物化；迁移回调和JSON返回值所有权明确。
 - [x] 完成已提交revision的current/as-of快照读取、生命周期截点、最近base选择与同版本delta尾重放。
@@ -232,7 +233,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 Document复制：`record_memory.S:.Ld_resolve_copies` 对照Pi固定版 `MemoryStorage.resolveDocumentCopies` 与 `storage-conformance.ts` 的独立base/ambiguous source场景。先在私有输入中解析所有copy，拒绝源ID在本批任何document命令中变化，源按current/as-of物化；Conversation owner可变而kind/key/history/fork保持一致，生成create/base后复用同一原子准备路径。公开读取仍拒绝prepare期间重入，内部只读路径仅用于解析已提交源。
 - K03复制验证：累计5254条实际MemoryStorage操作一致，含历史/current、latest/rewindable、NUL family key、定义不符、退役目标/源、源后续变化、两种顺序的同批修改及链式copy拒绝；O0/O2 ASan/UBSan验证复制独立、输入不变与每个直接分配/插入/部分复制失败的源状态/ID/序号不变。完整Runtime结果见当前实现记录。
 - K03事务submission候选：`records.S/h:pg_records_submission_change` 对照 `transaction.ts:applySubmissionChange`，阅读Transaction的submissionChanges暂存、`settleSuccess/discard`和`#read/#write`调用规则。手写转换保留终态、区分input/write放置、要求done从placed结算；输出独立拥有，输入不变。24个组合与固定上游实际函数体直接对照一致（仅剥离TS类型后执行原函数体），O0/O2 ASan/UBSan覆盖两段复制/部分复制故障。该入口等待完整事务组装调用，尚未提供完整Tx。
-- 下一完整行为：接通事务暂存、文档所有权/迁移提交及当前消息投影。
+- K03事务批次：`records.h/.S:pg_record_tx_begin/read/stage/commit/discard/submission_change` 对照Transaction构造、`#read/#write`、`settleSuccess/discard`及Session提交调用，采用私有候选、写后禁止公开表读、结算先seal与最终Storage/adopt。原生48字节Tx借用Session和注入的committed-read服务；同步回调期间拒绝Tx重入，整个Session mutation line由调用者串行持有。stage接收已构造的StorageWrite；typed创建/ID/文档tracker及异步drain继续由后续事务层实现。
+- K03事务验证：与真实MemoryStorage组合验证暂存不可见、混合批次提交、丢弃/重用、已seal拒绝、非法/失败表写后的read barrier、Document暂存后仍可读表、readonly和Storage失败、Session锁存、queued→placed→done连续候选及终态保持。O0/O2内存专项枚举暂存与submission转换的直接复制/插入/分配故障；读回调错误的partial结果释放及重入拒绝专项通过。原24条上游submission函数和5254条Storage对照继续通过。完整Runtime结果见当前实现记录。
+- 下一完整行为：补typed事务创建/ID与表查询、文档所有权/迁移提交，接入当前消息投影。
 
 ### K01 当前落点与补齐映射
 

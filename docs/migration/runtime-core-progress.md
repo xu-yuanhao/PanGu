@@ -175,3 +175,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 阅读固定Pi `transaction.ts` 的构造/暂存表、submissionChanges、applySubmissionChange、settleSuccess/discard和read/write admission。当前先移植实际转换函数到 `records.S:pg_records_submission_change`；完整事务组装尚待实现和接入。终态保留、input/write放置及done/unanswered结算均使用独立owned JSON候选。
 - 实际验证：24组状态与固定上游原函数体一致；测试读取固定源码并只剥离TS类型执行该函数体，未替换行为。5254条现有MemoryStorage操作仍通过。O0/O2 ASan/UBSan验证两段复制及部分复制失败清理、输入不变；完整Runtime退出0。暂存核心树G00、Assembly清单及产品构建通过，共享G00仍为4个TUI候选未登记。
 - 同一Agent自审：扩展现有模块导出/职责，未修改门禁；6个候选路径/内容摘要（本记录加入前）`325f9ac708ceae61a206b5d28b64b262388fd31ce6d08020a80b802d913c52a0`。结论为本地候选通过，尚未声称事务实际调用完成或K03完成。Pi/Harness fetch结果仍为固定 `d5b3de22` / `22ddee37`。
+
+## K03 事务批次与submission组装（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `Transaction`构造、`#read/#write/#assertOpen`、`settleSuccess/discard`及submissionChanges组装，Session的 `new Transaction/settleSuccess/discard` 提交调用。Pi/Harness fetch后仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：现有records模块新增48字节原生Tx，手写Assembly维护私有最终StorageWrite数组，普通表写尝试后禁止public表读，Document暂存保留表读；commit先seal并走现有 `pg_records_commit`，各结果均清理候选，discard可重复调用。注入committed-read同步服务；submission变更逆序查最新暂存候选再读Storage，转换后追加，实际接入上一批转换函数。整个Session mutation line由调用者串行持有。
+- 实际验证：真实MemoryStorage组合通过暂存不可见、混合批次采纳、丢弃/重用、read barrier、seal、readonly、Storage失败及Session锁存，queued→placed→done同批落盘与终态保持。O0/O2 ASan/UBSan枚举stage与submission组装直接分配/复制/插入故障；回调partial错误结果清理、Tx回调重入拒绝通过。完整Runtime退出0（最后补充的重入专项再以最终源O0/O2执行通过）；原24条转换函数和5254条MemoryStorage对照继续通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00仍报告4个TUI未登记候选。
+- 同一实施Agent自审：新增实际导出与模块职责登记，未调整门禁。5个候选路径/暂存内容清单SHA256摘要（加入本记录前）`f2ae287cc257ec6ce0ed5919abf873ef1243b18d065786fe97b4b1a7c3142650`。结论为本地组合候选通过；typed创建/ID/查询、Document tracker/所有权/迁移和异步操作drain尚待后续接入，当前应用消息投影尚未切到该通用Tx，不声明完整K03完成。

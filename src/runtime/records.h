@@ -36,4 +36,35 @@ pg_records_status pg_records_commit(pg_record_session *,const struct json_object
    Placement accepts queued records; done accepts placed inputs; unanswered
    accepts queued/placed. Failure clears output and leaves inputs unchanged. */
 pg_records_status pg_records_submission_change(const struct json_object *,const struct json_object *,struct json_object **);
+typedef enum { PG_TX_OK,PG_TX_INVALID,PG_TX_READ_AFTER_WRITE,PG_TX_SEALED,
+ PG_TX_ALLOCATION,PG_TX_READ_FAILED,PG_TX_COMMIT_FAILED,PG_TX_MISSING } pg_record_tx_status;
+typedef enum {PG_TX_CONVERSATION,PG_TX_ENTRY,PG_TX_TASK,PG_TX_SUBMISSION,
+ PG_TX_DOCUMENT_CREATE,PG_TX_DOCUMENT_COPY,PG_TX_DOCUMENT_CHANGE,PG_TX_DOCUMENT_RETIRE} pg_record_tx_write;
+typedef struct {
+ pg_record_session *session;
+ void *read_context;
+ /* Committed table read: 0 owned result, 1 missing, other values error. */
+ int (*read)(void *,unsigned,uint64_t,struct json_object **);
+ struct json_object *writes;
+ unsigned busy,sealed,has_table_write,reserved;
+} pg_record_tx;
+/* Caller provides zeroed or discarded Tx and serializes the entire mutation
+   line on its Session. Callbacks cannot reenter this Tx. Begin borrows Session
+   and read service; discard releases private candidates and is idempotent.
+   stage accepts a final StorageWrite of the declared kind and deep-copies it.
+   A table-write attempt forbids subsequent public table reads, including if
+   staging fails. Document writes do not set the table-write barrier.
+   Commit seals before admission, submits through pg_records_commit and consumes
+   candidates on every result. Inspect Session for the underlying commit error.
+   Typed creation, document tracking and async operation drainage layer on this
+   synchronous batch owner; these calls retain no asynchronous operation. */
+pg_record_tx_status pg_record_tx_begin(pg_record_tx *,pg_record_session *,void *,int (*)(void *,unsigned,uint64_t,struct json_object **));
+pg_record_tx_status pg_record_tx_read(pg_record_tx *,unsigned,uint64_t,struct json_object **);
+pg_record_tx_status pg_record_tx_stage(pg_record_tx *,pg_record_tx_write,const struct json_object *);
+pg_record_tx_status pg_record_tx_commit(pg_record_tx *);
+pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
+/* Resolve against the newest staged submission, then committed Storage;
+   append the transformed candidate in staging order. Internal committed lookup
+   is allowed after the public table-read barrier. */
+pg_record_tx_status pg_record_tx_submission_change(pg_record_tx *,uint64_t id,const struct json_object *);
 #endif

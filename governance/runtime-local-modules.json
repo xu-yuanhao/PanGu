@@ -882,10 +882,16 @@
         "session.documents.local.v0",
         "json-c"
       ],
-      "role": "prepared StorageWrite batch admission; detached immutable payload, synchronous backend adoption, post-settlement publication and fail-stop session contract; detached transaction submission placement/settlement transitions",
+      "role": "prepared StorageWrite batch admission; detached immutable payload, synchronous backend adoption, post-settlement publication and fail-stop session contract; detached transaction submission placement/settlement transitions; synchronous private transaction batch owner, committed read barrier, seal/discard and Storage settlement",
       "exports": [
         "pg_records_commit",
-        "pg_records_submission_change"
+        "pg_records_submission_change",
+        "pg_record_tx_begin",
+        "pg_record_tx_read",
+        "pg_record_tx_stage",
+        "pg_record_tx_commit",
+        "pg_record_tx_discard",
+        "pg_record_tx_submission_change"
       ],
       "reference_basis": [
         {
@@ -896,7 +902,7 @@
             "packages/durable/src/session/session.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts"
           ]

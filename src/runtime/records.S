@@ -389,3 +389,411 @@ pg_records_submission_change:
 .Ls_entry: .asciz "entry"
 .Ls_type: .asciz "type"
 .Ls_input: .asciz "input"
+.text
+.globl pg_record_tx_begin
+.type pg_record_tx_begin,@function
+pg_record_tx_begin:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov eax,1
+ test rbx,rbx
+ jz .Ltx_begin_return
+ test r12,r12
+ jz .Ltx_begin_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_begin_return
+ cmp qword ptr [rbx+24],0
+ jne .Ltx_begin_return
+ cmp dword ptr [r12+48],0
+ jne .Ltx_begin_return
+ cmp dword ptr [r12+52],0
+ jne .Ltx_begin_return
+ mov dword ptr [rbx+32],1
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Ltx_begin_allocation
+ mov [rbx],r12
+ mov [rbx+8],r13
+ mov [rbx+16],r14
+ mov [rbx+24],rax
+ mov qword ptr [rbx+32],0
+ mov qword ptr [rbx+40],0
+ xor eax,eax
+ jmp .Ltx_begin_return
+.Ltx_begin_allocation:
+ mov dword ptr [rbx+32],0
+ mov eax,4
+.Ltx_begin_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_begin,.-pg_record_tx_begin
+
+.globl pg_record_tx_read
+.type pg_record_tx_read,@function
+pg_record_tx_read:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rcx
+ mov [rsp+8],esi
+ mov [rsp+16],rdx
+ mov eax,1
+ test r12,r12
+ jz .Ltx_read_return
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Ltx_read_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_read_return
+ mov eax,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_read_return
+ mov eax,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_read_return
+ mov eax,2
+ cmp dword ptr [rbx+40],0
+ jne .Ltx_read_return
+ mov eax,1
+ cmp dword ptr [rsp+8],3
+ ja .Ltx_read_return
+ cmp qword ptr [rbx+16],0
+ je .Ltx_read_return
+ mov qword ptr [rsp],0
+ mov dword ptr [rbx+32],1
+ mov rdi,[rbx+8]
+ mov esi,[rsp+8]
+ mov rdx,[rsp+16]
+ mov rcx,rsp
+ call [rbx+16]
+ mov dword ptr [rbx+32],0
+ test eax,eax
+ jnz .Ltx_read_error
+ mov rax,[rsp]
+ mov [r12],rax
+ xor eax,eax
+ jmp .Ltx_read_return
+.Ltx_read_error:
+ cmp eax,1
+ mov ebx,5
+ mov eax,7
+ cmove ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+.Ltx_read_return:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_read,.-pg_record_tx_read
+
+.globl pg_record_tx_stage
+.type pg_record_tx_stage,@function
+pg_record_tx_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,24
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test rbx,rbx
+ jz .Ltx_stage_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_stage_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_stage_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_stage_return
+ mov ebp,1
+ cmp r12d,7
+ ja .Ltx_stage_return
+ cmp r12d,3
+ ja .Ltx_stage_document
+ mov dword ptr [rbx+40],1
+.Ltx_stage_document:
+ mov dword ptr [rbx+32],1
+ mov rdi,r13
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ltx_stage_cleanup
+ mov rdi,r13
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltx_stage_cleanup
+ mov rdi,r13
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ lea rcx,[rip+.Ltx_types]
+ movsxd rsi,dword ptr [rcx+r12*4]
+ add rsi,rcx
+ mov rdi,rax
+ call .Ls_string
+ test eax,eax
+ jz .Ltx_stage_cleanup
+ mov rdi,r13
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltx_stage_allocation
+ mov rdi,[rbx+24]
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltx_stage_allocation
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Ltx_stage_cleanup
+.Ltx_stage_allocation:
+ mov ebp,4
+.Ltx_stage_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Ltx_stage_return:
+ mov eax,ebp
+ add rsp,24
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_stage,.-pg_record_tx_stage
+
+.globl pg_record_tx_discard
+.type pg_record_tx_discard,@function
+pg_record_tx_discard:
+ mov eax,1
+ test rdi,rdi
+ jz .Ltx_discard_return
+ cmp dword ptr [rdi+32],0
+ jne .Ltx_discard_return
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+32],1
+ mov dword ptr [rbx+36],1
+ mov rdi,[rbx+24]
+ mov qword ptr [rbx+24],0
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+ xor eax,eax
+ pop rbx
+.Ltx_discard_return:
+ ret
+.size pg_record_tx_discard,.-pg_record_tx_discard
+
+.globl pg_record_tx_commit
+.type pg_record_tx_commit,@function
+pg_record_tx_commit:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Ltx_commit_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_commit_return
+ mov eax,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_commit_return
+ mov eax,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_commit_return
+ mov dword ptr [rbx+36],1
+ mov dword ptr [rbx+32],1
+ mov rdi,[rbx]
+ mov rsi,[rbx+24]
+ call pg_records_commit
+ mov r12d,eax
+ mov rdi,[rbx+24]
+ mov qword ptr [rbx+24],0
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+ xor eax,eax
+ test r12d,r12d
+ jz .Ltx_commit_return
+ mov eax,6
+.Ltx_commit_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_record_tx_commit,.-pg_record_tx_commit
+.section .rodata
+.Ltx_types: .long .Ltx_conversation-.Ltx_types,.Ltx_entry-.Ltx_types,.Ltx_task-.Ltx_types,.Ltx_submission-.Ltx_types,.Ltx_create-.Ltx_types,.Ltx_copy-.Ltx_types,.Ltx_change-.Ltx_types,.Ltx_retire-.Ltx_types
+.Ltx_conversation: .asciz "conversation"
+.Ltx_entry: .asciz "entry"
+.Ltx_task: .asciz "task"
+.Ltx_submission: .asciz "submission"
+.Ltx_create: .asciz "document.create"
+.Ltx_copy: .asciz "document.copy"
+.Ltx_change: .asciz "document.change"
+.Ltx_retire: .asciz "document.retire"
+.text
+.globl pg_record_tx_submission_change
+.type pg_record_tx_submission_change,@function
+pg_record_tx_submission_change:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ test rbx,rbx
+ jz .Ltx_submission_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_submission_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_submission_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_submission_return
+ mov dword ptr [rbx+40],1
+ test r12,r12
+ jz .Ltx_submission_return
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Ltx_submission_return
+ mov dword ptr [rbx+32],1
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r15,rax
+.Ltx_submission_find:
+ test r15,r15
+ jz .Ltx_submission_committed
+ dec r15
+ mov rdi,[rbx+24]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_submission]
+ call .Ls_string
+ test eax,eax
+ jz .Ltx_submission_find
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ltx_submission_find
+ jmp .Ltx_submission_apply
+.Ltx_submission_committed:
+ cmp qword ptr [rbx+16],0
+ je .Ltx_submission_cleanup
+ mov rdi,[rbx+8]
+ mov esi,3
+ mov rdx,r12
+ mov rcx,rsp
+ call [rbx+16]
+ test eax,eax
+ jnz .Ltx_submission_cleanup
+ mov r14,[rsp]
+.Ltx_submission_apply:
+ mov rdi,r14
+ mov rsi,r13
+ lea rdx,[rsp+8]
+ call pg_records_submission_change
+ test eax,eax
+ jz .Ltx_submission_write
+ cmp eax,5
+ je .Ltx_submission_allocation
+ jmp .Ltx_submission_cleanup
+.Ltx_submission_write:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ltx_submission_allocation
+ mov [rsp+16],rax
+ lea rdi,[rip+.Ltx_submission]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ltx_submission_allocation
+ mov r15,rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ls_type]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltx_submission_insert_failed
+ mov r15,[rsp+8]
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ltx_value]
+ mov rdx,r15
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltx_submission_allocation
+ mov qword ptr [rsp+8],0
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+16]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltx_submission_allocation
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Ltx_submission_cleanup
+.Ltx_submission_insert_failed:
+ mov rdi,r15
+ call json_object_put@PLT
+.Ltx_submission_allocation:
+ mov ebp,4
+.Ltx_submission_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Ltx_submission_return:
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_submission_change,.-pg_record_tx_submission_change
+.section .rodata
+.Ltx_value: .asciz "value"
+.Ltx_id: .asciz "id"
