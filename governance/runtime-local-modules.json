@@ -1084,6 +1084,43 @@
           ]
         }
       ]
+    },
+    {
+      "id": "session.documents.holds.local.v0",
+      "sources": [
+        "src/runtime/holds.h",
+        "src/runtime/holds.S"
+      ],
+      "dependencies": [
+        "session.documents.transaction.local.v0",
+        "session.documents.delta.local.v0",
+        "session.documents.local.v0",
+        "json-c",
+        "libc"
+      ],
+      "role": "Session mutation-line native deferred host: owned dynamic incarnation registry, detached PendingOps snapshots, atomic prepared transfer, cache pin integration and earliest saturated deadlines; confirmed-persistence release and failed-Session teardown",
+      "exports": [
+        "pg_document_holds_open",
+        "pg_document_holds_bind",
+        "pg_document_holds_pinned",
+        "pg_document_holds_deadline",
+        "pg_document_holds_release",
+        "pg_document_holds_discard_all",
+        "pg_document_holds_close"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#hold accumulates per-incarnation PendingOps, sticky base and minimum deadline; #release drops holds and unpins; #armHoldTimer minimum deadline selection exposed to injected timer host; native prepare before value adoption makes allocation failures atomic",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

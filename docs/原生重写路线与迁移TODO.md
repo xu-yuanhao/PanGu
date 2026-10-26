@@ -89,6 +89,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通同事务fork-copy的获取、源快照核对、迁移/编辑及单一create/base结算；保留复制源冲突校验，并支持副本退休/同址重建。
 - [x] 移植Chord PendingOps的跨路径折叠/结构屏障/溢出状态与Pi storeHeld内容构造；验证owned输入输出和失败时保留队列。
 - [x] 接通deferred资格判断与同版本内存采纳路由：符合条件时交给注入的holds服务，保留持久版本/计数/序号；混合写入等整批落盘。
+- [x] 接通原生holds宿主：候选队列所有权、连续编辑折叠、最早期限/Infinity、缓存pin及持久确认后的release。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -313,3 +314,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 | 应用组合/TUI入口 | `composition/pangu.c`、`tui_runtime_adapter.h` | K14/K15完整操作与联调 |
 
 实际构建输入以 `governance/assembly-first.json` 为准；`tools/runtime/build_test.py` 验证当前Runtime及提供者替换，基础实验不自动成为产品依赖。K01其余项仍按全部消费者的ABI与释放验证判断。
+
+### K03 holds宿主交接（2026-10-26）
+
+- 本批阅读Pi d5b3de22 session.ts的#hold/#release/#armHoldTimer、runCommit调用路径及session-deferred-commits.test.ts的holding场景；Pi/Harness fetch旧新提交一致：d5b3de22 / 22ddee37。
+- 原生映射：holds.h/.S提供56字节宿主与56字节持有项，bind注入既有deferred接口。prepare拥有独立PendingOps快照，apply转移队列并touch缓存，discard释放准备资源；pin查询并入宿主cache hooks。deadline提供最早饱和期限；release用于持久确认后的单实例释放，失败Session通过discard_all完成资源清理。旧接口和布局保持。
+- 下一行为：Session正常提交takeHeld合并及批量持久flush，随后接版本切换/关闭与timer服务。K03整体验收仍按原有条目执行。

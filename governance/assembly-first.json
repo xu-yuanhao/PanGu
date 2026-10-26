@@ -148,6 +148,10 @@
     "src/runtime/pending.S": {
       "role": "assembly-core",
       "reason": "手写Chord PendingOps队列、跨路径叶子折叠、结构屏障、根替换与有界溢出；json-c承担持久值/索引与序列化"
+    },
+    "src/runtime/holds.S": {
+      "role": "assembly-core",
+      "reason": "手写延迟文档队列所有权、候选快照/采纳、缓存pin与最早期限管理"
     }
   }
 }

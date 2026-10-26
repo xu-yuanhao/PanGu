@@ -620,6 +620,8 @@
     "src/runtime/document_tx.h": "native-source",
     "src/runtime/document_tx.S": "native-source",
     "src/runtime/pending.S": "native-source",
-    "docs/licenses/pi.md": "document"
+    "docs/licenses/pi.md": "document",
+    "src/runtime/holds.h": "native-source",
+    "src/runtime/holds.S": "native-source"
   }
 }
