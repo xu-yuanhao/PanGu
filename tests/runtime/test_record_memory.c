@@ -1252,6 +1252,19 @@ static void durable_session_tests(void){
 }
 
 
+static void durable_read_only_tests(void){
+ for(unsigned deferred=0;deferred<2;++deferred)for(unsigned mode=0;mode<8;++mode){durable_fixture f;durable_open(&f);deferred_fixture *n=&f.native.n.f;n->session.read_only=1;uint64_t seq=n->memory.next_sequence;size_t rows=n->memory.count;assert(!pg_durable_session_begin(&f.session,&n->tx,&n->scope,&n->memory,tx_read));struct json_object *out=0;
+ if(mode==1||mode==7){pg_document_change *edit=0;struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"refused\"]]");assert(!pg_document_tx_get(&n->scope,&n->definition,&n->address,0,0,&edit)&&!pg_document_change_append(edit,ops));json_object_put(ops);}
+ if(mode==2||mode==7){struct json_object *draft=json_tokener_parse("{\"kind\":\"note\"}");assert(!pg_record_tx_append_entry(&n->tx,1,draft,0,tx_mint,&out));json_object_put(draft);json_object_put(out);out=0;}
+ if(mode==3){task_create_fixture initial={.tx=&n->tx,.memory=&n->memory};pg_task_creation host={&initial,task_initial,task_mint,0,1};struct json_object *definition=json_tokener_parse("{\"name\":\"work\",\"version\":1}"),*options=json_tokener_parse("{\"ownership\":{\"kind\":\"conversation\"}}");uint64_t id=0;assert(!pg_record_tx_create_task(&n->tx,definition,0,options,&host,&id)&&id);json_object_put(definition);json_object_put(options);}
+ if(mode==4){struct json_object *draft=json_tokener_parse("{\"conversationId\":1,\"status\":\"queued\"}");assert(!pg_record_tx_create_submission(&n->tx,draft,tx_mint,&out));json_object_put(draft);json_object_put(out);out=0;}
+ if(mode==5)assert(!pg_document_tx_retire(&n->scope,&n->definition,&n->address));
+ pg_document_definition fresh=n->definition;fresh.kind=(pg_slice){"fresh",5};pg_document_address address=n->address;address.kind=fresh.kind;
+ if(mode==6){struct json_object *seed=json_tokener_parse("{\"text\":\"new\"}");pg_document_initializer initial={seed,fork_replacement_initial};pg_document_request request={.definition=&fresh,.address=&address,.initializer=&initial,.mint=tx_mint};pg_document_change *edit=0;assert(!pg_document_tx_doc(&n->scope,&request,&edit));json_object_put(seed);}
+ assert((pg_durable_session_settle(&f.session,deferred,100,0)==PG_TX_OK)==(mode==0));assert(!n->session.failed&&!f.native.n.holds.count&&!f.native.armed&&!n->adopted&&!n->published&&!n->observed&&n->memory.next_sequence==seq&&n->memory.count==rows&&n->session.sequence==seq-1&&pg_durable_session_idle(&f.session));assert(!pg_durable_snapshot(&f.session,&n->definition,&n->address,&out)&&!strcmp(json_object_get_string(json_object_object_get(out,"text")),"seed"));json_object_put(out);out=0;if(mode==6)assert(pg_durable_snapshot(&f.session,&fresh,&address,&out)==PG_DOC_MISSING&&!out);assert(!pg_durable_session_begin(&f.session,&n->tx,&n->scope,&n->memory,tx_read)&&!pg_durable_session_settle(&f.session,deferred,100,0));assert(!pg_durable_session_close(&f.session));durable_closed(&f,0);
+ }
+ puts("PASS: 16 read-only Session normal/deferred transactions, empty success, write refusal and continued reads/close");
+}
 static void durable_stage(durable_fixture *f,const char *text){deferred_fixture *n=&f->native.n.f;assert(!pg_durable_session_begin(&f->session,&n->tx,&n->scope,&n->memory,tx_read));struct json_object *batch=json_tokener_parse(text);assert(batch);for(size_t i=0;i<json_object_array_length(batch);++i){struct json_object *write=json_object_array_get_idx(batch,i);const char *type=json_object_get_string(json_object_object_get(write,"type"));unsigned kind=!strcmp(type,"entry")?PG_TX_ENTRY:!strcmp(type,"conversation")?PG_TX_CONVERSATION:!strcmp(type,"document.create")?PG_TX_DOCUMENT_CREATE:!strcmp(type,"document.change")?PG_TX_DOCUMENT_CHANGE:PG_TX_DOCUMENT_RETIRE;assert(!pg_record_tx_stage(&n->tx,kind,write));}json_object_put(batch);assert(!pg_durable_session_settle(&f->session,0,0,0));}
 static void durable_history_seed(durable_fixture *f){
  durable_stage(f,"[{\"type\":\"entry\",\"value\":{\"id\":15,\"conversationId\":1,\"kind\":\"before\"}}]");
@@ -1371,6 +1384,7 @@ int main(void){
  reader_history_tests();
  reader_guard_tests();
  document_storage_guard_tests();
+ durable_read_only_tests();
 #ifdef PG_MEMORY_FAULTS
  reader_faults();
 #endif

@@ -107,6 +107,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通可注入的Storage点读/ID分配失败守卫：首因锁存、跨失败结果丢弃、读取参数错误/取消豁免、活跃调用阻止后端关闭。
 - [x] 将分页/head/request/fork-aware Entry查询接入共享Storage失败守卫，错误时释放partial页/记录并清空游标和提交序号。
 - [x] 将Document find/read/scan与历史Entry接入统一失败守卫，参数错误/取消在快照外层保持非致命，允许随后重试。
+- [x] 验证原生只读Session的普通/deferred事务：空批成功、所有记录/文档写入拒绝、无采纳/发布/持久序号变化，拒绝后读取与关闭正常。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -457,3 +458,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 35组真实MemoryStorage当前/历史find/read/scan/Entry路径验证成功、参数错误、取消、普通后端失败和跨失败首因；参数错误/取消后同入口重试成功。专项与完整Runtime见当前实现记录。
 - 上游检查：Pi HEAD保持d5b3de22；origin由f9daca3推进到89c921d8b56b59e768b26e7f48b6832978119310。新提交包含Harness `json.ts:assignJson`的__proto__原型污染修复，以及pi-ai URL/stream和TUI终端文本加固。Session/Transaction本批来源无差异。K07/K09移植assignJson时采用own-member查找（原生json-c成员无JS原型链）；K05对照新trusted-url及pi-messages大小/流限制，终端相关修复在整机集成时核对。固定对照提交保持，references工作树不改。
 - 后续继续Session观察/只读与K03总验收，任务调度及整机服务按对应步骤接入。
+
+### K03 原生只读事务验收交接
+
+- 对照Pi d5b3de22 Session.#runCommit的空写入/readOnly/deferred顺序和harness-read-only.test.ts的空事务成功、写入拒绝后健康场景。Pi origin保持89c921d，固定Session源码无差异，Harness保持22ddee37。
+- 在既有真实Durable Session组合上增加16组普通/deferred×空/文档编辑/Entry/Task/Submission/retire/new Doc/混合事务验证；写入拒绝前可以产生临时候选和已消费ID，但不改变Storage内容/提交序号、不采纳、不发布、不建立hold或timer。随后快照、空事务和关闭仍成功。
+- 实现无需修改；验收覆盖的是Session事务边界。Harness层暂停调度、root恢复与只读打开随K04/K06/K10/K14接入，不以本测试代替这些步骤。专项结果见当前实现记录；下一行为继续公开观察与K03总验收。

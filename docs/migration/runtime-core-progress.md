@@ -465,3 +465,9 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Document find/read/scan/历史Entry适配，独立48字节描述符共享既有guard、query dispatch、read completion；历史前端conversation/id转换为后端id/conversation，保持commit sequence。非致命参数错误/取消以EXEMPT明确传给外层快照，外层不重复锁存Storage失败；普通错误和跨失败仍遵循首因/partial清理。旧结构布局、回调签名保持。
 - 实际验证：35组MemoryStorage当前/历史Document查询，覆盖成功、参数错误、取消、后端失败、跨失败及参数/取消后重新读取成功；页面metadata与partial JSON清理正确。首次测试误将guard已经锁存的Snapshot结果期望成普通Storage错误，改为实际SessionFailed语义后重新运行。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有Session/reader独立导出与来源、专项、TODO，守卫/预算与旧ABI保持。6个候选路径内容清单摘要（本记录加入前）：cc4a169f1e93bc8e05b6e611aa469cbe4d8a918b51e0a4c2f22f55a716c41b24；隔离核心树7c1aa424985fb0f666111b53c4c40df5da1f13ad。结论为本地候选通过；公开观察/只读及K03整体验收继续，TUI工作树独立保留。
+
+## K03 原生只读Session事务验收
+
+- 来源：Pi d5b3de22 Session.#runCommit空写入/readOnly/deferred分支及harness-read-only测试的事务拒绝/保持健康场景；fetch后origin为89c921d，Session来源无差异，Harness保持22ddee37。
+- 实际验证：16组真实Durable Session普通/deferred事务：空批成功；文档编辑/Entry/Task/Submission/retire/new Doc/混合写入拒绝，MemoryStorage内容与序号、Session采纳/发布、holds/timer均保持。拒绝后旧快照、空事务和关闭成功，新Doc不可见；创建时消费ID符合现有源语义。O0/O2 ASan/UBSan专项及共享G00/Assembly检查通过。
+- 本批仅补充现有Session实现的完整只读事务验证，产品源码与模块登记未变；不重复产品构建。2个候选路径内容清单摘要（本记录加入前）：c8e20794e115800f4f8dec50c3d60415d39b79eda46adc51d267919fc9bb0b69。自审结论为只读事务边界通过；Harness只读打开/暂停调度/恢复随对应步骤验证，K03总验收保持未完成。TUI工作树保留。
