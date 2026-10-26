@@ -560,40 +560,11 @@ pg_durable_storage_read:
  mov rdx,r13
  mov rcx,rsp
  call [rbx+16]
+ mov esi,eax
+ mov rdi,rbx
+ call .Lstorage_read_status
  mov ebp,eax
- mov rdi,rbx
- call .Lstorage_health
  test eax,eax
- jnz .Lstorage_read_crossed
- cmp ebp,1
- jbe .Lstorage_read_result
- cmp qword ptr [rbx+32],0
- je .Lstorage_read_cancel
- mov rdi,[rbx+8]
- mov esi,ebp
- call [rbx+32]
- test eax,eax
- jnz .Lstorage_read_result
-.Lstorage_read_cancel:
- cmp qword ptr [rbx+40],0
- je .Lstorage_read_fail
- mov rdi,[rbx+8]
- call [rbx+40]
- test eax,eax
- jnz .Lstorage_read_result
-.Lstorage_read_fail:
- mov rdi,rbx
- call .Lstorage_fail
- jmp .Lstorage_read_cleanup
-.Lstorage_read_crossed:
- mov ebp,64
- jmp .Lstorage_read_cleanup
-.Lstorage_read_result:
- mov rdi,rbx
- call .Lstorage_health
- test eax,eax
- jnz .Lstorage_read_crossed
- test ebp,ebp
  jnz .Lstorage_read_cleanup
  mov rax,[rsp]
  mov [r14],rax
@@ -672,4 +643,183 @@ pg_durable_storage_mint:
  pop rbp
  ret
 .size pg_durable_storage_mint,.-pg_durable_storage_mint
+.section .note.GNU-stack,"",@progbits
+.text
+/* Normalize synchronous read completion through the shared failure latch. */
+.Lstorage_read_status:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12d,esi
+ call .Lstorage_health
+ test eax,eax
+ jnz .Lstorage_status_crossed
+ cmp r12d,1
+ jbe .Lstorage_status_result
+ cmp qword ptr [rbx+32],0
+ je .Lstorage_status_cancel
+ mov rdi,[rbx+8]
+ mov esi,r12d
+ call [rbx+32]
+ test eax,eax
+ jnz .Lstorage_status_result
+.Lstorage_status_cancel:
+ cmp qword ptr [rbx+40],0
+ je .Lstorage_status_fail
+ mov rdi,[rbx+8]
+ call [rbx+40]
+ test eax,eax
+ jnz .Lstorage_status_result
+.Lstorage_status_fail:
+ mov rdi,rbx
+ call .Lstorage_fail
+ mov eax,r12d
+ jmp .Lstorage_status_end
+.Lstorage_status_result:
+ mov rdi,rbx
+ call .Lstorage_health
+ test eax,eax
+ jnz .Lstorage_status_crossed
+ mov eax,r12d
+ jmp .Lstorage_status_end
+.Lstorage_status_crossed:
+ mov eax,64
+.Lstorage_status_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.globl pg_durable_storage_scan
+.type pg_durable_storage_scan,@function
+pg_durable_storage_scan:
+ mov r8,rdx
+ mov rdx,rsi
+ xor esi,esi
+ xor ecx,ecx
+ xor r9d,r9d
+ jmp .Lstorage_query
+.size pg_durable_storage_scan,.-pg_durable_storage_scan
+.globl pg_durable_storage_head
+.type pg_durable_storage_head,@function
+pg_durable_storage_head:
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ mov esi,1
+ xor r9d,r9d
+ jmp .Lstorage_query
+.size pg_durable_storage_head,.-pg_durable_storage_head
+.globl pg_durable_storage_request
+.type pg_durable_storage_request,@function
+pg_durable_storage_request:
+ mov r8,rdx
+ mov rdx,rsi
+ mov esi,2
+ xor ecx,ecx
+ xor r9d,r9d
+ jmp .Lstorage_query
+.size pg_durable_storage_request,.-pg_durable_storage_request
+.globl pg_durable_storage_entry
+.type pg_durable_storage_entry,@function
+pg_durable_storage_entry:
+ mov r9,r8
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ mov esi,3
+ jmp .Lstorage_query
+.size pg_durable_storage_entry,.-pg_durable_storage_entry
+.Lstorage_query:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov [rsp+32],r9
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov ebp,66
+ test r15,r15
+ jz .Lstorage_query_end
+ mov qword ptr [r15],0
+ test r12d,r12d
+ jnz .Lstorage_query_entry_output
+ mov qword ptr [r15+8],0
+ mov qword ptr [r15+16],0
+.Lstorage_query_entry_output:
+ cmp r12d,3
+ jne .Lstorage_query_descriptor
+ test r9,r9
+ jz .Lstorage_query_end
+ mov qword ptr [r9],0
+.Lstorage_query_descriptor:
+ test rbx,rbx
+ jz .Lstorage_query_end
+ cmp qword ptr [rbx+16+r12*8],0
+ je .Lstorage_query_end
+ mov rdi,[rbx]
+ call .Lstorage_enter
+ mov ebp,eax
+ test eax,eax
+ jnz .Lstorage_query_end
+ mov rdi,[rbx+8]
+ mov rsi,r13
+ cmp r12d,0
+ je .Lstorage_query_short
+ cmp r12d,2
+ je .Lstorage_query_short
+ mov rdx,r14
+ mov rcx,rsp
+ lea r8,[rsp+24]
+ jmp .Lstorage_query_call
+.Lstorage_query_short:
+ mov rdx,rsp
+.Lstorage_query_call:
+ call [rbx+16+r12*8]
+ mov esi,eax
+ mov rdi,[rbx]
+ call .Lstorage_read_status
+ mov ebp,eax
+ test eax,eax
+ jnz .Lstorage_query_cleanup
+ mov rax,[rsp]
+ mov [r15],rax
+ mov qword ptr [rsp],0
+ test r12d,r12d
+ jnz .Lstorage_query_sequence
+ mov rax,[rsp+8]
+ mov [r15+8],rax
+ mov rax,[rsp+16]
+ mov [r15+16],rax
+.Lstorage_query_sequence:
+ cmp r12d,3
+ jne .Lstorage_query_cleanup
+ mov rax,[rsp+24]
+ mov rdx,[rsp+32]
+ mov [rdx],rax
+.Lstorage_query_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rbx]
+ call .Lstorage_leave
+.Lstorage_query_end:
+ mov eax,ebp
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
 .section .note.GNU-stack,"",@progbits

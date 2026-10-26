@@ -1197,7 +1197,11 @@
         "pg_durable_session_idle",
         "pg_durable_session_close",
         "pg_durable_storage_read",
-        "pg_durable_storage_mint"
+        "pg_durable_storage_mint",
+        "pg_durable_storage_scan",
+        "pg_durable_storage_head",
+        "pg_durable_storage_request",
+        "pg_durable_storage_entry"
       ],
       "reference_basis": [
         {
@@ -1206,7 +1210,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction",
+          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction; independent query descriptor wraps scans, latest head, request ID lookup and fork-aware Entry with commit sequence; all reads share one completion guard and transfer output metadata only on success",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-adoption.test.ts",

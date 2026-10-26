@@ -451,3 +451,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写pg_durable_storage_read/mint，独立56字节借用服务描述符适配既有Tx读取/分配回调。读取参数错误与取消豁免由服务分类，其他异常锁存Storage失败；mint异常与无效ID不豁免。调用前后检查首因，跨失败结果释放，正常missing的partial结果也释放。busy阻止provider回调中关闭后端和同描述符重入；closing已准入事务仍能完成读取/分配，回调结束恢复原Session busy。旧ABI保持。
 - 实际验证：56组执行实际Pi GuardedStorage完整类，对照首次及后续结果、provider次数、request/cancel豁免与跨失败首因一致。原生补充close回调、closing已准入事务、重入、mint无效ID、partial owned结果清理；MemoryStorage通过guard作为Tx.read_context验证Submission创建/提交、读取和mint故障锁存。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan及固定Pi/Chord基线通过；共享和隔离核心树G00/Assembly、隔离产品构建通过。差异工具初次未链接durable_session及其依赖，补齐专项共享库构建输入后重跑通过。
 - 同一实施Agent自审：既有Session模块独立导出/服务类型、json-c依赖登记、专项和TODO，门禁/预算及旧布局保持。6个候选路径内容清单摘要（本记录加入前）：0e0ad7a336a7f020541482255bb0f3a3c9aabe1589a2d1fcda681c021ebc5a64；隔离核心树e5e8bc041591b24b1ff11d9f0b9d57f7b3907801。结论为本地候选通过。分页/head/request/document统一守卫、宿主失败关闭与整机服务仍按后续步骤接入，K03总验收保持未完成。TUI工作树独立保留。
+
+## K03 分页/head/request/Entry失败守卫
+
+- 来源：Pi d5b3de22 GuardedStorage的四表scan、findLatestHeadMarker、submissionByRequest、entry及#call，Transaction对应查询调用者与harness-storage-failure无效请求/取消用例。fetch后Pi HEAD/origin=d5b3de22/f9daca3，Harness为22ddee37。
+- 实现：手写四种查询适配，独立48字节pg_durable_queries借用既有Storage guard；分页/head/request绑定现有Tx查询接口，Entry返回fork-aware record和序号。共享read completion函数替换前批点读重复分支；正常missing/异常/crossed失败清理partial结果，分页metadata与Entry sequence只在成功时转交。既有结构布局保持。
+- 实际验证：32组原生四类查询×成功/missing/backend/request/cancel/crossed/reentry/close，验证同一首因与busy恢复；MemoryStorage通过Tx分页/head/request以及fork-aware Entry读取验证实际服务组合，无效分页拒绝后再次正常读取。3个分页直接分配/部分复制故障锁存失败并清空所有输出。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、56组实际Pi GuardedStorage及其余固定Pi/Chord差异基线通过；共享与隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：仅既有Session独立查询接口/导出、专项与TODO，共享失败函数收敛；门禁、预算和旧ABI保持。5个候选路径内容清单摘要（本记录加入前）：5026e3bf9565d393ed817affc03cc979640e2a0824cec1434103d8abe669f000；隔离核心树d3c95eaa6a0ac3cc555a7bbbb7ef79dd3834c3ee。结论为本地候选通过；Document提供者统一守卫和公开观察/只读完整验收继续推进，K03总验收未完成。TUI工作树独立保留。

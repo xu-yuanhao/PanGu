@@ -72,4 +72,21 @@ typedef struct {
    primitives. Existing record read/mint callback signatures are preserved. */
 int pg_durable_storage_read(void *,unsigned,uint64_t,struct json_object **);
 int pg_durable_storage_mint(void *,uint64_t *);
+/* Query descriptor borrows a shared read/mint guard, so all methods use the
+   same failure classification and cancellation context. Providers use context
+   below; classifiers use guard.context. Pages and records transfer ownership;
+   partial outputs are consumed on error, page metadata/entry sequence cleared.
+   Input/output buffers must be disjoint and callbacks expire on return. */
+typedef struct {
+ pg_durable_storage *guard;
+ void *context;
+ int (*scan)(void *,const pg_memory_query *,pg_memory_page *);
+ int (*head)(void *,uint64_t conversation,uint64_t maximum,struct json_object **);
+ int (*request)(void *,const pg_record_request_query *,struct json_object **);
+ int (*entry)(void *,uint64_t id,uint64_t conversation,struct json_object **,uint64_t *sequence);
+} pg_durable_queries;
+int pg_durable_storage_scan(void *,const pg_memory_query *,pg_memory_page *);
+int pg_durable_storage_head(void *,uint64_t,uint64_t,struct json_object **);
+int pg_durable_storage_request(void *,const pg_record_request_query *,struct json_object **);
+int pg_durable_storage_entry(void *,uint64_t,uint64_t,struct json_object **,uint64_t *);
 #endif
