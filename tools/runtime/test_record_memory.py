@@ -95,21 +95,24 @@ def entry_construction(native,library):
     code=r'''
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';import {pathToFileURL} from 'node:url';
 const source=readFileSync(process.argv[1],'utf8');const start=source.indexOf('#appendEntry(conversationId: ConversationId, value: EntryDraft)'),end=source.indexOf('createTask<',start);const {copyJson}=await import(pathToFileURL(process.argv[2]));
-const text='class Probe { #host={storage:{mintId:async()=>17}};#scope;#writes=[];constructor(task){this.#scope={taskId:task||undefined}} #assertOpen(){} async #requireConversation(){} #write(fn){return fn()} '+source.slice(start,end)+' run(value){return this.#appendEntry(9,value)} }';
-const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('('+stripTypeScriptTypes(text)+')');const answers=[];for(const c of JSON.parse(readFileSync(0,'utf8')))answers.push(await new Probe(c.task).run(c.draft));console.log(JSON.stringify(answers));
+const cs=source.indexOf('async #stageConversation('),ce=source.indexOf('appendEntry(conversationId:',cs);
+const text='class Probe { #host={storage:{mintId:async()=>17},conversationCreated:async()=>{}};#scope;#writes=[];#createdConversationIds=new Set();#forkSourceDocumentIds=new Set();#documents=[];#latestDocumentByAddress=new Map();#forkSourceConversationIds=new Set();#context={};constructor(task){this.#scope={taskId:task||undefined}} #assertOpen(){} async #currentTask(id){return id===20?{id,conversationId:9}:undefined} async #requireConversation(){} #write(fn){return fn()} '+source.slice(start,end)+source.slice(cs,ce)+' run(value){return this.#appendEntry(9,value)} create(owner,root){return this.#stageConversation(undefined,owner?{kind:"task",taskId:owner}:{kind:"ownerless"},root?1:undefined)} }';
+const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('('+stripTypeScriptTypes(text)+')');const answers=[];for(const c of JSON.parse(readFileSync(0,'utf8')))answers.push(await new Probe(c.task).run(c.draft));const conversations=[];for(const [owner,root] of [[0,0],[0,1],[20,0],[999,0]]){try{conversations.push({ok:true,value:await new Probe(0).create(owner,root)})}catch{conversations.push({ok:false})}}console.log(JSON.stringify({entries:answers,conversations}));
 '''
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(path),str(ROOT/'references/pi/packages/chord/src/json.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
     class Tx(ctypes.Structure):
         _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('has_write',ctypes.c_uint),('reserved',ctypes.c_uint)]
     read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));mint_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
     @read_type
-    def read(context,table,id,out):out[0]=library.json_tokener_parse(b'{"id":9}');return 0
+    def read(context,table,id,out):
+        if table==2 and id!=20:return 1
+        out[0]=library.json_tokener_parse(b'{"id":20,"conversationId":9}' if table==2 else b'{"id":9}');return 0
     @mint_type
     def mint(context,out):out[0]=17;return 0
     native.pg_record_tx_begin.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.c_void_p,read_type]
     native.pg_record_tx_append_entry.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint64,ctypes.c_void_p,ctypes.c_uint64,mint_type,ctypes.POINTER(ctypes.c_void_p)]
     native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
-    for case,want in zip(cases,expected,strict=True):
+    for case,want in zip(cases,expected['entries'],strict=True):
         tx=Tx();session=ctypes.create_string_buffer(88);draft=library.json_tokener_parse(json.dumps(case['draft']).encode());out=ctypes.c_void_p()
         try:
             assert not native.pg_record_tx_begin(ctypes.byref(tx),session,None,read)
@@ -117,7 +120,17 @@ const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const Probe=eval('(
             assert json.loads(library.json_object_to_json_string_ext(out,0))==want,(case,want)
             assert json.loads(library.json_object_to_json_string_ext(draft,0))==case['draft']
         finally:library.json_object_put(out);library.json_object_put(draft);assert not native.pg_record_tx_discard(ctypes.byref(tx))
-    print(f'PASS: {len(cases)} Entry constructions match actual Pi appendEntry body with fixed mint/read host')
+    native.pg_record_tx_create_conversation.argtypes=[ctypes.POINTER(Tx),ctypes.c_uint64,ctypes.c_uint,mint_type,ctypes.POINTER(ctypes.c_void_p)]
+    for (owner,root),want in zip([(0,0),(0,1),(20,0),(999,0)],expected['conversations'],strict=True):
+        tx=Tx();session=ctypes.create_string_buffer(88);out=ctypes.c_void_p()
+        try:
+            assert not native.pg_record_tx_begin(ctypes.byref(tx),session,None,read)
+            status=native.pg_record_tx_create_conversation(ctypes.byref(tx),owner,root,mint,ctypes.byref(out));actual=dict(ok=status==0)
+            if not status:actual['value']=json.loads(library.json_object_to_json_string_ext(out,0))
+            else:assert not out.value
+            assert actual==want,(owner,root,actual,want)
+        finally:library.json_object_put(out);assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print(f'PASS: {len(cases)} Entry and 4 Conversation constructions match actual Pi method bodies with fixed host')
 
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):

@@ -892,7 +892,8 @@
         "pg_record_tx_commit",
         "pg_record_tx_discard",
         "pg_record_tx_submission_change",
-        "pg_record_tx_append_entry"
+        "pg_record_tx_append_entry",
+        "pg_record_tx_create_conversation"
       ],
       "reference_basis": [
         {
@@ -903,7 +904,7 @@
             "packages/durable/src/session/session.ts",
             "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution",
+          "semantics": "Storage.commit adopts once before resolution; Session publishes after settlement; admitted failures latch Session and never roll back adopted state; transaction.applySubmissionChange terminal preservation, queued placement and placed-input settlement; Transaction.#read/#write/settleSuccess/discard and ordered submissionChanges assembly, synchronous native storage callbacks; Transaction.#appendEntry/#requireConversation, minted identity, self head and scope task attribution; stageConversation ownerless/root/task-owned record construction and currentTask staged-candidate preference",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts"
           ]

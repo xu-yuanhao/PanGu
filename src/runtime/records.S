@@ -1047,3 +1047,235 @@ pg_record_tx_append_entry:
 .Ltx_head: .asciz "head"
 .Ltx_self: .asciz "self"
 .Ltx_by_task: .asciz "byTaskId"
+.text
+.globl pg_record_tx_create_conversation
+.type pg_record_tx_create_conversation,@function
+pg_record_tx_create_conversation:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp+40],edx
+ mov r13,rcx
+ mov r14,r8
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],0
+ test r14,r14
+ jz .Ltx_conversation_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ltx_conversation_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_conversation_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_conversation_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_conversation_return
+ mov dword ptr [rbx+40],1
+ cmp dword ptr [rsp+40],1
+ ja .Ltx_conversation_return
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Ltx_conversation_return
+ cmp dword ptr [rsp+40],0
+ je .Ltx_conversation_minted
+ test r12,r12
+ jnz .Ltx_conversation_return
+ mov qword ptr [rsp+48],1
+ mov dword ptr [rbx+32],1
+ jmp .Ltx_conversation_record
+.Ltx_conversation_minted:
+ test r13,r13
+ jz .Ltx_conversation_return
+ mov dword ptr [rbx+32],1
+ mov qword ptr [rsp+48],0
+ mov rdi,[rbx+8]
+ lea rsi,[rsp+48]
+ call r13
+ test eax,eax
+ jnz .Ltx_conversation_read_failed
+ mov rax,[rsp+48]
+ test rax,rax
+ jz .Ltx_conversation_read_failed
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Ltx_conversation_read_failed
+ test r12,r12
+ jz .Ltx_conversation_record
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r15,rax
+.Ltx_conversation_find_task:
+ test r15,r15
+ jz .Ltx_conversation_read_task
+ dec r15
+ mov rdi,[rbx+24]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Ltx_conversation_find_task
+ mov rdi,r13
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ltx_conversation_find_task
+ jmp .Ltx_conversation_task_owner
+.Ltx_conversation_read_task:
+ cmp qword ptr [rbx+16],0
+ je .Ltx_conversation_cleanup
+ mov rdi,[rbx+8]
+ mov esi,2
+ mov rdx,r12
+ lea rcx,[rsp+24]
+ call [rbx+16]
+ test eax,eax
+ jz .Ltx_conversation_task_loaded
+ cmp eax,1
+ jne .Ltx_conversation_read_failed
+ jmp .Ltx_conversation_cleanup
+.Ltx_conversation_task_loaded:
+ mov r13,[rsp+24]
+ test r13,r13
+ jz .Ltx_conversation_cleanup
+.Ltx_conversation_task_owner:
+ mov rdi,r13
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Ltx_conversation_cleanup
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Ltx_conversation_cleanup
+ mov [rsp+56],rax
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ltx_conversation_allocation
+ mov [rsp+32],rax
+ mov rdi,[rsp+56]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_conversation_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ltx_task_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+.Ltx_conversation_record:
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ltx_conversation_allocation
+ mov [rsp],rax
+ mov rdi,[rsp+48]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ cmp qword ptr [rsp+32],0
+ je .Ltx_conversation_snapshot
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_owner]
+ mov rdx,[rsp+32]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ mov qword ptr [rsp+32],0
+.Ltx_conversation_snapshot:
+ mov rdi,[rsp]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ltx_conversation_allocation
+ mov [rsp+8],rax
+ lea rdi,[rip+.Ltx_conversation]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ls_type]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltx_value]
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ mov qword ptr [rsp],0
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltx_conversation_allocation
+ mov qword ptr [rsp+8],0
+ mov rax,[rsp+16]
+ mov [r14],rax
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Ltx_conversation_cleanup
+.Ltx_conversation_read_failed:
+ mov ebp,5
+ jmp .Ltx_conversation_cleanup
+.Ltx_conversation_allocation:
+ mov ebp,4
+.Ltx_conversation_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Ltx_conversation_return:
+ mov eax,ebp
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_create_conversation,.-pg_record_tx_create_conversation
+.section .rodata
+.Ltx_owner: .asciz "owner"
+.Ltx_task_id: .asciz "taskId"

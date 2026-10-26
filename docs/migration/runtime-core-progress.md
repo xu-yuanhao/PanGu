@@ -189,3 +189,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly `pg_record_tx_append_entry` 确认同批创建/已提交Conversation后mint；复制draft并覆盖id/conversationId/byTaskId，head=self使用新ID；先准备独立返回值和完整StorageWrite，再一次追加到Tx私有数组。失败不追加，已mint的ID保留消耗；读/分配失败清理全部partial值，纯原生状态与JSON库胶水编排均为Assembly。
 - 实际验证：10条构造语料执行固定上游原方法体和实际Chord copyJson（固定read/mint host）一致，仅证明记录构造；真实MemoryStorage验证同批Conversation追加、committed Conversation追加、缺失拒绝、归属、返回值隔离、丢弃及ID消耗。O0/O2 ASan/UBSan与每项直接分配/插入/复制故障通过，完整Runtime退出0；之后新增的构造对照再单独通过，原24条submission/5254条Storage对照保持通过。隔离核心暂存树G00、Assembly清单和产品构建通过。共享G00仍报告4个TUI候选未登记。
 - 同一实施Agent自审：扩展已有实际导出/来源，无门禁或预算变更。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`dff3402f59d963cc1e0a0ffb23074f13a9946246d85048ab3860dd3265df6b62`。结论为本地候选通过；Conversation typed ownership/fork与完整Document Tx仍待实现，新入口尚待应用消息投影接入，K03未完成。
+
+## K03 typed Conversation记录创建（2026-10-26）
+
+- 来源：Pi `d5b3de22` 的 `Transaction.#stageConversation/#currentTask`，阅读 `session/forks.ts:prepareForkDocumentCopies/collectCopies` 确认后续fork选择依赖；本批实现无parent记录构造。Pi/Harness fetch仍为固定 `d5b3de22` / `22ddee37`。
+- 实现：`pg_record_tx_create_conversation` 手写Assembly支持root保留ID1、ownerless与task-owned；普通创建先mint，再查最新暂存task或Storage，owner由task.conversationId/taskId派生；生成完整命令后一次追加，返回独立记录。mint后失败消耗ID符合上游顺序。
+- 实际验证：4种构造执行固定Pi实际私有方法体（parent未提供，mint/task/creation-hook固定host）一致；实际MemoryStorage验证同批task、committed task和更新候选优先级、missing owner、root及返回隔离。O0/O2 ASan/UBSan和逐直接分配/插入/部分复制故障通过；完整Runtime退出0，最后补充候选优先级用例另在最终源O0/O2执行通过。原10条Entry、24条submission及5254条Storage对照通过。隔离核心暂存树G00、Assembly清单、产品构建通过；共享G00仍报告4个TUI候选未登记。
+- 同一实施Agent自审：扩展实际导出/来源登记，不改变门禁或预算。6个候选路径/暂存内容清单SHA256摘要（加入本记录前）`ac445b23fbacbe99b99c73b3d0b24e143422bc72168e823f1c967dc933c17776`。结论为本地候选通过；fork文档选择/creation hook装配、完整Document Tx及当前应用接入仍待完成，K03未完成。

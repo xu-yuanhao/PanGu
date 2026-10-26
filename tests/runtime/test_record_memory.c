@@ -108,6 +108,15 @@ static void typed_entries(void){
 #endif
  json_object_put(conversation);json_object_put(draft);assert(!pg_record_memory_close(&memory));
 }
+static void typed_conversations(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};struct json_object *out=0,*task=json_tokener_parse("{\"type\":\"task\",\"value\":{\"id\":20,\"conversationId\":1,\"state\":{\"status\":\"pending\"}}}");assert(task);assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_create_conversation(&tx,0,1,0,&out)&&json_object_get_int(json_object_object_get(out,"id"))==1&&m.next_id==2);json_object_put(out);assert(!pg_record_tx_stage(&tx,PG_TX_TASK,task)&&!pg_record_tx_create_conversation(&tx,20,0,tx_mint,&out)&&json_object_get_int(json_object_object_get(out,"id"))==2&&json_object_get_int(json_object_object_get(json_object_object_get(out,"owner"),"taskId"))==20);json_object_object_add(out,"local",json_object_new_boolean(1));json_object_put(out);assert(!pg_record_tx_commit(&tx)&&m.count==3&&!pg_record_memory_read(&m,PG_TABLE_CONVERSATION,2,&out)&&!json_object_object_get(out,"local"));json_object_put(out);
+ json_object_object_add(json_object_object_get(task,"value"),"conversationId",json_object_new_int(2));assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_stage(&tx,PG_TX_TASK,task)&&!pg_record_tx_create_conversation(&tx,20,0,tx_mint,&out)&&json_object_get_int(json_object_object_get(json_object_object_get(out,"owner"),"conversationId"))==2);json_object_put(out);assert(!pg_record_tx_discard(&tx));
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&!pg_record_tx_create_conversation(&tx,20,0,tx_mint,&out)&&json_object_get_int(json_object_object_get(out,"id"))==22);json_object_put(out);assert(!pg_record_tx_discard(&tx));uint64_t before=m.next_id;assert(!pg_record_tx_begin(&tx,&session,&m,tx_read)&&pg_record_tx_create_conversation(&tx,999,0,tx_mint,&out)==PG_TX_INVALID&&!out&&m.next_id==before+1&&!json_object_array_length(tx.writes)&&!pg_record_tx_discard(&tx));
+#ifdef PG_MEMORY_FAULTS
+ assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));doc_tracking=1;doc_calls=doc_fail=0;assert(!pg_record_tx_create_conversation(&tx,20,0,tx_mint,&out));doc_tracking=0;unsigned count=doc_calls;json_object_put(out);assert(!pg_record_tx_discard(&tx));for(unsigned i=1;i<=count;++i){assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));doc_tracking=1;doc_calls=0;doc_fail=i;int status=pg_record_tx_create_conversation(&tx,20,0,tx_mint,&out);doc_tracking=0;assert(status!=PG_TX_OK&&!out&&!tx.busy&&tx.has_table_write&&!json_object_array_length(tx.writes)&&m.count==3);assert(!pg_record_tx_discard(&tx));}doc_fail=0;
+#endif
+ json_object_put(task);assert(!pg_record_memory_close(&m));
+}
 static int tx_reentrant(void *context,unsigned table,uint64_t id,struct json_object **out){(void)table;(void)id;pg_record_tx *tx=context;struct json_object *value=0;assert(pg_record_tx_discard(tx)==PG_TX_INVALID&&pg_record_tx_commit(tx)==PG_TX_INVALID&&pg_record_tx_read(tx,0,1,&value)==PG_TX_INVALID&&!value&&pg_record_tx_begin(tx,tx->session,context,tx_reentrant)==PG_TX_INVALID);*out=json_object_new_object();assert(*out);return 2;}
 static void transaction_batches(void){
  _Static_assert(sizeof(pg_record_tx)==48&&offsetof(pg_record_tx,busy)==32&&offsetof(pg_record_tx,has_table_write)==40,"Tx ABI");
@@ -133,6 +142,7 @@ static void transaction_faults(void){
 }
 #endif
 int main(void){
+ typed_conversations();
  typed_entries();
 #ifdef PG_MEMORY_FAULTS
  transaction_faults();

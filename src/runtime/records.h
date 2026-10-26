@@ -74,4 +74,11 @@ pg_record_tx_status pg_record_tx_submission_change(pg_record_tx *,uint64_t id,co
    mint uses read_context, returns 0 and a positive safe ID on success. */
 pg_record_tx_status pg_record_tx_append_entry(pg_record_tx *,uint64_t conversation_id,const struct json_object *draft,
  uint64_t by_task_id,int (*mint)(void *,uint64_t *),struct json_object **);
+/* Construct an ownerless (owner_task_id=0) or task-owned Conversation.
+   root=1 reserves ID 1 and requires ownerless ownership; otherwise mint uses
+   read_context before task lookup. Latest staged task wins over Storage.
+   Success returns a detached record independent of the staged candidate.
+   This primitive does not perform fork selection or extension creation hooks. */
+pg_record_tx_status pg_record_tx_create_conversation(pg_record_tx *,uint64_t owner_task_id,unsigned root,
+ int (*mint)(void *,uint64_t *),struct json_object **);
 #endif
