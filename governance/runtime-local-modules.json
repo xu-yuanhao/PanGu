@@ -1041,13 +1041,14 @@
         "session.documents.delta.local.v0",
         "json-c"
       ],
-      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse",
+      "role": "synchronous settlement of multiple loaded document edits: prepare, generated-plan validation, checkpoint, adoption preparation, Storage callback chaining and cleanup; mutation-line scoped acquisition and ownership of stable edit handles with transaction-local address reuse; initializer/mint based new document acquisition and uniform create-base settlement/cache installation",
       "exports": [
         "pg_document_tx_commit",
         "pg_document_tx_open",
         "pg_document_tx_get",
         "pg_document_tx_finish",
-        "pg_document_tx_abort"
+        "pg_document_tx_abort",
+        "pg_document_tx_doc"
       ],
       "reference_basis": [
         {
@@ -1057,7 +1058,7 @@
             "packages/durable/src/session/transaction.ts",
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup",
+          "semantics": "settleSuccess/assemble/adopt/discard: prepare all loaded edits before validation; checkpoint after generated plan validation; Storage adopts before publication; local explicit-op inputs and injected synchronous C ABI; Transaction.doc latestDocumentByAddress memoization and assertTaskDocumentsOpen, loaded cache acquisition, explicit-op native edits and scope cleanup; acquire created branch checks owner then initializes before mint; planDocument created stores a base even with no edits; adopt new incarnation installs after Storage confirmation",
           "tests_to_read": [
             "packages/durable/test/session-documents.test.ts",
             "packages/durable/test/session-adoption.test.ts"

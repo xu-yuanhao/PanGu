@@ -83,6 +83,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 完成definition-free Document.copy：已提交源快照转为目标base，核对kind/key/history/fork并拒绝同批变更复制源。
 - [x] 接通已存在Doc的事务内编辑获取/地址复用、统一checkpoint提交与loaded adoption；包含迁移版本写回和失败清理。
 - [x] 完成新Doc的缓存安装候选、索引容量预留和Storage确认后的createdAt/loaded安装；批量安装后直接命中缓存。
+- [x] 接通缺失Doc的owner检查、initializer、mint及事务内draft复用；新旧文档与普通表统一提交，确认后安装新incarnation。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -201,6 +202,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 对应资料已保存到 `references/pi-rust-yannelli`、`pie`、`pi-rust-nktkt`、`pi-rust-bigfish`、`pi-python-vamsi`、`bun-porting`。功能与行为的实现依据为上表中的Pi和Harness源码。
 
 ## 核心交接区
+
+- K03 Doc自动创建：固定Pi d5b3de22 的Transaction.doc/acquire(created)、planDocument(created)、adopt/install及session-documents.test.ts的首次base/重复acquire/family seed用例；原生document_tx.h/.S新增56字节request与pg_document_tx_doc。get复用已存在/本事务draft，missing先验证owner，再initializer和mint；新Doc在统一finalizer生成create/base，准备install并统一reserve，Storage确认后安装。手写Assembly实现；scope48、entry152与现有公开布局保持。16个family文档跨数组扩容、同批新旧Doc/表、放弃/只读/initializer失败、逐直接故障和后端adopt前后错误通过。task终态导致Doc退休的源分支随下一生命周期步骤接入。
+
 
 - K03 新Doc安装：固定Pi d5b3de22 的 Transaction.adopt(created 分支)→Session.host.install/touchDocument；原生 documents.h/.S 的 install_prepare/reserve/apply/discard 对应准备、预留、提交后采纳与放弃。提前复制record/value并分配stamp/node，采用json-c公开resize/insert接口。32个真实MemoryStorage批量创建后缓存直接命中；重复/过期/关闭拒绝及故障注入通过。missing Doc 的自动初始化/创建由后续 document_tx 获取流程串接。
 

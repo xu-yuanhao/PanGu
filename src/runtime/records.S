@@ -2748,3 +2748,105 @@ pg_record_tx_check_document_task:
  pop rbx
  ret
 .size pg_record_tx_check_document_task,.-pg_record_tx_check_document_task
+
+.text
+.globl pg_record_tx_require_document_owner
+.hidden pg_record_tx_require_document_owner
+.type pg_record_tx_require_document_owner,@function
+pg_record_tx_require_document_owner:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov r12,[rsi+32]
+ mov eax,[rsi+40]
+ test eax,eax
+ jz .Ldocument_owner_ok
+ cmp eax,2
+ jne .Ldocument_owner_conversation
+ lea rdx,[rsp]
+ mov rsi,r12
+ call .Ltx_current_task
+ test edx,edx
+ jnz .Ldocument_owner_done
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_terminal]
+ call .Ls_string
+ test eax,eax
+ jnz .Ldocument_owner_done
+ jmp .Ldocument_owner_ok
+.Ldocument_owner_conversation:
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r13,rax
+.Ldocument_owner_each:
+ test r13,r13
+ jz .Ldocument_owner_read
+ dec r13
+ mov rdi,[rbx+24]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_conversation]
+ call .Ls_string
+ test eax,eax
+ jz .Ldocument_owner_each
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ldocument_owner_each
+ jmp .Ldocument_owner_ok
+.Ldocument_owner_read:
+ cmp qword ptr [rbx+16],0
+ je .Ldocument_owner_done
+ mov rdi,[rbx+8]
+ xor esi,esi
+ mov rdx,r12
+ mov rcx,rsp
+ call [rbx+16]
+ test eax,eax
+ jnz .Ldocument_owner_done
+ cmp qword ptr [rsp],0
+ je .Ldocument_owner_done
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,r12
+ jne .Ldocument_owner_done
+.Ldocument_owner_ok:
+ xor ebp,ebp
+.Ldocument_owner_done:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_require_document_owner,.-pg_record_tx_require_document_owner

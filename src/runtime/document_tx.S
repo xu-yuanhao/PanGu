@@ -1,6 +1,7 @@
 .intel_syntax noprefix
 .text
-/* Settlement context: entries/count, original context/adopt/publish, error. */
+/* Settlement context: entries/count, original hooks, error, cache,
+   reservation[32], monotonic time, new-incarnation count. */
 .Ldocs_finalize:
  push rbp
  push rbx
@@ -24,6 +25,17 @@
  test eax,eax
  jnz .Ldocs_finalize_doc_error
  mov r15,[r14]
+ cmp dword ptr [r14+148],0
+ je .Ldocs_plan_loaded
+ mov rdi,r15
+ mov rsi,[r14+16]
+ lea rdx,[r14+112]
+ call .Ldocs_create_write
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+ mov dword ptr [r14+144],1
+ jmp .Ldocs_append_write
+.Ldocs_plan_loaded:
  mov rdi,[r15+72]
  mov rsi,[r15+88]
  mov rdx,[r15+96]
@@ -66,7 +78,7 @@
  xor r13d,r13d
 .Ldocs_checkpoint_each:
  cmp r13,[rbx+8]
- jae .Ldocs_finalize_ok
+ jae .Ldocs_finalize_reserve
  imul r14,r13,152
  add r14,[rbx]
  mov r15,[r14]
@@ -112,6 +124,26 @@
  mov qword ptr [rsp],0
  mov dword ptr [r14+144],1
 .Ldocs_prepare_adoption:
+ cmp dword ptr [r14+148],0
+ je .Ldocs_adoption_loaded
+ mov rax,[r15+152]
+ cmp qword ptr [rbx+48],0
+ je .Ldocs_install_cache
+ cmp rax,[rbx+48]
+ jne .Ldocs_finalize_invalid
+.Ldocs_install_cache:
+ mov [rbx+48],rax
+ mov rdi,rax
+ mov rsi,[r15+16]
+ mov rdx,[r15]
+ mov rcx,[r14+16]
+ lea r8,[r15+120]
+ call pg_document_install_prepare@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
+ inc qword ptr [rbx+96]
+ jmp .Ldocs_adoption_next
+.Ldocs_adoption_loaded:
  lea rdi,[r14+32]
  mov rsi,r15
  lea rdx,[r14+16]
@@ -119,8 +151,26 @@
  call pg_document_adoption_prepare@PLT
  test eax,eax
  jnz .Ldocs_finalize_doc_error
+.Ldocs_adoption_next:
  inc r13
  jmp .Ldocs_checkpoint_each
+.Ldocs_finalize_reserve:
+ cmp qword ptr [rbx+96],0
+ je .Ldocs_finalize_ok
+ mov r15,[rbx+48]
+ cmp qword ptr [r15+104],0
+ jne .Ldocs_finalize_invalid
+ mov dword ptr [r15+104],1
+ mov rdi,[r15+64]
+ call [r15+72]
+ mov [rbx+88],rax
+ mov dword ptr [r15+104],0
+ mov rdi,r15
+ mov rsi,[rbx+96]
+ lea rdx,[rbx+56]
+ call pg_document_cache_reserve@PLT
+ test eax,eax
+ jnz .Ldocs_finalize_doc_error
 .Ldocs_finalize_ok:
  xor ebp,ebp
  jmp .Ldocs_finalize_return
@@ -161,8 +211,19 @@
  jae .Ldocs_adopt_host
  imul r15,r14,152
  add r15,[rbx]
+ cmp dword ptr [r15+148],0
+ je .Ldocs_apply_loaded
+ mov rdi,[r15]
+ add rdi,120
+ lea rsi,[rbx+56]
+ mov rdx,r13
+ mov rcx,[rbx+88]
+ call pg_document_install_apply@PLT
+ jmp .Ldocs_apply_result
+.Ldocs_apply_loaded:
  lea rdi,[r15+32]
  call pg_document_adoption_apply@PLT
+.Ldocs_apply_result:
  test eax,eax
  jnz .Ldocs_adopt_return
  inc r14
@@ -200,7 +261,7 @@ pg_document_tx_commit:
  push r13
  push r14
  push r15
- sub rsp,56
+ sub rsp,104
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -238,8 +299,10 @@ pg_document_tx_commit:
  jne .Ldocs_commit_return
  cmp qword ptr [r15+112],0
  jne .Ldocs_commit_return
- cmp qword ptr [r15+144],0
+ cmp dword ptr [r15+144],0
  jne .Ldocs_commit_return
+ cmp dword ptr [r15+148],1
+ ja .Ldocs_commit_return
  cmp qword ptr [r15+40],0
  jne .Ldocs_commit_return
  cmp qword ptr [r15+48],0
@@ -282,6 +345,11 @@ pg_document_tx_commit:
  mov rax,[r15+40]
  mov [rsp+32],rax
  mov qword ptr [rsp+40],0
+ pxor xmm0,xmm0
+ movups [rsp+48],xmm0
+ movups [rsp+64],xmm0
+ movups [rsp+80],xmm0
+ mov qword ptr [rsp+96],0
  mov [r15+24],rsp
  lea rax,[rip+.Ldocs_adopt]
  mov [r15+32],rax
@@ -323,12 +391,18 @@ pg_document_tx_commit:
  mov rdi,[r15+112]
  call json_object_put@PLT
  mov qword ptr [r15+112],0
- mov qword ptr [r15+144],0
+ mov dword ptr [r15+144],0
+ cmp dword ptr [r15+148],0
+ je .Ldocs_cleanup_next
+ mov rdi,[r15]
+ add rdi,120
+ call pg_document_install_discard@PLT
+.Ldocs_cleanup_next:
  inc r14
  jmp .Ldocs_commit_cleanup
 .Ldocs_commit_return:
  mov eax,ebp
- add rsp,56
+ add rsp,104
  pop r15
  pop r14
  pop r13
@@ -492,56 +566,19 @@ pg_document_tx_get:
  mov ebp,eax
  test eax,eax
  jnz .Ldoc_scope_get_cleanup
- mov rax,[rbx+24]
- cmp rax,[rbx+32]
- jb .Ldoc_scope_get_install
- mov rsi,[rbx+32]
- test rsi,rsi
- jnz .Ldoc_scope_get_grow
- mov esi,4
- jmp .Ldoc_scope_get_allocate
-.Ldoc_scope_get_grow:
- mov rax,0x007fffffffffffff
- cmp rsi,rax
- jae .Ldoc_scope_get_capacity
- shl rsi,1
-.Ldoc_scope_get_allocate:
- mov [rsp+48],rsi
- mov rdi,[rbx+16]
- mov edx,152
- call reallocarray@PLT
- test rax,rax
- jz .Ldoc_scope_get_allocation
- mov [rbx+16],rax
- mov rax,[rsp+48]
- mov [rbx+32],rax
-.Ldoc_scope_get_install:
- imul rdi,[rbx+24],152
- add rdi,[rbx+16]
- mov [rsp+40],rdi
- xor eax,eax
- mov ecx,19
- rep stosq
- mov rax,[rsp+40]
- mov rcx,[rsp]
- mov [rax],rcx
- mov rcx,[rsp+8]
- mov [rax+8],rcx
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rsp+8]
  mov rcx,[rsp+24]
- mov [rax+128],rcx
- mov rcx,[rsp+32]
- mov [rax+136],rcx
+ mov r8,[rsp+32]
+ xor r9d,r9d
+ call .Ldoc_scope_append
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_scope_get_cleanup
  mov rax,[rsp+8]
  mov [r14],rax
  mov qword ptr [rsp+8],0
- inc qword ptr [rbx+24]
- xor ebp,ebp
- jmp .Ldoc_scope_get_cleanup
-.Ldoc_scope_get_capacity:
- mov ebp,2
- jmp .Ldoc_scope_get_cleanup
-.Ldoc_scope_get_allocation:
- mov ebp,3
 .Ldoc_scope_get_cleanup:
  cmp qword ptr [rsp+8],0
  je .Ldoc_scope_get_clear
@@ -581,6 +618,18 @@ pg_document_tx_get:
  call pg_document_change_discard@PLT
  mov rdi,r13
  call free@PLT
+ imul rax,r12,152
+ add rax,[rbx+16]
+ cmp dword ptr [rax+148],0
+ je .Ldoc_scope_release_next
+ mov r13,[rax]
+ lea rdi,[r13+120]
+ call pg_document_install_discard@PLT
+ mov rdi,r13
+ call pg_document_loaded_close@PLT
+ mov rdi,r13
+ call free@PLT
+.Ldoc_scope_release_next:
  inc r12
  jmp .Ldoc_scope_release_each
 .Ldoc_scope_release_array:
@@ -664,3 +713,337 @@ pg_document_tx_abort:
  pop rbx
  ret
 .size pg_document_tx_abort,.-pg_document_tx_abort
+
+.text
+/* Append a managed entry; edits/loaded allocations are stable across growth. */
+.Ldoc_scope_append:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov [rsp],r9d
+ mov eax,2
+ mov rsi,[rbx+32]
+ cmp [rbx+24],rsi
+ jb .Ldoc_append_install
+ test rsi,rsi
+ jnz .Ldoc_append_grow
+ mov esi,4
+ jmp .Ldoc_append_allocate
+.Ldoc_append_grow:
+ mov rcx,0x007fffffffffffff
+ cmp rsi,rcx
+ jae .Ldoc_append_return
+ shl rsi,1
+.Ldoc_append_allocate:
+ mov [rsp+8],rsi
+ mov rdi,[rbx+16]
+ mov edx,152
+ call reallocarray@PLT
+ test rax,rax
+ jz .Ldoc_append_allocation
+ mov [rbx+16],rax
+ mov rax,[rsp+8]
+ mov [rbx+32],rax
+.Ldoc_append_install:
+ imul rbp,[rbx+24],152
+ add rbp,[rbx+16]
+ mov rdi,rbp
+ xor eax,eax
+ mov ecx,19
+ rep stosq
+ mov [rbp],r12
+ mov [rbp+8],r13
+ mov [rbp+128],r14
+ mov [rbp+136],r15
+ mov eax,[rsp]
+ mov [rbp+148],eax
+ inc qword ptr [rbx+24]
+ xor eax,eax
+ jmp .Ldoc_append_return
+.Ldoc_append_allocation:
+ mov eax,3
+.Ldoc_append_return:
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Private created handle: loaded[120], install[32], borrowed cache[8].
+   Entry.reserved=1 owns this allocation until managed finish/abort. */
+.globl pg_document_tx_doc
+.type pg_document_tx_doc,@function
+pg_document_tx_doc:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ test r13,r13
+ jz .Ldoc_create_return
+ mov qword ptr [r13],0
+ test r12,r12
+ jz .Ldoc_create_return
+ mov rsi,[r12]
+ mov rdx,[r12+8]
+ mov rcx,[r12+40]
+ mov r8,[r12+48]
+ mov r9,r13
+ call pg_document_tx_get
+ mov ebp,eax
+ cmp eax,8
+ jne .Ldoc_create_return
+ mov ebp,1
+ cmp qword ptr [r12+32],0
+ je .Ldoc_create_return
+ cmp qword ptr [r12+24],0
+ je .Ldoc_create_return
+ mov r15,[rbx]
+ mov dword ptr [rbx+40],1
+ mov dword ptr [r15+32],1
+ mov rdi,r15
+ mov rsi,[r12+8]
+ call pg_record_tx_require_document_owner@PLT
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rdi,[r12]
+ mov rsi,[r12+16]
+ mov rdx,[r12+24]
+ lea rcx,[rsp+16]
+ call pg_document_initialize@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rdi,[r15+8]
+ lea rsi,[rsp+24]
+ call [r12+32]
+ test eax,eax
+ jnz .Ldoc_create_mint_error
+ mov ebp,3
+ mov edi,1
+ mov esi,160
+ call calloc@PLT
+ test rax,rax
+ jz .Ldoc_create_cleanup
+ mov r14,rax
+ mov [rsp],rax
+ mov rcx,[rbx+8]
+ mov [rax+152],rcx
+ mov rdi,[r12]
+ mov rsi,[r12+8]
+ mov rdx,[rsp+24]
+ mov rcx,rax
+ call pg_document_record_create@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rdi,[r14]
+ lea rsi,[r14+24]
+ call pg_document_record_decode@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rax,[rsp+16]
+ mov [r14+8],rax
+ mov qword ptr [rsp+16],0
+ mov rax,[r12]
+ mov [r14+16],rax
+ mov rax,[rax+16]
+ mov [r14+88],rax
+ mov [r14+96],rax
+ mov dword ptr [r14+116],1
+ mov edi,1
+ mov esi,32
+ call calloc@PLT
+ mov ebp,3
+ test rax,rax
+ jz .Ldoc_create_cleanup
+ mov [rsp+8],rax
+ mov rdi,r14
+ mov rsi,rax
+ call pg_document_loaded_begin@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rdi,rbx
+ mov rsi,r14
+ mov rdx,[rsp+8]
+ mov rcx,[r12+40]
+ mov r8,[r12+48]
+ mov r9d,1
+ call .Ldoc_scope_append
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldoc_create_cleanup
+ mov rax,[rsp+8]
+ mov [r13],rax
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ jmp .Ldoc_create_cleanup
+.Ldoc_create_mint_error:
+ mov ebp,9
+.Ldoc_create_cleanup:
+ mov rdi,[rsp+8]
+ test rdi,rdi
+ jz .Ldoc_create_loaded_cleanup
+ call pg_document_change_discard@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+.Ldoc_create_loaded_cleanup:
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Ldoc_create_seed_cleanup
+ call pg_document_loaded_close@PLT
+ mov rdi,[rsp]
+ call free@PLT
+.Ldoc_create_seed_cleanup:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov dword ptr [r15+32],0
+ mov dword ptr [rbx+40],0
+.Ldoc_create_return:
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_tx_doc,.-pg_document_tx_doc
+
+.text
+/* Consume RAX scalar/reference into RDI object at RSI key. */
+.Ldocs_attach:
+ test rax,rax
+ jz .Ldocs_attach_error
+ push rbx
+ mov rbx,rax
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Ldocs_attach_done
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Ldocs_attach_done:
+ pop rbx
+ ret
+.Ldocs_attach_error:
+ mov eax,1
+ ret
+
+/* New incarnation always stores a base, including an empty edit. */
+.Ldocs_create_write:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ xor r15d,r15d
+ mov ebp,3
+ mov qword ptr [r13],0
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ldocs_create_write_done
+ mov r14,rax
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ldocs_create_write_done
+ mov r15,rax
+ lea rdi,[rip+.Ldoc_write_create]
+ call json_object_new_string@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldoc_write_type]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ mov rdi,[rbx]
+ call json_object_get@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldoc_write_record]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ lea rdi,[rip+.Ldoc_write_base]
+ call json_object_new_string@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Ldoc_write_kind]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ mov rdi,[rbx+96]
+ call json_object_new_int64@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Ldoc_write_version]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Ldoc_write_value]
+ call .Ldocs_attach
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ mov rdi,r14
+ lea rsi,[rip+.Ldoc_write_content]
+ mov rdx,r15
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldocs_create_write_done
+ xor r15d,r15d
+ mov [r13],r14
+ xor r14d,r14d
+ xor ebp,ebp
+.Ldocs_create_write_done:
+ mov rdi,r14
+ call json_object_put@PLT
+ mov rdi,r15
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,8
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldoc_write_type: .asciz "type"
+.Ldoc_write_create: .asciz "document.create"
+.Ldoc_write_record: .asciz "record"
+.Ldoc_write_kind: .asciz "kind"
+.Ldoc_write_base: .asciz "base"
+.Ldoc_write_version: .asciz "version"
+.Ldoc_write_value: .asciz "value"
+.Ldoc_write_content: .asciz "content"

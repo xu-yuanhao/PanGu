@@ -17,14 +17,16 @@ typedef struct {
 } pg_document_tx_entry;
 /* Loaded handles and edits are borrowed, disjoint, unique per incarnation and
    alive for the whole synchronous mutation line. Entry internal fields start
-   zeroed. Seal and prepare all edits, validate all generated plans, then invoke
+   zeroed; reserved is private to managed Doc creation. Seal and prepare all
+   edits, validate all generated plans, then invoke
    checkpoint predicates and prepare adoption before Storage admission.
    Storage confirmation applies all loaded values before the Session's existing
    adopt hook; its existing publish hook follows normal settlement. Hooks and
    context are restored on return. No-op edits cause no Storage commit.
    After a valid admission every result discards prepared state and seals edits;
-   argument/precondition refusal leaves caller state unchanged. Creation,
-   retirement and deferred holds are handled by the surrounding Doc transaction.
+   argument/precondition refusal leaves caller state unchanged. Managed creation
+   stores a base and installs after confirmation; retirement and deferred holds
+   are coordinated by the surrounding Session host.
    Callers must finish through this entry once loaded edits were acquired. */
 pg_record_tx_status pg_document_tx_commit(pg_record_tx *,pg_document_tx_entry *,size_t);
 typedef struct {
@@ -34,7 +36,8 @@ typedef struct {
  size_t count,capacity;
  unsigned busy,sealed;
 } pg_document_tx;
-/* Bind one Doc scope to an open record Tx and cache on its mutation line.\n   Scope fields are API-managed. get currently
+/* Bind one Doc scope to an open record Tx and cache on its mutation line.
+   Scope fields are API-managed. get
    acquires existing incarnations; missing addresses return PG_DOC_MISSING.
    Repeated addresses reuse the first edit and its definition/checkpoint,
    matching transaction-local draft identity. Returned edits are owned by this
@@ -43,10 +46,26 @@ typedef struct {
    must not run while the mutation line holds these borrowed loaded handles.
    finish seals edits, commits through uniform settlement and frees them;
    abort discards the whole record Tx and frees edits. Neither leaves handles
-   valid after return. New incarnations and retirement are added by Doc access. */
+   valid after return. doc adds initializer/mint based creation on missing. */
 pg_document_status pg_document_tx_open(pg_document_tx *,pg_record_tx *,pg_document_cache *);
 pg_document_status pg_document_tx_get(pg_document_tx *,const pg_document_definition *,const pg_document_address *,void *,
  int (*checkpoint)(void *,const struct json_object *,const struct json_object *,uint64_t),pg_document_change **);
+typedef struct {
+ const pg_document_definition *definition;
+ const pg_document_address *address;
+ const struct json_object *seed;
+ const pg_document_initializer *initializer;
+ int (*mint)(void *,uint64_t *); /* record Tx read_context */
+ void *context;
+ int (*checkpoint)(void *,const struct json_object *,const struct json_object *,uint64_t);
+} pg_document_request;
+/* Acquire an existing or transaction-local draft; on missing address require
+   its owner, initialize a detached value, then mint and stage a private new
+   incarnation. Initialization/mint only run on first missing acquisition.
+   All callbacks run with scope/record Tx busy. Failure returns no edit and
+   leaves prior candidates intact; minted IDs remain consumed. New values
+   become visible through Storage and cache only on successful finish. */
+pg_document_status pg_document_tx_doc(pg_document_tx *,const pg_document_request *,pg_document_change **);
 pg_record_tx_status pg_document_tx_finish(pg_document_tx *);
 pg_record_tx_status pg_document_tx_abort(pg_document_tx *);
 #endif

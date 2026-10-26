@@ -295,3 +295,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写Assembly 32字节install候选与32字节reservation；prepare核对未带lifecycle stamp的创建记录，隔离record/value，预分配node和createdAt整数。reserve通过json-c公开lh_table_resize预留容量，apply确认sequence后设置整数、插入索引并接入all/idle链；discard释放未安装所有权。保持cache112字节与旧函数表布局。reservation要求同一Session执行线且期间只允许共用预留的安装操作；host随后维护pin。
 - 实际验证：真实MemoryStorage同批创建32个Doc，确认后install，再get全部零find/read命中，record/value/version/createdAt与输入隔离符合源语义。重复install、重复地址、已关闭缓存、过期count、非法sequence、带createdAt/retiredAt输入拒绝；逐直接分配/插入/复制故障与预留失败清理通过。O0/O2 ASan/UBSan通过；apply计数只有一次预留容量内的linkhash插入，直接分配/复制/resize wrapper均未调用。完整Runtime退出0，最终语义检查补充后O2专项通过；原Pi/Chord差异基线保持。共享及隔离核心暂存树G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：扩展已有模块导出/来源及专项wrap，无门禁预算变更。6个候选路径内容清单摘要（加入本记录前）：bd91064c5e37a89d72edb4eb245fd4dca718a5dc97eb21d626ca2dbf0a21f98b。结论为本地候选通过。缺失地址自动创建与统一Doc Tx结算尚需接线；新incarnation的retirement/holds仍属于K03。TUI未提交文件保留原样。
+
+## K03 Doc自动创建与统一结算（2026-10-26）
+
+- 来源：固定Pi d5b3de22 的Transaction.doc/acquire(created)、planDocument(created)、adopt与Session.install；读取session-documents.test.ts的首次base、重复acquire、首次family seed用例，以及session-adoption的确认边界。本批Pi/Harness fetch仍为d5b3de22 / 22ddee37。
+- 实现：手写Assembly pg_document_tx_doc使用56字节request注入initializer/mint/checkpoint；missing地址先验证conversation/task owner，再隔离初始化、mint、创建私有loaded和稳定edit。重复地址复用首次edit；统一finalizer为新Doc生成create/base，即使未编辑也写初值；在所有checkpoint后预备install并统一reserve，Storage确认后批量安装，再调用原Session adopt/publish。新Doc私有内存随finish/abort清理；scope48/entry152及旧函数表布局保持。抽出共用entry追加逻辑供已有/新建路径使用。
+- 实际验证：16个family文档跨数组扩容、同址重复只初始化/mint一次、批量提交后直接命中缓存、混合新旧Doc及普通表写通过。owner缺失/terminal在initializer前拒绝，同批新conversation/task允许创建；初始化失败、只读、abort及逐直接分配/插入/复制错误清理通过。后端adopt前失败无缓存安装，adopt后失败保留已提交/采纳状态并锁存Session，均不发布伪成功。O0/O2 ASan/UBSan专项、完整Runtime与原Pi/Chord对照退出0；最后补充后端失败用例两优化级均通过。共享G00/Assembly清单、隔离核心暂存树G00/Assembly清单/产品构建通过。
+- 同一实施Agent自审：扩展实际导出/来源，records新增隐藏owner查询仅供mutation line调用；未改门禁、预算或TUI文件。6个候选路径内容清单摘要（本记录加入前）：58e2e01a160ff262750abf00347c8301ba7d8da6e9b77586d3b69015fc73be86。结论为本地候选通过；retireDoc、同址替换、Task终态自动退休及holds仍待下一生命周期步骤完成，K03未完成。TUI候选及其待交接登记保持工作树。
