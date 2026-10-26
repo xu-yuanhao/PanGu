@@ -3845,3 +3845,243 @@ pg_record_tx_array_transfer:
  pop rbp
  ret
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_set_task
+.type pg_record_tx_set_task,@function
+pg_record_tx_set_task:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,88
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov r8,rcx
+ mov ecx,11
+ rep stosq
+ mov [rsp],rdx
+ mov [rsp+8],r8
+ mov qword ptr [rsp+40],-1
+ mov ebp,1
+ test rbx,rbx
+ jz .Lset_task_end
+ cmp dword ptr [rbx+32],0
+ jne .Lset_task_end
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Lset_task_end
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Lset_task_end
+ mov dword ptr [rbx+40],1
+ cmp qword ptr [rsp+8],0
+ je .Lset_task_end
+ mov dword ptr [rbx+32],1
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lset_task_cleanup
+ mov rdi,r12
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Lset_task_cleanup
+ mov [rsp+32],rax
+ mov rdi,rbx
+ mov rsi,rax
+ call .Ltask_slot
+ test rax,rax
+ jz .Lset_task_allocation
+ mov rdi,[rbx+24]
+ call json_object_array_length@PLT
+ mov r13,rax
+.Lset_task_find:
+ test r13,r13
+ jz .Lset_task_found
+ dec r13
+ mov rdi,[rbx+24]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ls_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_task]
+ call .Ls_string
+ test eax,eax
+ jz .Lset_task_find
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_value]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ cmp rax,[rsp+32]
+ jne .Lset_task_find
+ mov [rsp+48],r14
+ mov [rsp+40],r13
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltx_terminal]
+ call .Ls_string
+ test eax,eax
+ jnz .Lset_task_cleanup
+ mov rdi,r14
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ mov r15,rax
+ mov rdi,r12
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ cmp rax,r15
+ jne .Lset_task_cleanup
+.Lset_task_found:
+ mov rdi,r12
+ lea rsi,[rip+.Ltx_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ls_status]
+ call json_object_object_get@PLT
+ mov [rsp+56],rax
+ mov rdi,r12
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lset_task_allocation
+ xor r13d,r13d
+.Lset_task_stamp:
+ cmp r13d,2
+ jae .Lset_task_write
+ lea r14,[rip+.Ltask_started]
+ lea r15,[rip+.Ltask_running]
+ test r13d,r13d
+ jz .Lset_task_stamp_key
+ lea r14,[rip+.Ltask_ended]
+ lea r15,[rip+.Ltx_terminal]
+.Lset_task_stamp_key:
+ mov rdi,[rsp+48]
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lset_task_stamp_copy
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lset_task_stamp_next
+ mov rdi,[rsp+56]
+ mov rsi,r15
+ call .Ls_string
+ test eax,eax
+ jz .Lset_task_stamp_next
+ mov rdi,[rsp]
+ call [rsp+8]
+ call json_object_new_double@PLT
+ test rax,rax
+ jz .Lset_task_allocation
+ mov [rsp+72],rax
+ jmp .Lset_task_stamp_attach
+.Lset_task_stamp_copy:
+ mov rdi,rax
+ lea rsi,[rsp+72]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lset_task_allocation
+.Lset_task_stamp_attach:
+ mov rdi,[rsp+16]
+ mov rsi,r14
+ mov rdx,[rsp+72]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lset_task_allocation
+ mov qword ptr [rsp+72],0
+.Lset_task_stamp_next:
+ inc r13d
+ jmp .Lset_task_stamp
+.Lset_task_write:
+ mov rdi,[rsp+16]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lset_task_cleanup
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lset_task_allocation
+ mov [rsp+24],rax
+ lea rdi,[rip+.Ltx_task]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Ls_type]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lset_task_allocation
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Ltx_value]
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lset_task_allocation
+ mov qword ptr [rsp+16],0
+ cmp qword ptr [rsp+40],-1
+ je .Lset_task_append
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+40]
+ mov rdx,[rsp+24]
+ call json_object_array_put_idx@PLT
+ jmp .Lset_task_installed
+.Lset_task_append:
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+24]
+ call json_object_array_add@PLT
+.Lset_task_installed:
+ test eax,eax
+ jnz .Lset_task_allocation
+ mov qword ptr [rsp+24],0
+ xor ebp,ebp
+ jmp .Lset_task_cleanup
+.Lset_task_allocation:
+ mov ebp,4
+.Lset_task_cleanup:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Lset_task_end:
+ mov eax,ebp
+ add rsp,88
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_set_task,.-pg_record_tx_set_task
+.section .rodata
+.Ltask_started: .asciz "startedAt"
+.Ltask_ended: .asciz "endedAt"
+.Ltask_running: .asciz "running"
+.section .note.GNU-stack,"",@progbits

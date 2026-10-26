@@ -85,6 +85,13 @@ pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
    failures retain prior candidates and already minted IDs stay consumed. */
 pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct json_object *,
  int (*mint)(void *,uint64_t *),struct json_object **);
+/* Replace a Task candidate with a detached final record. Reject an already
+   terminal candidate or a changed candidate conversation. Candidate timestamps
+   take precedence, then input timestamps; now() supplies missing startedAt on
+   running and endedAt on terminal. Provider runs only when needed, with Tx
+   busy; nonfinite clock/record values reject. A failure keeps prior writes,
+   preserves first-access order and marks the caller table-read barrier. */
+pg_record_tx_status pg_record_tx_set_task(pg_record_tx *,const struct json_object *,void *clock_context,double (*now)(void *));
 /* Detached candidate snapshots of an open Tx, permitted after table writes.
    Tasks retain first-accessed ID order and expose the latest value per ID;
    conversations retain staged creation/fork order. No Storage calls. Partial

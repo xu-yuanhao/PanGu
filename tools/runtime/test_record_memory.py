@@ -460,6 +460,30 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
         finally:assert not native.pg_record_tx_discard(ctypes.byref(tx))
     print('PASS: cached Task success/missing/rejection and first-read candidate order match actual Pi Task cache methods')
 
+def task_replacement(native,library):
+    cases=[]
+    candidates=[None,dict(id=10,conversationId=1,state=dict(status='pending')),dict(id=10,conversationId=1,state=dict(status='waiting'),startedAt=0,endedAt=9),dict(id=10,conversationId=1,state=dict(status='terminal')),dict(id=10,conversationId=2,state=dict(status='pending'))]
+    for candidate in candidates:
+        for status in ['pending','running','waiting','terminal']:
+            for times in [{},{'startedAt':None,'endedAt':None},{'startedAt':-2.5},{'startedAt':8,'endedAt':0}]:cases.append(dict(candidate=candidate,value=dict(id=10,conversationId=1,state=dict(status=status),**times)))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';const base=pathToFileURL(process.argv[1]+'/');registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};return n(s,c)}});const {copyJson}=await import(new URL('packages/chord/src/json.ts',base));const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const s=readFileSync(new URL('packages/durable/src/session/transaction.ts',base),'utf8');const a=s.indexOf('setTask(value:'),b=s.indexOf('\n\t/**',a),c=s.indexOf('#stampTimes(value:'),d=s.indexOf('\n\t#taskEntry(',c);const text='class Probe{calls=0;task={};#host={now:()=>{this.calls++;return 100.25}};constructor(candidate){if(candidate)this.task.write={kind:"replace",record:candidate}}#assertOpen(){}#hasTableWrite=false;#taskEntry(){return this.task}'+s.slice(a,b)+s.slice(c,d)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){const p=new Probe(c.candidate);let ok=true;try{p.setTask(c.value)}catch{ok=false}out.push({ok,calls:p.calls,value:p.task.write?.record??null})}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    now_type=ctypes.CFUNCTYPE(ctypes.c_double,ctypes.c_void_p);native.pg_record_tx_set_task.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,ctypes.c_void_p,now_type];native.pg_record_tx_discard.argtypes=[ctypes.POINTER(Tx)]
+    library.json_object_array_length.argtypes=[ctypes.c_void_p];library.json_object_array_length.restype=ctypes.c_size_t
+    for case,want in zip(cases,expected,strict=True):
+        calls=[]
+        @now_type
+        def now(context):calls.append(1);return 100.25
+        writes=[] if case['candidate'] is None else [dict(type='task',value=case['candidate'])];tx=Tx(None,None,None,library.json_tokener_parse(json.dumps(writes).encode()));value=library.json_tokener_parse(json.dumps(case['value']).encode())
+        try:
+            status=native.pg_record_tx_set_task(ctypes.byref(tx),value,None,now);batch=json.loads(library.json_object_to_json_string_ext(tx.writes,0));actual=dict(ok=status==0,calls=len(calls),value=batch[-1]['value'] if batch else None);assert actual==want and not tx.busy and tx.barrier,(case,status,actual,want)
+        finally:library.json_object_put(value);assert not native.pg_record_tx_discard(ctypes.byref(tx))
+    print(f'PASS: {len(cases)} Task replacements and lifecycle timestamps match actual Pi setTask/stampTimes')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -743,5 +767,6 @@ def main():
         submission_creation(native,library)
         candidate_snapshots(native,library)
         task_cache_order(native,library)
+        task_replacement(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

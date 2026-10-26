@@ -423,3 +423,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 所有权修复：最初在json-c userdata destructor内递归释放元数据触发引用计数断言，独立非空array探针也复现此重入问题；改为Tx显式清理/转交并在Storage拷贝时排除内部metadata。故障路径及最终树重新验证，无该问题残留。对照脚本的TypeScript拼接与ctypes局部Tx类型声明错误均在工具中修正，未计入通过结果。
 - 实际验证：执行实际Pi #taskEntry/#committedTask/stagedTasks方法对照四种先读顺序，重复成功/缺失/拒绝的值、provider次数和最终候选顺序一致；已有10组候选数组、5982个MemoryStorage操作与其余固定Pi/Chord基线保持通过。原生验证返回隔离、busy/reentry、缺失和错误缓存、分叉批次重建后顺序/释放；10个缓存直接分配/插入/部分复制故障通过，候选枚举故障范围扩展Task184/Conversation5。最终O0/O2 ASan/UBSan专项及完整Runtime O0/O2 UBSan通过，分叉保留用例随后两优化级补充复验；既有3条delta ABI边界继续单列。共享及隔离核心树G00/Assembly清单与隔离产品构建通过。
 - 同一实施Agent自审：仅既有records/holds内部元数据生命周期、来源/实际模块登记、专项及TODO，公开布局保持，门禁/预算未改。7个候选路径内容清单摘要（本记录加入前）：9ca4cf7d56daf26f7c2d7754fd0949437f007d4a82f811eba7e1982238125300。结论为本地候选通过；后续补Task setTask终态/conversation/时间戳与createTask，K03总验收尚未完成。TUI工作树保持独立。
+
+## K03 setTask候选替换与生命周期时间戳
+
+- 来源：固定Pi d5b3de22 Transaction.setTask/#stampTimes/#taskEntry、session-tables终态/conversation拒绝和harness-tasks生命周期时间戳调用。本批fetch后Pi HEAD/origin=d5b3de22/f9daca3，Harness为22ddee37。
+- 实现：手写pg_record_tx_set_task按同ID最新候选核对terminal/conversation，再复制并原地替换最新write；首次访问slot与原Tx ABI保持。时间戳candidate优先于input，null视为缺失，仅在running/terminal缺少对应字段时调用注入double时钟；有限小数/负值保持，非有限结果拒绝。clock回调在Tx busy下运行，失败保留旧候选并保持table-read barrier，返回/原记录不别名。
+- 实际验证：80组执行实际Pi setTask/#stampTimes，terminal/conversation拒绝、candidate/input/null优先、小数时间、clock调用次数及最终候选一致。真实MemoryStorage验证pending→running→waiting→running→terminal，仅两次clock且跨阶段保留startedAt/endedAt；旧候选terminal拒绝后最终统一提交。NaN clock拒绝保留waiting候选；10个直接分配/插入/部分复制故障保留先前write，包含新增json_object_new_double故障包装。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan与固定Pi/Chord差异基线通过，新增NaN用例随后两优化级专项复验；既有3条delta ABI边界单列。共享及隔离核心树G00/Assembly清单、隔离产品构建通过。
+- 同一实施Agent自审：仅既有records独立导出/来源、专项和TODO，旧结构/枚举及门禁/预算保持。7个候选路径内容清单摘要（本记录加入前）：739e2221795de02309107137cbf84638cf6e39515a58bbac04f4e5f38e449461。结论为本地候选通过；随后移植createTask初始化/owner/输入和时间来源，K03总验收未完成。TUI工作树保持独立。

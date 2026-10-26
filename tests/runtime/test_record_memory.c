@@ -7,6 +7,7 @@
 #include "../../src/runtime/durable_session.h"
 #include "../../src/runtime/document_reader.h"
 #include <assert.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +43,8 @@ struct json_object *__wrap_json_object_new_array_ext(int size){if(doc_fault())re
 int __wrap_json_object_array_add(struct json_object *array,struct json_object *value){if(doc_fault())return -1;if(allocation_failure==6&&++array_add_calls==2){allocation_failure=0;return -1;}if(allocation_failure==5){allocation_failure=0;return -1;}return __real_json_object_array_add(array,value);}
 struct json_object *__real_json_object_new_object(void);
 struct json_object *__real_json_object_new_int64(int64_t);
+struct json_object *__real_json_object_new_double(double);
+struct json_object *__wrap_json_object_new_double(double n){return doc_fault()?0:__real_json_object_new_double(n);}
 struct json_object *__real_json_object_new_string(const char *);
 struct json_object *__real_json_object_new_string_len(const char *,int);
 const char *__real_json_object_to_json_string_ext(struct json_object *,int);
@@ -204,6 +207,21 @@ static int task_cache_read(void *context,unsigned table,uint64_t id,struct json_
  return f->mode?7:0;}
 typedef struct {pg_record_memory *memory;unsigned tasks;} task_rebuild_provider;
 static int task_rebuild_read(void *context,unsigned table,uint64_t id,struct json_object **out){task_rebuild_provider *p=context;if(table==PG_TABLE_TASK)++p->tasks;return pg_record_memory_read(p->memory,(pg_record_table)table,id,out);}
+
+typedef struct {pg_record_tx *tx;unsigned calls;double value;} task_clock_fixture;
+static double task_clock(void *context){task_clock_fixture *f=context;assert(f->tx->busy&&pg_record_tx_discard(f->tx)==PG_TX_INVALID);++f->calls;return f->value;}
+static struct json_object *task_draft(const char *status,unsigned conversation){char text[200];int n=snprintf(text,sizeof(text),"{\"id\":10,\"conversationId\":%u,\"state\":{\"status\":\"%s\"}}",conversation,status);assert(n>0);struct json_object *out=json_tokener_parse(text);assert(out);return out;}
+static void set_task_tests(void){
+ pg_record_memory m={0};assert(!pg_record_memory_open(&m)&&!doc_commit(&m,"[{\"type\":\"conversation\",\"value\":{\"id\":1}}]"));pg_record_session session={.storage=pg_record_memory_storage(&m)};pg_record_tx tx={0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));task_clock_fixture clock={&tx,0,100.5};const char *states[]={"pending","running","waiting","running","terminal"};struct json_object *out=0;
+ for(unsigned i=0;i<5;++i){struct json_object *value=task_draft(states[i],1);clock.value=100.5+i;assert(!pg_record_tx_set_task(&tx,value,&clock,task_clock)&&json_object_array_length(tx.writes)==1);assert(!json_object_object_add(value,"outside",json_object_new_int64(1)));json_object_put(value);assert(!pg_record_tx_staged_tasks(&tx,&out)&&json_object_array_length(out)==1);struct json_object *candidate=json_object_array_get_idx(out,0);assert(!json_object_object_get(candidate,"outside"));if(i)assert(json_object_get_double(json_object_object_get(candidate,"startedAt"))==101.5);if(i==4)assert(json_object_get_double(json_object_object_get(candidate,"endedAt"))==104.5);json_object_put(out);out=0;}
+ assert(clock.calls==2);struct json_object *value=task_draft("pending",1);assert(pg_record_tx_set_task(&tx,value,&clock,task_clock)==PG_TX_INVALID&&clock.calls==2);json_object_put(value);assert(!pg_record_tx_commit(&tx)&&!pg_record_memory_read(&m,PG_TABLE_TASK,10,&out)&&json_object_get_double(json_object_object_get(out,"startedAt"))==101.5);json_object_put(out);out=0;
+ tx=(pg_record_tx){0};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));value=task_draft("waiting",1);assert(!pg_record_tx_set_task(&tx,value,&clock,task_clock));json_object_put(value);clock.value=NAN;value=task_draft("running",1);assert(pg_record_tx_set_task(&tx,value,&clock,task_clock)==PG_TX_INVALID&&!pg_record_tx_staged_tasks(&tx,&out)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(json_object_array_get_idx(out,0),"state"),"status")),"waiting"));json_object_put(out);out=0;json_object_put(value);value=task_draft("running",2);assert(pg_record_tx_set_task(&tx,value,&clock,task_clock)==PG_TX_INVALID&&!pg_record_tx_discard(&tx));json_object_put(value);assert(!pg_record_memory_close(&m));
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){assert(!pg_record_memory_open(&m));session=(pg_record_session){.storage=pg_record_memory_storage(&m)};tx=(pg_record_tx){0};clock=(task_clock_fixture){&tx,0,1.25};assert(!pg_record_tx_begin(&tx,&session,&m,tx_read));value=task_draft("pending",1);assert(!pg_record_tx_set_task(&tx,value,&clock,task_clock));json_object_put(value);struct json_object *before=0;assert(!pg_record_tx_staged_tasks(&tx,&before));value=task_draft("running",1);doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_record_tx_set_task(&tx,value,&clock,task_clock);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;assert(!tx.busy&&!session.failed&&tx.has_table_write&&json_object_array_length(tx.writes)==1);assert(!pg_record_tx_staged_tasks(&tx,&out));if(target){assert(status!=PG_TX_OK&&json_object_equal(before,out));++failures;}else {assert(!status);total=calls;}json_object_put(before);json_object_put(out);out=0;json_object_put(value);assert(!pg_record_tx_discard(&tx)&&!pg_record_memory_close(&m));}
+ printf("PASS: setTask terminal/conversation guard, lifecycle timestamps/isolation and %u direct allocation/insert/clone failures\n",failures);
+#endif
+}
 static void task_cache_tests(void){
  for(unsigned error=0;error<2;++error){pg_record_memory memory={0};assert(!pg_record_memory_open(&memory));pg_record_session session={.storage=pg_record_memory_storage(&memory)};pg_record_tx tx={0};task_cache_provider f={.tx=&tx,.mode=error};assert(!pg_record_tx_begin(&tx,&session,&f,task_cache_read));struct json_object *out=0;
  for(unsigned i=0;i<3;++i){assert(pg_record_tx_read(&tx,PG_TABLE_TASK,2,&out)==(error?PG_TX_READ_FAILED:PG_TX_OK)&&f.calls==1&&!tx.busy);if(!error){assert(json_object_get_int(json_object_object_get(out,"n"))==1&&!json_object_object_add(out,"outside",json_object_new_int64(1)));json_object_put(out);out=0;}}
@@ -1337,6 +1355,7 @@ int main(void){
  for(unsigned mode=1;mode<=3;++mode){assert(!pg_record_memory_open(&memory));allocation_failure=mode;assert(commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)==PG_MEMORY_ALLOCATION&&!memory.rows&&!memory.count&&!memory.busy&&memory.next_id==2&&memory.next_sequence==1);assert(!commit_text(&memory,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq)&&seq==1);allocation_failure=1;assert(pg_record_memory_read(&memory,PG_TABLE_ENTRY,3,&out)==PG_MEMORY_ALLOCATION&&!out);assert(!pg_record_memory_close(&memory));}
 #endif
  long page=sysconf(_SC_PAGESIZE);char *guard=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(guard!=MAP_FAILED&&!mprotect(guard+page,(size_t)page,PROT_NONE));pg_record_memory *tail=(pg_record_memory*)(guard+page-sizeof(pg_record_memory));memset(tail,0,sizeof(*tail));assert(!pg_record_memory_open(tail)&&!commit_text(tail,"[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\"}}]",&seq));assert(!pg_record_memory_read(tail,PG_TABLE_ENTRY,3,&out)&&out);assert(!pg_record_memory_close(tail)&&json_object_get_int(json_object_object_get(out,"id"))==3);json_object_put(out);assert(!munmap(guard,(size_t)page*2));
+ set_task_tests();
  task_cache_tests();
  task_cache_rebuild();
  candidate_snapshots();

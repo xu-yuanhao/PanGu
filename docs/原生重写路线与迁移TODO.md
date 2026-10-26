@@ -101,6 +101,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通原始Submission创建：先核对conversation再mint，隔离draft/返回值，候选可继续place/settle并统一提交。
 - [x] 提供已写候选的隔离快照：Task按ID保留最新值，Conversation保持创建/分叉顺序；分配失败保留候选。
 - [x] 接通Task提交态读取缓存与首次访问定序：缓存成功/缺失/错误、独立返回值，候选快照保持先读后写顺序，重建批次转交私有元数据。
+- [x] 接通setTask候选替换：终态拒绝、conversation稳定、已有生命周期时间戳优先及按状态注入时钟。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -409,3 +410,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 批次的分叉拼接与holds合并重建转移元数据；Storage复制省略该元数据，commit/discard在删除候选前显式释放，错误路径保持所有权。该策略避开json-c userdata destructor内递归释放带来的重入问题，测试发现的失败已修复并重跑。
 - 验证：实际Pi #taskEntry/#committedTask/stagedTasks的成功/缺失/拒绝、重复读取次数与四种先读后写顺序一致；独立返回值、read barrier、候选隔离和10个缓存直接分配/插入/部分复制故障通过，候选枚举故障范围扩展为184/5。专项/完整Runtime结果见当前实现记录。
 - 下一行为：Task候选setTask的终态拒绝、conversation稳定与时间戳，以及createTask原生构造，继续K03/K06来源映射。
+
+### K03 setTask候选与时间戳交接
+
+- 阅读固定Pi d5b3de22 Transaction.setTask/#stampTimes/#taskEntry与session-tables的终态/跨conversation拒绝、harness-tasks的时间戳场景；原生records新增pg_record_tx_set_task，以同ID最新候选检查后原地替换候选write。首次访问顺序继续由Task slot持有，Storage/文档结算复用现有入口。
+- startedAt/endedAt优先使用已有candidate，再使用输入；缺失时仅running/terminal调用注入double时钟，保留有限小数/负数语义，非有限结果拒绝且保留旧候选。复制候选与输入隔离，错误保持table-write barrier且不改变已存在的write。
+- 验证：80组实际setTask/stampTimes差异、pending→running→waiting→running→terminal连续转换、只调用两次时钟、终态覆盖/conversation改变拒绝、NaN拒绝和10个直接分配/插入/复制故障通过。专项/完整Runtime结果见当前实现记录。
+- 下一行为：createTask的初始化、owner/输入/状态与时间来源，继续K03/K06移植。
