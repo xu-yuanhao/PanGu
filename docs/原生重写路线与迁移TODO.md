@@ -79,6 +79,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 完成已提交revision的current/as-of快照读取、生命周期截点、最近base选择与同版本delta尾重放。
 - [x] 将Document create/change/retire与其余四类表接入同一原子内存批次，维护全局ID、live地址唯一性及revision历史，提供current/as-of物化读取。
 - [x] 完成Document逻辑地址查找、精确scope/kind过滤与升序分页；current及历史成员关系返回独立生命周期record。
+- [x] 完成definition-free Document.copy：已提交源快照转为目标base，核对kind/key/history/fork并拒绝同批变更复制源。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -228,7 +229,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - K03 Document验证：累计2048条实际MemoryStorage操作对照一致，增加四类scope/history组合、连续delta与版本base、退役/重建、重复命令、混合表失败、历史截点读取。O0/O2内存专项验证创建、已有值更新、退役+同址重建、读取时逐直接分配/插入/部分复制失败；失败不改变已存记录/ID/序号，不采纳，输出归零。完整Runtime检查通过，新增故障场景后的全量复验见当前实现记录。
 - K03 Document查询：`pg_record_memory_find_document/scan_documents` 对照Pi `MemoryStorage.findDocument/scanDocuments/isAliveAt`、`addressKey`、`scopeKey`与`page`，阅读 `storage-conformance.ts` 的退役重建和身份字段场景。Native地址复用既有48字节类型；DocumentQuery 64字节，Page沿用24字节。成员关系可查询current-only的历史，区别于content历史拒绝；at截点按[createdAt,retiredAt)判断。当前基于provider有序全局行过滤，不新增平行存储。
 - K03查询验证：4922条累计实际MemoryStorage对照一致；新增singleton/空key、NUL kind/key、同址新旧实例、scope/kind过滤、0～120截点、负/正after及分页。O0/O2 ASan/UBSan验证输出隔离、缺失、无效limit、复制部分结果/分配/插入失败清理。完整Runtime复验结果见当前实现记录。K03仍待copy及完整Tx。
-- 下一完整行为：补Document.copy，再接事务暂存及当前消息投影。
+- K03 Document复制：`record_memory.S:.Ld_resolve_copies` 对照Pi固定版 `MemoryStorage.resolveDocumentCopies` 与 `storage-conformance.ts` 的独立base/ambiguous source场景。先在私有输入中解析所有copy，拒绝源ID在本批任何document命令中变化，源按current/as-of物化；Conversation owner可变而kind/key/history/fork保持一致，生成create/base后复用同一原子准备路径。公开读取仍拒绝prepare期间重入，内部只读路径仅用于解析已提交源。
+- K03复制验证：累计5254条实际MemoryStorage操作一致，含历史/current、latest/rewindable、NUL family key、定义不符、退役目标/源、源后续变化、两种顺序的同批修改及链式copy拒绝；O0/O2 ASan/UBSan验证复制独立、输入不变与每个直接分配/插入/部分复制失败的源状态/ID/序号不变。完整Runtime结果见当前实现记录。
+- 下一完整行为：接通事务暂存、文档所有权/迁移提交及当前消息投影。
 
 ### K01 当前落点与补齐映射
 

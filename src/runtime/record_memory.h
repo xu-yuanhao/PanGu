@@ -17,8 +17,10 @@ typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCA
    IDs are positive safe integers; integral JSON floats share the same namespace.
    Table writes use Pi StorageWrite JSON objects; conversation/entry IDs cannot
    be replaced; task/submission replacement keeps the same global record type.
-   Document create/change/retire share batch atomicity and the global ID index;
-   only one live incarnation may occupy an exact logical address. */
+   Document create/change/retire/copy share batch atomicity and the global ID index;
+   only one live incarnation may occupy an exact logical address. Copy resolves
+   a committed conversation snapshot into a base with matching kind/key/history/
+   fork; no document command may change its source in the same batch. */
 pg_memory_status pg_record_memory_open(pg_record_memory *);
 pg_memory_status pg_record_memory_close(pg_record_memory *);
 pg_record_storage pg_record_memory_storage(pg_record_memory *);

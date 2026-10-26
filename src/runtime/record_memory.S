@@ -1735,6 +1735,11 @@ pg_record_memory_head:
  mov qword ptr [rsp+40],0
  mov qword ptr [rsp+48],0
  mov ebp,2
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ld_resolve_copies
+ test eax,eax
+ jnz .Ld_prepare_status
  mov rdi,r12
  call json_object_array_length@PLT
  mov r14,rax
@@ -2397,6 +2402,11 @@ pg_record_memory_head:
 .globl pg_record_memory_document
 .type pg_record_memory_document,@function
 pg_record_memory_document:
+ xor r8d,r8d
+ jmp .Ld_document_read_common
+.Ld_document_read_preparing:
+ mov r8d,1
+.Ld_document_read_common:
  push rbp
  push rbx
  push r12
@@ -2423,8 +2433,11 @@ pg_record_memory_document:
  jz .Ld_read_return
  cmp dword ptr [rbx+44],0
  jne .Ld_read_return
+ test r8d,r8d
+ jnz .Ld_document_read_allowed
  cmp dword ptr [rbx+40],1
  je .Ld_read_return
+.Ld_document_read_allowed:
  cmp qword ptr [rbx+24],0
  je .Ld_read_return
  test r12,r12
@@ -2945,3 +2958,234 @@ pg_record_memory_scan_documents:
  pop rbp
  ret
 .size pg_record_memory_scan_documents,.-pg_record_memory_scan_documents
+.text
+/* Return the ID changed by one document command, or zero for other writes. */
+.Ld_changed_id:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ DGET rbx,type
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ld_create]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_changed_record
+ mov rdi,r12
+ lea rsi,[rip+.Ld_copy]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_changed_record
+ mov rdi,r12
+ lea rsi,[rip+.Ld_change]
+ call .Ld_string
+ test eax,eax
+ jnz .Ld_changed_direct
+ mov rdi,r12
+ lea rsi,[rip+.Ld_retire]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_changed_return
+.Ld_changed_direct:
+ DGET rbx,id
+ jmp .Ld_changed_number
+.Ld_changed_record:
+ DGET rbx,record
+ DGET rax,id
+.Ld_changed_number:
+ mov rdi,rax
+ call .Ld_integer
+.Ld_changed_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+/* Resolve copies only in the detached input, before staging any table row. */
+.Ld_resolve_copies:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,152
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,2
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov r14,rax
+ xor r15d,r15d
+.Ld_copy_each:
+ cmp r15,r14
+ jae .Ld_copy_success
+ mov rdi,r12
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ DGET r13,type
+ mov rdi,rax
+ lea rsi,[rip+.Ld_copy]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_copy_next
+ DGET r13,source
+ mov [rsp+24],rax
+ DGET rax,id
+ mov rdi,rax
+ call .Ld_integer
+ test rax,rax
+ jz .Ld_copy_cleanup
+ mov [rsp+16],rax
+ mov qword ptr [rsp+32],0
+.Ld_copy_changed:
+ mov rsi,[rsp+32]
+ cmp rsi,r14
+ jae .Ld_copy_point
+ mov rdi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call .Ld_changed_id
+ cmp rax,[rsp+16]
+ je .Ld_copy_cleanup
+ inc qword ptr [rsp+32]
+ jmp .Ld_copy_changed
+.Ld_copy_point:
+ DGET "qword ptr [rsp+24]",at
+ mov [rsp+40],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ld_current]
+ call .Ld_string
+ test eax,eax
+ jz .Ld_copy_sequence
+ mov rdx,-1
+ jmp .Ld_copy_read
+.Ld_copy_sequence:
+ mov rdi,[rsp+40]
+ call .Ld_integer
+ test rax,rax
+ jz .Ld_copy_cleanup
+ mov rdx,rax
+.Ld_copy_read:
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ lea rcx,[rsp]
+ call .Ld_document_read_preparing
+ test eax,eax
+ jnz .Ld_copy_read_error
+ DGET "qword ptr [rsp]",record
+ mov [rsp+24],rax
+ mov rdi,rax
+ lea rsi,[rsp+48]
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_copy_cleanup
+ DGET r13,record
+ mov [rsp+40],rax
+ mov rdi,rax
+ lea rsi,[rsp+96]
+ call .Ld_address
+ test eax,eax
+ jnz .Ld_copy_cleanup
+ cmp dword ptr [rsp+88],1
+ jne .Ld_copy_cleanup
+ cmp dword ptr [rsp+136],1
+ jne .Ld_copy_cleanup
+ /* A fork changes the owner while retaining definition/family identity. */
+ mov rax,[rsp+80]
+ mov [rsp+128],rax
+ lea rdi,[rsp+48]
+ lea rsi,[rsp+96]
+ call pg_document_address_equal
+ test eax,eax
+ jz .Ld_copy_cleanup
+ DGET "qword ptr [rsp+24]",history
+ mov [rsp+16],rax
+ DGET "qword ptr [rsp+40]",history
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ call json_object_equal@PLT
+ test eax,eax
+ jz .Ld_copy_cleanup
+ DGET "qword ptr [rsp+24]",fork
+ mov [rsp+16],rax
+ DGET "qword ptr [rsp+40]",fork
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ call json_object_equal@PLT
+ test eax,eax
+ jz .Ld_copy_cleanup
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ld_copy_allocation
+ mov [rsp+8],rax
+ lea rdi,[rip+.Ld_base]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ld_copy_allocation
+ DADD "qword ptr [rsp+8]",kind,rax
+ test eax,eax
+ jnz .Ld_copy_allocation
+ DGET "qword ptr [rsp]",version
+ mov rdi,rax
+ call json_object_get@PLT
+ DADD "qword ptr [rsp+8]",version,rax
+ test eax,eax
+ jnz .Ld_copy_allocation
+ DGET "qword ptr [rsp]",value
+ mov rdi,rax
+ call json_object_get@PLT
+ DADD "qword ptr [rsp+8]",value,rax
+ test eax,eax
+ jnz .Ld_copy_allocation
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ DADD r13,content,rdx
+ test eax,eax
+ jnz .Ld_copy_allocation
+ lea rdi,[rip+.Ld_create]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ld_copy_allocation
+ DADD r13,type,rax
+ test eax,eax
+ jnz .Ld_copy_allocation
+ mov rdi,r13
+ lea rsi,[rip+.Ld_source]
+ call json_object_object_del@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+.Ld_copy_next:
+ inc r15
+ jmp .Ld_copy_each
+.Ld_copy_success:
+ xor ebp,ebp
+ jmp .Ld_copy_cleanup
+.Ld_copy_read_error:
+ cmp eax,3
+ jne .Ld_copy_cleanup
+.Ld_copy_allocation:
+ mov ebp,3
+.Ld_copy_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,152
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ld_copy: .asciz "document.copy"
+.Ld_source: .asciz "source"
+.Ld_at: .asciz "at"

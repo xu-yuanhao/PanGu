@@ -85,7 +85,19 @@ static void document_writes(void){
 
 #endif
 }
+static void document_copies(void){
+ const char *source="[{\"type\":\"document.create\",\"record\":{\"id\":2,\"kind\":\"copy\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"rewindable\",\"fork\":\"asOf\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]";
+ const char *copy="[{\"type\":\"document.copy\",\"record\":{\"id\":3,\"kind\":\"copy\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":4},\"history\":\"rewindable\",\"fork\":\"asOf\"},\"source\":{\"id\":2,\"at\":\"current\"}}]";
+ pg_record_memory m={0};uint64_t seq;struct json_object *batch=json_tokener_parse(copy),*saved=0,*snapshot=0;assert(batch&&!json_object_deep_copy(batch,&saved,0));pg_record_storage service=pg_record_memory_storage(&m);assert(!pg_record_memory_open(&m)&&!doc_commit(&m,source));assert(!service.commit(&m,batch,doc_adopt,0,&seq)&&seq==2&&json_object_equal(batch,saved));assert(!pg_record_memory_document(&m,3,UINT64_MAX,&snapshot));assert(json_object_get_int(json_object_object_get(json_object_object_get(snapshot,"value"),"x"))==1);json_object_put(snapshot);
+ assert(!doc_commit(&m,"[{\"type\":\"document.change\",\"id\":2,\"content\":{\"kind\":\"base\",\"version\":2,\"value\":{\"x\":9}}}]"));assert(!pg_record_memory_document(&m,3,UINT64_MAX,&snapshot)&&json_object_get_int(json_object_object_get(snapshot,"version"))==1);json_object_put(snapshot);assert(!pg_record_memory_close(&m));
+#ifdef PG_MEMORY_FAULTS
+ assert(!pg_record_memory_open(&m)&&!doc_commit(&m,source));doc_tracking=1;doc_calls=doc_fail=0;assert(!service.commit(&m,batch,doc_adopt,0,&seq));doc_tracking=0;unsigned count=doc_calls;assert(!pg_record_memory_close(&m));
+ for(unsigned i=1;i<=count;++i){assert(!pg_record_memory_open(&m)&&!doc_commit(&m,source));struct json_object *before=0;assert(!json_object_deep_copy(m.rows[0].value,&before,0));doc_tracking=1;doc_calls=0;doc_fail=i;int status=service.commit(&m,batch,doc_adopt,0,&seq);doc_tracking=0;assert(status==PG_MEMORY_ALLOCATION&&!seq&&m.count==1&&m.next_sequence==2&&m.next_id==3&&!m.busy&&json_object_equal(before,m.rows[0].value)&&json_object_equal(batch,saved));json_object_put(before);assert(!pg_record_memory_close(&m));}doc_fail=0;
+#endif
+ json_object_put(saved);json_object_put(batch);
+}
 int main(void){
+ document_copies();
  document_writes();
  pg_record_memory memory={0};assert(!pg_record_memory_open(&memory)&&pg_record_memory_open(&memory)==PG_MEMORY_INVALID);uint64_t id=0,seq=0;assert(!pg_record_memory_mint(&memory,&id)&&id==2);
  assert(!commit_text(&memory,"[{\"type\":\"task\",\"value\":{\"id\":5,\"conversationId\":1,\"kind\":\"test\",\"state\":{\"status\":\"pending\"}}},{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test\",\"data\":{\"x\":1}}},{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"submission\",\"value\":{\"id\":7,\"conversationId\":1,\"status\":\"queued\"}},{\"type\":\"task\",\"value\":{\"id\":5,\"conversationId\":1,\"kind\":\"test\",\"state\":{\"status\":\"running\"}}}]",&seq));

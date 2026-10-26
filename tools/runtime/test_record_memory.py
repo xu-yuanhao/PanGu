@@ -158,6 +158,34 @@ def main():
                         operation=dict(op='docscan',query=query,limit=limit)
                         if after is not None:operation['cursor']=dict(after=after)
                         operations.append(operation)
+    source=dict(id=300000,kind='copy.中',scope=dict(kind='conversation',conversationId=1),history='rewindable',fork='asOf')
+    base=dict(kind='base',version=1,value=dict(text='base',rows=[1]))
+    operations.append(dict(op='commit',writes=[dict(type='document.create',record=source,content=base)]))
+    operations.append(dict(op='commit',writes=[dict(type='document.change',id=source['id'],content=dict(kind='delta',version=1,ops=[['a',['text'],'tail'],['p',['rows'],0,0,[2]]]))]))
+    for index,at in enumerate([*range(151),'current',100000]):
+        target=dict(source,id=301000+index,scope=dict(kind='conversation',conversationId=500000+index))
+        operations.append(dict(op='commit',writes=[dict(type='document.copy',record=target,source=dict(id=source['id'],at=at))]))
+        operations.append(dict(op='document',id=target['id'],at='current'))
+    target=dict(source,id=302000,scope=dict(kind='conversation',conversationId=600000))
+    for field,value in [('kind','other'),('key',''),('history','latest'),('fork','current'),('scope',dict(kind='session'))]:
+        operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,**{field:value}),source=dict(id=source['id'],at='current'))]))
+    for order in [False,True]:
+        writes=[dict(type='document.copy',record=target,source=dict(id=source['id'],at='current')),dict(type='document.change',id=source['id'],content=base)]
+        operations.append(dict(op='commit',writes=writes[::-1] if order else writes))
+    operations.append(dict(op='commit',writes=[dict(type='document.copy',record=target,source=dict(id=source['id'],at='current')),dict(type='document.retire',id=target['id'])]))
+    operations.append(dict(op='document',id=target['id'],at='current'))
+    operations.append(dict(op='commit',writes=[dict(type='document.retire',id=source['id'])]))
+    operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,id=302001),source=dict(id=source['id'],at='current'))]))
+    operations.append(dict(op='document',id=301151,at='current'))
+    for index,history in enumerate(['latest','rewindable']):
+        doc_record=dict(id=400000+index*10,kind='family.copy',key='key\0中',scope=dict(kind='conversation',conversationId=1),history=history,fork='current')
+        target=dict(doc_record,id=doc_record['id']+1,scope=dict(kind='conversation',conversationId=2))
+        operations.append(dict(op='commit',writes=[dict(type='document.create',record=doc_record,content=dict(kind='base',version=4,value=dict(value='family')))]))
+        operations.append(dict(op='commit',writes=[dict(type='document.copy',record=target,source=dict(id=doc_record['id'],at='current'))]))
+        operations.append(dict(op='document',id=target['id'],at='current'))
+        operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,id=doc_record['id']+2,scope=dict(kind='conversation',conversationId=3)),source=dict(id=doc_record['id'],at=100000))]))
+        operations.append(dict(op='document',id=doc_record['id']+2,at='current'))
+        operations.append(dict(op='commit',writes=[dict(type='document.copy',record=dict(target,id=doc_record['id']+3),source=dict(id=doc_record['id'],at='current')),dict(type='document.copy',record=dict(target,id=doc_record['id']+4,scope=dict(kind='conversation',conversationId=4)),source=dict(id=doc_record['id']+3,at='current'))]))
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',ORACLE,str(ROOT/'references/pi')],input=json.dumps(operations),text=True,capture_output=True,check=True,timeout=30).stdout)
     with tempfile.TemporaryDirectory(prefix='pangu-record-memory-') as temp:
         path=Path(temp)/'memory.so';flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc'],text=True).split()

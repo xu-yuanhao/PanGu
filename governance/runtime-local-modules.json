@@ -915,7 +915,7 @@
         "system libc",
         "session.documents.delta.local.v0"
       ],
-      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption; atomic document create/change/retire and detached revision snapshots",
+      "role": "atomic in-memory table records/global IDs with fork-aware entry/head reads and ordered filtered pages; native ordered row storage, detached ownership and synchronous adoption; atomic document create/change/retire and detached revision snapshots; definition-free document copy resolved into a detached base before commit",
       "exports": [
         "pg_record_memory_open",
         "pg_record_memory_close",
@@ -938,7 +938,7 @@
             "packages/durable/src/types.ts",
             "packages/durable/src/storage/scan.ts"
           ],
-          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker; prepareDocumentActions/checkDocumentActions/applyDocumentActions and document materialization with live address uniqueness; findDocument and scanDocuments exact scope/kind/family identity and current/historical membership",
+          "semantics": "prepareCommit/checkGlobalIds/applyPreparedCommit/mintId and four table point reads; immutable conversation/entry IDs, same-table task/submission replacements, monotonic Session-global ID and sequence; scanStart/nextCursor, four filtered table scans, fork history bounds, entry commit sequence and findLatestHeadMarker; prepareDocumentActions/checkDocumentActions/applyDocumentActions and document materialization with live address uniqueness; findDocument and scanDocuments exact scope/kind/family identity and current/historical membership; resolveDocumentCopies rejects changed/ambiguous sources and preserves kind/key/history/fork across conversation owners",
           "tests_to_read": [
             "packages/durable/test/memory-storage.test.ts",
             "packages/durable/test/session-adoption.test.ts"
