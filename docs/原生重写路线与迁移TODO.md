@@ -109,6 +109,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 将Document find/read/scan与历史Entry接入统一失败守卫，参数错误/取消在快照外层保持非致命，允许随后重试。
 - [x] 验证原生只读Session的普通/deferred事务：空批成功、所有记录/文档写入拒绝、无采纳/发布/持久序号变化，拒绝后读取与关闭正常。
 - [x] 移植同步listener注册/取消/分发宿主：身份去重、通知快照、内部失败锁存、外部错误报告和一次关闭清理。
+- [x] 移植observed/stored publication构造：普通表过滤/顺序、observed与stored文档集合分离、memory与held-only通知、共享对象身份和内部先通知。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -472,3 +473,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - `durable_session.h/.S`独立listener宿主按internal/durable/close三类身份去重，取消保持顺序；分发先复制快照，callback内增删不影响本轮。内部错误锁存adoption失败并继续本轮，外部/close错误交report；close一次通知、释放注册存储，快照分配失败保留注册供重试。重复注册/取消1000次保持容量，不累积空槽。原生callback同步返回错误码，借用publication/context到返回为止。
 - 验证：三类通知的顺序、取消后当前/下一轮差异、增订阅、重入拒绝、错误隔离、一次关闭及注册/分发/关闭分配失败保留；专项/完整Runtime结果见当前实现记录。
 - 下一行为：构造Pi observed/stored publication（含held差异）并把该宿主接入Session采纳、持久发布和close；Document watch使用这些通知。此项只验收listener宿主，不作为完整Session观察能力通过。
+
+### K03 publication构造交接
+
+- 阅读固定Pi d5b3de22 Session.#publish/#hold/#storeHolds、ObservedCommit/CommitPublication/DocumentCommitChange类型、deferred发布用例。fetch后origin保持89c921d，相关Session无差异；Harness保持22ddee37。
+- `durable_session.h/.S:pg_session_publications_prepare/discard/deliver`从StorageWrite和独立observed/stored文档集合准备owned publication。普通表先按源顺序过滤，再追加文档；相同文档集合保留observed/stored共享对象身份，不同集合使held已观察内容仅进入持久通知。memory仅内部、held-only仅外部，普通提交内部先于外部。输入/输出隔离，构造错误清理全部结果。
+- 16组执行实际Pi #publish数据构造分支，payload和共享身份一致，包含NUL type拒绝匹配；六组普通/memory/held×共享/分离集合验证和25个直接分配/插入/部分复制故障通过。最终专项/完整Runtime见当前实现记录。
+- 下一行为：从原生Doc adoption/holds生成DocumentCommitChange，连同table batch把这些publication接入实际Session钩子及关闭通知。此处验证独立publication构造/分发，尚未把Session接线或Document watch视作完成。

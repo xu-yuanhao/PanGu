@@ -613,6 +613,29 @@ for(const c of JSON.parse(readFileSync(0,'utf8'))){let calls=0;const latch={fail
         actual=dict(results=results,calls=calls,failure={0:None,3:'backend',4:'crossed',5:'prior'}[failed.value]);assert actual==want,(case,actual,want)
     print(f'PASS: {len(cases)} read/mint failure, request-error/cancellation exemptions and crossed failure cases match actual Pi GuardedStorage')
 
+def publications(native,library):
+    cases=[]
+    for shared in [False,True]:
+        for writes in [[],[{'type':'entry','value':{'id':1}},{'type':'document.change','id':2}],[{'type':'task','value':{}},{'type':'conversation','value':{}},{'type':'submission','value':{}}],[{'type':'entry\0bad','value':{}},{'type':'unknown'}]]:
+            for documents in [[],[{'type':'document','value':{'text':'中'},'ops':[]},{'type':'document.copy','source':{'id':1,'at':2}}]]:
+                cases.append(dict(shared=shared,writes=writes,observed=documents,stored=documents if shared else [{'type':'document','value':None,'ops':[]}]))
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const s=readFileSync(process.argv[1],'utf8'),a=s.indexOf('\n\t#publish('),b=s.indexOf('// The commit is durable:',a),start=s.indexOf('const changes:',a);const body=s.slice(start,b);const Probe=eval('('+stripTypeScriptTypes('class Probe{#commitListeners=new Set([1]);#internalListeners=new Set();run(seq,writes,documents){const context={telemetry:{addEvent(){}}};'+body+'return {observed,stored,shared:observed===stored}}}')+')');const p=new Probe(),out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){out.push(p.run(7,c.writes,{observed:c.observed,stored:c.shared?c.observed:c.stored}))}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi/packages/durable/src/session/session.ts')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Request(ctypes.Structure):
+        _fields_=[('writes',ctypes.c_void_p),('observed',ctypes.c_void_p),('stored',ctypes.c_void_p),('sequence',ctypes.c_uint64),('mode',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    class Output(ctypes.Structure):_fields_=[('observed',ctypes.c_void_p),('stored',ctypes.c_void_p)]
+    native.pg_session_publications_prepare.argtypes=[ctypes.POINTER(Request),ctypes.POINTER(Output)];native.pg_session_publications_discard.argtypes=[ctypes.POINTER(Output)]
+    for case,want in zip(cases,expected,strict=True):
+        inputs=[library.json_tokener_parse(json.dumps(case[key]).encode()) for key in ['writes','observed','stored']];request=Request(inputs[0],inputs[1],inputs[1] if case['shared'] else inputs[2],7,0,0);out=Output()
+        try:
+            assert not native.pg_session_publications_prepare(ctypes.byref(request),ctypes.byref(out));actual={key:json.loads(library.json_object_to_json_string_ext(getattr(out,key),0)) for key in ['observed','stored']};actual['shared']=out.observed==out.stored;assert actual==want,(case,actual,want)
+        finally:
+            native.pg_session_publications_discard(ctypes.byref(out))
+            for value in inputs:library.json_object_put(value)
+    print(f'PASS: {len(cases)} observed/stored publication payloads and identity match actual Pi publish body')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -900,5 +923,6 @@ def main():
         task_options(native,library)
         task_creation(native,library)
         storage_guard(native,library)
+        publications(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

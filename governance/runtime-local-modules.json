@@ -1209,7 +1209,10 @@
         "pg_session_listen",
         "pg_session_unlisten",
         "pg_session_deliver",
-        "pg_session_listeners_close"
+        "pg_session_listeners_close",
+        "pg_session_publications_prepare",
+        "pg_session_publications_discard",
+        "pg_session_publications_deliver"
       ],
       "reference_basis": [
         {
@@ -1218,7 +1221,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction; independent query descriptor wraps scans, latest head, request ID lookup and fork-aware Entry with commit sequence; all reads share one completion guard and transfer output metadata only on success; Document find/read/scan and historical Entry use shared guard, nonfatal guarded errors signal EXEMPT to outer snapshot readers without relatching failure; historical frontend orders conversation/id while backend retains id/conversation; independent synchronous listener registry deduplicates callback/context identities by channel, snapshots dispatch before mutation, contains/report host errors and latches internal errors, closes once and releases registration storage; publication construction/Session wiring remain separate",
+          "semantics": "runCommit mutation line, hold vs normal settlement, loadDocument flush-before-drop; close seals new admission immediately while admitted work settles, stops timer jobs, stores healthy held values, clears trackers before backend close, preserves first failure and permits repeated close; native synchronous frontend plus injected foreground/serial job/close providers; GuardedStorage-compatible synchronous read/mint adapters preserve first failure, discard outputs crossed by failure, exempt request errors and caller cancellation only for reads, prevent backend close during calls and admit reads/mints for an already admitted closing transaction; independent query descriptor wraps scans, latest head, request ID lookup and fork-aware Entry with commit sequence; all reads share one completion guard and transfer output metadata only on success; Document find/read/scan and historical Entry use shared guard, nonfatal guarded errors signal EXEMPT to outer snapshot readers without relatching failure; historical frontend orders conversation/id while backend retains id/conversation; independent synchronous listener registry deduplicates callback/context identities by channel, snapshots dispatch before mutation, contains/report host errors and latches internal errors, closes once and releases registration storage; publication construction/Session wiring remain separate; detached observed/stored publication preparation preserves table order and shared identity, separates observed vs held stored document sets, memory-only vs held-only modes, and delivers internal before durable listeners",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-adoption.test.ts",

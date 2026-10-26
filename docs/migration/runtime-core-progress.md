@@ -478,3 +478,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写listener注册/取消/独立channel分发/一次关闭；callback+context身份去重，取消紧缩保持顺序，容量按几何增长，通知先复制snapshot。internal错误保留首因并锁存adoption失败，外部和close错误报告且继续通知；callback同步返回错误码，publication/context仅借用。分配失败保留注册/closed状态可重试；旧ABI保持。
 - 实际验证：三类通知身份/顺序/快照，callback内增删、已取消仍执行本轮而下一轮消失、内部首因/外部报告、重入拒绝、close一次及注册/分发/close三个直接分配失败。1000次注册/取消容量保持8，无空槽累计。最终O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心G00/Assembly清单、隔离产品构建通过。
 - 同一实施Agent自审：既有Session独立类型/导出/来源、专项与TODO；门禁、预算、既有ABI保持。5个候选路径内容清单摘要（本记录加入前）：ce68835540ea7a58dfc3a60526d68a7715118c83aef57906e5b309dce421b849；隔离核心树75d1b232131aa5e79d40a3a190331e09aec9229f。结论为listener宿主本地通过；observed/stored publication构造、Session接线与Document watch继续推进，完整观察与K03总验收保持未完成。TUI工作树保留。
+
+## K03 observed/stored publication构造
+
+- 来源：Pi d5b3de22 #publish/#hold/#storeHolds、publication/DocumentCommitChange类型与deferred观察测试；fetch后origin保持89c921d，相关Session来源无差异，Harness保持22ddee37。
+- 实现：手写publication准备/释放/分发，普通表过滤保留原序、排除Document StorageWrites，追加预备文档集合。observed/stored输入集合相同时保留输出共享身份，否则分别形成含/不含已观察held内容的集合；memory仅observed、held flush仅stored，正常提交内部先外部后。owned输出隔离于输入，失败返回零输出；类型匹配核对字节长度，含NUL伪前缀不误匹配。
+- 实际验证：16组执行实际Pi #publish构造分支，数据及共享身份一致；六组stored/memory/held×共享/分离集合验证与25个直接分配/插入/部分复制故障通过。O0/O2 ASan/UBSan专项、完整Runtime O0/O2 UBSan和固定Pi/Chord差异基线通过；共享及隔离核心树G00/Assembly、隔离产品构建通过。
+- 同一实施Agent自审：既有Session独立类型/导出/来源、专项和TODO；旧ABI、门禁、预算保持。6个候选路径内容清单摘要（本记录加入前）：7f9ea48d0da8e8d9641092ac40d09b738629bb6a844ea5e14785b1d6b3e32ec5；隔离核心树f7e7e82d02eab7acd05e01102fe481659348acba。结论为publication构造/分发本地通过；实际Doc adoption/holds变更构造、Session接线与Document watch仍待接入，完整观察与K03总验收未完成。TUI工作树保留。

@@ -284,6 +284,19 @@ static void session_listener_tests(void){
 #endif
  puts("PASS: listener identity/order, dispatch snapshots, mutation/cancellation, contained errors, close and allocation failures");
 }
+typedef struct {unsigned order[4],count;const pg_session_publications *payload;} publication_listener_fixture;
+static int publication_internal(void *ctx,const void *value,void *delivery){publication_listener_fixture *f=ctx;assert(delivery==f&&value==f->payload->observed);f->order[f->count++]=0;return 0;}
+static int publication_external(void *ctx,const void *value,void *delivery){publication_listener_fixture *f=ctx;assert(delivery==f&&value==f->payload->stored);f->order[f->count++]=1;return 0;}
+static void publication_tests(void){
+ _Static_assert(sizeof(pg_session_publication_request)==40&&sizeof(pg_session_publications)==16,"publication ABI");
+ struct json_object *writes=json_tokener_parse("[{\"type\":\"entry\",\"value\":{\"id\":1}},{\"type\":\"document.change\",\"id\":2},{\"type\":\"task\",\"value\":{\"id\":3}},{\"type\":\"entry\\u0000ignored\",\"value\":{}},{\"type\":\"submission\",\"value\":{\"id\":4}},{\"type\":\"conversation\",\"value\":{\"id\":5}}]"),*observed=json_tokener_parse("[{\"type\":\"document\",\"value\":{\"text\":\"new\"},\"ops\":[]}]"),*stored=json_tokener_parse("[{\"type\":\"document\",\"value\":{\"text\":\"new\"},\"ops\":[[\"r\",{}]]}]");assert(writes&&observed&&stored);
+ for(unsigned mode=0;mode<3;++mode)for(unsigned shared=0;shared<2;++shared){pg_session_publication_request request={writes,observed,shared?observed:stored,7,mode,0};pg_session_publications out={0};assert(!pg_session_publications_prepare(&request,&out));struct json_object *changes=0;if(mode!=2){assert(out.observed&&!strcmp(json_object_get_string(json_object_object_get(out.observed,"kind")),mode==1?"memory":"stored"));changes=json_object_object_get(out.observed,"changes");assert(json_object_array_length(changes)==(mode==0?5:1)&&json_object_equal(json_object_array_get_idx(changes,mode==0?4:0),json_object_array_get_idx(observed,0)));assert((json_object_object_get(out.observed,"seq")!=0)==(mode==0));}else assert(!out.observed);if(mode!=1){assert(out.stored&&json_object_get_int(json_object_object_get(out.stored,"seq"))==7);changes=json_object_object_get(out.stored,"changes");assert(json_object_array_length(changes)==(mode==0?5:1)&&json_object_equal(json_object_array_get_idx(changes,mode==0?4:0),json_object_array_get_idx(request.stored_documents,0)));if(mode==0)assert((out.observed==out.stored)==shared);}else assert(!out.stored);
+ pg_record_session records={0};pg_session_listeners listeners={.records=&records};publication_listener_fixture f={.payload=&out};assert(!pg_session_listen(&listeners,0,publication_internal,&f)&&!pg_session_listen(&listeners,1,publication_external,&f)&&!pg_session_publications_deliver(&listeners,&out,&f));assert(f.count==(mode==0?2:1)&&f.order[0]==(mode==2?1:0));if(!mode)assert(f.order[1]==1);assert(!pg_session_listeners_close(&listeners,&f));pg_session_publications_discard(&out);assert(!out.observed&&!out.stored);}
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;for(unsigned target=0;target<=total;++target){pg_session_publication_request request={writes,observed,stored,7,0,0};pg_session_publications out={0};doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_session_publications_prepare(&request,&out);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;if(target){assert(status&&!out.observed&&!out.stored);++failures;}else{assert(!status&&out.observed&&out.stored);total=calls;pg_session_publications_discard(&out);}}printf("PASS: six stored/memory/held publication modes and %u direct allocation/insert/clone failures\n",failures);
+#endif
+ json_object_put(writes);json_object_put(observed);json_object_put(stored);
+}
 static void storage_guard_tests(void){
  _Static_assert(sizeof(pg_durable_storage)==56&&offsetof(pg_durable_storage,busy)==48,"guard descriptor ABI");
  for(unsigned mint=0;mint<2;++mint)for(unsigned mode=0;mode<9;++mode){pg_record_session records={0};pg_durable_session session={.records=&records,.phase=1};guard_fixture f={.mode=mode};pg_durable_storage guard={.session=&session,.context=&f,.read=guard_read,.mint=guard_mint,.request_error=guard_error,.cancelled=guard_cancelled};f.guard=&guard;struct json_object *out=0;uint64_t id=999;int status=mint?pg_durable_storage_mint(&guard,&id):pg_durable_storage_read(&guard,2,10,&out);unsigned failed=mode==5?PG_RECORDS_ADOPTION_FAILED:mode==2||(mint&&(mode==3||mode==4||mode==8))?PG_RECORDS_STORAGE_FAILED:0;int want=mode==5?64:mint&&mode==8?66:mode==2||mode==4?7:mode==3?8:!mint&&mode==1?1:0;assert(status==want&&records.failed==failed&&!guard.busy&&!session.busy&&f.calls==1);if(!status){if(mint)assert(id==100);else assert(out);}else{assert(!out);if(mint)assert(!id);}json_object_put(out);out=0;
@@ -1486,6 +1499,7 @@ int main(void){
  task_family_tests();
  storage_guard_tests();
  session_listener_tests();
+ publication_tests();
  guarded_transaction_tests();
  guarded_query_tests();
  guarded_memory_query_tests();

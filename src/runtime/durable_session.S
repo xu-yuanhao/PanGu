@@ -1130,3 +1130,380 @@ pg_session_listeners_close:
  ret
 .size pg_session_listeners_close,.-pg_session_listeners_close
 .section .note.GNU-stack,"",@progbits
+.text
+/* Append detached JSON array elements to a private output array. */
+.Lpublication_append:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov rbp,rax
+.Lpublication_append_each:
+ cmp r13,rbp
+ jae .Lpublication_append_ok
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ test rax,rax
+ jz .Lpublication_append_attach
+ mov rdi,rax
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lpublication_append_bad
+.Lpublication_append_attach:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lpublication_append_bad
+ mov qword ptr [rsp],0
+ inc r13
+ jmp .Lpublication_append_each
+.Lpublication_append_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,1
+ jmp .Lpublication_append_end
+.Lpublication_append_ok:
+ xor eax,eax
+.Lpublication_append_end:
+ add rsp,24
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Build one {kind?,seq?,changes} payload; append cloned documents to tables. */
+.Lpublication_make:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lpublication_make_bad
+ mov [rsp],rax
+ mov rdi,r12
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lpublication_make_bad
+ mov rdi,[rsp+8]
+ mov rsi,r13
+ call .Lpublication_append
+ test eax,eax
+ jnz .Lpublication_make_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_changes]
+ mov rdx,[rsp+8]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lpublication_make_bad
+ mov qword ptr [rsp+8],0
+ cmp dword ptr [rbx+32],1
+ je .Lpublication_make_kind
+ mov rdi,[rbx+24]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_seq]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lpublication_make_bad
+.Lpublication_make_kind:
+ test r14,r14
+ jz .Lpublication_make_ok
+ mov rdi,r14
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpublication_kind]
+ call .Lpublication_attach
+ test eax,eax
+ jnz .Lpublication_make_bad
+.Lpublication_make_ok:
+ mov rax,[rsp]
+ jmp .Lpublication_make_end
+.Lpublication_make_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ xor eax,eax
+.Lpublication_make_end:
+ add rsp,24
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lpublication_attach:
+ test rax,rax
+ jz .Lpublication_attach_bad
+ push rbx
+ mov rbx,rax
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lpublication_attach_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Lpublication_attach_end:
+ pop rbx
+ ret
+.Lpublication_attach_bad:
+ mov eax,1
+ ret
+.globl pg_session_publications_prepare
+.type pg_session_publications_prepare,@function
+pg_session_publications_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov ebp,1
+ test r12,r12
+ jz .Lpublication_prepare_end
+ mov qword ptr [r12],0
+ mov qword ptr [r12+8],0
+ test rbx,rbx
+ jz .Lpublication_prepare_end
+ cmp dword ptr [rbx+32],2
+ ja .Lpublication_prepare_end
+ xor r13d,r13d
+.Lpublication_validate:
+ mov rdi,[rbx+r13*8]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lpublication_prepare_cleanup
+ mov rdi,[rbx+r13*8]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lpublication_prepare_cleanup
+ inc r13
+ cmp r13,3
+ jb .Lpublication_validate
+ cmp dword ptr [rbx+32],1
+ je .Lpublication_valid_seq
+ mov rax,[rbx+24]
+ test rax,rax
+ jz .Lpublication_prepare_cleanup
+ mov rdx,9007199254740991
+ cmp rax,rdx
+ ja .Lpublication_prepare_cleanup
+.Lpublication_valid_seq:
+ mov ebp,2
+ mov edi,0
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lpublication_prepare_cleanup
+ mov [rsp],rax
+ cmp dword ptr [rbx+32],0
+ jne .Lpublication_build
+ xor r13d,r13d
+ mov rdi,[rbx]
+ call json_object_array_length@PLT
+ mov [rsp+24],rax
+.Lpublication_tables:
+ cmp r13,[rsp+24]
+ jae .Lpublication_build
+ mov rdi,[rbx]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_type]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+32],eax
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lpublication_next
+ mov [rsp+16],rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp eax,[rsp+32]
+ jne .Lpublication_next
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lpublication_entry]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lpublication_table
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lpublication_task]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lpublication_table
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lpublication_submission]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lpublication_table
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lpublication_conversation]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lpublication_next
+.Lpublication_table:
+ mov qword ptr [rsp+16],0
+ mov rdi,r14
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lpublication_prepare_cleanup
+ mov rdi,[rsp]
+ mov rsi,[rsp+16]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lpublication_prepare_cleanup
+ mov qword ptr [rsp+16],0
+.Lpublication_next:
+ mov qword ptr [rsp+16],0
+ inc r13
+ jmp .Lpublication_tables
+.Lpublication_build:
+ cmp dword ptr [rbx+32],2
+ je .Lpublication_stored
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rbx+8]
+ lea rcx,[rip+.Lpublication_stored_kind]
+ cmp dword ptr [rbx+32],1
+ jne .Lpublication_observed_make
+ lea rcx,[rip+.Lpublication_memory]
+.Lpublication_observed_make:
+ call .Lpublication_make
+ test rax,rax
+ jz .Lpublication_prepare_cleanup
+ mov [r12],rax
+ cmp dword ptr [rbx+32],1
+ je .Lpublication_prepare_ok
+ mov rax,[rbx+8]
+ cmp rax,[rbx+16]
+ jne .Lpublication_stored
+ mov rdi,[r12]
+ call json_object_get@PLT
+ mov [r12+8],rax
+ jmp .Lpublication_prepare_ok
+.Lpublication_stored:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,[rbx+16]
+ xor ecx,ecx
+ call .Lpublication_make
+ test rax,rax
+ jz .Lpublication_prepare_cleanup
+ mov [r12+8],rax
+.Lpublication_prepare_ok:
+ xor ebp,ebp
+.Lpublication_prepare_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ test ebp,ebp
+ jz .Lpublication_prepare_end
+ mov rdi,r12
+ call pg_session_publications_discard
+.Lpublication_prepare_end:
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_session_publications_prepare,.-pg_session_publications_prepare
+.globl pg_session_publications_discard
+.type pg_session_publications_discard,@function
+pg_session_publications_discard:
+ test rdi,rdi
+ jz .Lpublication_discard_end
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rbx]
+ call json_object_put@PLT
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov qword ptr [rbx],0
+ mov qword ptr [rbx+8],0
+ pop rbx
+.Lpublication_discard_end:
+ ret
+.size pg_session_publications_discard,.-pg_session_publications_discard
+.globl pg_session_publications_deliver
+.type pg_session_publications_deliver,@function
+pg_session_publications_deliver:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov eax,1
+ test r12,r12
+ jz .Lpublication_deliver_end
+ cmp qword ptr [r12],0
+ je .Lpublication_deliver_stored
+ xor esi,esi
+ mov rdx,[r12]
+ mov rcx,r13
+ call pg_session_deliver
+ test eax,eax
+ jnz .Lpublication_deliver_end
+.Lpublication_deliver_stored:
+ xor eax,eax
+ cmp qword ptr [r12+8],0
+ je .Lpublication_deliver_end
+ mov rdi,rbx
+ mov esi,1
+ mov rdx,[r12+8]
+ mov rcx,r13
+ call pg_session_deliver
+.Lpublication_deliver_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_session_publications_deliver,.-pg_session_publications_deliver
+.section .rodata
+.Lpublication_changes: .asciz "changes"
+.Lpublication_seq: .asciz "seq"
+.Lpublication_kind: .asciz "kind"
+.Lpublication_type: .asciz "type"
+.Lpublication_entry: .asciz "entry"
+.Lpublication_task: .asciz "task"
+.Lpublication_submission: .asciz "submission"
+.Lpublication_conversation: .asciz "conversation"
+.Lpublication_stored_kind: .asciz "stored"
+.Lpublication_memory: .asciz "memory"
+.section .note.GNU-stack,"",@progbits

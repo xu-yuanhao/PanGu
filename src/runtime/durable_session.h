@@ -131,4 +131,22 @@ int pg_session_listen(pg_session_listeners *,unsigned,pg_session_listener,void *
 void pg_session_unlisten(pg_session_listeners *,unsigned,pg_session_listener,void *);
 int pg_session_deliver(pg_session_listeners *,unsigned,const void *,void *);
 int pg_session_listeners_close(pg_session_listeners *,void *);
+typedef struct {
+ const struct json_object *writes,*observed_documents,*stored_documents;
+ uint64_t sequence;
+ unsigned mode,reserved; /* 0 stored transaction, 1 memory adoption, 2 held flush */
+} pg_session_publication_request;
+typedef struct {struct json_object *observed,*stored;} pg_session_publications;
+/* Prepare detached publication payloads before adoption. Table changes retain
+   write order and precede document changes; raw Document StorageWrites are
+   excluded. Shared document inputs retain shared publication identity in mode
+   0. Mode 1 publishes only memory, mode 2 only stored held changes. Request
+   arrays contain finite JSON. Caller keeps outputs immutable through delivery
+   and clears them with discard. A failed preparation leaves zero outputs. */
+int pg_session_publications_prepare(const pg_session_publication_request *,pg_session_publications *);
+void pg_session_publications_discard(pg_session_publications *);
+/* Deliver internal observed first, then durable stored, borrowing both values.
+   The host supplies the originating delivery context. Callback errors remain
+   contained as for deliver; successful return means notification completed. */
+int pg_session_publications_deliver(pg_session_listeners *,const pg_session_publications *,void *);
 #endif
