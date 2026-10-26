@@ -367,6 +367,34 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
         finally:library.json_object_put(output);library.json_object_put(writes)
     print(f'PASS: {len(cases)} typed Entry lookups match actual Pi Transaction.entry body')
 
+def submission_creation(native,library):
+    cases=[dict(conversationId=owner,type=kind,status=status,id=999,requestId='r\0中',data=dict(x=1)) for owner in [1,2] for kind in ['input','write'] for status in ['queued','placed','done','unanswered']]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes,registerHooks} from 'node:module';import {pathToFileURL} from 'node:url';const base=pathToFileURL(process.argv[1]+'/');registerHooks({resolve(s,c,n){if(s==='@earendil-works/chord')return {url:new URL('packages/chord/src/json.ts',base).href,shortCircuit:true};return n(s,c)}});const {copyJson}=await import(new URL('packages/chord/src/json.ts',base));const TABLE_JSON_COPY_OPTIONS={omitUndefinedProperties:true};const source=readFileSync(new URL('packages/durable/src/session/transaction.ts',base),'utf8');const start=source.indexOf('createSubmission(create:'),end=source.indexOf('\n\t/**',start);const text='class Probe{#host={storage:{mintId:async()=>17}};#submissions=new Map();#write(fn){return fn()}#assertOpen(){}async #requireConversation(id){if(id!==1)throw Error("missing")}'+source.slice(start,end)+'}';const Probe=eval('('+stripTypeScriptTypes(text)+')');const out=[];for(const c of JSON.parse(readFileSync(0,'utf8'))){try{out.push({ok:true,value:await new Probe().createSubmission(c)})}catch{out.push({ok:false})}}console.log(JSON.stringify(out));
+'''
+    want=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(ROOT/'references/pi')],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    class Tx(ctypes.Structure):
+        _fields_=[('session',ctypes.c_void_p),('context',ctypes.c_void_p),('read',ctypes.c_void_p),('writes',ctypes.c_void_p),('busy',ctypes.c_uint),('sealed',ctypes.c_uint),('barrier',ctypes.c_uint),('depth',ctypes.c_uint)]
+    read_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint64,ctypes.POINTER(ctypes.c_void_p));mint_type=ctypes.CFUNCTYPE(ctypes.c_int,ctypes.c_void_p,ctypes.POINTER(ctypes.c_uint64))
+    native.pg_record_tx_create_submission.argtypes=[ctypes.POINTER(Tx),ctypes.c_void_p,mint_type,ctypes.POINTER(ctypes.c_void_p)]
+    for case,expected in zip(cases,want,strict=True):
+        minted=[]
+        @read_type
+        def read(ctx,table,id,out):
+            assert table==0
+            if id!=1:return 1
+            out[0]=library.json_tokener_parse(b'{"id":1}');return 0
+        @mint_type
+        def mint(ctx,out):minted.append(17);out[0]=17;return 0
+        writes=library.json_tokener_parse(b'[]');draft=library.json_tokener_parse(json.dumps(case).encode());tx=Tx(None,None,ctypes.cast(read,ctypes.c_void_p),writes);out=ctypes.c_void_p()
+        try:
+            status=native.pg_record_tx_create_submission(ctypes.byref(tx),draft,mint,ctypes.byref(out));actual=dict(ok=status==0)
+            if not status:actual['value']=json.loads(library.json_object_to_json_string_ext(out,0))
+            else:assert not out.value
+            assert actual==expected and tx.barrier and not tx.busy and len(minted)==int(expected['ok']),(case,status,actual,expected)
+        finally:library.json_object_put(out);library.json_object_put(draft);library.json_object_put(writes)
+    print(f'PASS: {len(cases)} submission constructions match actual Pi createSubmission body')
+
 def main():
     for name in ('packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -647,5 +675,6 @@ def main():
         loaded_access(native,library)
         historical_snapshots(native,library)
         typed_entries(native,library)
+        submission_creation(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

@@ -74,6 +74,13 @@ pg_record_tx_status pg_record_tx_entry(pg_record_tx *,uint64_t id,const pg_entry
 pg_record_tx_status pg_record_tx_stage(pg_record_tx *,pg_record_tx_write,const struct json_object *);
 pg_record_tx_status pg_record_tx_commit(pg_record_tx *);
 pg_record_tx_status pg_record_tx_discard(pg_record_tx *);
+/* Require the draft's conversation (committed or staged), mint through
+   read_context, detach draft and override id, then stage a submission write.
+   The owned result is independent of the private candidate. No submission
+   admission policy runs here. A write attempt sets the public read barrier;
+   failures retain prior candidates and already minted IDs stay consumed. */
+pg_record_tx_status pg_record_tx_create_submission(pg_record_tx *,const struct json_object *,
+ int (*mint)(void *,uint64_t *),struct json_object **);
 /* Resolve against the newest staged submission, then committed Storage;
    append the transformed candidate in staging order. Internal committed lookup
    is allowed after the public table-read barrier. */

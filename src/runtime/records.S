@@ -3156,3 +3156,145 @@ pg_record_tx_entry:
 .section .rodata
 .Ltyped_entry_kind: .asciz "kind"
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_record_tx_create_submission
+.type pg_record_tx_create_submission,@function
+pg_record_tx_create_submission:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov ebp,1
+ test r14,r14
+ jz .Lsubmission_create_end
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lsubmission_create_end
+ cmp dword ptr [rbx+32],0
+ jne .Lsubmission_create_end
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Lsubmission_create_end
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Lsubmission_create_end
+ mov dword ptr [rbx+40],1
+ test r13,r13
+ jz .Lsubmission_create_end
+ mov dword ptr [rbx+32],1
+ mov rdi,r12
+ lea rsi,[rip+.Ltx_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call pg_document_safe_number
+ test rax,rax
+ jz .Lsubmission_create_cleanup
+ mov [rsp+64],rax
+ mov dword ptr [rsp+72],1
+ mov rdi,rbx
+ lea rsi,[rsp+32]
+ call pg_record_tx_require_document_owner
+ test eax,eax
+ jnz .Lsubmission_create_cleanup
+ mov rdi,[rbx+8]
+ lea rsi,[rsp+24]
+ call r13
+ test eax,eax
+ jnz .Lsubmission_create_read_error
+ mov rax,[rsp+24]
+ test rax,rax
+ jz .Lsubmission_create_read_error
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lsubmission_create_read_error
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lsubmission_create_cleanup
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lsubmission_create_cleanup
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ mov rdi,[rsp+24]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltx_id]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ mov rdi,[rsp]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Lsubmission_create_allocation
+ mov [rsp+8],rax
+ lea rdi,[rip+.Ltx_submission]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ls_type]
+ call .Ltx_entry_attach
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltx_value]
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ mov qword ptr [rsp],0
+ mov rdi,[rbx+24]
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lsubmission_create_allocation
+ mov qword ptr [rsp+8],0
+ mov rax,[rsp+16]
+ mov [r14],rax
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Lsubmission_create_cleanup
+.Lsubmission_create_read_error:
+ mov ebp,5
+ jmp .Lsubmission_create_cleanup
+.Lsubmission_create_allocation:
+ mov ebp,4
+.Lsubmission_create_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov dword ptr [rbx+32],0
+.Lsubmission_create_end:
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_create_submission,.-pg_record_tx_create_submission
+.section .note.GNU-stack,"",@progbits

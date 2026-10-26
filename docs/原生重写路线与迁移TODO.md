@@ -98,6 +98,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通当前与Entry历史只读快照：已采纳内存值、缓存同版本快路径、fork原会话/序号解析、隔离迁移、历史生命周期与读取失败守卫。
 - [x] 接通conversation/request ID的提交态索引与Tx查询：按批次原顺序覆盖/移除，保留写后读屏障和owned结果。
 - [x] 接通类型化Entry提交态读取：可选精确kind过滤、缺失/不匹配、owned结果及原事务读屏障。
+- [x] 接通原始Submission创建：先核对conversation再mint，隔离draft/返回值，候选可继续place/settle并统一提交。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -387,3 +388,9 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 阅读固定Pi d5b3de22 Transaction.entry(first,second)与#read调用；records.S新增pg_record_tx_entry，复用既有committed read后执行精确长度/字节kind筛选。NULL kind接受任意类型，空kind与缺省分离，NUL保留；结果/错误清理、table-write barrier和sealed规则复用既有读取。
 - 验证：20组实际Pi Transaction.entry方法差异；真实MemoryStorage的NUL/空kind、missing、table-write/sealed、部分复制错误和owned输出清理通过。专项与完整Runtime结果记入当前实现记录；原ABI保持。
 - 下一行为：K03剩余事务构造、状态候选与整体验收继续对照源码补齐。
+
+### K03 Submission创建交接
+
+- 阅读固定Pi d5b3de22 Transaction.createSubmission/#requireConversation/#write及harness-submissions调用；records.S新增pg_record_tx_create_submission，复用已有staged/committed conversation所有权查询、scalar attach与统一候选提交。创建先owner检查再mint，复制draft覆盖ID，无额外submission admission策略；返回快照与候选隔离。失败保留既有候选和已消耗ID，写尝试保持table-read barrier。
+- 验证：16组实际createSubmission方法差异、已提交/同批root conversation、draft/返回值变化隔离、同批unanswered结算、owner缺失不mint及10个直接分配/插入/部分复制故障通过。专项和完整Runtime结果见当前实现记录。
+- 下一行为：K03剩余Task候选与事务构造语义，继续总验收覆盖。
