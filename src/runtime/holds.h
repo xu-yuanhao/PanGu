@@ -44,4 +44,13 @@ pg_document_status pg_document_holds_close(pg_document_holds *);
    every result. Backend/adoption failure follows Session fail-stop and keeps
    the holds for failed-Session teardown. Serialized with all Doc transactions. */
 pg_records_status pg_document_holds_flush(pg_document_holds *,pg_record_session *);
+/* Flush only one incarnation; missing is a healthy no-op. May run from the
+   cache's version-reload flush callback; releases just that pin before reload.
+   Other holds and their deadlines remain. Positive safe incarnation ID. */
+pg_records_status pg_document_holds_flush_one(pg_document_holds *,pg_record_session *,uint64_t id);
+/* Host has stopped admissions. Flush a healthy Session, skip writes after
+   failure, then release queues and close this owner on every result. Cache and
+   Storage remain owned by the host and close after return. Preserve first
+   Session failure. Repeated finish returns the same Session result. */
+pg_records_status pg_document_holds_finish(pg_document_holds *,pg_record_session *);
 #endif

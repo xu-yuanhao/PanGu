@@ -92,6 +92,7 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 接通原生holds宿主：候选队列所有权、连续编辑折叠、最早期限/Infinity、缓存pin及持久确认后的release。
 - [x] 接通holds整批持久flush：统一Storage提交、确认时更新持久计数、成功后释放pin并通知持久订阅者；失败遵循Session fail-stop。
 - [x] 接通正常事务及deferred混合回退的takeHeld合并：当前编辑/只读与其他写入/退休同批保存，保留无关holds，支持checkpoint base覆盖。
+- [x] 接通按incarnation的版本重载前flush及holds结束服务：只保存目标队列、保持其它期限；健康时排空、失败时清理、保留首个错误。
 - [ ] 完成文档生命周期、所有权、revision、checkpoint、迁移提交、延迟提交、只读视图和一致的查询语义。
 - [ ] 验收：一批同时修改条目/文档/任务原子成功或失败；提交确认后通知观察者；失败会话停止；分页、版本和生命周期与对应上游用例比较。
 
@@ -336,3 +337,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 原生映射：document_tx.h新增32字节merge服务及merge/deferred_merge结算入口；既有结构与函数表保持。checkpoint统一完成后，由holds_merge_bind提供的原生服务折叠held+own、以最终prepared值构造StorageWrite；本次选定base覆盖队列内容。无编辑退休只使用已有held值，写在retire前；只读获取随其他写入保存，空批次及无关holds保持。prepare失败保留原队列，确认后采纳值/计数，退休驱逐前释放匹配holds以维持原生借用有效期。deferred eligibility在合并前判断，合格批次继续内存采纳，不合格批次采用同一路径合并后落盘。
 - 验证：正常编辑、只读加Entry、纯读/无关事务、仅record退休/编辑后退休、本次base及已有sticky base、多文档选择/部分保留/先插入再替换、deferred继续及混合/退休回退通过；六类已准入后端/采纳错误保持fail-stop。单编辑69、仅record退休45、多编辑131个直接分配/插入/部分复制故障保留旧值/队列/pin。专项与完整Runtime检查结果记入当前实现记录。
 - 下一行为：版本切换前flush、正常关闭及deadline/timer服务接入，随后继续K03查询/视图与整机组合。K03总验收仍未完成。
+
+### K03 版本重载与holds结束交接（2026-10-26）
+
+- 阅读Pi d5b3de22 Session.#loadDocument/#storeHolds/close与session-deferred-commits.test.ts的reload-before-drop、close/failure场景；本批Pi/Harness fetch旧新提交一致：d5b3de22 / 22ddee37。
+- holds.h/.S新增flush_one，复用整批提交实现，按incarnation选择写入/计数采纳/释放，仅处理重载目标。Cache在flush回调内保持独占guard；documents.h/.S新增受限touch_flushing，供确认后解pin，clock/pin回调中的嵌套调用继续拒绝。原结构和旧入口保持。版本reload只在flush成功后释放旧loaded。
+- holds_finish用于宿主停止接收工作后的队列结束：健康Session排空，失败Session跳过写入，所有结果清理并关闭holds owner，保留首个失败；重复结束返回同一结果。Cache和Storage由宿主随后关闭，整机Session admission/关闭队列仍由后续组合衔接。
+- 验证：真实MemoryStorage完成v1 held→仅目标保存→v2迁移→正常迁移base提交，另一个文档的队列/pin/期限保持。拒绝后端时保留旧loaded；62个逐直接分配/插入/部分复制故障区分落盘前失败与落盘成功后重载失败。结束服务65个故障点及健康/已失败/后端失败/重复结束通过。专项和完整Runtime结果记入当前实现记录。
+- 下一行为：deadline/timer服务衔接及完整Session关闭组合，继续K03查询/只读视图和整机接口。

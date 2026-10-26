@@ -1290,7 +1290,9 @@ pg_document_cache_get:
  je .Lcache_get_drop
  mov rdi,[rbx+64]
  lea rsi,[r15+48]
+ mov dword ptr [rbx+104],2
  call [rbx+88]
+ mov dword ptr [rbx+104],1
  test eax,eax
  jnz .Lcache_get_flush_failed
 .Lcache_get_drop:
@@ -1391,18 +1393,34 @@ pg_document_cache_get:
 .globl pg_document_cache_touch
 .type pg_document_cache_touch,@function
 pg_document_cache_touch:
+ xor edx,edx
+ jmp .Lcache_touch_public_common
+.globl pg_document_cache_touch_flushing
+.type pg_document_cache_touch_flushing,@function
+pg_document_cache_touch_flushing:
+ mov edx,2
+.Lcache_touch_public_common:
  push rbx
- sub rsp,16
+ sub rsp,32
  mov rbx,rdi
  mov eax,1
  test rbx,rbx
  jz .Lcache_public_touch_return
  cmp qword ptr [rbx],0
  je .Lcache_public_touch_return
- cmp qword ptr [rbx+104],0
+ cmp dword ptr [rbx+108],0
  jne .Lcache_public_touch_return
+ cmp [rbx+104],edx
+ jne .Lcache_public_touch_return
+ mov [rsp+16],edx
  mov [rsp+8],rsi
+ test edx,edx
+ jz .Lcache_touch_guard_public
+ mov dword ptr [rbx+104],3
+ jmp .Lcache_touch_guard_ready
+.Lcache_touch_guard_public:
  mov dword ptr [rbx+104],1
+.Lcache_touch_guard_ready:
  mov rdi,rsi
  call pg_document_address_valid
  test eax,eax
@@ -1422,12 +1440,14 @@ pg_document_cache_touch:
 .Lcache_public_touch_invalid:
  mov eax,1
 .Lcache_public_touch_settled:
- mov dword ptr [rbx+104],0
+ mov ecx,[rsp+16]
+ mov [rbx+104],ecx
 .Lcache_public_touch_return:
- add rsp,16
+ add rsp,32
  pop rbx
  ret
 .size pg_document_cache_touch,.-pg_document_cache_touch
+.size pg_document_cache_touch_flushing,.-pg_document_cache_touch_flushing
 
 .globl pg_document_cache_evict
 .type pg_document_cache_evict,@function

@@ -401,7 +401,13 @@ pg_document_holds_release:
  call memmove@PLT
  mov rdi,[rbx]
  lea rsi,[r12+24]
+ cmp qword ptr [rdi+104],2
+ jne .Lrelease_touch_normal
+ call pg_document_cache_touch_flushing@PLT
+ jmp .Lrelease_touch_done
+.Lrelease_touch_normal:
  call pg_document_cache_touch@PLT
+.Lrelease_touch_done:
  mov dword ptr [rbx+48],0
  jmp .Lrelease_end
 .Lrelease_missing:
@@ -512,6 +518,17 @@ pg_document_holds_close:
 .globl pg_document_holds_flush
 .type pg_document_holds_flush,@function
 pg_document_holds_flush:
+ xor edx,edx
+ jmp .Lflush_common
+.globl pg_document_holds_flush_one
+.type pg_document_holds_flush_one,@function
+pg_document_holds_flush_one:
+ test rdx,rdx
+ jz .Linvalid
+ mov rax,9007199254740991
+ cmp rdx,rax
+ ja .Linvalid
+.Lflush_common:
  push rbp
  push rbx
  push r12
@@ -525,6 +542,7 @@ pg_document_holds_flush:
  xor eax,eax
  mov ecx,21
  rep stosq
+ mov [rsp+152],rdx
  mov ebp,1
  test rbx,rbx
  jz .Lflush_return
@@ -546,6 +564,21 @@ pg_document_holds_flush:
  ja .Lflush_return
  cmp qword ptr [rbx+16],0
  je .Lflush_empty
+ cmp qword ptr [rsp+152],0
+ je .Lflush_selected_ready
+ mov rax,[rbx+8]
+ mov rcx,[rbx+16]
+.Lflush_select_find:
+ test rcx,rcx
+ jz .Lflush_empty
+ mov rdi,[rax]
+ mov rdx,[rsp+152]
+ cmp [rdi+72],rdx
+ je .Lflush_selected_ready
+ add rax,56
+ dec rcx
+ jmp .Lflush_select_find
+.Lflush_selected_ready:
  cmp dword ptr [r12+56],0
  jne .Lflush_readonly
  cmp qword ptr [rbx+16],0x7fffffff
@@ -554,7 +587,12 @@ pg_document_holds_flush:
  test rax,rax
  jz .Lflush_return
  cmp qword ptr [rax+104],0
+ je .Lflush_cache_ready
+ cmp qword ptr [rsp+152],0
+ je .Lflush_return
+ cmp qword ptr [rax+104],2
  jne .Lflush_return
+.Lflush_cache_ready:
  mov [rsp],rbx
  mov [rsp+8],r12
  mov rax,[r12+24]
@@ -589,6 +627,12 @@ pg_document_holds_flush:
  imul r14,r13,56
  add r14,[rbx+8]
  mov r15,[r14]
+ mov rax,[rsp+152]
+ test rax,rax
+ jz .Lflush_selected_plan
+ cmp [r15+72],rax
+ jne .Lflush_plan_next
+.Lflush_selected_plan:
  lea rdi,[rsp+80]
  lea rsi,[r14+8]
  mov edx,32
@@ -662,6 +706,7 @@ pg_document_holds_flush:
  mov rdi,[rsp+120]
  call json_object_put@PLT
  mov qword ptr [rsp+120],0
+.Lflush_plan_next:
  inc r13
  jmp .Lflush_plan_loop
 .Lflush_plan_error:
@@ -732,6 +777,7 @@ pg_document_holds_flush:
  pop rbp
  ret
 .size pg_document_holds_flush,.-pg_document_holds_flush
+.size pg_document_holds_flush_one,.-pg_document_holds_flush_one
 
 /* Storage adoption updates only metadata: held values are already visible. */
 .Lflush_adopt:
@@ -749,8 +795,15 @@ pg_document_holds_flush:
  cmp rcx,[r12+16]
  jae .Lflush_adopt_chain
  mov rax,[r8]
+ mov rdx,[rbx+152]
+ test rdx,rdx
+ jz .Lflush_adopt_selected
+ cmp [rax+72],rdx
+ jne .Lflush_adopt_next
+.Lflush_adopt_selected:
  mov rdx,[r9+rcx*8]
  mov [rax+104],rdx
+.Lflush_adopt_next:
  add r8,56
  inc rcx
  jmp .Lflush_adopt_loop
@@ -780,6 +833,8 @@ pg_document_holds_flush:
  mov [rsp],rsi
  mov [rsp+8],rdx
  mov r12,[rbx]
+ cmp qword ptr [rbx+152],0
+ jne .Lflush_publish_one
  mov r13,[r12+8]
  mov r14,[r12+16]
  mov qword ptr [r12+8],0
@@ -805,6 +860,32 @@ pg_document_holds_flush:
  mov rdi,r13
  mov rsi,r14
  call .Lfree_items
+ jmp .Lflush_publish_chain
+.Lflush_publish_one:
+ mov r13,[r12+8]
+ mov r14,[r12+16]
+ mov r15,[rbx+152]
+.Lflush_release_find:
+ test r14,r14
+ jz .Lflush_release_bad
+ mov rsi,[r13]
+ cmp [rsi+72],r15
+ je .Lflush_release_selected
+ add r13,56
+ dec r14
+ jmp .Lflush_release_find
+.Lflush_release_selected:
+ mov dword ptr [r12+48],0
+ mov rdi,r12
+ call pg_document_holds_release@PLT
+ mov dword ptr [r12+48],1
+ test eax,eax
+ jz .Lflush_publish_chain
+.Lflush_release_bad:
+ mov dword ptr [rbx+56],1
+ mov rax,[rbx+8]
+ mov dword ptr [rax+52],4
+.Lflush_publish_chain:
  cmp dword ptr [rbx+56],0
  jne .Lflush_publish_end
  cmp qword ptr [rbx+32],0
@@ -1324,4 +1405,65 @@ pg_document_holds_merge_bind:
  ret
 .section .rodata
 .Lmerge_retire: .asciz "document.retire"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_holds_finish
+.type pg_document_holds_finish,@function
+pg_document_holds_finish:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,1
+ test rbx,rbx
+ jz .Lfinish_return
+ test r12,r12
+ jz .Lfinish_return
+ cmp dword ptr [rbx+48],0
+ jne .Lfinish_return
+ cmp dword ptr [r12+48],0
+ jne .Lfinish_return
+ cmp dword ptr [rbx+52],0
+ je .Lfinish_closed
+ cmp dword ptr [rbx+52],1
+ jne .Lfinish_return
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lfinish_return
+ cmp qword ptr [rax+104],0
+ jne .Lfinish_return
+ mov r13d,[r12+52]
+ test r13d,r13d
+ jnz .Lfinish_cleanup
+ call pg_document_holds_flush@PLT
+ mov r13d,eax
+ test eax,eax
+ jz .Lfinish_cleanup
+ cmp dword ptr [r12+52],0
+ jne .Lfinish_cleanup
+ mov [r12+52],eax
+.Lfinish_cleanup:
+ mov rdi,rbx
+ call pg_document_holds_discard_all@PLT
+ test eax,eax
+ jnz .Lfinish_internal
+ mov rdi,rbx
+ call pg_document_holds_close@PLT
+ test eax,eax
+ jz .Lfinish_closed
+.Lfinish_internal:
+ cmp dword ptr [r12+52],0
+ jne .Lfinish_closed
+ mov dword ptr [r12+52],4
+.Lfinish_closed:
+ mov r13d,[r12+52]
+.Lfinish_return:
+ mov eax,r13d
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_holds_finish,.-pg_document_holds_finish
 .section .note.GNU-stack,"",@progbits

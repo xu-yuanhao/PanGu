@@ -81,7 +81,9 @@ pg_document_status pg_document_loaded_close(pg_document_loaded *);
 typedef struct {
  void *context;
  uint64_t (*clock)(void *); /* monotonic milliseconds */
- /* Store held changes before version-driven replacement; NULL is no holds. */
+ /* Store held changes before version-driven replacement; NULL is no holds.
+    The callback keeps an exclusive cache guard; released pins use the
+    dedicated touch_flushing entry, while public cache reentry is refused. */
  int (*flush)(void *,const pg_document_loaded *);
  /* Observer/held incarnation pin count lives in its owning service. */
  int (*pinned)(void *,uint64_t id);
@@ -109,6 +111,10 @@ typedef struct {
 pg_document_status pg_document_cache_open(pg_document_cache *,const pg_document_storage *,const pg_document_cache_hooks *,uint64_t retention);
 pg_document_status pg_document_cache_get(pg_document_cache *,const pg_document_definition *,const pg_document_address *,pg_document_loaded **);
 pg_document_status pg_document_cache_touch(pg_document_cache *,const pg_document_address *);
+/* Only inside this cache's version-reload flush callback, after confirmed
+   persistence/unpin. Preserves the mutation guard; all public cache reentry
+   stays refused. No allocations or eviction. */
+pg_document_status pg_document_cache_touch_flushing(pg_document_cache *,const pg_document_address *);
 pg_document_status pg_document_cache_evict(pg_document_cache *,const pg_document_address *,uint64_t incarnation);
 pg_document_status pg_document_cache_sweep(pg_document_cache *);
 pg_document_status pg_document_cache_retention(pg_document_cache *,uint64_t);

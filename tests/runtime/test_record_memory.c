@@ -962,10 +962,51 @@ static void native_merge_tests(void){
 #endif
 }
 
+
+static uint64_t native_reload_clock(void *context){native_holds_fixture *n=context;assert(n->f.cache.busy&&pg_document_cache_close(&n->f.cache)==PG_DOC_INVALID);if(n->f.cache.busy==3)assert(pg_document_cache_touch_flushing(&n->f.cache,&n->f.address)==PG_DOC_INVALID);return n->f.now;}
+static int native_reload(void *context,const pg_document_loaded *loaded){native_holds_fixture *n=context;assert(n->f.cache.busy==2&&pg_document_cache_touch(&n->f.cache,&loaded->record.address)==PG_DOC_INVALID&&pg_document_cache_close(&n->f.cache)==PG_DOC_INVALID);return pg_document_holds_flush_one(&n->holds,&n->f.session,loaded->record.id);}
+static int native_reload_migrate(void *context,struct json_object *state,uint64_t version,struct json_object **out){(void)context;assert(version==1);struct json_object *flag=json_object_new_int64(1);if(!flag)return 1;if(json_object_object_add(state,"migrated",flag)){json_object_put(flag);return 1;}*out=json_object_get(state);return 0;}
+static void native_reload_tests(void){
+ native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);n.f.cache.flush=native_reload;n.f.cache.clock=native_reload_clock;
+ pg_document_definition two=n.f.definition;two.version=2;two.migrate=native_reload_migrate;pg_document_loaded *loaded=0,*other=n.holds.items[1].loaded;
+ assert(pg_document_cache_touch_flushing(&n.f.cache,&n.f.address)==PG_DOC_INVALID);
+ assert(!pg_document_cache_get(&n.f.cache,&two,&n.f.address,&loaded)&&loaded&&loaded->value_version==2&&loaded->stored_version==1&&loaded->deltas_since_base==2&&!strcmp(json_object_get_string(json_object_object_get(loaded->value,"text")),"seedheld")&&json_object_get_int(json_object_object_get(loaded->value,"migrated"))==1);
+ assert(n.holds.count==1&&n.holds.items[0].loaded==other&&pg_document_holds_deadline(&n.holds)==600&&pg_document_holds_pinned(&n.holds,3)&&!pg_document_holds_pinned(&n.holds,2)&&n.f.adopted==1&&n.f.published==1&&n.f.observed==2&&n.f.session.sequence==4&&!n.f.cache.busy);
+ assert(!pg_document_cache_get(&n.f.cache,&n.f.definition,&n.f.address,&loaded)&&loaded->value_version==1&&n.f.session.sequence==4);
+ assert(!pg_record_tx_begin(&n.f.tx,&n.f.session,&n.f.memory,tx_read)&&!pg_document_tx_open(&n.f.scope,&n.f.tx,&n.f.cache));pg_document_change *edit=0;assert(!pg_document_tx_get(&n.f.scope,&two,&n.f.address,0,0,&edit));struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"+v2\"]]");assert(ops&&!pg_document_change_append(edit,ops));json_object_put(ops);assert(!pg_document_tx_merge(&n.f.scope,0,&merge)&&n.holds.count==1&&n.f.session.sequence==5);
+ struct json_object *stored=0;assert(!pg_record_memory_document(&n.f.memory,2,UINT64_MAX,&stored)&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(stored,"value"),"text")),"seedheld+v2")&&json_object_get_int(json_object_object_get(json_object_object_get(stored,"value"),"migrated"))==1);json_object_put(stored);
+ n.f.session.read_only=1;assert(!pg_document_holds_flush_one(&n.holds,&n.f.session,99)&&n.holds.count==1&&pg_document_holds_flush_one(&n.holds,&n.f.session,0)==PG_RECORDS_INVALID);n.f.session.read_only=0;assert(!pg_document_holds_flush_one(&n.holds,&n.f.session,3)&&!n.holds.count&&!n.f.cache.busy);native_hold_close(&n);
+ native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);n.f.cache.flush=native_reload;n.f.cache.clock=native_reload_clock;two=n.f.definition;two.version=2;two.migrate=native_reload_migrate;pg_document_loaded *old=n.holds.items[0].loaded;native_flush_fixture backend={.n=&n,.mode=1};n.f.session.storage=(pg_record_storage){&backend,native_flush_backend};assert(pg_document_cache_get(&n.f.cache,&two,&n.f.address,&loaded)==PG_DOC_STORAGE_FAILED&&!loaded&&n.holds.count==2&&n.holds.items[0].loaded==old&&n.f.cache.count==2&&!n.f.cache.busy&&n.f.session.failed==PG_RECORDS_STORAGE_FAILED);native_hold_close(&n);
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);n.f.cache.flush=native_reload;n.f.cache.clock=native_reload_clock;two=n.f.definition;two.version=2;two.migrate=native_reload_migrate;old=n.holds.items[0].loaded;other=n.holds.items[1].loaded;struct json_object *value=old->value;doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_document_cache_get(&n.f.cache,&two,&n.f.address,&loaded);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;
+ assert(!n.holds.busy&&!n.f.cache.busy&&!n.f.session.busy&&pg_document_holds_pinned(&n.holds,3));
+ if(target){assert(status!=PG_DOC_OK&&!loaded&&(n.holds.count==1||n.holds.count==2));if(n.holds.count==2)assert(n.holds.items[0].loaded==old&&old->value==value&&n.f.cache.count==2);else assert(n.holds.items[0].loaded==other&&!n.f.session.failed);++failures;}else{assert(!status&&n.holds.count==1&&loaded->value_version==2);total=calls;}
+ native_hold_close(&n);
+ }
+ printf("PASS: selected holds flush and version reload; %u direct allocation/insert/clone failures\n",failures);
+#endif
+}
+static void native_finish_tests(void){
+ for(unsigned mode=0;mode<3;++mode){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);native_flush_fixture backend={.n=&n,.mode=1};if(mode)n.f.session.storage=(pg_record_storage){&backend,native_flush_backend};if(mode==2)n.f.session.failed=PG_RECORDS_ADOPTION_FAILED;
+ unsigned expected=mode==0?0:mode==1?PG_RECORDS_STORAGE_FAILED:PG_RECORDS_ADOPTION_FAILED;
+ assert(pg_document_holds_finish(&n.holds,&n.f.session)==expected&&!n.holds.active&&!n.holds.count&&!n.holds.items&&!n.holds.busy&&n.f.session.failed==expected&&!n.f.session.busy&&n.f.observed==2&&n.f.published==(mode?0u:1u));assert(pg_document_holds_finish(&n.holds,&n.f.session)==expected&&pg_document_holds_bind(&n.holds,&deferred)==PG_DOC_INVALID);deferred_close(&n.f);
+ }
+#ifdef PG_MEMORY_FAULTS
+ unsigned total=0,failures=0;
+ for(unsigned target=0;target<=total;++target){native_holds_fixture n;pg_document_deferred deferred;pg_document_merge merge;native_merge_open(&n,&deferred,&merge,0);native_merge_other_hold(&n,&deferred);doc_calls=0;doc_fail=target;doc_tracking=1;int status=pg_document_holds_finish(&n.holds,&n.f.session);doc_tracking=0;unsigned calls=doc_calls;doc_fail=0;assert(!n.holds.active&&!n.holds.busy&&!n.holds.items&&!n.holds.count&&!n.f.session.busy);
+ if(target){assert(status!=0&&n.f.session.failed==(unsigned)status&&pg_document_holds_finish(&n.holds,&n.f.session)==(unsigned)status);++failures;}else {assert(!status&&!n.f.session.failed&&n.f.published==1);total=calls;}deferred_close(&n.f);
+ }
+ printf("PASS: holds finish drains healthy/cleans failed, repeated finish, and %u direct allocation/insert/clone failures\n",failures);
+#endif
+}
+
 int main(void){
  native_holds_tests();
  native_flush_tests();
  native_merge_tests();
+ native_reload_tests();
+ native_finish_tests();
  deferred_memory_transactions();
  deferred_other_reads_and_documents();
  deferred_fallbacks();
