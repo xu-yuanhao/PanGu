@@ -217,3 +217,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：Assembly `pg_record_tx_scan/latest_head` 通过注入的24字节查询descriptor调用committed Storage；普通表写后与sealed拒绝、callback期间防重入、失败释放partial结果并清空输出。原Query/Page布局112/24字节移至共用records头，Memory提供 `pg_record_memory_queries`，其余实现与过滤/游标语义不变。
 - 实际验证：真实MemoryStorage通过各表扫描、fork分页及祖先head、无head/未知会话、read barrier/seal、callback partial错误清理与重入拒绝；O0/O2 ASan/UBSan及逐分配/复制/插入故障通过。初次全量因服务factory的PC32重定位不能链接shared object失败，改为GOT获取函数地址后5262条Storage对照及完整Runtime通过；最后补充无head专项在最终源O0/O2通过。隔离核心暂存树G00、Assembly清单与产品构建通过；共享G00仍为4个TUI候选未登记。
 - 同一实施Agent自审：新增实际导出/查询契约登记，移动现有类型定义，不保留双份布局，不修改门禁或预算。7个候选路径/暂存内容清单SHA256摘要（加入本记录前）`c3e2fb7f4114175cfdc1970470a03774ff4cc23e182184ecb17f9a0378d938fc`。结论为本地候选通过；creation hook、request查询与完整Document Tx等仍待实现，K03未完成。
+
+## K03 Conversation创建host（2026-10-26）
+
+- 来源：固定Pi Transaction `#stageConversation`、Session `conversationCreated` 默认与host注入、Harness同名override及 `harness-conversations.test.ts` 创建回调场景。Pi/Harness fetch仍为 `d5b3de22` / `22ddee37`。
+- 实现：Assembly `pg_record_tx_create` 统一root/new/fork记录组装后调用注入host。callback可以在本Tx追加/嵌套创建；活跃callback期间commit/discard拒绝。原Tx预留字段用于creation_depth，48字节布局不变。回调错误返回独立CREATION_FAILED结果，输出清空，由外层失败callback discard已暂存候选，符合Session提交错误传播分工。Harness内建文档初始化由其对应模块接入host，本批未宣称已有Live/Inbox等文档。
+- 实际验证：实际MemoryStorage验证root/new/fork回调内追加Entry、嵌套创建、空hook及错误路径丢弃，候选阶段无存储写入。O0/O2 ASan/UBSan与逐直接分配/插入/部分复制故障通过；完整Runtime退出0，原5262条Storage/选择与构造对照通过。隔离核心暂存树G00、Assembly清单与产品构建通过。
+- TUI交接登记：已读当前U03请求，四个新文件在共享bootstrap清单按client-source/client-test登记，未修改守卫，当前共享G00通过。此工作树登记连同已有PTY工具登记待TUI整体交接后提交；TUI源码未进入本批暂存。登记仅证明文件已列入清单，不代表完整TUI/产品构建验收。
+- 同一实施Agent自审：新增实际导出/host类型/creation_depth语义登记，无门禁预算调整。5个核心候选路径/暂存内容清单SHA256摘要（本记录加入前）`64434fa17fed9691485aa373c8a8c799149882ee39004bc9b8444243e2c084e9`。结论为本地候选通过；完整Document Tx、request查询和实际应用接入仍待完成，K03未完成。

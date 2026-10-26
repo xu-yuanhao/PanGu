@@ -38,7 +38,7 @@ pg_records_status pg_records_commit(pg_record_session *,const struct json_object
    accepts queued/placed. Failure clears output and leaves inputs unchanged. */
 pg_records_status pg_records_submission_change(const struct json_object *,const struct json_object *,struct json_object **);
 typedef enum { PG_TX_OK,PG_TX_INVALID,PG_TX_READ_AFTER_WRITE,PG_TX_SEALED,
- PG_TX_ALLOCATION,PG_TX_READ_FAILED,PG_TX_COMMIT_FAILED,PG_TX_MISSING } pg_record_tx_status;
+ PG_TX_ALLOCATION,PG_TX_READ_FAILED,PG_TX_COMMIT_FAILED,PG_TX_MISSING,PG_TX_CREATION_FAILED } pg_record_tx_status;
 typedef enum {PG_TX_CONVERSATION,PG_TX_ENTRY,PG_TX_TASK,PG_TX_SUBMISSION,
  PG_TX_DOCUMENT_CREATE,PG_TX_DOCUMENT_COPY,PG_TX_DOCUMENT_CHANGE,PG_TX_DOCUMENT_RETIRE} pg_record_tx_write;
 typedef struct {
@@ -47,7 +47,7 @@ typedef struct {
  /* Committed table read: 0 owned result, 1 missing, other values error. */
  int (*read)(void *,unsigned,uint64_t,struct json_object **);
  struct json_object *writes;
- unsigned busy,sealed,has_table_write,reserved;
+ unsigned busy,sealed,has_table_write,creation_depth;
 } pg_record_tx;
 /* Caller provides zeroed or discarded Tx and serializes the entire mutation
    line on its Session. Callbacks cannot reenter this Tx. Begin borrows Session
@@ -127,4 +127,24 @@ typedef struct {
    failures clear the output. Latest head is unbounded and fork-aware. */
 pg_record_tx_status pg_record_tx_scan(pg_record_tx *,const pg_record_queries *,const pg_memory_query *,pg_memory_page *);
 pg_record_tx_status pg_record_tx_latest_head(pg_record_tx *,const pg_record_queries *,uint64_t conversation,struct json_object **);
+typedef struct {
+ uint64_t owner_task_id,parent,entry;
+ unsigned root,reserved;
+} pg_conversation_request;
+typedef struct {
+ void *context;
+ /* mint receives Tx.read_context; fork Storage owns its own context. */
+ int (*mint)(void *,uint64_t *);
+ const pg_fork_storage *fork;
+ /* Runs after Conversation and fork plans are staged. May stage or create
+    more records on this Tx; the borrowed record is immutable. Return 0 on
+    success. Hooks are synchronous; no borrowed pointer survives return. */
+ int (*created)(void *,pg_record_tx *,const struct json_object *);
+} pg_conversation_host;
+/* Unified new/root/fork creation followed by the injected host hook. parent=0
+   selects new/root and requires entry=0. Errors return no owned result. A hook
+   error leaves its staged candidates for the enclosing callback to discard,
+   matching a failed creating callback. Commit/discard are refused while a
+   creation callback (including nested creations) is active. */
+pg_record_tx_status pg_record_tx_create(pg_record_tx *,const pg_conversation_request *,const pg_conversation_host *,struct json_object **);
 #endif

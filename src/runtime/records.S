@@ -409,6 +409,8 @@ pg_record_tx_begin:
  jz .Ltx_begin_return
  cmp dword ptr [rbx+32],0
  jne .Ltx_begin_return
+ cmp dword ptr [rbx+44],0
+ jne .Ltx_begin_return
  cmp qword ptr [rbx+24],0
  jne .Ltx_begin_return
  cmp dword ptr [r12+48],0
@@ -589,6 +591,8 @@ pg_record_tx_discard:
  jz .Ltx_discard_return
  cmp dword ptr [rdi+32],0
  jne .Ltx_discard_return
+ cmp dword ptr [rdi+44],0
+ jne .Ltx_discard_return
  push rbx
  mov rbx,rdi
  mov dword ptr [rbx+32],1
@@ -614,6 +618,8 @@ pg_record_tx_commit:
  test rbx,rbx
  jz .Ltx_commit_return
  cmp dword ptr [rbx+32],0
+ jne .Ltx_commit_return
+ cmp dword ptr [rbx+44],0
  jne .Ltx_commit_return
  mov eax,3
  cmp dword ptr [rbx+36],0
@@ -2291,3 +2297,104 @@ pg_record_tx_latest_head:
  pop rbp
  ret
 .size pg_record_tx_latest_head,.-pg_record_tx_latest_head
+
+.text
+.globl pg_record_tx_create
+.type pg_record_tx_create,@function
+pg_record_tx_create:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov ebp,1
+ mov qword ptr [rsp],0
+ test r14,r14
+ jz .Ltx_create_return
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Ltx_create_return
+ cmp dword ptr [rbx+32],0
+ jne .Ltx_create_return
+ mov ebp,3
+ cmp dword ptr [rbx+36],0
+ jne .Ltx_create_return
+ mov ebp,1
+ cmp qword ptr [rbx+24],0
+ je .Ltx_create_return
+ test r12,r12
+ jz .Ltx_create_return
+ test r13,r13
+ jz .Ltx_create_return
+ cmp dword ptr [r12+28],0
+ jne .Ltx_create_return
+ cmp dword ptr [r12+24],1
+ ja .Ltx_create_return
+ cmp dword ptr [rbx+44],-1
+ je .Ltx_create_return
+ cmp qword ptr [r12+8],0
+ jne .Ltx_create_fork_check
+ cmp qword ptr [r12+16],0
+ jne .Ltx_create_return
+ jmp .Ltx_create_admit
+.Ltx_create_fork_check:
+ cmp dword ptr [r12+24],0
+ jne .Ltx_create_return
+ cmp qword ptr [r13+16],0
+ je .Ltx_create_return
+.Ltx_create_admit:
+ inc dword ptr [rbx+44]
+ mov rdi,rbx
+ cmp qword ptr [r12+8],0
+ jne .Ltx_create_fork
+ mov rsi,[r12]
+ mov edx,[r12+24]
+ mov rcx,[r13+8]
+ mov r8,rsp
+ call pg_record_tx_create_conversation
+ jmp .Ltx_create_assembled
+.Ltx_create_fork:
+ mov rsi,[r12+8]
+ mov rdx,[r12+16]
+ mov rcx,[r12]
+ mov r8,[r13+16]
+ mov r9,rsp
+ call pg_record_tx_fork_conversation
+.Ltx_create_assembled:
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltx_create_complete
+ cmp qword ptr [r13+24],0
+ je .Ltx_create_success
+ mov rdi,[r13]
+ mov rsi,rbx
+ mov rdx,[rsp]
+ call [r13+24]
+ test eax,eax
+ jz .Ltx_create_success
+ mov ebp,8
+ jmp .Ltx_create_complete
+.Ltx_create_success:
+ mov rax,[rsp]
+ mov [r14],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+.Ltx_create_complete:
+ dec dword ptr [rbx+44]
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ltx_create_return:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_record_tx_create,.-pg_record_tx_create
