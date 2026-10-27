@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 默认系统提示词采用Pi Coding Agent的分节机制和工具贡献，身份适配PanGu；从注入的实际工具表选择snippets/rules。
-- 工作区.pangu/SYSTEM.md和APPEND_SYSTEM.md、首个AGENTS/CLAUDE上下文候选通过完整文件服务加载，剥离BOM并接入持久Generation配置。显式PANGU_SYSTEM_PROMPT_FILE保持完整替换；工作区和工具表依赖已在Host声明。
-- 提示词专项与完整Runtime O0/O2通过；隔离副本使用已提交TUI进行产品构建。真实DeepSeek项目自定义/追加/上下文覆盖指令与重开、默认提示词四工具/诊断/patch/身份/历史流程通过。
+- `PANGU_PLUGIN`连接本地共享库到实际Agent父作用域；模型提供者、执行器和工具声明从该作用域注入Durable请求/工具任务，默认base服务可供扩展组合。
+- model.provider ABI1拥有稳定identity，随请求配置保存；恢复身份不匹配拒绝。Agent停止/排空后释放扩展并卸载库，再关闭根Host。
+- 原生DSO回归、完整Runtime O0/O2与隔离产品构建通过；真实DeepSeek插件模型/工具包装的read、调用计数、释放回执和重开通过，默认四工具/诊断/patch/身份/历史流程通过。
 
 ## 当前接口边界
 
@@ -48,6 +48,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-crash
 python3 -B tools/runtime/test_pangu_pty.py --live-config-recovery
 python3 -B tools/runtime/test_pangu_pty.py --live-thinking
 python3 -B tools/runtime/test_pangu_pty.py --live-resources
+python3 -B tools/runtime/test_pangu_pty.py --live-plugin
 ```
 
 PTY工具支持`--binary`选择已构建的集成程序。真实凭据文档保存在本地Git私有目录。

@@ -134,7 +134,8 @@
         "src/runtime/mimo_projection.S",
         "src/runtime/mimo_stream.S",
         "src/runtime/mimo.h",
-        "src/runtime/mimo_layout.h"
+        "src/runtime/mimo_layout.h",
+        "src/runtime/model_provider.h"
       ],
       "dependencies": [
         "agent.runtime.v0",

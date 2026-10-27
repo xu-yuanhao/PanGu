@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Coding Agent `core/system-prompt.ts` normalize/buildRules/buildSystemPromptSections/renderProjectContext、`resource-loader.ts` loadContextFileFromDir/discoverSystemPromptFile/discoverAppendSystemPromptFile及read/bash/edit/write prompt贡献。Pi远端`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`这些入口无差异，固定参考工作树。
-- 实际调用链：产品Agent依赖显式注入workspace/tool.registry/files；原生`pg_prompt_workspace`用平台probe和既有完整文件服务加载工作区.pangu/SYSTEM.md、APPEND_SYSTEM.md及首个上下文候选（AGENTS.override.md、AGENTS.md、AGENTS.MD、CLAUDE.md、CLAUDE.MD）。手写Assembly按default/custom前缀、实际工具snippets/rules、addendum、project_context和cwd顺序拼接，剥离文件BOM；PanGu身份和真实平台工具约束适配参考文本。结果沿既有prepare/configuration进入持久Generation和实际模型请求。显式PANGU_SYSTEM_PROMPT_FILE保持完整替换入口。
-- 验证：提示词专项核对实际工具选择、自定义前缀、append、上下文候选优先级、BOM、probe失败与输出容量拒绝；完整Runtime O0/O2通过。隔离副本以已提交TUI加本批核心源码构建，真实DeepSeek工作区指令/重开以及默认提示词下四工具、exit 7诊断、patch、身份/历史流程通过；平台服务依赖遗漏曾使Agent激活失败，补齐显式import后复验。
-- 接口与自审：`pg_prompt_workspace_source`48字节，借用files/probe/tools/workspace；函数失败清空输出，拥有文件服务的组合负责生命周期。登记prompt导出/实际来源和模块职责；静态组合只承担fstatat/errno布局胶水与服务接线，提示词选择/拼接为Assembly。TUI进行中源码保持原位，核心暂存明确路径。
-- 剩余与下一交付物：本批加载工作区范围；用户级与祖先目录继承、资源刷新、sections/hooks、skills/templates/信任设置仍在K11原清单。当前模型prompt上限4095字节，资源超限明确失败；动态预算/长上下文按K05/K12完成。继续B03模型/扩展调用链与B04资源工作流，完整TODO不变。
+- 来源：Harness Cordis `service.ts`服务随fiber作用域注册/撤销、`context.ts`/`registry.ts`组合及Pi Durable `harness/registry.ts`快照与配置解析；复用既有原生host/native_plugin的父子替换、依赖顺序和协作释放实现。Pi远端`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，Harness`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，固定参考树。
+- 实际调用链：根Host提供默认模型/工具/存储；`PANGU_PLUGIN`将本地共享库加载为子作用域，Agent在其子作用域启动。Agent从同一作用域解析model.provider、tools和tool.registry；默认Model由版本化pg_model_provider包住configure/failure/complete与原有pg_model，扩展可继承base服务并提供替代。请求保存稳定provider身份，恢复时不匹配明确拒绝；执行器与声明目录沿同一解析结果注入模型与Tool任务。退出先停止Agent/排空请求与工具，再关闭扩展作用域/卸载库，最后关闭根服务。
+- 验证：产品隔离构建、Runtime完整O0/O2及原生DSO生命周期回归；真实共享库夹具包装默认模型与工具服务，计数实际configure/execute，执行真实DeepSeek→read→回答并重开续聊，关闭回执核对提供者确实被使用和释放。上述真实插件流程和默认四工具/诊断/patch/身份与历史流程均通过。TUI进行中源码继续保留，产品验证使用已提交TUI和本批核心。
+- 接口与自审：新增`model_provider.h`的model.provider ABI1（80字节、稳定identity和borrowed函数表）；登记实际头、依赖与fixture。原生DSO仍导出pangu_plugin_v1，可提供tools/tool.registry/model.provider；默认base服务名tools.base/tool.registry.base/model.provider.base用于组合。生产逻辑沿既有Assembly宿主与任务实现；C组合仅组装函数表、租约及外部提供者调用。
+- 剩余与下一交付物：当前启动加载一个本地库，完整extension registry、多个扩展选择、运行中更新/撤销、hooks和自定义任务仍按K02/K09完成；Session与Storage尚未通过完整独立契约替换。本批不据启动加载勾选整个插件机制。继续沿实际扩展调用链补齐，不增加旁路实现。

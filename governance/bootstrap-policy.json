@@ -594,6 +594,8 @@
     "src/runtime/durable_inputs.S": "native-source",
     "src/runtime/durable_inputs.h": "native-source",
     "src/runtime/edit_diff.h": "native-source",
-    "src/runtime/edit_diff.S": "native-source"
+    "src/runtime/edit_diff.S": "native-source",
+    "src/runtime/model_provider.h": "native-source",
+    "tests/runtime/product_plugin_fixture.c": "native-test"
   }
 }

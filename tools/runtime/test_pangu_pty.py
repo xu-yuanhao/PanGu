@@ -370,12 +370,50 @@ def resource_workflow(binary, root, environment):
             terminal.close()
     print('PASS: actual project custom/append/override resources and reopened PanGu context', flush=True)
 
+def plugin_workflow(binary, root, environment):
+    root = root / 'plugin-workflow'
+    root.mkdir()
+    library = root / 'fixture.so'
+    receipt = root / 'released.txt'
+    source = Path(__file__).resolve().parents[2] / 'tests/runtime/product_plugin_fixture.c'
+    subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
+                    '-fPIC', '-shared', str(source), '-o', str(library)], check=True)
+    env = dict(environment)
+    env.update(PANGU_PLUGIN=str(library), PANGU_PLUGIN_RECEIPT=str(receipt))
+    (root / 'source.txt').write_text('PANGUPLUGINREALREAD\n')
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Use read to inspect source.txt and reply with its exact content.')
+        assert b'PANGUPLUGINREALREAD' in output and b'[tool] read' in re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', output), repr(output[-2000:])
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    match = re.fullmatch(r'released configured=(\d+) executed=(\d+)\n', receipt.read_text())
+    assert match and int(match[1]) >= 2 and int(match[2]) >= 1
+    saved = stored_bytes(root / '.pangu')
+    # Request configuration lives in retained task checkpoint events or assistant
+    # history depending on task compaction; actual successful read proves routing.
+    assert b'PANGUPLUGINREALREAD' in saved
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Without tools repeat the file content remembered from the previous turn.')
+        assert b'PANGUPLUGINREALREAD' in output, repr(output[-1800:])
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: native extension model/tool services, actual model/read, ordered release and reopen', flush=True)
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,help='already built product')
     parser.add_argument('--live',action='store_true',help='real coding workflow and committed context reopen')
     parser.add_argument('--live-persistent',action='store_true',help='cooperative exit during an unsafe tool and reopen')
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
+    parser.add_argument('--live-plugin',action='store_true',help='native service substitution and ordered shutdown')
     parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
     parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
     parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
@@ -387,9 +425,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_plugin:
+                plugin_workflow(binary,root,env)
             if args.live_resources:
                 resource_workflow(binary,root,env)
             if args.live_thinking:
