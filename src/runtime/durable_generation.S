@@ -498,6 +498,8 @@ jmp .Lgg_project_role
  call json_object_is_type@PLT
  test eax,eax
  jz .Lgg_project_bad
+ cmp dword ptr [rsp+24],3
+ je .Lgg_project_tool_text
  xor r14d,r14d
 .Lgg_project_block:
  mov rdi,r13
@@ -523,19 +525,6 @@ jmp .Lgg_project_role
  mov ecx,0
  mov r8d,0
  xor r9d,r9d
- cmp dword ptr [rsp+24],3
- jne .Lgg_project_text
- GGET r12,tool_call_id
- mov [rsp+16],rax
- GGET r12,tool_name
- mov rbp,rax
- GGET r12,is_error
- mov rdi,rax
- call json_object_get_boolean@PLT
- mov r9d,eax
- mov rcx,[rsp+16]
- mov r8,rbp
-.Lgg_project_text:
  mov rsi,[rsp+8]
  mov edx,[rsp+24]
  jmp .Lgg_project_one
@@ -591,6 +580,33 @@ jmp .Lgg_project_role
  inc qword ptr [rbx+PG_S_COUNT]
  inc r14
  jmp .Lgg_project_block
+.Lgg_project_tool_text:
+ mov rdi,r13
+ call .Lgg_join_tool_text
+ test rax,rax
+ jz .Lgg_project_bad
+ mov [rsp+8],rax
+ GGET r12,tool_call_id
+ mov [rsp+16],rax
+ GGET r12,tool_name
+ mov rbp,rax
+ GGET r12,is_error
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov r9d,eax
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov edx,3
+ mov rcx,[rsp+16]
+ mov r8,rbp
+ call .Lgg_add_message
+ mov ebp,eax
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ test ebp,ebp
+ jnz .Lgg_project_bad
+ inc qword ptr [rbx+PG_S_COUNT]
+ jmp .Lgg_project_ok
 .Lgg_project_add:
  mov rdi,rbx
  call .Lgg_add_message
@@ -1970,3 +1986,92 @@ pg_durable_generation_history:
 .section .rodata
 .Lgg_history_json: .asciz "{\"conversationId\":1,\"state\":{\"checkpoint\":{\"cutoff\":9007199254740991}}}"
 .section .note.GNU-stack,"",@progbits
+
+.text
+/* OpenAI-completions joins a tool result's text blocks with LF. */
+.Lgg_join_tool_text:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ xor r12d,r12d
+ xor r13d,r13d
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov edi,1
+ mov esi,4096
+ call calloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgj_end
+.Lgj_loop:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lgj_finish
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ GGET r14,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgj_end
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgj_end
+ GGET r14,text
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgj_end
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ mov [rsp+16],rax
+ lea rcx,[r13+rax]
+ test r12,r12
+ jz .Lgj_size
+ inc rcx
+.Lgj_size:
+ cmp rcx,4096
+ jae .Lgj_end
+ test r12,r12
+ jz .Lgj_copy
+ mov rax,[rsp]
+ mov byte ptr [rax+r13],10
+ inc r13
+.Lgj_copy:
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[rsp]
+ add rdi,r13
+ mov rdx,[rsp+16]
+ call memcpy@PLT
+ add r13,[rsp+16]
+ inc r12
+ jmp .Lgj_loop
+.Lgj_finish:
+ mov rdi,[rsp]
+ mov esi,r13d
+ call json_object_new_string_len@PLT
+ mov [rsp+8],rax
+.Lgj_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rax,[rsp+8]
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret

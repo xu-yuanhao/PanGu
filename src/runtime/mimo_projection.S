@@ -525,6 +525,14 @@ pg_mimo_encode_request:
  jnz .Linvalid
  lea rdi, [r13 + PG_MM_MSG_TEXT]
  mov rsi, qword ptr [r13 + PG_MM_MSG_SIZE]
+ call .Ltool_blank
+ lea rdi, [r13 + PG_MM_MSG_TEXT]
+ mov rsi, qword ptr [r13 + PG_MM_MSG_SIZE]
+ test eax,eax
+ jz .Ltool_text_ready
+ lea rdi,[rip+.Ltool_no_output]
+ mov esi,16
+.Ltool_text_ready:
  call json_object_new_string_len@PLT
  test rax,rax
  jz .Linvalid
@@ -750,3 +758,68 @@ pg_mimo_encode_request:
 .size pg_mimo_encode_request, .-pg_mimo_encode_request
 
 .section .note.GNU-stack,"",@progbits
+
+.text
+/* ECMAScript trim's WhiteSpace and LineTerminator set, on UTF-8 bytes. */
+.Ltool_blank:
+ test rsi,rsi
+ jz .Ltool_blank_yes
+ movzx eax,byte ptr [rdi]
+ cmp eax,32
+ je .Ltool_blank_one
+ cmp eax,9
+ jb .Ltool_blank_no
+ cmp eax,13
+ jbe .Ltool_blank_one
+ cmp rsi,2
+ jb .Ltool_blank_no
+ cmp word ptr [rdi],0xa0c2
+ je .Ltool_blank_two
+ cmp rsi,3
+ jb .Ltool_blank_no
+ movzx eax,word ptr [rdi]
+ movzx edx,byte ptr [rdi+2]
+ cmp eax,0x80e2
+ jne .Ltool_blank_other
+ cmp edx,0x80
+ jb .Ltool_blank_no
+ cmp edx,0x8a
+ jbe .Ltool_blank_three
+ cmp edx,0xa8
+ je .Ltool_blank_three
+ cmp edx,0xa9
+ je .Ltool_blank_three
+ cmp edx,0xaf
+ je .Ltool_blank_three
+ jmp .Ltool_blank_no
+.Ltool_blank_other:
+ shl edx,16
+ or eax,edx
+ cmp eax,0x809ae1
+ je .Ltool_blank_three
+ cmp eax,0x9f81e2
+ je .Ltool_blank_three
+ cmp eax,0x8080e3
+ je .Ltool_blank_three
+ cmp eax,0xbfbbef
+ jne .Ltool_blank_no
+.Ltool_blank_three:
+ add rdi,3
+ sub rsi,3
+ jmp .Ltool_blank
+.Ltool_blank_two:
+ add rdi,2
+ sub rsi,2
+ jmp .Ltool_blank
+.Ltool_blank_one:
+ inc rdi
+ dec rsi
+ jmp .Ltool_blank
+.Ltool_blank_yes:
+ mov eax,1
+ ret
+.Ltool_blank_no:
+ xor eax,eax
+ ret
+.section .rodata
+.Ltool_no_output: .asciz "(no tool output)"

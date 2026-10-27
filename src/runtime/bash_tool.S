@@ -809,3 +809,258 @@ pg_bash_tool_definition:
  ret
 .size pg_bash_tool_definition,.-pg_bash_tool_definition
 .section .note.GNU-stack,"",@progbits
+.text
+.globl pg_bash_tool_snapshot
+.type pg_bash_tool_snapshot,@function
+pg_bash_tool_snapshot:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,128
+ mov rbx,rdi
+ mov r13,rsi
+ xor r12d,r12d
+ mov ebp,1
+ test rsi,rsi
+ jz .Lbhs_end
+ mov qword ptr [rsi],0
+ test rdi,rdi
+ jz .Lbhs_end
+ cmp dword ptr [rdi+PG_BH_STAGE],5
+ jne .Lbhs_end
+ mov ebp,5
+ lea rdi,[rip+.Lbhs_json]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lbhs_end
+ mov rdi,rax
+ lea rsi,[rip+.Lbhs_structured]
+ call json_object_object_get@PLT
+ mov r14,rax
+ lea rdi,[rbx+PG_BH_TAIL]
+ mov esi,[rbx+PG_BH_TAIL_N]
+ call json_object_new_string_len@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lbhs_output]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_end
+ mov edi,[rbx+PG_BH_FLAGS]
+ and edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lbhs_truncated]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_end
+ mov edi,[rbx+PG_BH_EXIT]
+ call json_object_new_int@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lbhs_exit]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_end
+ cmp byte ptr [rbx+PG_BH_PATH],0
+ je .Lbhs_error
+ lea rdi,[rbx+PG_BH_PATH]
+ call json_object_new_string@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lbhs_path]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_end
+ mov rdi,rsp
+ mov esi,128
+ lea rdx,[rip+.Lbhs_full_format]
+ test dword ptr [rbx+PG_BH_FLAGS],2
+ jz .Lbhs_path_message
+ lea rdx,[rip+.Lbhs_partial_format]
+.Lbhs_path_message:
+ lea rcx,[rbx+PG_BH_PATH]
+ xor eax,eax
+ call snprintf@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lbhs_full_code]
+ mov rdx,rsp
+ lea rcx,[rip+.Lbhs_info]
+ call .Lbhs_diagnostic
+ test eax,eax
+ jnz .Lbhs_end
+.Lbhs_error:
+ mov eax,[rbx+PG_BH_REASON]
+ test eax,eax
+ jnz .Lbhs_reason
+ test dword ptr [rbx+PG_BH_FLAGS],2
+ jnz .Lbhs_capture_error
+ cmp dword ptr [rbx+PG_BH_EXIT],0
+ je .Lbhs_truncation
+ mov rdi,rsp
+ mov esi,128
+ lea rdx,[rip+.Lbhs_exit_format]
+ mov ecx,[rbx+PG_BH_EXIT]
+ xor eax,eax
+ call snprintf@PLT
+ lea rsi,[rip+.Lbhs_exit_code]
+ mov rdx,rsp
+ jmp .Lbhs_report_error
+.Lbhs_reason:
+ lea rsi,[rip+.Lbhs_aborted_code]
+ lea rdx,[rip+.Lbhs_aborted_message]
+ cmp eax,1
+ je .Lbhs_report_error
+ cmp eax,3
+ je .Lbhs_report_error
+ lea rsi,[rip+.Lbhs_timeout_code]
+ lea rdx,[rip+.Lbhs_timeout_message]
+ cmp eax,2
+ je .Lbhs_report_error
+.Lbhs_capture_error:
+ lea rsi,[rip+.Lbhs_capture_code]
+ lea rdx,[rip+.Lbhs_capture_message]
+.Lbhs_report_error:
+ mov rdi,r12
+ lea rcx,[rip+.Lbhs_error_severity]
+ call .Lbhs_diagnostic
+ test eax,eax
+ jnz .Lbhs_end
+.Lbhs_truncation:
+ test dword ptr [rbx+PG_BH_FLAGS],1
+ jz .Lbhs_success
+ mov rdi,r12
+ lea rsi,[rip+.Lbhs_truncated_code]
+ lea rdx,[rip+.Lbhs_truncated_message]
+ lea rcx,[rip+.Lbhs_warn]
+ call .Lbhs_diagnostic
+ test eax,eax
+ jnz .Lbhs_end
+.Lbhs_success:
+ mov [r13],r12
+ xor r12d,r12d
+ xor ebp,ebp
+.Lbhs_end:
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,128
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_bash_tool_snapshot,.-pg_bash_tool_snapshot
+.Lbhs_set:
+ test rdx,rdx
+ jz .Lbhs_set_bad
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lbhs_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,5
+.Lbhs_set_end:
+ pop rbx
+ ret
+.Lbhs_set_bad:
+ mov eax,5
+ ret
+/* root,code,message,severity; temporary diagnostic transfers only on add. */
+.Lbhs_diagnostic:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ call json_object_new_object@PLT
+ mov r15,rax
+ test rax,rax
+ jz .Lbhs_diagnostic_bad
+ mov rdi,r12
+ call json_object_new_string@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Lbhs_code]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_diagnostic_bad
+ mov rdi,r13
+ call json_object_new_string@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Lbhs_message]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_diagnostic_bad
+ mov rdi,r14
+ call json_object_new_string@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Lbhs_severity]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_diagnostic_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lbhs_diagnostics]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,r15
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lbhs_diagnostic_bad
+ xor r15d,r15d
+ xor ebx,ebx
+ jmp .Lbhs_diagnostic_end
+.Lbhs_diagnostic_bad:
+ mov ebx,5
+.Lbhs_diagnostic_end:
+ mov rdi,r15
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,16
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lbhs_json: .asciz "{\"structuredOutput\":{\"output\":\"\",\"truncated\":false,\"exitCode\":0},\"diagnostics\":[]}"
+.Lbhs_structured: .asciz "structuredOutput"
+.Lbhs_output: .asciz "output"
+.Lbhs_truncated: .asciz "truncated"
+.Lbhs_exit: .asciz "exitCode"
+.Lbhs_path: .asciz "fullOutputPath"
+.Lbhs_diagnostics: .asciz "diagnostics"
+.Lbhs_code: .asciz "code"
+.Lbhs_message: .asciz "message"
+.Lbhs_severity: .asciz "severity"
+.Lbhs_info: .asciz "info"
+.Lbhs_warn: .asciz "warn"
+.Lbhs_error_severity: .asciz "error"
+.Lbhs_full_code: .asciz "full_output"
+.Lbhs_full_format: .asciz "Full output: %s"
+.Lbhs_partial_format: .asciz "Partial output: %s"
+.Lbhs_exit_code: .asciz "exit_code"
+.Lbhs_exit_format: .asciz "Command exited with code %d"
+.Lbhs_timeout_code: .asciz "timeout"
+.Lbhs_timeout_message: .asciz "Command timed out"
+.Lbhs_aborted_code: .asciz "aborted"
+.Lbhs_aborted_message: .asciz "Command aborted"
+.Lbhs_capture_code: .asciz "output_error"
+.Lbhs_capture_message: .asciz "Command output capture failed or reached its limit"
+.Lbhs_truncated_code: .asciz "output_truncated"
+.Lbhs_truncated_message: .asciz "Output truncated to the retained tail"

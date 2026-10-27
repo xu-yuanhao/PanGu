@@ -136,7 +136,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `tools/{read,write,edit,bash,edit-diff,image-processor}.ts`、`env/`、`images/`、`truncate.ts`；`tools.test.ts`、`tools-read-differential.test.ts`、`tools-images.test.ts`、`env-node.test.ts`。
 
 - [ ] 在现有 read/write/edit/bash 服务上补齐上游输入准备、路径/目录、分页/完整文件、UTF-8/二进制/图片、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
-- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询。附件、诊断文本渲染与完整ExecutionEnv待补齐。
+- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询。已有诊断文本渲染、bash结构化结果与单条工具消息投影；附件与完整ExecutionEnv待补齐。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
 ### K09 — 完整原生 Extension 能力
@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`tools/edit.ts`、`edit-diff.ts` generateDiffString/generateUnifiedPatch和`harness/tool.ts`；其依赖jsdiff 8.0.4的Myers路径、行分词、buildValues替换排序和patch/create格式。本批沿Pi远端`842c73170a3658d4e3b39fcc84690211ed503e09`核对的相同工具模块开发；Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，保留固定参考工作树。
-- 实际调用链：`edit_tool.S`在写入前以原始快照/候选内容生成拥有所有权的details，写成功后经Tool host snapshot与任务回执原子入库，错误/下一租约/关闭时释放。`edit_diff.S`手写行分词、Myers路径、引用计数回收路径节点、四行上下文编号diff、统一patch和EOF标记，保留BOM/CRLF文件变换，展示按Pi规范归一化；移除编辑器旧首字节公共前缀行号算法。`pg_durable_tool_observe`按会话/call ID分页查询最新匹配工具，返回独立拥有的{task,call,entry?}；`pg_durable_client_tool_observe`提供前台绑定。
-- 验证：原生diff与固定Pi实际函数/jsdiff的244组可复验语料比较通过（另有开发中502组对照），包含重复行、Unicode、空内容、无末尾换行、CRLF/BOM及长上下文；编辑已有91组准备/文件语料和失败/写后崩溃专项通过；最终节点回收实现的编辑/差异专项ASan/UBSan通过。SQLite/JSONL观察专项核对结果、缺失、跨会话隔离与存储重开。Runtime完整O0/O2与产品构建通过；真实DeepSeek PTY四工具/身份/重开续聊及实际patch反向匹配通过；两后端真实模型重试→read→follow-up→重开通过，工具开始事件查询接口返回真实参数。控制自审：登记Assembly diff实现及实际模块/构建输入；桥接控制块288字节，既有pg_event与tui_runtime_ops布局不变，工具元数据所有权纳入清理。
-- TUI可用接口：`pg_tui_runtime_tool_observer(ops)`返回借用的`tui_tool_observer`；read(context,call_id,len,&json)同步读取、不会推进调度，0为拥有的快照、1为缺失，其他为错误；其他适配器的可选接口查找返回NULL。call.arguments为真实参数，entry.model[0].details含diff/patch/firstChangedLine，entry.data含status/diagnostics/arguments；无entry表示尚无结果。调用release释放快照；后续读取不使旧快照失效。产品已绑定此接口，TUI U03按此入口接线；同一call ID重复时查询最新匹配任务，返回task.id供客户端保留身份。
-- 剩余与下一交付物：TUI具体diff控件/取消结果消费由TUI归属文件接入；核心继续K08诊断文本渲染、图片与工具环境行为，以及B03模型/扩展实际调用链。K05/K07/K09–K14的其他范围保持原清单。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts` appendToolResult/renderDiagnostics、`tools/bash.ts` executeShell及`ai/src/api/openai-completions.ts`工具文本join/空输出占位。本批Pi远端`269afc66abfd5fdd37ff0eedfe2b749b6050a420`的上述模块无差异，Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，保留固定参考工作树。
+- 实际调用链：`pg_bash_tool_snapshot`在关闭前读取原生最终状态，返回拥有的structuredOutput（output/truncated/exitCode/fullOutputPath）和full_output/exit_code/timeout/aborted/output_error/output_truncated诊断；产品注入此提供者。`durable_tool.S`同批保存structuredOutput到Entry.data、diagnostics到data，并按Pi格式追加模型文本块。`durable_generation.S`将同一工具结果的所有文本按LF合为一条原生消息，删除旧的逐块工具结果路径；`mimo_projection.S`按ECMAScript空白规则为无工具输出生成占位，保持call ID配对。
+- 验证：SQLite/JSONL真实工具结果→Generation历史投影→实际请求JSON核对同一调用只有一条tool消息，诊断存在；原生bash专项核对结构化退出、截断、输出长度、故障与资源释放。工具/诊断专项ASan/UBSan、完整Runtime O0/O2、产品构建和G00/Assembly通过；真实DeepSeek PTY完成四工具、明确exit 7命令的后续回答/结构化退出与诊断、patch反向匹配、身份及重开续聊。控制自审：只新增bash snapshot导出与结果字段；模型、工具和TUI函数表布局保持不变。
+- TUI接口：继续使用`pg_tui_runtime_tool_observer(ops)`；拥有的entry.data.structuredOutput提供bash退出码、完整输出文件路径和保留尾部，entry.data.diagnostics提供类型化诊断；模型content单独包含格式化诊断。已有diff/patch/firstChangedLine接口保持原入口。
+- 剩余与下一交付物：当前模型ABI仍为单条4095字节文本与64条消息，合并超限会拒绝投影；完整内容块/图片、输出预算及长上下文按K05/K08/K12完成。核心继续B03模型与工具行为覆盖，TUI按已有独立观察接口消费结构化结果；其他功能保留原清单。

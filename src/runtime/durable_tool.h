@@ -17,8 +17,9 @@ typedef struct {
  void (*progress)(void *,uint64_t task_id,pg_slice);
  /* Optional final metadata snapshot, before service close/release. call borrows
     the committed toolCall. Return 0 with an owned object (or NULL): optional
-    details is JSON, diagnostics is an array. Failure stops settlement without
-    repeating the effect. Metadata stays owned by this task through commit. */
+    details/structuredOutput are JSON, diagnostics is an array. Failure stops settlement without
+    repeating the effect. Metadata stays owned by this task through commit. Diagnostics are rendered
+    as a separate model text block; structuredOutput is stored in Entry.data. */
  int (*snapshot)(void *,uint64_t task_id,const struct json_object *call,struct json_object **);
 } pg_durable_tool_host;
 typedef struct {

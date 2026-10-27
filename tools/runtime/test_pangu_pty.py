@@ -117,6 +117,8 @@ def workflow(binary, root, env):
         for tool in (b'read', b'write', b'edit', b'bash'):
             assert b'[tool] ' + tool in re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', output), ('missing actual tool', tool)
         assert marker.encode() in output and b'_EDIT' in output
+        output = run_input(terminal, 'Use bash to run exactly this command: `printf PANGU_EXIT_CHECK; exit 7`. Then report the exit code. Do not repeat the command.')
+        assert b'7' in output and b'PANGU_EXIT_CHECK' in output
         output = run_input(terminal, 'What product are you? Answer only its name.')
         assert b'PanGu' in output
         terminal.send(b'\x04')
@@ -137,6 +139,7 @@ def workflow(binary, root, env):
             for child in value:
                 yield from records(child)
     edits = []
+    failed_bash = []
     for path in directory.iterdir():
         if path.is_file():
             for line in path.read_bytes().splitlines():
@@ -148,7 +151,13 @@ def workflow(binary, root, env):
                     message = entry['model'][0]
                     if message['toolName'] == 'edit' and not message['isError']:
                         edits.append(entry)
+                    if message['toolName'] == 'bash' and message['isError']:
+                        failed_bash.append(entry)
     assert edits, 'missing committed actual edit receipt'
+    assert any(e['data']['structuredOutput']['exitCode'] == 7
+               and any(d['code'] == 'exit_code' for d in e['data']['diagnostics'])
+               and any('[error] Command exited with code 7' in b.get('text', '') for b in e['model'][0]['content'])
+               for e in failed_bash), 'missing actual nonzero bash diagnostics'
     assert all(e['data']['status'] == 'completed' and e['data']['arguments']['path'] == 'target.txt'
                and e['model'][0]['details']['firstChangedLine'] == 1 for e in edits)
     assert all(e['model'][0]['details']['diff'] and e['model'][0]['details']['patch'] for e in edits)

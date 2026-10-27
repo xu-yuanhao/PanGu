@@ -27,4 +27,8 @@ typedef struct {
 } pg_bash_tool;
 int pg_bash_tool_init(pg_bash_tool *,const pg_process_ops *,int directory,char *const *environment);
 pg_tool_definition pg_bash_tool_definition(pg_bash_tool *);
+struct json_object;
+/* Before close, at final stage only: 0 owned {structuredOutput,diagnostics},
+   1 no completed result, 5 allocation error. Reads typed state, never output text. */
+int pg_bash_tool_snapshot(const pg_bash_tool *,struct json_object **);
 #endif

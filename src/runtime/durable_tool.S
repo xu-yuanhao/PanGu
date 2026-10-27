@@ -459,11 +459,57 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_metadata_add_failed
 .Ldt_metadata_diagnostics:
+ mov rdi,[rbx+4272]
+ lea rsi,[rip+.Ldt_structured_output]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ldt_metadata_diagnostic_array
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_structured_output]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldt_metadata_add_failed
+.Ldt_metadata_diagnostic_array:
  DGET "qword ptr [rbx+4272]",diagnostics
  test rax,rax
  jz .Ldt_metadata_done
  DREF rbp,diagnostics,rax
 .Ldt_metadata_done:
+ DGET rbp,diagnostics
+ mov rbp,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldt_diagnostics_ready
+ mov rdi,rbp
+ call .Ldt_render_diagnostics
+ test rax,rax
+ jz .Ldt_stage_alloc
+ mov [rsp+32],rax
+ lea rdi,[rip+.Ldt_diag_text_json]
+ call json_tokener_parse@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Ldt_stage_alloc
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ mov rdx,[rsp+32]
+ mov qword ptr [rsp+32],0
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ DGET r14,content
+ mov rdi,rax
+ mov rsi,[rsp+40]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldt_stage_alloc
+ mov qword ptr [rsp+40],0
+.Ldt_diagnostics_ready:
  mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",conversation_id
  mov rdi,rax
@@ -552,6 +598,10 @@ pg_durable_tool_init:
  mov rdi,[rsp+8]
  call json_object_put@PLT
  mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
  call json_object_put@PLT
  mov eax,ebp
  add rsp,48
@@ -1159,3 +1209,123 @@ pg_durable_tool_observation_release:
 .Ldto_task_key: .asciz "task"
 .Ldto_call_key: .asciz "call"
 .Ldto_entry_key: .asciz "entry"
+
+.text
+/* Pi renderDiagnostics, retaining explicit JSON string lengths. */
+.Ldt_render_diagnostics:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ xor r12d,r12d
+ mov r13d,10
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov edi,1
+ mov esi,4096
+ call calloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldr_end
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_diag_open]
+ mov edx,10
+ call memcpy@PLT
+.Ldr_loop:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ldr_finish
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ DGET r14,severity
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldr_end
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ mov [rsp+16],rax
+ lea rcx,[r13+rax+3]
+ cmp rcx,4085
+ jae .Ldr_end
+ test r12,r12
+ jz .Ldr_item
+ mov rax,[rsp]
+ mov byte ptr [rax+r13],10
+ inc r13
+.Ldr_item:
+ mov rax,[rsp]
+ mov byte ptr [rax+r13],91
+ inc r13
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[rsp]
+ add rdi,r13
+ mov rdx,[rsp+16]
+ call memcpy@PLT
+ add r13,[rsp+16]
+ mov rax,[rsp]
+ mov word ptr [rax+r13],0x205d
+ add r13,2
+ DGET r14,message
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldr_end
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ mov [rsp+16],rax
+ lea rcx,[r13+rax+11]
+ cmp rcx,4096
+ jae .Ldr_end
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[rsp]
+ add rdi,r13
+ mov rdx,[rsp+16]
+ call memcpy@PLT
+ add r13,[rsp+16]
+ inc r12
+ jmp .Ldr_loop
+.Ldr_finish:
+ mov rdi,[rsp]
+ add rdi,r13
+ lea rsi,[rip+.Ldt_diag_close]
+ mov edx,11
+ call memcpy@PLT
+ add r13,11
+ mov rdi,[rsp]
+ mov esi,r13d
+ call json_object_new_string_len@PLT
+ mov [rsp+8],rax
+.Ldr_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rax,[rsp+8]
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_severity: .asciz "severity"
+.Ldt_diag_open: .ascii "<harness>\n"
+.Ldt_diag_close: .ascii "\n</harness>"
+.Ldt_diag_text_json: .asciz "{\"type\":\"text\"}"
+
+.section .rodata
+.Ldt_structured_output: .asciz "structuredOutput"

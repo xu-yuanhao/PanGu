@@ -322,9 +322,19 @@ static void test_page_tail(void) {
     assert(!munmap(event_map, (size_t)page * 2));
 }
 
+static void test_empty_tool_text(void){
+ const char *cases[]={""," ","\t\r\n", "\xc2\xa0", "\xe1\x9a\x80", "\xe2\x80\x80", "\xe2\x80\x8a", "\xe2\x80\xa8", "\xe2\x80\xa9", "\xe2\x80\xaf", "\xe2\x81\x9f", "\xe3\x80\x80", "\xef\xbb\xbf", " x ", "\xc2\x85", "\xe2\x80\x8b"};
+ for(size_t i=0;i<sizeof(cases)/sizeof(*cases);i++){
+  session=(pg_session){0};session.count=3;session.messages[0].role=PG_USER;session.messages[0].size=1;memcpy(session.messages[0].text,"x",2);
+  pg_message *call=&session.messages[1],*result=&session.messages[2];call->role=PG_TOOL_CALL;call->size=2;memcpy(call->text,"{}",3);strcpy(call->call_id,"call");strcpy(call->tool_name,"bash");result->role=PG_TOOL_RESULT;strcpy(result->call_id,"call");result->size=strlen(cases[i]);memcpy(result->text,cases[i],result->size+1);
+  pg_mimo provider={0};assert(!pg_mimo_encode_request(&provider,&session));json_object *root=root_of(provider.request),*messages=get(root,"messages");const char *text=json_object_get_string(get(json_object_array_get_idx(messages,2),"content"));assert(!strcmp(text,i<13?"(no tool output)":cases[i]));json_object_put(root);free(provider.request);
+ }
+}
+
 int main(void) {
     test_model_init();
     test_projection_model_env();
+    test_empty_tool_text();
     test_projection_rejections();
     test_plain_conversation_projection();
     test_decode_terminators();

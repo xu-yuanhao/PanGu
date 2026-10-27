@@ -737,7 +737,8 @@
       "role": "handwritten cooperative bash adapter; explicit borrowed process service/cwd/environment, validated command and timeout, separate stream decoding, 3072-byte/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
       "exports": [
         "pg_bash_tool_init",
-        "pg_bash_tool_definition"
+        "pg_bash_tool_definition",
+        "pg_bash_tool_snapshot"
       ],
       "reference_basis": [
         {

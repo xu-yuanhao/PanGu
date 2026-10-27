@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- `edit_diff.S`将Pi/jsdiff的行比较、四行上下文和统一patch移植为手写汇编，拥有的diff/patch/firstChangedLine随实际edit结果原子入库；写失败、下一租约与关闭清理旧元数据。
-- 独立`tui_tool_observer`已绑定到产品桥接。按会话/call ID读取拥有的task、call和结果Entry，不推进调度；参数、状态、diff/patch与诊断可从明确字段读取。桥接控制块288字节，既有事件与ops布局不变。
-- 244组可复验上游实际diff差异比较、编辑91组语料和失败/恢复专项（最终节点回收实现ASan/UBSan通过）、两后端观察/重开、完整Runtime O0/O2及产品构建通过；真实DeepSeek PTY四工具/身份/重开续聊及实际patch反向匹配、两后端真实Generation/工具观察/follow-up通过。
+- bash通过原生snapshot提供结构化退出码、截断、尾部、完整/部分输出文件和类型化诊断；结果随工具Entry原子保存，TUI独立观察接口可读取。
+- 工具诊断按Pi格式成为模型文本块；Generation将一个toolResult内的文本块合为一条工具消息，避免重复call ID。OpenAI请求投影为纯空白输出提供源实现规定的占位文本。
+- 两后端实际结果/诊断→历史→请求JSON专项、bash状态/故障专项、完整Runtime O0/O2、产品构建与G00/Assembly通过。真实DeepSeek PTY四工具、exit 7后的回答与持久诊断、patch反向匹配、身份及重开续聊通过。
 
 ## 当前接口边界
 
