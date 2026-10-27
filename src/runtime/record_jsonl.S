@@ -269,6 +269,10 @@ pg_record_jsonl_storage:
  mov [rsp],rdi
  lea r9,[rip+.Ljl_persist]
  call pg_record_memory_commit_persisted@PLT
+ mov [rsp+8],eax
+ mov rdi,rbx
+ call .Ljl_reclaim_commit
+ mov eax,[rsp+8]
  add rsp,16
  mov dword ptr [rbx+56],0
  pop rbx
@@ -522,6 +526,13 @@ pg_record_jsonl_storage:
  call .Ljl_append
  test eax,eax
  jnz .Ljl_persist_poison
+ mov rdi,r12
+ call json_object_get@PLT
+ mov [rbx+96],rax
+ mov rax,[rsp+32]
+ mov [rbx+80],rax
+ mov [rbx+88],r14
+ mov qword ptr [rsp+32],0
  xor ebp,ebp
  jmp .Ljl_persist_cleanup
 .Ljl_persist_poison:
@@ -2107,6 +2118,10 @@ pg_record_jsonl_storage:
  jnz .Ljl_recover_cleanup
  mov rdi,rsp
  call .Ljl_reclaim_recovered
+ mov rdi,rsp
+ call .Ljl_retain_current
+ test eax,eax
+ jnz .Ljl_recover_alloc
  xor eax,eax
  jmp .Ljl_recover_cleanup
 .Ljl_recover_alloc:
@@ -2167,6 +2182,10 @@ pg_record_jsonl_open:
  mov dword ptr [rbx+56],1
  mov dword ptr [rbx+60],0
  mov [rbx+64],r13d
+ mov qword ptr [rbx+72],0
+ mov qword ptr [rbx+80],0
+ mov qword ptr [rbx+88],0
+ mov qword ptr [rbx+96],0
  mov rdi,r12
  mov esi,448
  call mkdir@PLT
@@ -2205,6 +2224,9 @@ pg_record_jsonl_open:
  call close@PLT
  mov dword ptr [rbx+48],-1
 .Ljl_open_memory_cleanup:
+ mov rdi,[rbx+72]
+ call json_object_put@PLT
+ mov qword ptr [rbx+72],0
  mov rdi,rbx
  call pg_record_memory_close@PLT
  mov dword ptr [rbx+56],0
@@ -2240,6 +2262,9 @@ pg_record_jsonl_close:
  mov r12d,eax
  mov dword ptr [rbx+48],-1
  mov dword ptr [rbx+52],0
+ mov rdi,[rbx+72]
+ call json_object_put@PLT
+ mov qword ptr [rbx+72],0
  mov rdi,rbx
  call pg_record_memory_close@PLT
  xor eax,eax
@@ -2252,6 +2277,342 @@ pg_record_jsonl_close:
 .Ljl_close_return:
  ret
 .size pg_record_jsonl_close,.-pg_record_jsonl_close
+
+/* Keep only current-only identity facts after recovery. */
+.Ljl_retain_current:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ljl_retain_bad
+ mov r13,[rbx+32]
+ mov [r13+72],rax
+ mov r12,[rbx+16]
+.Ljl_retain_each:
+ test r12,r12
+ jz .Ljl_retain_done
+ test qword ptr [r12+24],1
+ jz .Ljl_retain_next
+ mov edi,1
+ call json_object_new_int@PLT
+ mov rdx,rax
+ mov rdi,[r13+72]
+ mov rsi,[r12+8]
+ call .Ljl_set
+ test eax,eax
+ jnz .Ljl_retain_bad
+.Ljl_retain_next:
+ mov r12,[r12]
+ jmp .Ljl_retain_each
+.Ljl_retain_done:
+ xor eax,eax
+ jmp .Ljl_retain_return
+.Ljl_retain_bad:
+ mov eax,1
+.Ljl_retain_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* Borrowed write -> file name, return 1=task,2=create,3=change,4=retire,0=other. */
+.Ljl_write_file:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ JGET rbx,type
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ljl_task]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_write_file_create
+ JGET rbx,value
+ JGET rax,id
+ mov ebx,1
+ jmp .Ljl_write_file_id
+.Ljl_write_file_create:
+ mov rdi,r13
+ lea rsi,[rip+.Ljl_create]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_write_file_change
+ JGET rbx,record
+ JGET rax,id
+ mov ebx,2
+ jmp .Ljl_write_file_id
+.Ljl_write_file_change:
+ mov rdi,r13
+ lea rsi,[rip+.Ljl_change]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_write_file_retire
+ JGET rbx,id
+ mov ebx,3
+ jmp .Ljl_write_file_id
+.Ljl_write_file_retire:
+ mov rdi,r13
+ lea rsi,[rip+.Ljl_retire]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_write_file_return
+ JGET rbx,id
+ mov ebx,4
+.Ljl_write_file_id:
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ mov rdx,rax
+ mov rdi,r12
+ xor esi,esi
+ cmp ebx,1
+ sete sil
+ call .Ljl_filename
+ mov eax,ebx
+.Ljl_write_file_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* Derive the final maintenance action for one batch file: 0 keep,1 replace,2 remove. */
+.Ljl_reclaim_action:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ xor ebp,ebp
+.Ljl_action_each:
+ mov rdi,[rbx+96]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ljl_action_done
+ mov rdi,[rbx+96]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ mov rsi,rsp
+ call .Ljl_write_file
+ test eax,eax
+ jz .Ljl_action_next
+ mov [rsp+64],eax
+ mov rdi,rsp
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ljl_action_next
+ cmp dword ptr [rsp+64],1
+ jne .Ljl_action_doc
+ JGET r14,value
+ JGET rax,state
+ JGET rax,status
+ mov rdi,rax
+ lea rsi,[rip+.Ljl_terminal]
+ call .Ljl_equal
+ lea ebp,[rax+rax]
+ jmp .Ljl_action_next
+.Ljl_action_doc:
+ mov rdi,[rbx+72]
+ mov rsi,r12
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Ljl_action_next
+ cmp dword ptr [rsp+64],4
+ je .Ljl_action_remove
+ cmp ebp,2
+ je .Ljl_action_next
+ JGET r14,content
+ JGET rax,kind
+ mov rdi,rax
+ lea rsi,[rip+.Ljl_base]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_action_next
+ mov ebp,1
+ jmp .Ljl_action_next
+.Ljl_action_remove:
+ mov ebp,2
+.Ljl_action_next:
+ inc r13
+ jmp .Ljl_action_each
+.Ljl_action_done:
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Called after adoption; failures retain the original sidecar for recovery. */
+.Ljl_reclaim_commit:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,152
+ mov rbx,rdi
+ cmp qword ptr [rbx+96],0
+ je .Ljl_commit_reclaim_return
+ xor r12d,r12d
+.Ljl_commit_facts:
+ mov rdi,[rbx+96]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ljl_commit_reclaim_flush
+ mov rdi,[rbx+96]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rsp]
+ call .Ljl_write_file
+ cmp eax,2
+ jne .Ljl_commit_facts_next
+ JGET r13,record
+ mov r14,rax
+ JGET rax,scope
+ JGET rax,kind
+ mov rdi,rax
+ lea rsi,[rip+.Ljl_conversation]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_commit_fact_add
+ JGET r14,history
+ mov rdi,rax
+ lea rsi,[rip+.Ljl_latest]
+ call .Ljl_equal
+ test eax,eax
+ jz .Ljl_commit_facts_next
+.Ljl_commit_fact_add:
+ mov edi,1
+ call json_object_new_int@PLT
+ mov rdx,rax
+ mov rdi,[rbx+72]
+ mov rsi,rsp
+ call .Ljl_set
+ test eax,eax
+ jnz .Ljl_commit_reclaim_free
+.Ljl_commit_facts_next:
+ inc r12
+ jmp .Ljl_commit_facts
+.Ljl_commit_reclaim_flush:
+ /* The acknowledged main marker was already fsynced when requested. */
+.Ljl_commit_reclaim_start:
+ xor r12d,r12d
+.Ljl_commit_reclaim_each:
+ mov rdi,[rbx+96]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ljl_commit_reclaim_free
+ mov rdi,[rbx+96]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,rsp
+ call .Ljl_write_file
+ test eax,eax
+ jz .Ljl_commit_reclaim_next
+ mov rdi,rbx
+ mov rsi,rsp
+ call .Ljl_reclaim_action
+ cmp eax,2
+ je .Ljl_commit_reclaim_remove
+ cmp eax,1
+ jne .Ljl_commit_reclaim_next
+ lea rdi,[rsp+64]
+ mov esi,80
+ lea rdx,[rip+.Ljl_reclaim_file]
+ mov rcx,rsp
+ xor eax,eax
+ call snprintf@PLT
+ mov edi,[rbx+48]
+ lea rsi,[rsp+64]
+ mov edx,0x80241
+ mov ecx,384
+ xor eax,eax
+ call openat@PLT
+ test eax,eax
+ js .Ljl_commit_reclaim_next
+ mov edi,eax
+ call close@PLT
+ test eax,eax
+ jnz .Ljl_commit_reclaim_next
+ xor r13d,r13d
+.Ljl_commit_reclaim_copy:
+ cmp r13,[rbx+88]
+ jae .Ljl_commit_reclaim_rename
+ imul r14,r13,24
+ add r14,[rbx+80]
+ mov rdi,[r14]
+ mov rsi,rsp
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ljl_commit_reclaim_copy_next
+ mov rdi,rbx
+ lea rsi,[rsp+64]
+ mov rdx,[r14+8]
+ mov rcx,[r14+16]
+ call .Ljl_append
+ test eax,eax
+ jnz .Ljl_commit_reclaim_next
+.Ljl_commit_reclaim_copy_next:
+ inc r13
+ jmp .Ljl_commit_reclaim_copy
+.Ljl_commit_reclaim_rename:
+ mov edi,[rbx+48]
+ lea rsi,[rsp+64]
+ mov edx,edi
+ mov rcx,rsp
+ call renameat@PLT
+ jmp .Ljl_commit_reclaim_next
+.Ljl_commit_reclaim_remove:
+ mov edi,[rbx+48]
+ mov rsi,rsp
+ xor edx,edx
+ call unlinkat@PLT
+.Ljl_commit_reclaim_next:
+ inc r12
+ jmp .Ljl_commit_reclaim_each
+.Ljl_commit_reclaim_free:
+ xor r12d,r12d
+.Ljl_commit_plan_free:
+ cmp r12,[rbx+88]
+ jae .Ljl_commit_plan_json
+ imul r13,r12,24
+ add r13,[rbx+80]
+ mov rdi,[r13]
+ call free@PLT
+ mov rdi,[r13+8]
+ call free@PLT
+ inc r12
+ jmp .Ljl_commit_plan_free
+.Ljl_commit_plan_json:
+ mov rdi,[rbx+80]
+ call free@PLT
+ mov rdi,[rbx+96]
+ call json_object_put@PLT
+ mov qword ptr [rbx+80],0
+ mov qword ptr [rbx+88],0
+ mov qword ptr [rbx+96],0
+.Ljl_commit_reclaim_return:
+ add rsp,152
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
 
 .section .rodata
 .Ljl_type: .asciz "type"

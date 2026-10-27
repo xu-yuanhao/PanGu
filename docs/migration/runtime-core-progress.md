@@ -78,3 +78,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 ## B01 JSONL与PanGu身份（2026-10-27）
 
 `record_jsonl.S`接通原生Storage/Session提交、task/doc sidecar和主提交标记、独占写租约、撕裂/未确认尾部恢复、终态任务和当前checkpoint恢复维护；平台C仅处理目录布局。Memory持久化屏障借用已解析copy的分离批次，默认内存路径保持原实现。Runtime O0/O2、JSONL ASan/UBSan、产品构建及独立上游行为对照通过；当前实际差异保留在核心TODO。PanGu使用自身数据协议与`.pangu`命名空间，提示词继承参考机制并适配PanGu身份与实际操作入口。
+
+## B01完整Session关闭与即时维护（2026-10-27）
+
+SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合验证通过：延迟内容关闭保存、混合批次、已接收事务在关闭中结算、已入队timer排空、失败关闭与版本迁移重开。JSONL在采纳后回收终态Task/current-only checkpoint，临时重写失败保持提交成功并由重开维护重试。验证与当前批次见核心TODO交接区。

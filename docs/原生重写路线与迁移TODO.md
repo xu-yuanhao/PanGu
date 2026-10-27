@@ -95,8 +95,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `storage/memory.ts`、`storage/jsonl/`、`storage/sqlite/`；`memory-storage`、`jsonl-storage`、`sqlite-storage`、`sqlite-migrations` 测试。
 
 - [x] 原生SQLite提供者接入Storage/Session提交：准备后事务持久化、确认后采纳、混合记录/文档跨进程重开、只读打开、过期写入者拒绝、失败锁存及损坏拒绝；持久化采用PanGu原生批次日志。
-- [x] 原生JSONL提供者接入Storage/Session：main marker与task/doc sidecar编码、准备后写入、确认后采纳、独占写租约、跨进程重开、撕裂/未确认尾部恢复及恢复时终态任务/当前checkpoint清理。
-- [ ] 在Storage接口下完成内存、JSONL与SQLite提供者，复用SQLite成熟库；维护PanGu自身的存储版本与原生日志。
+- [x] 原生JSONL提供者接入Storage/Session：main marker与task/doc sidecar编码、准备后写入、确认后采纳、独占写租约、跨进程重开、撕裂/未确认尾部恢复及提交后及恢复时终态任务/当前checkpoint清理，维护失败保留已提交事实并在恢复时重试。
+- [x] 在Storage接口下完成内存、JSONL与SQLite提供者，复用SQLite成熟库；维护PanGu自身的存储版本与原生日志。
 - [ ] 将 K03 的记录、查询、事务与版本迁移接入持久提供者；完成锁、尾部恢复、失败关闭与只读打开。
 - [ ] 验收：同一 Session 场景在各后端重开得到相同语义；完整批次、损坏/截断和 IO 失败有明确结果；PanGu存储版本、提交边界与重开后的逻辑事实可核对。
 
@@ -192,7 +192,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 现有Loop/Session、MiMo流、read/write/edit/bash及TUI纯逻辑已为手写汇编。已验证的实现和命令见 [当前实现记录](migration/runtime-core-progress.md)。K03–K08可复用这些实现；完整任务仍按各步骤全部验收条件判断。
 
-当前从B01开始，复用已有Session/事务实现，接入持久后端并完成重开调用链。基础核对随实际消费者完成。
+B01已接通持久提交与完整Session关闭重开链；当前推进B02的持久Task/Scheduler，K04剩余验收与新消费者集中核对。基础能力随实际消费者补齐。
 
 ## 移植方法来源
 
@@ -208,8 +208,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`storage/jsonl/storage.ts`（encodeCommit、recover、confirmRecord、readLines、planReclamations）、MemoryStorage.prepareCommit及Session提交调用链；`test/jsonl-storage.test.ts`与`testing/storage-conformance.ts`。本批fetch后Pi origin/main为`6c384aa30f619d7b28963f2bab24d8dacbe73cb6`，采用Storage路径无差异；Harness HEAD/origin/master均为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。Session观察采用`8b0caefc2260a28d2cec0a7ce3daef1d3de24776`。
-- 实际调用链与实现入口：`pg_records_commit`→`pg_record_jsonl_storage`→Memory完整准备/解析copy→sidecar追加→main marker→内存采纳/Session通知；`record_jsonl.S/h`恢复记录、历史、请求索引与当前checkpoint。`record_jsonl_posix.c`仅处理DIR/dirent/stat平台布局。SQLite与内存沿同一Storage契约。PanGu拥有自己的`.pangu`、身份与数据协议，参考对照比较各自公开查询结果。产品默认system自称PanGu；内置模板的身份/路径适配归K11。
-- 已运行命令/结果：Runtime O0/O2全套、产品构建`--output /tmp/pangu-jsonl/pangu`与G00通过；JSONL O0 ASan/UBSan专项通过（混合事务、重新exec、租约、撕裂/未确认尾部、部分写失败、终态任务sidecar、当前checkpoint回收后二次恢复、Document.copy与损坏拒绝）；`test_record_sqlite.py --jsonl`在Pi与PanGu独立存储上对照逻辑记录、提交序号、历史/当前文档、next ID通过。文档与格式检查通过。
-- 剩余行为差异或阻断：SQLite恢复成本随提交历史增长；JSONL当前在恢复时回收终态/current-only内容，运行中提交后的即时回收仍需接入。新后端与完整Durable事务/holds/缓存关闭组合、只读策略和存储版本的综合验收待完成，K04总项保持未完成。既有TUI Markdown/PTY失败由TUI修复；U05/U06接口在B02/B04联调。
-- 下一可运行交付物：完成B01持久后端与Durable Session/holds关闭重开组合，再沿B02接通持久Task/Scheduler→Generation/Tool→TUI执行链；其余Storage差异按所属用例集中补齐。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的JSONL `planReclamations/reclaimSidecars/recover`与Session `hold/close`，原生即时维护在采纳后执行；实际Session/Tx/holds/timer/缓存关闭路径接入SQLite和JSONL。B02已阅读`harness/scheduler.ts`的open/reserve/run/decide/commitState、`types.ts`的TaskDefinition/TaskState及其调用关系，下一批按`harness-tasks`、`harness-tasks-recovery`、`harness-sleep`成组移植。参考提交沿用前批固定Storage快照；Session观察采用`8b0caefc2260a28d2cec0a7ce3daef1d3de24776`。
+- 实际调用链与实现入口：`pg_durable_session_settle/close`→holds/timer/cache→SQLite或JSONL→重开恢复；JSONL marker采纳后回收终态Task/current-only checkpoint，失败留下原sidecar和可重试临时文件。控制体拥有current-only身份表及短期编码计划，close统一释放。`test_durable_storage.c`直接组合两后端与完整Session，覆盖延迟/混合/关闭竞合/入队timer/失败/版本迁移。
+- 已运行命令/结果：`build_test.py` Runtime O0/O2与独立Pi/PanGu存储行为对照通过；JSONL O0 ASan/UBSan专项及维护写失败恢复通过；完整Session组合O0 ASan/UBSan的10场景通过，加入迁移后O2 ASan/UBSan的12场景通过；产品构建`--output /tmp/pangu-durable-store/pangu`通过。共享G00仅报告TUI并行新增的`tui_safe.S/h`、`tui_tool.S/h`未登记，本批保留其工作，核心独立提交树G00检查通过。
+- 剩余行为差异或阻断：SQLite重开成本随批次历史增长；K04完整跨后端覆盖与只读/版本最终核对保留在其验收项。B02需要持久Task的定义解析、phase推进、checkpoint、sleep/wake、关闭与中断恢复接入实际调度；TUI未交接文件保持原状。
+- 下一可运行交付物：B02持久Task从pending保存为running后执行phase，提交checkpoint并在退出重开后继续，结合sleep/wake与终态完成实际调用链，再接Generation/Tool。

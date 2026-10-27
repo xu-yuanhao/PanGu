@@ -1613,7 +1613,7 @@
         "json-c C ABI",
         "POSIX filesystem C ABI"
       ],
-      "role": "PanGu JSONL main-marker and sidecar commit/recovery, single writer lease, torn/unconfirmed tail truncation, terminal/current-only checkpoint cleanup on recovery; platform C owns directory layouts",
+      "role": "PanGu JSONL main-marker and sidecar commit/recovery, single writer lease, torn/unconfirmed tails, post-adoption terminal/current-only maintenance with recovery retry; platform C owns directory layouts",
       "exports": [
         "pg_record_jsonl_open",
         "pg_record_jsonl_close",

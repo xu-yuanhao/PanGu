@@ -10,13 +10,14 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <json-c/json.h>
-_Static_assert(sizeof(pg_record_jsonl)==72&&offsetof(pg_record_jsonl,directory)==48,"JSONL ABI");
+_Static_assert(sizeof(pg_record_jsonl)==104&&offsetof(pg_record_jsonl,directory)==48,"JSONL ABI");
 static const char *first="[{\"type\":\"conversation\",\"value\":{\"id\":1}},{\"type\":\"entry\",\"value\":{\"id\":2,\"conversationId\":1,\"kind\":\"test\",\"head\":2}},{\"type\":\"task\",\"value\":{\"id\":3,\"kind\":\"test.task\",\"version\":1,\"input\":null,\"background\":false,\"abortRequested\":false,\"conversationId\":1,\"owner\":{\"kind\":\"conversation\",\"conversationId\":1},\"state\":{\"status\":\"pending\",\"checkpoint\":{\"x\":1}}}},{\"type\":\"submission\",\"value\":{\"id\":4,\"conversationId\":1,\"requestId\":\"request\",\"status\":\"queued\"}},{\"type\":\"document.create\",\"record\":{\"id\":5,\"kind\":\"test\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"rewindable\",\"fork\":\"asOf\"},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]";
 static const char *second="[{\"type\":\"entry\",\"value\":{\"id\":6,\"conversationId\":1,\"kind\":\"test\",\"head\":6}},{\"type\":\"document.change\",\"id\":5,\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":2}}}]";
 static char path[512];
 static unsigned calls,fail_write;
 ssize_t __real_write(int,const void *,size_t);
 ssize_t __wrap_write(int fd,const void *data,size_t size){
+ if(fail_write>=100){if(--fail_write==100){fail_write=0;errno=EIO;return -1;}return __real_write(fd,data,size);}
  if(fail_write&&!--fail_write){errno=EIO;return -1;}
  if(fail_write&&size>1)size/=2;
  return __real_write(fd,data,size);
@@ -69,12 +70,12 @@ int main(int argc,char **argv){
  assert(commit(&s,"[{\"type\":\"task\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test.task\",\"state\":{\"status\":\"pending\",\"checkpoint\":{\"x\":9}}}}]",&seq)==PG_MEMORY_STORAGE&&!seq&&s.poisoned&&calls==before&&s.memory.next_sequence==3);
  assert(!pg_record_jsonl_close(&s));assert(!pg_record_jsonl_open(&s,path,0));check(&s);assert(!pg_record_jsonl_close(&s));
  /* A final terminal task can be recovered after its live sidecar is reclaimed. */
- assert(!pg_record_jsonl_open(&s,path,0));assert(!commit(&s,"[{\"type\":\"task\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test.task\",\"state\":{\"status\":\"terminal\"}}}]",&seq)&&seq==3);assert(!pg_record_jsonl_close(&s));remove_file("task-3.jsonl");
+ assert(!pg_record_jsonl_open(&s,path,0));assert(!commit(&s,"[{\"type\":\"task\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"test.task\",\"state\":{\"status\":\"terminal\"}}}]",&seq)&&seq==3);assert(!pg_record_jsonl_close(&s));{char gone[600];snprintf(gone,sizeof(gone),"%s/task-3.jsonl",path);assert(access(gone,F_OK)<0&&errno==ENOENT);}
  assert(!pg_record_jsonl_open(&s,path,0));struct json_object *v=0;assert(!pg_record_memory_read(&s.memory,PG_TABLE_TASK,3,&v));json_object_put(v);assert(!pg_record_jsonl_close(&s));
  /* Current-only checkpoints compact on recovery, and remain readable on the next recovery. */
  assert(!pg_record_jsonl_open(&s,path,1));
  assert(!commit(&s,"[{\"type\":\"document.create\",\"record\":{\"id\":8,\"kind\":\"session-checkpoint\",\"scope\":{\"kind\":\"session\"}},\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":1}}}]",&seq)&&seq==4);
- assert(!commit(&s,"[{\"type\":\"document.change\",\"id\":8,\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":9}}}]",&seq)&&seq==5);assert(!pg_record_jsonl_close(&s));
+ fail_write=103;assert(!commit(&s,"[{\"type\":\"document.change\",\"id\":8,\"content\":{\"kind\":\"base\",\"version\":1,\"value\":{\"x\":9}}}]",&seq)&&seq==5&&!s.poisoned);assert(!pg_record_jsonl_close(&s));
  for(unsigned i=0;i<2;i++){assert(!pg_record_jsonl_open(&s,path,1));assert(!pg_record_memory_document(&s.memory,8,UINT64_MAX,&v));assert(json_object_get_int(json_object_object_get(json_object_object_get(v,"value"),"x"))==9);json_object_put(v);assert(!pg_record_jsonl_close(&s));}
  char compact[600];snprintf(compact,sizeof(compact),"%s/doc-8.jsonl",path);FILE *f=fopen(compact,"r");assert(f);char *line=0;size_t cap=0;assert(getline(&line,&cap,f)>0&&getline(&line,&cap,f)<0);free(line);assert(!fclose(f));
  assert(!pg_record_jsonl_open(&s,path,0));
