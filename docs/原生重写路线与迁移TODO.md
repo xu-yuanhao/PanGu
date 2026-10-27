@@ -596,3 +596,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 手写JSON Watch的start/advance/next/finish与stop/cancel/end/end_after_delivery/release。原生cooperative continuation以next取出一帧、finish确认异步消费；start不内联调用用户。保持acquisition/latest-delivered value区别、单帧ops身份、多帧PendingOps折叠/overflow root、retired累积与最新context；endAfterDelivery等pending/在途帧完成，终止立即丢pending/source refs，但在途帧保留到finish，既有终止优先于迟到listener错误。
 - 原生正常/慢消费/退休/null/单帧身份/多种结束与report重入stop，10001-op单帧及溢出根替换；6个交付分配故障可重试，19个advance分配/复制/插入故障保留原pending。实际执行完整Chord Watch/WatchLifecycle及真实PendingOps，与native连续慢消费的两次帧、context、值、退休和最终结束逐项一致。
 - 下一行为：连接Session watch获取/advance/close、Task owner结束后的待交付与close订阅保留；当前JSON Watch引擎可独立运行，整体watch接口继续按完整组合验收。
+
+### K03 Session Watch组合与Task末尾交付
+
+- 固定Pi 8b0caef watchDoc/#observeDocument/createWatch/endWatch/#notifyClose及Chord Watch.endAfterDelivery，读取Task终态最后退休帧与关闭/监听失败优先级用例。Pi origin保持6c384aa，Harness保持22ddee37。
+- [x] document_reader.S/h新增pg_durable_watch，复用observe的准入/取消/guarded load，组合扩展source与既有Watch引擎。durable_session.S/h维护私有watch标记，内部queue准备失败仍为内部观察失败；Task terminal仅取消commit订阅并释放pin，保留close订阅直到pending/in-flight完成；Session close立即终止、丢pending。停止/结束清除observer owned状态及借用pin provider context，消费中source_release返回WAIT。既有同步observer ABI保持。
+- 原生12组真实Session提交通知、慢消费、stop/cancel/listener error/健康与失败close、read-only/missing/晚获取取消，以及Task终态事务自动扫描/退休后的before-start drain、close-drop、in-flight末尾帧和listener-error；24个获取分配/clone/registry故障清理。source probe组合实际#observeDocument与完整Chord Watch，四组Task末尾交付/close/在途错误的订阅计数、pin、帧与结束原因一致。
+- 下一行为：补齐获取后取消服务与整机host的Watch轮询组合，核对完整观察验收及K03剩余公开API；已有Session Watch组合可运行。

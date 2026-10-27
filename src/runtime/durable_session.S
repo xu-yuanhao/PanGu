@@ -3972,7 +3972,14 @@ pg_document_observer_release:
  mov rax,[rbx+40]
  mov rax,[rax]
  mov esi,[rax+52]
+ cmp dword ptr [rbx+96],2
+ jne .Lobserver_close_sync
+ lea rdi,[rbx+104]
+ call pg_document_watch_end
+ jmp .Lobserver_close_done
+.Lobserver_close_sync:
  call .Lobserver_end
+.Lobserver_close_done:
  xor eax,eax
  pop rbx
  ret
@@ -4207,6 +4214,8 @@ pg_document_observer_open:
  call [rbx+56]
  test eax,eax
  jz .Lobserver_commit_delivered
+ cmp dword ptr [rbx+96],2
+ je .Lobserver_commit_error
  mov [rsp+168],eax
  mov rdi,rbx
  mov esi,eax
@@ -4252,6 +4261,24 @@ pg_document_observer_open:
 .Lobserver_commit_owner:
  cmp dword ptr [rsp+144],0
  je .Lobserver_commit_cleanup
+ cmp dword ptr [rbx+96],2
+ jne .Lobserver_owner_sync
+ mov rdi,[rbx+40]
+ xor esi,esi
+ lea rdx,[rip+.Lobserver_commit]
+ mov rcx,rbx
+ call pg_session_unlisten
+ mov rsi,[rbx+88]
+ mov qword ptr [rbx+88],0
+ test rsi,rsi
+ jz .Lobserver_owner_watch_end
+ mov rdi,[rbx+48]
+ call [rbx+80]
+.Lobserver_owner_watch_end:
+ lea rdi,[rbx+104]
+ call pg_document_watch_end_after_delivery
+ jmp .Lobserver_commit_cleanup
+.Lobserver_owner_sync:
  mov rdi,rbx
  xor esi,esi
  call .Lobserver_end
@@ -4804,4 +4831,95 @@ pg_document_watch_release:
 .Lwatch_release_end:
  ret
 .size pg_document_watch_release,.-pg_document_watch_release
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_watch_source_advance
+.hidden pg_document_watch_source_advance
+.type pg_document_watch_source_advance,@function
+pg_document_watch_source_advance:
+ add rdi,104
+ jmp pg_document_watch_advance
+.size pg_document_watch_source_advance,.-pg_document_watch_source_advance
+.globl pg_document_watch_source_end
+.hidden pg_document_watch_source_end
+.type pg_document_watch_source_end,@function
+pg_document_watch_source_end:
+ sub rsp,8
+ add rdi,104
+ call pg_document_watch_end
+ xor eax,eax
+ add rsp,8
+ ret
+.size pg_document_watch_source_end,.-pg_document_watch_source_end
+.globl pg_document_watch_source_pin
+.hidden pg_document_watch_source_pin
+.type pg_document_watch_source_pin,@function
+pg_document_watch_source_pin:
+ mov rax,[rdi+272]
+ mov rdi,[rdi+264]
+ jmp rax
+.size pg_document_watch_source_pin,.-pg_document_watch_source_pin
+.globl pg_document_watch_source_unpin
+.hidden pg_document_watch_source_unpin
+.type pg_document_watch_source_unpin,@function
+pg_document_watch_source_unpin:
+ mov rax,[rdi+280]
+ mov rdi,[rdi+264]
+ jmp rax
+.size pg_document_watch_source_unpin,.-pg_document_watch_source_unpin
+.globl pg_document_watch_source_detach
+.hidden pg_document_watch_source_detach
+.type pg_document_watch_source_detach,@function
+pg_document_watch_source_detach:
+ push rbx
+ mov rbx,rdi
+ call pg_document_observer_detach
+ mov rdi,rbx
+ call pg_document_observation_close
+ pxor xmm0,xmm0
+ movups [rbx+48],xmm0
+ movups [rbx+64],xmm0
+ mov qword ptr [rbx+80],0
+ movups [rbx+264],xmm0
+ mov qword ptr [rbx+280],0
+ pop rbx
+ ret
+.size pg_document_watch_source_detach,.-pg_document_watch_source_detach
+.globl pg_document_watch_source_report
+.hidden pg_document_watch_source_report
+.type pg_document_watch_source_report,@function
+pg_document_watch_source_report:
+ jmp .Lobserver_report
+.size pg_document_watch_source_report,.-pg_document_watch_source_report
+.globl pg_document_watch_source_release
+.type pg_document_watch_source_release,@function
+pg_document_watch_source_release:
+ mov eax,3
+ test rdi,rdi
+ jz .Lwatch_source_release_end
+ cmp dword ptr [rdi+100],0
+ jne .Lwatch_source_release_end
+ mov rax,[rdi+40]
+ test rax,rax
+ jz .Lwatch_source_release_ready
+ cmp dword ptr [rax+48],0
+ jne .Lwatch_source_release_invalid
+.Lwatch_source_release_ready:
+ push rbx
+ mov rbx,rdi
+ add rdi,104
+ call pg_document_watch_release
+ test eax,eax
+ jnz .Lwatch_source_release_done
+ mov rdi,rbx
+ call pg_document_observer_release
+.Lwatch_source_release_done:
+ pop rbx
+ ret
+.Lwatch_source_release_invalid:
+ mov eax,3
+.Lwatch_source_release_end:
+ ret
+.size pg_document_watch_source_release,.-pg_document_watch_source_release
 .section .note.GNU-stack,"",@progbits

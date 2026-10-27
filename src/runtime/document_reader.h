@@ -46,4 +46,16 @@ typedef struct {
    Request and address expire on return; definition can stay cached. Observer
    starts zeroed/released; success follows observer_open ownership/lifetime. */
 int pg_durable_observe(pg_durable_session *,const pg_document_observe_request *,pg_document_observer *);
+typedef struct {
+ const pg_document_definition *definition;
+ const pg_document_address *address;
+ pg_session_listeners *listeners;
+ const pg_document_watch_pins *pins;
+ void *context;
+ int (*cancelled)(void *);
+} pg_document_watch_request;
+/* Acquire a Watch with the same admission/cancellation as observe. Pin service
+   is copied; its context is borrowed until termination. Report uses Session
+   listeners. Source starts zeroed/released; drive source.watch outside adopt. */
+int pg_durable_watch(pg_durable_session *,const pg_document_watch_request *,pg_document_watch_source *);
 #endif

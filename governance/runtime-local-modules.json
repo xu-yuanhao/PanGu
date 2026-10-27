@@ -1303,7 +1303,8 @@
         "pg_document_watch_cancel",
         "pg_document_watch_end",
         "pg_document_watch_end_after_delivery",
-        "pg_document_watch_release"
+        "pg_document_watch_release",
+        "pg_document_watch_source_release"
       ],
       "reference_basis": [
         {
@@ -1406,6 +1407,19 @@
             "packages/chord/test/watch.test.ts",
             "packages/durable/test/session-watches.test.ts"
           ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts",
+            "packages/chord/src/watch.ts"
+          ],
+          "semantics": "#observeDocument/endWatch owner terminal unsubscribes commit/unpins but retains close subscription until Watch.endAfterDelivery finishes pending/in-flight frames; Session close terminates immediately and drops pending; listener failure wins before final delivery, internal Watch preparation failure remains an internal observer error; private observer tag identifies the explicit extended source without changing the synchronous observer layout",
+          "tests_to_read": [
+            "packages/durable/test/session-watches.test.ts",
+            "packages/chord/test/watch.test.ts"
+          ]
         }
       ]
     },
@@ -1425,7 +1439,8 @@
       "exports": [
         "pg_durable_snapshot",
         "pg_durable_snapshot_as_of",
-        "pg_durable_observe"
+        "pg_durable_observe",
+        "pg_durable_watch"
       ],
       "reference_basis": [
         {
@@ -1451,6 +1466,18 @@
           "tests_to_read": [
             "packages/durable/test/session-observers.test.ts",
             "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "watchDoc uses the same serialized/cancellable attachment as observeDoc, installs the shared Watch engine and injected pin services; native zeroed extended source owns both observation and Watch, termination drops source state and borrowed provider context while retaining in-flight consumer ownership",
+          "tests_to_read": [
+            "packages/durable/test/session-watches.test.ts",
+            "packages/durable/test/session-observers.test.ts"
           ]
         }
       ]

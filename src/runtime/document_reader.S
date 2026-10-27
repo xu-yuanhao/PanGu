@@ -461,3 +461,93 @@ pg_durable_snapshot_as_of:
 .Lreader_id: .asciz "id"
 .Lreader_conversation: .asciz "conversationId"
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_watch
+.type pg_durable_watch,@function
+pg_durable_watch:
+ push rbx
+ push r12
+ push r13
+ sub rsp,112
+ mov rbx,rdx
+ mov r12,rdi
+ mov r13,rsi
+ mov eax,1
+ test rbx,rbx
+ jz .Ldurable_watch_end
+ test r13,r13
+ jz .Ldurable_watch_end
+ cmp dword ptr [rbx+236],0
+ jne .Ldurable_watch_end
+ cmp dword ptr [rbx+256],0
+ jne .Ldurable_watch_end
+ mov rax,[r13+24]
+ test rax,rax
+ jz .Ldurable_watch_end
+ cmp qword ptr [rax+8],0
+ je .Ldurable_watch_end
+ cmp qword ptr [rax+16],0
+ je .Ldurable_watch_end
+ mov rcx,[rax]
+ mov [rbx+264],rcx
+ mov rcx,[rax+8]
+ mov [rbx+272],rcx
+ mov rcx,[rax+16]
+ mov [rbx+280],rcx
+ mov [rsp],rbx
+ lea rax,[rip+pg_document_watch_source_advance]
+ mov [rsp+8],rax
+ lea rax,[rip+pg_document_watch_source_end]
+ mov [rsp+16],rax
+ lea rax,[rip+pg_document_watch_source_pin]
+ mov [rsp+24],rax
+ lea rax,[rip+pg_document_watch_source_unpin]
+ mov [rsp+32],rax
+ mov rax,[r13]
+ mov [rsp+40],rax
+ mov rax,[r13+8]
+ mov [rsp+48],rax
+ mov rax,[r13+16]
+ mov [rsp+56],rax
+ mov rax,rsp
+ mov [rsp+64],rax
+ mov rax,[r13+32]
+ mov [rsp+72],rax
+ mov rax,[r13+40]
+ mov [rsp+80],rax
+ mov rdi,r12
+ lea rsi,[rsp+40]
+ mov rdx,rbx
+ call pg_durable_observe
+ test eax,eax
+ jnz .Ldurable_watch_clear_pins
+ mov [rsp+88],rbx
+ lea rax,[rip+pg_document_watch_source_detach]
+ mov [rsp+96],rax
+ lea rax,[rip+pg_document_watch_source_report]
+ mov [rsp+104],rax
+ lea rdi,[rbx+104]
+ mov rsi,[rbx+8]
+ lea rdx,[rsp+88]
+ call pg_document_watch_open@PLT
+ test eax,eax
+ jnz .Ldurable_watch_cleanup
+ mov dword ptr [rbx+96],2
+ jmp .Ldurable_watch_end
+.Ldurable_watch_cleanup:
+ mov rdi,rbx
+ call pg_document_observer_release@PLT
+ mov eax,3
+.Ldurable_watch_clear_pins:
+ pxor xmm0,xmm0
+ movups [rbx+264],xmm0
+ mov qword ptr [rbx+280],0
+.Ldurable_watch_end:
+ add rsp,112
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_watch,.-pg_durable_watch
+.section .note.GNU-stack,"",@progbits

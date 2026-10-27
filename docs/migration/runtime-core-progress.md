@@ -592,3 +592,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 手写cooperative start/next/finish continuation，单帧在途、busy期间PendingOps折叠；单帧ops身份、overflow root、退休累积、最新context、初始/最新delivered value分开。stop/cancel/source失败立即清pending/source并detach一次，在途帧保留到finish；ending等待交付，listener错误报告与先有终止原因保持。新增接口与pending依赖登记，公开旧ABI保持。
 - 实际验证：正常与慢消费、退休/null/lone身份、多种终止与report重入stop、10001-op单帧及溢出根替换；6个交付分配故障安全重试，19个advance分配/复制/插入故障保持原pending。直接执行完整Pi Chord Watch/WatchLifecycle和实际PendingOps，与native连续慢消费两帧/值/context/retired/end逐项一致。
 - 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan和来源差异通过；共享/隔离核心G00/Assembly、隔离产品构建通过。同一实施Agent自审6路径候选摘要（本记录加入前）502d33526d1713479f56885afc8eb3187c05a54c93a07739fd5e5ba51783cfa2；隔离核心树50faeba21a6be2566516d8562562d93cfedf4f95。结论为独立JSON Watch引擎本地通过；Session watch接线/Task owner末尾交付与close订阅保留继续，K03全量未完成。TUI工作保留。
+
+## K03 Session Watch获取、提交与Task末尾交付
+
+- 固定Pi 8b0caef watchDoc/#observeDocument/createWatch/endWatch/#notifyClose与Chord Watch.endAfterDelivery；fetch后Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写Session Watch扩展source复用同步observe的guarded/cancellable获取及JSON Watch引擎；私有tag保持基础observer ABI。Task终态取消commit订阅/释放pin，保留close订阅直至pending/in-flight结束；Session关闭立即终止并丢pending。终止清除owned observer状态与pin provider context，source_release等消费完成，Watch queue准备错误走内部观察失败。
+- 实际验证：12组真实Session普通提交/慢消费/stop/cancel/listener error/健康及失败close、read-only/missing/晚取消，Task终态同批扫描自动退休后的before-start drain、Session close-drop、in-flight末尾帧与listener-error；24个获取allocation/clone/registry故障回滚。初始Task测试漏传现有接口所要求的scan服务，提交准入拒绝；补入真实MemoryStorage scan并使用自动退休后全部通过，未将初次拒绝记为通过。
+- source probe组合实际上游#observeDocument与完整Chord Watch，四组Task末尾交付/close/在途错误的commit/close订阅、pin、退休帧、值和结束原因一致。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享/隔离核心G00/Assembly及隔离产品构建通过。
+- 同一实施Agent自审8路径候选摘要（本记录加入前）fe0a8dc6c778420bdb27cbd2f92e3e902d5b5efac9ecead8c821beb02fe9f32b；隔离核心树27a442155f694dd67eb3f1a1102af590881101cd。结论为Session Watch组合本地通过；获取后取消服务及整机host Watch轮询继续，K03全量未完成。TUI工作保留。

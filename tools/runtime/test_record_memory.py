@@ -813,6 +813,19 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     finally:assert not native.pg_document_watch_release(watch)
     print('PASS: native cooperative Watch delivery matches actual Pi Chord Watch folding, busy continuation, context, retirement, delivered value and endAfterDelivery')
 
+def session_watch_owner_source():
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776'
+    session=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/durable/src/session/session.ts'],text=True)
+    watch=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/chord/src/watch.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {pathToFileURL} from 'node:url';const {session,watch}=JSON.parse(readFileSync(0,'utf8')),{PendingOps}=await import(pathToFileURL(process.argv[1]));const withoutAbortSignal=c=>c,NO_OPERATIONS=[];function checkRecordScope(){}function checkRecordVersion(){}function contained(fn,onError){try{fn()}catch(e){onError(e)}}const Watch=eval('(()=>{'+stripTypeScriptTypes(watch.slice(watch.indexOf('/**')).replaceAll('export ',''))+';return Watch})()');const a=session.indexOf('\n\t#observeDocument<'),b=session.indexOf('\n\tasync #loadDocument',a),c=session.indexOf('function atAddress('),d=session.indexOf('\nfunction cancellationError',c),e=session.indexOf('\n\t#notifyClose():'),f=session.indexOf('\n\t/**',e),atAddress=eval('('+stripTypeScriptTypes(session.slice(c,d))+')');const Probe=eval('('+stripTypeScriptTypes(`class Probe{#failure;#documentSweep;#holdTimer;commits=new Set();#closeListeners=new Set();pins=0;unpins=0;reports=0;watch;record={id:3,kind:'taskwatch',scope:{kind:'task',taskId:100}};constructor(){this.watch=this.#observeDocument({}, {addressId:'a',record:this.record,storedVersion:1,valueVersion:1,tracker:{value:{text:'task'}}},(value,detach,report)=>new Watch(value,detach,report),watch=>watch.endAfterDelivery())}#pinDocument(){this.pins++;let pinned=true;return ()=>{if(pinned){pinned=false;this.unpins++}}}observeCommits(fn){this.commits.add(fn);return ()=>this.commits.delete(fn)}subscribeClose(fn){this.#closeListeners.add(fn);return ()=>this.#closeListeners.delete(fn)}report(){this.reports++}publish(changes){for(const fn of [...this.commits])fn({changes},{})}close(){this.#notifyClose()}state(){return {commits:this.commits.size,closes:this.#closeListeners.size,pins:this.pins,unpins:this.unpins}}`+session.slice(a,b)+session.slice(e,f)+'}')+')');const out=[];for(let mode=0;mode<4;mode++){const p=new Probe(),frames=[];let resolve,reject;const gate=new Promise((yes,no)=>{resolve=yes;reject=no});if(mode>=2){p.watch.start(async change=>{frames.push(structuredClone(change));if(frames.length===1)await gate});p.publish([{type:'document',record:p.record,version:1,value:{text:'taska'},ops:[['a',['text'],'a']]}]);await new Promise(r=>setImmediate(r))}p.publish([{type:'task',value:{id:100,state:{status:'terminal'}}},{type:'document',record:p.record,value:null,ops:[]}]);const pending=p.state();if(mode===0)p.watch.start(async change=>{frames.push(structuredClone(change))});if(mode===1)p.close();if(mode===2)resolve();if(mode===3)reject(Error('listener'));const end=await p.watch.closed;out.push({pending,final:p.state(),reason:end.reason,frames:frames.map(x=>x.retired),value:p.watch.value.text,reports:p.reports})}console.log(JSON.stringify(out));
+'''
+    pending=ROOT/'references/pi/packages/chord/src/delta/pending.ts'
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(pending)],input=json.dumps(dict(session=session,watch=watch)),text=True,capture_output=True,check=True,timeout=30).stdout)
+    expected=[dict(pending=dict(commits=0,closes=1,pins=1,unpins=1),final=dict(commits=0,closes=0,pins=1,unpins=1),reason='listener_error' if mode==3 else 'ended',frames=[[True],[],[False,True],[False]][mode],value='taska' if mode>=2 else 'task',reports=int(mode==3)) for mode in range(4)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi Session observeDocument + Chord Watch match native terminal-Task drain, close subscription retention, Session-close drop and in-flight listener-error precedence')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1110,5 +1123,6 @@ def main():
         observer_pin_source()
         observer_attach_source()
         watch_delivery_source(native,library)
+        session_watch_owner_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

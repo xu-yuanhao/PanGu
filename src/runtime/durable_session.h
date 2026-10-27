@@ -333,4 +333,12 @@ void pg_document_watch_cancel(pg_document_watch *);
 void pg_document_watch_end(pg_document_watch *,int failure);
 void pg_document_watch_end_after_delivery(pg_document_watch *);
 int pg_document_watch_release(pg_document_watch *);
+typedef struct {void *context;int (*pin)(void *,uint64_t);void (*unpin)(void *,uint64_t);} pg_document_watch_pins;
+typedef struct {pg_document_observer observer;pg_document_watch watch;pg_document_watch_pins pins;} pg_document_watch_source;
+/* source.watch uses the cooperative Watch API. The source keeps only its close
+   subscription after terminal Task publication until pending delivery ends.
+   stop/cancel/close release observer state/pins immediately; source storage and
+   listener registry remain caller-owned through source_release. Returns WAIT
+   for an in-flight consumer, INVALID during registry/source callbacks. */
+int pg_document_watch_source_release(pg_document_watch_source *);
 #endif
