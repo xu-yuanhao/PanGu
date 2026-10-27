@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Harness/Conversation submit、harness/submissions.ts、inbox边界与原生现有Inputs服务；使用现有harness-host-inputs/inbox/requestId行为覆盖。Pi远端核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：产品绑定 `pg_tui_runtime_inputs(runtime_ops)` → 独立 `pg_inputs_ops`/`tui_inputs_ops` → Durable Client/Inputs。typed input/write、steer/followUp、按ID回执、会话内升序分页与撤回复用持久提交；空闲输入接通run_started和Scheduler，运行中的队列保持当前root与取消状态；已结算requestId重复仅返回原ID。
-- 验证：输入操作表接入真实DeepSeek，在SQLite/JSONL完成空闲提交→follow-up排队→状态/分页/跨会话拒绝/撤回→read工具→回答/follow-up→重开。最终去重与typed write边界、ASan/UBSan通过。Runtime整批回归及隔离产品构建通过，最终边界修正另跑受影响专项。
-- 接口与自审：公共 `client.h` 新增独立48字节Inputs操作表，TUI头提供别名和可选getter。现有pg_client、TUI ops、bridge布局保持；getter仅在当前前台binding有效，操作表借用至客户端暂停，JSON结果独立拥有/显式release。核心逻辑手写Assembly，C为产品绑定；模块exports登记同步，G00/Assembly核对。
-- 剩余与下一交付物：TUI U06可经新getter接入输入队列交互；本批提供Runtime操作，实际控件由TUI线完成。K10/K13继续会话/任务/Live/usage查询操作，K07/K09按原覆盖表完成富partial、工具环境与hooks及工具级executionMode。并行TUI工作保留原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 resource-loader.ts discoverSystemPromptFile/discoverAppendSystemPromptFile/loadProjectContextFiles/loadContextFileFromDir，以及 system-prompt.ts。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`；本批采用用户/项目资源优先级。
+- 实际调用链：产品组合打开用户资源的只读完整文件服务 → Assembly prompt组装 → Generation保存systemPrompt → 模型请求/恢复。项目`.pangu/SYSTEM.md`和`APPEND_SYSTEM.md`分别覆盖用户同名文件；用户AGENTS先于本地项目指令，每层按既有override/AGENTS/CLAUDE候选顺序选一个。用户资源默认`~/.pangu/agent`，`PANGU_AGENT_DIR`可指定位置。
+- 验证：prompt专项ASan/UBSan核对项目覆盖、用户fallback、两层指令顺序、BOM与失败清空；隔离产品构建、G00/Assembly通过。真实TUI/DeepSeek核对用户和项目标记、关闭重开、独立工作区fallback及持久systemPrompt；以上真实TUI验证和Runtime整批回归均通过。
+- 接口与自审：`pg_prompt_workspace_source`扩展为88字节，尾部借用user_files/context/probe/directory；prompt与直接消费者同步。用户目录打开/探测/关闭为C平台接线，选择顺序及拼接为Assembly；资源只读服务仅借用到prompt返回，当前有界prompt预算保持。来源与模块职责登记同步。
+- 剩余与下一交付物：K11继续祖先目录/worktree指令继承、配置、skills/templates/刷新和MCP等原覆盖行为；K10/K13继续实际查询操作。Inputs表已提供，TUI交互由并行线接入；其工作保留原位。

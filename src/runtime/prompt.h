@@ -14,9 +14,14 @@ typedef struct {
  int (*probe)(void *,const char *path);
  const pg_tool_registry *tools;
  pg_slice workspace;
+ const pg_tools *user_files;
+ void *user_context;
+ int (*user_probe)(void *,const char *path);
+ pg_slice user_directory;
 } pg_prompt_workspace_source;
 /* Pi coding sections: default/custom prefix, declared tools/rules, addendum,
-   first context candidate and cwd. Owns no source resources; output <4096.
+   user/project context candidates and cwd. Project SYSTEM/APPEND overrides
+   the corresponding user resource; user instructions precede project ones. Owns no source resources; output <4096.
    Failure clears output/size. Calls are serialized with the file service. */
 int pg_prompt_workspace(const pg_prompt_workspace_source *,char *,size_t,size_t *);
 #endif

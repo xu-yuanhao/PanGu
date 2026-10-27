@@ -184,6 +184,7 @@ pg_prompt_workspace:
  xor r14d,r14d
  mov qword ptr [rbp+4112],0
  mov qword ptr [rbp+4128],0
+ mov qword ptr [rbp+4160],0
  test rcx,rcx
  jz .Lpw_invalid
  mov qword ptr [rcx],0
@@ -206,7 +207,14 @@ pg_prompt_workspace:
  lea rdi,[rip+.Lpw_system_path]
  call .Lpw_read
  cmp eax,1
+ jne .Lpw_system_selected
+ mov qword ptr [rbp+4160],1
+ lea rdi,[rip+.Lpw_user_system]
+ call .Lpw_read
+ mov qword ptr [rbp+4160],0
+ cmp eax,1
  je .Lpw_default
+.Lpw_system_selected:
  test eax,eax
  jnz .Lpw_fail
  mov rdi,[rbp+4136]
@@ -300,10 +308,18 @@ pg_prompt_workspace:
  test eax,eax
  jnz .Lpw_fail
 .Lpw_addendum:
+ mov qword ptr [rbp+4160],0
  lea rdi,[rip+.Lpw_append_path]
  call .Lpw_read
  cmp eax,1
+ jne .Lpw_addendum_selected
+ mov qword ptr [rbp+4160],1
+ lea rdi,[rip+.Lpw_user_append]
+ call .Lpw_read
+ mov qword ptr [rbp+4160],0
+ cmp eax,1
  je .Lpw_context_begin
+.Lpw_addendum_selected:
  test eax,eax
  jnz .Lpw_fail
  mov rax,[rbp+4136]
@@ -322,11 +338,13 @@ pg_prompt_workspace:
  test eax,eax
  jnz .Lpw_fail
 .Lpw_context_begin:
+ mov qword ptr [rbp+4160],1
+.Lpw_context_pass:
  mov qword ptr [rbp+4120],0
 .Lpw_context:
  mov rcx,[rbp+4120]
  cmp ecx,5
- jae .Lpw_cwd
+ jae .Lpw_context_done
  lea rax,[rip+.Lpw_context_names]
  mov rdi,[rax+rcx*8]
  call .Lpw_read
@@ -338,6 +356,20 @@ pg_prompt_workspace:
  call .Lpw_append
  test eax,eax
  jnz .Lpw_fail
+ cmp qword ptr [rbp+4160],0
+ je .Lpw_context_label
+ mov rdi,[rbx+72]
+ mov rsi,[rbx+80]
+ test rsi,rsi
+ jz .Lpw_context_label
+ call .Lpw_append_slice
+ test eax,eax
+ jnz .Lpw_fail
+ lea rdi,[rip+.Lpw_slash]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_fail
+.Lpw_context_label:
  mov rdi,[rbp+4104]
  call .Lpw_append
  test eax,eax
@@ -354,10 +386,15 @@ pg_prompt_workspace:
  call .Lpw_append
  test eax,eax
  jnz .Lpw_fail
- jmp .Lpw_cwd
+ jmp .Lpw_context_done
 .Lpw_context_next:
  inc qword ptr [rbp+4120]
  jmp .Lpw_context
+.Lpw_context_done:
+ cmp qword ptr [rbp+4160],0
+ je .Lpw_cwd
+ mov qword ptr [rbp+4160],0
+ jmp .Lpw_context_pass
 .Lpw_cwd:
  lea rdi,[rip+.Lpw_cwd_open]
  call .Lpw_append
@@ -426,7 +463,17 @@ pg_prompt_workspace:
  mov [rbp+4104],rdi
  mov rsi,rdi
  mov rdi,[rbx+8]
- call [rbx+16]
+ mov rax,[rbx+16]
+ cmp qword ptr [rbp+4160],0
+ je .Lpw_probe_selected
+ cmp qword ptr [rbx+48],0
+ je .Lpw_read_missing
+ mov rdi,[rbx+56]
+ mov rax,[rbx+64]
+ test rax,rax
+ jz .Lpw_read_bad
+.Lpw_probe_selected:
+ call rax
  test eax,eax
  jz .Lpw_read_missing
  cmp eax,1
@@ -437,6 +484,10 @@ pg_prompt_workspace:
  call strlen@PLT
  mov rdx,rax
  mov rdi,[rbx]
+ cmp qword ptr [rbp+4160],0
+ je .Lpw_files_selected
+ mov rdi,[rbx+48]
+.Lpw_files_selected:
  mov rsi,[rbp+4104]
  mov rcx,rbp
  mov r8d,4096
@@ -502,3 +553,8 @@ pg_prompt_workspace:
 .Lpw_snippets: .quad .Lpw_read_snippet,.Lpw_bash_snippet,.Lpw_edit_snippet,.Lpw_write_snippet
 .Lpw_rules: .quad .Lpw_read_rule,.Lpw_bash_rule,.Lpw_edit_rule,.Lpw_write_rule
 .Lpw_context_names: .quad .Lpw_agents_override,.Lpw_agents,.Lpw_agents_caps,.Lpw_claude,.Lpw_claude_caps
+
+.section .rodata
+.Lpw_user_system: .asciz "SYSTEM.md"
+.Lpw_user_append: .asciz "APPEND_SYSTEM.md"
+.Lpw_slash: .asciz "/"

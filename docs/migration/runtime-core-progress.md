@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 公共Inputs操作表接入产品前台：typed input/write、steer/followUp、稳定ID回执、当前会话分页及撤回。TUI通过独立`pg_tui_runtime_inputs(ops)`消费，原函数表/bridge布局保持。
-- 空闲输入产生正常运行边界，队列保持当前运行；已结算requestId重复返回原回执，typed write按持久事实结算。
-- Runtime完整回归、隔离产品构建通过。真实DeepSeek两后端的操作表→队列→工具/follow-up→重开通过；最终去重/write边界与ASan/UBSan通过。
+- 项目`.pangu/SYSTEM.md`/`APPEND_SYSTEM.md`分别覆盖用户资源同名文件；用户指令先于本地项目指令，均按override/AGENTS/CLAUDE顺序选择。
+- 用户目录默认`~/.pangu/agent`，`PANGU_AGENT_DIR`可指定；完整只读资源服务在prompt构建后关闭，实际prompt沿既有Generation请求配置保存/恢复。
+- prompt专项ASan/UBSan、隔离产品构建及G00/Assembly通过；Runtime整批回归与真实TUI/DeepSeek资源覆盖、重开、用户fallback和请求期持久systemPrompt核对均通过。
 
 ## 当前接口边界
 

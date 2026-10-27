@@ -193,10 +193,16 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
- pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)}};
+ pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0}};
  size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
  if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
- else if(pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;
+ else {
+  char user_path[4096];const char *agent_dir=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");
+  if(!agent_dir&&home){int n=snprintf(user_path,sizeof(user_path),"%s/.pangu/agent",home);if(n<0||(size_t)n>=sizeof(user_path))return 1;agent_dir=user_path;}
+  pg_read_tool user={.directory=-1};pg_tool_registry user_registry={0};pg_tools user_files={0};
+  if(agent_dir){struct stat metadata;if(!stat(agent_dir,&metadata)){if(!S_ISDIR(metadata.st_mode)||pg_read_tool_open(&user,agent_dir))return 1;pg_tool_definition definition=pg_read_snapshot_definition(&user);if(pg_tool_registry_init(&user_registry,&definition,1)){pg_read_tool_close(&user);return 1;}user_files=pg_tool_registry_service(&user_registry);source.user_files=&user_files;source.user_context=&user;source.user_probe=prompt_probe;source.user_directory=(pg_slice){agent_dir,strlen(agent_dir)};}else if(errno!=ENOENT&&errno!=ENOTDIR)return 1;}
+  int result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);pg_read_tool_close(&user);if(result)return 1;
+ }
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
  if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;

@@ -100,9 +100,11 @@ def terminal_exit(binary, root, env):
             terminal.close()
     print('PASS: Durable default .pangu create/reopen, idle stability, corruption/torn tail and terminal restoration', flush=True)
 
-def run_input(terminal, text):
+def run_input(terminal, text, after_submit=None):
     terminal.output = b''
     terminal.send(text.encode() + b'\r')
+    if after_submit is not None:
+        after_submit()
     terminal.until(b'[run] finished: success', 160)
     return terminal.output
 
@@ -357,18 +359,69 @@ def resource_workflow(binary, root, environment):
     (root / 'AGENTS.override.md').write_text('The project marker is ' + marker + '.')
     env = dict(environment)
     env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
+    agent_dir = root.parent / 'user-agent-resources'
+    agent_dir.mkdir()
+    user_marker = 'PANGUUSERCONTEXT' + os.urandom(5).hex()
+    user_prefix = 'PANGUUSERPREFIX' + os.urandom(5).hex()
+    user_append = 'PANGUUSERAPPEND' + os.urandom(5).hex()
+    (agent_dir / 'SYSTEM.md').write_text('You are PanGu. The user prefix token is ' + user_prefix + '.')
+    (agent_dir / 'APPEND_SYSTEM.md').write_text('The append token is ' + user_append + '.')
+    (agent_dir / 'AGENTS.md').write_text('The user context marker is ' + user_marker + '.')
+    env['PANGU_AGENT_DIR'] = str(agent_dir)
+    def prompts(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == 'systemPrompt' and isinstance(child, str):
+                    yield child
+                else:
+                    yield from prompts(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from prompts(child)
+    saved = []
+    def capture_request():
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            found = []
+            for path in private.iterdir():
+                if path.is_file():
+                    try:
+                        for line in path.read_bytes().splitlines():
+                            try:
+                                found.extend(prompts(json.loads(line)))
+                            except (ValueError, UnicodeDecodeError):
+                                pass
+                    except FileNotFoundError:
+                        pass
+            if found:
+                saved.extend(found)
+                return
+            time.sleep(0.01)
+        raise AssertionError('in-flight persisted request configuration not found')
     for reopen in (False, True):
         terminal = Terminal(binary, root, env)
         try:
             terminal.until(b'> ', 5)
-            output = run_input(terminal, 'Report the project marker and append token exactly. Use no tools.')
-            assert marker.encode() in output and append.encode() in output
+            output = run_input(terminal, 'Report the project marker, user context marker and append token exactly. Use no tools.', capture_request)
+            assert marker.encode() in output and append.encode() in output and user_marker.encode() in output
             assert b'WRONG_PRIORITY' not in output
             terminal.send(b'\x04')
             terminal.finish()
         finally:
             terminal.close()
-    print('PASS: actual project custom/append/override resources and reopened PanGu context', flush=True)
+    fallback = root.parent / 'resource-user-fallback'
+    fallback.mkdir()
+    terminal = Terminal(binary, fallback, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Report the user context marker, user prefix token and append token exactly. Use no tools.')
+        assert all(token.encode() in output for token in (user_marker, user_prefix, user_append))
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert saved and all(user_prefix not in prompt and user_append not in prompt and user_marker in prompt for prompt in saved)
+    print('PASS: user/project resource priority, combined AGENTS, actual saved prompt, user fallback and reopened PanGu context', flush=True)
 
 def plugin_workflow(binary, root, environment):
     root = root / 'plugin-workflow'
