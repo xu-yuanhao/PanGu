@@ -377,7 +377,7 @@ def plugin_workflow(binary, root, environment):
     receipt = root / 'released.txt'
     source = Path(__file__).resolve().parents[2] / 'tests/runtime/product_plugin_fixture.c'
     subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
-                    '-fPIC', '-shared', str(source), '-o', str(library)], check=True)
+                    '-fPIC', '-shared', str(source), *subprocess.check_output(['pkg-config','--cflags','--libs','json-c'],text=True).split(), '-o', str(library)], check=True)
     env = dict(environment)
     env.update(PANGU_PLUGIN=str(library), PANGU_PLUGIN_RECEIPT=str(receipt))
     (root / 'source.txt').write_text('PANGUPLUGINREALREAD\n')
@@ -390,12 +390,12 @@ def plugin_workflow(binary, root, environment):
         terminal.finish()
     finally:
         terminal.close()
-    match = re.fullmatch(r'released configured=(\d+) executed=(\d+)\n', receipt.read_text())
-    assert match and int(match[1]) >= 2 and int(match[2]) >= 1
+    match = re.fullmatch(r'released configured=(\d+) executed=(\d+) snapshots=(\d+)\n', receipt.read_text())
+    assert match and int(match[1]) >= 2 and int(match[2]) >= 1 and int(match[3]) >= 1
     saved = stored_bytes(root / '.pangu')
     # Request configuration lives in retained task checkpoint events or assistant
     # history depending on task compaction; actual successful read proves routing.
-    assert b'PANGUPLUGINREALREAD' in saved
+    assert b'PANGUPLUGINREALREAD' in saved and b'product.fixture' in saved and b'fixture_result' in saved
     terminal = Terminal(binary, root, env)
     try:
         terminal.until(b'> ', 5)

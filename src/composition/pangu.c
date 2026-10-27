@@ -3,6 +3,7 @@
 #include "../runtime/host.h"
 #include "../runtime/native_plugin.h"
 #include "../runtime/model_provider.h"
+#include "../runtime/tool_provider.h"
 #include "../runtime/read_tool.h"
 #include "../runtime/write_tool.h"
 #include "../runtime/edit_tool.h"
@@ -27,6 +28,8 @@
 static pg_host host,agent_scope;
 static pg_native_plugin extension;
 static pg_model_provider default_model_provider;
+static pg_tool_provider default_tool_provider;
+static int native_tool_snapshot(void *,uint64_t,const struct json_object *,struct json_object **);
 static int native_model_configure(void *,const struct json_object *,const pg_tool_registry *);
 static void native_model_failure(void *,pg_model_failure *);
 static int native_model_complete(void *,struct json_object *);
@@ -41,6 +44,7 @@ static struct {
  pg_durable_client client;pg_client native_client;pg_session history;
  const pg_model_provider *model_provider;
  const pg_tool_registry *declared_tools;
+ const pg_tool_provider *tool_provider;
  pg_tools selected_tools;
  struct json_object *configuration;
  pg_timer_job fire,queued;void *fire_context,*queued_context;uint64_t deadline;
@@ -80,7 +84,8 @@ static int tools_start(void *ctx,pg_host *scope,size_t owner){
  if(!root||!files||!process||pg_bash_tool_init(&shell_tool,process,root->directory,command_environment))return 1;
  editor.files=*files;pg_tool_definition definitions[]={pg_read_tool_definition(root),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor),pg_bash_tool_definition(&shell_tool)};
  if(pg_tool_registry_init(&registry,definitions,4))return 1;application.tools=pg_tool_registry_service(&registry);
- return pg_host_provide(scope,owner,"tools",&application.tools)||pg_host_provide(scope,owner,"tool.registry",&registry)||pg_host_provide(scope,owner,"tools.base",&application.tools)||pg_host_provide(scope,owner,"tool.registry.base",&registry);
+ default_tool_provider=(pg_tool_provider){PG_TOOL_PROVIDER_ABI,sizeof(pg_tool_provider),application.tools,&registry,0,native_tool_snapshot,"pangu.coding-tools.v1"};
+ return pg_host_provide(scope,owner,"tools",&application.tools)||pg_host_provide(scope,owner,"tool.registry",&registry)||pg_host_provide(scope,owner,"tools.base",&application.tools)||pg_host_provide(scope,owner,"tool.registry.base",&registry)||pg_host_provide(scope,owner,"tools.provider",&default_tool_provider)||pg_host_provide(scope,owner,"tools.provider.base",&default_tool_provider);
 }
 static int tools_stop(void *ctx){(void)ctx;int result=application.tools.close?application.tools.close(application.tools.context):0;if(result!=1)pg_edit_tool_clear(&editor);return result;}
 static int model_start(void *ctx,pg_host *scope,size_t owner){
@@ -150,9 +155,8 @@ static int model_complete(void *ctx,const pg_model *model,struct json_object *as
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
 static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){(void)ctx;if(durable.tools_leased)return 1;durable.tools_leased=1;pg_edit_tool_clear(&editor);*out=durable.selected_tools;pg_durable_client_tool(&durable.client,id,0);return 0;}
 static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
-static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
+static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
- if(durable.selected_tools.context!=application.tools.context)return 0;
  const char *name=json_object_get_string(json_object_object_get(call,"name"));
  if(name&&!strcmp(name,"bash")){int result=pg_bash_tool_snapshot(&shell_tool,out);return result==1?0:result;}
  if(!name||strcmp(name,"edit")||!editor.details)return 0;
@@ -160,6 +164,10 @@ static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,st
  struct json_object *details=json_object_get(editor.details);
  if(json_object_object_add(value,"details",details)){json_object_put(details);json_object_put(value);return 5;}
  *out=value;return 0;
+}
+static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
+ (void)ctx;const pg_tool_provider *selected=durable.tool_provider;*out=0;
+ return selected->snapshot?selected->snapshot(selected->context,id,call,out):0;
 }
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}
 static int client_submit(void *ctx,pg_slice text){(void)ctx;return durable.native_client.submit(durable.native_client.context,text);}
@@ -171,13 +179,15 @@ static int prompt_probe(void *context,const char *path){
  return S_ISREG(metadata.st_mode)?1:0;
 }
 static int agent_start(void *ctx,pg_host *scope,size_t owner){
- (void)ctx;const pg_model_provider *selected=pg_host_get(scope,owner,"model.provider");pg_tools *executor=pg_host_get(scope,owner,"tools");
+ (void)ctx;const pg_model_provider *selected=pg_host_get(scope,owner,"model.provider");const pg_tool_provider *toolset=pg_host_get(scope,owner,"tools.provider");
+ pg_tools *executor=toolset?(pg_tools *)&toolset->tools:0;
+ if(!toolset||toolset->abi!=PG_TOOL_PROVIDER_ABI||toolset->size!=sizeof(*toolset)||!toolset->catalog||!toolset->identity||!*toolset->identity||strlen(toolset->identity)>63)return 1;
  if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
  if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
- durable.model_provider=selected;durable.selected_tools=*executor;
+ durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
- pg_tool_registry *declared=pg_host_get(scope,owner,"tool.registry");if(!declared)return 1;durable.declared_tools=declared;
+ const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
  pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)}};
  size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
  if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
@@ -208,12 +218,12 @@ static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
  if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools","session","files","workspace","tool.registry"};
-static const pg_plugin agent_plugin={"agent",0,agent_imports,6,agent_exports,2,agent_start,agent_stop};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
+static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
+static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,2,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"model",0,model_imports,1,model_exports,3,model_start,model_stop},
- {"tools",0,tool_imports,3,tools_exports,4,tools_start,tools_stop},
+ {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},
  {"workspace",0,0,0,workspace_exports,1,workspace_start,workspace_stop},

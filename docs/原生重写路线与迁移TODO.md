@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Harness Cordis `service.ts`服务随fiber作用域注册/撤销、`context.ts`/`registry.ts`组合及Pi Durable `harness/registry.ts`快照与配置解析；复用既有原生host/native_plugin的父子替换、依赖顺序和协作释放实现。Pi远端`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，Harness`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，固定参考树。
-- 实际调用链：根Host提供默认模型/工具/存储；`PANGU_PLUGIN`将本地共享库加载为子作用域，Agent在其子作用域启动。Agent从同一作用域解析model.provider、tools和tool.registry；默认Model由版本化pg_model_provider包住configure/failure/complete与原有pg_model，扩展可继承base服务并提供替代。请求保存稳定provider身份，恢复时不匹配明确拒绝；执行器与声明目录沿同一解析结果注入模型与Tool任务。退出先停止Agent/排空请求与工具，再关闭扩展作用域/卸载库，最后关闭根服务。
-- 验证：产品隔离构建、Runtime完整O0/O2及原生DSO生命周期回归；真实共享库夹具包装默认模型与工具服务，计数实际configure/execute，执行真实DeepSeek→read→回答并重开续聊，关闭回执核对提供者确实被使用和释放。上述真实插件流程和默认四工具/诊断/patch/身份与历史流程均通过。TUI进行中源码继续保留，产品验证使用已提交TUI和本批核心。
-- 接口与自审：新增`model_provider.h`的model.provider ABI1（80字节、稳定identity和borrowed函数表）；登记实际头、依赖与fixture。原生DSO仍导出pangu_plugin_v1，可提供tools/tool.registry/model.provider；默认base服务名tools.base/tool.registry.base/model.provider.base用于组合。生产逻辑沿既有Assembly宿主与任务实现；C组合仅组装函数表、租约及外部提供者调用。
-- 剩余与下一交付物：当前启动加载一个本地库，完整extension registry、多个扩展选择、运行中更新/撤销、hooks和自定义任务仍按K02/K09完成；Session与Storage尚未通过完整独立契约替换。本批不据启动加载勾选整个插件机制。继续沿实际扩展调用链补齐，不增加旁路实现。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts`最终output/details/structuredOutput/diagnostics分离及`registry.ts`工具集合解析；Harness/Cordis服务随作用域提供和释放。本批核对远端Pi`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，新增Tool restart_limit结算属于下一次恢复行为评估，当前元数据路径沿固定快照。
+- 实际调用链：`tools.provider`将借用的执行器、catalog、snapshot和identity作为同一ABI1描述符注入Agent；模型声明和Tool执行使用该描述符。插件snapshot在工具关闭前转移拥有的details/structuredOutput/diagnostics，经既有Assembly Tool事务保存并由观察接口读取，诊断沿模型文本投影送入后继Generation。删除按context指针判断静态工具元数据的分支，默认与插件均走显式提供者。
+- 验证：产品隔离构建、G00/Assembly；实际DSO夹具提供自己的snapshot，计数模型configure、工具execute和snapshot，真实模型read→结果诊断→回答→重开，核对持久details/diagnostics及关闭回执。真实插件闭环、持久元数据、释放回执及默认四工具/diagnostics/patch/身份/历史流程均通过。
+- 接口与自审：`tool_provider.h`的tools.provider ABI1为96字节，snapshot偏移80，目录/执行/结果元数据共同借用至操作释放；新头已登记。Agent依赖tools.provider代替分别读取tools与tool.registry，默认tools.provider.base供插件组合。已有pg_tools/pg_model/TUI事件布局不变，新增生产代码为契约及C组合接线，复用现有Assembly执行/事务/宿主。
+- 剩余与下一交付物：完整extension registry、动态多个扩展/更新/撤销、hooks及自定义任务按K02/K09继续；新上游连续重启限额对应终态/诊断需成组接入Task/Generation/Tool，保留原覆盖范围。TUI进行中工作保持原位，仅提交核心明确路径。

@@ -201,7 +201,8 @@
       "sources": [
         "src/runtime/tools.h",
         "src/runtime/tools.S",
-        "src/runtime/tools_layout.h"
+        "src/runtime/tools_layout.h",
+        "src/runtime/tool_provider.h"
       ],
       "dependencies": [
         "agent.runtime.v0",

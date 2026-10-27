@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- `PANGU_PLUGIN`连接本地共享库到实际Agent父作用域；模型提供者、执行器和工具声明从该作用域注入Durable请求/工具任务，默认base服务可供扩展组合。
-- model.provider ABI1拥有稳定identity，随请求配置保存；恢复身份不匹配拒绝。Agent停止/排空后释放扩展并卸载库，再关闭根Host。
-- 原生DSO回归、完整Runtime O0/O2与隔离产品构建通过；真实DeepSeek插件模型/工具包装的read、调用计数、释放回执和重开通过，默认四工具/诊断/patch/身份/历史流程通过。
+- tools.provider ABI1将执行器、声明目录与结构化结果快照共同注入实际Agent；默认与扩展均使用同一契约。
+- 插件结果的details/structuredOutput/diagnostics沿现有Assembly Tool事务原子保存，诊断进入后继模型请求，TUI沿独立观察接口读取。
+- 隔离产品构建与G00/Assembly通过；真实插件调用/元数据持久化/关闭回执/重开及默认四工具、诊断、patch、身份和历史工作流通过。
 
 ## 当前接口边界
 
