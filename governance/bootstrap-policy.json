@@ -562,6 +562,10 @@
     "src/runtime/durable_session.h": "native-source",
     "src/runtime/durable_session.S": "native-source",
     "src/runtime/document_reader.h": "native-source",
-    "src/runtime/document_reader.S": "native-source"
+    "src/runtime/document_reader.S": "native-source",
+    "src/runtime/record_sqlite.S": "native-source",
+    "src/runtime/record_sqlite.h": "native-source",
+    "tests/runtime/test_record_sqlite.c": "native-test",
+    "tools/runtime/test_record_sqlite.py": "development-tool"
   }
 }

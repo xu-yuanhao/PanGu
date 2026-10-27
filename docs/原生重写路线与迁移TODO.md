@@ -94,6 +94,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `storage/memory.ts`、`storage/jsonl/`、`storage/sqlite/`；`memory-storage`、`jsonl-storage`、`sqlite-storage`、`sqlite-migrations` 测试。
 
+- [x] 原生SQLite提供者接入Storage/Session提交：准备后事务持久化、确认后采纳、混合记录/文档跨进程重开、只读打开、过期写入者拒绝、失败锁存及损坏拒绝；原生批次日志布局与上游物理表布局的差异见交接区。
 - [ ] 在 Storage 接口下完成内存、JSONL与SQLite提供者，复用SQLite成熟库；维护当前原生日志及其显式数据转换入口。
 - [ ] 将 K03 的记录、查询、事务与版本迁移接入持久提供者；完成锁、尾部恢复、失败关闭与只读打开。
 - [ ] 验收：同一 Session 场景在各后端重开得到相同语义；完整批次、损坏/截断和 IO 失败有明确结果；原生文件与导入文件字节可核对。
@@ -206,8 +207,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi基础快照`d5b3de22d0e24a3e9c38a9410d3329b099717283`；Session观察/生命周期采用`8b0caefc2260a28d2cec0a7ce3daef1d3de24776`；Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。批次开始核对上游后固定采用范围。
-- 实际调用链与实现入口：K03模块已实现内存事务/文档与Session生命周期，`defe4ca`已提交显式Session失败入口；现有`journal.S/journal_posix.c`、`mimo*`、`agent.S`、编码工具与Runtime桥接可复用。公共接口`client.h/tui_runtime_adapter.h`由核心维护，TUI消费。
-- 已运行命令/结果：`defe4ca`的G00、产品构建和核心O0 ASan/UBSan专项通过；TUI Markdown单元崩溃，multiline PTY提前退出，详见实现记录。本轮仅修改四份流程文档；完整功能清单/来源覆盖逐项比较保持，链接与`git diff --check`通过。
-- 剩余行为差异或阻断：B01需将Session/Tx接入Memory/JSONL/SQLite并补齐公开行为差异；TUI当前失败由其交互组修复。U05/U06所需操作入口由核心在B02/B04提供并集中联调，接口需求保留在TUI交接区。
-- 下一可运行交付物：B01的Durable混合记录/文档事务经持久后端提交，退出重开后读取相同事实；据实际消费者补齐必要Session/Storage接口并验证失败与恢复。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`storage/sqlite/storage.ts`（open/commit/mintId/document）、`storage/memory.ts`（prepareCommit/apply）、`storage/jsonl/storage.ts`（prepare→persist→apply），调用方`session/session.ts`与`testing/storage-conformance.ts`、`test/sqlite-storage.test.ts`。批次已fetch：Pi origin/main为`6c384aa30f619d7b28963f2bab24d8dacbe73cb6`，这些Storage路径无差异；Harness HEAD/origin/master均为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。Session观察仍采用`8b0caefc2260a28d2cec0a7ce3daef1d3de24776`。
+- 实际调用链与实现入口：`pg_records_commit`→`pg_record_sqlite_storage`→`pg_record_memory_commit_persisted`→SQLite事务确认→内存采纳/Session通知；`record_sqlite.S/h`开放数据库并回放已提交批次，现有内存查询/Document服务直接消费恢复后的状态。公开ABI、模块、SQLite3依赖及产品/专项构建已登记。
+- 已运行命令/结果：`python3 -B tools/runtime/build_test.py`的O0/O2 Runtime回归通过；新增SQLite专项O0 ASan/UBSan通过（混合事务、重新exec恢复、请求索引/分页、持久后通知、只读、过期写入者、非空批次写入拒绝、Session失败、损坏）；`python3 -B tools/runtime/test_record_sqlite.py`对照真实固定Pi SQLite通过；G00、`git diff --check`与产品构建`--output /tmp/pangu-sqlite/pangu`通过。既有TUI Markdown/PTY失败保留在TUI修复范围。
+- 剩余行为差异或阻断：原生SQLite使用`pangu_durable_commits_v1(seq,writes)`批次日志，查询复用恢复的Memory；重开成本随历史增长，上游SQLite表格式导入/前缀配置尚未覆盖。B01还需JSONL/sidecar恢复与完整Storage/Session用例，K04总项保持未完成。U05/U06入口在B02/B04联调。
+- 下一可运行交付物：继续B01，按Pi JSONL的main marker与sidecar提交/恢复链完成原生JSONL提供者，同时核对SQLite当前物理差异对完整移植验收的影响。

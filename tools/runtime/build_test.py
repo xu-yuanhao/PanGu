@@ -58,6 +58,13 @@ def main():
                             str(ROOT / 'tests/runtime/native_plugin_fixture.S'), '-o', library], check=True)
             native_paths.append(library)
         for mode in ('-O0', '-O2'):
+            sqlite_test = str(Path(directory) / 'test-record-sqlite')
+            sqlite_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'record_sqlite']],
+                            str(ROOT / 'tests/runtime/test_record_sqlite.c'), *sqlite_flags, '-o', sqlite_test], check=True)
+            subprocess.run([sqlite_test], check=True, timeout=30)
             host_test = str(Path(directory) / 'test-host')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/host'),
@@ -268,6 +275,7 @@ def main():
                             implementation('src/runtime/profile'), str(ROOT / 'tests/runtime/agent_abi.S'), str(ROOT / 'tests/runtime/test_agent_asm.c'),
                             '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_record_sqlite.py')], check=True)
     return 0
 if __name__ == '__main__':
     raise SystemExit(main())

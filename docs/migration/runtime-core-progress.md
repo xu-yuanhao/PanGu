@@ -59,6 +59,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 | 文档 | `documents.S`、`document_tx.S`、`document_reader.S`：地址身份、版本/迁移、revision重放、编辑/退休/fork-copy、缓存及当前/历史读取 |
 | 延迟持久化 | `pending.S`、`holds.S`、`hold_timer.S`：变更折叠、pin、定时保存、混合提交与失败清理 |
 | Session与观察 | `durable_session.S`：事务准入、分阶段关闭、首因保留、通知队列、同步观察、Watch获取/交付/取消与readOnLine |
+| SQLite存储 | `record_sqlite.S/h`：原生批次事务、持久后采纳、重开恢复、只读与过期写入者拒绝；通过现有Storage/Session接口提交，查询复用恢复后的Memory |
 
 这些模块已有专项、来源差异及Runtime集成验证记录；B01负责接通完整持久后端与重开，B02负责持久任务和整机执行链。当前未提交的Session失败入口候选由B01统一核对。
 
@@ -69,3 +70,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 ## 全工作区交接提交（2026-10-27）
 
 接入TUI Markdown产品源登记与Session失败入口导出，修正`tui_view.S`两处Clang常量表达式写法。G00、产品构建和Session/内存记录专项（O0 ASan/UBSan）通过。当前TUI专项在`test_tui_md`的paragraphs用例后崩溃；PTY在multiline_edit_submit收到目标文本前进程退出，均为本轮真实失败，后续TUI修复以此为起点。本次按用户要求保存并推送全部核心/TUI候选。
+
+## B01 SQLite接入（2026-10-27）
+
+`record_memory.S`在完整准备后增加持久化屏障，拒绝时保持记录/序号，成功后直接应用并通知；默认内存提交沿用同一实现。`record_sqlite.S`通过成熟SQLite/json-c C ABI实现原生提交与顺序恢复。实际Session混合事务重开结果与固定Pi SQLite对照通过，Runtime O0/O2、SQLite ASan/UBSan专项及产品构建通过。原生SQLite文件为批次日志，回放成本与上游物理布局差异见核心TODO当前交接；完整K04验收继续由B01完成。

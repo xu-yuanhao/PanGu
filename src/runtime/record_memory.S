@@ -118,6 +118,13 @@ pg_record_memory_storage:
  ret
 
 .Lmemory_commit:
+ xor r9d,r9d
+ jmp .Lmemory_commit_common
+
+.globl pg_record_memory_commit_persisted
+.type pg_record_memory_commit_persisted,@function
+pg_record_memory_commit_persisted:
+.Lmemory_commit_common:
  push rbp
  push rbx
  push r12
@@ -125,6 +132,7 @@ pg_record_memory_storage:
  push r14
  push r15
  sub rsp,120
+ mov [rsp+112],r9
  mov rbx,rdi
  mov r12,rdx
  mov r13,rcx
@@ -383,6 +391,17 @@ pg_record_memory_storage:
  mov rax,[rsp+40]
  mov [rbx+16],rax
 .Lmemory_empty_prepared:
+ mov rax,[rsp+112]
+ test rax,rax
+ jz .Lmemory_persisted
+ /* Persistence runs after all preparation, before observable row mutation. */
+ mov rdi,[rsp+176]
+ mov rsi,[rsp+8]
+ mov rdx,[rbx+32]
+ call rax
+ test eax,eax
+ jnz .Lmemory_persist_failed
+.Lmemory_persisted:
  mov qword ptr [rsp+24],0
 .Lmemory_apply:
  mov rax,[rsp+24]
@@ -460,6 +479,9 @@ pg_record_memory_storage:
  mov [r14],rax
  xor r15d,r15d
  jmp .Lmemory_commit_cleanup
+.Lmemory_persist_failed:
+ mov r15d,4
+ jmp .Lmemory_commit_cleanup
 .Lmemory_prepare_failed:
  cmp eax,3
  je .Lmemory_allocation_cleanup
@@ -490,6 +512,8 @@ pg_record_memory_storage:
  pop rbx
  pop rbp
  ret
+
+.size pg_record_memory_commit_persisted,.-pg_record_memory_commit_persisted
 
 .globl pg_record_memory_mint
 .type pg_record_memory_mint,@function

@@ -1010,7 +1010,8 @@
         "pg_record_memory_queries",
         "pg_record_memory_documents",
         "pg_record_memory_submission_by_request",
-        "pg_record_memory_requests"
+        "pg_record_memory_requests",
+        "pg_record_memory_commit_persisted"
       ],
       "reference_basis": [
         {
@@ -1562,6 +1563,40 @@
           "tests_to_read": [
             "packages/durable/test/session-checkpoints-migrations.test.ts",
             "packages/durable/test/session-watches.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "storage.sqlite.local.v1",
+      "sources": [
+        "src/runtime/record_sqlite.S",
+        "src/runtime/record_sqlite.h"
+      ],
+      "dependencies": [
+        "storage.records.memory.local.v0",
+        "SQLite3 C ABI",
+        "json-c C ABI"
+      ],
+      "role": "Native SQLite atomic StorageWrite batches, prepared memory barrier, durable-before-adopt and consistent reopen; native log schema with history-proportional replay",
+      "exports": [
+        "pg_record_sqlite_open",
+        "pg_record_sqlite_close",
+        "pg_record_sqlite_storage"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/storage/sqlite/storage.ts",
+            "packages/durable/src/storage/memory.ts",
+            "packages/durable/src/storage/jsonl/storage.ts"
+          ],
+          "semantics": "prepare and detach before durable commit; apply and adopt only after acknowledgement; reopen preserves query/ID/sequence semantics; native physical schema differs",
+          "tests_to_read": [
+            "packages/durable/test/sqlite-storage.test.ts",
+            "packages/durable/src/testing/storage-conformance.ts"
           ]
         }
       ]

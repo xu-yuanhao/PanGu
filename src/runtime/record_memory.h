@@ -11,7 +11,7 @@ typedef struct {
  uint64_t next_id,next_sequence;
  unsigned busy,closed;
 } pg_record_memory;
-typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCATION } pg_memory_status;
+typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCATION,PG_MEMORY_STORAGE } pg_memory_status;
 /* Fresh zeroed or completely closed caller storage. Reads return detached owned
    values; rows are private. Serialized use, no retained Storage callbacks.
    IDs are positive safe integers; integral JSON floats share the same namespace.
@@ -24,6 +24,13 @@ typedef enum { PG_MEMORY_OK,PG_MEMORY_MISSING,PG_MEMORY_INVALID,PG_MEMORY_ALLOCA
 pg_memory_status pg_record_memory_open(pg_record_memory *);
 pg_memory_status pg_record_memory_close(pg_record_memory *);
 pg_record_storage pg_record_memory_storage(pg_record_memory *);
+/* Prepared commit with a synchronous persistence barrier. persist borrows the
+   original validated batch and sequence; zero confirms durable storage. All
+   allocations precede persist, then rows/index apply without allocation and
+   adopt runs once. A rejected barrier leaves records and sequence unchanged.
+   Serialized callers keep batch immutable; neither callback may reenter. */
+pg_memory_status pg_record_memory_commit_persisted(pg_record_memory *,const struct json_object *,
+ pg_records_adopt,void *,uint64_t *,int (*persist)(void *,const struct json_object *,uint64_t),void *);
 /* Private row allocation metadata owns the conversation/request index; release
    all rows/index state through close, never by freeing the borrowed rows. */
 pg_memory_status pg_record_memory_submission_by_request(void *,const pg_record_request_query *,struct json_object **);

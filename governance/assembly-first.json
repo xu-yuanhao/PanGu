@@ -168,6 +168,10 @@
     "src/client/tui/tui_md.S": {
       "role": "assembly-core",
       "reason": "手写流式Markdown状态、转义与终端文本布局"
+    },
+    "src/runtime/record_sqlite.S": {
+      "role": "assembly-core",
+      "reason": "手写SQLite事务提交、准备后持久化屏障与顺序恢复，调用成熟SQLite/json-c库"
     }
   }
 }
