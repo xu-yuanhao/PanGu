@@ -61,3 +61,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 | Session与观察 | `durable_session.S`：事务准入、分阶段关闭、首因保留、通知队列、同步观察、Watch获取/交付/取消与readOnLine |
 
 这些模块已有专项、来源差异及Runtime集成验证记录；B01负责接通完整持久后端与重开，B02负责持久任务和整机执行链。当前未提交的Session失败入口候选由B01统一核对。
+
+## 历史探针清理（2026-10-27）
+
+删除15个包含`cases.h/graph-cases.h`的历史探针目录，共71文件、24,845,721字节；核对产品源、工具/构建配置及目录外源码均无消费者，同步移除bootstrap登记。当前Runtime/TUI回归测试保留。G00通过；当前共享树产品构建在TUI候选`tui_view.S:426/439`的内存操作数表达式报错，本次保留该候选并记录构建失败。
