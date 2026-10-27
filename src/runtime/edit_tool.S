@@ -642,6 +642,7 @@
  sub rsp,616
  mov rbp,rsp
  mov rbx,rdi
+ mov qword ptr [rbx+56],0
  mov r12,rcx
  mov r13,r8
  mov r14,r9
@@ -812,6 +813,8 @@
  cmp rax,r13
  jae .Lsummary_failed
  mov [r14],rax
+ mov rax,[rbp+FIRST_LINE]
+ mov [rbx+56],rax
  xor eax,eax
  jmp .Lexecute_return
 .Lsummary_failed:

@@ -136,7 +136,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `tools/{read,write,edit,bash,edit-diff,image-processor}.ts`、`env/`、`images/`、`truncate.ts`；`tools.test.ts`、`tools-read-differential.test.ts`、`tools-images.test.ts`、`env-node.test.ts`。
 
 - [ ] 在现有 read/write/edit/bash 服务上补齐上游输入准备、路径/目录、分页/完整文件、UTF-8/二进制/图片、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
-- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。
+- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供firstChangedLine。diff/patch、附件与完整ExecutionEnv待补齐。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
 ### K09 — 完整原生 Extension 能力
@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`submissions.ts` admitSubmission/status/wait/abort、`inbox.ts` prepareBoundary/applyBoundary/appendInput/isDisplayOnly/isStale/withdrawQueuedInputs，以及Generation answer/finishToolRound/endFailedRun/startRun；对应harness-submissions的去重/拒绝/关闭/重开、harness-inbox的队列/reset/stale/失败策略用例。本批核对Pi远端由`177e2ad7e41e85c16c859f844a0569a3c76f2666`前进至`db14038bd847c5bad57de217e0ac0c5ad1ae60ba`，上述三个模块无差异；Harness远端保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，参考工作树沿固定提交。
-- 实际调用链：产品Host导出`inputs`服务；Client文本入口→`durable_inputs.S`去重/判断busy→原子Submission/User Entry/Generation，忙时输入保留为Submission中的PanGu队列draft。Generation在最终回答、postTools、失败及abort阶段使用同一事务处理Entry、队列放置/撤回、Submission结算和后继Task。queued payload在放置/撤回时移除；查询与轮询经Session readOnLine，退出只暂停任务。reset/head边界接入模型上下文；Client配置收敛为实际Session/Scheduler/Inputs/会话依赖，已删除其旧提交工厂。
-- 验证：SQLite/JSONL的request去重（含NUL）、busy reject无写入、撤回、one/all steering/follow-up、展示写入/reset后写入、stale、三种失败策略、取消、关闭竞态和重开专项通过ASan/UBSan；真实DeepSeek各完成故障注入/重试→真实read→回答→持久follow-up自动回答并结算。关闭竞态专项曾发现轮询输出指针复用，修正后复验通过。固定集成树Runtime完整O0/O2回归、G00/Assembly与产品构建通过；真实PTY完成read/write/edit/bash、PanGu身份、重开续聊和正常退出/进程终止后恢复，命令副作用保持一次。控制自审：登记Assembly Inputs/头、实际依赖与导出，原有TUI函数表和事件布局保持不变。
-- 剩余行为：当前Input内容遵循有界UTF-8文本模型ABI，完整内容块随K05完成；前台事件仍在调度空闲时汇总结束，逐Submission/run的视图与TUI队列操作随K13/U06接入。K07 deferred/partial/hook/顺序及嵌套工具，K10多会话/分叉/完整生命周期，K11资源配置，K12压缩，K13观察/用量及K06余项保持原清单。队列与busy查询当前复用通用记录扫描；完整失败历史视图、原生错误载体和长上下文仍按所属步骤补齐；Inputs默认实现已接入Host，完整服务替换与生命周期按K02完成。
-- 下一交付物：提供TUI U03的真实参数与结构化工具结果接口，接通工具状态、diff/首个变更行与附件消费；保持现有文本、队列与真实模型调用链可运行。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts` Reported、appendToolResult和`tools/edit.ts`返回details；Coding Agent工具渲染以参数/结果消费为入口。本批Pi远端为`842c73170a3658d4e3b39fcc84690211ed503e09`，上述模块及edit-diff无差异；沿固定参考工作树开发。
+- 实际调用链：`durable_tool.S`在工具完成、关闭/释放前调用注入snapshot；拥有metadata直至原子提交并释放。结果Entry保存模型消息details与data中的arguments/diagnostics/status，明确completed/error/aborted/interrupted。恢复中未重新执行的工具不采集当前提供者的陈旧结果。产品edit将首个变更行作为details持久化；工具租约开始时清空其旧元数据。`durable_client.S`从已提交toolCall读取真实参数，canonical JSON随TOOL_STARTED.text经既有桥接到TUI detail；事件/函数表布局不变。
+- 验证：SQLite/JSONL工具任务专项核对参数、details、diagnostics和各恢复/取消状态；编辑专项核对成功元数据。完整Runtime O0/O2回归、产品构建、G00/Assembly通过；真实DeepSeek PTY完成四工具、PanGu身份与重开续聊，实际成功edit回执的参数、status与firstChangedLine检查通过。控制自审：仅扩展原生工具host可选回调和editor私有控制布局，旧工具定义、pg_tools、pg_event和TUI ops尺寸保持不变。
+- 剩余行为：edit diff/patch、诊断的模型文本渲染、图片附件和独立结构化观察接口/TUI消费继续在K08/K13/U03完成；当前details持久记录仅首行来自真实edit，专项中的diff/patch为测试提供者数据，不能当作产品实现。K05完整内容块、K07 deferred/partial/hooks、K10多会话/分叉、K11资源配置、K12压缩、K13观察/用量及K02服务替换按原清单推进。
+- 下一交付物：沿Pi edit-diff接通实际diff/patch和结构化观察消费者，与既有真实模型工具链集中联调。

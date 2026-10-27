@@ -127,6 +127,30 @@ def workflow(binary, root, env):
     saved = stored_bytes(directory)
     secret = env.get('PANGU_MODEL_API_KEY', env.get('MIMO_API_KEY', '')).encode()
     assert secret and secret not in saved
+    def records(value):
+        if isinstance(value, dict):
+            if value.get('kind') == 'pangu.tool-result':
+                yield value
+            for child in value.values():
+                yield from records(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from records(child)
+    edits = []
+    for path in directory.iterdir():
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                try:
+                    value = json.loads(line)
+                except (ValueError, UnicodeDecodeError):
+                    continue
+                for entry in records(value):
+                    message = entry['model'][0]
+                    if message['toolName'] == 'edit' and not message['isError']:
+                        edits.append(entry)
+    assert edits, 'missing committed actual edit receipt'
+    assert all(e['data']['status'] == 'completed' and e['data']['arguments']['path'] == 'target.txt'
+               and e['model'][0]['details']['firstChangedLine'] == 1 for e in edits)
     terminal = Terminal(binary, root, env)
     try:
         terminal.until(b'> ', 5)

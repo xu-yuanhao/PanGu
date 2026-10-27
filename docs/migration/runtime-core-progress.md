@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 输入入口统一通过Durable Submission服务。PanGu queued draft保存在Submission记录，放置/撤回时移除；Entry、Submission和Generation状态在同一Session事务内推进。
-- 两后端通过去重、busy拒绝、队列选择、写入/reset/stale、失败策略、取消与关闭/重开专项。真实DeepSeek完成当前工具运行后，自动放置并回答持久follow-up；可重查结算。
-- Generation保留持久重试、上下文错误过滤及真实模型/工具链；Runtime/TUI沿既有提交、事件与历史接口工作。固定集成树的完整Runtime O0/O2回归、G00/Assembly与产品构建通过；真实终端四工具、重开续聊、两种执行中退出恢复通过。
+- 工具参数从持久assistant toolCall送到TOOL_STARTED.text，TUI桥接将其交给detail，沿用既有事件布局。
+- 工具host可选snapshot在执行完成、关闭前转移元数据所有权；结果Entry与任务回执同批保存参数、明确状态、details及diagnostics。恢复中未执行的工具不会取用提供者陈旧元数据；真实edit提供firstChangedLine。
+- SQLite/JSONL工具、恢复/取消与编辑专项、完整Runtime O0/O2、G00/Assembly和产品构建通过。真实DeepSeek PTY四工具、PanGu身份和重开续聊通过；实际编辑回执的参数、status与firstChangedLine检查通过。
 
 ## 当前接口边界
 

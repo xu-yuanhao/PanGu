@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-_Static_assert(sizeof(pg_edit_tool)==56 && offsetof(pg_edit_tool,files)==0,"edit context ABI");
+_Static_assert(sizeof(pg_edit_tool)==64 && offsetof(pg_edit_tool,files)==0 && offsetof(pg_edit_tool,first_changed_line)==56,"edit context ABI");
 _Static_assert(json_type_object==4&&json_type_array==5&&json_type_string==6,"JSON types");
 _Static_assert((JSON_TOKENER_STRICT|JSON_TOKENER_VALIDATE_UTF8)==17,"JSON flags");
 static pg_tool_registry registry;
@@ -43,7 +43,7 @@ const char *__wrap_json_object_to_json_string_ext(json_object *o,int flags){retu
 static pg_slice s(const char *p){return (pg_slice){p,strlen(p)};}
 static int forward_allow(void *p,pg_slice name,pg_slice args){(void)p;++checks;if((name.size==4&&deny_read)||(name.size==5&&deny_write))return 0;return file_service.authorize(file_service.context,name,args);}
 static int forward_execute(void *p,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)p;if(name.size==4){++reads;if(oversize_read){*size=cap;return 0;}if(partial_read){memcpy(out,"alpha",5);*size=5;return PG_TOOL_PARTIAL;}}else{assert(name.size==5);++writes;}int rc=file_service.execute(file_service.context,name,args,out,cap,size);if(name.size==5&&!rc){if(crash_after_write)_exit(73);if(fail_after_write)return 1;}return rc;}
-static int invoke(const char *args){char out[128]={0};size_t n=777;char *copy=strdup(args);assert(copy);int rc=service.execute(service.context,s("edit"),s(args),out,sizeof(out),&n);assert(!strcmp(args,copy));free(copy);assert(n>0&&n<sizeof(out));memcpy(last_output,out,sizeof(out));return rc;}
+static int invoke(const char *args){char out[128]={0};size_t n=777;char *copy=strdup(args);assert(copy);int rc=service.execute(service.context,s("edit"),s(args),out,sizeof(out),&n);assert(!strcmp(args,copy));free(copy);if(!rc)assert(editor.first_changed_line>0);assert(n>0&&n<sizeof(out));memcpy(last_output,out,sizeof(out));return rc;}
 static void put(const char *bytes){int fd=open("file.txt",O_WRONLY|O_CREAT|O_TRUNC,0600);assert(fd>=0&&write(fd,bytes,strlen(bytes))==(ssize_t)strlen(bytes));assert(!close(fd));}
 static void expect(const char *bytes){char content[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,content,sizeof(content));assert(n==(ssize_t)strlen(bytes)&&!memcmp(content,bytes,(size_t)n));assert(!close(fd));}
 static unsigned fds(void){DIR *dir=opendir("/proc/self/fd");assert(dir);unsigned n=0;while(readdir(dir))++n;assert(!closedir(dir));return n;}

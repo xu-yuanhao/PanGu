@@ -669,6 +669,16 @@ pg_durable_client_output:
  inc r12
  jmp .Ldc_tool_find
 .Ldc_tool_found:
+ CGET "qword ptr [rsp+128]",arguments
+ mov rdi,rax
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Ldc_tool_fail
+ mov [rsp+32],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [rsp+40],rax
  CGET "qword ptr [rsp+128]",name
  mov rbp,rax
  mov dword ptr [rsp+24],2
@@ -846,6 +856,7 @@ pg_durable_client_publish:
 .Ldc_background: .asciz "background"
 .Ldc_abort_requested: .asciz "abortRequested"
 .Ldc_input: .asciz "input"
+.Ldc_arguments: .asciz "arguments"
 .Ldc_call_id: .asciz "callId"
 .Ldc_assistant: .asciz "assistant"
 .Ldc_id: .asciz "id"

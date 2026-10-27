@@ -15,6 +15,11 @@ typedef struct {
  /* mint receives runner.host->context, matching Record Tx read_context. */
  int (*mint)(void *,uint64_t *);
  void (*progress)(void *,uint64_t task_id,pg_slice);
+ /* Optional final metadata snapshot, before service close/release. call borrows
+    the committed toolCall. Return 0 with an owned object (or NULL): optional
+    details is JSON, diagnostics is an array. Failure stops settlement without
+    repeating the effect. Metadata stays owned by this task through commit. */
+ int (*snapshot)(void *,uint64_t task_id,const struct json_object *call,struct json_object **);
 } pg_durable_tool_host;
 typedef struct {
  const pg_durable_tool_host *host;

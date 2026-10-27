@@ -49,7 +49,8 @@ typedef struct tui_event {
 	/* 工具事件：稳定调用 ID 与工具名 */
 	const char *tool_call_id;
 	const char *tool_name;
-	/* tool_finished：1 成功 / 0 失败；detail 为简短内容或错误摘要 */
+	/* tool_started：detail 为真实参数的 JSON；tool_finished：1 成功 / 0 失败，
+       detail 为工具输出或错误摘要。 */
 	int tool_ok;
 	const char *detail;
 	size_t detail_len;

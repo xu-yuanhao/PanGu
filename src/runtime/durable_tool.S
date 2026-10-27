@@ -107,7 +107,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,4272
+ mov esi,4288
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -338,6 +338,8 @@ pg_durable_tool_init:
  lea rdx,[r12+32]
  call [rax+16]
 .Ldt_cleanup_json:
+ mov rdi,[r12+4272]
+ call json_object_put@PLT
  mov rdi,[r12+16]
  call json_object_put@PLT
  mov rdi,[r12+24]
@@ -417,6 +419,51 @@ pg_durable_tool_init:
  call .Ldt_set
  test eax,eax
  jnz .Ldt_stage_end
+ DGET "qword ptr [rsp]",data
+ mov rbp,rax
+ DREF rbp,arguments,"qword ptr [rbx+24]"
+ lea rdi,[rip+.Ldt_completed]
+ cmp dword ptr [rbx+4252],0
+ je .Ldt_data_status
+ lea rdi,[rip+.Ldt_result_error]
+ cmp dword ptr [rbx+4280],0
+ je .Ldt_data_abort
+ lea rdi,[rip+.Ldt_interrupted]
+.Ldt_data_abort:
+ cmp dword ptr [rbx+4256],2
+ jne .Ldt_data_status
+ lea rdi,[rip+.Ldt_aborted]
+.Ldt_data_status:
+ call json_object_new_string@PLT
+ mov rdx,rax
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_status]
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ mov rdi,[rbx+4272]
+ test rdi,rdi
+ jz .Ldt_metadata_done
+ lea rsi,[rip+.Ldt_details]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ldt_metadata_diagnostics
+ /* JSON null is a valid details value. */
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_details]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldt_metadata_add_failed
+.Ldt_metadata_diagnostics:
+ DGET "qword ptr [rbx+4272]",diagnostics
+ test rax,rax
+ jz .Ldt_metadata_done
+ DREF rbp,diagnostics,rax
+.Ldt_metadata_done:
  mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",conversation_id
  mov rdi,rax
@@ -489,6 +536,10 @@ pg_durable_tool_init:
  mov qword ptr [rsp+16],0
  xor eax,eax
  jmp .Ldt_stage_end
+.Ldt_metadata_add_failed:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ jmp .Ldt_stage_alloc
 .Ldt_stage_error_alloc:
  mov rdi,rbp
  call json_object_put@PLT
@@ -665,6 +716,7 @@ pg_durable_tool_init:
  mov qword ptr [rsp],4096
  lea rax,[r14+4224]
  mov [rsp+8],rax
+ mov dword ptr [r14+4284],1
  call [r14+48]
  jmp .Ldt_poll_result
 .Ldt_poll_active:
@@ -707,6 +759,38 @@ pg_durable_tool_init:
  movzx eax,al
  mov [r14+4252],eax
 .Ldt_poll_close:
+ cmp dword ptr [r14+4268],0
+ jne .Ldt_snapshot_done
+ mov rax,[r12]
+ cmp qword ptr [rax+40],0
+ je .Ldt_snapshot_mark
+ cmp dword ptr [r14+4284],0
+ je .Ldt_snapshot_mark
+ mov rdi,[rax]
+ mov rsi,[rbx+16]
+ mov rdx,[r14+16]
+ lea rcx,[r14+4272]
+ call [rax+40]
+ test eax,eax
+ jnz .Ldt_poll_error
+ mov rdi,[r14+4272]
+ test rdi,rdi
+ jz .Ldt_snapshot_mark
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_snapshot_invalid
+ DGET "qword ptr [r14+4272]",diagnostics
+ test rax,rax
+ jz .Ldt_snapshot_mark
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_snapshot_invalid
+.Ldt_snapshot_mark:
+ mov dword ptr [r14+4268],1
+.Ldt_snapshot_done:
  cmp dword ptr [r14+4236],0
  je .Ldt_poll_final
  mov rax,[r14+80]
@@ -735,7 +819,11 @@ pg_durable_tool_init:
  lea rsi,[rip+.Ldt_close_message]
  call .Ldt_message_output
  jmp .Ldt_poll_final
+.Ldt_snapshot_invalid:
+ mov eax,4
+ jmp .Ldt_poll_error
 .Ldt_poll_interrupted:
+ mov dword ptr [r14+4280],1
  mov dword ptr [r14+4252],1
  mov dword ptr [r14+4256],1
  mov rdi,r14
@@ -809,6 +897,11 @@ pg_durable_tool_init:
 .Ldt_outcome: .asciz "outcome"
 .Ldt_status: .asciz "status"
 .Ldt_result: .asciz "result"
+.Ldt_data: .asciz "data"
+.Ldt_details: .asciz "details"
+.Ldt_diagnostics: .asciz "diagnostics"
+.Ldt_result_error: .asciz "error"
+.Ldt_interrupted: .asciz "interrupted"
 .Ldt_entry_id: .asciz "entryId"
 .Ldt_error: .asciz "error"
 .Ldt_message: .asciz "message"

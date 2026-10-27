@@ -8,6 +8,8 @@ typedef enum { PG_SUCCESS, PG_ERROR, PG_CANCELLED } pg_outcome;
 typedef struct {
     pg_event_kind kind;
     pg_outcome outcome;
+    /* TOOL_STARTED text is the canonical JSON arguments; TOOL_FINISHED text
+       is output. Slices borrow the event until next poll. */
     pg_slice text, call_id, tool_name;
 } pg_event;
 typedef struct {
