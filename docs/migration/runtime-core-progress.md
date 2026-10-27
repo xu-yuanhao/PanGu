@@ -556,3 +556,11 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 手写begin_close保存外层dispatch guard，快照分配成功后封闭订阅并移除close集合，保留internal/durable观察直到已接收工作和holds保存完成。独立close_notified在Session封闭准入后停timer/发close，复用实际分阶段关闭，最终排空host queue及释放注册。公开布局保持，新增导出在现有模块登记。
 - 实际验证：直接与观察内部两条begin-close路径、回调取消/错误/重入、快照分配失败重试；四条实际Session自动保存路径核对一次关闭事件/报告、健康close持久通知、失败close不写和重复close。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异和新增8b实际方法probe通过；共享与隔离核心G00/Assembly及隔离产品构建通过。
 - 同一实施Agent自审：6个候选路径内容清单摘要（本记录加入前）81c3f261c068ccae93f779e36253b13f0228edaf0ab8890493d0cac8360b5686；隔离核心树74e3cd6eb5c90e6bd5f68343dd31d06f305d9ff8。结论为关闭通知生命周期本地通过；地址跟随watch/同步observeDoc继续，K03全量未完成。TUI工作保留。
+
+## K03 逻辑地址观察状态转换
+
+- 固定Pi 8b0caef #observeDocument/atAddress及watchDoc/observeDoc调用者，阅读session-observers退休/重建、session-watches地址与版本用例。Pi origin保持6c384aa，Harness origin/master保持22ddee37。
+- 手写独立观察状态：checked loaded初始化后独立地址/值所有权，缓存驱逐后仍可用；按incarnation或完整逻辑地址跟随，退休保留last value身份并清除状态值，重建/版本变化生成root replacement，同版本空ops跳过。fallible事件准备完成后才替换状态。现有服务与ABI保持，4个导出登记到现有模块。
+- 实际验证：三scope、kind/key/owner过滤、驱逐后转换、退休value身份与重复退休、重建/版本/空ops、12个直接分配/插入/复制故障；直接执行固定上游#observeDocument/atAddress，11组逐事件结果与原生一致。初始测试误为Session/Task definition附加Conversation策略，被实际cache检查拒绝；按scope改正夹具后重跑全部验证。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过，共享/隔离核心G00和Assembly及隔离产品构建通过。隔离核心树6f64b04a96604d2c76d50c90ed3126c5fe44f87a；其后仅为本组件TODO加完成勾选，6路径最终内容清单摘要（本记录加入前）5937a89c56dd249089b131798f8921c0d74f109c841538311965401ba8eb7202，候选树3747dbe485180ed7d974d365e3f0d6364ce8581c。
+- 同一实施Agent自审结论：地址跟随转换本地通过；下一批连接实际Session监听、pin/unpin、detach/owner结束/close及watch消费。K03完整观察项保持未勾选，TUI工作保留。

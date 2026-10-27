@@ -3549,3 +3549,327 @@ pg_durable_session_close_notified:
  ret
 .size pg_durable_session_close_notified,.-pg_durable_session_close_notified
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_observation_open
+.type pg_document_observation_open,@function
+pg_document_observation_open:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov eax,1
+ test rbx,rbx
+ jz .Lobservation_open_end
+ test r12,r12
+ jz .Lobservation_open_end
+ cmp dword ptr [rbx+32],0
+ jne .Lobservation_open_end
+ cmp dword ptr [rbx+36],0
+ jne .Lobservation_open_end
+ cmp dword ptr [r12+116],1
+ jne .Lobservation_open_end
+ cmp dword ptr [r12+112],0
+ jne .Lobservation_open_end
+ mov rdi,[r12+16]
+ lea rsi,[r12+24]
+ mov rdx,[r12+88]
+ call pg_document_check@PLT
+ test eax,eax
+ jnz .Lobservation_open_end
+ mov rdi,[r12]
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lobservation_open_bad
+ mov rdi,[r12+8]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lobservation_open_bad
+ mov rax,[rsp]
+ mov [rbx],rax
+ mov rax,[rsp+8]
+ mov [rbx+8],rax
+ mov rax,[r12+72]
+ mov [rbx+16],rax
+ mov rax,[r12+96]
+ mov [rbx+24],rax
+ mov dword ptr [rbx+32],1
+ xor eax,eax
+ jmp .Lobservation_open_end
+.Lobservation_open_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,3
+.Lobservation_open_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.size pg_document_observation_open,.-pg_document_observation_open
+
+.globl pg_document_observation_change_release
+.type pg_document_observation_change_release,@function
+pg_document_observation_change_release:
+ push rbx
+ mov rbx,rdi
+ test rbx,rbx
+ jz .Lobservation_change_end
+ mov rdi,[rbx]
+ call json_object_put@PLT
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov qword ptr [rbx],0
+ mov qword ptr [rbx+8],0
+ mov qword ptr [rbx+16],0
+.Lobservation_change_end:
+ pop rbx
+ ret
+.size pg_document_observation_change_release,.-pg_document_observation_change_release
+
+.globl pg_document_observation_close
+.type pg_document_observation_close,@function
+pg_document_observation_close:
+ mov eax,1
+ test rdi,rdi
+ jz .Lobservation_close_end
+ cmp dword ptr [rdi+36],0
+ jne .Lobservation_close_end
+ push rbx
+ mov rbx,rdi
+ call pg_document_observation_change_release
+ mov qword ptr [rbx+24],0
+ mov qword ptr [rbx+32],0
+ xor eax,eax
+ pop rbx
+.Lobservation_close_end:
+ ret
+.size pg_document_observation_close,.-pg_document_observation_close
+
+.globl pg_document_observation_advance
+.type pg_document_observation_advance,@function
+pg_document_observation_advance:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,104
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov eax,1
+ test r13,r13
+ jz .Lobservation_advance_end
+ mov qword ptr [r13],0
+ mov qword ptr [r13+8],0
+ mov qword ptr [r13+16],0
+ test rbx,rbx
+ jz .Lobservation_advance_end
+ test r12,r12
+ jz .Lobservation_advance_end
+ cmp dword ptr [rbx+32],1
+ jne .Lobservation_advance_end
+ cmp dword ptr [rbx+36],0
+ jne .Lobservation_advance_end
+ mov r14,[r12]
+ test r14,r14
+ jz .Lobservation_advance_end
+ mov dword ptr [rbx+36],1
+ xor ebp,ebp
+ mov qword ptr [rsp+64],0
+ mov qword ptr [rsp+72],0
+ mov qword ptr [rsp+80],0
+ mov rax,[r14+48]
+ cmp rax,[rbx+16]
+ je .Lobservation_address_match
+ mov rdi,[rbx]
+ mov rsi,rsp
+ call pg_document_record_decode@PLT
+ test eax,eax
+ jnz .Lobservation_invalid
+ mov rdi,rsp
+ mov rsi,r14
+ call pg_document_address_equal@PLT
+ test eax,eax
+ jz .Lobservation_missing
+.Lobservation_address_match:
+ cmp qword ptr [r12+8],0
+ jne .Lobservation_value
+ mov rax,[r14+48]
+ cmp rax,[rbx+16]
+ jne .Lobservation_missing
+ cmp qword ptr [rbx+8],0
+ je .Lobservation_missing
+ mov ebp,1
+ mov rdi,[rbx+8]
+ jmp .Lobservation_copy_value
+.Lobservation_value:
+ mov rdi,[r12+8]
+ call json_object_get_type@PLT
+ cmp eax,4
+ jne .Lobservation_invalid
+ mov rax,[r12+24]
+ test rax,rax
+ jz .Lobservation_invalid
+ mov rdx,9007199254740991
+ cmp rax,rdx
+ ja .Lobservation_invalid
+ mov rax,[r14+48]
+ cmp rax,[rbx+16]
+ jne .Lobservation_replace
+ mov rax,[r12+24]
+ cmp rax,[rbx+24]
+ jne .Lobservation_replace
+ mov rdi,[r12+16]
+ test rdi,rdi
+ jz .Lobservation_invalid
+ call json_object_get_type@PLT
+ cmp eax,5
+ jne .Lobservation_invalid
+ mov rdi,[r12+16]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lobservation_missing
+ jmp .Lobservation_new_value
+.Lobservation_replace:
+ mov ebp,2
+.Lobservation_new_value:
+ mov rdi,[r12+8]
+.Lobservation_copy_value:
+ cmp ebp,1
+ jne .Lobservation_clone_value
+ call json_object_get@PLT
+ mov [rsp+64],rax
+ jmp .Lobservation_value_copied
+.Lobservation_clone_value:
+ lea rsi,[rsp+64]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lobservation_allocation
+.Lobservation_value_copied:
+ cmp ebp,2
+ je .Lobservation_root
+ test ebp,ebp
+ jz .Lobservation_copy_ops
+ xor edi,edi
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lobservation_allocation
+ mov [rsp+72],rax
+ jmp .Lobservation_adopt
+.Lobservation_copy_ops:
+ mov rdi,[r12+16]
+ lea rsi,[rsp+72]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lobservation_allocation
+ jmp .Lobservation_adopt
+.Lobservation_root:
+ mov edi,1
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lobservation_allocation
+ mov [rsp+72],rax
+ mov edi,2
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lobservation_allocation
+ mov [rsp+80],rax
+ lea rdi,[rip+.Lobservation_root_name]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lobservation_allocation
+ mov r15,rax
+ mov rdi,[rsp+80]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lobservation_root_item_bad
+ mov rdi,[rsp+64]
+ call json_object_get@PLT
+ mov r15,rax
+ mov rdi,[rsp+80]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lobservation_root_item_bad
+ mov rdi,[rsp+72]
+ mov rsi,[rsp+80]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lobservation_allocation
+ mov qword ptr [rsp+80],0
+.Lobservation_adopt:
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov qword ptr [rbx+8],0
+ cmp ebp,1
+ jne .Lobservation_adopt_value
+ mov qword ptr [rbx+16],0
+ mov dword ptr [r13+16],1
+ jmp .Lobservation_output
+.Lobservation_adopt_value:
+ mov rdi,[rsp+64]
+ call json_object_get@PLT
+ mov [rbx+8],rax
+ mov rax,[r14+48]
+ mov [rbx+16],rax
+ mov rax,[r12+24]
+ mov [rbx+24],rax
+ cmp ebp,2
+ sete al
+ movzx eax,al
+ mov [r13+20],eax
+.Lobservation_output:
+ mov rax,[rsp+64]
+ mov [r13],rax
+ mov rax,[rsp+72]
+ mov [r13+8],rax
+ xor eax,eax
+ jmp .Lobservation_unlock
+.Lobservation_root_item_bad:
+ mov rdi,r15
+ call json_object_put@PLT
+.Lobservation_allocation:
+ mov r15d,3
+ jmp .Lobservation_cleanup
+.Lobservation_missing:
+ mov r15d,8
+ jmp .Lobservation_cleanup
+.Lobservation_invalid:
+ mov r15d,1
+.Lobservation_cleanup:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ mov rdi,[rsp+80]
+ call json_object_put@PLT
+ mov eax,r15d
+.Lobservation_unlock:
+ mov dword ptr [rbx+36],0
+.Lobservation_advance_end:
+ add rsp,104
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_observation_advance,.-pg_document_observation_advance
+.section .rodata
+.Lobservation_root_name: .asciz "r"
+.section .note.GNU-stack,"",@progbits

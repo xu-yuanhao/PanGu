@@ -561,3 +561,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - durable_session.S/h新增begin_close和close_notified独立入口：登记状态open/draining/released，close集合调用前移除，其余观察注册保留；嵌套观察中恢复原busy，快照分配失败在调用前拒绝且允许重试。实际Session关闭封闭准入，停timer后分发close，完成原分阶段清理，再排空host queue并释放listeners，既有ABI保持。
 - 原生专项覆盖三close订阅者的取消/错误/快照、观察内部关闭、分配失败重试；四组自动保存Session路径验证关闭事件仅一次、错误报告、重复关闭重入保护、最终无注册资源，健康close仍发布holds保存而失败close不写。来源probe核对实际上游停timer/快照/错误/重入顺序。
 - 后续继续地址跟随watch及同步observeDoc，K03总验收按全部公开行为核对。
+
+### K03 地址跟随的观察状态
+
+- 固定Pi 8b0caef的Session.#observeDocument/atAddress，调用者watchDoc/observeDoc及session-observers的retirement/recreation、session-watches的scope/family/version用例。上游检查Pi origin保持6c384aa、Harness保持22ddee37，固定工作树未变。
+- [x] durable_session.S/h新增独立owned观察状态与单个Document notice转换：checked loaded初始化后独立持有地址/值，缓存驱逐不影响；相同incarnation直接匹配，其他incarnation按kind/key/scope/owner匹配。退休事件保留上次value身份、空ops并从状态释放value；同址重建/版本改变生成root replacement；同版本空ops不交付。所有fallible准备先于状态替换，失败清空输出且保留原状态。
+- observation_state_tests覆盖三scope、地址过滤、缓存驱逐、退休值身份、重复退休、重建/版本/空ops及12个直接分配/插入/复制故障。test_record_memory.py直接执行固定上游#observeDocument/atAddress，11组逐次事件与原生一致。
+- 下一行为：将转换接入实际Session订阅、pin/unpin、detach/owner终态及close回调，再完成同步observeDoc与watch消费；本批状态转换组件不等同完整watch。

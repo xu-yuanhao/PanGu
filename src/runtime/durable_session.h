@@ -253,4 +253,20 @@ typedef struct {pg_record_storage backend;pg_session_dispatch *dispatch;} pg_ses
    Return the backend's exact status. A queue snapshot allocation failure leaves
    work for the notification cleanup's retry, without inventing Storage errors. */
 int pg_session_dispatch_storage_commit(void *,const struct json_object *,pg_records_adopt,void *,uint64_t *);
+/* Owned address-following state; fields are API-managed and JSON is immutable.
+   Open copies a checked loaded document and retains no pointer into its cache.
+   Retirement drops the state value; its returned event owns the last value.
+   Outputs are initially empty/disjoint and released before reuse. */
+typedef struct {struct json_object *record,*value;uint64_t incarnation,version;unsigned active,busy;} pg_document_observation;
+typedef struct {const pg_document_record *record;const struct json_object *value,*ops;uint64_t version;} pg_document_observation_input;
+typedef struct {struct json_object *value,*ops;unsigned retired,replaced;} pg_document_observation_change;
+pg_document_status pg_document_observation_open(pg_document_observation *,const pg_document_loaded *);
+/* One already-validated document notice. NULL value denotes retirement; ops
+   are needed for same-incarnation/version updates. MISSING means no delivery.
+   New incarnation/version produces a root replacement. Allocation failure
+   preserves the previous state and clears output. State/event share immutable
+   owned values, independent of the input notice and retired loaded handle. */
+pg_document_status pg_document_observation_advance(pg_document_observation *,const pg_document_observation_input *,pg_document_observation_change *);
+void pg_document_observation_change_release(pg_document_observation_change *);
+pg_document_status pg_document_observation_close(pg_document_observation *);
 #endif

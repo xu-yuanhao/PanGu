@@ -1270,7 +1270,11 @@
         "pg_session_adoption_hold_bind",
         "pg_session_dispatch_storage_commit",
         "pg_session_listeners_begin_close",
-        "pg_durable_session_close_notified"
+        "pg_durable_session_close_notified",
+        "pg_document_observation_open",
+        "pg_document_observation_advance",
+        "pg_document_observation_change_release",
+        "pg_document_observation_close"
       ],
       "reference_basis": [
         {
@@ -1322,6 +1326,18 @@
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-adoption.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#observeDocument and atAddress: detached native state follows logical address and incarnation/version, retirement delivers its last value with no ops and releases retained value, recreation/version change delivers root replacement, same-version empty ops are suppressed; fallible native preparation preserves old state and output ownership",
+          "tests_to_read": [
+            "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
           ]
         }
       ]

@@ -711,6 +711,44 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==['sweep','timer',1,'report',2,3],actual
     print('PASS: actual Pi 8b0caef notifyClose disarms before callbacks, snapshots once, contains failure and permits reentrant close notification')
 
+def observation_source_state(native,library):
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776'
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/durable/src/session/session.ts'],text=True)
+    record=dict(id=2,kind='defer',scope=dict(kind='conversation',conversationId=1),history='latest',fork='initial',createdAt=1)
+    def notice(id,value,ops,version=1,**extra):return dict(type='document',record={**record,'id':id,**extra},value=value,ops=ops,version=version)
+    ops=[['s',['text'],'next']]
+    changes=[notice(2,dict(text='next'),ops),notice(2,dict(text='ignored'),[]),notice(20,dict(text='other'),ops,kind='other'),notice(20,dict(text='other'),ops,key=''),notice(20,dict(text='other'),ops,scope=dict(kind='conversation',conversationId=9)),notice(20,None,[]),notice(2,None,[['s',['text'],'retiring']]),notice(2,None,[]),notice(20,dict(text='new'),[],2),notice(20,dict(text='v3'),[],3),notice(20,dict(text='last'),ops,3)]
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const {source,record,changes}=JSON.parse(readFileSync(0,'utf8'));const a=source.indexOf('\n\t#observeDocument<'),b=source.indexOf('\n\tasync #loadDocument',a),c=source.indexOf('function atAddress('),d=source.indexOf('\nfunction cancellationError',c);const NO_OPERATIONS=[];function checkRecordScope(){}function checkRecordVersion(){}const atAddress=eval('('+stripTypeScriptTypes(source.slice(c,d))+')');const Probe=eval('('+stripTypeScriptTypes(`class Probe{#failure;commit;end;#pinDocument(){return ()=>{}}observeCommits(fn){this.commit=fn;return ()=>{}}subscribeClose(fn){this.end=fn;return ()=>{}}report(e){throw e}open(record){const events=[];this.#observeDocument({}, {addressId:'address',record,storedVersion:1,valueVersion:1,tracker:{value:{text:'seed'}}},()=>({advance:x=>events.push(structuredClone(x)),end(){}}),()=>{});return events}`+source.slice(a,b)+'}')+')');const p=new Probe(),events=p.open(record),out=[];for(const change of changes){const before=events.length;p.commit({changes:[change]},null);out.push(events.length===before?null:events.at(-1))}console.log(JSON.stringify(out));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=json.dumps(dict(source=source,record=record,changes=changes)),text=True,capture_output=True,check=True).stdout)
+    class Record(ctypes.Structure):_fields_=[('address',Address),('id',ctypes.c_uint64),('history',ctypes.c_uint),('fork',ctypes.c_uint)]
+    class Definition(ctypes.Structure):_fields_=[('kind',Slice),('version',ctypes.c_uint64),('scope',ctypes.c_uint),('history',ctypes.c_uint),('fork',ctypes.c_uint),('family',ctypes.c_uint),('context',ctypes.c_void_p),('migrate',ctypes.c_void_p)]
+    class Loaded(ctypes.Structure):_fields_=[('record_owner',ctypes.c_void_p),('value',ctypes.c_void_p),('definition',ctypes.POINTER(Definition)),('record',Record),('stored',ctypes.c_uint64),('version',ctypes.c_uint64),('deltas',ctypes.c_uint64),('busy',ctypes.c_uint),('active',ctypes.c_uint)]
+    class State(ctypes.Structure):_fields_=[('record',ctypes.c_void_p),('value',ctypes.c_void_p),('id',ctypes.c_uint64),('version',ctypes.c_uint64),('active',ctypes.c_uint),('busy',ctypes.c_uint)]
+    class Input(ctypes.Structure):_fields_=[('record',ctypes.POINTER(Record)),('value',ctypes.c_void_p),('ops',ctypes.c_void_p),('version',ctypes.c_uint64)]
+    class Event(ctypes.Structure):_fields_=[('value',ctypes.c_void_p),('ops',ctypes.c_void_p),('retired',ctypes.c_uint),('replaced',ctypes.c_uint)]
+    native.pg_document_record_decode.argtypes=[ctypes.c_void_p,ctypes.POINTER(Record)]
+    native.pg_document_observation_open.argtypes=[ctypes.POINTER(State),ctypes.POINTER(Loaded)]
+    native.pg_document_observation_advance.argtypes=[ctypes.POINTER(State),ctypes.POINTER(Input),ctypes.POINTER(Event)]
+    native.pg_document_observation_close.argtypes=[ctypes.POINTER(State)]
+    native.pg_document_observation_change_release.argtypes=[ctypes.POINTER(Event)]
+    make=lambda x:library.json_tokener_parse(json.dumps(x).encode())
+    r=make(record);v=make(dict(text='seed'));decoded=Record();assert not native.pg_document_record_decode(r,ctypes.byref(decoded))
+    name=ctypes.create_string_buffer(b'defer');definition=Definition(Slice(ctypes.addressof(name),5),1,1,1,2,0,None,None);loaded=Loaded(r,v,ctypes.pointer(definition),decoded,1,1,0,0,1);state=State();assert not native.pg_document_observation_open(ctypes.byref(state),ctypes.byref(loaded));library.json_object_put(r);library.json_object_put(v)
+    actual=[]
+    try:
+        for change in changes:
+            r=make(change['record']);v=make(change['value']) if change['value'] is not None else None;ops=make(change['ops']);rec=Record();assert not native.pg_document_record_decode(r,ctypes.byref(rec));inp=Input(ctypes.pointer(rec),v,ops,change['version']);event=Event()
+            try:
+                status=native.pg_document_observation_advance(ctypes.byref(state),ctypes.byref(inp),ctypes.byref(event));assert status in (0,8),status
+                actual.append(None if status else dict(value=json.loads(library.json_object_to_json_string_ext(event.value,0)),ops=json.loads(library.json_object_to_json_string_ext(event.ops,0)),retired=bool(event.retired)))
+            finally:
+                native.pg_document_observation_change_release(ctypes.byref(event));library.json_object_put(r);library.json_object_put(v);library.json_object_put(ops)
+    finally:assert not native.pg_document_observation_close(ctypes.byref(state))
+    assert actual==expected,(actual,expected)
+    print(f'PASS: {len(changes)} native address-following state transitions match actual Pi 8b0caef observeDocument')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1003,5 +1041,6 @@ def main():
         dispatch_notifications(native,library)
         adoption_source_order()
         close_source_order()
+        observation_source_state(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()
