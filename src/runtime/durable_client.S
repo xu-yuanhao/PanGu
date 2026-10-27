@@ -114,6 +114,20 @@ pg_durable_client_emit:
  mov qword ptr [rsp+48],0
  mov [rsp],esi
  mov [rsp+4],edx
+ cmp esi,4
+ jne .Ldc_boundary_emit
+ cmp edx,1
+ jne .Ldc_boundary_emit
+ mov rdi,[rbx+112]
+ test rdi,rdi
+ jz .Ldc_boundary_emit
+ call json_object_get_string@PLT
+ mov [rsp+8],rax
+ mov rdi,[rbx+112]
+ call json_object_get_string_len@PLT
+ mov [rsp+16],rax
+.Ldc_boundary_emit:
+ mov rdi,rbx
  mov rsi,rsp
  call pg_durable_client_emit@PLT
  add rsp,64
@@ -154,6 +168,7 @@ pg_durable_client_open:
  movdqu [rbx+64],xmm0
  movdqu [rbx+80],xmm0
  mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+112],0
  call json_object_new_object@PLT
  mov [rbx+104],rax
  test rax,rax
@@ -323,6 +338,9 @@ pg_durable_client_open:
  mov dword ptr [rbx+76],1
  mov dword ptr [rbx+80],0
  mov dword ptr [rbx+92],0
+ mov rdi,[rbx+112]
+ call json_object_put@PLT
+ mov qword ptr [rbx+112],0
  mov rdi,rbx
  xor esi,esi
  xor edx,edx
@@ -606,6 +624,9 @@ pg_durable_client_suspend:
  mov rdi,[rbx+104]
  call json_object_put@PLT
  mov qword ptr [rbx+104],0
+ mov rdi,[rbx+112]
+ call json_object_put@PLT
+ mov qword ptr [rbx+112],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -846,6 +867,8 @@ pg_durable_client_publish:
  sub rsp,8
  mov rbx,rdi
  mov r12,rsi
+ cmp dword ptr [rbx+84],0
+ jne .Ldc_publish_end
  xor r13d,r13d
 .Ldc_publish_each:
  mov rdi,r12
@@ -874,6 +897,31 @@ pg_durable_client_publish:
  mov rdi,rbx
  mov edx,1
  call pg_durable_client_tool@PLT
+ CGET "qword ptr [rsp]",value
+ mov r14,rax
+ CGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_publish_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_generation]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_publish_next
+ CGET r14,state
+ CGET rax,outcome
+ CGET rax,error
+ CGET rax,message
+ test rax,rax
+ jz .Ldc_publish_next
+ mov rdi,rax
+ call json_object_get@PLT
+ mov r14,rax
+ mov rdi,[rbx+112]
+ call json_object_put@PLT
+ mov [rbx+112],r14
+ mov dword ptr [rbx+92],1
 .Ldc_publish_next:
  inc r13
  jmp .Ldc_publish_each
@@ -904,6 +952,10 @@ pg_durable_client_publish:
 .Ldc_text: .asciz "text"
 .Ldc_type: .asciz "type"
 .Ldc_value: .asciz "value"
+.Ldc_kind: .asciz "kind"
+.Ldc_generation: .asciz "pangu.generation"
+.Ldc_error: .asciz "error"
+.Ldc_message: .asciz "message"
 .Ldc_task: .asciz "task"
 .Ldc_id_format: .asciz "%llu"
 .Ldc_user_json: .asciz "{\"kind\":\"pangu.user\",\"model\":[{\"role\":\"user\",\"content\":\"\"}]}"

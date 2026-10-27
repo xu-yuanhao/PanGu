@@ -247,9 +247,17 @@ static void test_abi_input(void)
 	check_sentinels("input_text");
 	T_CHECK(abi_probe2((abi_fn2)tui_input_feed, (unsigned long)&in, '\r') == TUI_KEY_ENTER);
 	T_CHECK(tui_input_len(&in) == 1); /* 提交不改动内容 */
+ (void)abi_probe1((abi_fn1)tui_input_remember, (unsigned long)&in);
+ check_sentinels("input_remember");
+ T_CHECK(in.history_count == 1);
 	(void)abi_probe1((abi_fn1)tui_input_reset, (unsigned long)&in);
 	check_sentinels("input_reset");
 	T_CHECK(tui_input_len(&in) == 0);
+ (void)abi_probe2((abi_fn2)tui_input_feed, (unsigned long)&in, 27);
+ (void)abi_probe2((abi_fn2)tui_input_feed, (unsigned long)&in, '[');
+ T_CHECK(abi_probe2((abi_fn2)tui_input_feed, (unsigned long)&in, 'A') == TUI_KEY_CURSOR);
+ check_sentinels("input_vertical_history");
+ T_CHECK(in.len == 1 && in.buf[0] == 'h');
 	T_RUN("abi_input");
 }
 
@@ -401,12 +409,13 @@ static void test_abi_history(void){tui_view view;tui_state state;tstr out;tstr_c
 static char *guard_alloc(size_t usable)
 {
 	size_t pg = 4096;
-	char *base = mmap(NULL, 2 * pg, PROT_READ | PROT_WRITE,
+	size_t span = ((usable + pg - 1) / pg) * pg;
+	char *base = mmap(NULL, span + pg, PROT_READ | PROT_WRITE,
 			  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	T_CHECK(base != MAP_FAILED);
-	T_CHECK(mprotect(base + pg, pg, PROT_NONE) == 0);
-	return base + pg - usable; /* usable 字节止于保护页边界 */
+	T_CHECK(mprotect(base + span, pg, PROT_NONE) == 0);
+	return base + span - usable; /* usable 字节止于保护页边界 */
 }
 
 static void test_guard_utf8(void)
@@ -458,6 +467,20 @@ static void test_guard_input_full(void)
 	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 2);
 	T_CHECK(tui_input_feed(in, 0x15) == TUI_KEY_CHAR);
 	T_CHECK(tui_input_len(in) == 0);
+ /* Full history capacity must stay inside the enlarged guarded structure. */
+ for (unsigned j=0;j<105;j++) {
+  tui_input_reset(in);
+  tui_input_feed(in, 'a' + j % 26);
+  tui_input_remember(in);
+ }
+ T_CHECK(in->history_count == 100);
+ tui_input_reset(in);
+ feed_bytes(in, "\x1b[A");
+ T_CHECK(in->len == 1);
+ memset(in->buf,'a',TUI_INPUT_MAX_BYTES-1);
+ in->len=TUI_INPUT_MAX_BYTES-1; in->cursor=in->len; in->columns=1;
+ feed_bytes(in,"\x1b[A");
+ T_CHECK(in->cursor == TUI_INPUT_MAX_BYTES-3);
 	T_RUN("guard_input_full");
 }
 
@@ -489,7 +512,6 @@ static void test_guard_view_text(void)
 	/* md 行缓冲：无换行不输出，完整与不完整序列都在行内 */
 	T_CHECK(out.len == 0);
 	T_CHECK(v.md.line_len == 5);
-	T_CHECK(v.carry_len == 0);
 	memset(&ev, 0, sizeof(ev));
 	ev.kind = TUI_EV_TEXT_DELTA;
 	ev.text = "\n";

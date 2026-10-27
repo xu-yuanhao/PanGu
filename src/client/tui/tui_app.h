@@ -23,7 +23,8 @@ typedef enum {
 	TUI_EXIT_EOF = 0,        /* ^D 或 stdin EOF */
 	TUI_EXIT_CTRL_C_IDLE,    /* 闲置时 ^C */
 	TUI_EXIT_SIGNAL,         /* 外部 SIGINT/SIGTERM/SIGHUP */
-	TUI_EXIT_POLL_ERROR      /* Runtime poll 错误（未补造终态） */
+	TUI_EXIT_POLL_ERROR,     /* Runtime poll 错误（未补造终态） */
+	TUI_EXIT_COMMAND        /* explicit /quit, through normal shutdown */
 } tui_exit_reason;
 
 typedef struct tui_app_config {

@@ -12,7 +12,7 @@ typedef struct {
  const pg_tool_registry *tools;
  pg_mimo_call_storage extra[PG_TOOL_BATCH_LIMIT-1];
  pg_model_call calls[PG_TOOL_BATCH_LIMIT];
- unsigned call_count;
+ unsigned call_count,transport_error;
 } pg_mimo;
 /* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint

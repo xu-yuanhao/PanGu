@@ -9,13 +9,17 @@
 .Lfmt_cud:          .asciz "\033[%uB"
 .Lfmt_cha:          .asciz "\033[%uG"
 .Lprompt:           .asciz "> "
-.Linput_hint:       .asciz "[tui] 输入：Enter 提交，Alt+Enter 插入换行，Ctrl-U 清空草稿\n"
+.Lsearch_match: .asciz "[match] "
+.Lsearch_failed: .asciz "[search] Unicode 转换不可用；可 Ctrl-C 恢复草稿\n"
+.Lsearch_idle: .asciz "[search] 输入内容开始查找\n"
+.Lsearch_no_match: .asciz "[search] 无匹配\n"
+.Lhistory_search: .asciz "[history search] 输入查询；Ctrl-R/Up: 较早；Ctrl-S/Down: 较新；Enter: 采用；Esc/Ctrl-C: 恢复草稿\n"
+.Lcompletions: .asciz "[commands] /hotkeys  /quit\n> /hotkeys\n  /quit\nUp/Down: 选择；Enter: 填入；Esc/Ctrl-C: 关闭\n"
+.Lcompletions_quit: .asciz "[commands] /hotkeys  /quit\n  /hotkeys\n> /quit\nUp/Down: 选择；Enter: 填入；Esc/Ctrl-C: 关闭\n"
+.Lhelp: .asciz "[help] PanGu 快捷键\nEnter: 提交；Alt+Enter: 换行；括号粘贴: 安全多行输入\nLeft/Right: 按码点移动；Home/End: 行首/行尾\nUp/Down: 视觉行移动；顶部/底部: 输入历史与草稿\nBackspace/Delete: 删除；Ctrl-U: 清空草稿\nCtrl-O: 展开所有保留工具的隐藏输出（运行中也可展开）；Ctrl-R: 搜索输入历史；Tab: 补全本地命令；PageUp/PageDown: 阅读历史/回到最新；F1 或 /hotkeys: 快捷键帮助\nCtrl-C: 运行时请求取消，闲置时退出；Ctrl-D: 空草稿退出，非空退格\n/quit: 通过 Runtime shutdown 退出并恢复终端\n[help] 可直接继续编辑当前草稿\n"
+.Linput_hint:       .asciz "[tui] 输入：Enter 提交，Alt+Enter 插入换行，Ctrl-U 清空草稿，F1 帮助；行首 Up 浏览输入历史，行尾 Down 返回草稿\n"
 .Lqmark:            .asciz "?"
-.Ltool_pfx:         .asciz "[tool] "
 .Lhash_paren:       .asciz " (#"
-.Lparen_started:    .asciz ") started\n"
-.Lfin_ok:           .asciz ") finished ok: "
-.Lfin_err:          .asciz ") finished error: "
 .Lnl:               .asciz "\n"
 .Lrun_started:      .asciz "[run] started\n"
 .Lrun_fin_ok:       .asciz "[run] finished: success\n"
@@ -43,223 +47,48 @@
 
 .section .text
 
-/* ---- 内部：sink.write(ctx, data, len)，返回值忽略。rbx=view，rsi/rdx=数据 ---- */
-.type li_sink_write,@function
-li_sink_write:
- mov rax, qword ptr [rbx + TUI_LI_VIEW_SINK_WRITE]
- mov rdi, qword ptr [rbx + TUI_LI_VIEW_SINK_CTX]
- jmp rax
-.size li_sink_write, .-li_sink_write
+/* ---- emit 回调（tui_tool_emit 实现）与内部通道：转义/换行翻译委托
+ * tui_safe.S（视图、工具、diff 共享同一实现）。 ----
+ * tui_view_raw_put(ctx=v, data, len)：不转义；ANSI 模式 '\n'→"\r\n"。
+ * tui_view_safe_put(ctx=v, data, len)：控制字节转义 + 换行翻译。 */
+.globl tui_view_raw_put
+.type tui_view_raw_put,@function
+tui_view_raw_put:
+ mov ecx, edx          /* len */
+ mov rdx, rsi          /* data（先于 esi 覆写取走） */
+ mov esi, dword ptr [rdi + TUI_LI_VIEW_ANSI]
+ lea rdi, [rdi + TUI_LI_VIEW_SINK_CTX]
+ jmp tui_raw_write@PLT
+.size tui_view_raw_put,.-tui_view_raw_put
 
-/* ---- 内部：vput(tui_view *v, const char *data, size_t len)
- * ANSI 模式把 '\n' 翻译为 "\r\n"；降级模式原样写出。 ---- */
+.globl tui_view_safe_put
+.type tui_view_safe_put,@function
+tui_view_safe_put:
+ mov ecx, edx
+ mov rdx, rsi
+ mov esi, dword ptr [rdi + TUI_LI_VIEW_ANSI]
+ lea rdi, [rdi + TUI_LI_VIEW_SINK_CTX]
+ jmp tui_safe_write@PLT
+.size tui_view_safe_put,.-tui_view_safe_put
+
+/* ---- 内部：vput(tui_view *v, const char *data, size_t len) ---- */
 .type li_vput,@function
 li_vput:
- test rdx, rdx
- jz .Lvput_done
- cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
- je .Lvput_plain
- push rbx
- push r12
- push r13
- push r14
- push r15
- mov rbx, rdi
- mov r12, rsi
- mov r13, rdx
- xor r14d, r14d /* i */
- xor r15d, r15d /* off */
-.Lvput_scan:
- cmp r14, r13
- jae .Lvput_tail
- cmp byte ptr [r12 + r14], 10 /* '\n' */
- jne .Lvput_next
- cmp r14, r15
- jbe .Lvput_no_pre
- mov rdi, rbx
- lea rsi, [r12 + r15]
- mov rdx, r14
- sub rdx, r15
- call li_sink_write
-.Lvput_no_pre:
- mov rdi, rbx
- lea rsi, [rip + .Lcrlf]
- mov edx, 2
- call li_sink_write
- lea r15, [r14 + 1]
-.Lvput_next:
- inc r14
- jmp .Lvput_scan
-.Lvput_tail:
- cmp r13, r15
- jbe .Lvput_fin
- mov rdi, rbx
- lea rsi, [r12 + r15]
- mov rdx, r13
- sub rdx, r15
- call li_sink_write
-.Lvput_fin:
- pop r15
- pop r14
- pop r13
- pop r12
- pop rbx
-.Lvput_done:
- ret
-.Lvput_plain:
- mov rax, qword ptr [rdi + TUI_LI_VIEW_SINK_WRITE]
- mov rdi, qword ptr [rdi + TUI_LI_VIEW_SINK_CTX]
- jmp rax
+ mov ecx, edx          /* len */
+ mov rdx, rsi          /* data（先于 esi 覆写取走） */
+ mov esi, dword ptr [rdi + TUI_LI_VIEW_ANSI]
+ lea rdi, [rdi + TUI_LI_VIEW_SINK_CTX]
+ jmp tui_raw_write@PLT
 .size li_vput, .-li_vput
 
 /* Escape control bytes in data, preserving complete UTF-8 and newline/tab. */
 .type li_safe_vput,@function
 li_safe_vput:
- push rbx
- push r12
- push r13
- push r14
- push r15
- sub rsp,16
- mov rbx,rdi
- mov r12,rsi
- mov r13,rdx
- xor r14d,r14d
- xor r15d,r15d
-.Lsafe_scan:
- cmp r14,r13
- jae .Lsafe_tail
- movzx eax,byte ptr [r12+r14]
- cmp eax,32
- jae .Lsafe_non_c0
- cmp eax,9
- je .Lsafe_next
- cmp eax,10
- je .Lsafe_next
- jmp .Lsafe_byte
-.Lsafe_non_c0:
- cmp eax,127
- je .Lsafe_byte
- cmp eax,128
- jb .Lsafe_next
- cmp eax,160
- jb .Lsafe_byte
- cmp eax,194
- jb .Lsafe_byte
- cmp eax,244
- ja .Lsafe_byte
- cmp eax,194
- jne .Lsafe_utf8
- lea rcx,[r14+1]
- cmp rcx,r13
- jae .Lsafe_byte
- movzx eax,byte ptr [r12+rcx]
- cmp eax,128
- jb .Lsafe_utf8
- cmp eax,159
- ja .Lsafe_utf8
- mov qword ptr [rsp+8],2
- jmp .Lsafe_escape
-.Lsafe_utf8:
- movzx edi,byte ptr [r12+r14]
- call tui_utf8_seq_len
- mov rcx,r13
- sub rcx,r14
- cmp rax,rcx
- ja .Lsafe_incomplete
- mov ecx,1
-.Lsafe_continuation:
- cmp rcx,rax
- jae .Lsafe_sequence_bounds
- lea rdx,[r14+rcx]
- movzx edx,byte ptr [r12+rdx]
- sub edx,128
- cmp edx,63
- ja .Lsafe_incomplete
- inc ecx
- jmp .Lsafe_continuation
-.Lsafe_sequence_bounds:
- movzx edx,byte ptr [r12+r14]
- movzx ecx,byte ptr [r12+r14+1]
- cmp edx,224
- jne .Lsafe_surrogate
- cmp ecx,160
- jb .Lsafe_incomplete
-.Lsafe_surrogate:
- cmp edx,237
- jne .Lsafe_plane
- cmp ecx,159
- ja .Lsafe_incomplete
-.Lsafe_plane:
- cmp edx,240
- jne .Lsafe_maximum
- cmp ecx,144
- jb .Lsafe_incomplete
-.Lsafe_maximum:
- cmp edx,244
- jne .Lsafe_advance
- cmp ecx,143
- ja .Lsafe_incomplete
-.Lsafe_advance:
- add r14,rax
- jmp .Lsafe_scan
-.Lsafe_incomplete:
- movzx eax,byte ptr [r12+r14]
-.Lsafe_byte:
- mov qword ptr [rsp+8],1
-.Lsafe_escape:
- mov [rsp+4],eax
- cmp r14,r15
- je .Lsafe_marker
- mov rdi,rbx
- lea rsi,[r12+r15]
- mov rdx,r14
- sub rdx,r15
- call li_vput
-.Lsafe_marker:
- mov eax,[rsp+4]
- lea rsi,[rip+.Lhex]
- mov ecx,eax
- and eax,15
- shr ecx,4
- mov al,[rsi+rax]
- mov cl,[rsi+rcx]
- mov word ptr [rsp],0x785c
- mov [rsp+2],cl
- mov [rsp+3],al
- mov edx,4
- cmp qword ptr [rsp+8],2
- jne .Lsafe_emit
- mov dword ptr [rsp],0x3030755c
- mov [rsp+4],cl
- mov [rsp+5],al
- mov edx,6
-.Lsafe_emit:
- mov rdi,rbx
- mov rsi,rsp
- call li_vput
- add r14,[rsp+8]
- mov r15,r14
- jmp .Lsafe_scan
-.Lsafe_next:
- inc r14
- jmp .Lsafe_scan
-.Lsafe_tail:
- cmp r13,r15
- jbe .Lsafe_done
- mov rdi,rbx
- lea rsi,[r12+r15]
- mov rdx,r13
- sub rdx,r15
- call li_vput
-.Lsafe_done:
- add rsp,16
- pop r15
- pop r14
- pop r13
- pop r12
- pop rbx
- ret
+ mov ecx, edx
+ mov rdx, rsi
+ mov esi, dword ptr [rdi + TUI_LI_VIEW_ANSI]
+ lea rdi, [rdi + TUI_LI_VIEW_SINK_CTX]
+ jmp tui_safe_write@PLT
 .size li_safe_vput,.-li_safe_vput
 
 /* ---- 内部：vputs(tui_view *v, const char *s) ---- */
@@ -334,127 +163,6 @@ li_editor_break:
 .Lbrk_ret:
  ret
 .size li_editor_break, .-li_editor_break
-
-/* ---- 内部：cp_width(seq, len) → eax ∈ {0,1,2}：code point 显示宽度近似。
- * 零宽：组合附加符号/零宽字符/变体选择符；宽 2：CJK/全角/主要 emoji 平面。
- * 与编辑器同为 code point 粒度，不声明完整字素簇/东亚宽度全表。 */
-.align 4
-.Lw_zero:
- .long 0x0300, 0x036F
- .long 0x200B, 0x200F
- .long 0xFE00, 0xFE0F
-.Lw_zero_end:
-.Lw_wide:
- .long 0x1100, 0x115F
- .long 0x2E80, 0x303E
- .long 0x3041, 0x33FF
- .long 0x3400, 0x4DBF
- .long 0x4E00, 0x9FFF
- .long 0xA000, 0xA4CF
- .long 0xAC00, 0xD7A3
- .long 0xF900, 0xFAFF
- .long 0xFE30, 0xFE4F
- .long 0xFF00, 0xFF60
- .long 0x1F300, 0x1F64F
- .long 0x1F680, 0x1F6FF
- .long 0x1F900, 0x1F9FF
- .long 0x20000, 0x2FFFD
- .long 0x30000, 0x3FFFD
-.Lw_wide_end:
-
-.type li_cp_width,@function
-li_cp_width:
- movzx eax, byte ptr [rdi]
- cmp eax, 0x80
- jb .Lw_one
- mov edx, eax
- and edx, 0xE0
- cmp edx, 0xC0
- jne .Lw_3
- cmp rsi, 2
- jb .Lw_one
- movzx eax, byte ptr [rdi + 1]
- and eax, 0x3F
- movzx edx, byte ptr [rdi]
- and edx, 0x1F
- shl edx, 6
- or eax, edx
- jmp .Lw_scan
-.Lw_3:
- mov edx, eax
- and edx, 0xF0
- cmp edx, 0xE0
- jne .Lw_4
- cmp rsi, 3
- jb .Lw_one
- movzx eax, byte ptr [rdi + 1]
- and eax, 0x3F
- movzx edx, byte ptr [rdi + 2]
- and edx, 0x3F
- shl eax, 6
- or eax, edx
- movzx edx, byte ptr [rdi]
- and edx, 0x0F
- shl edx, 12
- or eax, edx
- jmp .Lw_scan
-.Lw_4:
- mov edx, eax
- and edx, 0xF8
- cmp edx, 0xF0
- jne .Lw_one /* 非法首字节按 1 */
- cmp rsi, 4
- jb .Lw_one
- movzx eax, byte ptr [rdi + 1]
- and eax, 0x3F
- movzx edx, byte ptr [rdi + 2]
- and edx, 0x3F
- shl eax, 6
- or eax, edx
- movzx edx, byte ptr [rdi + 3]
- and edx, 0x3F
- shl eax, 6
- or eax, edx
- movzx edx, byte ptr [rdi]
- and edx, 0x07
- shl edx, 18
- or eax, edx
-.Lw_scan:
- lea rdx, [rip + .Lw_zero]
- xor ecx, ecx
-.Lw_zero_loop:
- cmp ecx, TUI_W_ZERO_COUNT
- jae .Lw_wide_scan
- cmp eax, dword ptr [rdx + rcx*4]
- jb .Lw_zero_next
- cmp eax, dword ptr [rdx + rcx*4 + 4]
- jbe .Lw_ret0
-.Lw_zero_next:
- add ecx, 2
- jmp .Lw_zero_loop
-.Lw_wide_scan:
- lea rdx, [rip + .Lw_wide]
- xor ecx, ecx
-.Lw_wide_loop:
- cmp ecx, TUI_W_WIDE_COUNT
- jae .Lw_one
- cmp eax, dword ptr [rdx + rcx*4]
- jb .Lw_wide_next
- cmp eax, dword ptr [rdx + rcx*4 + 4]
- jbe .Lw_ret2
-.Lw_wide_next:
- add ecx, 2
- jmp .Lw_wide_loop
-.Lw_ret0:
- xor eax, eax
- ret
-.Lw_ret2:
- mov eax, 2
- ret
-.Lw_one:
- mov eax, 1
- ret
-.size li_cp_width, .-li_cp_width
 
 /* ---- 内部：event_resume_editor(v)：编辑缓冲非空则重绘编辑行 ---- */
 .type li_event_resume,@function
@@ -554,12 +262,25 @@ li_put_field:
 .type tui_view_init,@function
 tui_view_init:
  .cfi_startproc
- mov qword ptr [rdi + TUI_LI_VIEW_SINK_CTX], rsi
- mov qword ptr [rdi + TUI_LI_VIEW_SINK_WRITE], rdx
+ mov [rdi + TUI_LI_VIEW_TERMINAL], rsi
+ mov [rdi + TUI_LI_VIEW_TERMINAL + 8], rdx
+ mov qword ptr [rdi + TUI_LI_VIEW_SINK_CTX], rdi
+ lea rax, [rip + li_view_emit]
+ mov qword ptr [rdi + TUI_LI_VIEW_SINK_WRITE], rax
+ mov dword ptr [rdi + TUI_LI_VIEW_READING], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_TERMINAL_ROWS], 24
+ mov qword ptr [rdi + TUI_LI_VIEW_TRANSCRIPT_LEN], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_READ_ANCHOR], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_READ_START], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_PAGE_ROWS], 10
+ mov dword ptr [rdi + TUI_LI_VIEW_DROPPED], 0
  mov dword ptr [rdi + TUI_LI_VIEW_ANSI], ecx
  mov qword ptr [rdi + TUI_LI_VIEW_EDITOR], r8
+ test r8, r8
+ jz .Linit_no_editor
+ mov dword ptr [r8 + TUI_LI_INPUT_COLUMNS], 80
+.Linit_no_editor:
  mov dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- mov qword ptr [rdi + TUI_LI_VIEW_CARRY_LEN], 0
  mov dword ptr [rdi + TUI_LI_VIEW_COLS], 80
  mov dword ptr [rdi + TUI_LI_VIEW_EDITOR_ROWS], 0
  mov dword ptr [rdi + TUI_LI_VIEW_CURSOR_ROW], 0
@@ -567,6 +288,7 @@ tui_view_init:
  /* md 渲染器：同一 sink/模式，默认 80 列（set_size 同步更新） */
  push rbx
  push r12
+ push rax
  mov rbx, rdi
  mov r12d, ecx
  lea rdi, [rbx + TUI_LI_VIEW_MD]
@@ -575,6 +297,14 @@ tui_view_init:
  mov ecx, r12d
  mov r8d, 80
  call tui_md_init@PLT
+ /* tool 状态机：emit 回调指向视图自身的安全/原始通道 */
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
+ mov rsi, rbx
+ lea rdx, [rip + tui_view_safe_put]
+ lea rcx, [rip + tui_view_raw_put]
+ mov r8d, r12d
+ call tui_tool_init@PLT
+ pop rax
  pop r12
  pop rbx
  ret
@@ -600,6 +330,12 @@ tui_view_set_size:
  mov rdi, rbx
  call li_editor_break
  mov dword ptr [rbx + TUI_LI_VIEW_COLS], r12d
+ mov rax, [rbx + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lsize_no_editor
+ mov dword ptr [rax + TUI_LI_INPUT_COLUMNS], r12d
+ mov dword ptr [rax + TUI_LI_INPUT_PREF_VALID], 0
+.Lsize_no_editor:
  /* md 折行宽度跟随（滚动回显不重排，仅影响后续行） */
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  mov esi, r12d
@@ -619,6 +355,8 @@ tui_view_set_size:
 .type tui_view_redraw_editor,@function
 tui_view_redraw_editor:
  .cfi_startproc
+ cmp dword ptr [rdi + TUI_LI_VIEW_READING], 0
+ jne .Lred_ret
  cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
  je .Lred_ret
  mov rax, qword ptr [rdi + TUI_LI_VIEW_EDITOR]
@@ -689,17 +427,32 @@ tui_view_redraw_editor:
  je .Lred_skip
  mov edi, eax
  call tui_utf8_seq_len@PLT
+ /* A partially typed codepoint can sit before an existing complete suffix.
+  * Omit that prefix during every redraw, including stream/resize/paste paths. */
+ cmp dword ptr [r12 + TUI_LI_INPUT_UTF8_PENDING], 0
+ je .Lred_complete_range
+ mov rcx, [r12 + TUI_LI_INPUT_CURSOR]
+ cmp r13, rcx
+ jae .Lred_complete_range
+ lea rdx, [r13 + rax]
+ cmp rdx, rcx
+ jbe .Lred_complete_range
+ mov r13, rcx
+ jmp .Lred_loop
+.Lred_complete_range:
  mov rcx, qword ptr [r12 + TUI_LI_INPUT_LEN]
  sub rcx, r13
  cmp rax, rcx
  jbe .Lred_len_ok
- mov rax, rcx
+ mov [rsp], r14
+ mov [rsp + 8], r15
+ jmp .Lred_have_cur
 .Lred_len_ok:
  mov qword ptr [rsp + 16], rax
  mov rdi, r12
  add rdi, r13
  mov rsi, rax
- call li_cp_width
+ call tui_utf8_cp_width@PLT
  mov qword ptr [rsp + 24], rax
  /* 自动换行：本行已有内容且整字符放不下 */
  test r15d, r15d
@@ -861,12 +614,11 @@ tui_view_exit_note:
  sub rsp, 160 /* char line[160] */
  mov rbx, rdi
  mov r12, rsi
+ call tui_view_return_latest
  mov r13d, eax /* snprintf 返回值暂存（先格式化，与 C 版顺序一致） */
  /* 退出说明前收束未完模型行与 carry，失败路径不丢已收到的输出 */
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_flush@PLT
- mov rdi, rbx
- call li_finish_carry
  mov rdi, rsp
  mov esi, 160
  lea rdx, [rip + .Lfmt_exit]
@@ -1011,8 +763,6 @@ tui_view_poll_error:
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_flush@PLT
  mov rdi, rbx
- call li_finish_carry
- mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lpoll_err]
  mov rdi, rbx
@@ -1035,8 +785,6 @@ tui_view_protocol_violation:
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_flush@PLT
  mov rdi, rbx
- call li_finish_carry
- mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lproto_violation]
  mov rdi, rbx
@@ -1050,21 +798,6 @@ tui_view_protocol_violation:
  .cfi_endproc
 .size tui_view_protocol_violation, .-tui_view_protocol_violation
 
-/* A role/tool boundary never joins an incomplete sequence from another stream. */
-li_finish_carry:
- push rbx
- mov rbx,rdi
- cmp qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
- je .Lfinish_carry_done
- call li_event_suspend
- mov rdi,rbx
- lea rsi,[rbx+TUI_LI_VIEW_CARRY]
- mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
- call li_safe_vput
- mov qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
-.Lfinish_carry_done:
- pop rbx
- ret
 
 /* void tui_view_event(tui_view *v, const tui_event *ev) */
 .globl tui_view_event
@@ -1078,6 +811,7 @@ tui_view_event:
  push r15
  mov rbx, rdi /* v */
  mov r12, rsi /* ev */
+ call li_transcript_event
  mov eax, dword ptr [r12 + TUI_LI_EVENT_KIND]
  cmp eax, TUI_LI_EV_RUN_STARTED
  je .Lev_started
@@ -1116,194 +850,67 @@ tui_view_event:
 .Lev_md_out:
  jmp .Lev_out
 
-/* ---- tool_output：carry 拼接 + 尾部不完整序列留存（原文转义） ---- */
+/* ---- tool_output：经 tui_tool 状态机（行缓冲/预览/保留/展开由其管理） ---- */
 .Lev_delta:
- sub rsp, 16 /* [rsp] = tail */
- mov qword ptr [rsp], 0
- xor r13d, r13d /* off */
- xor r14d, r14d /* flush_carry */
- xor r15d, r15d /* written */
- mov rcx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
- test rcx, rcx
- jz .Ldelta_scan
- movzx edi, byte ptr [rbx + TUI_LI_VIEW_CARRY]
- call tui_utf8_seq_len@PLT /* rax = cl0 */
- mov rcx, qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN]
- cmp rax, rcx
- jbe .Lcarry_ready /* cl0 <= carry_len：need=0，直接冲掉 */
- mov rdx, rax
- sub rdx, rcx /* rdx = need */
- cmp qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN], rdx
- jb .Lcarry_absorb
- mov r13, rdx /* off = need：本段前缀补全 carry */
- mov r14d, 1
- jmp .Ldelta_scan
-.Lcarry_ready:
- mov r14d, 1
- jmp .Ldelta_scan
-.Lcarry_absorb:
- /* 本段全部并入 carry；不提前写出（遵守“绝不写出半个序列”） */
- lea rdi, [rbx + TUI_LI_VIEW_CARRY]
- add rdi, rcx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
- mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
- call memcpy@PLT
- mov rax, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
- add qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], rax
- mov r13, rax /* off = text_len：本段无输出 */
-.Ldelta_scan:
- /* tail = incomplete_tail(text+off, text_len-off) */
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
- add rsi, r13
- mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
- sub rdx, r13
- mov rdi, rsi
- mov rsi, rdx
- call tui_utf8_incomplete_tail@PLT
- mov [rsp], rax /* tail */
- mov r15, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
- sub r15, r13
- sub r15, rax /* written = rem - tail */
- test r14d, r14d
- jz .Ldelta_no_flush
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
  mov rdi, rbx
  call li_event_suspend
- lea rdi,[rsp+8]
- lea rsi,[rbx+TUI_LI_VIEW_CARRY]
- mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
- call memcpy
- lea rdi,[rsp+8]
- add rdi,[rbx+TUI_LI_VIEW_CARRY_LEN]
- test r13,r13
- jz .Lcarry_joined
- mov rsi,[r12+TUI_LI_EVENT_TEXT]
- mov rdx,r13
- call memcpy
-.Lcarry_joined:
- mov rdx,[rbx+TUI_LI_VIEW_CARRY_LEN]
- add rdx,r13
- mov rdi,rbx
- lea rsi,[rsp+8]
- call li_safe_vput
- mov qword ptr [rbx+TUI_LI_VIEW_CARRY_LEN],0
- test r15,r15
- jz .Ldelta_tailcopy
- mov rdi,rbx
- mov rsi,[r12+TUI_LI_EVENT_TEXT]
- add rsi,r13
- mov rdx,r15
- call li_safe_vput
- jmp .Ldelta_tailcopy
-.Ldelta_no_flush:
- test r15, r15
- jz .Ldelta_tailcopy
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ mov rcx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ call tui_tool_output@PLT
+ test eax, eax
+ jz .Lev_out
  mov rdi, rbx
- call li_event_suspend
- mov rdi, rbx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
- add rsi, r13
- mov rdx, r15
- call li_safe_vput
-.Ldelta_tailcopy:
- mov rax, [rsp]
- test rax, rax
- jz .Ldelta_resume_chk
- lea rdi, [rbx + TUI_LI_VIEW_CARRY]
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
- add rsi, r13
- add rsi, r15
- mov rdx, rax
- call memcpy@PLT
- mov rax, [rsp]
- mov qword ptr [rbx + TUI_LI_VIEW_CARRY_LEN], rax
-.Ldelta_resume_chk:
- mov rdi, rbx
- test r14d, r14d
- jnz .Ldelta_resume
- test r15, r15
- jz .Ldelta_out16
-.Ldelta_resume:
  call li_event_resume
-.Ldelta_out16:
- add rsp, 16
  jmp .Lev_out
 
 .Lev_tool_started:
  mov rdi, rbx
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_break@PLT
- mov rdi,rbx
- call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
- lea rsi, [rip + .Ltool_pfx]
- mov rdi, rbx
- call li_vputs
- mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
  mov rsi, qword ptr [r12 + TUI_LI_EVENT_TOOL_NAME]
- mov edx, 48
- call li_put_field
- lea rsi, [rip + .Lhash_paren]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
+ call tui_tool_started@PLT
+ test eax, eax
+ jz .Lev_out
  mov rdi, rbx
- call li_vputs
- mov rdi, rbx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
- mov edx, 48
- call li_put_field
- lea rsi, [rip + .Lparen_started]
- mov rdi, rbx
- call li_vputs
+ call li_event_resume
  jmp .Lev_out
 
 .Lev_tool_finished:
  mov rdi, rbx
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_break@PLT
- mov rdi,rbx
- call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
- lea rsi, [rip + .Ltool_pfx]
- mov rdi, rbx
- call li_vputs
- mov rdi, rbx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_TOOL_NAME]
- mov edx, 48
- call li_put_field
- lea rsi, [rip + .Lhash_paren]
- mov rdi, rbx
- call li_vputs
- mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
  mov rsi, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
- mov edx, 48
- call li_put_field
- mov r13d, dword ptr [r12 + TUI_LI_EVENT_TOOL_OK]
- lea rsi, [rip + .Lfin_ok]
- test r13d, r13d
- jnz .Ltoolf_ok
- lea rsi, [rip + .Lfin_err]
-.Ltoolf_ok:
+ mov edx, dword ptr [r12 + TUI_LI_EVENT_TOOL_OK]
+ mov rcx, qword ptr [r12 + TUI_LI_EVENT_DETAIL]
+ mov r8, qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN]
+ call tui_tool_finished@PLT
+ test eax, eax
+ jz .Lev_out
  mov rdi, rbx
- call li_vputs
- mov rdi, rbx
- mov rsi, qword ptr [r12 + TUI_LI_EVENT_DETAIL]
- mov rdx, qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN]
- mov rcx, TUI_LI_VIEW_TOOL_SNIPPET
- call li_put_bounded
- lea rsi, [rip + .Lnl]
- mov rdi, rbx
- call li_vputs
+ call li_event_resume
  jmp .Lev_out
 
 .Lev_finished:
  mov rdi, rbx
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_flush@PLT
- mov rdi,rbx
- call li_finish_carry
 .Lfin_no_carry:
  mov rdi, rbx
  call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
+ call tui_tool_flush@PLT
  mov eax, dword ptr [r12 + TUI_LI_EVENT_RUN_STATUS]
  cmp eax, TUI_LI_RUN_SUCCESS
  je .Lfin_success
@@ -1360,7 +967,7 @@ tui_view_event:
 .globl tui_view_cp_width
 .type tui_view_cp_width,@function
 tui_view_cp_width:
- jmp li_cp_width
+ jmp tui_utf8_cp_width@PLT
 .size tui_view_cp_width,.-tui_view_cp_width
 
 .globl tui_view_history
@@ -1372,6 +979,18 @@ tui_view_history:
  mov rbx,rdi
  mov r12,rsi
  mov r13d,[r12+TUI_LI_HISTORY_KIND]
+ mov rdi, rbx
+ lea rsi, [rip + .Ltranscript_history]
+ mov edx, OFFSET .Ltranscript_history_len
+ call li_transcript_append
+ mov rdi, rbx
+ mov rsi, [r12 + TUI_LI_HISTORY_TEXT]
+ mov rdx, [r12 + TUI_LI_HISTORY_TEXT_LEN]
+ call li_transcript_append
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_transcript_append
  cmp r13d,3
  ja .Lhistory_view_done
  call li_event_suspend
@@ -1431,7 +1050,794 @@ tui_view_history:
  ret
 .size tui_view_history,.-tui_view_history
 
+/* void tui_view_tool_expand(tui_view *v) — Ctrl-O：展开当前保留工具调用的
+ * 保留输出。展开输出前把编辑行收束进回显，完成后按需重绘草稿。 */
+.globl tui_view_tool_expand
+.type tui_view_tool_expand,@function
+tui_view_tool_expand:
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
+ call tui_tool_expand@PLT
+ test eax, eax
+ jz .Lvte_out
+ mov rdi, rbx
+ call li_event_resume
+.Lvte_out:
+ pop rax
+ pop r12
+ pop rbx
+ ret
+.size tui_view_tool_expand,.-tui_view_tool_expand
+
 .section .note.GNU-stack,"",@progbits
 
-.set TUI_W_ZERO_COUNT, (.Lw_zero_end - .Lw_zero) / 4
-.set TUI_W_WIDE_COUNT, (.Lw_wide_end - .Lw_wide) / 4
+.section .text
+/* Pi hotkeys help, adapted to currently implemented native bindings.
+ * Flush active model line before the fixed help block, then restore editor. */
+.globl tui_view_help
+.type tui_view_help,@function
+tui_view_help:
+ push rbx
+ mov rbx, rdi
+ call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
+ mov rdi, rbx
+ lea rsi, [rip + .Lhelp]
+ call li_vputs
+ mov rdi, rbx
+ call tui_view_redraw_editor@PLT
+ pop rbx
+ ret
+.size tui_view_help,.-tui_view_help
+
+.section .text
+.globl tui_view_completions
+.type tui_view_completions,@function
+tui_view_completions:
+ push rbx
+ mov rbx, rdi
+ call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
+ mov rdi, rbx
+ lea rsi, [rip + .Lcompletions]
+ mov rax, [rbx + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lcompletion_write
+ cmp dword ptr [rax + TUI_LI_INPUT_COMPLETION_SEL], 0
+ je .Lcompletion_write
+ lea rsi, [rip + .Lcompletions_quit]
+.Lcompletion_write:
+ call li_vputs
+ mov rdi, rbx
+ call tui_view_redraw_editor@PLT
+ pop rbx
+ ret
+.size tui_view_completions,.-tui_view_completions
+
+.section .text
+.globl tui_view_history_search
+.type tui_view_history_search,@function
+tui_view_history_search:
+ push rbx
+ mov rbx, rdi
+ call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
+ mov rdi, rbx
+ lea rsi, [rip + .Lhistory_search]
+ call li_vputs
+ mov rax, [rbx + TUI_LI_VIEW_EDITOR]
+ test rax, rax
+ jz .Lsearch_draw
+ lea rsi, [rip + .Lsearch_failed]
+ cmp dword ptr [rax + TUI_LI_INPUT_SEARCH_FAILED], 0
+ jne .Lsearch_status
+ movsxd rcx, dword ptr [rax + TUI_LI_INPUT_HISTORY_INDEX]
+ test rcx, rcx
+ js .Lsearch_missing
+ push rax
+ push rcx
+ mov rdi, rbx
+ lea rsi, [rip + .Lsearch_match]
+ call li_vputs
+ pop rcx
+ pop rax
+ mov edx, [rax + rcx*4 + TUI_LI_INPUT_HISTORY_LENS]
+ shl rcx, 10
+ lea rsi, [rax + rcx + TUI_LI_INPUT_HISTORY]
+ mov rdi, rbx
+ call li_vput
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ call li_vputs
+ jmp .Lsearch_draw
+.Lsearch_missing:
+ lea rsi, [rip + .Lsearch_no_match]
+ cmp qword ptr [rax + TUI_LI_INPUT_LEN], 0
+ jne .Lsearch_status
+ lea rsi, [rip + .Lsearch_idle]
+.Lsearch_status:
+ mov rdi, rbx
+ call li_vputs
+.Lsearch_draw:
+ mov rdi, rbx
+ call tui_view_redraw_editor@PLT
+ pop rbx
+ ret
+.size tui_view_history_search,.-tui_view_history_search
+
+.section .rodata
+.Ltranscript_user: .ascii "\n[user] "
+.set .Ltranscript_user_len, . - .Ltranscript_user
+.Ltranscript_history: .ascii "\n[history] "
+.set .Ltranscript_history_len, . - .Ltranscript_history
+.Ltranscript_tool: .ascii "\n[tool] "
+.set .Ltranscript_tool_len, . - .Ltranscript_tool
+.Lread_enter: .ascii "\033[?1049h"
+.Lread_leave: .ascii "\033[?1049l"
+.Lread_clear: .ascii "\033[H\033[2J"
+.Lread_header: .asciz "[history] PgUp/PgDn"
+.Lread_dropped: .asciz "[history] older buffered text was evicted"
+.Lread_backlog: .asciz "\n[history] output received while reading:\n"
+.section .text
+
+/* Physical sink proxy: source events continue updating state during reading,
+ * but live repaint writes cannot move the frozen reading viewport. */
+.type li_view_emit,@function
+li_view_emit:
+ cmp dword ptr [rdi + TUI_LI_VIEW_READING], 0
+ jne .Lemit_hidden
+ mov rax, [rdi + TUI_LI_VIEW_TERMINAL + 8]
+ mov rdi, [rdi + TUI_LI_VIEW_TERMINAL]
+ jmp rax
+.Lemit_hidden:
+ xor eax, eax
+ ret
+.size li_view_emit,.-li_view_emit
+
+/* Owned source transcript, 64KiB. Eviction removes complete old source lines;
+ * anchors are adjusted by the same cut, preserving reading position until its
+ * actual source bytes are evicted. Oversize chunks retain a UTF-8-safe suffix. */
+.type li_transcript_append,@function
+li_transcript_append:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13, rdx
+ test r13, r13
+ jz .Lta_done
+ cmp r13, 65536
+ jbe .Lta_room_view
+ mov dword ptr [rbx + TUI_LI_VIEW_DROPPED], 1
+ sub r13, 65536
+ add r12, r13
+ mov r13d, 65536
+.Lta_align_view:
+ test r13, r13
+ jz .Lta_done
+ movzx eax, byte ptr [r12]
+ and eax, 192
+ cmp eax, 128
+ jne .Lta_room_view
+ inc r12
+ dec r13
+ jmp .Lta_align_view
+.Lta_room_view:
+ mov r15, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ lea rax, [r15 + r13]
+ cmp rax, 65536
+ jbe .Lta_copy_view
+ xor r14d, r14d
+.Lta_find_cut_view:
+ cmp r14, r15
+ jae .Lta_cut_view
+ inc r14
+ cmp byte ptr [rbx + r14 + TUI_LI_VIEW_TRANSCRIPT - 1], 10
+ jne .Lta_find_cut_view
+.Lta_cut_view:
+ mov dword ptr [rbx + TUI_LI_VIEW_DROPPED], 1
+ lea rdi, [rbx + TUI_LI_VIEW_TRANSCRIPT]
+ lea rsi, [rdi + r14]
+ mov rdx, r15
+ sub rdx, r14
+ call memmove@PLT
+ sub r15, r14
+ mov [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN], r15
+ mov rax, [rbx + TUI_LI_VIEW_READ_ANCHOR]
+ mov rcx, r14
+ shl rcx, 5
+ sub rax, rcx
+ jnc .Lta_anchor_ok
+ xor eax, eax
+.Lta_anchor_ok:
+ mov [rbx + TUI_LI_VIEW_READ_ANCHOR], rax
+ mov rax, [rbx + TUI_LI_VIEW_READ_START]
+ sub rax, r14
+ jnc .Lta_start_ok
+ xor eax, eax
+.Lta_start_ok:
+ mov [rbx + TUI_LI_VIEW_READ_START], rax
+ jmp .Lta_room_view
+.Lta_copy_view:
+ lea rdi, [rbx + r15 + TUI_LI_VIEW_TRANSCRIPT]
+ mov rsi, r12
+ mov rdx, r13
+ call memcpy@PLT
+ add r15, r13
+ mov [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN], r15
+.Lta_done:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_transcript_append,.-li_transcript_append
+
+/* Called with event in r12, view in rbx; never retains borrowed event slices. */
+.type li_transcript_event,@function
+li_transcript_event:
+ sub rsp, 8
+ mov eax, [r12 + TUI_LI_EVENT_KIND]
+ cmp eax, TUI_LI_EV_TEXT_DELTA
+ je .Lrecord_text
+ cmp eax, TUI_LI_EV_TOOL_OUTPUT
+ je .Lrecord_text
+ cmp eax, TUI_LI_EV_TOOL_STARTED
+ je .Lrecord_tool
+ cmp eax, TUI_LI_EV_TOOL_FINISHED
+ je .Lrecord_detail
+ cmp eax, TUI_LI_EV_RUN_FINISHED
+ jne .Lrecord_done
+ lea rsi, [rip + .Lrun_fin_unknown]
+ mov eax, [r12 + TUI_LI_EVENT_RUN_STATUS]
+ cmp eax, TUI_LI_RUN_SUCCESS
+ jne .Lrecord_error
+ lea rsi, [rip + .Lrun_fin_ok]
+ jmp .Lrecord_string
+.Lrecord_error:
+ cmp eax, TUI_LI_RUN_CANCELLED
+ jne .Lrecord_failure
+ lea rsi, [rip + .Lrun_fin_cancel]
+ jmp .Lrecord_string
+.Lrecord_failure:
+ lea rsi, [rip + .Lrun_fin_err]
+ jmp .Lrecord_string
+.Lrecord_tool:
+ mov rdi, rbx
+ lea rsi, [rip + .Ltranscript_tool]
+ mov edx, OFFSET .Ltranscript_tool_len
+ call li_transcript_append
+ mov rsi, [r12 + TUI_LI_EVENT_TOOL_NAME]
+ test rsi, rsi
+ jz .Lrecord_done
+.Lrecord_string:
+ mov [rsp], rsi
+ mov rdi, rsi
+ call strlen@PLT
+ mov rsi, [rsp]
+ mov rdx, rax
+ mov rdi, rbx
+ call li_transcript_append
+ jmp .Lrecord_done
+.Lrecord_detail:
+ mov rsi, [r12 + TUI_LI_EVENT_DETAIL]
+ mov rdx, [r12 + TUI_LI_EVENT_DETAIL_LEN]
+ jmp .Lrecord_bytes
+.Lrecord_text:
+ mov rsi, [r12 + TUI_LI_EVENT_TEXT]
+ mov rdx, [r12 + TUI_LI_EVENT_TEXT_LEN]
+.Lrecord_bytes:
+ test rsi, rsi
+ jz .Lrecord_done
+ mov rdi, rbx
+ call li_transcript_append
+.Lrecord_done:
+ add rsp, 8
+ ret
+.size li_transcript_event,.-li_transcript_event
+
+.globl tui_view_user
+.type tui_view_user,@function
+tui_view_user:
+ push rbx
+ push r12
+ push r13
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13, rdx
+ lea rsi, [rip + .Ltranscript_user]
+ mov edx, OFFSET .Ltranscript_user_len
+ call li_transcript_append
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r13
+ call li_transcript_append
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_transcript_append
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_view_user,.-tui_view_user
+
+/* Direct physical output helpers, bypass the read-mode suppression proxy. */
+.type li_read_raw,@function
+li_read_raw:
+ mov rcx, rdx
+ mov rdx, rsi
+ mov esi, 1
+ lea rdi, [rbx + TUI_LI_VIEW_TERMINAL]
+ jmp tui_raw_write@PLT
+.size li_read_raw,.-li_read_raw
+.type li_read_string,@function
+li_read_string:
+ push rsi
+ mov rdi, rsi
+ call strlen@PLT
+ pop rsi
+ mov rdx, rax
+ jmp li_read_raw
+.size li_read_string,.-li_read_string
+
+
+/* A display position packs source byte offset in high bits and a printable
+ * escape expansion offset in low 5 bits. No fabricated character is skipped. */
+.type li_read_token,@function
+li_read_token:
+ push rbp
+ sub rsp, 48
+ mov rbp, rdi
+ mov rax, r12
+ shr rax, 5
+ mov [rsp], rax
+ mov rcx, r12
+ and ecx, 31
+ mov [rsp + 8], rcx
+ lea rdi, [rbx + rax + TUI_LI_VIEW_TRANSCRIPT]
+ mov [rsp + 24], rdi
+ mov qword ptr [rsp + 16], 1
+ movzx eax, byte ptr [rdi]
+ cmp eax, 10
+ je .Lrt_newline
+ cmp eax, 9
+ je .Lrt_tab
+ cmp eax, 32
+ jb .Lrt_byte_escape
+ cmp eax, 127
+ je .Lrt_byte_escape
+ cmp eax, 128
+ jae .Lrt_unicode
+ mov ecx, 1
+ mov edx, 1
+ mov rsi, rdi
+ jmp .Lrt_direct
+.Lrt_newline:
+ mov edx, 1
+ xor ecx, ecx
+ mov rsi, rdi
+ mov r8d, 1
+ jmp .Lrt_advance_direct
+.Lrt_tab:
+ mov word ptr [rbp], 0x2020
+ mov byte ptr [rbp + 2], 32
+ mov qword ptr [rsp + 32], 3 /* Pi display TAB policy */
+ jmp .Lrt_expanded
+.Lrt_unicode:
+ mov rsi, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ sub rsi, [rsp]
+ call tui_safe_seq_len@PLT
+ test eax, eax
+ jz .Lrt_invalid
+ mov [rsp + 16], rax
+ mov rdi, [rsp + 24]
+ cmp byte ptr [rdi], 194
+ jne .Lrt_width
+ cmp byte ptr [rdi + 1], 159
+ ja .Lrt_width
+ mov dword ptr [rbp], 0x3030755c /* \u00 */
+ movzx eax, byte ptr [rdi + 1]
+ lea rsi, [rip + .Lhex]
+ mov ecx, eax
+ shr ecx, 4
+ and eax, 15
+ mov cl, [rsi + rcx]
+ mov al, [rsi + rax]
+ mov [rbp + 4], cl
+ mov [rbp + 5], al
+ mov qword ptr [rsp + 32], 6
+ jmp .Lrt_expanded
+.Lrt_width:
+ mov rsi, [rsp + 16]
+ call tui_utf8_cp_width@PLT
+ mov ecx, eax
+ cmp ecx, [rbx + TUI_LI_VIEW_COLS]
+ ja .Lrt_wide_escape
+ mov rsi, [rsp + 24]
+ mov edx, [rsp + 16]
+ jmp .Lrt_direct
+.Lrt_invalid:
+ mov rdi, [rsp + 24]
+ movzx eax, byte ptr [rdi]
+.Lrt_byte_escape:
+ mov word ptr [rbp], 0x785c
+ lea rsi, [rip + .Lhex]
+ mov ecx, eax
+ shr ecx, 4
+ and eax, 15
+ mov cl, [rsi + rcx]
+ mov al, [rsi + rax]
+ mov [rbp + 2], cl
+ mov [rbp + 3], al
+ mov qword ptr [rsp + 32], 4
+ jmp .Lrt_expanded
+.Lrt_wide_escape:
+ xor r9d, r9d
+ mov rdi, [rsp + 24]
+ lea rsi, [rip + .Lhex]
+.Lrt_wide_loop:
+ movzx eax, byte ptr [rdi + r9]
+ mov ecx, eax
+ shr ecx, 4
+ and eax, 15
+ mov cl, [rsi + rcx]
+ mov al, [rsi + rax]
+ mov word ptr [rbp + r9*4], 0x785c
+ mov [rbp + r9*4 + 2], cl
+ mov [rbp + r9*4 + 3], al
+ inc r9
+ cmp r9, [rsp + 16]
+ jb .Lrt_wide_loop
+ shl r9, 2
+ mov [rsp + 32], r9
+.Lrt_expanded:
+ mov rax, [rsp + 8]
+ lea rsi, [rbp + rax]
+ inc rax
+ cmp rax, [rsp + 32]
+ jae .Lrt_expansion_end
+ lea rax, [r12 + 1]
+ jmp .Lrt_cell
+.Lrt_expansion_end:
+ mov rax, [rsp]
+ add rax, [rsp + 16]
+ shl rax, 5
+.Lrt_cell:
+ mov edx, 1
+ mov ecx, 1
+ xor r8d, r8d
+ jmp .Lrt_return
+.Lrt_direct:
+ xor r8d, r8d
+.Lrt_advance_direct:
+ mov rax, [rsp]
+ add rax, [rsp + 16]
+ shl rax, 5
+.Lrt_return:
+ add rsp, 48
+ pop rbp
+ ret
+.size li_read_token,.-li_read_token
+
+/* Two bounded streaming passes locate visual rows without a full row table.
+ * The same token iterator renders a page, including partial escape expansions. */
+.equ PDIR, 0
+.equ PEND, 8
+.equ PANCHOR, 16
+.equ PTARGET, 24
+.equ PNEXT, 32
+.equ PPTR, 40
+.equ PLEN, 48
+.equ PWIDTH, 52
+.equ PNL, 56
+.equ PBUF, 64
+.equ PHEAD, 80
+.equ PBUDGET, 84
+.equ PHEIGHT, 88
+.equ PFRAME, 96
+.globl tui_view_page
+.type tui_view_page,@function
+tui_view_page:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp, PFRAME
+ mov rbx, rdi
+ mov [rsp + PDIR], esi
+ cmp dword ptr [rbx + TUI_LI_VIEW_ANSI], 0
+ je .Lpage_done
+ cmp dword ptr [rbx + TUI_LI_VIEW_READING], 0
+ jne .Lpage_count_init
+ test esi, esi
+ jns .Lpage_done
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
+ mov rdi, rbx
+ call li_editor_break
+ mov rax, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ mov [rbx + TUI_LI_VIEW_READ_START], rax
+ shl rax, 5
+ mov [rbx + TUI_LI_VIEW_READ_ANCHOR], rax
+ mov dword ptr [rbx + TUI_LI_VIEW_READING], 1
+ lea rsi, [rip + .Lread_enter]
+ mov edx, 8
+ call li_read_raw
+.Lpage_count_init:
+ mov eax, [rbx + TUI_LI_VIEW_TERMINAL_ROWS]
+ test eax, eax
+ jnz .Lpage_height_valid
+ mov eax, 1
+.Lpage_height_valid:
+ mov [rsp + PHEIGHT], eax
+ xor ecx, ecx
+ cmp eax, 1
+ jbe .Lpage_headers_set
+ inc ecx
+ cmp eax, 3
+ jb .Lpage_headers_set
+ cmp dword ptr [rbx + TUI_LI_VIEW_DROPPED], 0
+ je .Lpage_headers_set
+ inc ecx
+.Lpage_headers_set:
+ mov [rsp + PHEAD], ecx
+ sub eax, ecx
+ cmp eax, [rbx + TUI_LI_VIEW_PAGE_ROWS]
+ jbe .Lpage_budget_set
+ mov eax, [rbx + TUI_LI_VIEW_PAGE_ROWS]
+.Lpage_budget_set:
+ test eax, eax
+ jnz .Lpage_budget_valid
+ mov eax, 1
+.Lpage_budget_valid:
+ mov [rsp + PBUDGET], eax
+ mov rax, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ shl rax, 5
+ mov [rsp + PEND], rax
+ xor r12d, r12d /* packed position */
+ xor r13d, r13d /* visual row */
+ xor r14d, r14d /* column */
+ mov qword ptr [rsp + PANCHOR], 0
+.Lpage_count:
+ cmp r12, [rbx + TUI_LI_VIEW_READ_ANCHOR]
+ ja .Lpage_count_token
+ mov [rsp + PANCHOR], r13
+.Lpage_count_token:
+ cmp r12, [rsp + PEND]
+ jae .Lpage_choose
+ lea rdi, [rsp + PBUF]
+ call li_read_token
+ test r8d, r8d
+ jnz .Lpage_count_lf
+ test r14d, r14d
+ jz .Lpage_count_fit
+ lea edx, [r14 + rcx]
+ cmp edx, [rbx + TUI_LI_VIEW_COLS]
+ jbe .Lpage_count_fit
+ inc r13
+ xor r14d, r14d
+ jmp .Lpage_count
+.Lpage_count_fit:
+ add r14d, ecx
+ mov r12, rax
+ jmp .Lpage_count
+.Lpage_count_lf:
+ inc r13
+ xor r14d, r14d
+ mov r12, rax
+ jmp .Lpage_count
+.Lpage_choose:
+ mov r15, [rsp + PANCHOR]
+ mov eax, [rsp + PDIR]
+ test eax, eax
+ jz .Lpage_target
+ mov ecx, [rsp + PBUDGET]
+ js .Lpage_older
+ add r15, rcx
+ cmp r15, r13
+ ja .Lpage_latest
+ jmp .Lpage_target
+.Lpage_older:
+ sub r15, rcx
+ jnc .Lpage_target
+ xor r15d, r15d
+.Lpage_target:
+ mov [rsp + PTARGET], r15
+ xor r12d, r12d
+ xor r13d, r13d
+ xor r14d, r14d
+.Lpage_seek:
+ cmp r13, r15
+ je .Lpage_draw
+ cmp r12, [rsp + PEND]
+ jae .Lpage_latest
+ lea rdi, [rsp + PBUF]
+ call li_read_token
+ test r8d, r8d
+ jnz .Lpage_seek_lf
+ test r14d, r14d
+ jz .Lpage_seek_fit
+ lea edx, [r14 + rcx]
+ cmp edx, [rbx + TUI_LI_VIEW_COLS]
+ jbe .Lpage_seek_fit
+ inc r13
+ xor r14d, r14d
+ jmp .Lpage_seek
+.Lpage_seek_fit:
+ add r14d, ecx
+ mov r12, rax
+ jmp .Lpage_seek
+.Lpage_seek_lf:
+ inc r13
+ xor r14d, r14d
+ mov r12, rax
+ jmp .Lpage_seek
+.Lpage_draw:
+ cmp r12, [rsp + PEND]
+ jb .Lpage_draw_valid
+ cmp dword ptr [rsp + PDIR], 0
+ jg .Lpage_latest
+.Lpage_draw_valid:
+ mov [rbx + TUI_LI_VIEW_READ_ANCHOR], r12
+ lea rsi, [rip + .Lread_clear]
+ mov edx, 7
+ call li_read_raw
+ cmp dword ptr [rsp + PHEAD], 0
+ je .Lpage_body_init
+ lea rsi, [rip + .Lread_header]
+ call li_read_label
+ cmp dword ptr [rsp + PHEAD], 2
+ jb .Lpage_body_init
+ lea rsi, [rip + .Lread_dropped]
+ call li_read_label
+.Lpage_body_init:
+ xor r13d, r13d
+ xor r14d, r14d
+.Lpage_emit:
+ cmp r12, [rsp + PEND]
+ jae .Lpage_eof
+ lea rdi, [rsp + PBUF]
+ call li_read_token
+ mov [rsp + PNEXT], rax
+ mov [rsp + PPTR], rsi
+ mov [rsp + PLEN], edx
+ mov [rsp + PWIDTH], ecx
+ mov [rsp + PNL], r8d
+ test r8d, r8d
+ jnz .Lpage_emit_token
+ test r14d, r14d
+ jz .Lpage_emit_token
+ lea eax, [r14 + rcx]
+ cmp eax, [rbx + TUI_LI_VIEW_COLS]
+ jbe .Lpage_emit_token
+ mov eax, r13d
+ add eax, [rsp + PHEAD]
+ inc eax
+ cmp eax, [rsp + PHEIGHT]
+ jae .Lpage_done
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_read_raw
+ inc r13d
+ xor r14d, r14d
+ cmp r13d, [rsp + PBUDGET]
+ jae .Lpage_done
+ jmp .Lpage_emit
+.Lpage_emit_token:
+ cmp dword ptr [rsp + PNL], 0
+ je .Lpage_token_fits_height
+ mov eax, r13d
+ add eax, [rsp + PHEAD]
+ inc eax
+ cmp eax, [rsp + PHEIGHT]
+ jae .Lpage_done
+.Lpage_token_fits_height:
+ mov rsi, [rsp + PPTR]
+ mov edx, [rsp + PLEN]
+ call li_read_raw
+ mov r12, [rsp + PNEXT]
+ cmp dword ptr [rsp + PNL], 0
+ jne .Lpage_emit_lf
+ add r14d, [rsp + PWIDTH]
+ jmp .Lpage_emit
+.Lpage_emit_lf:
+ inc r13d
+ xor r14d, r14d
+ cmp r13d, [rsp + PBUDGET]
+ jb .Lpage_emit
+ jmp .Lpage_done
+.Lpage_eof:
+ test r14d, r14d
+ jz .Lpage_done
+ mov eax, r13d
+ add eax, [rsp + PHEAD]
+ inc eax
+ cmp eax, [rsp + PHEIGHT]
+ jae .Lpage_done
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_read_raw
+ jmp .Lpage_done
+.Lpage_latest:
+ mov rdi, rbx
+ call tui_view_return_latest
+.Lpage_done:
+ add rsp, PFRAME
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_view_page,.-tui_view_page
+
+/* Fixed ASCII status text fits one terminal row even after a narrow resize. */
+.type li_read_label,@function
+li_read_label:
+ push r12
+ mov r12, rsi
+ mov rdi, rsi
+ call strlen@PLT
+ mov edx, [rbx + TUI_LI_VIEW_COLS]
+ cmp rax, rdx
+ jbe .Lread_label_len
+ mov rax, rdx
+.Lread_label_len:
+ mov rdx, rax
+ mov rsi, r12
+ call li_read_raw
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_read_raw
+ pop r12
+ ret
+.size li_read_label,.-li_read_label
+
+
+.globl tui_view_return_latest
+.type tui_view_return_latest,@function
+tui_view_return_latest:
+ cmp dword ptr [rdi + TUI_LI_VIEW_READING], 0
+ je .Llatest_ret
+ push rbx
+ mov rbx, rdi
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
+ lea rdi, [rbx + TUI_LI_VIEW_TOOL]
+ call tui_tool_flush@PLT
+ mov dword ptr [rbx + TUI_LI_VIEW_READING], 0
+ lea rsi, [rip + .Lread_leave]
+ mov edx, 8
+ call li_read_raw
+ mov rax, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ cmp rax, [rbx + TUI_LI_VIEW_READ_START]
+ jbe .Llatest_editor
+ lea rsi, [rip + .Lread_backlog]
+ call li_read_string
+ mov rcx, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
+ mov rax, [rbx + TUI_LI_VIEW_READ_START]
+ sub rcx, rax
+ lea rdx, [rbx + rax + TUI_LI_VIEW_TRANSCRIPT]
+ lea rdi, [rbx + TUI_LI_VIEW_TERMINAL]
+ mov esi, 1
+ call tui_safe_write@PLT
+.Llatest_editor:
+ mov rdi, rbx
+ call tui_view_redraw_editor
+ pop rbx
+.Llatest_ret:
+ ret
+.size tui_view_return_latest,.-tui_view_return_latest

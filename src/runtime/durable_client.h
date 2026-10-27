@@ -14,7 +14,7 @@ typedef struct {
  void *head,*tail,*delivered;
  unsigned busy,active,cancelled,stopping,failed,fault;
  uint64_t root;
- struct json_object *tool_events;
+ struct json_object *tool_events,*error_message;
 } pg_durable_client;
 /* Single foreground client on its scheduler, borrowed providers/configuration.
    Submit atomically appends a User Entry and creates Generation. Poll pumps

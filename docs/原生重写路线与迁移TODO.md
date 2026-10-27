@@ -127,7 +127,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] model-issued `pangu.tool`接入真实read/write/bash服务与Task/Scheduler：call/execute意图先存、双safe恢复、异步输出/关闭、abort、暂停排空及原子结果Entry/终态。入口`durable_tool.S/h`；Generation和嵌套工具按下面剩余项继续。
 - [x] Generation prepare/request/tools接通真实模型→assistant/owned工具任务→waiting→结果入库→后继Generation；请求配置和cutoff持久化，SQLite/JSONL上的真实DeepSeek Flash闭环与重开通过。入口`durable_generation.S/h`。
 - [ ] 在原生Generation/Tool与Client调用链完成turn/run/settled、草稿与提交事实、流进度、批量调用、顺序/并行工具轮次和结果关联。
-- [ ] 完成可恢复模型重试、deferred生成、partial变化、工具中断结算和副作用恢复策略；模型请求沿用已提交配置与身份。
+- [x] 接通模型错误分类、失败assistant/Task状态原子结算、当前重试策略、持久指数退避/截止时间、提前唤醒、重开续试及取消；真实模型在一次故障注入后完成工具闭环。
+- [ ] 完成deferred生成、partial变化、完整工具中断结算和副作用恢复策略；模型请求沿用已提交配置与身份。
 - [ ] 验收：无工具、单/多工具、错误、取消、暂停与进程恢复的状态/事件/副作用逐项对照；达到消息/输出预算前给出可处理结果。
 
 ### K08 — 完成编码工具与环境适配
@@ -215,8 +216,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Harness `Conversation.submit/abort`、`bindConversation/Harness.open`、Generation `prepare/request/startToolRound/finishToolRound`、Tool `call/execute/abort/settle`及`harness-host-inputs`、generation/tools recovery测试；Coding Agent交互层消费提交/取消/事件/历史。已检查Pi远端从`531340f`至`177e2ad7e41e85c16c859f844a0569a3c76f2666`的本批模块差异：新增observe与telemetry隔离、adopt后取消通知；原生取消处理已在提交外调度，观察扩展随K13接入。Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，本批参考工作树保持固定提交。
-- 实际调用链：`pangu.c`原生Host→JSONL Durable Session→`durable_client.S`原子User Entry/Generation→Scheduler→已提交配置/上下文→模型流→owned Tool/wait→真实read/write/edit/bash→结果入库→后继Generation。Client拥有事件字节，桥接消费submit/cancel/poll/history；退出暂停并排空资源，默认工作区`.pangu`，重开投影历史与继续持久任务。
-- 验证：Client严格UTF-8拒绝不写入、输入/任务原子创建、忙时拒绝、prepare暂停重开/取消、历史与ABI在SQLite/JSONL通过ASan/UBSan；真实DeepSeek两后端Client闭环各2次请求/1次read/2个assistant、HTTP200、零fault。Runtime完整O0/O2回归、隔离核心树G00/Assembly与产品构建通过；真实终端完成四种编码工具、PanGu身份、历史重开与继续对话。PTY恢复定位到已提交TUI Unicode宽度常量的前向汇编错误；隔离基线采用显式立即数修正后，真实工具执行中退出重开及进程终止重开均通过，命令副作用保持一次；当前TUI候选已有表/常量前置修正。控制登记自审：新增Assembly Client/头、Generation历史导出与实际组合依赖，沿既有门禁登记，验证范围如上。
-- 剩余行为：TUI候选尚待交接，临时候选整机构建通过，其自身测试当前停在`tests/client/tui/test_tui_view.c:270`的控制转义断言；未编辑/暂存TUI归属文件。K05/K07重试/deferred/partial、顺序工具/hook、K10输入队列与多会话、K11资源配置恢复、K12压缩、K13完整观察/用量和K06余项继续按所属清单完成；当前模型投影仍为64条消息，启动仍加载所选提示文件。
-- 下一交付物：接收TUI候选后统一登记与终端回归；核心继续按Generation/工具恢复用例成组补齐持久模型重试及错误结算，把已接通的产品链扩展为完整K07行为。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Generation `classify/retry/prepare`、`pi-ai/utils/retry.ts`与`overflow.ts`、上下文`EXCLUDED_STOP_REASONS`，以及generation预算/禁用/非重试/策略变化、generation-recovery退避重开/提前唤醒用例。批次起核对Pi远端`177e2ad7e41e85c16c859f844a0569a3c76f2666`、Harness远端`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`均与上一批核对点一致，继续固定参考树。TUI来源/范围由TUI TODO交接区给出。
+- 实际调用链：模型start/next失败→注入的failure查询→`model_failure.S`分类→`durable_generation.S`将error assistant与sleeping/failed状态同批提交→Scheduler按持久until唤醒→retry/prepare读取当前配置与策略→重新请求；模型上下文过滤error/aborted/deferred响应。`durable_client.S`把正常failed结果与诊断转成真实错误终态。产品已接入；libc POSIX regex仅由布局胶水执行匹配。MiMo/OpenAI-compatible传输保存CURL失败码，非200读取完整有界错误体后分类。TUI交接候选接入安全输出、工具预览/展开、输入历史/搜索/命令选择和会话阅读；结构化diff候选仍由独立测试消费。
+- 验证：两后端错误分类/预算、quota/禁用、动态策略、早醒、退避重开/取消及ABI专项通过；一次瞬时失败注入后，真实DeepSeek各完成重试、read任务和后继回答，HTTP200、零task fault。MiMo汇编ABI/传输/分配专项、固定集成树Runtime完整O0/O2回归、Clang九客户端程序/二十四组PTY、G00/Assembly与产品构建通过。整机真实DeepSeek完成read/write/edit/bash、PanGu身份、历史重开续聊，正常退出和进程终止后恢复均保持一次写入；恢复PTY按文件副作用同步，适配工具按源行缓冲展示。控制登记自审：新增Assembly错误分类与公开failure契约、POSIX regex布局胶水；登记TUI交接的八个文件，产品接入safe/tool，diff候选由专项构建；补充实际libunistring依赖。
+- 剩余行为：K07 deferred/partial、顺序工具/hook/嵌套工具，K10输入队列与多会话，K11资源配置恢复，K12压缩，K13完整观察/用量，以及K06余项继续按所属清单完成。当前模型投影64条消息，启动仍加载所选提示文件；历史目前沿模型上下文投影，完整失败响应视图随K13完成。TUI U03结构化工具参数/diff/附件与U04/U07剩余布局/字素/持久分页按其TODO保持待完成。
+- 下一交付物：沿K07/K10把当前前台输入接入Durable Submission/队列边界；为TUI U03提供真实参数/结构化工具结果接口，继续成组补齐产品调用链。

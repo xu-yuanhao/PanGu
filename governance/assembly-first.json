@@ -18,7 +18,7 @@
     "src/client/tui/tui_term.c": {
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
-      "reason": "termios/ioctl等平台结构与系统库适配"
+      "reason": "termios/winsize平台布局与libunistring完整Unicode小写转换的外部ABI胶水"
     },
     "src/runtime/session.S": {
       "role": "assembly-core",
@@ -197,6 +197,23 @@
     "src/runtime/durable_client.S": {
       "role": "assembly-core",
       "reason": "手写Durable前台输入事务、调度事件队列、取消与暂停；借用注入的Session和Scheduler"
+    },
+    "src/runtime/model_failure.S": {
+      "role": "assembly-core",
+      "reason": "手写Pi模型错误分类顺序、HTTP/传输映射；复用平台regex执行匹配"
+    },
+    "src/runtime/model_regex_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "POSIX regex_t/regmatch_t布局与regcomp/regexec/regfree胶水"
+    },
+    "src/client/tui/tui_safe.S": {
+      "role": "assembly-core",
+      "reason": "手写共享UTF-8安全输出与控制字节转义"
+    },
+    "src/client/tui/tui_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写工具输出预览、尾部保留、完成状态与展开"
     }
   }
 }

@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import pty
+import re
 import select
 import signal
 import subprocess
@@ -114,7 +115,7 @@ def workflow(binary, root, env):
         output = run_input(terminal, 'Read source.txt using read. Write its exact content to target.txt using write. Then use edit to append the literal suffix _EDIT to its first line. Run bash command cat target.txt to verify the result. Finish by replying with the final file content. Use all four tools.')
         assert (root / 'target.txt').read_text() == marker + '_EDIT\n'
         for tool in (b'read', b'write', b'edit', b'bash'):
-            assert b'[tool] ' + tool in output, ('missing actual tool', tool)
+            assert b'[tool] ' + tool in re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', output), ('missing actual tool', tool)
         assert marker.encode() in output and b'_EDIT' in output
         output = run_input(terminal, 'What product are you? Answer only its name.')
         assert b'PanGu' in output
@@ -150,11 +151,13 @@ def recovery(binary, root, env, crash=False):
         child_pid = root / 'crash-child.pid'
         command = (f'printf "%s" "$$" > {child_pid.name}; ' if crash else '') + f'printf once >> {target.name}; printf PANGU_EFFECT_STARTED; sleep 30; printf late >> {target.name}'
         terminal.send(('Use bash exactly once to run: '+json.dumps(command)+'. If interrupted, never repeat it. Report the result briefly.').encode()+b'\r')
-        terminal.until(b'PANGU_EFFECT_STARTED', 120)
-        # The echoed user input contains the marker too; wait for the real effect.
+        # Tool previews may buffer a source line until LF; observe the actual
+        # side effect while draining the PTY instead of synchronizing on text.
         deadline = time.monotonic()+60
-        while not target.exists():
-            assert time.monotonic()<deadline
+        while not target.exists() or target.read_bytes()!=b'once':
+            assert time.monotonic()<deadline, 'command effect was not observed: '+repr(target.read_bytes() if target.exists() else None)
+            if target.exists():
+                assert target.read_bytes() in (b'',b'once'), 'unexpected command effect before exit: '+repr(target.read_bytes())
             readable, _, _ = select.select([terminal.master], [], [], .1)
             if readable:
                 terminal.output += os.read(terminal.master,8192)
@@ -172,7 +175,7 @@ def recovery(binary, root, env, crash=False):
             terminal.finish()
     finally:
         terminal.close()
-    assert target.read_bytes()==b'once'
+    assert target.read_bytes()==b'once', ('effect after exit',target.read_bytes())
     terminal = Terminal(binary, root, env)
     try:
         terminal.until(b'[run] finished: success',160)

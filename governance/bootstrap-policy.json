@@ -579,6 +579,17 @@
     "src/runtime/durable_generation.S": "native-source",
     "src/runtime/durable_generation.h": "native-source",
     "src/runtime/durable_client.S": "native-source",
-    "src/runtime/durable_client.h": "native-source"
+    "src/runtime/durable_client.h": "native-source",
+    "src/runtime/model_failure.h": "native-source",
+    "src/runtime/model_failure.S": "native-source",
+    "src/runtime/model_regex_posix.c": "native-source",
+    "src/client/tui/tui_safe.h": "client-source",
+    "src/client/tui/tui_safe.S": "client-source",
+    "src/client/tui/tui_tool.h": "client-source",
+    "src/client/tui/tui_tool.S": "client-source",
+    "src/client/tui/tui_diff.h": "client-source",
+    "src/client/tui/tui_diff.S": "client-source",
+    "tests/client/tui/test_tui_tool.c": "client-test",
+    "tests/client/tui/test_tui_diff.c": "client-test"
   }
 }

@@ -146,3 +146,136 @@ tui_utf8_truncate_len:
 .size tui_utf8_truncate_len, .-tui_utf8_truncate_len
 
 .section .note.GNU-stack,"",@progbits
+
+.section .text
+/* ---- 内部：cp_width(seq, len) → eax ∈ {0,1,2}：code point 显示宽度近似。
+ * 零宽：组合附加符号/零宽字符/变体选择符；宽 2：CJK/全角/主要 emoji 平面。
+ * 与编辑器同为 code point 粒度，不声明完整字素簇/东亚宽度全表。 */
+.align 4
+.Lw_zero:
+ .long 0x0300, 0x036F
+ .long 0x200B, 0x200F
+ .long 0xFE00, 0xFE0F
+.Lw_zero_end:
+.Lw_wide:
+ .long 0x1100, 0x115F
+ .long 0x2E80, 0x303E
+ .long 0x3041, 0x33FF
+ .long 0x3400, 0x4DBF
+ .long 0x4E00, 0x9FFF
+ .long 0xA000, 0xA4CF
+ .long 0xAC00, 0xD7A3
+ .long 0xF900, 0xFAFF
+ .long 0xFE30, 0xFE4F
+ .long 0xFF00, 0xFF60
+ .long 0x1F300, 0x1F64F
+ .long 0x1F680, 0x1F6FF
+ .long 0x1F900, 0x1F9FF
+ .long 0x20000, 0x2FFFD
+ .long 0x30000, 0x3FFFD
+.Lw_wide_end:
+
+/* 表项计数必须在首次使用（.text 的 cmp）之前定义：.set 按序处理，
+ * 文件尾部定义会让 cmp 把符号当绝对内存操作数（cmp ecx, [N]）而非立即数。 */
+.set TUI_W_ZERO_COUNT, (.Lw_zero_end - .Lw_zero) / 4
+.set TUI_W_WIDE_COUNT, (.Lw_wide_end - .Lw_wide) / 4
+
+.globl tui_utf8_cp_width
+.type tui_utf8_cp_width,@function
+tui_utf8_cp_width:
+ test rsi, rsi
+ jnz .Lw_nonempty
+ xor eax, eax
+ ret
+.Lw_nonempty:
+ movzx eax, byte ptr [rdi]
+ cmp eax, 0x80
+ jb .Lw_one
+ mov edx, eax
+ and edx, 0xE0
+ cmp edx, 0xC0
+ jne .Lw_3
+ cmp rsi, 2
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi]
+ and edx, 0x1F
+ shl edx, 6
+ or eax, edx
+ jmp .Lw_scan
+.Lw_3:
+ mov edx, eax
+ and edx, 0xF0
+ cmp edx, 0xE0
+ jne .Lw_4
+ cmp rsi, 3
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi + 2]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi]
+ and edx, 0x0F
+ shl edx, 12
+ or eax, edx
+ jmp .Lw_scan
+.Lw_4:
+ mov edx, eax
+ and edx, 0xF8
+ cmp edx, 0xF0
+ jne .Lw_one /* 非法首字节按 1 */
+ cmp rsi, 4
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi + 2]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi + 3]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi]
+ and edx, 0x07
+ shl edx, 18
+ or eax, edx
+.Lw_scan:
+ lea rdx, [rip + .Lw_zero]
+ xor ecx, ecx
+.Lw_zero_loop:
+ cmp ecx, OFFSET TUI_W_ZERO_COUNT
+ jae .Lw_wide_scan
+ cmp eax, dword ptr [rdx + rcx*4]
+ jb .Lw_zero_next
+ cmp eax, dword ptr [rdx + rcx*4 + 4]
+ jbe .Lw_ret0
+.Lw_zero_next:
+ add ecx, 2
+ jmp .Lw_zero_loop
+.Lw_wide_scan:
+ lea rdx, [rip + .Lw_wide]
+ xor ecx, ecx
+.Lw_wide_loop:
+ cmp ecx, OFFSET TUI_W_WIDE_COUNT
+ jae .Lw_one
+ cmp eax, dword ptr [rdx + rcx*4]
+ jb .Lw_wide_next
+ cmp eax, dword ptr [rdx + rcx*4 + 4]
+ jbe .Lw_ret2
+.Lw_wide_next:
+ add ecx, 2
+ jmp .Lw_wide_loop
+.Lw_ret0:
+ xor eax, eax
+ ret
+.Lw_ret2:
+ mov eax, 2
+ ret
+.Lw_one:
+ mov eax, 1
+ ret
+.size tui_utf8_cp_width, .-tui_utf8_cp_width

@@ -336,13 +336,18 @@
         "src/client/tui/runtime_bridge.h",
         "src/client/tui/tui_term.S",
         "src/client/tui/tui_layout.h",
-        "src/client/tui/runtime_bridge_layout.h"
+        "src/client/tui/runtime_bridge_layout.h",
+        "src/client/tui/tui_safe.h",
+        "src/client/tui/tui_safe.S",
+        "src/client/tui/tui_tool.h",
+        "src/client/tui/tui_tool.S"
       ],
       "dependencies": [
         "client.contract.v0",
         "system libc",
         "POSIX termios/poll/signals",
-        "session.commit.local.v0"
+        "session.commit.local.v0",
+        "libunistring.so.5 via libdl"
       ],
       "role": "handwritten TUI and native bridge; optional bounded startup committed-history reader before attach, no lifecycle replay; escape untrusted terminal controls after UTF-8 carry joining; termios layout remains thin C",
       "exports": [
@@ -352,7 +357,15 @@
         "pg_tui_bridge_set_detach",
         "pg_tui_bridge_set_history",
         "tui_state_history",
-        "tui_view_history"
+        "tui_view_history",
+        "tui_input_remember",
+        "tui_raw_write",
+        "tui_safe_write",
+        "tui_tool_started",
+        "tui_tool_output",
+        "tui_tool_finished",
+        "tui_tool_expand",
+        "tui_tool_flush"
       ],
       "reference_basis": [
         {
@@ -384,6 +397,15 @@
             "packages/tui/test/terminal.test.ts",
             "packages/tui/test/keys.test.ts"
           ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/modes/interactive/components/tool-execution.ts",
+            "packages/tui/src/components/editor.ts"
+          ],
+          "semantics": "Tool output preview/tail/expand and accepted-input history; source-line previews and one-way scrollback expansion remain explicit U03/U04 differences."
         }
       ]
     },
@@ -1715,15 +1737,19 @@
         "src/runtime/durable_generation.h",
         "src/runtime/durable_generation.S",
         "src/runtime/durable_client.S",
-        "src/runtime/durable_client.h"
+        "src/runtime/durable_client.h",
+        "src/runtime/model_failure.h",
+        "src/runtime/model_failure.S",
+        "src/runtime/model_regex_posix.c"
       ],
       "dependencies": [
         "task.runner.local.v0",
         "task.tool.local.v0",
         "json-c",
-        "libutf8proc"
+        "libutf8proc",
+        "system libc POSIX regex"
       ],
-      "role": "Native Generation/Tool execution and foreground Client: atomic input/Generation creation, scheduler pumping, owned model/tool event queue, cancellation, suspend and committed history projection.",
+      "role": "Native Generation/Tool/Client: atomic input and assistant/state transactions, durable configurable retry sleep/reprepare, current policy, error-filtered model projection, scheduler events, cancellation, suspend and startup history.",
       "exports": [
         "pg_durable_generation_init",
         "pg_durable_generation_history",
@@ -1734,7 +1760,8 @@
         "pg_durable_client_tool",
         "pg_durable_client_publish",
         "pg_durable_client_fault",
-        "pg_durable_client_output"
+        "pg_durable_client_output",
+        "pg_model_retryable"
       ],
       "reference_basis": [
         {
@@ -1744,9 +1771,13 @@
             "packages/durable/src/harness/generation.ts",
             "packages/durable/src/harness/harness.ts",
             "packages/durable/src/harness/submissions.ts",
-            "packages/durable/src/harness/scheduler.ts"
+            "packages/durable/src/harness/scheduler.ts",
+            "packages/ai/src/utils/retry.ts",
+            "packages/durable/src/harness/context.ts",
+            "packages/durable/src/harness/agent.ts",
+            "packages/ai/src/utils/overflow.ts"
           ],
-          "semantics": "prepare/request/startToolRound/finishToolRound mapped to native services and pangu Entry/Task identities; retry/deferred/compaction/hooks/queue boundaries and sequential mode remain K07/K10/K12 coverage",
+          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; model context excludes error/aborted/deferred assistants. Deferred/compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
           "tests_to_read": [
             "packages/durable/test/harness-generation.test.ts",
             "packages/durable/test/harness-generation-recovery.test.ts",
@@ -1755,10 +1786,34 @@
           ]
         }
       ]
+    },
+    {
+      "id": "client.tui.diff.candidate.v0",
+      "sources": [
+        "src/client/tui/tui_diff.h",
+        "src/client/tui/tui_diff.S"
+      ],
+      "dependencies": [
+        "client.tui.local.v0"
+      ],
+      "role": "Candidate diff rendering consumed by tests/client/tui/test_tui_diff.c; structured edit event integration belongs to U03.",
+      "exports": [
+        "tui_diff_render"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/modes/interactive/components/diff.ts"
+          ],
+          "semantics": "Numbered diff groups, line color and current bounded prefix/suffix intraline candidate."
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
-  "product_runtime_dependencies": "Core uses C ABI layouts; hosted adapters use registered libcurl/json-c/libc/POSIX, edit text uses libutf8proc for Unicode normalization.",
+  "product_runtime_dependencies": "Core uses C ABI layouts; hosted adapters use registered libcurl/json-c/libc/POSIX, edit text uses libutf8proc for Unicode normalization. TUI history search uses libunistring.so.5 through a scoped dlopen C ABI adapter.",
   "limits": {
     "messages": 64,
     "text_bytes_including_terminator": 4096,
@@ -1806,6 +1861,14 @@
       "license": "LGPL-2.1-or-later",
       "purpose": "existing libc dependency: mature spawn/exec setup, directory/descriptor actions, process groups and nonblocking wait; no new third-party library",
       "impact": "Linux/glibc process backend only; opaque spawn storage is checked during product build, other libc/platform ports not certified"
+    },
+    {
+      "name": "libunistring",
+      "version": "1.4.2-1 (system package; SONAME libunistring.so.5)",
+      "source": "system unicase.h and scoped dlopen/dlsym",
+      "license": "GPL-2.0-or-later / LGPL-3.0-or-later (installed package metadata)",
+      "purpose": "TUI history search full context-sensitive Unicode lowercase",
+      "impact": "Linux TUI external Unicode bridge; handles and replacement allocations are released per call."
     }
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",

@@ -20,8 +20,26 @@
 #define TUI_LI_INPUT_UTF8_PENDING    1064
 #define TUI_LI_INPUT_PASTE_REJECT    1068
 #define TUI_LI_INPUT_ENTER_CR        1072
-#define TUI_LI_INPUT_SIZE            1080
+#define TUI_LI_INPUT_HISTORY_COUNT   1076
+#define TUI_LI_INPUT_HISTORY_INDEX   1080
+#define TUI_LI_INPUT_COLUMNS         1084
+#define TUI_LI_INPUT_PREF_COL        104928
+#define TUI_LI_INPUT_PREF_VALID      104932
+#define TUI_LI_INPUT_DRAFT_LEN       1088
+#define TUI_LI_INPUT_DRAFT_CURSOR    1096
+#define TUI_LI_INPUT_DRAFT           1104
+#define TUI_LI_INPUT_HISTORY_LENS    2128
+#define TUI_LI_INPUT_HISTORY         2528
+#define TUI_LI_INPUT_COMPLETION_OPEN 104936
+#define TUI_LI_INPUT_COMPLETION_SEL  104940
+#define TUI_LI_INPUT_SEARCH_ACTIVE   104944
+#define TUI_LI_INPUT_SEARCH_FAILED   104948
+#define TUI_LI_INPUT_SIZE            104952
 #define TUI_LI_INPUT_MAX_BYTES       1024
+
+/* tui_out_sink（tui_sink.h） */
+#define TUI_LI_SINK_CTX              0
+#define TUI_LI_SINK_WRITE            8
 
 /* tui_state（tui_state.h） */
 #define TUI_LI_STATE_OPS             0
@@ -39,14 +57,22 @@
 #define TUI_LI_VIEW_ANSI             16
 #define TUI_LI_VIEW_EDITOR           24
 #define TUI_LI_VIEW_EDITOR_ON_LINE   32
-#define TUI_LI_VIEW_CARRY            36
-#define TUI_LI_VIEW_CARRY_LEN        40
-#define TUI_LI_VIEW_COLS             48
-#define TUI_LI_VIEW_EDITOR_ROWS      52
-#define TUI_LI_VIEW_CURSOR_ROW       56
-#define TUI_LI_VIEW_CURSOR_COL       60
-#define TUI_LI_VIEW_MD               64
-#define TUI_LI_VIEW_SIZE             5824
+#define TUI_LI_VIEW_COLS             36
+#define TUI_LI_VIEW_EDITOR_ROWS      40
+#define TUI_LI_VIEW_CURSOR_ROW       44
+#define TUI_LI_VIEW_CURSOR_COL       48
+#define TUI_LI_VIEW_MD               56
+#define TUI_LI_VIEW_TOOL             5816
+#define TUI_LI_VIEW_TERMINAL         24960
+#define TUI_LI_VIEW_READING          24976
+#define TUI_LI_VIEW_TERMINAL_ROWS    24980
+#define TUI_LI_VIEW_TRANSCRIPT_LEN   24984
+#define TUI_LI_VIEW_READ_ANCHOR      24992
+#define TUI_LI_VIEW_READ_START       25000
+#define TUI_LI_VIEW_PAGE_ROWS        25008
+#define TUI_LI_VIEW_DROPPED          25012
+#define TUI_LI_VIEW_TRANSCRIPT       25016
+#define TUI_LI_VIEW_SIZE             90552
 #define TUI_LI_VIEW_TOOL_SNIPPET     160
 #define TUI_LI_VIEW_ERROR_DETAIL     512
 
@@ -74,6 +100,37 @@
 #define TUI_LI_MD_LINE_MAX           512
 #define TUI_LI_MD_TABLE_ROWS         16
 #define TUI_LI_MD_ROW_MAX            256
+
+/* tui_tool（tui_tool.h） */
+#define TUI_LI_TOOL_EMIT_CTX         0
+#define TUI_LI_TOOL_EMIT_PUT         8
+#define TUI_LI_TOOL_EMIT_RAW         16
+#define TUI_LI_TOOL_ANSI             24
+#define TUI_LI_TOOL_ACTIVE           28
+#define TUI_LI_TOOL_LAST_FIN         32
+#define TUI_LI_TOOL_SLOT0            36
+#define TUI_LI_TOOL_SIZE             19144
+#define TUI_LI_REC_NAME              0
+#define TUI_LI_REC_NAME_LEN          64
+#define TUI_LI_REC_ID                68
+#define TUI_LI_REC_ID_LEN            132
+#define TUI_LI_REC_STATE             136
+#define TUI_LI_REC_EXPANDED          140
+#define TUI_LI_REC_OUTLINES          144
+#define TUI_LI_REC_SHOWN             148
+#define TUI_LI_REC_HINTED            152
+#define TUI_LI_REC_TAIL_LEN          156
+#define TUI_LI_REC_LOSSY             160
+#define TUI_LI_REC_LINE              164
+#define TUI_LI_REC_LINE_LEN          676
+#define TUI_LI_REC_TAIL              680
+#define TUI_LI_REC_SIZE              4776
+#define TUI_LI_TOOL_NAME_MAX         64
+#define TUI_LI_TOOL_ID_MAX           64
+#define TUI_LI_TOOL_LINE_MAX         512
+#define TUI_LI_TOOL_TAIL_MAX         4096
+#define TUI_LI_TOOL_SLOTS            4
+#define TUI_LI_TOOL_PREVIEW          10
 
 /* tui_event / tui_runtime_ops（tui_runtime_adapter.h，主 Agent 维护，只读） */
 #define TUI_LI_EVENT_KIND            0
@@ -141,6 +198,12 @@
 #define TUI_LI_KEY_IGNORED           7
 #define TUI_LI_KEY_CURSOR            8
 #define TUI_LI_KEY_PASTE             9
+#define TUI_LI_KEY_CTRL_O            10
+#define TUI_LI_KEY_HELP              11
+#define TUI_LI_KEY_COMPLETIONS       12
+#define TUI_LI_KEY_SEARCH            13
+#define TUI_LI_KEY_PAGE_UP           14
+#define TUI_LI_KEY_PAGE_DOWN         15
 #define TUI_LI_EV_RUN_STARTED        1
 #define TUI_LI_EV_TEXT_DELTA         2
 #define TUI_LI_EV_TOOL_STARTED       3
@@ -157,6 +220,7 @@
 #define TUI_LI_EXIT_CTRL_C_IDLE      1
 #define TUI_LI_EXIT_SIGNAL           2
 #define TUI_LI_EXIT_POLL_ERROR       3
+#define TUI_LI_EXIT_COMMAND          4
 
 /* Linux x86-64 平台常量（glibc 公开接口约定；sigaction 偏移在 ABI 测试中
  * 另有 offsetof 断言，见 tests/client/tui/test_tui_abi.c） */
@@ -186,6 +250,7 @@
 #include "tui_runtime_adapter.h"
 #include "tui_state.h"
 #include "tui_term.h"
+#include "tui_tool.h"
 #include "tui_view.h"
 
 #define TUI_ASSERT_OFF(type, field, val) \
@@ -207,6 +272,20 @@ TUI_ASSERT_OFF(tui_input, paste_cr, TUI_LI_INPUT_PASTE_CR);
 TUI_ASSERT_OFF(tui_input, utf8_pending, TUI_LI_INPUT_UTF8_PENDING);
 TUI_ASSERT_OFF(tui_input, paste_reject, TUI_LI_INPUT_PASTE_REJECT);
 TUI_ASSERT_OFF(tui_input, enter_cr, TUI_LI_INPUT_ENTER_CR);
+TUI_ASSERT_OFF(tui_input, history_count, TUI_LI_INPUT_HISTORY_COUNT);
+TUI_ASSERT_OFF(tui_input, history_index, TUI_LI_INPUT_HISTORY_INDEX);
+TUI_ASSERT_OFF(tui_input, history_draft_len, TUI_LI_INPUT_DRAFT_LEN);
+TUI_ASSERT_OFF(tui_input, history_draft_cursor, TUI_LI_INPUT_DRAFT_CURSOR);
+TUI_ASSERT_OFF(tui_input, history_draft, TUI_LI_INPUT_DRAFT);
+TUI_ASSERT_OFF(tui_input, history_lens, TUI_LI_INPUT_HISTORY_LENS);
+TUI_ASSERT_OFF(tui_input, history, TUI_LI_INPUT_HISTORY);
+TUI_ASSERT_OFF(tui_input, columns, TUI_LI_INPUT_COLUMNS);
+TUI_ASSERT_OFF(tui_input, preferred_column, TUI_LI_INPUT_PREF_COL);
+TUI_ASSERT_OFF(tui_input, preferred_valid, TUI_LI_INPUT_PREF_VALID);
+TUI_ASSERT_OFF(tui_input, completion_open, TUI_LI_INPUT_COMPLETION_OPEN);
+TUI_ASSERT_OFF(tui_input, completion_selected, TUI_LI_INPUT_COMPLETION_SEL);
+TUI_ASSERT_OFF(tui_input, history_search_active, TUI_LI_INPUT_SEARCH_ACTIVE);
+TUI_ASSERT_OFF(tui_input, history_search_failed, TUI_LI_INPUT_SEARCH_FAILED);
 TUI_ASSERT_SIZE(tui_input, TUI_LI_INPUT_SIZE);
 TUI_ASSERT_EQ(TUI_INPUT_MAX_BYTES, TUI_LI_INPUT_MAX_BYTES);
 
@@ -224,16 +303,54 @@ TUI_ASSERT_OFF(tui_view, sink.write, TUI_LI_VIEW_SINK_WRITE);
 TUI_ASSERT_OFF(tui_view, ansi, TUI_LI_VIEW_ANSI);
 TUI_ASSERT_OFF(tui_view, editor, TUI_LI_VIEW_EDITOR);
 TUI_ASSERT_OFF(tui_view, editor_on_line, TUI_LI_VIEW_EDITOR_ON_LINE);
-TUI_ASSERT_OFF(tui_view, carry, TUI_LI_VIEW_CARRY);
-TUI_ASSERT_OFF(tui_view, carry_len, TUI_LI_VIEW_CARRY_LEN);
 TUI_ASSERT_OFF(tui_view, cols, TUI_LI_VIEW_COLS);
 TUI_ASSERT_OFF(tui_view, editor_rows, TUI_LI_VIEW_EDITOR_ROWS);
 TUI_ASSERT_OFF(tui_view, cursor_row, TUI_LI_VIEW_CURSOR_ROW);
 TUI_ASSERT_OFF(tui_view, cursor_col, TUI_LI_VIEW_CURSOR_COL);
 TUI_ASSERT_OFF(tui_view, md, TUI_LI_VIEW_MD);
+TUI_ASSERT_OFF(tui_view, tool, TUI_LI_VIEW_TOOL);
+TUI_ASSERT_OFF(tui_view, terminal_sink, TUI_LI_VIEW_TERMINAL);
+TUI_ASSERT_OFF(tui_view, reading, TUI_LI_VIEW_READING);
+TUI_ASSERT_OFF(tui_view, terminal_rows, TUI_LI_VIEW_TERMINAL_ROWS);
+TUI_ASSERT_OFF(tui_view, transcript_len, TUI_LI_VIEW_TRANSCRIPT_LEN);
+TUI_ASSERT_OFF(tui_view, read_anchor, TUI_LI_VIEW_READ_ANCHOR);
+TUI_ASSERT_OFF(tui_view, read_start, TUI_LI_VIEW_READ_START);
+TUI_ASSERT_OFF(tui_view, page_rows, TUI_LI_VIEW_PAGE_ROWS);
+TUI_ASSERT_OFF(tui_view, transcript_dropped, TUI_LI_VIEW_DROPPED);
+TUI_ASSERT_OFF(tui_view, transcript, TUI_LI_VIEW_TRANSCRIPT);
 TUI_ASSERT_SIZE(tui_view, TUI_LI_VIEW_SIZE);
 TUI_ASSERT_EQ(TUI_VIEW_TOOL_SNIPPET_BYTES, TUI_LI_VIEW_TOOL_SNIPPET);
 TUI_ASSERT_EQ(TUI_VIEW_ERROR_DETAIL_BYTES, TUI_LI_VIEW_ERROR_DETAIL);
+
+TUI_ASSERT_OFF(tui_tool, emit.ctx, TUI_LI_TOOL_EMIT_CTX);
+TUI_ASSERT_OFF(tui_tool, emit.put, TUI_LI_TOOL_EMIT_PUT);
+TUI_ASSERT_OFF(tui_tool, emit.raw, TUI_LI_TOOL_EMIT_RAW);
+TUI_ASSERT_OFF(tui_tool, ansi, TUI_LI_TOOL_ANSI);
+TUI_ASSERT_OFF(tui_tool, active, TUI_LI_TOOL_ACTIVE);
+TUI_ASSERT_OFF(tui_tool, last_finished, TUI_LI_TOOL_LAST_FIN);
+TUI_ASSERT_OFF(tui_tool, slot, TUI_LI_TOOL_SLOT0);
+TUI_ASSERT_SIZE(tui_tool, TUI_LI_TOOL_SIZE);
+TUI_ASSERT_OFF(tui_tool_rec, name, TUI_LI_REC_NAME);
+TUI_ASSERT_OFF(tui_tool_rec, name_len, TUI_LI_REC_NAME_LEN);
+TUI_ASSERT_OFF(tui_tool_rec, id, TUI_LI_REC_ID);
+TUI_ASSERT_OFF(tui_tool_rec, id_len, TUI_LI_REC_ID_LEN);
+TUI_ASSERT_OFF(tui_tool_rec, state, TUI_LI_REC_STATE);
+TUI_ASSERT_OFF(tui_tool_rec, expanded, TUI_LI_REC_EXPANDED);
+TUI_ASSERT_OFF(tui_tool_rec, out_lines, TUI_LI_REC_OUTLINES);
+TUI_ASSERT_OFF(tui_tool_rec, shown, TUI_LI_REC_SHOWN);
+TUI_ASSERT_OFF(tui_tool_rec, hinted, TUI_LI_REC_HINTED);
+TUI_ASSERT_OFF(tui_tool_rec, tail_len, TUI_LI_REC_TAIL_LEN);
+TUI_ASSERT_OFF(tui_tool_rec, lossy, TUI_LI_REC_LOSSY);
+TUI_ASSERT_OFF(tui_tool_rec, line, TUI_LI_REC_LINE);
+TUI_ASSERT_OFF(tui_tool_rec, line_len, TUI_LI_REC_LINE_LEN);
+TUI_ASSERT_OFF(tui_tool_rec, tail, TUI_LI_REC_TAIL);
+TUI_ASSERT_SIZE(tui_tool_rec, TUI_LI_REC_SIZE);
+TUI_ASSERT_EQ(TUI_TOOL_NAME_MAX, TUI_LI_TOOL_NAME_MAX);
+TUI_ASSERT_EQ(TUI_TOOL_ID_MAX, TUI_LI_TOOL_ID_MAX);
+TUI_ASSERT_EQ(TUI_TOOL_LINE_MAX, TUI_LI_TOOL_LINE_MAX);
+TUI_ASSERT_EQ(TUI_TOOL_TAIL_MAX, TUI_LI_TOOL_TAIL_MAX);
+TUI_ASSERT_EQ(TUI_TOOL_SLOTS, TUI_LI_TOOL_SLOTS);
+TUI_ASSERT_EQ(TUI_TOOL_PREVIEW_LINES, TUI_LI_TOOL_PREVIEW);
 
 TUI_ASSERT_OFF(tui_md, sink.ctx, TUI_LI_MD_SINK_CTX);
 TUI_ASSERT_OFF(tui_md, sink.write, TUI_LI_MD_SINK_WRITE);
@@ -323,6 +440,12 @@ TUI_ASSERT_EQ(TUI_KEY_OVERFLOW, TUI_LI_KEY_OVERFLOW);
 TUI_ASSERT_EQ(TUI_KEY_IGNORED, TUI_LI_KEY_IGNORED);
 TUI_ASSERT_EQ(TUI_KEY_CURSOR, TUI_LI_KEY_CURSOR);
 TUI_ASSERT_EQ(TUI_KEY_PASTE, TUI_LI_KEY_PASTE);
+TUI_ASSERT_EQ(TUI_KEY_CTRL_O, TUI_LI_KEY_CTRL_O);
+TUI_ASSERT_EQ(TUI_KEY_HELP, TUI_LI_KEY_HELP);
+TUI_ASSERT_EQ(TUI_KEY_COMPLETIONS, TUI_LI_KEY_COMPLETIONS);
+TUI_ASSERT_EQ(TUI_KEY_SEARCH, TUI_LI_KEY_SEARCH);
+TUI_ASSERT_EQ(TUI_KEY_PAGE_UP, TUI_LI_KEY_PAGE_UP);
+TUI_ASSERT_EQ(TUI_KEY_PAGE_DOWN, TUI_LI_KEY_PAGE_DOWN);
 TUI_ASSERT_EQ(TUI_EV_RUN_STARTED, TUI_LI_EV_RUN_STARTED);
 TUI_ASSERT_EQ(TUI_EV_TEXT_DELTA, TUI_LI_EV_TEXT_DELTA);
 TUI_ASSERT_EQ(TUI_EV_TOOL_STARTED, TUI_LI_EV_TOOL_STARTED);
@@ -339,6 +462,7 @@ TUI_ASSERT_EQ(TUI_EXIT_EOF, TUI_LI_EXIT_EOF);
 TUI_ASSERT_EQ(TUI_EXIT_CTRL_C_IDLE, TUI_LI_EXIT_CTRL_C_IDLE);
 TUI_ASSERT_EQ(TUI_EXIT_SIGNAL, TUI_LI_EXIT_SIGNAL);
 TUI_ASSERT_EQ(TUI_EXIT_POLL_ERROR, TUI_LI_EXIT_POLL_ERROR);
+TUI_ASSERT_EQ(TUI_EXIT_COMMAND, TUI_LI_EXIT_COMMAND);
 
 #endif /* !__ASSEMBLER__ */
 #endif /* PANGU_TUI_LAYOUT_H */

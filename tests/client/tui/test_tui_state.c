@@ -174,8 +174,8 @@ static void test_full_round_trip_unique_terminal(void)
 		T_CHECK(finished == 1); /* 唯一终态 */
 	}
 	T_CHECK(tstr_contains(&out, "[run] started"));
-	T_CHECK(tstr_contains(&out, "[tool] t (#c1) started"));
-	T_CHECK(tstr_contains(&out, "[tool] t (#c1) finished"));
+	T_CHECK(tstr_contains(&out, "[tool] \x1b[1mt\x1b[22m (#c1) started"));
+	T_CHECK(tstr_contains(&out, "[tool] \x1b[1mt\x1b[22m (#c1)"));
 
 	/* 闲置后再 poll：无操作 */
 	tui_state_poll(&s);
@@ -276,8 +276,39 @@ static unsigned history_calls,history_mode;
 static int m_history(void *ctx,size_t index,tui_history_entry *out){(void)ctx;++history_calls;*out=(tui_history_entry){.kind=index?1u:0u,.text=index?"answer":"question",.text_len=index?6u:8u};if(history_mode==1)return -1;if(history_mode==2){out->text=0;return 1;}if(history_mode==3){out->kind=4;return 1;}if(history_mode==4)return 1;if(history_mode==5){out->kind=2;out->tool_name="t";out->tool_name_len=64;out->call_id="c";out->call_id_len=1;return 1;}return index<2?1:0;}
 static void test_startup_history(void){for(history_mode=0;history_mode<6;++history_mode){tstr out;tui_view view;tui_state state;mock_runtime runtime={0};tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_runtime_ops ops=m_ops;ops.ctx=&runtime;ops.history=m_history;history_calls=0;tui_state_init(&state,&ops,&view);int result=tui_state_history(&state);T_CHECK(!runtime.poll_calls&&!runtime.submit_calls&&!runtime.cancel_calls&&!state.running);if(!history_mode){T_CHECK(result==2&&history_calls==3&&!state.fatal);T_CHECK(tstr_contains(&out,"[history] user: question")&&tstr_contains(&out,"[history] assistant: answer"));T_CHECK(tui_state_history(&state)==0&&history_calls==3);}else{T_CHECK(result<0&&state.fatal);T_CHECK(history_calls<=(history_mode==4?65u:1u));}T_CHECK(!tstr_contains(&out,"[run] started")&&!tstr_contains(&out,"finished: success"));}T_RUN("startup_history_no_execution_and_bounded_errors");}
 
+static int prompt_snapshot(void *ctx, size_t index, tui_history_entry *out)
+{
+ (void)ctx;
+ static char borrowed[64];
+ memset(borrowed,0,sizeof(borrowed)); /* invalidates preceding borrowed slice */
+ if(index>=3) return 0;
+ const char *text=index==0?"first中":index==1?"assistant text":"latest🙂";
+ strcpy(borrowed,text);
+ *out=(tui_history_entry){.kind=index==1?1:0,.text=borrowed,.text_len=strlen(borrowed)};
+ return 1;
+}
+static void test_startup_prompts_restore_editor_history(void)
+{
+ tui_input in; tui_input_init(&in); feed_bytes(&in,"draft");
+ tstr out; tstr_clear(&out); tui_view view;
+ tui_view_init(&view,tstr_sink(&out),0,&in);
+ mock_runtime mock={0}; tui_runtime_ops ops=m_ops;
+ ops.ctx=&mock; ops.history=prompt_snapshot;
+ tui_state state; tui_state_init(&state,&ops,&view);
+ T_CHECK(tui_state_history(&state)==3);
+ T_CHECK(in.len==5 && in.cursor==5 && in.history_count==2);
+ T_CHECK(mock.submit_calls==0 && mock.poll_calls==0);
+ feed_bytes(&in,"\x1b[H\x1b[A");
+ T_CHECK(in.len==strlen("latest🙂") && !memcmp(in.buf,"latest🙂",in.len));
+ feed_bytes(&in,"\x1b[A");
+ T_CHECK(in.len==strlen("first中") && !memcmp(in.buf,"first中",in.len));
+ T_CHECK(tui_state_history(&state)==0 && in.history_count==2);
+ T_RUN("startup_user_prompts_copied_to_editor_history");
+}
+
 int main(void)
 {
+ test_startup_prompts_restore_editor_history();
     test_startup_history();
 	test_attach_existing_run();
 	test_submit_and_busy();

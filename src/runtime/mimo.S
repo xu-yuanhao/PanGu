@@ -383,11 +383,13 @@ li_next:
  mov rax, qword ptr [rbx + PG_MM_HTTP]
  test rax, rax
  jz .Lnx_running                      /* 首响应头未到 */
- cmp rax, 200
- jne .Lnx_bad                         /* 非 200 立即失败 */
 .Lnx_running:
  cmp dword ptr [rsp], 0
- jne .Lnx_lines
+ je .Lnx_transport_result
+ cmp qword ptr [rbx+PG_MM_HTTP],200
+ jne .Lnx_wait
+ jmp .Lnx_lines
+.Lnx_transport_result:
  mov dword ptr [rsp + 8], 0           /* left */
  mov rdi, qword ptr [rbx + PG_MM_MULTI]
  lea rsi, [rsp + 8]
@@ -396,7 +398,9 @@ li_next:
  jz .Lnx_bad
  cmp dword ptr [rax + PG_MM_CURLMSG_MSG], PG_MM_CURLMSG_DONE
  jne .Lnx_bad
- cmp dword ptr [rax + PG_MM_CURLMSG_RESULT], PG_MM_CURLE_OK
+ mov ecx,[rax + PG_MM_CURLMSG_RESULT]
+ mov [rbx+PG_MM_TRANSPORT_ERROR],ecx
+ cmp ecx,PG_MM_CURLE_OK
  jne .Lnx_bad                         /* 传输错误不得伪造成功 */
  cmp qword ptr [rbx + PG_MM_HTTP], 200
  jne .Lnx_bad

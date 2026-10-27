@@ -14,6 +14,10 @@ extern "C" {
 
 /* 首字节推断序列长度：1..4；非法首字节返回 1（按单字节处理）。 */
 size_t tui_utf8_seq_len(unsigned char lead);
+/* Shared code-point cell width approximation used by input and view. */
+unsigned tui_utf8_cp_width(const char *seq, size_t len);
+/* External full Unicode lowercase; caller owns output, SIZE_MAX on failure. */
+size_t tui_unicode_lower(const char *text, size_t len, char *out, size_t cap);
 
 /* buf[0..len) 末尾不完整序列的字节数（0..3），用于跨事件拼接。 */
 size_t tui_utf8_incomplete_tail(const char *buf, size_t len);

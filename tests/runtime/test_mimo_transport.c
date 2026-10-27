@@ -315,6 +315,8 @@ static void test_transport_failures(void) {
     reset_script();
     assert(start() == 0);
     script_http = 500;
+    assert(!nxt(&e)&&e.kind==PG_MODEL_WAIT);
+    finish_transport();
     assert(nxt(&e) == 1);
     model.close(model.context);
 

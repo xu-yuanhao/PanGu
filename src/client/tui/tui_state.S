@@ -292,6 +292,16 @@ tui_state_history:
  cmp rax,62
  ja .Lhistory_error
 .Lhistory_render:
+ cmp dword ptr [rsp + TUI_LI_HISTORY_KIND], 0
+ jne .Lhistory_display
+ mov rax, [rbx + TUI_LI_STATE_VIEW]
+ mov rdi, [rax + TUI_LI_VIEW_EDITOR]
+ test rdi, rdi
+ jz .Lhistory_display
+ mov rsi, [rsp + TUI_LI_HISTORY_TEXT]
+ mov rdx, [rsp + TUI_LI_HISTORY_TEXT_LEN]
+ call tui_input_history_add@PLT
+.Lhistory_display:
  mov rdi,[rbx+TUI_LI_STATE_VIEW]
  mov rsi,rsp
  call tui_view_history

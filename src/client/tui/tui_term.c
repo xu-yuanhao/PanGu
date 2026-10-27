@@ -1,4 +1,4 @@
-/* Linux termios/winsize adapters for the terminal service. */
+/* Linux termios/winsize and external Unicode-library ABI adapters. */
 #define _POSIX_C_SOURCE 200809L
 
 #include "tui_term.h"
@@ -65,3 +65,30 @@ const tui_term_platform tui_term_linux_platform = {
 	linux_restore,
 	linux_query_size,
 };
+
+/* libunistring implements full, context-sensitive lowercase (including dotted I
+ * and final sigma). Input/search state remains in Assembly. The library handle
+ * and any replacement allocation are released before return; no global lease. */
+#include <dlfcn.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unicase.h>
+#include "tui_utf8.h"
+size_t tui_unicode_lower(const char *text, size_t len, char *out, size_t cap)
+{
+ void *handle = dlopen("libunistring.so.5", RTLD_NOW | RTLD_LOCAL);
+ if (!handle) return SIZE_MAX;
+ uint8_t *(*lower)(const uint8_t *, size_t, const char *, uninorm_t, uint8_t *, size_t *);
+ void *symbol = dlsym(handle, "u8_tolower");
+ _Static_assert(sizeof(lower) == sizeof(symbol), "POSIX function pointer ABI");
+ memcpy(&lower, &symbol, sizeof(lower));
+ if (!lower) { dlclose(handle); return SIZE_MAX; }
+ size_t size = cap;
+ uint8_t *result = lower((const uint8_t *)text, len, NULL, NULL, (uint8_t *)out, &size);
+ if (!result || size > cap) size = SIZE_MAX;
+ else if (result != (uint8_t *)out) memcpy(out, result, size);
+ if (result != (uint8_t *)out) free(result);
+ dlclose(handle);
+ return size;
+}

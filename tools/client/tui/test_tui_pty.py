@@ -132,6 +132,398 @@ def case_startup_and_exit_paths():
     print('ok: startup_and_exit_paths')
 
 
+def case_prompt_history_draft():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send('历史🙂'.encode() + b'\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'draft\x1b[H\x1b[A')
+        d.until(b'> ' + '历史🙂'.encode(), 5)
+        # Down at the end restores exact draft and its saved start cursor.
+        d.send(b'\x1b[F\x1b[B')
+        d.until(b'> draft', 5)
+        d.send(b'!')
+        d.until(b'> !draft', 5)
+        d.send(b'\x15\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: prompt_history_draft')
+
+
+def case_visual_vertical_edit():
+    d = Demo('no_tool', cols=6)
+    try:
+        wait_idle(d)
+        d.send(b'abcdefghij\x1b[A!')
+        d.until(b'> abc!', 5)
+        assert RUN_STARTED not in d.output
+        d.send(b'\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: visual_vertical_edit')
+
+
+def case_help_preserves_draft():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'draft\x1b[D\x1bOP')
+        d.until(b'[help] PanGu', 5)
+        d.send(b'!')
+        d.until(b'> draf!t', 5)
+        assert RUN_STARTED not in d.output
+        d.send(b'\x15\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: help_preserves_draft')
+
+
+def case_hotkeys_local_command():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'/hotkeys\r')
+        d.until(b'[help] PanGu', 5)
+        assert RUN_STARTED not in d.output
+        # Command consumed its editor text. A normal prompt still submits.
+        d.send(b'hello\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'/hotkeysX\r')
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'[help] PanGu' not in d.output
+        d.send(b'\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        # A multiline prompt containing the command is model input.
+        d.send(b'/hotkeys\x1b\rcomment\r')
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'[help] PanGu' not in d.output
+        d.send(b'\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('tool_roundtrip', tick=100)
+    try:
+        wait_idle(d)
+        d.send(b'go\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'/hotkeys\r')
+        d.until(b'[help] PanGu', 5)
+        d.until(RUN_FINISHED_OK, 15)
+        assert d.output.count(RUN_STARTED) == 1
+        d.send(b'\x04')
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: hotkeys_local_command_and_exact_match')
+
+
+def case_quit_command():
+    for active in (False, True):
+        d = Demo('tool_roundtrip' if active else 'no_tool', tick=100)
+        try:
+            wait_idle(d)
+            if active:
+                d.send(b'go\r')
+                d.until(RUN_STARTED, 5)
+            d.send(b'/quit\r')
+            d.until('/quit 退出'.encode(), 5)
+            d.until(PASTE_OFF, 5)
+            d.finish(0)
+            assert d.output.count(RUN_STARTED) == int(active)
+            if active:
+                assert RUN_FINISHED_OK not in d.output
+        finally:
+            d.close()
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'/quitX\r')
+        d.until(RUN_FINISHED_OK, 15)
+        assert d.alive()
+        d.send(b'/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: quit_idle_active_and_exact_match')
+
+
+def case_local_command_completion():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'/\t')
+        d.until(b'[commands] /hotkeys  /quit', 5)
+        d.send(b'h\t\r')
+        d.until(b'[help] PanGu', 5)
+        assert RUN_STARTED not in d.output
+        d.send(b'/q\t\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: local_command_completion')
+
+
+def case_command_choice_focus():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'/\t\x03!')
+        d.until(b'> /!', 5)
+        assert d.alive() and RUN_STARTED not in d.output
+        d.send(b'\x15/\t\x1b[B\r')
+        d.until(b'> /quit', 5)
+        assert d.alive()  # Enter accepted the choice, did not execute it.
+        d.send(b'\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('tool_roundtrip', tick=100)
+    try:
+        wait_idle(d)
+        d.send(b'go\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'/\t\x03')
+        d.until(b'[commands]', 5)
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'[run] finished: cancelled' not in d.output
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: command_choice_accept_cancel_focus')
+
+
+def case_reverse_history_recall():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'older needle\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.output = b''
+        d.send(b'newer NEEDLE\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.output = b''
+        d.send(b'needle\x12needle')
+        d.until(b'[match] newer NEEDLE', 5)
+        d.output = b''
+        d.send(b'\x12')
+        d.until(b'[match] older needle', 5)
+        d.output = b''
+        d.send(b'\x03!')
+        d.until(b'> needle!', 5)
+        assert d.alive() and RUN_STARTED not in d.output
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: reverse_history_recall_restore')
+
+
+def case_escape_control_cancel():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'original\x12query')
+        d.until(b'[history search]', 5)
+        d.output = b''
+        d.send(b'\x1b')
+        deadline = time.monotonic() + 0.05
+        while time.monotonic() < deadline:
+            d.pump(min(0.01, deadline - time.monotonic()))
+        d.until(b'> original', 5)
+        d.send(b'!')
+        d.until(b'> original!', 5)
+        d.send(b'\x15/\t')
+        d.until(b'[commands]', 5)
+        d.output = b''
+        d.send(b'\x1b')
+        deadline = time.monotonic() + 0.05
+        while time.monotonic() < deadline:
+            d.pump(min(0.01, deadline - time.monotonic()))
+        d.until(b'> /', 5)
+        d.send(b'quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('tool_roundtrip', tick=100)
+    try:
+        wait_idle(d)
+        d.send(b'go\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'original\x12query')
+        d.until(b'[history search]', 5)
+        fcntl.ioctl(d.master, termios.TIOCSWINSZ, struct.pack('HHHH', 20, 40, 0, 0))
+        d.process.send_signal(signal.SIGWINCH)
+        d.output = b''
+        d.send(b'\x1b')
+        deadline = time.monotonic() + 0.05
+        while time.monotonic() < deadline:
+            d.pump(min(0.01, deadline - time.monotonic()))
+        d.until(b'> original', 5)
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'[run] finished: cancelled' not in d.output
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: standalone_escape_closes_controls')
+
+
+def case_partial_utf8_never_submits():
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'go\xe4\r')
+        d.pump(0.1)
+        assert RUN_STARTED not in d.output
+        d.send(b'\x7f\r')
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'\xe4\x1b[' not in d.output
+        d.send(b'/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: partial_utf8_never_submits')
+
+
+def case_stream_preserves_partial_utf8():
+    d = Demo('tool_roundtrip', tick=100)
+    try:
+        wait_idle(d)
+        d.send(b'go\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'ab\x1b[D\xe4')
+        d.until(RUN_FINISHED_OK, 15)
+        assert b'\xe4b' not in d.output
+        d.send(b'\xb8\xad')
+        d.until('a中b'.encode(), 5)
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: stream_preserves_partial_utf8')
+
+
+def case_reading_keeps_anchor_and_draft():
+    d = Demo('tool_roundtrip', tick=100)
+    try:
+        wait_idle(d)
+        d.send(b'go\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'draft\x1b[5~')
+        d.until(b'\x1b[?1049h', 5)
+        d.until(b'[history] PgUp/PgDn', 5)
+        # Source events continue while the physical reading screen is frozen.
+        deadline = time.monotonic()+1
+        while time.monotonic()<deadline:
+            d.pump(0.02)
+        d.output = b''
+        fcntl.ioctl(d.master, termios.TIOCSWINSZ, struct.pack('HHHH', 8, 30, 0, 0))
+        d.process.send_signal(signal.SIGWINCH)
+        d.until(b'[history] PgUp/PgDn', 5)
+        d.send(b'\x04')  # return to latest; never backspace the nonempty draft
+        d.until(b'\x1b[?1049l', 5)
+        d.until(b'> draft', 5)
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'!')
+        d.until(b'> draft!', 5)
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    d = Demo('no_tool')
+    try:
+        wait_idle(d)
+        d.send(b'draft\x1b[5~')
+        d.until(b'\x1b[?1049h', 5)
+        d.process.send_signal(signal.SIGTERM)
+        d.until(b'\x1b[?1049l', 5)
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: reading_keeps_anchor_and_draft')
+
+
+def case_read_long_line_visual_pages():
+    d = Demo('no_tool', cols=8, rows=6)
+    try:
+        wait_idle(d)
+        d.send(b'0123456789abcdefghijklmnop\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'\x1b[5~' * 20)
+        d.until(b'[user] 0', 5)
+        deadline=time.monotonic()+0.1
+        while time.monotonic()<deadline:
+            d.pump(0.01)
+        d.output=b''
+        d.send(b'\x1b[6~')
+        d.until(b'9abcdefg\r\nhijklmno\r\np\r\n', 5)
+        d.send(b'\r/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: read_long_line_visual_pages')
+
+
+def case_reader_one_cell_resize():
+    d = Demo('no_tool', cols=8, rows=6)
+    try:
+        wait_idle(d)
+        d.send(b'abcdefghijk\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'\x1b[5~')
+        d.until(b'\x1b[?1049h', 5)
+        deadline=time.monotonic()+0.1
+        while time.monotonic()<deadline:
+            d.pump(0.01)
+        d.output=b''
+        fcntl.ioctl(d.master, termios.TIOCSWINSZ, struct.pack('HHHH', 1, 1, 0, 0))
+        d.process.send_signal(signal.SIGWINCH)
+        d.until(b'\x1b[H\x1b[2J', 5)
+        deadline=time.monotonic()+0.1
+        while time.monotonic()<deadline:
+            d.pump(0.01)
+        assert b'\r\n' not in d.output, 'one-row reading page scrolled its only row'
+        assert b'\x1b[?1049l' not in d.output
+        d.send(b'\r/quit\r')
+        d.until(b'\x1b[?1049l', 5)
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: reader_one_cell_resize_no_scroll')
+
+
 def case_multiline_edit_submit():
     d = Demo('no_tool')
     try:
@@ -279,7 +671,7 @@ def case_streaming_keeps_draft():
         d.until(RUN_STARTED, 5)
         d.send(b'draft')                    # 流式期间输入新草稿
         d.until(b'draft', 5)
-        d.until(b'[tool] read_file (#call-1)', 5)
+        d.until(b'[tool] \x1b[1mread_file\x1b[22m (#call-1)', 5)
         d.until(RUN_FINISHED_OK, 15)
         # 流式/工具输出结束后草稿仍在输入区（事件挂起/恢复不丢草稿）
         d.until(b'> draft', 5)
@@ -327,10 +719,76 @@ def case_poll_error_failure_path():
     print('ok: poll_error_failure_path')
 
 
+def case_product_prompt_history(binary):
+    """Real product/storage; a local refused connection produces a model error.
+
+    The committed user receipt must remain editable after reopening regardless
+    of the model outcome. No external service or credential is required.
+    """
+    import socket
+    import tempfile
+    sys.path.insert(0, str(ROOT / 'tools/runtime'))
+    from test_pangu_pty import Terminal, stored_bytes
+    with tempfile.TemporaryDirectory(prefix='pangu-tui-history-') as directory:
+        root = Path(directory)
+        # Reserve a non-listening port for deterministic local connection refusal.
+        with socket.socket() as reserved:
+            reserved.bind(('127.0.0.1', 0))
+            port = reserved.getsockname()[1]
+            env = {k:v for k,v in os.environ.items() if not k.startswith(('PANGU_', 'MIMO_'))}
+            env.update(PANGU_MODEL_ENDPOINT=f'https://127.0.0.1:{port}/chat/completions',
+                       PANGU_MODEL_NAME='offline-history', PANGU_MODEL_API_KEY='offline-placeholder')
+            prompt = 'persist中🙂'.encode()
+            terminal = Terminal(Path(binary), root, env)
+            try:
+                terminal.until(b'> ', 5)
+                terminal.send(prompt + b'\r')
+                terminal.until(b'[run] finished: error', 15)
+                terminal.send(b'/quit\r')
+                terminal.until(PASTE_OFF, 5)
+                terminal.finish()
+            finally:
+                terminal.close()
+            original = stored_bytes(root / '.pangu')
+            terminal = Terminal(Path(binary), root, env)
+            try:
+                terminal.until(b'> ', 5)
+                assert prompt in terminal.output and b'[history]' in terminal.output
+                assert RUN_STARTED not in terminal.output
+                terminal.output = b''
+                terminal.send(b'\x1b[A')
+                terminal.until(b'> ' + prompt, 5)
+                terminal.output = b''
+                terminal.send(b'\x15\x12PERSIST')
+                terminal.until(b'[match] ' + prompt, 5)
+                terminal.send(b'\x03/quit\r')
+                terminal.until(PASTE_OFF, 5)
+                terminal.finish()
+                assert RUN_STARTED not in terminal.output
+            finally:
+                terminal.close()
+            assert stored_bytes(root / '.pangu') == original, 'idle history browsing changed storage'
+    print('ok: product_failed_run_reopen_prompt_history_no_execution')
+
+
 def main():
     if not DEMO.exists():
         subprocess.run(['bash', str(ROOT / 'tools/client/tui/build.sh')], check=True)
     case_startup_and_exit_paths()
+    case_prompt_history_draft()
+    case_visual_vertical_edit()
+    case_help_preserves_draft()
+    case_hotkeys_local_command()
+    case_quit_command()
+    case_local_command_completion()
+    case_command_choice_focus()
+    case_reverse_history_recall()
+    case_escape_control_cancel()
+    case_partial_utf8_never_submits()
+    case_stream_preserves_partial_utf8()
+    case_reading_keeps_anchor_and_draft()
+    case_read_long_line_visual_pages()
+    case_reader_one_cell_resize()
     case_multiline_edit_submit()
     case_paste_safety()
     case_unfinished_paste_recovery()
@@ -340,6 +798,8 @@ def main():
     case_resize_keeps_draft()
     case_narrow_autowrap()
     case_poll_error_failure_path()
+    if os.environ.get('PANGU_TUI_PRODUCT'):
+        case_product_prompt_history(os.environ['PANGU_TUI_PRODUCT'])
     print('test_tui_pty: all passed')
 
 

@@ -29,7 +29,9 @@
 .equ OFF_INTERACTIVE, OFF_COUNT + 4
 .equ OFF_K,       OFF_INTERACTIVE + 4                /* size_t，8 对齐 */
 .equ OFF_N,       OFF_K + 8
-.equ APP_FRAME,   (OFF_N + 8 + 15) & -16
+.equ OFF_ESC_DEADLINE, OFF_N + 8
+.equ OFF_ESC_POLL, OFF_ESC_DEADLINE + 8
+.equ APP_FRAME,   (OFF_ESC_POLL + 4 + 15) & -16
 
 .section .rodata
 handled_signals:
@@ -41,6 +43,9 @@ handled_signals:
 .Lname_poll_err: .asciz "Runtime 错误"
 .Lname_unknown:  .asciz "未知"
 .Lruntime_dflt:  .asciz "runtime"
+.Lcmd_hotkeys: .ascii "/hotkeys"
+.Lcmd_quit: .ascii "/quit"
+.Lname_quit: .asciz "/quit 退出"
 
 /* 信号路径全局最小状态：仅 int 标志与自管道 fd（与被替换 C 版一致） */
 .section .data
@@ -239,6 +244,7 @@ tui_app_run:
  mov dword ptr [rsp + OFF_WAKE], -1
  mov dword ptr [rsp + OFF_WAKE + 4], -1
  mov dword ptr [rsp + OFF_COUNT], 0
+ mov qword ptr [rsp + OFF_ESC_DEADLINE], 0
  mov dword ptr [rsp + OFF_REASON], TUI_LI_EXIT_EOF
  mov eax, dword ptr [rbx + TUI_LI_APP_ANSI]
  mov dword ptr [rsp + OFF_INTERACTIVE], eax
@@ -273,6 +279,18 @@ tui_app_run:
  mov rdi, r14
  movzx esi, word ptr [r12 + TUI_LI_TERM_COLS]
  call tui_view_set_size@PLT
+ movzx eax, word ptr [r12 + TUI_LI_TERM_ROWS]
+ mov [r14 + TUI_LI_VIEW_TERMINAL_ROWS], eax
+ cmp eax, 4
+ jae .Lread_rows_normal
+ mov eax, 4
+.Lread_rows_normal:
+ sub eax, 3
+ cmp eax, 10
+ jbe .Lread_rows_set
+ mov eax, 10
+.Lread_rows_set:
+ mov [r14 + TUI_LI_VIEW_PAGE_ROWS], eax
  mov rdi, r15
  mov rsi, qword ptr [rbx + TUI_LI_APP_OPS]
  mov rdx, r14
@@ -356,6 +374,24 @@ tui_app_run:
  mov rdi, r14
  movzx esi, word ptr [r12 + TUI_LI_TERM_COLS]
  call tui_view_set_size@PLT
+ movzx eax, word ptr [r12 + TUI_LI_TERM_ROWS]
+ mov [r14 + TUI_LI_VIEW_TERMINAL_ROWS], eax
+ cmp eax, 4
+ jae .Lread_resize_rows_normal
+ mov eax, 4
+.Lread_resize_rows_normal:
+ sub eax, 3
+ cmp eax, 10
+ jbe .Lread_resize_rows_set
+ mov eax, 10
+.Lread_resize_rows_set:
+ mov [r14 + TUI_LI_VIEW_PAGE_ROWS], eax
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lread_resize_done
+ mov rdi, r14
+ xor esi, esi
+ call tui_view_page@PLT
+.Lread_resize_done:
  mov rdi, r14
  call tui_view_redraw_editor@PLT
 .Ldo_poll:
@@ -373,11 +409,65 @@ tui_app_run:
  je .Ltimeout_ok
  mov edx, dword ptr [rsp + OFF_TICK]
 .Ltimeout_ok:
+ mov [rsp + OFF_ESC_POLL], edx
+ cmp dword ptr [r13 + TUI_LI_INPUT_PASTE], 0
+ jne .Lescape_timer_off
+ cmp dword ptr [r13 + TUI_LI_INPUT_ESC_STATE], 1
+ jne .Lescape_timer_off
+ mov eax, [r13 + TUI_LI_INPUT_SEARCH_ACTIVE]
+ or eax, [r13 + TUI_LI_INPUT_COMPLETION_OPEN]
+ or eax, [r14 + TUI_LI_VIEW_READING]
+ jz .Lescape_timer_off
+ call tui_li_milliseconds
+ mov rcx, [rsp + OFF_ESC_DEADLINE]
+ test rcx, rcx
+ jnz .Lescape_deadline_set
+ lea rcx, [rax + 10] /* Pi stdin-buffer default Escape timeout */
+ mov [rsp + OFF_ESC_DEADLINE], rcx
+.Lescape_deadline_set:
+ sub rcx, rax
+ jns .Lescape_remaining
+ xor ecx, ecx
+.Lescape_remaining:
+ mov edx, [rsp + OFF_ESC_POLL]
+ test edx, edx
+ js .Lescape_timeout_use
+ cmp ecx, edx
+ jae .Lescape_poll
+.Lescape_timeout_use:
+ mov edx, ecx
+ jmp .Lescape_poll
+.Lescape_timer_off:
+ mov qword ptr [rsp + OFF_ESC_DEADLINE], 0
+ mov edx, [rsp + OFF_ESC_POLL]
+.Lescape_poll:
  lea rdi, [rsp + OFF_PFDS]
  mov esi, 2
  call poll@PLT
  test eax, eax
  js .Lpoll_errno
+ jnz .Lpoll_has_events
+ cmp qword ptr [rsp + OFF_ESC_DEADLINE], 0
+ je .Lpump
+ call tui_li_milliseconds
+ cmp rax, [rsp + OFF_ESC_DEADLINE]
+ jb .Lpump
+ mov qword ptr [rsp + OFF_ESC_DEADLINE], 0
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lescape_input_control
+ mov dword ptr [r13 + TUI_LI_INPUT_ESC_STATE], 0
+ mov rdi, r14
+ call tui_view_return_latest@PLT
+ jmp .Lpump
+.Lescape_input_control:
+ mov rdi, r13
+ call tui_input_escape_timeout@PLT
+ cmp eax, TUI_LI_KEY_CURSOR
+ jne .Lpump
+ mov rdi, r14
+ call tui_view_redraw_editor@PLT
+ jmp .Lpump
+.Lpoll_has_events:
  /* pfds[1].revents & POLLIN → 读干唤醒管道 */
  test word ptr [rsp + OFF_PFDS + 14], TUI_LI_POLLIN
  jz .Lcheck_stdin
@@ -403,14 +493,57 @@ tui_app_run:
  jae .Lpump
  lea rcx, [rsp + OFF_BUF]
  movzx esi, byte ptr [rcx + rax]
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lread_feed_byte
+ cmp dword ptr [r13 + TUI_LI_INPUT_PASTE], 0
+ jne .Lread_feed_byte
+ cmp esi, 3
+ je .Lkey_read_return
+ cmp esi, 4
+ je .Lkey_read_return
+ cmp esi, 13
+ je .Lkey_read_return
+ cmp esi, 10
+ je .Lkey_read_return
+.Lread_feed_byte:
  mov rdi, r13
  call tui_input_feed@PLT
+ cmp eax, TUI_LI_KEY_PAGE_UP
+ je .Lkey_page_up
+ cmp eax, TUI_LI_KEY_PAGE_DOWN
+ je .Lkey_page_down
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lkey_normal
+ cmp eax, TUI_LI_KEY_ENTER
+ je .Lkey_read_return
+ cmp eax, TUI_LI_KEY_CTRL_C
+ je .Lkey_read_return
+ cmp eax, TUI_LI_KEY_CTRL_D
+ je .Lkey_read_return
+ cmp eax, TUI_LI_KEY_IGNORED
+ je .Lkey_next
+ cmp eax, TUI_LI_KEY_NONE
+ je .Lkey_next
+ mov [rsp + OFF_ESC_POLL], eax
+ mov rdi, r14
+ call tui_view_return_latest@PLT
+ mov eax, [rsp + OFF_ESC_POLL]
+ jmp .Lkey_normal
+.Lkey_normal:
  cmp eax, TUI_LI_KEY_ENTER
  je .Lkey_enter
  cmp eax, TUI_LI_KEY_CTRL_C
  je .Lkey_ctrl_c
  cmp eax, TUI_LI_KEY_CTRL_D
  je .Lkey_ctrl_d
+ cmp eax, TUI_LI_KEY_SEARCH
+ je .Lkey_search
+ cmp eax, TUI_LI_KEY_COMPLETIONS
+ je .Lkey_completions
+ cmp eax, TUI_LI_KEY_HELP
+ je .Lkey_help
+ cmp eax, TUI_LI_KEY_CTRL_O
+ je .Lkey_ctrl_o
  cmp eax, TUI_LI_KEY_OVERFLOW
  je .Lkey_overflow
  cmp eax, TUI_LI_KEY_CHAR
@@ -422,6 +555,19 @@ tui_app_run:
  cmp eax, TUI_LI_KEY_PASTE
  je .Lkey_redraw
  jmp .Lkey_next
+.Lkey_page_up:
+ mov esi, -1
+ jmp .Lkey_page
+.Lkey_page_down:
+ mov esi, 1
+.Lkey_page:
+ mov rdi, r14
+ call tui_view_page@PLT
+ jmp .Lkey_next
+.Lkey_read_return:
+ mov rdi, r14
+ call tui_view_return_latest@PLT
+ jmp .Lkey_next
 .Lkey_enter:
  mov rdi, r13
  call tui_input_empty@PLT
@@ -431,6 +577,41 @@ tui_app_run:
  call tui_input_incomplete@PLT
  test eax, eax
  jnz .Lkey_next /* 未完成粘贴/转义不提交（防御；feed 契约已保证） */
+ /* Exact local command dispatch precedes Runtime submit (Pi interactive-mode).
+  * No prefix matching: multiline examples and /hotkeysX remain model text. */
+ cmp qword ptr [r13 + TUI_LI_INPUT_LEN], 5
+ jne .Lkey_check_hotkeys
+ mov rdi, r13
+ lea rsi, [rip + .Lcmd_quit]
+ mov edx, 5
+ call memcmp@PLT
+ test eax, eax
+ jnz .Lkey_submit
+ mov rdi, r14
+ call tui_view_finalize_editor@PLT
+ mov rdi, r13
+ call tui_input_reset@PLT
+ mov dword ptr [rsp + OFF_REASON], TUI_LI_EXIT_COMMAND
+ jmp .Ldone
+.Lkey_check_hotkeys:
+ cmp qword ptr [r13 + TUI_LI_INPUT_LEN], 8
+ jne .Lkey_submit
+ mov rdi, r13
+ lea rsi, [rip + .Lcmd_hotkeys]
+ mov edx, 8
+ call memcmp@PLT
+ test eax, eax
+ jnz .Lkey_submit
+ mov rdi, r14
+ call tui_view_finalize_editor@PLT
+ mov rdi, r13
+ call tui_input_remember@PLT
+ mov rdi, r13
+ call tui_input_reset@PLT
+ mov rdi, r14
+ call tui_view_help@PLT
+ jmp .Lkey_next
+.Lkey_submit:
  mov rdi, r13
  call tui_input_text@PLT
  mov rsi, rax
@@ -442,7 +623,13 @@ tui_app_run:
  test eax, eax
  jnz .Lkey_next /* BUSY/ERROR：内容保留，提示已由 view/state 完成 */
  mov rdi, r14
+ mov rsi, r13
+ mov rdx, [r13 + TUI_LI_INPUT_LEN]
+ call tui_view_user@PLT
+ mov rdi, r14
  call tui_view_finalize_editor@PLT
+ mov rdi, r13
+ call tui_input_remember@PLT
  mov rdi, r13
  call tui_input_reset@PLT
  jmp .Lkey_next
@@ -460,6 +647,23 @@ tui_app_run:
 .Lkey_ctrl_d:
  mov dword ptr [rsp + OFF_REASON], TUI_LI_EXIT_EOF
  jmp .Ldone
+.Lkey_search:
+ mov rdi, r14
+ call tui_view_history_search@PLT
+ jmp .Lkey_next
+.Lkey_completions:
+ mov rdi, r14
+ call tui_view_completions@PLT
+ jmp .Lkey_next
+.Lkey_help:
+ mov rdi, r14
+ call tui_view_help@PLT
+ jmp .Lkey_next
+.Lkey_ctrl_o:
+ /* Pi app.tools.expand（ctrl+o）：展开当前保留工具调用的保留输出 */
+ mov rdi, r14
+ call tui_view_tool_expand@PLT
+ jmp .Lkey_next
 .Lkey_overflow:
  mov rdi, r14
  call tui_view_input_limit@PLT
@@ -548,6 +752,31 @@ tui_app_run:
  .cfi_endproc
 .size tui_app_run, .-tui_app_run
 
+/* CLOCK_MONOTONIC host clock; scoped control deadlines only. */
+.type tui_li_milliseconds,@function
+tui_li_milliseconds:
+ sub rsp, 24
+ mov edi, 1
+ mov rsi, rsp
+ call clock_gettime@PLT
+ test eax, eax
+ jne .Lclock_failure
+ mov rax, [rsp]
+ imul rax, rax, 1000
+ mov rcx, rax
+ mov rax, [rsp + 8]
+ xor edx, edx
+ mov esi, 1000000
+ div rsi
+ add rax, rcx
+ jmp .Lclock_done
+.Lclock_failure:
+ mov rax, -1
+.Lclock_done:
+ add rsp, 24
+ ret
+.size tui_li_milliseconds,.-tui_li_milliseconds
+
 /* ---- 局部：shutdown（cfg 在 rbx，由主函数持有） ---- */
 .type tui_li_shutdown,@function
 tui_li_shutdown:
@@ -617,6 +846,8 @@ tui_li_close_if_open:
 tui_exit_reason_name:
  .cfi_startproc
  lea rax, [rip + .Lname_unknown]
+ cmp edi, TUI_LI_EXIT_COMMAND
+ je .Lret_command
  cmp edi, TUI_LI_EXIT_EOF
  je .Lret_eof
  cmp edi, TUI_LI_EXIT_CTRL_C_IDLE
@@ -625,6 +856,9 @@ tui_exit_reason_name:
  je .Lret_signal
  cmp edi, TUI_LI_EXIT_POLL_ERROR
  je .Lret_poll_err
+ ret
+.Lret_command:
+ lea rax, [rip + .Lname_quit]
  ret
 .Lret_eof:
  lea rax, [rip + .Lname_eof]

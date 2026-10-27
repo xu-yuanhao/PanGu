@@ -21,10 +21,10 @@
 
 ## 本批验证与集成状态
 
-- Runtime完整O0/O2回归、Durable Client ASan/UBSan专项、隔离核心树产品构建、G00与Assembly检查通过。
-- 真实DeepSeek通过两后端的Client→Generation→read→后继回答；终端完成read/write/edit/bash、PanGu身份、历史重开与继续对话。
-- 终端执行中退出/恢复验证定位到已提交TUI宽度表的前向常量编码错误。当前TUI候选已将常量定义前移；隔离基线采用显式立即数修正后，真实unsafe工具退出重开与进程终止重开通过，副作用未重复。
-- TUI候选临时整机可构建；候选自身测试目前停在`test_tui_view.c:270`的控制字符转义断言。TUI候选及其登记由双方交接后统一集成，核心提交保留其未提交文件。
+- Generation失败响应与下一状态原子入库：按当前策略执行有上限指数退避，deadline持久化；重开、提前唤醒和取消保持任务语义；额度/账户错误与上下文溢出优先排除重试。
+- 错误Entry保留于PanGu存储，模型请求按Pi过滤error/aborted/deferred assistant；失败终态通过Client传出错误详情。重试前重新prepare配置。
+- Runtime完整O0/O2回归、MiMo汇编ABI/传输/分配专项、隔离产品构建、G00与Assembly检查通过；SQLite/JSONL各通过一次故障注入后的真实DeepSeek工具闭环。
+- TUI交接的安全输出、工具预览/尾部/展开及历史/搜索/阅读候选已纳入固定集成树；Clang九客户端程序、二十四组PTY通过。真实DeepSeek整机完成四工具编码、PanGu身份、重开续聊与两种执行中退出恢复。U03/U04/U07的完整验收仍按TUI TODO。
 
 ## 当前接口边界
 

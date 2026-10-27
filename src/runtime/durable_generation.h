@@ -1,6 +1,7 @@
 #ifndef PANGU_DURABLE_GENERATION_H
 #define PANGU_DURABLE_GENERATION_H
 #include "durable_tool.h"
+#include "model_failure.h"
 typedef struct {
  void *context;
  /* Owned strict JSON {systemPrompt,model,...request options}. The provider
@@ -12,16 +13,20 @@ typedef struct {
  int (*mint)(void *,uint64_t *);
  void (*progress)(void *,uint64_t,pg_slice);
  const pg_task_definition *tool;
+ /* Optional provider failure query, before close; absent means non-retryable. */
+ void (*failure)(void *,const pg_model *,pg_model_failure *);
 } pg_durable_generation_host;
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
- pg_task_phase phases[3];
+ pg_task_phase phases[4];
 } pg_durable_generation;
 /* Resolve pangu.generation alongside pangu.tool. prepare saves configuration
    and context cutoff; request streams through the native model service, then
    atomically appends assistant/create-owned-tools/waits or ends with its Entry
-   receipt. tools hands off to a new generation task after results commit.
+   receipt. A provider failure appends an error assistant and commits bounded
+   retry sleep or a failed receipt; retry prepares current configuration after
+   the durable deadline. tools hands off to a new generation task after results commit.
    Caller holds host/model/definition leases until cleanup. Model service uses
    the existing bounded pg_session protocol; unsupported content rejects rather
    than silently losing model context. */

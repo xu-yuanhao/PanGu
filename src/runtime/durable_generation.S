@@ -77,7 +77,7 @@ pg_durable_generation_init:
  mov [rdi+40],rax
  lea rax,[rdi+88]
  mov [rdi+48],rax
- mov qword ptr [rdi+56],3
+ mov qword ptr [rdi+56],4
  lea rax,[rip+.Lgg_abort]
  mov [rdi+64],rax
  lea rax,[rip+.Lgg_cleanup]
@@ -107,6 +107,14 @@ pg_durable_generation_init:
  mov [rdi+192],rax
  lea rax,[rip+.Lgg_cleanup]
  mov [rdi+200],rax
+ lea rax,[rip+.Lgg_retry_name]
+ mov [rdi+208],rax
+ mov qword ptr [rdi+216],5
+ mov [rdi+224],rdi
+ lea rax,[rip+.Lgg_retry]
+ mov [rdi+232],rax
+ lea rax,[rip+.Lgg_cleanup]
+ mov [rdi+240],rax
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -122,7 +130,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,4320
+ mov esi,4384
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -169,6 +177,10 @@ pg_durable_generation_init:
  lea rsi,[r12+32]
  call [rax+24]
 .Lgg_cleanup_json:
+ mov rdi,[r12+4352]
+ call json_object_put@PLT
+ mov rdi,[r12+4360]
+ call json_object_put@PLT
  mov rdi,[r12+16]
  call json_object_put@PLT
  mov rdi,[r12+24]
@@ -283,6 +295,18 @@ pg_durable_generation_init:
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_prepare_end
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ GGET rax,attempt
+ test rax,rax
+ jz .Lgg_prepare_attempt_ready
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_attempt]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_prepare_end
+.Lgg_prepare_attempt_ready:
  mov rdi,rbx
  mov rsi,[rsp+32]
  call pg_task_runner_commit@PLT
@@ -420,13 +444,36 @@ pg_durable_generation_init:
  lea rsi,[rip+.Lgg_assistant]
  call strcmp@PLT
  test eax,eax
- jz .Lgg_project_role
+ jz .Lgg_project_assistant
  mov dword ptr [rsp+24],3
  mov rdi,r13
  lea rsi,[rip+.Lgg_tool_result]
  call strcmp@PLT
  test eax,eax
  jnz .Lgg_project_bad
+jmp .Lgg_project_role
+.Lgg_project_assistant:
+ GGET r12,stop_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_project_role
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_error_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_project_ok
+ mov rdi,r13
+ lea rsi,[rip+.Lgg_aborted_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_project_ok
+ mov rdi,r13
+ lea rsi,[rip+.Lgg_deferred_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_project_ok
 .Lgg_project_role:
  GGET r12,content
  mov r13,rax
@@ -822,13 +869,13 @@ pg_durable_generation_init:
  mov dword ptr [r14+84],1
  call [r14+40]
  test eax,eax
- jnz .Lgg_request_invalid
+ jnz .Lgg_request_model_error
 .Lgg_request_started:
  mov rdi,[r14+32]
  lea rsi,[r14+4200]
  call [r14+48]
  test eax,eax
- jnz .Lgg_request_invalid
+ jnz .Lgg_request_model_error
  mov eax,[r14+4200]
  test eax,eax
  jz .Lgg_request_pending
@@ -838,6 +885,8 @@ pg_durable_generation_init:
  je .Lgg_request_call
  cmp eax,3
  je .Lgg_request_ready
+ cmp eax,4
+ je .Lgg_request_model_error
  cmp eax,5
  jne .Lgg_request_invalid
  mov r13,[r14+4208]
@@ -888,6 +937,12 @@ pg_durable_generation_init:
  mov rcx,r13
  call r8
  jmp .Lgg_request_pending
+.Lgg_request_model_error:
+ mov rdi,r12
+ mov rsi,rbx
+ call .Lgg_failure
+ test eax,eax
+ jnz .Lgg_request_end
 .Lgg_request_ready:
  /* Place preceding streamed text before terminal tool calls. */
  cmp qword ptr [r14+4192],0
@@ -1021,6 +1076,14 @@ pg_durable_generation_init:
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov [rbx+4256],rax
+ cmp qword ptr [rbx+4360],0
+ je .Lgg_stage_success
+ mov rdi,[rbx+4360]
+ call json_object_get@PLT
+ mov [r13],rax
+ xor eax,eax
+ jmp .Lgg_stage_end
+.Lgg_stage_success:
  lea rdi,[rip+.Lgg_terminal_json]
  call json_tokener_parse@PLT
  mov [rsp+64],rax
@@ -1347,6 +1410,289 @@ pg_durable_generation_init:
  pop r12
  pop rbx
  ret
+/* Model failures are committed facts; an operation owns the candidate through
+   the assistant/state transaction and may retry its commit without new IO. */
+.Lgg_failure:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov r12,rdi
+ mov rbx,rsi
+ mov r14,[rsi+56]
+ lea rax,[rip+.Lgg_default_failure]
+ mov [r14+4320],rax
+ mov qword ptr [r14+4328],20
+ mov rax,[r12]
+ cmp qword ptr [rax+56],0
+ je .Lgg_failure_described
+ mov rdi,[rax]
+ lea rsi,[r14+32]
+ lea rdx,[r14+4320]
+ call [rax+56]
+.Lgg_failure_described:
+ cmp qword ptr [r14+4320],0
+ je .Lgg_failure_invalid
+ cmp qword ptr [r14+4328],4096
+ jae .Lgg_failure_invalid
+ mov rdi,[r14+4320]
+ mov esi,[r14+4328]
+ call json_object_new_string_len@PLT
+ mov rdi,[r14+24]
+ lea rsi,[rip+.Lgg_error_message]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_failure_error
+ lea rdi,[rip+.Lgg_error_word]
+ call json_object_new_string@PLT
+ mov rdi,[r14+24]
+ lea rsi,[rip+.Lgg_stop_reason]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_failure_error
+ /* Resolve current policy; the next prepare obtains fresh request settings. */
+ GGET "qword ptr [rbx+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[r12]
+ mov rdi,[rax]
+ lea rdx,[r14+4352]
+ call [rax+8]
+ test eax,eax
+ jnz .Lgg_failure_invalid
+ GGET "qword ptr [r14+4352]",retry_key
+ mov r13,rax
+ mov qword ptr [rsp+16],3
+ mov qword ptr [rsp+24],2000
+ mov qword ptr [rsp+32],60000
+ mov dword ptr [rsp+40],1
+ test r13,r13
+ jz .Lgg_failure_policy
+ GGET r13,enabled
+ test rax,rax
+ jz .Lgg_failure_max
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov [rsp+40],eax
+.Lgg_failure_max:
+ GGET r13,max_retries
+ test rax,rax
+ jz .Lgg_failure_base
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lgg_failure_invalid
+ mov [rsp+16],rax
+.Lgg_failure_base:
+ GGET r13,base_delay
+ test rax,rax
+ jz .Lgg_failure_cap
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lgg_failure_invalid
+ mov [rsp+24],rax
+.Lgg_failure_cap:
+ GGET r13,max_delay
+ test rax,rax
+ jz .Lgg_failure_policy
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lgg_failure_invalid
+ mov [rsp+32],rax
+.Lgg_failure_policy:
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ GGET rax,attempt
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jnz .Lgg_failure_attempt
+ mov eax,1
+.Lgg_failure_attempt:
+ mov [rsp+8],rax
+ cmp dword ptr [r14+4336],0
+ je .Lgg_failure_terminal
+ cmp dword ptr [rsp+40],0
+ je .Lgg_failure_terminal
+ cmp rax,[rsp+16]
+ ja .Lgg_failure_terminal
+ mov rcx,rax
+ dec rcx
+ mov rax,[rsp+24]
+ mov rdx,[rsp+32]
+ cmp rax,rdx
+ cmova rax,rdx
+ test rax,rax
+ jz .Lgg_failure_delay
+.Lgg_failure_double:
+ test rcx,rcx
+ jz .Lgg_failure_delay
+ cmp rax,rdx
+ jae .Lgg_failure_delay
+ shl rax,1
+ jc .Lgg_failure_saturate
+ cmp rax,rdx
+ cmova rax,rdx
+ dec rcx
+ jmp .Lgg_failure_double
+.Lgg_failure_saturate:
+ mov rax,rdx
+.Lgg_failure_delay:
+ mov [rsp+24],rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ cvtsi2sd xmm1,qword ptr [rsp+24]
+ addsd xmm0,xmm1
+ movsd [rsp+56],xmm0
+ lea rdi,[rip+.Lgg_retry_json]
+ call json_tokener_parse@PLT
+ mov [r14+4360],rax
+ test rax,rax
+ jz .Lgg_failure_alloc
+ GGET rax,checkpoint
+ mov rbp,rax
+ mov rdi,[rsp+8]
+ call json_object_new_int64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_attempt]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_failure_error
+ movsd xmm0,[rsp+56]
+ call json_object_new_double@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_until]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_failure_error
+ movsd xmm0,[rsp+56]
+ call json_object_new_double@PLT
+ mov rdi,[r14+4360]
+ lea rsi,[rip+.Lgg_until]
+ mov rdx,rax
+ call .Lgg_set
+ jmp .Lgg_failure_error
+.Lgg_failure_terminal:
+ lea rdi,[rip+.Lgg_failed_json]
+ call json_tokener_parse@PLT
+ mov [r14+4360],rax
+ test rax,rax
+ jz .Lgg_failure_alloc
+ GGET rax,outcome
+ GGET rax,error_key
+ mov rbp,rax
+ GGET "qword ptr [r14+24]",error_message
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_message_key]
+ mov rdx,rax
+ call .Lgg_copy_field
+ jmp .Lgg_failure_error
+.Lgg_failure_invalid:
+ mov eax,4
+ jmp .Lgg_failure_error
+.Lgg_failure_alloc:
+ mov eax,5
+.Lgg_failure_error:
+ neg eax
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lgg_retry:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rsi
+ mov qword ptr [rsp],0
+ GGET "qword ptr [rsi+32]",state
+ GGET rax,checkpoint
+ mov r12,rax
+ GGET rax,until
+ mov rdi,rax
+ call json_object_get_double@PLT
+ movsd [rsp+8],xmm0
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ ucomisd xmm0,[rsp+8]
+ jb .Lgg_retry_early
+ lea rdi,[rip+.Lgg_reprepare_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_retry_alloc
+ GGET rax,checkpoint
+ mov r13,rax
+ GGET r12,attempt
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ inc rax
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lgg_attempt]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_retry_error
+ jmp .Lgg_retry_commit
+.Lgg_retry_early:
+ lea rdi,[rip+.Lgg_retry_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_retry_alloc
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_checkpoint]
+ mov rdx,r12
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_retry_error
+ movsd xmm0,[rsp+8]
+ call json_object_new_double@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_until]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_retry_error
+.Lgg_retry_commit:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call pg_task_runner_commit@PLT
+ jmp .Lgg_retry_error
+.Lgg_retry_alloc:
+ mov eax,5
+.Lgg_retry_error:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ neg eax
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
 .section .rodata
 .Lgg_name: .asciz "pangu.generation"
 .Lgg_prepare_name: .asciz "prepare"
@@ -1382,6 +1728,25 @@ pg_durable_generation_init:
 .Lgg_tools_key: .asciz "tools"
 .Lgg_on: .asciz "on"
 .Lgg_empty_json: .asciz "{}"
+.Lgg_retry_name: .asciz "retry"
+.Lgg_attempt: .asciz "attempt"
+.Lgg_until: .asciz "until"
+.Lgg_retry_key: .asciz "retry"
+.Lgg_enabled: .asciz "enabled"
+.Lgg_max_retries: .asciz "maxRetries"
+.Lgg_base_delay: .asciz "baseDelayMs"
+.Lgg_max_delay: .asciz "maxAgentDelayMs"
+.Lgg_error_key: .asciz "error"
+.Lgg_message_key: .asciz "message"
+.Lgg_error_message: .asciz "errorMessage"
+.Lgg_stop_reason: .asciz "stopReason"
+.Lgg_error_word: .asciz "error"
+.Lgg_aborted_word: .asciz "aborted"
+.Lgg_deferred_word: .asciz "deferred"
+.Lgg_default_failure: .asciz "Model request failed"
+.Lgg_failed_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"failed\",\"error\":{\"message\":\"Model request failed\",\"detail\":{\"reason\":\"model_error\"}}}}"
+.Lgg_retry_json: .asciz "{\"status\":\"sleeping\",\"checkpoint\":{\"phase\":\"retry\",\"attempt\":1,\"until\":0},\"until\":0}"
+.Lgg_reprepare_json: .asciz "{\"status\":\"running\",\"checkpoint\":{\"phase\":\"prepare\",\"attempt\":1}}"
 .Lgg_initial_json: .asciz "{\"phase\":\"prepare\",\"attempt\":1}"
 .Lgg_request_json: .asciz "{\"status\":\"running\",\"checkpoint\":{\"phase\":\"request\",\"attempt\":1}}"
 .Lgg_assistant_json: .asciz "{\"role\":\"assistant\",\"content\":[]}"
@@ -1432,7 +1797,7 @@ pg_durable_generation_history:
  mov rax,[rsp+120]
  mov [rsp+32],rax
  mov edi,1
- mov esi,4320
+ mov esi,4384
  call calloc@PLT
  mov [rsp+128],rax
  test rax,rax
