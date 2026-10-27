@@ -1320,7 +1320,9 @@
         "pg_document_watch_source_release",
         "pg_document_watch_observe_cancellation",
         "pg_document_watch_cancellation_release",
-        "pg_durable_session_unload_documents"
+        "pg_durable_session_unload_documents",
+        "pg_durable_read_on_line_begin",
+        "pg_durable_read_on_line_end"
       ],
       "reference_basis": [
         {
@@ -1460,6 +1462,20 @@
             "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-watches.test.ts"
           ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts",
+            "packages/durable/src/harness/context.ts",
+            "packages/durable/src/harness/scheduler.ts"
+          ],
+          "semantics": "readOnLine serialized read-only job maps to an explicit native begin/end continuation; Session line ownership spans multiple guarded reads/polls and delays backend close; private reserved counter prevents lease end inside admitted Storage providers and allows already-admitted reads after close seals new work",
+          "tests_to_read": [
+            "packages/durable/test/session-watches.test.ts",
+            "packages/durable/test/harness-context.test.ts"
+          ]
         }
       ]
     },
@@ -1481,7 +1497,8 @@
         "pg_durable_snapshot_as_of",
         "pg_durable_observe",
         "pg_durable_watch",
-        "pg_durable_watch_cancellable"
+        "pg_durable_watch_cancellable",
+        "pg_durable_conversation_document_on_line"
       ],
       "reference_basis": [
         {
@@ -1531,6 +1548,18 @@
           "tests_to_read": [
             "packages/durable/test/session-watches.test.ts",
             "packages/chord/test/watch.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "conversationDocumentOnLine within the admitted read-line continuation reuses guarded current cache/provider acquisition, returns detached record/value and materialized valueVersion, preserves line ownership across success/missing/migration/copy/Storage failure and permits already-admitted close-phase reads",
+          "tests_to_read": [
+            "packages/durable/test/session-checkpoints-migrations.test.ts",
+            "packages/durable/test/session-watches.test.ts"
           ]
         }
       ]

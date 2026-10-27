@@ -614,3 +614,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 手写可复用cache clear与开放健康Session的mutation-line卸载，先保存holds（使用既有配置通知），同步timer再清loaded/idle节点，保留provider/hooks/index及独立observer；保存失败保留节点与首因，busy/active Tx不开始工作。既有ABI保持。
 - 实际验证：held持久保存/冷加载、无holds清理无分配、8类admission、真实Storage拒绝、38个flush allocation/clone/Storage故障；Watch跨卸载保持same-incarnation ops，在途帧独立存活，新增observed unload持久通知一次验证。source probe执行实际unloadDocuments，核对先保存、失败不清缓存、保留观察pin。
 - 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及来源差异通过，共享/隔离核心G00/Assembly与隔离产品构建通过。同一实施Agent自审8路径候选摘要（本记录加入前）e10691646c792c4f21c646aba3614b08869a4534ef745175aed63a69aa6ce284；隔离核心树7e75968f1ecc4e215ccaebaa9fc5eb2a37f74f79。结论为缓存卸载本地通过；readOnLine/conversationDocumentOnLine/显式Session fail与事务查询继续核对，K03全量未完成。TUI工作保留。
+
+## K03 API核对补齐readOnLine与文档读取
+
+- 固定Pi 8b0caef readOnLine/#enqueue/conversationDocumentOnLine，阅读Harness context.readContextFrom与scheduler.waitForTask调用者；上游Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写begin/end continuation保留Session line跨多次guarded Storage读/宿主轮询，阻止事务/新lease/后端关闭；私有reserved标记/nested-read计数让provider内end拒绝，close封闭后已接收读取仍完成。原192字节Session与既有guard ABI保持。共用current-reader实现增加conversation document的owned record/value/materialized version输出，成功/失败/缺失保持lease ownership。
+- 实际验证：正常、close中、provider请求close、Storage失败、read-only、8类admission，禁止新Tx/provider内提前end，缺失/错误scope、迁移与关闭后owned结果，25个cold/warm allocation/clone/provider故障；既有snapshot/observe/guard行为持续通过。source probe执行实际readOnLine/#enqueue/conversationDocumentOnLine，核对读/关闭顺序、拒绝新工作、valueVersion及missing。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享/隔离核心G00/Assembly及隔离产品构建通过。同一实施Agent自审8路径候选摘要（本记录加入前）dcac99b51b45378096cbb8ff6b6fd95f9718a43754c0dfd1e784ebe6a8b60c96；隔离核心树b50e0d6d770cbe19753a0cfc71c90571b0267bec。结论为原生read-line/文档读取本地通过；显式Session.fail和事务查询继续核对，K03全量未完成。TUI工作保留。

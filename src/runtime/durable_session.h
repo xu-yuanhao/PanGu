@@ -367,4 +367,15 @@ typedef struct {
    with Watch operations. release waits for termination and rejects reentry. */
 int pg_document_watch_observe_cancellation(pg_document_watch *,pg_document_watch_cancellation *,const pg_document_watch_cancellation_provider *);
 int pg_document_watch_cancellation_release(pg_document_watch_cancellation *);
+typedef struct {pg_durable_session *session;unsigned active,busy;} pg_durable_read_line;
+/* Caller-owned continuation for readOnLine: begin reserves the Session line,
+   blocking new Tx and backend close across multiple guarded reads/polls. End
+   releases it after every read returns; PENDING keeps ownership when called
+   from a provider or while another Session primitive is busy. Accepted reads
+   may finish after close seals admission. No writes/Tx are allowed in the job.
+   Same statuses as document_reader admission; end does not override job errors.
+   Session's private reserved field tracks admitted nested Storage reads; keep
+   the zeroed/released handle and Session alive until end succeeds. */
+int pg_durable_read_on_line_begin(pg_durable_read_line *,pg_durable_session *);
+int pg_durable_read_on_line_end(pg_durable_read_line *);
 #endif

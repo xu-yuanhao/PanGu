@@ -618,3 +618,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] documents.S/h增加可复用cache clear，释放loaded节点并保留provider/hooks/index，临时句柄到期、独立观察仍有效；durable_session.S与document_reader.h增加健康开放Session的mutation-line卸载：先flush holds（含已配置通知），同步timer，成功后clear。保存失败保留节点/首因，已接收事务或服务忙时返回PENDING。
 - 原生正常held保存/冷加载、无holds clear无分配、8类admission、实际Storage拒绝、38个flush分配/clone/Storage故障；实际Watch跨两次unload及在途帧后继续同incarnation ops；observed timer组合新增unload持久通知一次验证。source probe执行实际unloadDocuments核对先保存/失败不清缓存/保留观察pin。
 - 后续核对readOnLine、conversationDocumentOnLine、Session显式fail和其余事务查询入口，再做K03全量验收；整机host Watch消费由K14组合。
+
+### K03 API核对：readOnLine与conversationDocumentOnLine
+
+- 固定Pi 8b0caef readOnLine/#enqueue/conversationDocumentOnLine；阅读Harness context.readContextFrom的bounds捕获及scheduler.waitForTask的读后注册调用者。上游Pi origin保持6c384aa、Harness保持22ddee37。
+- [x] 手写begin/end读取continuation，明确持有Session line跨多次Storage读取/宿主轮询；阻止新Tx/新lease和后端关闭。Session私有reserved保留read-line标记与nested Storage计数，provider内end返回PENDING，已准入读取在close封闭后仍能完成；end释放ownership且不覆盖job错误，既有192字节Session布局保持。
+- [x] conversationDocumentOnLine原生入口在lease内共用现有guarded cache/provider路径，返回独立owned record/value和materialized version；冷/热、迁移、只读、missing/错误scope/失败清理保留line ownership，现有snapshot/observe路径共用实现。
+- 原生正常/关闭中/提供者触发关闭/Storage失败/只读、8类准入、provider内提前end拒绝、新事务禁止与25个cold/warm allocation/clone/provider故障；source probe执行实际readOnLine/#enqueue/conversationDocumentOnLine核对读/关闭顺序、拒绝新工作、valueVersion和missing。
+- 后续核对显式Session.fail及其余事务查询入口，再进行K03全量验收；整机host job队列由K14组合这些continuation。

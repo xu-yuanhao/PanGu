@@ -847,6 +847,17 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print('PASS: actual Pi unloadDocuments stores holds before dropping cache, preserves cache on flush rejection and retains observer pins, matching native maintenance scenarios')
 
+def read_on_line_source():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8');function method(marker,end='\n\t/**'){const a=source.indexOf(marker),b=source.indexOf(end,a);return source.slice(a,b)}const resolveAddress=(definition,args)=>({id:'doc',address:{kind:definition.kind,scope:{kind:'conversation',conversationId:args[0]}}});function checkRecordScope(){}function checkRecordVersion(){}const Probe=eval('('+stripTypeScriptTypes(`class Probe{#tail=Promise.resolve();closing=false;events=[];data={record:{id:2,kind:'doc',scope:{kind:'conversation',conversationId:1}},storedVersion:1,valueVersion:2,tracker:{value:{text:'seed',migrated:1}}};#assertHealthy(){}assertUsable(){if(this.closing)throw Error('closed')}async #loadDocument(){this.events.push('load');return this.data}async run(){let release,ready;const gate=new Promise(r=>release=r),started=new Promise(r=>ready=r),token={definition:{kind:'doc'}};const reading=this.readOnLine(async()=>{this.events.push('read1');const first=await this.conversationDocumentOnLine(token,1,{});ready();await gate;this.events.push('read2');const last=await this.conversationDocumentOnLine(token,1,{});return {first,last}});await started;this.closing=true;let closed=false;const closing=this.#enqueue(async()=>{this.events.push('close');closed=true});let rejected=false;try{await this.readOnLine(async()=>{})}catch{rejected=true}const before=closed;release();const result=await reading;await closing;return {events:this.events,before,rejected,result}}async missing(){this.data=undefined;return (await this.readOnLine(()=>this.conversationDocumentOnLine({definition:{kind:'doc'}},1,{})))===undefined}`+method('\n\treadOnLine<')+method('\n\tasync conversationDocumentOnLine(', '\n\tsnapshot<')+method('\n\t#enqueue<')+'}')+')');console.log(JSON.stringify({line:await new Probe().run(),missing:await new Probe().missing()}));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True,timeout=30).stdout)
+    document=dict(record=dict(id=2,kind='doc',scope=dict(kind='conversation',conversationId=1)),version=2,value=dict(text='seed',migrated=1))
+    expected=dict(line=dict(events=['read1','load','read2','load','close'],before=False,rejected=True,result=dict(first=document,last=document)),missing=True)
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi readOnLine/enqueue/conversationDocumentOnLine preserve admitted multi-read order before close, reject new work, expose materialized version and handle missing, matching native read-line scenarios')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1147,5 +1158,6 @@ def main():
         session_watch_owner_source()
         watch_cancellation_source()
         session_unload_source()
+        read_on_line_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

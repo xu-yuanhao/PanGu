@@ -542,10 +542,19 @@ pg_durable_session_close:
  cmp dword ptr [rax+172],2
  jne .Lstorage_enter_closed
  cmp qword ptr [rax+152],0
- je .Lstorage_enter_closed
+ jne .Lstorage_enter_busy
+ test dword ptr [rax+180],1
+ jz .Lstorage_enter_closed
 .Lstorage_enter_busy:
  cmp dword ptr [rdi+48],0
  jne .Lstorage_enter_reentry
+ mov ecx,[rax+180]
+ test cl,1
+ jz .Lstorage_enter_line_ready
+ add ecx,2
+ jc .Lstorage_enter_reentry
+ mov [rax+180],ecx
+.Lstorage_enter_line_ready:
  mov dword ptr [rdi+48],1
  mov edx,[rax+168]
  mov [rdi+52],edx
@@ -567,6 +576,10 @@ pg_durable_session_close:
  ret
 .Lstorage_leave:
  mov rax,[rdi]
+ test dword ptr [rax+180],1
+ jz .Lstorage_leave_line_ready
+ sub dword ptr [rax+180],2
+.Lstorage_leave_line_ready:
  mov edx,[rdi+52]
  mov [rax+168],edx
  mov dword ptr [rdi+48],0
@@ -5256,4 +5269,96 @@ pg_durable_session_unload_documents:
  pop rbx
  ret
 .size pg_durable_session_unload_documents,.-pg_durable_session_unload_documents
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_read_on_line_begin
+.type pg_durable_read_on_line_begin,@function
+pg_durable_read_on_line_begin:
+ mov eax,1
+ test rdi,rdi
+ jz .Lread_line_begin_end
+ test rsi,rsi
+ jz .Lread_line_begin_end
+ cmp qword ptr [rdi+8],0
+ jne .Lread_line_begin_end
+ mov eax,14
+ cmp dword ptr [rsi+172],1
+ je .Lread_line_begin_open
+ cmp dword ptr [rsi+172],2
+ jae .Lread_line_begin_end
+ mov eax,1
+ ret
+.Lread_line_begin_open:
+ mov rcx,[rsi]
+ mov eax,13
+ cmp dword ptr [rcx+52],0
+ jne .Lread_line_begin_end
+ mov eax,11
+ cmp dword ptr [rsi+168],0
+ jne .Lread_line_begin_end
+ cmp dword ptr [rsi+180],0
+ jne .Lread_line_begin_end
+ cmp qword ptr [rsi+160],0
+ jne .Lread_line_begin_end
+ cmp dword ptr [rcx+48],0
+ jne .Lread_line_begin_end
+ mov rcx,[rsi+8]
+ cmp qword ptr [rcx+104],0
+ jne .Lread_line_begin_end
+ mov rcx,[rsi+16]
+ cmp dword ptr [rcx+48],0
+ jne .Lread_line_begin_end
+ mov rcx,[rsi+24]
+ cmp dword ptr [rcx+56],0
+ jne .Lread_line_begin_end
+ mov [rdi],rsi
+ mov dword ptr [rdi+8],1
+ mov dword ptr [rsi+168],1
+ mov dword ptr [rsi+180],1
+ xor eax,eax
+.Lread_line_begin_end:
+ ret
+.size pg_durable_read_on_line_begin,.-pg_durable_read_on_line_begin
+.globl pg_durable_read_on_line_end
+.type pg_durable_read_on_line_end,@function
+pg_durable_read_on_line_end:
+ mov eax,1
+ test rdi,rdi
+ jz .Lread_line_end_done
+ cmp dword ptr [rdi+12],0
+ jne .Lread_line_end_done
+ cmp dword ptr [rdi+8],0
+ je .Lread_line_end_ok
+ cmp dword ptr [rdi+8],1
+ jne .Lread_line_end_done
+ mov rdx,[rdi]
+ test rdx,rdx
+ jz .Lread_line_end_done
+ cmp dword ptr [rdx+168],1
+ jne .Lread_line_end_done
+ mov eax,11
+ cmp dword ptr [rdx+180],1
+ jne .Lread_line_end_done
+ mov rcx,[rdx]
+ cmp dword ptr [rcx+48],0
+ jne .Lread_line_end_done
+ mov rcx,[rdx+8]
+ cmp qword ptr [rcx+104],0
+ jne .Lread_line_end_done
+ mov rcx,[rdx+16]
+ cmp dword ptr [rcx+48],0
+ jne .Lread_line_end_done
+ mov rcx,[rdx+24]
+ cmp dword ptr [rcx+56],0
+ jne .Lread_line_end_done
+ mov dword ptr [rdx+180],0
+ mov dword ptr [rdx+168],0
+ mov qword ptr [rdi],0
+ mov dword ptr [rdi+8],0
+.Lread_line_end_ok:
+ xor eax,eax
+.Lread_line_end_done:
+ ret
+.size pg_durable_read_on_line_end,.-pg_durable_read_on_line_end
 .section .note.GNU-stack,"",@progbits

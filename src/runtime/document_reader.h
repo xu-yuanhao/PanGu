@@ -69,4 +69,10 @@ int pg_durable_watch_cancellable(pg_durable_session *,const pg_document_watch_re
    nodes. Providers, definitions and observer subscriptions remain usable.
    PENDING during admitted work; a flush error preserves nodes and first cause. */
 int pg_durable_session_unload_documents(pg_durable_session *);
+typedef struct {struct json_object *record,*value;uint64_t version;} pg_document_on_line;
+/* Only inside this admitted readOnLine continuation. Returns detached owned
+   record/value and materialized value version for a conversation document;
+   missing/errors clear output. Does not yield the line. Release both JSON
+   references when done; definition can remain cached, as with snapshot. */
+int pg_durable_conversation_document_on_line(pg_durable_read_line *,const pg_document_definition *,const pg_document_address *,pg_document_on_line *);
 #endif
