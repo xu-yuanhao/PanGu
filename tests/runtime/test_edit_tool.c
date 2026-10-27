@@ -103,7 +103,7 @@ int main(int argc,char **argv){
  diff_contract();
  char root[]="/tmp/pangu-edit-tool-XXXXXX";assert(mkdtemp(root));int saved=open(".",O_RDONLY|O_DIRECTORY);assert(saved>=0&&!chdir(root));
  pg_read_tool reader={-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
- pg_tool_definition file_entries[]={pg_read_snapshot_definition(&reader),pg_write_tool_definition(&writer)};assert(!pg_tool_registry_init(&files,file_entries,2));file_service=pg_tool_registry_service(&files);
+ pg_tool_definition file_entries[]={pg_read_snapshot_definition(&reader),pg_write_file_definition(&writer)};assert(!pg_tool_registry_init(&files,file_entries,2));file_service=pg_tool_registry_service(&files);
  service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0,0,0,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
  pg_tool_definition entries[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),definition};assert(!pg_tool_registry_init(&registry,entries,3));
  if(argc==2&&!strcmp(argv[1],"--json")){json_cases();assert(!unlink("file.txt"));pg_edit_tool_clear(&editor);pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));return 0;}
@@ -153,6 +153,8 @@ int main(int argc,char **argv){
  char escaped[4096];memset(escaped,'\t',3000);memcpy(escaped+3000,"alpha\n",7);put(escaped);w=writes;assert(invoke(shapes[0])&&writes==w&&strstr(last_output,"bounds"));expect(escaped);put("alpha\n");
  assert(!rename("file.txt","quote\"name.txt"));assert(!invoke("{\"path\":\"quote\\\"name.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!rename("quote\"name.txt","file.txt"));expect("ALPHA\n");put("alpha\n");
  assert(invoke("{\"path\":\"missing/file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(access("missing",F_OK));
+ assert(!rename("file.txt","@file"));assert(!invoke("{\"path\":\"@@file\",\"oldText\":\"alpha\",\"newText\":\"AT\"}"));assert(!rename("@file","file.txt"));expect("AT\n");put("alpha\n");
+ assert(!rename("file.txt","space\xc2\xa0" "file"));char unicode_url[4096];snprintf(unicode_url,sizeof(unicode_url),"{\"path\":\"file://%s/space%%C2%%A0file\",\"oldText\":\"alpha\",\"newText\":\"URL\"}",root);assert(!invoke(unicode_url));assert(!rename("space\xc2\xa0" "file","file.txt"));expect("URL\n");put("alpha\n");
  char absolute_args[4096];snprintf(absolute_args,sizeof(absolute_args),"{\"path\":\"%s/file.txt\",\"oldText\":\"alpha\",\"newText\":\"ABS\"}",root);assert(!invoke(absolute_args));expect("ABS\n");put("alpha\n");assert(!invoke("{\"path\":\"./file.txt\",\"oldText\":\"alpha\",\"newText\":\"DOT\"}"));expect("DOT\n");put("alpha\n");
  assert(!symlink("file.txt","link"));assert(!invoke("{\"path\":\"link\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("ALPHA\n");put("alpha\n");assert(!unlink("link"));
  api_calls=0;assert(!invoke(shapes[0]));unsigned points=api_calls;assert(points>10);for(unsigned failure=1;failure<=points;++failure){put("alpha\n");api_calls=0;fail_api=failure;assert(invoke(shapes[0]));expect("alpha\n");}fail_api=0;printf("edit allocation/setup failure points: %u\n",points);put("alpha\n");

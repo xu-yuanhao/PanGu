@@ -60,6 +60,7 @@ int main(void){
  assert(!link("binary","hard"));assert(!run("{\"path\":\"hard\",\"content\":\"x\"}"));expect_file("binary","x",1);
  assert(!mkfifo("fifo",0600));assert(run("{\"path\":\"fifo\",\"content\":\"x\"}"));
  assert(run("{\"path\":\"a\",\"content\":\"x\"}"));
+ assert(!run("{\"path\":\"missing-prefix/../normalized\",\"content\":\"lexical\"}"));expect_file("normalized","lexical",7);assert(access("missing-prefix",F_OK)&&!unlink("normalized"));assert(!run("{\"path\":\"trailing/\",\"content\":\"file\"}"));expect_file("trailing","file",4);assert(!unlink("trailing"));char file_url[4096];snprintf(file_url,sizeof(file_url),"{\"path\":\"file://%s/space%%20file\",\"content\":\"url\"}",temporary);assert(!run(file_url));expect_file("space file","url",3);assert(!unlink("space file"));snprintf(file_url,sizeof(file_url),"{\"path\":\"file://%s/%%00\",\"content\":\"rejected\"}",temporary);assert(run(file_url)&&access("file:",F_OK));
  char absolute_args[4096];snprintf(absolute_args,sizeof(absolute_args),"{\"path\":\"%s/absolute/file\",\"content\":\"absolute\"}",temporary);assert(!run(absolute_args));expect_file("absolute/file","absolute",8);assert(!unlink("absolute/file")&&!rmdir("absolute"));assert(!run("{\"path\":\"./keep\",\"content\":\"dot\"}"));expect_file("keep","dot",3);assert(!run("{\"path\":\"a/../keep\",\"content\":\"parent\"}"));expect_file("keep","parent",6);
  assert(!run("{\"path\":\"keep\",\"content\":\"original\"}"));
  truncate_fail=1;assert(run("{\"path\":\"keep\",\"content\":\"bad\"}"));truncate_fail=0;expect_file("keep","original",8);

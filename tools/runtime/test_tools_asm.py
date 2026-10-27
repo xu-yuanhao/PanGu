@@ -13,7 +13,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CC = '/usr/bin/clang-23'
-SRC = [str(ROOT / 'src/runtime/tools.S'), str(ROOT / 'src/runtime/read_tool.S')]
+SRC = [str(ROOT / 'src/runtime/tools.S'), str(ROOT / 'src/runtime/read_tool.S'), str(ROOT / 'src/runtime/tool_path.S'), str(ROOT / 'src/runtime/tool_path_posix.c')]
 TESTS = [
     ('test_tools', str(ROOT / 'tests/runtime/test_tools.c')),
     ('test_read_tool', str(ROOT / 'tests/runtime/test_read_tool.c')),
@@ -22,8 +22,8 @@ TESTS = [
 
 
 def flags(opt, extra=()):
-    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c'], text=True).split()
-    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c'], text=True).split()
+    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c', 'libcurl', 'libutf8proc'], text=True).split()
+    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c', 'libcurl', 'libutf8proc'], text=True).split()
     return ['-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra',
             '-Wno-cast-function-type', opt, '-I' + str(ROOT / 'src/runtime'),
             '-I' + str(ROOT), *cflags, *extra, *libs]

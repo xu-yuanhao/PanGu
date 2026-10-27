@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "../../src/runtime/read_tool.h"
+#include "../../src/runtime/tool_path.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,13 +27,21 @@ static void pages(pg_tools tools,const char *path){
  assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\\u0000suffix\":2}"),out,sizeof(out),&n)==PG_TOOL_ERROR);
  f=fopen(path,"wb");assert(f);for(unsigned i=0;i<1048577;++i)assert(fputc('a',f)!=EOF);assert(!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2}"),out,sizeof(out),&n)==PG_TOOL_ERROR&&strstr(out,"scan limit"));
 }
-int main(void){char root[]="/tmp/pangu-read-XXXXXX",path[512];assert(mkdtemp(root));
+static void prepared_paths(void){
+ const char *cases[][2]={{"a//b/./c/../d/","a/b/d"},{"missing/../file","file"},{"link/../file","file"},{"../../a/../x","../../x"},{"/a/../../b","/b"},{"a/..","."},{"/..","/"},{"@./中文","中文"},{"a\xc2\xa0" "b","a b"},{"x\xe2\x80\xaf" "y","x y"},{"file:///tmp/a%20b/../c","/tmp/c"},{"file://localhost/tmp/%E4%B8%AD","/tmp/中"},{"file://remote/tmp/x","file:/remote/tmp/x"},{"file:///tmp/a%2Fb","file:/tmp/a%2Fb"},{"file:///tmp/%FF","file:/tmp/%FF"},{"file:///tmp/a%zz","file:/tmp/a%zz"},{"file://%6cocalhost/tmp/a","/tmp/a"},{"file://localhost","/"},{"file://%00/tmp/a","file:/%00/tmp/a"},{"file:///tmp/a?x=%2f","/tmp/a"}};
+ char prepared[4096];for(size_t i=0;i<sizeof(cases)/sizeof(*cases);i++){assert(!pg_tool_path_prepare(s(cases[i][0]),prepared,sizeof(prepared)));if(strcmp(prepared,cases[i][1]))fprintf(stderr,"path %s -> %s, wanted %s\n",cases[i][0],prepared,cases[i][1]);assert(!strcmp(prepared,cases[i][1]));}
+ assert(pg_tool_path_prepare(s("file:///tmp/%00"),prepared,sizeof(prepared))&&!prepared[0]);
+ char *old=getenv("HOME"),*copy=old?strdup(old):0;assert(!old||copy);assert(!setenv("HOME","/tmp/pangu-path-home",1));assert(!pg_tool_path_prepare(s("~/missing/../file"),prepared,sizeof(prepared))&&!strcmp(prepared,"/tmp/pangu-path-home/file"));assert(!pg_tool_path_prepare(s("~"),prepared,sizeof(prepared))&&!strcmp(prepared,"/tmp/pangu-path-home"));assert(!(copy?setenv("HOME",copy,1):unsetenv("HOME")));free(copy);
+ memset(prepared,'x',sizeof(prepared));assert(pg_tool_path_prepare(s("a/b"),prepared,2)&&!prepared[0]);char nul[]={'a',0,'b'};assert(pg_tool_path_prepare((pg_slice){nul,sizeof(nul)},prepared,sizeof(prepared))&&!prepared[0]);
+}
+int main(void){prepared_paths();char root[]="/tmp/pangu-read-XXXXXX",path[512];assert(mkdtemp(root));
  snprintf(path,sizeof(path),"%s/sample.c",root);FILE *f=fopen(path,"w");assert(f);fputs("int answer = 42;\n",f);fclose(f);
  pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,root));pg_tool_definition d=pg_read_tool_definition(&reader);pg_tool_registry r={0};assert(!pg_tool_registry_init(&r,&d,1));pg_tools tools=pg_tool_registry_service(&r);char out[128];size_t n;
  assert(!tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n));assert(n==17&&!memcmp(out,"int answer = 42;\n",17));
  assert(d.validate(d.context,s("{\"path\":\"literal\\\\u0000\"}")));assert(!d.validate(d.context,s("{\"path\\u0000suffix\":\"sample.c\"}")));
- const char *bad[]={"{\"path\":\"sample.c/\"}","{\"path\":\"sample.c\",\"extra\":1}","{\"path\":4}"};
+ const char *bad[]={"{\"path\":\"sample.c\",\"extra\":1}","{\"path\":4}"};
  for(size_t i=0;i<sizeof(bad)/sizeof(bad[0]);++i)assert(tools.execute(tools.context,s("read"),s(bad[i]),out,sizeof(out),&n));
+ assert(!tools.execute(tools.context,s("read"),s("{\"path\":\"missing-prefix/../sample.c\"}"),out,sizeof(out),&n)&&n==17);char resolved_file[1024];snprintf(resolved_file,sizeof(resolved_file),"{\"path\":\"file://%s/sample.c\"}",root);assert(!tools.execute(tools.context,s("read"),s(resolved_file),out,sizeof(out),&n)&&n==17);
  pages(tools,path);
  snprintf(path,sizeof(path),"%s/sample.c",root);f=fopen(path,"w");assert(f);fputs("int answer = 42;\n",f);assert(!fclose(f));
  snprintf(path,sizeof(path),"%s/link",root);assert(!symlink("sample.c",path));assert(!tools.execute(tools.context,s("read"),s("{\"path\":\"link\"}"),out,sizeof(out),&n));unlink(path);

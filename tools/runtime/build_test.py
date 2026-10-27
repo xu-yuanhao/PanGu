@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
-DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
+PATH_SOURCES = [implementation('src/runtime/' + name) for name in ('tool_path', 'tool_path_posix')]
+DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
 PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
     'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
     'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
@@ -35,20 +36,20 @@ def main():
             output = str(Path(directory) / 'live-model-batch')
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
-                            *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_diff'), implementation('src/runtime/edit_tool'),
+                            *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_diff'), implementation('src/runtime/edit_tool'),
                             str(ROOT / 'tests/runtime/live_mimo_batch.c'), *model_flags, '-o', output], check=True)
             subprocess.run([output, *(['--capacity'] if '--live-capacity' in sys.argv else ['--snapshot'] if '--live-snapshot-edit' in sys.argv else ['--execute'] if '--live-batch-execute' in sys.argv else [])], check=True, timeout=150)
             return 0
         if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal', '--live-resume', '--live-submission')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; never put credentials in source or arguments')
-            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             output = str(Path(directory) / 'live-mimo')
             live_source = 'live_journal.c' if '--live-journal' in sys.argv or '--live-resume' in sys.argv or '--live-submission' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), *MODEL_SOURCES,
-                            implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime' / live_source), *flags, '-o', output], check=True)
+                            implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'), implementation('src/runtime/journal'), implementation('src/runtime/journal_posix'), str(ROOT / 'tests/runtime' / live_source), *flags, '-o', output], check=True)
             if '--live-journal' in sys.argv or '--live-resume' in sys.argv or '--live-submission' in sys.argv:
                 storage_dir = Path(directory) / 'storage'
                 storage_dir.mkdir()
@@ -131,15 +132,15 @@ def main():
                             *delta_flags, '-o', delta_test], check=True)
             subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
-            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libgit2'], text=True).split()
+            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libgit2', 'libcurl', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ('prompt', 'prompt_posix', 'tools', 'read_tool')],
+                            *[implementation('src/runtime/' + name) for name in ('prompt', 'prompt_posix', 'tools', 'tool_path', 'tool_path_posix', 'read_tool')],
                             str(ROOT / 'tests/runtime/test_prompt.c'),
                             '-Wl,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext',
                             *prompt_flags, '-o', prompt_test], check=True)
             subprocess.run([prompt_test], check=True, timeout=15)
-            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             for name, sources, wraps in [
                 ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),
                 ('transport', ['test_mimo_transport.c', 'mimo_abi.S'], ABI_WRAPS + CURL_WRAPS),
@@ -188,14 +189,14 @@ def main():
                             implementation('src/runtime/agent'), str(ROOT / 'tests/runtime/test_session_commit.c'), '-o', session_test], check=True)
             subprocess.run([session_test], check=True, timeout=10)
             write_test = str(Path(directory) / 'test-write-tool')
-            write_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            write_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/tools'),
-                            implementation('src/runtime/write_tool'), str(ROOT / 'tests/runtime/test_write_tool.c'),
+                            *PATH_SOURCES, implementation('src/runtime/write_tool'), str(ROOT / 'tests/runtime/test_write_tool.c'),
                             '-Wl,--wrap=write,--wrap=ftruncate,--wrap=fsync', *write_flags, '-o', write_test], check=True)
             subprocess.run([write_test], check=True, timeout=10)
             edit_test = str(Path(directory) / 'test-edit-text')
-            edit_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc'], text=True).split()
+            edit_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/edit_text'),
                             str(ROOT / 'tests/runtime/test_edit_text.c'), '-Wl,--wrap=calloc,--wrap=utf8proc_map',
@@ -205,7 +206,7 @@ def main():
                             '--binary', edit_test], check=True, timeout=45)
             edit_tool_test = str(Path(directory) / 'test-edit-tool')
             edit_tool_sources = ['agent', 'session', 'submissions', 'journal', 'journal_posix',
-                                 'tools', 'read_tool', 'write_tool', 'edit_text', 'edit_diff', 'edit_tool']
+                                 'tools', 'tool_path', 'tool_path_posix', 'read_tool', 'write_tool', 'edit_text', 'edit_diff', 'edit_tool']
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in edit_tool_sources],
@@ -254,10 +255,10 @@ def main():
                             str(ROOT / 'tests/runtime/test_async_tools.c'), *write_flags, '-o', async_test], check=True)
             subprocess.run([async_test], check=True, timeout=20)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
-            tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',
                             '-pedantic', '-Wno-cast-function-type', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            '-I' + str(ROOT / 'src/runtime'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'),
+                            '-I' + str(ROOT / 'src/runtime'), implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'),
                             str(ROOT / 'tests/runtime/test_tools_asm.c'), *tool_flags, '-o', tools_asm_test], check=True)
             subprocess.run([tools_asm_test], check=True, timeout=30)
             output = str(Path(directory) / 'test-agent')
@@ -265,7 +266,7 @@ def main():
                             '-pedantic', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *SOURCES, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
-            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c'], text=True).split()
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
@@ -279,7 +280,7 @@ def main():
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/tools'), implementation('src/runtime/read_tool'),
+                            implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'),
                             str(ROOT / 'tests/runtime/test_read_tool.c'), *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,

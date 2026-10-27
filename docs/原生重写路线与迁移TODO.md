@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable tools/{read,write,edit,path-utils}.ts、env/node.ts 的 absolutePath/openBinaryReader/openBinaryWriter；按其相对/绝对路径与文件链接行为调整现有编码工具。
-- 实际调用链：模型声明/Tool参数 → 原有Assembly read/write/edit服务 → 注入cwd fd与POSIX openat → 实际文件结果/结构化Entry。read通过一次openat打开路径；write从cwd或文件系统根逐层创建父目录，跟随链接；edit复用相同完整read/write服务。删除路径形式拒绝循环与重复逐组件read遍历；原地保持一个实现。
-- 验证：临时工作区实际绝对/点段路径、文件/目录符号链接、hard link写入及edit专项ASan/UBSan通过；类型/NUL/输出预算、非普通文件、短写/EINTR/部分写与fd清理保持。Runtime完整回归通过，最后关闭fd守卫另跑write专项；隔离产品构建通过。真实DeepSeek四工具验证绝对read/write、链接edit、父目录bash回读及持久参数，该真实模型/持久参数验证通过。
-- 接口与自审：公开函数表/结构尺寸保持；write平台flags断言随实际openat更新，删除已无消费者的单链接数布局。生产逻辑全部在现有Assembly中修改，声明/头/来源登记同步。旧路径拒绝夹具按Pi行为替换为临时目录内的真实副作用断言，参数、容量和失败路径用例保留。
-- 剩余与下一交付物：K08继续完整路径归一化（不存在前缀的点段、home/file URL和Unicode候选）、图片/附件、完整截断及ExecutionEnv/并发语义；K11继续配置、skills/templates/刷新和MCP。并行TUI工作保持原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 tools/path-utils.ts normalizeToolPath、env/node.ts resolvePath及对应tools/env用例；使用Node路径/URL规则对照并修正authority、空路径、非法转义和NUL边界。
+- 实际调用链：read/write参数或edit私有参数 → 共享Assembly路径准备 → 内部ExecutionEnv解析 → 已有POSIX文件服务。粘贴@/Unicode空格转换只在工具入口执行一次；home/file URL和重复分隔符/词法点段统一处理。不存在目录的missing/../file不产生额外mkdir，URL解码后真实文件名在edit内部保持。
+- 验证：read/write/edit专项ASan/UBSan覆盖路径样例、home、file URL、UTF-8/编码NUL、无额外目录、trailing separator、@@文件和URL Unicode文件的真实编辑；最终URI authority校验另跑read专项。Runtime整批回归、Assembly ABI检查、G00/Assembly通过；产品构建与真实DeepSeek四工具验证file URL read→home/点段write→粘贴路径链接edit→bash，持久工具参数保持原始值。最终产品重建通过。
+- 接口与自审：新增tools.path.local.v0由三个当前工具和内部完整文件服务消费，路径准备/解析与私有JSON适配为Assembly；C仅桥接libc home查询，URL/Unicode复用已有libcurl/utf8proc。新增pg_write_file_definition为内部write服务选择环境解析阶段，与模型write共用同一实现；既有结构/函数表布局保持。源、依赖、exports与实际构建输入同步登记。
+- 剩余与下一交付物：K08继续read的Unicode/NFD文件候选、图片/附件、完整截断和ExecutionEnv并发/环境语义；K11配置、skills/templates/刷新与MCP继续按原覆盖表推进。并行TUI工作保持原位。

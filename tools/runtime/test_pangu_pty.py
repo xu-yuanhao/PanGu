@@ -303,14 +303,19 @@ def path_workflow(binary, root, environment):
     workspace.mkdir()
     shared.mkdir()
     marker = 'PANGUPOSIX' + os.urandom(5).hex()
-    (shared / 'source.txt').write_text(marker + '\n')
+    (shared / 'space source.txt').write_text(marker + '\n')
     (workspace / 'alias.txt').symlink_to(shared / 'target.txt')
-    terminal = Terminal(binary, workspace, dict(environment))
+    env = dict(environment, HOME=str(shared))
+    terminal = Terminal(binary, workspace, env)
     try:
         terminal.until(b'> ', 5)
-        output = run_input(terminal, 'Use read with absolute path ' + str(shared / 'source.txt') + '. Use write with absolute path ' + str(shared / 'target.txt') + ' to copy the first line. Then use edit with path alias.txt (the symbolic link) to append _PATH to that line. Finally run bash command cat ../posix-path-shared/target.txt and reply with its exact content. Use all four tools.')
+        read_path = (shared / 'space source.txt').as_uri()
+        write_path = '~/missing-prefix/../target.txt'
+        edit_path = '@./alias.txt'
+        output = run_input(terminal, 'Use all four tools and preserve the following literal path arguments exactly: read path=' + read_path + '; write path=' + write_path + ' to copy the first line; edit path=' + edit_path + ' to append _PATH to that line through the symbolic link. Finally bash command cat ../posix-path-shared/target.txt and reply with the exact final content. HOME is ' + str(shared) + '.')
         assert (shared / 'target.txt').read_text().strip() == marker + '_PATH'
         assert (workspace / 'alias.txt').is_symlink()
+        assert not (shared / 'missing-prefix').exists()
         assert (marker + '_PATH').encode() in output
         terminal.send(b'\x04')
         terminal.finish()
@@ -333,9 +338,9 @@ def path_workflow(binary, root, environment):
                     saved.extend(results(json.loads(line)))
                 except (ValueError, UnicodeDecodeError):
                     pass
-    for name, path in [('read', str(shared / 'source.txt')), ('write', str(shared / 'target.txt')), ('edit', 'alias.txt')]:
+    for name, path in [('read', read_path), ('write', write_path), ('edit', edit_path)]:
         assert any(result.get('model', [{}])[0].get('toolName') == name and result.get('data', {}).get('arguments', {}).get('path') == path for result in saved), (name, 'canonical persisted arguments missing')
-    print('PASS: real model absolute read/write, symlink edit, parent-relative bash and committed tool arguments', flush=True)
+    print('PASS: real model file URL read, home/lexical write without extra mkdir, pasted-path symlink edit, bash and unchanged committed arguments', flush=True)
 
 def thinking_workflow(binary, root, environment):
     root = root / 'thinking-workflow'

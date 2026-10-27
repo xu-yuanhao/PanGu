@@ -227,6 +227,15 @@
       "role": "c-bridge",
       "bridge_kind": "external-library",
       "reason": "libgit2元数据发现及POSIX stat/realpath与完整文件服务的协议胶水；继承、遮蔽、优先级由Assembly实现"
+    },
+    "src/runtime/tool_path.S": {
+      "role": "assembly-core",
+      "reason": "手写Pi工具路径prepare、空白/@、home/file URL与POSIX词法归一化；复用curl URL/utf8proc接口"
+    },
+    "src/runtime/tool_path_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "libc passwd布局与home目录查询胶水，路径决策由Assembly实现"
     }
   }
 }

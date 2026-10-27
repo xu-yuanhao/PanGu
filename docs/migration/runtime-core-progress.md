@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- read/write/edit实际服务接受POSIX相对/绝对路径、点段和符号链接；write保持创建父目录、打开后检查普通文件及unsafe replay语义，hard link写入按实际文件描述符执行。
-- 原地删除路径拒绝与重复read路径遍历，复用openat；类型/NUL/长度、输出/扫描预算和非普通文件检查保持。
-- read/write/edit与prompt受影响专项ASan/UBSan、Runtime完整回归及隔离产品构建通过，最终关闭fd守卫另跑write专项。真实DeepSeek四工具实际副作用及持久参数字段核对通过。
+- read/write/edit共享Assembly路径准备：粘贴@/Unicode空白、home、file URL和词法点段；复用libcurl URL/utf8proc、libc home查询。
+- 内部文件服务仅做环境解析，防止edit再次转换已准备的@/Unicode路径；写入missing/../file不会创建多余目录，原始参数继续持久保存。
+- 路径/read/write/edit专项ASan/UBSan、最终URI边界read专项、Runtime整批回归、Assembly ABI和G00/Assembly通过。真实DeepSeek四工具file URL→home/点段→粘贴路径链接→bash及原始持久参数通过；最终产品重建通过。
 
 ## 当前接口边界
 

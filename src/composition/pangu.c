@@ -77,7 +77,7 @@ static int process_start(void *ctx,pg_host *scope,size_t owner){
 static int process_stop(void *ctx){(void)ctx;return pg_process_close(&command_process);}
 static int files_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;writer.directory=root->directory;
- pg_tool_definition definitions[]={pg_read_snapshot_definition(root),pg_write_tool_definition(&writer)};
+ pg_tool_definition definitions[]={pg_read_snapshot_definition(root),pg_write_file_definition(&writer)};
  if(pg_tool_registry_init(&file_registry,definitions,2))return 1;
  application.files=pg_tool_registry_service(&file_registry);return pg_host_provide(scope,owner,"files",&application.files);
 }

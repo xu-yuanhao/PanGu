@@ -17,7 +17,7 @@
 #define FRAME 8808
 .section .rodata
 .Lname: .asciz "edit"
-.Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
+.Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Paths support home expansion, file URLs and lexical dot segments. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"edits\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":16,\"items\":{\"type\":\"object\",\"properties\":{\"oldText\":{\"type\":\"string\"},\"newText\":{\"type\":\"string\"}},\"required\":[\"oldText\",\"newText\"],\"additionalProperties\":false}}},\"required\":[\"path\",\"edits\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Ledits: .asciz "edits"
@@ -162,12 +162,6 @@
  pop rbx
  ret
 
-.Lpath_valid:
- xor eax,eax
- test rsi,rsi
- setz al
- ret
-
 /* Append old/new JSON strings without modifying the owned source trees. */
 .Lpair:
  push rbx
@@ -302,6 +296,10 @@
  call json_object_is_type@PLT
  test eax,eax
  jz .Lparse_bad
+ mov rdi,r12
+ call pg_tool_path_arguments@PLT
+ test eax,eax
+ jnz .Lparse_bad
  mov qword ptr [rsp+40],0
  mov rdi,r12
  lea rsi,[rip+.Lpath]
@@ -310,11 +308,6 @@
  mov rdi,[rsp+40]
  lea rsi,[rbx+P_PATH]
  call .Lstring
- test eax,eax
- jnz .Lparse_bad
- mov rdi,[rbx+P_PATH]
- mov rsi,[rbx+P_PATH_N]
- call .Lpath_valid
  test eax,eax
  jnz .Lparse_bad
  mov rdi,r12

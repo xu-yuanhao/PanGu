@@ -261,9 +261,10 @@
       "dependencies": [
         "tools.registry.local.v0",
         "json-c",
-        "POSIX directory-relative file APIs"
+        "POSIX directory-relative file APIs",
+        "tools.path.local.v0"
       ],
-      "role": "handwritten cwd-relative or absolute POSIX UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; POSIX dot segments and symlinks follow openat resolution; regular-file and explicit safe replay checks remain; explicit internal snapshot factory shares the read engine but rejects pagination arguments and never truncates source input",
+      "role": "handwritten cwd-relative or absolute POSIX UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; Shared Pi path preparation maps pasted @/spaces, home and file URLs and folds lexical dot segments before POSIX symlink resolution; regular-file and explicit safe replay checks remain; explicit internal snapshot factory shares the read engine but rejects pagination arguments and never truncates source input",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
@@ -567,11 +568,13 @@
       "dependencies": [
         "tools.registry.local.v0",
         "json-c",
-        "POSIX directory-relative file APIs; read_tool_layout.h platform constants"
+        "POSIX directory-relative file APIs; read_tool_layout.h platform constants",
+        "tools.path.local.v0"
       ],
-      "role": "handwritten bounded POSIX relative/absolute write: mkdir parents, follow symbolic links/dot segments, verify the opened regular file before truncation; synchronous short-write/EINTR loop, file/parent fsync, explicit unsafe replay policy; partial mutation possible on failure",
+      "role": "handwritten bounded POSIX relative/absolute write: mkdir parents, follow symbolic links after shared home/file-URL/lexical path preparation, verify the opened regular file before truncation; synchronous short-write/EINTR loop, file/parent fsync, explicit unsafe replay policy; partial mutation possible on failure",
       "exports": [
-        "pg_write_tool_definition"
+        "pg_write_tool_definition",
+        "pg_write_file_definition"
       ],
       "reference_basis": [
         {
@@ -633,7 +636,8 @@
         "tools.edit.text.local.v0",
         "json-c",
         "system libc",
-        "tools.edit.diff.local.v0"
+        "tools.edit.diff.local.v0",
+        "tools.path.local.v0"
       ],
       "role": "handwritten canonical/legacy argument preparation and one synchronous read-transform-write operation through an injected pg_tools read/write service; preserves inner validation/authorization, borrows no POSIX backend internals, unsafe replay policy",
       "exports": [
@@ -1872,6 +1876,43 @@
             "packages/durable/src/tools/edit.ts"
           ],
           "semantics": "generateDiffString/generateUnifiedPatch and jsdiff 8.0.4 diff/base, diff/line and patch/create (BSD-3-Clause)"
+        }
+      ]
+    },
+    {
+      "id": "tools.path.local.v0",
+      "sources": [
+        "src/runtime/tool_path.S",
+        "src/runtime/tool_path_posix.c",
+        "src/runtime/tool_path.h"
+      ],
+      "dependencies": [
+        "client.contract.v0",
+        "json-c",
+        "libcurl",
+        "libutf8proc",
+        "system libc"
+      ],
+      "role": "Shared handwritten tool path preparation for read/write/edit, home lookup via libc, URL parsing via libcurl; lexical normalization before filesystem effects. Internal ExecutionEnv resolve omits pasted @/space conversion, so private edit arguments are prepared once and decoded filenames stay intact.",
+      "exports": [
+        "pg_tool_path_prepare",
+        "pg_tool_path_arguments",
+        "pg_tool_path_home",
+        "pg_tool_path_resolve"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/path-utils.ts",
+            "packages/durable/src/env/node.ts"
+          ],
+          "semantics": "normalizeToolPath pasted spaces/@, resolvePath home/file URL and lexical separators/dot segments; native relative leading parents stay relative to injected cwd fd",
+          "tests_to_read": [
+            "packages/durable/test/env-node.test.ts",
+            "packages/durable/test/tools.test.ts"
+          ]
         }
       ]
     }

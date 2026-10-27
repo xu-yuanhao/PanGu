@@ -598,6 +598,9 @@
     "src/runtime/model_provider.h": "native-source",
     "tests/runtime/product_plugin_fixture.c": "native-test",
     "src/runtime/tool_provider.h": "native-source",
-    "src/runtime/prompt_posix.c": "native-source"
+    "src/runtime/prompt_posix.c": "native-source",
+    "src/runtime/tool_path.S": "native-source",
+    "src/runtime/tool_path_posix.c": "native-source",
+    "src/runtime/tool_path.h": "native-source"
   }
 }

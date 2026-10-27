@@ -8,4 +8,6 @@
    An interrupted write may be partial: this tool is not replay-safe. */
 typedef struct { int directory; } pg_write_tool;
 pg_tool_definition pg_write_tool_definition(pg_write_tool *);
+/* Internal ExecutionEnv write: incoming paths were tool-prepared already. */
+pg_tool_definition pg_write_file_definition(pg_write_tool *);
 #endif

@@ -3,7 +3,7 @@
 .intel_syntax noprefix
 .section .rodata
 .Lname: .asciz "write"
-.Ldescription: .asciz "Write UTF-8 content to a relative or absolute regular file, creating parent directories. Overwrites existing content. Paths follow POSIX resolution, including symbolic links and dot segments. An interrupted write may have partially run."
+.Ldescription: .asciz "Write UTF-8 content to a relative or absolute regular file, creating parent directories. Overwrites existing content. Paths support home expansion, file URLs and lexical dot segments before following links. An interrupted write may have partially run."
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Lcontent: .asciz "content"
@@ -25,6 +25,7 @@
  mov [rsp+32],rdx
  mov [rsp+40],rcx
  mov [rsp+48],r8
+ mov [rsp+56],r9d
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  test rbx,rbx
@@ -178,10 +179,19 @@
  test rax,rax
  jnz .Lparse_bad
 .Lcopy_path:
- mov rdi,[rsp+32]
- mov rsi,r14
- lea rdx,[r13+1]
- call memcpy@PLT
+ mov rdi,r14
+ mov rsi,r13
+ mov rdx,[rsp+32]
+ mov ecx,4096
+ cmp dword ptr [rsp+56],0
+ jne .Lwrite_resolve
+ call pg_tool_path_prepare@PLT
+ jmp .Lwrite_prepared
+.Lwrite_resolve:
+ call pg_tool_path_resolve@PLT
+.Lwrite_prepared:
+ test eax,eax
+ jnz .Lparse_bad
  inc r15d
  jmp .Lfield
 .Lcopy_content:
@@ -218,12 +228,19 @@
 
 .type .Lvalidate,@function
 .Lvalidate:
+ xor r10d,r10d
+ jmp .Lvalidate_path_mode
+.Lvalidate_file:
+ mov r10d,1
+.Lvalidate_path_mode:
  sub rsp,8216
+ mov [rsp+8208],r10d
  mov rdi,rsi
  mov rsi,rdx
  mov rdx,rsp
  lea rcx,[rsp+4096]
  lea r8,[rsp+8192]
+ mov r9d,[rsp+8208]
  call .Lparse
  xor eax,1
  add rsp,8216
@@ -244,6 +261,11 @@
 /* Stack: path[4096], content[4096], length, stat[144], saved outputs. */
 .type .Lexecute,@function
 .Lexecute:
+ xor r10d,r10d
+ jmp .Lexecute_path_mode
+.Lexecute_file:
+ mov r10d,1
+.Lexecute_path_mode:
  push rbx
  push r12
  push r13
@@ -254,6 +276,7 @@
  mov [rsp+8344],rcx
  mov [rsp+8352],r8
  mov [rsp+8360],r9
+ mov [rsp+8376],r10d
  mov r12d,-1
  mov r13d,-1
  test rcx,rcx
@@ -268,6 +291,7 @@
  mov rdx,rsp
  lea rcx,[rsp+4096]
  lea r8,[rsp+8192]
+ mov r9d,[rsp+8376]
  call .Lparse
  test eax,eax
  jnz .Lwrite_error
@@ -467,3 +491,19 @@ pg_write_tool_definition:
 
 .section .rodata
 .Lfilesystem_root: .asciz "/"
+
+.text
+.globl pg_write_file_definition
+.type pg_write_file_definition,@function
+pg_write_file_definition:
+ push rbx
+ mov rbx,rdi
+ call pg_write_tool_definition
+ lea rax,[rip+.Lvalidate_file]
+ mov [rbx+PG_TL_DEF_VALIDATE],rax
+ lea rax,[rip+.Lexecute_file]
+ mov [rbx+PG_TL_DEF_EXECUTE],rax
+ mov rax,rbx
+ pop rbx
+ ret
+.size pg_write_file_definition,.-pg_write_file_definition

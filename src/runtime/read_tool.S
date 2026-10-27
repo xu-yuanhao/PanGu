@@ -15,7 +15,7 @@
 .Lmsg_offset: .asciz "read offset is beyond end of file"
 .Lmsg_scan: .asciz "read scan limit exceeded (1 MiB per call)"
 .Lread_name:     .asciz "read"
-.Lread_desc: .asciz "Read a regular UTF-8 text file using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Relative and absolute paths follow POSIX resolution. Oversized individual lines are refused."
+.Lread_desc: .asciz "Read a regular UTF-8 text file using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution. Oversized individual lines are refused."
 .Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
@@ -39,6 +39,7 @@ li_parse_path:
  test byte ptr [rsp],0
  sub rsp,48
  mov [rsp+4112],rcx
+ mov [rsp+4128],r8d
  mov qword ptr [rcx],1
  mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
  mov qword ptr [rcx+16],0
@@ -127,10 +128,19 @@ li_parse_path:
  call memchr@PLT
  test rax, rax
  jnz .Lpp_bad_put
- lea rdi, [rbx]
- mov rsi, [rsp + 4104]
- lea rdx, [r12 + 1] /* Include the path terminator. */
- call memcpy@PLT
+ mov rdi,[rsp+4104]
+ mov rsi,r12
+ mov rdx,rbx
+ mov ecx,4096
+ cmp dword ptr [rsp+4128],0
+ jne .Lpp_resolve
+ call pg_tool_path_prepare@PLT
+ jmp .Lpp_prepared
+.Lpp_resolve:
+ call pg_tool_path_resolve@PLT
+.Lpp_prepared:
+ test eax,eax
+ jnz .Lpp_bad_put
  jmp .Lpp_ok
 .Lpp_bad:
  mov eax, 1 /* 无对象需要释放 */
@@ -216,6 +226,7 @@ li_validate:
  mov rdi, rsi
  mov rsi, r8
  lea rcx,[rsp+4096]
+ mov r8d,[rsp+4120]
  call li_parse_path
  test eax,eax
  jnz .Lvalidate_return
@@ -409,6 +420,7 @@ li_execute_read:
  mov rdi, rsi
  mov rsi, r8
  lea rcx,[rsp+4272]
+ mov r8d,[rsp+4360]
  call li_parse_path
  test eax,eax
  jnz .Lrd_invalid
