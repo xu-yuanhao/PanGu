@@ -25,7 +25,7 @@ pg_memory_status pg_record_memory_open(pg_record_memory *);
 pg_memory_status pg_record_memory_close(pg_record_memory *);
 pg_record_storage pg_record_memory_storage(pg_record_memory *);
 /* Prepared commit with a synchronous persistence barrier. persist borrows the
-   original validated batch and sequence; zero confirms durable storage. All
+   detached, copy-resolved StorageWrite batch and sequence; zero confirms durable storage. All
    allocations precede persist, then rows/index apply without allocation and
    adopt runs once. A rejected barrier leaves records and sequence unchanged.
    Serialized callers keep batch immutable; neither callback may reenter. */

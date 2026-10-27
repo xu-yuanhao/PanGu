@@ -73,4 +73,8 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 
 ## B01 SQLite接入（2026-10-27）
 
-`record_memory.S`在完整准备后增加持久化屏障，拒绝时保持记录/序号，成功后直接应用并通知；默认内存提交沿用同一实现。`record_sqlite.S`通过成熟SQLite/json-c C ABI实现原生提交与顺序恢复。实际Session混合事务重开结果与固定Pi SQLite对照通过，Runtime O0/O2、SQLite ASan/UBSan专项及产品构建通过。原生SQLite文件为批次日志，回放成本与上游物理布局差异见核心TODO当前交接；完整K04验收继续由B01完成。
+`record_memory.S`在完整准备后增加持久化屏障，拒绝时保持记录/序号，成功后直接应用并通知；默认内存提交沿用同一实现。`record_sqlite.S`通过成熟SQLite/json-c C ABI实现原生提交与顺序恢复。实际Session混合事务重开结果与固定Pi SQLite对照通过，Runtime O0/O2、SQLite ASan/UBSan专项及产品构建通过。原生SQLite文件为批次日志，回放成本见核心TODO当前交接；完整K04验收继续由B01完成。
+
+## B01 JSONL与PanGu身份（2026-10-27）
+
+`record_jsonl.S`接通原生Storage/Session提交、task/doc sidecar和主提交标记、独占写租约、撕裂/未确认尾部恢复、终态任务和当前checkpoint恢复维护；平台C仅处理目录布局。Memory持久化屏障借用已解析copy的分离批次，默认内存路径保持原实现。Runtime O0/O2、JSONL ASan/UBSan、产品构建及独立上游行为对照通过；当前实际差异保留在核心TODO。PanGu使用自身数据协议与`.pangu`命名空间，提示词继承参考机制并适配PanGu身份与实际操作入口。

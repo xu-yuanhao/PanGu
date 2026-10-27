@@ -1600,6 +1600,41 @@
           ]
         }
       ]
+    },
+    {
+      "id": "storage.jsonl.local.v1",
+      "sources": [
+        "src/runtime/record_jsonl.S",
+        "src/runtime/record_jsonl.h",
+        "src/runtime/record_jsonl_posix.c"
+      ],
+      "dependencies": [
+        "storage.records.memory.local.v0",
+        "json-c C ABI",
+        "POSIX filesystem C ABI"
+      ],
+      "role": "PanGu JSONL main-marker and sidecar commit/recovery, single writer lease, torn/unconfirmed tail truncation, terminal/current-only checkpoint cleanup on recovery; platform C owns directory layouts",
+      "exports": [
+        "pg_record_jsonl_open",
+        "pg_record_jsonl_close",
+        "pg_record_jsonl_storage"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/storage/jsonl/storage.ts",
+            "packages/durable/src/storage/memory.ts",
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "prepare before append, sidecars before marker, durability before adoption; final task/document lifetimes and current-only bases determine required content; PanGu owns its directory and data protocol",
+          "tests_to_read": [
+            "packages/durable/test/jsonl-storage.test.ts",
+            "packages/durable/src/testing/storage-conformance.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

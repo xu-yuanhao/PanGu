@@ -172,6 +172,15 @@
     "src/runtime/record_sqlite.S": {
       "role": "assembly-core",
       "reason": "手写SQLite事务提交、准备后持久化屏障与顺序恢复，调用成熟SQLite/json-c库"
+    },
+    "src/runtime/record_jsonl.S": {
+      "role": "assembly-core",
+      "reason": "手写PanGu JSONL编码、提交、sidecar确认、尾部恢复与checkpoint维护"
+    },
+    "src/runtime/record_jsonl_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "DIR、dirent与stat布局的目录读取胶水"
     }
   }
 }

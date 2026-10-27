@@ -566,6 +566,10 @@
     "src/runtime/record_sqlite.S": "native-source",
     "src/runtime/record_sqlite.h": "native-source",
     "tests/runtime/test_record_sqlite.c": "native-test",
-    "tools/runtime/test_record_sqlite.py": "development-tool"
+    "tools/runtime/test_record_sqlite.py": "development-tool",
+    "src/runtime/record_jsonl.S": "native-source",
+    "src/runtime/record_jsonl.h": "native-source",
+    "src/runtime/record_jsonl_posix.c": "native-source",
+    "tests/runtime/test_record_jsonl.c": "native-test"
   }
 }

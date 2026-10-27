@@ -131,7 +131,7 @@ pg_record_memory_commit_persisted:
  push r13
  push r14
  push r15
- sub rsp,120
+ sub rsp,136
  mov [rsp+112],r9
  mov rbx,rdi
  mov r12,rdx
@@ -141,6 +141,7 @@ pg_record_memory_commit_persisted:
  mov [rsp+8],rsi
  mov qword ptr [rsp],0
  mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+120],0
  test r14,r14
  jz .Lmemory_commit_invalid
  mov qword ptr [r14],0
@@ -181,6 +182,12 @@ pg_record_memory_commit_persisted:
  call .Lmemory_prepare_documents
  test eax,eax
  jnz .Lmemory_prepare_failed
+ cmp qword ptr [rsp+112],0
+ je .Lmemory_release_source
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov [rsp+120],rax
+.Lmemory_release_source:
  mov rdi,[rsp]
  call json_object_put@PLT
  mov rax,[rsp+64]
@@ -395,8 +402,8 @@ pg_record_memory_commit_persisted:
  test rax,rax
  jz .Lmemory_persisted
  /* Persistence runs after all preparation, before observable row mutation. */
- mov rdi,[rsp+176]
- mov rsi,[rsp+8]
+ mov rdi,[rsp+192]
+ mov rsi,[rsp+120]
  mov rdx,[rbx+32]
  call rax
  test eax,eax
@@ -498,13 +505,15 @@ pg_record_memory_commit_persisted:
  call free@PLT
  mov rdi,[rsp+104]
  call json_object_put@PLT
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
  mov dword ptr [rbx+40],0
  mov eax,r15d
  jmp .Lmemory_commit_return
 .Lmemory_commit_invalid:
  mov eax,2
 .Lmemory_commit_return:
- add rsp,120
+ add rsp,136
  pop r15
  pop r14
  pop r13

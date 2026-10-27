@@ -65,6 +65,12 @@ def main():
                             *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'record_sqlite']],
                             str(ROOT / 'tests/runtime/test_record_sqlite.c'), *sqlite_flags, '-o', sqlite_test], check=True)
             subprocess.run([sqlite_test], check=True, timeout=30)
+            jsonl_test = str(Path(directory) / 'test-record-jsonl')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'record_jsonl', 'record_jsonl_posix']],
+                            str(ROOT / 'tests/runtime/test_record_jsonl.c'), '-Wl,--wrap=write', *sqlite_flags, '-o', jsonl_test], check=True)
+            subprocess.run([jsonl_test], check=True, timeout=30)
             host_test = str(Path(directory) / 'test-host')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/host'),
@@ -276,6 +282,7 @@ def main():
                             '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
     subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_record_sqlite.py')], check=True)
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_record_sqlite.py'), '--jsonl'], check=True)
     return 0
 if __name__ == '__main__':
     raise SystemExit(main())
