@@ -10,24 +10,26 @@
 #include "tui_layout.h"
 .intel_syntax noprefix
 
-/* 主循环栈帧布局（rsp 相对，sub APP_FRAME 后） */
-.equ OFF_TERM,    0   /* tui_term 96 */
-.equ OFF_INPUT,   96  /* tui_input 1056 */
-.equ OFF_VIEW,    1152 /* tui_view 48 */
-.equ OFF_STATE,   1200 /* tui_state 32 */
-.equ OFF_SINK,    1232 /* tui_out_sink 16 */
-.equ OFF_WAKE,    1248 /* int wake[2] */
-.equ OFF_SAVED,   1256 /* struct sigaction saved[4] 608 */
-.equ OFF_SA,      1864 /* struct sigaction sa 152 */
-.equ OFF_PFDS,    2016 /* struct pollfd[2] 16 */
-.equ OFF_BUF,     2032 /* unsigned char buf[256] */
-.equ OFF_REASON,  2288
-.equ OFF_TICK,    2292
-.equ OFF_COUNT,   2296
-.equ OFF_INTERACTIVE, 2300
-.equ OFF_K,       2304 /* size_t 字节循环计数 */
-.equ OFF_N,       2312 /* ssize_t read 返回值 */
-.equ APP_FRAME,   2336
+/* 主循环栈帧布局（rsp 相对，sub APP_FRAME 后）。
+ * 缓冲区偏移从 tui_layout.h 的实际结构体尺寸派生：view 内嵌 md 后尺寸大增，
+ * 手写偏移曾停留在旧 64 字节 view，view_init 越界打穿调用者栈帧。 */
+.equ OFF_TERM,    0                                  /* tui_term */
+.equ OFF_INPUT,   OFF_TERM + TUI_LI_TERM_SIZE        /* tui_input */
+.equ OFF_VIEW,    OFF_INPUT + TUI_LI_INPUT_SIZE      /* tui_view（内嵌 md） */
+.equ OFF_STATE,   OFF_VIEW + TUI_LI_VIEW_SIZE        /* tui_state */
+.equ OFF_SINK,    OFF_STATE + TUI_LI_STATE_SIZE      /* tui_out_sink 16 */
+.equ OFF_WAKE,    OFF_SINK + 16                      /* int wake[2] */
+.equ OFF_SAVED,   OFF_WAKE + 8                       /* struct sigaction saved[4] */
+.equ OFF_SA,      OFF_SAVED + 4 * TUI_LI_SIGACTION_SIZE
+.equ OFF_PFDS,    OFF_SA + TUI_LI_SIGACTION_SIZE     /* struct pollfd[2] 16 */
+.equ OFF_BUF,     OFF_PFDS + 16                      /* unsigned char buf[256] */
+.equ OFF_REASON,  OFF_BUF + 256
+.equ OFF_TICK,    OFF_REASON + 4
+.equ OFF_COUNT,   OFF_TICK + 4
+.equ OFF_INTERACTIVE, OFF_COUNT + 4
+.equ OFF_K,       OFF_INTERACTIVE + 4                /* size_t，8 对齐 */
+.equ OFF_N,       OFF_K + 8
+.equ APP_FRAME,   (OFF_N + 8 + 15) & -16
 
 .section .rodata
 handled_signals:
@@ -267,6 +269,10 @@ tui_app_run:
  xor r8d, r8d
 .Lview_init:
  call tui_view_init@PLT
+ /* 初始编辑区宽度取实际终端列（term_init 已探测） */
+ mov rdi, r14
+ movzx esi, word ptr [r12 + TUI_LI_TERM_COLS]
+ call tui_view_set_size@PLT
  mov rdi, r15
  mov rsi, qword ptr [rbx + TUI_LI_APP_OPS]
  mov rdx, r14
@@ -346,6 +352,10 @@ tui_app_run:
  call [rax + TUI_LI_PLATFORM_QUERY_SIZE]
  cmp dword ptr [rsp + OFF_INTERACTIVE], 0
  je .Ldo_poll
+ /* 列数变化：收束旧编辑区（旧几何不可靠）后按新宽度重绘 */
+ mov rdi, r14
+ movzx esi, word ptr [r12 + TUI_LI_TERM_COLS]
+ call tui_view_set_size@PLT
  mov rdi, r14
  call tui_view_redraw_editor@PLT
 .Ldo_poll:
@@ -404,8 +414,12 @@ tui_app_run:
  cmp eax, TUI_LI_KEY_OVERFLOW
  je .Lkey_overflow
  cmp eax, TUI_LI_KEY_CHAR
- je .Lkey_redraw
+ je .Lkey_char_redraw
  cmp eax, TUI_LI_KEY_BACKSPACE
+ je .Lkey_redraw
+ cmp eax, TUI_LI_KEY_CURSOR
+ je .Lkey_redraw
+ cmp eax, TUI_LI_KEY_PASTE
  je .Lkey_redraw
  jmp .Lkey_next
 .Lkey_enter:
@@ -413,6 +427,10 @@ tui_app_run:
  call tui_input_empty@PLT
  test eax, eax
  jnz .Lkey_next /* 空提交由上层忽略 */
+ mov rdi, r13
+ call tui_input_incomplete@PLT
+ test eax, eax
+ jnz .Lkey_next /* 未完成粘贴/转义不提交（防御；feed 契约已保证） */
  mov rdi, r13
  call tui_input_text@PLT
  mov rsi, rax
@@ -446,6 +464,10 @@ tui_app_run:
  mov rdi, r14
  call tui_view_input_limit@PLT
  jmp .Lkey_next
+.Lkey_char_redraw:
+ /* 多字节序列未完成：等最后一字节到齐再整字重绘（Pi editor 以码点为编辑单位） */
+ cmp dword ptr [r13 + TUI_LI_INPUT_UTF8_PENDING], 0
+ jne .Lkey_next
 .Lkey_redraw:
  mov rdi, r14
  call tui_view_redraw_editor@PLT

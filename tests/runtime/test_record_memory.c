@@ -1723,7 +1723,30 @@ static void read_line_tests(void){
  puts("PASS: readOnLine continuation blocks writes/interleaving/close, nested provider end is refused, admitted reads finish after seal, migration/read-only and first failure preserve ownership");
 }
 
+typedef struct {durable_fixture d;pg_session_listeners listeners;pg_session_dispatch queue;pg_session_adoption_host host;pg_durable_failure failure;pg_durable_read_line line;unsigned order[8],used,closed,reports,listener_reports,close_error,expected;} session_failure_fixture;
+static int session_failure_close_event(void *ctx,const void *publication,void *delivery){session_failure_fixture *f=ctx;assert(!publication&&delivery==f&&f->d.session.phase==2&&f->d.session.busy&&f->d.native.n.f.session.failed==f->expected&&f->failure.cause==f->expected&&f->failure.busy&&!f->closed);f->order[f->used++]=1;++f->closed;assert(pg_durable_session_fail(&f->failure,99)==1&&!f->d.closes);return f->close_error?9:0;}
+static void session_failure_listener_report(void *ctx,int error){session_failure_fixture *f=ctx;assert(error==9&&f->failure.busy&&f->d.native.n.f.session.failed==f->expected);++f->listener_reports;}
+static void session_failure_report(void *ctx,unsigned cause){session_failure_fixture *f=ctx;assert(cause==f->expected&&f->closed==1&&!f->reports&&f->failure.reported&&f->d.session.phase==2&&f->d.session.busy&&!f->d.closes);f->order[f->used++]=2;++f->reports;assert(pg_durable_session_fail(&f->failure,100)==1&&pg_durable_session_close_notified(&f->d.session,&f->host)==1&&!f->d.closes);pg_record_tx tx={0};pg_document_tx docs={0};assert(pg_durable_session_begin(&f->d.session,&tx,&docs,&f->d.native.n.f.memory,tx_read)==PG_TX_INVALID);}
+static int session_failure_backend(void *ctx){session_failure_fixture *f=ctx;assert(f->reports==1&&f->closed==1&&f->order[0]==1&&f->order[1]==2);f->order[f->used++]=3;return durable_backend_close(&f->d);}
+static void session_failure_open(session_failure_fixture *f){memset(f,0,sizeof(*f));durable_open(&f->d);f->expected=7;f->listeners=(pg_session_listeners){.records=&f->d.native.n.f.session,.context=f,.report=session_failure_listener_report};f->queue.listeners=&f->listeners;f->host=(pg_session_adoption_host){{&f->listeners,&f->d.native.n.holds,f},&f->queue};f->failure=(pg_durable_failure){.session=&f->d.session,.notifications=&f->host,.context=f,.report=session_failure_report};f->d.session.backend=(pg_durable_close){f,session_failure_backend};assert(!pg_session_listen(&f->listeners,2,session_failure_close_event,f));}
+static void session_failure_tests(void){
+ _Static_assert(sizeof(pg_durable_failure)==48,"failure control ABI");
+ for(unsigned mode=0;mode<8;++mode){session_failure_fixture f;session_failure_open(&f);if(mode==1){f.expected=PG_RECORDS_STORAGE_FAILED;f.d.native.n.f.session.failed=f.expected;}if(mode==2)durable_edit(&f.d,0);if(mode==3)assert(!pg_durable_read_on_line_begin(&f.line,&f.d.session));if(mode==4)f.d.pending=1;if(mode==5)f.close_error=1;if(mode==7)f.d.fail_backend=1;
+#ifdef PG_MEMORY_FAULTS
+ if(mode==6){doc_tracking=1;doc_calls=0;doc_fail=1;}
+#endif
+ int status=pg_durable_session_fail(&f.failure,7);
+#ifdef PG_MEMORY_FAULTS
+ if(mode==6){doc_tracking=0;doc_fail=0;assert(status==1&&f.d.session.phase==2&&f.d.native.n.f.session.failed==7&&!f.failure.busy&&!f.failure.reported&&!f.closed&&!f.reports&&!f.d.closes);status=pg_durable_session_fail(&f.failure,88);}
+#endif
+ if(mode==2||mode==3||mode==4){assert(status==1&&f.failure.cause==f.expected&&f.failure.reported&&f.closed==1&&f.reports==1);if(mode==2){assert(!f.d.closes&&!pg_durable_session_abort(&f.d.session));}if(mode==3){assert(!f.d.closes&&!pg_durable_read_on_line_end(&f.line));}status=pg_durable_session_fail(&f.failure,101);}assert(status==-1&&f.failure.cause==f.expected&&f.d.native.n.f.session.failed==f.expected&&f.closed==1&&f.reports==1&&f.listener_reports==(mode==5)&&f.used==(mode==4?4u:3u)&&f.order[0]==1&&f.order[1]==2&&f.order[2]==3&&!f.failure.busy&&!f.listeners.entries&&f.queue.closed);assert(pg_durable_session_fail(&f.failure,102)==-1&&f.closed==1&&f.reports==1);durable_closed(&f.d,-1);
+ }
+ session_failure_fixture f;session_failure_open(&f);assert(pg_durable_session_fail(&f.failure,0)==-2&&!f.d.native.n.f.session.failed&&!f.d.closes&&!f.reports);pg_session_adoption_host *saved=f.failure.notifications;f.failure.notifications=0;assert(pg_durable_session_fail(&f.failure,7)==-2&&!f.d.native.n.f.session.failed);f.failure.notifications=saved;assert(pg_durable_session_fail(&f.failure,7)==-1);durable_closed(&f.d,-1);
+ puts("PASS: explicit Session failure first cause, close-listener/report/backend order, reentry, existing primitive failure, admitted Tx/read-line drain, pending/error backend and close-snapshot allocation retry");
+}
+
 int main(void){
+ session_failure_tests();
  read_line_tests();
  session_unload_tests();
  watch_cancellation_tests();

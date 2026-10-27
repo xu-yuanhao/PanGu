@@ -46,15 +46,21 @@ Claude-Code快照位于 `references/Claude-Code/`，源码为社区还原；采�
 
 ### U01 — 输入编辑与安全粘贴
 
-- [ ] 接续当前工作区的输入候选实现，完成UTF-8边界上的行内插入/删除、Left/Right、Home/End、Backspace/Delete、清草稿。
-- [ ] 完成多行编辑、Alt+Enter换行、普通Enter提交、CRLF去重、bracketed paste标记任意切分、控制字节过滤、超限后继续消费到结束标记。
-- [ ] 验收：中文/emoji、首尾/中间编辑、1023有效字节边界、粘贴中的Enter/Ctrl-C/Ctrl-D/ESC、未完成标记与结束后正常编辑，均在实际输入/PTY路径验证。
+- [x] 接续当前工作区的输入候选实现，完成UTF-8边界上的行内插入/删除、Left/Right、Home/End、Backspace/Delete、清草稿。
+- [x] 完成多行编辑、Alt+Enter换行、普通Enter提交、CRLF去重、bracketed paste标记任意切分、控制字节过滤、超限后继续消费到结束标记。
+- [x] 验收：中文/emoji、首尾/中间编辑、1023有效字节边界、粘贴中的Enter/Ctrl-C/Ctrl-D/ESC、未完成标记与结束后正常编辑，均在实际输入/PTY路径验证。
+  - 实现：`tui_input.S`（码点边界编辑、逐字节 feed 状态机、分片粘贴匹配）；`tui_input.h` 契约（1023 有效字节、整字符拒绝、无超时解析）。
+  - 单元：`test_tui_input.c` 12 组（含 `paste_all_splits` 全拆分点）；ABI/保护页：`test_tui_abi.c`（guard_input_full 按 1023 契约修正）。
+  - PTY：`tools/client/tui/test_tui_pty.py` multiline/paste_safety/unfinished_paste_recovery/capacity_limit。
 
 ### U02 — 稳定布局、渲染与终端生命周期
 
-- [ ] 会话、输入与状态区布局清晰，光标位置跟随实际草稿；支持多行、窄终端、自动折行和resize。
-- [ ] 流式输出/工具输出更新时保留草稿、逻辑光标和焦点；使用现有Unicode宽度能力完成中文/emoji显示。
-- [ ] 验收：正常退出、EOF、信号和失败路径恢复termios/光标/粘贴模式；长输出、resize和流式重绘PTY检查通过。
+- [x] 会话、输入与状态区布局清晰，光标位置跟随实际草稿；支持多行、窄终端、自动折行和resize。
+- [x] 流式输出/工具输出更新时保留草稿、逻辑光标和焦点；使用现有Unicode宽度能力完成中文/emoji显示。
+- [x] 验收：正常退出、EOF、信号和失败路径恢复termios/光标/粘贴模式；长输出、resize和流式重绘PTY检查通过。
+  - 实现：`tui_view.S`（多行重绘、CJK/emoji 宽度表换行、CUU/CUD/CHA 光标定位、editor_break 收束、resize 换列）；`tui_term.S`（进出 raw 模式开关 bracketed paste，修复序列长度 6→8）；`tui_app.S`（SIGWINCH 重绘、完整码点才重绘、未完成输入不提交）。
+  - PTY：startup_and_exit_paths/signal_exit_restores_terminal/poll_error_failure_path/streaming_keeps_draft/resize_keeps_draft/narrow_autowrap/capacity_limit（1023 字节长草稿重绘）。
+  - 已知限制：宽度表为 code point 粒度近似（非完整字素簇/East Asian Width 全表），组合字符按零宽处理；见 `tui_view.S` 注释。
 
 ### U03 — 消息、工具与变更展示
 
@@ -100,17 +106,37 @@ Claude-Code快照位于 `references/Claude-Code/`，源码为社区还原；采�
 
 ## 当前起点
 
-已有薄TUI具备输入/流式回答/工具状态/取消/退出、终端恢复与持久历史接入。当前共享树包含U01/U02的候选改动，先检查 `git status --short` 和相关实现，接续验证后完善。
+已有薄TUI具备输入/流式回答/工具状态/取消/退出、终端恢复与持久历史接入。U01/U02 候选改动已于本批接续验证并完成（见交接区），含 `tools/client/tui/test_tui_pty.py` 真 PTY 回放。
 
 优先完成U01–U04；同时把U05/U06所需Runtime能力写入下面请求表，核心可按其归属并行补齐。
 
 ## TUI交接区
 
-- 当前步骤：U01。
-- 参考提交、函数/测试：待本批填写。
-- 修改文件、接口/布局变化：待填写。
-- 实际命令、退出码与PTY观察：待填写。
-- 已完成行为/下一行为：待填写。
+- 当前步骤：U01、U02 已完成并验收；U03 进行中——Markdown 流式渲染（`tui_md`）已落地并通过单元/PTY 验收，工具/变更展示（渐进展开、diff/patch、图片）待做。
+- 参考提交、函数/测试（本批实际核对）：
+  - Pi `d5b3de2`（与固定快照一致）：`packages/tui/src/components/markdown.ts` 165–180（`trimPartialClosingFences` 流式部分闭栏防闪烁 → `tui_md` 的 `hold` 暂扣机制）、327–328（TAB→3 空格 → `md_validate` `.Lv_tab`）、320–345（流式增量渲染管线）。
+  - 行为差异（有意，均记录于 `tui_md.h`）：
+    - Pi 整段重排（每 delta 重渲活动块）；本实现滚动回显不可重写，按完整源行独立折行输出。
+    - Pi 孤儿 CR 归一为 LF（editor.ts:1145–1149 同源正则）；本实现 `tui_md_text` 直接丢弃 CR（`\r\n` 经 LF 正常成行，孤儿 CR 不成行）。
+    - 表格渲染为自绘管道表（box-drawing 边框、单元格 24 列封顶截断加 `…`、过窄整表回退原文）；GFM 分隔行判定含尾管道（本批修复 `.Ldl_sep` 行尾判定）。
+  - CJK 折行语义修正：宽字符仅在跨界（起始列+宽 > 终端列）时折行，恰好占满不折——与 ASCII 满行同一规则，对齐真实终端 auto-wrap 行为。
+- 修改文件、接口/布局变化：
+  - 新增 `tui_sink.h`（输出目的地函数表，视图与渲染共享）、`tui_md.h/.S`（流式行级 Markdown：段落/标题/列表/引用/围栏/分隔线/管道表格/内联样式/链接、转义安全、流式未闭合块与表格缓冲）、`tests/client/tui/test_tui_md.c`（14 组快照，含任意字节拆分等价、行满拆分）。
+  - `tui_view.h/.S`：view 内嵌 `tui_md`；TEXT_DELTA 改经 md 流式渲染（行完整才输出；工具/状态事件先 `md_break` 冲出未完行；RUN_FINISHED/终态先 `tui_md_flush`）；busy/submit/limit/cancel 提示前 `md_break`，poll_error/protocol_violation/exit_note 终态前 `md_flush`+carry 冲刷（失败退出不丢已收文本）。
+  - `tui_app.S`：主循环栈帧偏移改为从 `tui_layout.h` 结构体尺寸派生（修复 view 内嵌 md 后仍按旧 64 字节预留、`tui_view_init` 越界打穿调用者栈帧清空 `cfg.ops` 的启动崩溃）。
+  - `tui_md.S` 本批修复四处：`.Ldl_sep` 尾管道判定、`.Lpl_cand` 的 `CAND_LEN` qword 加载带上相邻 `TABLE_ON` 致钳制写坏 `TABLE_LENS`（dword 零扩展修正）、`md_render_table` 三处边框循环在 `call` 后从被覆盖的 `rax` 存回列计数器（先存后调）、`md_row_line` 的 `colw` 指针 32 位截断加载、`tui_md_text` 行满拆分 `k` 与 `md_cell_emit` 的 `cons/w` 跨调用使用 caller-saved 寄存器（改栈槽）+ 回扫缺 `LINE` 偏移、`md_row_parse` 计数上限与存储上限一致（8）。
+  - 测试更新至 md 流语义：`test_tui_view.c`（TEXT_DELTA 缓冲至行完整/事件收束、CR 丢弃、拆分 UTF-8 由 md 行缓冲拼合）、`test_tui_abi.c`（guard_view_text 同步）；`test_tui_md.c` 修正三处与实现/终端语义矛盾的期望（CJK 恰满不折、表格 `…` 需真超 24 列封顶才触发、行满拆分计数 511+89=600）。
+- 实际命令、退出码与PTY观察：
+  - `bash tools/client/tui/build.sh run-tests` → 7 个测试程序全部 all passed，退出码 0。
+  - `python3 -B tools/client/tui/test_tui_pty.py` → 10 场景 all passed，连跑 3 次稳定；`poll_error` 场景现核对"失败退出前已收文本可见"（本批新增 `md_flush` 收束），退出码 2、不补造终态、termios 精确还原。
+  - `python3 -B tools/gates/assembly_first.py` → PASS。
+  - `python3 -B tools/gates/check.py` → G00 FAIL 仅因本批 4 个新文件未登记（见下登记请求）；其余通过。
+- 已完成行为/下一行为：U03 第一项（Markdown 必要行为）完成；剩余：工具执行/输出/错误/取消的渐进展开、edit diff/patch 与首个变更行、图片的终端呈现或附件信息（对应 Pi `components/` 工具组件与 Coding Agent `modes/interactive/components/`），完成后整步验收勾选 U03。
+
+新增文件登记请求（请核心登记到 `governance/bootstrap-policy.json`）：
+- `src/client/tui/tui_sink.h` — 输出目的地函数表（视图与渲染模块共享的 sink 契约）。
+- `src/client/tui/tui_md.h` / `src/client/tui/tui_md.S` — 流式行级 Markdown 渲染（纯状态无 I/O，经 sink 输出；产品构建已加入 `tools/client/tui/build.sh` 的 ASM_SRC 与各测试链接）。
+- `tests/client/tui/test_tui_md.c` — md 快照/拆分等价/行满拆分测试。
 
 | 请求 | 操作、参数与结果/事件 | 对应U步骤 | 核心处理结果 |
 |---|---|---|---|
@@ -119,4 +145,5 @@ Claude-Code快照位于 `references/Claude-Code/`，源码为社区还原；采�
 | 模型与资源 | catalog/select/thinking/auth/settings/reload | U05 | 待核心提供 |
 | 运行操作 | steer/follow-up/list/withdraw/compact、task/view/watch、usage | U06 | 待核心提供 |
 
-新增文件登记请求：待填写。
+既有登记请求：
+- `tools/client/tui/test_tui_pty.py` — TUI PTY 回放工具（已登记，本批 G00 不再报该文件）。

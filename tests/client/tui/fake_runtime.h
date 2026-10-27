@@ -30,12 +30,13 @@ typedef struct tui_demo_step {
 typedef struct tui_demo_scenario {
 	const char *name;
 	int honor_cancel; /* 1=收到取消后终态改为 cancelled；0=忽略取消照常完成 */
+	int poll_fails;   /* 1=脚本播完后 poll 返回 -1（Runtime 错误路径） */
 	size_t step_count;
 	const tui_demo_step *steps;
 } tui_demo_scenario;
 
 /* 按名称取场景；未知返回 NULL。可用场景：no_tool, tool_roundtrip,
- * model_error, user_cancel, busy_reject。 */
+ * model_error, user_cancel, busy_reject, poll_error。 */
 const tui_demo_scenario *tui_demo_scenario_get(const char *name);
 
 /* 把场景名列表写入 buf（逗号分隔）。 */

@@ -1322,7 +1322,9 @@
         "pg_document_watch_cancellation_release",
         "pg_durable_session_unload_documents",
         "pg_durable_read_on_line_begin",
-        "pg_durable_read_on_line_end"
+        "pg_durable_read_on_line_end",
+        "pg_durable_session_begin_close_notified",
+        "pg_durable_session_fail"
       ],
       "reference_basis": [
         {

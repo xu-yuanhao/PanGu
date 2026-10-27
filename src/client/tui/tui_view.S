@@ -5,7 +5,11 @@
 .section .rodata
 .Lcrlf:             .asciz "\r\n"
 .Lcleartail:        .asciz "\r\033[J"
+.Lfmt_cuu:          .asciz "\r\033[%uA"
+.Lfmt_cud:          .asciz "\033[%uB"
+.Lfmt_cha:          .asciz "\033[%uG"
 .Lprompt:           .asciz "> "
+.Linput_hint:       .asciz "[tui] 输入：Enter 提交，Alt+Enter 插入换行，Ctrl-U 清空草稿\n"
 .Lqmark:            .asciz "?"
 .Ltool_pfx:         .asciz "[tool] "
 .Lhash_paren:       .asciz " (#"
@@ -278,26 +282,179 @@ li_vputs:
  ret
 .size li_vputs, .-li_vputs
 
-/* ---- 内部：event_suspend(v)：事件输出前结束编辑行 ---- */
+/* ---- 内部：event_suspend(v)：事件输出前结束编辑区（滚动入回显） ---- */
 .type li_event_suspend,@function
 li_event_suspend:
+ jmp li_editor_break
+.size li_event_suspend, .-li_event_suspend
+
+/* ---- 内部：editor_break(v)：下移到编辑区末行并结束该行，重置几何 ----
+ * 事件输出、提交定稿、resize 换行均经此收束；文本留在滚动回显。 */
+.type li_editor_break,@function
+li_editor_break:
  cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
- je .Lsusp_ret
+ je .Lbrk_ret
  cmp dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- je .Lsusp_ret
+ je .Lbrk_ret
  push rbx
  push r12
- push rax
+ push rax /* 24 字节保持 16 对齐 */
  mov rbx, rdi
+ mov r12d, dword ptr [rbx + TUI_LI_VIEW_EDITOR_ROWS]
+ dec r12d
+ sub r12d, dword ptr [rbx + TUI_LI_VIEW_CURSOR_ROW]
+ jle .Lbrk_nl
+ sub rsp, 32 /* char seq[32] */
+ mov rdi, rsp
+ mov esi, 32
+ lea rdx, [rip + .Lfmt_cud]
+ mov ecx, r12d
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jg .Lbrk_cud_write
+ add rsp, 32
+ jmp .Lbrk_nl
+.Lbrk_cud_write:
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vputs
+ add rsp, 32
+.Lbrk_nl:
+ mov rdi, rbx
  lea rsi, [rip + .Lcrlf]
  call li_vputs
  mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ROWS], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_ROW], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_COL], 0
  pop rax
  pop r12
  pop rbx
-.Lsusp_ret:
+.Lbrk_ret:
  ret
-.size li_event_suspend, .-li_event_suspend
+.size li_editor_break, .-li_editor_break
+
+/* ---- 内部：cp_width(seq, len) → eax ∈ {0,1,2}：code point 显示宽度近似。
+ * 零宽：组合附加符号/零宽字符/变体选择符；宽 2：CJK/全角/主要 emoji 平面。
+ * 与编辑器同为 code point 粒度，不声明完整字素簇/东亚宽度全表。 */
+.align 4
+.Lw_zero:
+ .long 0x0300, 0x036F
+ .long 0x200B, 0x200F
+ .long 0xFE00, 0xFE0F
+.Lw_zero_end:
+.Lw_wide:
+ .long 0x1100, 0x115F
+ .long 0x2E80, 0x303E
+ .long 0x3041, 0x33FF
+ .long 0x3400, 0x4DBF
+ .long 0x4E00, 0x9FFF
+ .long 0xA000, 0xA4CF
+ .long 0xAC00, 0xD7A3
+ .long 0xF900, 0xFAFF
+ .long 0xFE30, 0xFE4F
+ .long 0xFF00, 0xFF60
+ .long 0x1F300, 0x1F64F
+ .long 0x1F680, 0x1F6FF
+ .long 0x1F900, 0x1F9FF
+ .long 0x20000, 0x2FFFD
+ .long 0x30000, 0x3FFFD
+.Lw_wide_end:
+
+.type li_cp_width,@function
+li_cp_width:
+ movzx eax, byte ptr [rdi]
+ cmp eax, 0x80
+ jb .Lw_one
+ mov edx, eax
+ and edx, 0xE0
+ cmp edx, 0xC0
+ jne .Lw_3
+ cmp rsi, 2
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi]
+ and edx, 0x1F
+ shl edx, 6
+ or eax, edx
+ jmp .Lw_scan
+.Lw_3:
+ mov edx, eax
+ and edx, 0xF0
+ cmp edx, 0xE0
+ jne .Lw_4
+ cmp rsi, 3
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi + 2]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi]
+ and edx, 0x0F
+ shl edx, 12
+ or eax, edx
+ jmp .Lw_scan
+.Lw_4:
+ mov edx, eax
+ and edx, 0xF8
+ cmp edx, 0xF0
+ jne .Lw_one /* 非法首字节按 1 */
+ cmp rsi, 4
+ jb .Lw_one
+ movzx eax, byte ptr [rdi + 1]
+ and eax, 0x3F
+ movzx edx, byte ptr [rdi + 2]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi + 3]
+ and edx, 0x3F
+ shl eax, 6
+ or eax, edx
+ movzx edx, byte ptr [rdi]
+ and edx, 0x07
+ shl edx, 18
+ or eax, edx
+.Lw_scan:
+ lea rdx, [rip + .Lw_zero]
+ xor ecx, ecx
+.Lw_zero_loop:
+ cmp ecx, TUI_W_ZERO_COUNT
+ jae .Lw_wide_scan
+ cmp eax, dword ptr [rdx + rcx*4]
+ jb .Lw_zero_next
+ cmp eax, dword ptr [rdx + rcx*4 + 4]
+ jbe .Lw_ret0
+.Lw_zero_next:
+ add ecx, 2
+ jmp .Lw_zero_loop
+.Lw_wide_scan:
+ lea rdx, [rip + .Lw_wide]
+ xor ecx, ecx
+.Lw_wide_loop:
+ cmp ecx, TUI_W_WIDE_COUNT
+ jae .Lw_one
+ cmp eax, dword ptr [rdx + rcx*4]
+ jb .Lw_wide_next
+ cmp eax, dword ptr [rdx + rcx*4 + 4]
+ jbe .Lw_ret2
+.Lw_wide_next:
+ add ecx, 2
+ jmp .Lw_wide_loop
+.Lw_ret0:
+ xor eax, eax
+ ret
+.Lw_ret2:
+ mov eax, 2
+ ret
+.Lw_one:
+ mov eax, 1
+ ret
+.size li_cp_width, .-li_cp_width
 
 /* ---- 内部：event_resume_editor(v)：编辑缓冲非空则重绘编辑行 ---- */
 .type li_event_resume,@function
@@ -403,11 +560,61 @@ tui_view_init:
  mov qword ptr [rdi + TUI_LI_VIEW_EDITOR], r8
  mov dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
  mov qword ptr [rdi + TUI_LI_VIEW_CARRY_LEN], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_COLS], 80
+ mov dword ptr [rdi + TUI_LI_VIEW_EDITOR_ROWS], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_CURSOR_ROW], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_CURSOR_COL], 0
+ /* md 渲染器：同一 sink/模式，默认 80 列（set_size 同步更新） */
+ push rbx
+ push r12
+ mov rbx, rdi
+ mov r12d, ecx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ mov rsi, qword ptr [rbx + TUI_LI_VIEW_SINK_CTX]
+ mov rdx, qword ptr [rbx + TUI_LI_VIEW_SINK_WRITE]
+ mov ecx, r12d
+ mov r8d, 80
+ call tui_md_init@PLT
+ pop r12
+ pop rbx
  ret
  .cfi_endproc
 .size tui_view_init, .-tui_view_init
 
-/* void tui_view_redraw_editor(tui_view *v) — 整行重绘（"\r"+清行尾+提示符+缓冲） */
+.globl tui_view_set_size
+.type tui_view_set_size,@function
+tui_view_set_size:
+ .cfi_startproc
+ test esi, esi
+ jnz .Lsize_nonzero
+ mov esi, 1
+.Lsize_nonzero:
+ cmp esi, dword ptr [rdi + TUI_LI_VIEW_COLS]
+ je .Lsize_ret
+ /* 列数变化（resize）：旧几何不可靠，先把编辑区收束进滚动回显再更新 */
+ push rbx
+ push r12
+ push rax /* 24 字节保持 16 对齐 */
+ mov rbx, rdi
+ mov r12d, esi
+ mov rdi, rbx
+ call li_editor_break
+ mov dword ptr [rbx + TUI_LI_VIEW_COLS], r12d
+ /* md 折行宽度跟随（滚动回显不重排，仅影响后续行） */
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ mov esi, r12d
+ call tui_md_set_cols@PLT
+ pop rax
+ pop r12
+ pop rbx
+.Lsize_ret:
+ ret
+ .cfi_endproc
+.size tui_view_set_size, .-tui_view_set_size
+
+/* void tui_view_redraw_editor(tui_view *v) — 多行/窄终端重绘 + 真实光标定位
+ * 栈槽（sub rsp,80）：[0]=cur_row [8]=cur_col [16]=seq_len [24]=w [32..]=转义序列缓冲。
+ * 逻辑换行写 "\n"（ANSI 模式经 li_vput 译为 "\r\n"）；提交字节不受换行影响。 */
 .globl tui_view_redraw_editor
 .type tui_view_redraw_editor,@function
 tui_view_redraw_editor:
@@ -419,24 +626,171 @@ tui_view_redraw_editor:
  jz .Lred_ret
  push rbx
  push r12
- push rax
+ push r13
+ push r14
+ push r15
+ sub rsp, 80
  mov rbx, rdi
  mov r12, rax /* editor（buf 偏移 0） */
+ /* 擦除旧编辑区：先上移到编辑区首行，再清到屏幕尾 */
  cmp dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- je .Lred_no_clear
+ je .Lred_clear
+ mov ecx, dword ptr [rbx + TUI_LI_VIEW_CURSOR_ROW]
+ test ecx, ecx
+ jz .Lred_clear
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 32
+ lea rdx, [rip + .Lfmt_cuu]
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jle .Lred_clear
+ mov rdi, rbx
+ lea rsi, [rsp + 32]
+ call li_vputs
+.Lred_clear:
  mov rdi, rbx
  lea rsi, [rip + .Lcleartail]
  call li_vputs
-.Lred_no_clear:
  mov rdi, rbx
  lea rsi, [rip + .Lprompt]
  call li_vputs
+ mov qword ptr [rsp], 0 /* cur_row */
+ mov qword ptr [rsp + 8], 2 /* cur_col 默认：空稿/无捕获 */
+ mov r14d, 0 /* 视觉行 */
+ mov r15d, 2 /* 当前列（提示符后） */
+ xor r13d, r13d /* 字节偏移 i */
+.Lred_loop:
+ mov rax, qword ptr [r12 + TUI_LI_INPUT_LEN]
+ cmp r13, rax
+ jae .Lred_end
+ movzx eax, byte ptr [r12 + r13]
+ cmp al, 10
+ jne .Lred_not_nl
+ /* 光标恰在换行符前：捕获当前位置 */
+ mov rax, qword ptr [r12 + TUI_LI_INPUT_CURSOR]
+ cmp rax, r13
+ jne .Lred_nl_write
+ mov [rsp], r14
+ mov [rsp + 8], r15
+.Lred_nl_write:
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ call li_vputs
+ inc r14d
+ mov r15d, 0
+ inc r13
+ jmp .Lred_loop
+.Lred_not_nl:
+ cmp al, 32
+ jb .Lred_skip /* 防御：缓冲不含控制字节 */
+ cmp al, 127
+ je .Lred_skip
+ mov edi, eax
+ call tui_utf8_seq_len@PLT
+ mov rcx, qword ptr [r12 + TUI_LI_INPUT_LEN]
+ sub rcx, r13
+ cmp rax, rcx
+ jbe .Lred_len_ok
+ mov rax, rcx
+.Lred_len_ok:
+ mov qword ptr [rsp + 16], rax
+ mov rdi, r12
+ add rdi, r13
+ mov rsi, rax
+ call li_cp_width
+ mov qword ptr [rsp + 24], rax
+ /* 自动换行：本行已有内容且整字符放不下 */
+ test r15d, r15d
+ jz .Lred_place
+ mov edx, r15d
+ add edx, eax
+ cmp edx, dword ptr [rbx + TUI_LI_VIEW_COLS]
+ jbe .Lred_place
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ call li_vputs
+ inc r14d
+ mov r15d, 0
+.Lred_place:
+ /* 光标在本字符内或恰在其前：捕获 (row, col) */
+ mov rax, qword ptr [r12 + TUI_LI_INPUT_CURSOR]
+ cmp rax, r13
+ jb .Lred_no_cur
+ mov rcx, r13
+ add rcx, qword ptr [rsp + 16]
+ cmp rax, rcx
+ jae .Lred_no_cur
+ mov [rsp], r14
+ mov [rsp + 8], r15
+.Lred_no_cur:
  mov rdi, rbx
  mov rsi, r12
- mov rdx, qword ptr [r12 + TUI_LI_INPUT_LEN]
+ add rsi, r13
+ mov rdx, qword ptr [rsp + 16]
  call li_vput
+ mov eax, dword ptr [rsp + 24]
+ add r15d, eax
+ mov rax, qword ptr [rsp + 16]
+ add r13, rax
+ jmp .Lred_loop
+.Lred_skip:
+ inc r13
+ jmp .Lred_loop
+.Lred_end:
+ mov rax, qword ptr [r12 + TUI_LI_INPUT_CURSOR]
+ cmp rax, r13
+ jne .Lred_have_cur
+ mov [rsp], r14
+ mov [rsp + 8], r15
+.Lred_have_cur:
+ /* 真实光标从文本末尾移回编辑位置 */
+ mov rax, [rsp]
+ cmp r14, rax
+ jbe .Lred_row_done
+ mov ecx, r14d
+ sub ecx, dword ptr [rsp]
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 32
+ lea rdx, [rip + .Lfmt_cuu]
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jle .Lred_row_done
+ mov rdi, rbx
+ lea rsi, [rsp + 32]
+ call li_vputs
+.Lred_row_done:
+ mov ecx, dword ptr [rsp + 8]
+ cmp ecx, r15d
+ je .Lred_store
+ inc ecx
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 32
+ lea rdx, [rip + .Lfmt_cha]
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jle .Lred_store
+ mov rdi, rbx
+ lea rsi, [rsp + 32]
+ call li_vputs
+.Lred_store:
+ mov eax, r14d
+ inc eax
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ROWS], eax
+ mov eax, dword ptr [rsp]
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_ROW], eax
+ mov eax, dword ptr [rsp + 8]
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_COL], eax
  mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 1
- pop rax
+ add rsp, 80
+ pop r15
+ pop r14
+ pop r13
  pop r12
  pop rbx
 .Lred_ret:
@@ -444,27 +798,12 @@ tui_view_redraw_editor:
  .cfi_endproc
 .size tui_view_redraw_editor, .-tui_view_redraw_editor
 
-/* void tui_view_finalize_editor(tui_view *v) */
+/* void tui_view_finalize_editor(tui_view *v)：文本留在滚动回显，重置几何 */
 .globl tui_view_finalize_editor
 .type tui_view_finalize_editor,@function
 tui_view_finalize_editor:
  .cfi_startproc
- cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
- je .Lfin_ret
- cmp dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- je .Lfin_ret
- push rbx
- push r12
- push rax
- mov rbx, rdi
- lea rsi, [rip + .Lcrlf]
- call li_vputs
- mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- pop rax
- pop r12
- pop rbx
-.Lfin_ret:
- ret
+ jmp li_editor_break
  .cfi_endproc
 .size tui_view_finalize_editor, .-tui_view_finalize_editor
 
@@ -495,8 +834,14 @@ tui_view_banner:
  mov rdi, rbx
  mov rsi, rsp
  call li_vput
+ mov rdi, rbx
+ lea rsi, [rip + .Linput_hint]
+ call li_vputs
 .Lbanner_skip:
  mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ROWS], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_ROW], 0
+ mov dword ptr [rbx + TUI_LI_VIEW_CURSOR_COL], 0
  add rsp, 128
  pop rax
  pop r12
@@ -517,6 +862,11 @@ tui_view_exit_note:
  mov rbx, rdi
  mov r12, rsi
  mov r13d, eax /* snprintf 返回值暂存（先格式化，与 C 版顺序一致） */
+ /* 退出说明前收束未完模型行与 carry，失败路径不丢已收到的输出 */
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_flush@PLT
+ mov rdi, rbx
+ call li_finish_carry
  mov rdi, rsp
  mov esi, 160
  lea rdx, [rip + .Lfmt_exit]
@@ -524,15 +874,8 @@ tui_view_exit_note:
  xor eax, eax
  call snprintf@PLT
  mov r13d, eax
- cmp dword ptr [rbx + TUI_LI_VIEW_ANSI], 0
- je .Lexit_no_susp
- cmp dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
- je .Lexit_no_susp
  mov rdi, rbx
- lea rsi, [rip + .Lcrlf]
- call li_vputs
-.Lexit_no_susp:
- mov dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ call li_editor_break /* 多行编辑区同样收束后再写退出说明 */
  test r13d, r13d
  jle .Lexit_done
  cmp r13d, 159
@@ -564,6 +907,9 @@ tui_view_busy_rejected:
  push rax
  mov rbx, rdi
  mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT /* 冲出未完模型行再写状态行 */
+ mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lbusy]
  mov rdi, rbx
@@ -585,6 +931,9 @@ tui_view_submit_error:
  push r12
  push rax
  mov rbx, rdi
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT /* 冲出未完模型行再写状态行 */
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lsubmit_err]
@@ -608,6 +957,9 @@ tui_view_input_limit:
  push rax
  mov rbx, rdi
  mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT /* 冲出未完模型行再写状态行 */
+ mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Linput_limit]
  mov rdi, rbx
@@ -629,6 +981,9 @@ tui_view_cancel_requested:
  push r12
  push rax
  mov rbx, rdi
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT /* 冲出未完模型行再写状态行 */
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lcancel_note]
@@ -652,6 +1007,11 @@ tui_view_poll_error:
  push r12
  push rax
  mov rbx, rdi
+ /* 失败退出不补造终态，但已缓冲的模型文本必须可见后再退出 */
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_flush@PLT
+ mov rdi, rbx
+ call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lpoll_err]
@@ -672,6 +1032,10 @@ tui_view_protocol_violation:
  push r12
  push rax
  mov rbx, rdi
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_flush@PLT
+ mov rdi, rbx
+ call li_finish_carry
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lproto_violation]
@@ -718,7 +1082,7 @@ tui_view_event:
  cmp eax, TUI_LI_EV_RUN_STARTED
  je .Lev_started
  cmp eax, TUI_LI_EV_TEXT_DELTA
- je .Lev_delta
+ je .Lev_md
  cmp eax, TUI_LI_EV_TOOL_OUTPUT
  je .Lev_delta
  cmp eax, TUI_LI_EV_TOOL_STARTED
@@ -737,7 +1101,22 @@ tui_view_event:
  call li_vputs
  jmp .Lev_out
 
-/* ---- text_delta：carry 拼接 + 尾部不完整序列留存 ---- */
+/* ---- text_delta：流式 Markdown 渲染（完整行输出，工具输出另走原文通道） ---- */
+.Lev_md:
+ mov rdi, rbx
+ call li_event_suspend
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ mov rsi, qword ptr [r12 + TUI_LI_EVENT_TEXT]
+ mov rdx, qword ptr [r12 + TUI_LI_EVENT_TEXT_LEN]
+ call tui_md_text@PLT
+ test eax, eax
+ jz .Lev_md_out
+ mov rdi, rbx
+ call li_event_resume
+.Lev_md_out:
+ jmp .Lev_out
+
+/* ---- tool_output：carry 拼接 + 尾部不完整序列留存（原文转义） ---- */
 .Lev_delta:
  sub rsp, 16 /* [rsp] = tail */
  mov qword ptr [rsp], 0
@@ -850,6 +1229,9 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_tool_started:
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
  mov rdi,rbx
  call li_finish_carry
  mov rdi, rbx
@@ -874,6 +1256,9 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_tool_finished:
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_break@PLT
  mov rdi,rbx
  call li_finish_carry
  mov rdi, rbx
@@ -911,6 +1296,9 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_finished:
+ mov rdi, rbx
+ lea rdi, [rbx + TUI_LI_VIEW_MD]
+ call tui_md_flush@PLT
  mov rdi,rbx
  call li_finish_carry
 .Lfin_no_carry:
@@ -967,6 +1355,13 @@ tui_view_event:
  ret
  .cfi_endproc
 .size tui_view_event, .-tui_view_event
+
+/* 码点显示宽度（客户端内部共享）：md 渲染折行复用 */
+.globl tui_view_cp_width
+.type tui_view_cp_width,@function
+tui_view_cp_width:
+ jmp li_cp_width
+.size tui_view_cp_width,.-tui_view_cp_width
 
 .globl tui_view_history
 .type tui_view_history,@function
@@ -1037,3 +1432,6 @@ tui_view_history:
 .size tui_view_history,.-tui_view_history
 
 .section .note.GNU-stack,"",@progbits
+
+.set TUI_W_ZERO_COUNT, (.Lw_zero_end - .Lw_zero) / 4
+.set TUI_W_WIDE_COUNT, (.Lw_wide_end - .Lw_wide) / 4

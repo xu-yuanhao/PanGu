@@ -14,7 +14,7 @@ INC="-I$SRC"
 
 mkdir -p "$OUT"
 
-ASM_SRC="$SRC/tui_utf8.S $SRC/tui_term.S $SRC/tui_input.S $SRC/tui_view.S $SRC/tui_state.S $SRC/tui_app.S"
+ASM_SRC="$SRC/tui_utf8.S $SRC/tui_term.S $SRC/tui_input.S $SRC/tui_view.S $SRC/tui_md.S $SRC/tui_state.S $SRC/tui_app.S"
 C_SRC="$SRC/tui_term.c"
 
 echo "== 组装/编译核心（产品客户端，仅 libc 依赖） =="
@@ -30,7 +30,7 @@ for fixture in fake_runtime demo_main; do
 	$CC $CFLAGS $INC -c "$TST/$fixture.c" -o "$OUT/$fixture.o"
 done
 $CC "$OUT"/tui_utf8.o "$OUT"/tui_term.o "$OUT"/tui_term_cglue.o "$OUT"/tui_input.o \
-	"$OUT"/tui_view.o "$OUT"/tui_state.o "$OUT"/tui_app.o "$OUT"/fake_runtime.o \
+	"$OUT"/tui_view.o "$OUT"/tui_md.o "$OUT"/tui_state.o "$OUT"/tui_app.o "$OUT"/fake_runtime.o \
 	"$OUT"/demo_main.o -o "$OUT/pangu-tui-demo"
 
 echo "== 编译单元测试 =="
@@ -39,22 +39,25 @@ $CC $CFLAGS $INC -o "$OUT/test_tui_utf8" "$TST/test_tui_utf8.c" "$OUT/tui_utf8.o
 # shellcheck disable=SC2086
 $CC $CFLAGS $INC -o "$OUT/test_tui_input" "$TST/test_tui_input.c" "$OUT/tui_input.o" "$OUT/tui_utf8.o"
 # shellcheck disable=SC2086
-$CC $CFLAGS $INC -o "$OUT/test_tui_view" "$TST/test_tui_view.c" "$OUT/tui_view.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
+$CC $CFLAGS $INC -o "$OUT/test_tui_md" "$TST/test_tui_md.c" "$OUT/tui_md.o" "$OUT/tui_view.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
 # shellcheck disable=SC2086
-$CC $CFLAGS $INC -o "$OUT/test_tui_state" "$TST/test_tui_state.c" "$OUT/tui_state.o" "$OUT/tui_view.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
+$CC $CFLAGS $INC -o "$OUT/test_tui_view" "$TST/test_tui_view.c" "$OUT/tui_view.o" "$OUT/tui_md.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
+# shellcheck disable=SC2086
+$CC $CFLAGS $INC -o "$OUT/test_tui_state" "$TST/test_tui_state.c" "$OUT/tui_state.o" "$OUT/tui_view.o" "$OUT/tui_md.o" "$OUT/tui_utf8.o" "$OUT/tui_input.o"
 # shellcheck disable=SC2086
 $CC $CFLAGS $INC -o "$OUT/test_fake_runtime" "$TST/test_fake_runtime.c" "$OUT/fake_runtime.o"
 # ABI/边界/哨兵专项：寄存器保存与破坏、栈金丝雀、保护页边界、平台结构断言
 # shellcheck disable=SC2086
 $CC -D_POSIX_C_SOURCE=200809L -Wno-cast-function-type $CFLAGS $INC -I"$TST" -o "$OUT/test_tui_abi" \
 	"$TST/test_tui_abi.c" "$OUT/tui_utf8.o" "$OUT/tui_input.o" "$OUT/tui_state.o" \
-	"$OUT/tui_view.o" "$OUT/tui_app.o" "$OUT/tui_term.o" "$OUT/tui_term_cglue.o"
+	"$OUT/tui_view.o" "$OUT/tui_md.o" "$OUT/tui_app.o" "$OUT/tui_term.o" "$OUT/tui_term_cglue.o"
 
 echo "构建完成: $OUT/"
 echo "  $OUT/pangu-tui-demo --demo <no_tool|tool_roundtrip|model_error|user_cancel|busy_reject>"
 if [ "${1:-}" = "run-tests" ]; then
 	"$OUT/test_tui_utf8" && \
 		"$OUT/test_tui_input" && \
+		"$OUT/test_tui_md" && \
 		"$OUT/test_tui_view" && \
 		"$OUT/test_tui_state" && \
 		"$OUT/test_fake_runtime" && \

@@ -3494,34 +3494,53 @@ pg_session_listeners_begin_close:
  ret
 .size pg_session_listeners_begin_close,.-pg_session_listeners_begin_close
 
-.globl pg_durable_session_close_notified
-.type pg_durable_session_close_notified,@function
-pg_durable_session_close_notified:
+
+.text
+/* Validate the notification composition without changing failure/admission. */
+.Lclose_notification_valid:
+ mov eax,-2
+ test rdi,rdi
+ jz .Lclose_notification_checked
+ test rsi,rsi
+ jz .Lclose_notification_checked
+ mov ecx,[rdi+172]
+ dec ecx
+ cmp ecx,3
+ ja .Lclose_notification_checked
+ mov r10,[rdi]
+ test r10,r10
+ jz .Lclose_notification_checked
+ cmp qword ptr [rdi+24],0
+ je .Lclose_notification_checked
+ mov r11,[rsi]
+ test r11,r11
+ jz .Lclose_notification_checked
+ cmp [r11],r10
+ jne .Lclose_notification_checked
+ mov r10,[rsi+24]
+ test r10,r10
+ jz .Lclose_notification_checked
+ cmp [r10],r11
+ jne .Lclose_notification_checked
+ xor eax,eax
+.Lclose_notification_checked:
+ ret
+
+.globl pg_durable_session_begin_close_notified
+.type pg_durable_session_begin_close_notified,@function
+pg_durable_session_begin_close_notified:
  push rbx
  push r12
- sub rsp,24
+ sub rsp,8
  mov rbx,rdi
  mov r12,rsi
- mov eax,-2
- test rbx,rbx
- jz .Lnotified_close_end
- test r12,r12
- jz .Lnotified_close_end
- mov rcx,[r12]
- test rcx,rcx
- jz .Lnotified_close_end
- mov rax,[rcx]
- cmp rax,[rbx]
- jne .Lnotified_close_invalid
- mov rax,[r12+24]
- test rax,rax
- jz .Lnotified_close_invalid
- cmp [rax],rcx
- jne .Lnotified_close_invalid
+ call .Lclose_notification_valid
+ test eax,eax
+ jnz .Lbegin_notified_end
  cmp dword ptr [rbx+172],1
- jne .Lnotified_close_sealed
+ jne .Lbegin_notified_sealed
  mov dword ptr [rbx+172],2
-.Lnotified_close_sealed:
+.Lbegin_notified_sealed:
  mov eax,[rbx+168]
  mov [rsp],eax
  mov dword ptr [rbx+168],1
@@ -3532,11 +3551,27 @@ pg_durable_session_close_notified:
  call pg_session_listeners_begin_close
  mov edx,[rsp]
  mov [rbx+168],edx
+.Lbegin_notified_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_session_begin_close_notified,.-pg_durable_session_begin_close_notified
+
+.globl pg_durable_session_close_notified
+.type pg_durable_session_close_notified,@function
+pg_durable_session_close_notified:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ call pg_durable_session_begin_close_notified
  test eax,eax
- jnz .Lnotified_close_pending
+ jnz .Lnotified_close_end
  mov rdi,rbx
  call pg_durable_session_close
- mov [rsp+8],eax
+ mov [rsp],eax
  cmp dword ptr [rbx+172],4
  jne .Lnotified_close_end
  mov rdi,[r12+24]
@@ -3548,19 +3583,94 @@ pg_durable_session_close_notified:
  call pg_session_listeners_close
  test eax,eax
  jnz .Lnotified_close_pending
- mov eax,[rsp+8]
+ mov eax,[rsp]
  jmp .Lnotified_close_end
 .Lnotified_close_pending:
  mov eax,1
- jmp .Lnotified_close_end
-.Lnotified_close_invalid:
- mov eax,-2
 .Lnotified_close_end:
- add rsp,24
+ add rsp,8
  pop r12
  pop rbx
  ret
 .size pg_durable_session_close_notified,.-pg_durable_session_close_notified
+
+.globl pg_durable_session_fail
+.type pg_durable_session_fail,@function
+pg_durable_session_fail:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r13d,esi
+ mov eax,-2
+ test rbx,rbx
+ jz .Lsession_fail_end
+ test r13d,r13d
+ jz .Lsession_fail_end
+ cmp dword ptr [rbx+40],0
+ je .Lsession_fail_validate
+ mov eax,1
+ jmp .Lsession_fail_end
+.Lsession_fail_validate:
+ mov r12,[rbx]
+ mov rdi,r12
+ mov rsi,[rbx+8]
+ call .Lclose_notification_valid
+ test eax,eax
+ jnz .Lsession_fail_end
+ mov rcx,[r12]
+ mov eax,[rcx+52]
+ test eax,eax
+ jnz .Lsession_fail_existing
+ cmp dword ptr [r12+172],4
+ je .Lsession_fail_invalid
+ cmp dword ptr [rbx+32],0
+ jne .Lsession_fail_invalid
+ mov eax,r13d
+ mov [rcx+52],eax
+.Lsession_fail_existing:
+ cmp dword ptr [rbx+32],0
+ je .Lsession_fail_cause
+ cmp [rbx+32],eax
+ jne .Lsession_fail_invalid
+.Lsession_fail_cause:
+ mov [rbx+32],eax
+ mov dword ptr [rbx+40],1
+ mov rdi,r12
+ mov rsi,[rbx+8]
+ call pg_durable_session_begin_close_notified
+ test eax,eax
+ jnz .Lsession_fail_unlock
+ cmp dword ptr [rbx+36],0
+ jne .Lsession_fail_close
+ mov dword ptr [rbx+36],1
+ cmp qword ptr [rbx+24],0
+ je .Lsession_fail_close
+ mov eax,[r12+168]
+ mov [rsp],eax
+ mov dword ptr [r12+168],1
+ mov rdi,[rbx+16]
+ mov esi,[rbx+32]
+ call [rbx+24]
+ mov eax,[rsp]
+ mov [r12+168],eax
+.Lsession_fail_close:
+ mov rdi,r12
+ mov rsi,[rbx+8]
+ call pg_durable_session_close_notified
+.Lsession_fail_unlock:
+ mov dword ptr [rbx+40],0
+ jmp .Lsession_fail_end
+.Lsession_fail_invalid:
+ mov eax,-2
+.Lsession_fail_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_session_fail,.-pg_durable_session_fail
 .section .note.GNU-stack,"",@progbits
 
 .text

@@ -3,7 +3,8 @@
  * 职责边界：termios/系统调用集中在这里，渲染器不得散落平台调用。
  * 平台通过小型函数表选择（tui_term_platform），后续平台以新表注入，不改渲染器。
  *
- * 恢复语义：enter_raw 保存原始 termios，restore 精确还原并冲掉未读输入，
+ * 恢复语义：enter_raw 保存原始 termios 并启用 bracketed paste（ESC[?2004h，
+ * best-effort），restore 先写 ESC[?2004l 再精确还原并冲掉未读输入，
  * 防止退出后残留的 ^D/^C 字节被父 shell 重新解释（Pi terminal.ts 行为，按行为重写）。
  * SIGKILL 无法恢复，不宣称全部信号可恢复；可处理信号由主循环标志路径触发 restore。
  */

@@ -378,4 +378,25 @@ typedef struct {pg_durable_session *session;unsigned active,busy;} pg_durable_re
    the zeroed/released handle and Session alive until end succeeds. */
 int pg_durable_read_on_line_begin(pg_durable_read_line *,pg_durable_session *);
 int pg_durable_read_on_line_end(pg_durable_read_line *);
+/* Seal admission and synchronously stop observers without running backend
+   close. 0 notified, 1 retry snapshot allocation, -2 invalid composition. */
+int pg_durable_session_begin_close_notified(pg_durable_session *,pg_session_adoption_host *);
+typedef struct {
+ pg_durable_session *session;
+ pg_session_adoption_host *notifications;
+ void *context;
+ void (*report)(void *,unsigned cause);
+ unsigned cause,reported,busy,reserved;
+} pg_durable_failure;
+/* One stable zeroed controller per Session; initialize the four borrowed host
+   fields before first use. A nonzero cause fails first, or adopts an existing
+   primitive failure. Seal/close listeners precede report, report precedes
+   backend close, and each is once. Reentry returns pending. Repeat to drive
+   close polling without changing the cause/report. Snapshot allocation failure
+   retains sealed failure and retries before reporting. Context/host/controller
+   stay alive through final close; report returns normally and may request close.
+   Returns 1 pending, -1 failed-and-closed, -2 invalid; healthy closed Sessions
+   cannot acquire a new failure. Admitted Tx/read-line jobs must release before
+   backend close; unsaved holds are discarded on failure. */
+int pg_durable_session_fail(pg_durable_failure *,unsigned cause);
 #endif

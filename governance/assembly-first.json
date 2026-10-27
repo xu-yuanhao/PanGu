@@ -164,6 +164,10 @@
     "src/runtime/document_reader.S": {
       "role": "assembly-core",
       "reason": "手写Session当前/Entry历史快照、缓存快路径、fork原会话解析与读取失败守卫"
+    },
+    "src/client/tui/tui_md.S": {
+      "role": "assembly-core",
+      "reason": "手写流式Markdown状态、转义与终端文本布局"
     }
   }
 }

@@ -65,3 +65,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 ## 历史探针清理（2026-10-27）
 
 删除15个包含`cases.h/graph-cases.h`的历史探针目录，共71文件、24,845,721字节；核对产品源、工具/构建配置及目录外源码均无消费者，同步移除bootstrap登记。当前Runtime/TUI回归测试保留。G00通过；当前共享树产品构建在TUI候选`tui_view.S:426/439`的内存操作数表达式报错，本次保留该候选并记录构建失败。
+
+## 全工作区交接提交（2026-10-27）
+
+接入TUI Markdown产品源登记与Session失败入口导出，修正`tui_view.S`两处Clang常量表达式写法。G00、产品构建和Session/内存记录专项（O0 ASan/UBSan）通过。当前TUI专项在`test_tui_md`的paragraphs用例后崩溃；PTY在multiline_edit_submit收到目标文本前进程退出，均为本轮真实失败，后续TUI修复以此为起点。本次按用户要求保存并推送全部核心/TUI候选。

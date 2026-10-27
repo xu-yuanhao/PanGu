@@ -46,12 +46,18 @@ static const tui_demo_step steps_busy[] = {
 	{ 1, TUI_EV_RUN_FINISHED, NULL, NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
 };
 
+static const tui_demo_step steps_poll_error[] = {
+	{ 0, TUI_EV_RUN_STARTED, NULL, NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
+	{ 1, TUI_EV_TEXT_DELTA, "出错前的一段输出。", NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
+};
+
 static const tui_demo_scenario scenarios[] = {
-	{ "no_tool", 0, 6, steps_no_tool },
-	{ "tool_roundtrip", 0, 6, steps_tool },
-	{ "model_error", 0, 3, steps_error },
-	{ "user_cancel", 1, 5, steps_cancel },
-	{ "busy_reject", 0, 3, steps_busy },
+	{ "no_tool", 0, 0, 6, steps_no_tool },
+	{ "tool_roundtrip", 0, 0, 6, steps_tool },
+	{ "model_error", 0, 0, 3, steps_error },
+	{ "user_cancel", 1, 0, 5, steps_cancel },
+	{ "busy_reject", 0, 0, 3, steps_busy },
+	{ "poll_error", 0, 1, 2, steps_poll_error },
 };
 
 const tui_demo_scenario *tui_demo_scenario_get(const char *name)
@@ -132,8 +138,11 @@ static int fake_poll(void *ctx, tui_event *out)
 	const tui_demo_step *st;
 
 	fr->poll_calls++;
-	if (!fr->run_active || fr->step >= fr->sc->step_count)
+	if (!fr->run_active || fr->step >= fr->sc->step_count) {
+		if (fr->run_active && fr->sc->poll_fails)
+			return -1; /* 脚本播完且仍在运行：Runtime 错误路径 */
 		return 0;
+	}
 	if (fr->pending_idle > 0) {
 		fr->pending_idle--;
 		return 0;

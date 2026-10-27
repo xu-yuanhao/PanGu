@@ -441,21 +441,21 @@ static void test_guard_input_full(void)
 	unsigned i;
 
 	tui_input_init(in);
-	for (i = 0; i < TUI_INPUT_MAX_BYTES; i++)
+	for (i = 0; i < TUI_INPUT_MAX_BYTES - 1; i++)
 		T_CHECK(tui_input_feed(in, 'a') == TUI_KEY_CHAR);
-	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES);
-	/* 满后拒绝（整字符），节流，不越界写 */
+	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 1); /* 末字节保留 NUL */
+	/* 满（有效上限 1023）后拒绝（整字符），节流，不越界写 */
 	T_CHECK(tui_input_feed(in, 'b') == TUI_KEY_OVERFLOW);
 	T_CHECK(tui_input_feed(in, 'c') == TUI_KEY_IGNORED);
-	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES);
+	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 1);
 	/* 满 + 多字节首字节整字符拒绝路径 */
 	T_CHECK(tui_input_feed(in, 0xE6) == TUI_KEY_IGNORED); /* 节流后不再报 */
 	T_CHECK(tui_input_feed(in, 0xBC) == TUI_KEY_IGNORED);
 	T_CHECK(tui_input_feed(in, 0x94) == TUI_KEY_IGNORED);
-	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES);
+	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 1);
 	/* 回退与清行 */
 	T_CHECK(tui_input_feed(in, 0x7F) == TUI_KEY_BACKSPACE);
-	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 1);
+	T_CHECK(tui_input_len(in) == TUI_INPUT_MAX_BYTES - 2);
 	T_CHECK(tui_input_feed(in, 0x15) == TUI_KEY_CHAR);
 	T_CHECK(tui_input_len(in) == 0);
 	T_RUN("guard_input_full");
@@ -486,9 +486,17 @@ static void test_guard_view_text(void)
 	ev.text = b + 3;
 	ev.text_len = 5; /* e6 bc 94 完整 + f0 9f 两字节前缀 */
 	tui_view_event(&v, &ev);
+	/* md 行缓冲：无换行不输出，完整与不完整序列都在行内 */
+	T_CHECK(out.len == 0);
+	T_CHECK(v.md.line_len == 5);
+	T_CHECK(v.carry_len == 0);
+	memset(&ev, 0, sizeof(ev));
+	ev.kind = TUI_EV_TEXT_DELTA;
+	ev.text = "\n";
+	ev.text_len = 1;
+	tui_view_event(&v, &ev);
 	T_CHECK(find_bytes(out.buf, out.len, "\xe6\xbc\x94", 3) != NULL); /* 完整序列已写出 */
-	T_CHECK(find_bytes(out.buf, out.len, "\xf0\x9f", 2) == NULL);     /* 前缀只进 carry */
-	T_CHECK(v.carry_len == 2);
+	T_CHECK(find_bytes(out.buf, out.len, "\xf0\x9f", 2) == NULL);     /* 不完整前缀转义文本，不透传 */
 	T_RUN("guard_view_text");
 }
 

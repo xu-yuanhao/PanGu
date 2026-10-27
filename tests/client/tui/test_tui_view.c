@@ -48,13 +48,13 @@ static void test_event_lines_ansi(void)
 	ev.text = "第一段";
 	ev.text_len = strlen(ev.text);
 	tui_view_event(&v, &ev);
-	T_CHECK(tstr_contains(&out, "第一段"));
-	tstr_clear(&out);
+	T_CHECK(out.len == 0); /* 未完行缓冲：工具/状态行打断时才输出 */
 
 	ev.kind = TUI_EV_TOOL_STARTED;
 	ev.tool_call_id = "call-7";
 	ev.tool_name = "read_file";
 	tui_view_event(&v, &ev);
+	T_CHECK(tstr_contains(&out, "第一段\r\n")); /* md_break 冲出未完行 */
     ev.kind = TUI_EV_TOOL_OUTPUT;
     ev.text = "running\033[2J";
     ev.text_len = strlen(ev.text);
@@ -94,12 +94,13 @@ static void test_utf8_split_join(void)
 
 	memset(&ev, 0, sizeof(ev));
 	ev.kind = TUI_EV_TEXT_DELTA;
-	/* "演"(E6 BC 94) 拆成 2+1 字节跨事件到达 */
+	/* "演"(E6 BC 94) 拆成 2+1 字节跨事件到达；\n 收束行触发输出
+	 * （md 流式渲染：行缓冲内完成 UTF-8 拼合） */
 	ev.text = "\xe6\xbc";
 	ev.text_len = 2;
 	tui_view_event(&v, &ev);
-	ev.text = "\x94示";
-	ev.text_len = 3;
+	ev.text = "\x94示\n";
+	ev.text_len = strlen(ev.text);
 	tui_view_event(&v, &ev);
 	/* 输出中必须出现连续完整的 E6 BC 94，且没有把 E6 BC 单独放出后接换行 */
 	T_CHECK(find_bytes(out.buf, out.len, "\xe6\xbc\x94", 3) != NULL);
@@ -123,9 +124,8 @@ static void test_utf8_absorb_split(void)
 	tui_input in;
 	tui_event ev;
 
-	/* 4 字节 emoji F0 9F 98 80 按 1+2+1 跨事件到达：中段整体并入 carry，
-	 * 不得提前写出半个序列（被替换 C 版在此路径会把已并入的字节写两遍，
-	 * 本用例固定修正后的契约）。 */
+	/* 4 字节 emoji F0 9F 98 80 按 1+2+1 跨事件到达：md 行缓冲拼合，
+	 * 行完整前不得产生输出（含半个序列） */
 	tstr_clear(&out);
 	tui_input_init(&in);
 	tui_view_init(&v, tstr_sink(&out), 0, &in);
@@ -136,17 +136,22 @@ static void test_utf8_absorb_split(void)
 	ev.text_len = 1;
 	tui_view_event(&v, &ev);
 	T_CHECK(out.len == 0);
-	T_CHECK(v.carry_len == 1);
+	T_CHECK(v.md.line_len == 1);
 	ev.text = "\x9f\x98";
 	ev.text_len = 2;
 	tui_view_event(&v, &ev);
 	T_CHECK(out.len == 0); /* 吸收段不产生输出 */
-	T_CHECK(v.carry_len == 3);
+	T_CHECK(v.md.line_len == 3);
 	ev.text = "\x80";
 	ev.text_len = 1;
 	tui_view_event(&v, &ev);
-	T_CHECK(out.len == 4);
-	T_CHECK(memcmp(out.buf, "\xf0\x9f\x98\x80", 4) == 0); /* 恰好一次、连续完整 */
+	T_CHECK(out.len == 0);
+	T_CHECK(v.md.line_len == 4);
+	ev.text = "\n";
+	ev.text_len = 1;
+	tui_view_event(&v, &ev);
+	T_CHECK(out.len == 5);
+	T_CHECK(memcmp(out.buf, "\xf0\x9f\x98\x80\n", 5) == 0); /* 恰好一次、连续完整 */
 	T_CHECK(v.carry_len == 0);
 	T_RUN("utf8_absorb_split");
 }
@@ -266,10 +271,12 @@ static void test_history_and_controls(void)
   T_CHECK(tstr_contains(&out,"[history] user: A\\x1b]52;c;evil\\x07\\x08\\x0d\\x7f\\u009b你好🙂"));T_CHECK(!memchr(out.buf,27,out.len));T_CHECK(!memchr(out.buf,7,out.len));
   history=(tui_history_entry){.kind=3,.text="ok",.text_len=2,.tool_name="read",.tool_name_len=4,.call_id="one",.call_id_len=3,.tool_ok=0};tui_view_history(&view,&history);T_CHECK(tstr_contains(&out,"[history] result read (#one) error: ok"));T_CHECK(!tstr_contains(&out,"[run] started")&&!tstr_contains(&out,"finished: success"));
  }
- const char stream[]="hi你好🙂\xc2\x9b\x1b[2J\r!";
- for(size_t split=0;split<sizeof(stream);++split){tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event event={.kind=TUI_EV_TEXT_DELTA,.text=stream,.text_len=split};tui_view_event(&view,&event);event.text=stream+split;event.text_len=sizeof(stream)-1-split;tui_view_event(&view,&event);T_CHECK(!strcmp(out.buf,"hi你好🙂\\u009b\\x1b[2J\\x0d!"));T_CHECK(!view.carry_len);}
+ const char stream[]="hi你好🙂\xc2\x9b\x1b[2J\r!\n";
+ /* text_delta 经 tui_md 流式渲染：行完整才输出；孤儿 CR 丢弃（Pi 为 CR→LF，
+ * 见 TODO 交接区差异）；C1/CSI 控制字节转义，降级模式行分隔为 \n */
+ for(size_t split=0;split<sizeof(stream);++split){tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event event={.kind=TUI_EV_TEXT_DELTA,.text=stream,.text_len=split};tui_view_event(&view,&event);event.text=stream+split;event.text_len=sizeof(stream)-1-split;tui_view_event(&view,&event);T_CHECK(!strcmp(out.buf,"hi你好🙂\\u009b\\x1b[2J!\n"));T_CHECK(!view.carry_len);}
  const char malformed[]="\xe0\x1b]52;bad\a\xc0\x9b\xed\xa0\x80";tstr out;tui_view view;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_history_entry entry={.text=malformed,.text_len=sizeof(malformed)-1};tui_view_history(&view,&entry);T_CHECK(!memchr(out.buf,27,out.len)&&!memchr(out.buf,7,out.len));T_CHECK(tstr_contains(&out,"\\xe0\\x1b]52;bad\\x07\\xc0\\x9b\\xed\\xa0\\x80"));
- tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event partial={.kind=TUI_EV_TEXT_DELTA,.text="\xe4",.text_len=1};tui_view_event(&view,&partial);T_CHECK(!out.len&&view.carry_len==1);partial=(tui_event){.kind=TUI_EV_RUN_FINISHED,.run_status=TUI_RUN_CANCELLED};tui_view_event(&view,&partial);T_CHECK(tstr_contains(&out,"\\xe4[run] finished: cancelled")&&!view.carry_len&&!memchr(out.buf,0xe4,out.len));
+ tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);tui_event partial={.kind=TUI_EV_TEXT_DELTA,.text="\xe4",.text_len=1};tui_view_event(&view,&partial);T_CHECK(!out.len&&view.md.line_len==1);partial=(tui_event){.kind=TUI_EV_RUN_FINISHED,.run_status=TUI_RUN_CANCELLED};tui_view_event(&view,&partial);T_CHECK(tstr_contains(&out,"\\xe4\n[run] finished: cancelled")&&!view.carry_len&&!memchr(out.buf,0xe4,out.len));
  T_RUN("history_and_control_escaping_all_splits");
 }
 

@@ -6,6 +6,9 @@
  */
 #include "tui_layout.h"
 .intel_syntax noprefix
+.section .rodata
+.Lpaste_on:  .ascii "\033[?2004h"
+.Lpaste_off: .ascii "\033[?2004l"
 .section .text
 
 /* void tui_term_init(tui_term *t, int in_fd, int out_fd) — rdi rsi edx */
@@ -69,6 +72,11 @@ tui_term_enter_interactive:
  call [rax + TUI_LI_PLATFORM_ENTER_RAW]
  test eax, eax
  jnz .Lei_fail_pop
+ /* 启用 bracketed paste（best-effort：写失败不阻塞进入） */
+ mov rdi, rbx
+ lea rsi, [rip + .Lpaste_on]
+ mov edx, 8
+ call tui_term_write@PLT
  mov rdi, rbx
  mov rax, qword ptr [rbx + TUI_LI_TERM_PLATFORM]
  call [rax + TUI_LI_PLATFORM_QUERY_SIZE]
@@ -88,7 +96,7 @@ tui_term_enter_interactive:
  .cfi_endproc
 .size tui_term_enter_interactive, .-tui_term_enter_interactive
 
-/* void tui_term_restore(tui_term *t) — 可重复调用；经平台表还原 */
+/* void tui_term_restore(tui_term *t) — 可重复调用；先关 bracketed paste 再还原 */
 .globl tui_term_restore
 .type tui_term_restore,@function
 tui_term_restore:
@@ -98,8 +106,23 @@ tui_term_restore:
  cmp dword ptr [rdi + TUI_LI_TERM_SAVED_VALID], 0
  je .Lttr_ret
 .Lttr_do:
- mov rax, qword ptr [rdi + TUI_LI_TERM_PLATFORM]
- jmp qword ptr [rax + TUI_LI_PLATFORM_RESTORE]
+ push rbx
+ push r12
+ push rax
+ mov rbx, rdi
+ cmp dword ptr [rbx + TUI_LI_TERM_RAW_ACTIVE], 0
+ je .Lttr_nopaste
+ mov rdi, rbx
+ lea rsi, [rip + .Lpaste_off]
+ mov edx, 8
+ call tui_term_write@PLT
+.Lttr_nopaste:
+ mov rdi, rbx
+ mov rax, qword ptr [rbx + TUI_LI_TERM_PLATFORM]
+ call [rax + TUI_LI_PLATFORM_RESTORE]
+ pop rax
+ pop r12
+ pop rbx
 .Lttr_ret:
  ret
  .cfi_endproc
