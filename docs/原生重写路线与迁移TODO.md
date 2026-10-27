@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 resource-loader.ts discoverSystemPromptFile/discoverAppendSystemPromptFile/loadProjectContextFiles/loadContextFileFromDir，以及 system-prompt.ts。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`；本批采用用户/项目资源优先级。
-- 实际调用链：产品组合打开用户资源的只读完整文件服务 → Assembly prompt组装 → Generation保存systemPrompt → 模型请求/恢复。项目`.pangu/SYSTEM.md`和`APPEND_SYSTEM.md`分别覆盖用户同名文件；用户AGENTS先于本地项目指令，每层按既有override/AGENTS/CLAUDE候选顺序选一个。用户资源默认`~/.pangu/agent`，`PANGU_AGENT_DIR`可指定位置。
-- 验证：prompt专项ASan/UBSan核对项目覆盖、用户fallback、两层指令顺序、BOM与失败清空；隔离产品构建、G00/Assembly通过。真实TUI/DeepSeek核对用户和项目标记、关闭重开、独立工作区fallback及持久systemPrompt；以上真实TUI验证和Runtime整批回归均通过。
-- 接口与自审：`pg_prompt_workspace_source`扩展为88字节，尾部借用user_files/context/probe/directory；prompt与直接消费者同步。用户目录打开/探测/关闭为C平台接线，选择顺序及拼接为Assembly；资源只读服务仅借用到prompt返回，当前有界prompt预算保持。来源与模块职责登记同步。
-- 剩余与下一交付物：K11继续祖先目录/worktree指令继承、配置、skills/templates/刷新和MCP等原覆盖行为；K10/K13继续实际查询操作。Inputs表已提供，TUI交互由并行线接入；其工作保留原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` resource-loader.ts 的 loadProjectContextFiles/loadContextFileFromDir，以及 resource-loader.test.ts 的ancestor layering、override与目录候选用例；远端核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`。
+- 实际调用链：产品提供临时只读完整文件服务 → Assembly从canonical workspace逐层枚举根至父目录 → 每目录按override/AGENTS/CLAUDE选择一个 → 按用户、祖先、本地顺序组装 → Generation保存prompt并发送模型。已由用户目录加载的同一canonical目录在继承/本地阶段跳过，保持单次加载。
+- 验证：prompt专项ASan/UBSan核对多层顺序、override、用户目录位于祖先或cwd时去重；隔离产品构建、G00/Assembly通过。真实TUI核对用户/祖先/项目标记、父级override、关闭重开、fallback和请求期持久prompt顺序；以上真实TUI验证及Runtime整批回归均通过。
+- 接口与自审：prompt source为112字节，尾部增加ancestor_files/context/probe，接收相对文件系统根的候选路径。路径遍历、选择、去重与拼接为Assembly；C仅处理canonical路径和只读根服务的打开/关闭。新增路径缓冲与读入缓冲分离，有界失败清空保持；源登记/职责同步，无TUI布局变化。
+- 剩余与下一交付物：K11继续worktree主目录遮蔽/符号链接语义、配置、skills/templates与刷新、MCP等原覆盖行为。K10/K13继续查询操作；既有Inputs表供TUI线消费，并行文件保持原位。

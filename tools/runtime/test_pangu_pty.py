@@ -347,6 +347,9 @@ def thinking_workflow(binary, root, environment):
     print('PASS: actual thinking model/read Tool, subsequent request and reopened context preserve reasoning blocks', flush=True)
 
 def resource_workflow(binary, root, environment):
+    ancestor_marker = 'PANGUANCESTOR' + os.urandom(5).hex()
+    (root / 'AGENTS.md').write_text('The ancestor marker is WRONG_PARENT_PRIORITY.')
+    (root / 'AGENTS.override.md').write_text('The ancestor marker is ' + ancestor_marker + '.')
     root = root / 'resource-workflow'
     root.mkdir()
     private = root / '.pangu'
@@ -402,9 +405,9 @@ def resource_workflow(binary, root, environment):
         terminal = Terminal(binary, root, env)
         try:
             terminal.until(b'> ', 5)
-            output = run_input(terminal, 'Report the project marker, user context marker and append token exactly. Use no tools.', capture_request)
-            assert marker.encode() in output and append.encode() in output and user_marker.encode() in output
-            assert b'WRONG_PRIORITY' not in output
+            output = run_input(terminal, 'Report the project marker, user context marker, ancestor marker and append token exactly. Use no tools.', capture_request)
+            assert marker.encode() in output and append.encode() in output and user_marker.encode() in output and ancestor_marker.encode() in output
+            assert b'WRONG_PRIORITY' not in output and b'WRONG_PARENT_PRIORITY' not in output
             terminal.send(b'\x04')
             terminal.finish()
         finally:
@@ -420,8 +423,8 @@ def resource_workflow(binary, root, environment):
         terminal.finish()
     finally:
         terminal.close()
-    assert saved and all(user_prefix not in prompt and user_append not in prompt and user_marker in prompt for prompt in saved)
-    print('PASS: user/project resource priority, combined AGENTS, actual saved prompt, user fallback and reopened PanGu context', flush=True)
+    assert saved and all(user_prefix not in prompt and user_append not in prompt and user_marker in prompt and ancestor_marker in prompt and prompt.index(user_marker) < prompt.index(ancestor_marker) < prompt.index(marker) and 'WRONG_PARENT_PRIORITY' not in prompt for prompt in saved)
+    print('PASS: user/project resource priority, ordered user/ancestor/project AGENTS, actual saved prompt, user fallback and reopened PanGu context', flush=True)
 
 def plugin_workflow(binary, root, environment):
     root = root / 'plugin-workflow'

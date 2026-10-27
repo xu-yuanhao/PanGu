@@ -173,7 +173,7 @@ pg_prompt_workspace:
  push r13
  push r14
  push r15
- sub rsp,4096
+ sub rsp,8192
  mov byte ptr [rsp],0
  sub rsp,72
  mov rbp,rsp
@@ -352,38 +352,7 @@ pg_prompt_workspace:
  je .Lpw_context_next
  test eax,eax
  jnz .Lpw_fail
- lea rdi,[rip+.Lpw_context_open]
- call .Lpw_append
- test eax,eax
- jnz .Lpw_fail
- cmp qword ptr [rbp+4160],0
- je .Lpw_context_label
- mov rdi,[rbx+72]
- mov rsi,[rbx+80]
- test rsi,rsi
- jz .Lpw_context_label
- call .Lpw_append_slice
- test eax,eax
- jnz .Lpw_fail
- lea rdi,[rip+.Lpw_slash]
- call .Lpw_append
- test eax,eax
- jnz .Lpw_fail
-.Lpw_context_label:
- mov rdi,[rbp+4104]
- call .Lpw_append
- test eax,eax
- jnz .Lpw_fail
- lea rdi,[rip+.Lpw_context_path_end]
- call .Lpw_append
- test eax,eax
- jnz .Lpw_fail
- mov rdi,[rbp+4136]
- call .Lpw_append
- test eax,eax
- jnz .Lpw_fail
- lea rdi,[rip+.Lpw_context_close]
- call .Lpw_append
+ call .Lpw_emit_context
  test eax,eax
  jnz .Lpw_fail
  jmp .Lpw_context_done
@@ -393,6 +362,14 @@ pg_prompt_workspace:
 .Lpw_context_done:
  cmp qword ptr [rbp+4160],0
  je .Lpw_cwd
+ call .Lpw_ancestors
+ test eax,eax
+ jnz .Lpw_fail
+ mov rdi,[rbx+32]
+ mov rsi,[rbx+40]
+ call .Lpw_is_user_directory
+ test eax,eax
+ jnz .Lpw_cwd
  mov qword ptr [rbp+4160],0
  jmp .Lpw_context_pass
 .Lpw_cwd:
@@ -422,7 +399,7 @@ pg_prompt_workspace:
 .Lpw_invalid:
  mov eax,1
 .Lpw_end:
- add rsp,4168
+ add rsp,8264
  pop r15
  pop r14
  pop r13
@@ -466,6 +443,14 @@ pg_prompt_workspace:
  mov rax,[rbx+16]
  cmp qword ptr [rbp+4160],0
  je .Lpw_probe_selected
+ cmp qword ptr [rbp+4160],2
+ jne .Lpw_probe_user
+ mov rdi,[rbx+96]
+ mov rax,[rbx+104]
+ test rax,rax
+ jz .Lpw_read_bad
+ jmp .Lpw_probe_selected
+.Lpw_probe_user:
  cmp qword ptr [rbx+48],0
  je .Lpw_read_missing
  mov rdi,[rbx+56]
@@ -485,6 +470,9 @@ pg_prompt_workspace:
  mov rdx,rax
  mov rdi,[rbx]
  cmp qword ptr [rbp+4160],0
+ je .Lpw_files_selected
+ mov rdi,[rbx+88]
+ cmp qword ptr [rbp+4160],2
  je .Lpw_files_selected
  mov rdi,[rbx+48]
 .Lpw_files_selected:
@@ -558,3 +546,163 @@ pg_prompt_workspace:
 .Lpw_user_system: .asciz "SYSTEM.md"
 .Lpw_user_append: .asciz "APPEND_SYSTEM.md"
 .Lpw_slash: .asciz "/"
+
+.text
+.Lpw_emit_context:
+ sub rsp,8
+ lea rdi,[rip+.Lpw_context_open]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+ cmp qword ptr [rbp+4160],0
+ je .Lpw_emit_label
+ cmp qword ptr [rbp+4160],2
+ je .Lpw_emit_slash
+ mov rdi,[rbx+72]
+ mov rsi,[rbx+80]
+ test rsi,rsi
+ jz .Lpw_emit_label
+ call .Lpw_append_slice
+ test eax,eax
+ jnz .Lpw_emit_end
+.Lpw_emit_slash:
+ lea rdi,[rip+.Lpw_slash]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+.Lpw_emit_label:
+ mov rdi,[rbp+4104]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+ lea rdi,[rip+.Lpw_context_path_end]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+ mov rdi,[rbp+4136]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+ lea rdi,[rip+.Lpw_context_close]
+ call .Lpw_append
+ test eax,eax
+ jnz .Lpw_emit_end
+.Lpw_emit_end:
+ add rsp,8
+ ret
+/* Root-to-parent lexical order over a canonical absolute workspace path. */
+.Lpw_ancestors:
+ sub rsp,40
+ cmp qword ptr [rbx+88],0
+ je .Lpw_ancestor_ok
+ mov rax,[rbx+40]
+ cmp rax,1
+ jbe .Lpw_ancestor_ok
+ cmp rax,4096
+ jae .Lpw_ancestor_bad
+ mov rdi,[rbx+32]
+ test rdi,rdi
+ jz .Lpw_ancestor_bad
+ cmp byte ptr [rdi],47
+ jne .Lpw_ancestor_bad
+ cmp byte ptr [rdi+rax-1],47
+ je .Lpw_ancestor_bad
+ xor esi,esi
+ mov rdx,rax
+ call memchr@PLT
+ test rax,rax
+ jnz .Lpw_ancestor_bad
+ mov qword ptr [rsp],0
+ mov qword ptr [rbp+4160],2
+.Lpw_ancestor_directory:
+ mov rdi,[rbx+32]
+ mov rsi,[rsp]
+ test rsi,rsi
+ jnz .Lpw_ancestor_compare_user
+ mov esi,1
+.Lpw_ancestor_compare_user:
+ call .Lpw_is_user_directory
+ test eax,eax
+ jnz .Lpw_ancestor_parent
+ mov qword ptr [rsp+8],0
+.Lpw_ancestor_candidate:
+ mov rax,[rsp+8]
+ cmp rax,5
+ jae .Lpw_ancestor_parent
+ lea rcx,[rip+.Lpw_context_names]
+ mov rdi,[rcx+rax*8]
+ mov [rsp+16],rdi
+ call strlen@PLT
+ add rax,[rsp]
+ cmp rax,4096
+ jae .Lpw_ancestor_bad
+ cmp qword ptr [rsp],0
+ je .Lpw_ancestor_filename
+ lea rdi,[rbp+4168]
+ mov rsi,[rbx+32]
+ inc rsi
+ mov rdx,[rsp]
+ dec rdx
+ call memcpy@PLT
+ mov rax,[rsp]
+ mov byte ptr [rbp+rax+4167],47
+.Lpw_ancestor_filename:
+ mov rax,[rsp]
+ lea rdi,[rbp+rax+4168]
+ mov rsi,[rsp+16]
+ call strcpy@PLT
+ lea rdi,[rbp+4168]
+ call .Lpw_read
+ cmp eax,1
+ je .Lpw_ancestor_next_candidate
+ test eax,eax
+ jnz .Lpw_ancestor_end
+ call .Lpw_emit_context
+ test eax,eax
+ jnz .Lpw_ancestor_end
+ jmp .Lpw_ancestor_parent
+.Lpw_ancestor_next_candidate:
+ inc qword ptr [rsp+8]
+ jmp .Lpw_ancestor_candidate
+.Lpw_ancestor_parent:
+ mov rax,[rsp]
+ inc rax
+ mov rdx,[rbx+32]
+.Lpw_ancestor_find_slash:
+ cmp rax,[rbx+40]
+ jae .Lpw_ancestor_ok
+ cmp byte ptr [rdx+rax],47
+ je .Lpw_ancestor_found_slash
+ inc rax
+ jmp .Lpw_ancestor_find_slash
+.Lpw_ancestor_found_slash:
+ mov [rsp],rax
+ jmp .Lpw_ancestor_directory
+.Lpw_ancestor_ok:
+ xor eax,eax
+ jmp .Lpw_ancestor_end
+.Lpw_ancestor_bad:
+ mov eax,1
+.Lpw_ancestor_end:
+ add rsp,40
+ ret
+
+.Lpw_is_user_directory:
+ cmp qword ptr [rbx+48],0
+ je .Lpw_not_user_directory
+ cmp rsi,[rbx+80]
+ jne .Lpw_not_user_directory
+ cmp qword ptr [rbx+72],0
+ je .Lpw_not_user_directory
+ sub rsp,8
+ mov rdx,rsi
+ mov rsi,[rbx+72]
+ call memcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ add rsp,8
+ ret
+.Lpw_not_user_directory:
+ xor eax,eax
+ ret

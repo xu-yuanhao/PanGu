@@ -23,7 +23,7 @@ int __wrap_json_object_object_add(json_object *o,const char *k,json_object *v){r
 const char *__wrap_json_object_to_json_string_ext(json_object *o,int f){return ++calls==fail_at?0:__real_json_object_to_json_string_ext(o,f);}
 static int allow(void *ctx,pg_slice name,pg_slice args){(void)ctx;assert(name.size==4&&!memcmp(name.data,"read",4));json_object *o=json_tokener_parse(args.data),*v=0;assert(o&&json_object_object_get_ex(o,"path",&v)&&!strcmp(json_object_get_string(v),expected));json_object_put(o);return !denied;}
 static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t cap,size_t *n){(void)ctx;(void)name;(void)args;++executed;*n=0;if(mode==4){*n=cap;return PG_TOOL_OK;}if(mode==5){*n=4096;return PG_TOOL_OK;}if(cap<4)return PG_TOOL_ERROR;memcpy(out,"abc",3);*n=3;return mode==1?PG_TOOL_PARTIAL:mode==2?PG_TOOL_WAIT:mode==3?PG_TOOL_ERROR:PG_TOOL_OK;}
-_Static_assert(sizeof(pg_prompt_workspace_source)==88&&offsetof(pg_prompt_workspace_source,tools)==24&&offsetof(pg_prompt_workspace_source,workspace)==32,"prompt source layout");
+_Static_assert(sizeof(pg_prompt_workspace_source)==112&&offsetof(pg_prompt_workspace_source,tools)==24&&offsetof(pg_prompt_workspace_source,workspace)==32,"prompt source layout");
 static unsigned resource_mode;
 static int resource_probe(void *context,const char *path){(void)context;if(resource_mode==2)return -1;if(resource_mode==1&&(!strcmp(path,".pangu/SYSTEM.md")||!strcmp(path,".pangu/APPEND_SYSTEM.md")))return 1;return !strcmp(path,"AGENTS.override.md")||!strcmp(path,"AGENTS.md");}
 static int resource_allow(void *context,pg_slice name,pg_slice args){(void)context;(void)name;(void)args;return 1;}
@@ -31,9 +31,13 @@ static int resource_execute(void *context,pg_slice name,pg_slice args,char *out,
 static unsigned user_modes;
 static int user_probe(void *context,const char *path){(void)context;if(user_modes&8)return -1;if(!strcmp(path,"SYSTEM.md"))return !!(user_modes&1);if(!strcmp(path,"APPEND_SYSTEM.md"))return !!(user_modes&2);return (user_modes&4)&&!strcmp(path,"AGENTS.md");}
 static int user_execute(void *context,pg_slice name,pg_slice args,char *out,size_t capacity,size_t *size){(void)context;(void)name;const char *text=strstr(args.data,"APPEND_SYSTEM.md")?"User append.":strstr(args.data,"SYSTEM.md")?"User prefix.":"User context.";*size=strlen(text);assert(*size<capacity);memcpy(out,text,*size);return PG_TOOL_OK;}
+static unsigned ancestor_reads;
+static int ancestor_probe(void *context,const char *path){(void)context;return !strcmp(path,"AGENTS.md")||!strcmp(path,"one/AGENTS.override.md")||!strcmp(path,"one/two/CLAUDE.md");}
+static int ancestor_execute(void *context,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)context;(void)name;ancestor_reads++;struct json_object *value=json_tokener_parse(args.data);assert(value);const char *path=json_object_get_string(json_object_object_get(value,"path"));assert(path);const char *text=strstr(path,"one/two/")?"MIDDLE_CONTEXT":strstr(path,"one/")?"PARENT_OVERRIDE":"ROOT_CONTEXT";*size=strlen(text);assert(*size<cap);memcpy(out,text,*size);json_object_put(value);return PG_TOOL_OK;}
+
 static void workspace_prompt(void){
  pg_tools source={.authorize=resource_allow,.execute=resource_execute};pg_tool_registry tools={0};tools.count=2;tools.entries[0].name="read";tools.entries[1].name="edit";
- pg_prompt_workspace_source input={&source,0,resource_probe,&tools,{"/workspace",10},0,0,0,{0,0}};char output[4096];size_t size=0;
+ pg_prompt_workspace_source input={&source,0,resource_probe,&tools,{"/workspace",10},0,0,0,{0,0},0,0,0};char output[4096];size_t size=0;
  assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&size==strlen(output));
  assert(strstr(output,"inside PanGu")&&strstr(output,"- read: Read file contents")&&strstr(output,"- edit: Make precise file edits"));assert(!strstr(output,"- bash:")&&!strstr(output,"Use bash for"));
  assert(strstr(output,"<project_instructions path=\"AGENTS.override.md\">\nAlways use project conventions."));assert(strstr(output,"<cwd>\n/workspace\n</cwd>"));assert(!strstr(output,"\xef\xbb\xbf"));
@@ -44,6 +48,11 @@ static void workspace_prompt(void){
  assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&!strncmp(output,"User prefix.",12)&&strstr(output,"User append.")&&strstr(output,"User context.")<strstr(output,"Always use project conventions."));
  resource_mode=1;assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&!strncmp(output,"Custom PanGu prefix.",20)&&!strstr(output,"User prefix.")&&!strstr(output,"User append.")&&strstr(output,"User context."));resource_mode=0;
  user_modes=4;assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&strstr(output,"inside PanGu")&&strstr(output,"User context.")&&!strstr(output,"User append."));user_modes=8;assert(pg_prompt_workspace(&input,output,sizeof(output),&size)&&!size&&!output[0]);
+ pg_tools ancestors={.authorize=resource_allow,.execute=ancestor_execute};input.ancestor_files=&ancestors;input.ancestor_probe=ancestor_probe;input.workspace=(pg_slice){"/one/two/project",16};user_modes=4;ancestor_reads=0;
+ assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&ancestor_reads==3);const char *u=strstr(output,"User context."),*r=strstr(output,"ROOT_CONTEXT"),*parent=strstr(output,"PARENT_OVERRIDE"),*middle=strstr(output,"MIDDLE_CONTEXT"),*project=strstr(output,"Always use project conventions.");if(!(u&&r&&parent&&middle&&project&&u<r&&r<parent&&parent<middle&&middle<project))fprintf(stderr,"ancestor order: %s\n",output);assert(u&&r&&parent&&middle&&project&&u<r&&r<parent&&parent<middle&&middle<project);
+ input.user_directory=(pg_slice){"/one",4};ancestor_reads=0;assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&ancestor_reads==2&&!strstr(output,"PARENT_OVERRIDE"));
+ input.user_directory=input.workspace;ancestor_reads=0;assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&ancestor_reads==3&&!strstr(output,"Always use project conventions."));
+ input.ancestor_files=0;input.ancestor_probe=0;
  input.user_files=0;input.user_probe=0;input.user_directory=(pg_slice){0};user_modes=0;
 }
 int main(void){workspace_prompt();pg_tools files={0,allow,execute,0,0,0,0};char out[5000];size_t n;

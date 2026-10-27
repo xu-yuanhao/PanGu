@@ -17,10 +17,15 @@ typedef struct {
  const pg_tools *user_files;
  void *user_context;
  int (*user_probe)(void *,const char *path);
- pg_slice user_directory;
+ pg_slice user_directory; /* Canonical absolute directory for deduplication. */
+ /* Optional complete read/probe rooted at filesystem '/', receiving paths
+    relative to that root. Only ancestor context candidates are requested. */
+ const pg_tools *ancestor_files;
+ void *ancestor_context;
+ int (*ancestor_probe)(void *,const char *);
 } pg_prompt_workspace_source;
 /* Pi coding sections: default/custom prefix, declared tools/rules, addendum,
-   user/project context candidates and cwd. Project SYSTEM/APPEND overrides
+   user/ancestor/project context candidates and cwd. Project SYSTEM/APPEND overrides
    the corresponding user resource; user instructions precede project ones. Owns no source resources; output <4096.
    Failure clears output/size. Calls are serialized with the file service. */
 int pg_prompt_workspace(const pg_prompt_workspace_source *,char *,size_t,size_t *);

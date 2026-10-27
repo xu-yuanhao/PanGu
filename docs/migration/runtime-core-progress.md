@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 项目`.pangu/SYSTEM.md`/`APPEND_SYSTEM.md`分别覆盖用户资源同名文件；用户指令先于本地项目指令，均按override/AGENTS/CLAUDE顺序选择。
-- 用户目录默认`~/.pangu/agent`，`PANGU_AGENT_DIR`可指定；完整只读资源服务在prompt构建后关闭，实际prompt沿既有Generation请求配置保存/恢复。
-- prompt专项ASan/UBSan、隔离产品构建及G00/Assembly通过；Runtime整批回归与真实TUI/DeepSeek资源覆盖、重开、用户fallback和请求期持久systemPrompt核对均通过。
+- 项目上下文按用户目录→根至父目录→当前项目加载；每目录保持override/AGENTS/CLAUDE顺序，用户目录处于祖先或当前目录时按canonical路径去重。
+- 祖先路径遍历/组装为Assembly，复用完整只读文件服务；文件服务在prompt生成后关闭，实际prompt继续沿Generation保存配置/恢复。
+- prompt专项ASan/UBSan、隔离产品构建、G00/Assembly通过；Runtime整批回归与真实TUI/DeepSeek继承、重开、fallback及请求期持久prompt顺序均通过。
 
 ## 当前接口边界
 
