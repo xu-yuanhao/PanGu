@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` classify/poll/abort、pi-ai `DeferredHandle` 和 harness-generation 的deferred轮询/取消/提前唤醒用例。核对Pi远端 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`、Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`；本批沿固定快照实现deferred调用链。
-- 实际调用链：provider complete返回deferred handle → Generation保存handle、原配置/cutoff、pollAt与sleeping Task → Scheduler定时恢复 → provider fetch驱动既有事件流 → 最终assistant/工具原子分类。重复pending取回的pollAt严格前进；提前唤醒重新睡眠。取消先取得提供者、协作等待cancel完成、释放租约并保存aborted终态。
-- 验证：SQLite/JSONL取消专项覆盖pending取消、零fetch、lease释放和终态重开；ASan/UBSan通过。最终真实DeepSeek闭环使用测试提供者模拟远端deferred句柄/一次pending取回，再连接真实API，核对sleeping重开、两次fetch、工具/follow-up、HTTP 200。Runtime完整回归、隔离产品构建及ABI2原生插件实际流程的结果见当前实现记录。
-- 接口与自审：model.provider ABI2为96字节，尾部加入fetch_deferred/cancel_deferred；现有pg_model事件布局保持。Generation host为96字节，新增poll phase后模块296字节；公开消费者、组合和插件夹具同步。默认OpenAI-completions保持原配置/传输，deferred能力由提供者声明；生产纯逻辑手写Assembly，C只负责服务接线。
-- 剩余与下一交付物：K07继续补齐thinking/流中tool参数partial、进度配置、fault/orphan和deferred Live观察/取消失败语义；K10/K13将现有队列与任务事实接入实际查询操作。K02/K09完整扩展生命周期按覆盖表继续；并行TUI工作保留原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` startToolRound/tools/abort/readCalls/createToolTask，以及 `harness-tools.test.ts` 全局顺序执行和取消场景。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`；本批采用固定快照的轮次语义。
+- 实际调用链：保存的toolExecution=sequential → assistant与首个Tool/wait同批提交 → 剩余call ID保存在pending → 每个结果结算后原子创建下一个owned Tool并更新waiting → 完成后沿Inputs边界启动后继Generation。取消先排空已启动子任务，再按原assistant给未启动调用写aborted结果，和Generation/输入结算同批提交。产品通过PANGU_TOOL_EXECUTION选择parallel/sequential。
+- 验证：SQLite/JSONL持久轮次场景核对单任务准入、实际文件read顺序、中途关闭重开，以及取消后两个call/result精确配对；ASan/UBSan通过。真实DeepSeek两后端均返回双read调用，核对首个Tool开始时tools=1/pending=1、两个结果及follow-up，HTTP 200。最终引用清理修正后的Runtime整批回归、隔离产品构建和G00/Assembly通过。
+- 接口与自审：使用既有Generation/Tool/Inputs/Tx契约，公开函数表和结构布局保持；纯逻辑手写Assembly，C仅把启动配置接入已保存请求配置。pending与task ID数组按原生JSON所有权管理；构建清单沿用现有模块，来源登记更新。
+- 剩余与下一交付物：K07/K09继续补齐按工具executionMode要求的顺序轮次、工具可见集合/环境与hooks、富partial和fault/orphan处理；K10/K13继续将队列、任务及Live事实接入查询操作。deferred取消失败语义和Live观察仍按原覆盖表完成。并行TUI工作保留原位。

@@ -1279,6 +1279,22 @@ jmp .Lgg_project_role
  mov [rsp+72],rax
  test rax,rax
  jz .Lgg_stage_alloc
+ call json_object_new_array@PLT
+ mov [rsp+104],rax
+ test rax,rax
+ jz .Lgg_stage_alloc
+ mov dword ptr [rsp+112],0
+ GGET "qword ptr [rbx+16]",tool_execution
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_stage_mode_ready
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_sequential]
+ call strcmp@PLT
+ test eax,eax
+ setz byte ptr [rsp+112]
+.Lgg_stage_mode_ready:
  lea rdi,[rip+.Lgg_tool_definition_json]
  call json_tokener_parse@PLT
  mov [rsp+80],rax
@@ -1330,6 +1346,25 @@ jmp .Lgg_project_role
  call strcmp@PLT
  test eax,eax
  jnz .Lgg_stage_next
+ cmp dword ptr [rsp+112],0
+ je .Lgg_stage_start_call
+ mov rdi,[rsp+72]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lgg_stage_start_call
+ GGET "qword ptr [rsp+136]",id
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rbp,rax
+ mov rdi,[rsp+104]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lgg_stage_next
+ mov rdi,rbp
+ call json_object_put@PLT
+ jmp .Lgg_stage_alloc
+.Lgg_stage_start_call:
  lea rdi,[rip+.Lgg_tool_input_json]
  call json_tokener_parse@PLT
  mov [rsp+96],rax
@@ -1395,6 +1430,12 @@ jmp .Lgg_project_role
  GGET "qword ptr [rsp+64]",checkpoint
  mov r14,rax
  mov rdi,rax
+ lea rsi,[rip+.Lgg_pending]
+ mov rdx,[rsp+104]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_stage_end
+ mov rdi,r14
  lea rsi,[rip+.Lgg_tools_key]
  mov rdx,[rsp+72]
  call .Lgg_copy_field
@@ -1464,6 +1505,8 @@ jmp .Lgg_project_role
  mov rdi,[rsp+88]
  call json_object_put@PLT
  mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov rdi,[rsp+104]
  call json_object_put@PLT
  mov eax,ebp
  add rsp,224
@@ -1590,9 +1633,18 @@ jmp .Lgg_project_role
  call .Lgg_operation
  test eax,eax
  jnz .Lgg_tools_error
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ GGET rax,pending
+ mov rdi,rax
+ call json_object_array_length@PLT
+ lea rdx,[rip+.Lgg_handoff]
+ test rax,rax
+ jz .Lgg_tools_commit
+ lea rdx,[rip+.Lgg_next_tool]
+.Lgg_tools_commit:
  mov rdi,rbx
  mov rsi,[rbx+56]
- lea rdx,[rip+.Lgg_handoff]
  call pg_task_runner_commit_with@PLT
 .Lgg_tools_error:
  neg eax
@@ -1625,6 +1677,11 @@ jmp .Lgg_project_role
  mov rdx,rax
  mov rcx,rsp
  call pg_durable_inputs_prepare@PLT
+ test eax,eax
+ jnz .Lgg_abort_stage_end
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lgg_abort_unstarted
  test eax,eax
  jnz .Lgg_abort_stage_end
  mov rdi,rbx
@@ -2873,3 +2930,350 @@ pg_durable_generation_history:
 
 .section .rodata
 .Lgg_phase: .asciz "phase"
+
+/* Start one saved call only after the preceding owned tool has settled. */
+.text
+.Lgg_next_tool:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,128
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rcx
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ lea rdi,[rip+.Lgg_wait_json]
+ call json_tokener_parse@PLT
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lgg_next_alloc
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",state
+ GGET rax,checkpoint
+ mov rdi,rax
+ lea rsi,[rsp+80]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lgg_next_alloc
+ lea rdi,[rip+.Lgg_tool_input_json]
+ call json_tokener_parse@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lgg_next_alloc
+ GGET "qword ptr [rsp+80]",assistant
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lgg_assistant]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_next_end
+ GGET "qword ptr [rsp+80]",pending
+ mov r14,rax
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lgg_call_id]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_next_end
+ mov rdi,r14
+ xor esi,esi
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Lgg_next_alloc
+ lea rdi,[rip+.Lgg_tool_options_json]
+ call json_tokener_parse@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lgg_next_alloc
+ GGET rax,ownership
+ mov r14,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax+16]
+ call json_object_new_uint64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_task_id]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_next_end
+ lea rdi,[rip+.Lgg_tool_definition_json]
+ call json_tokener_parse@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lgg_next_alloc
+ mov [rsp],rbx
+ lea rax,[rip+.Lgg_child_initial]
+ mov [rsp+8],rax
+ lea rax,[rip+.Lgg_child_mint]
+ mov [rsp+16],rax
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+32],rax
+ mov rdi,r12
+ mov rsi,[rsp+64]
+ mov rdx,[rsp+56]
+ mov rcx,[rsp+48]
+ mov r8,rsp
+ lea r9,[rsp+88]
+ call pg_record_tx_create_task@PLT
+ test eax,eax
+ jnz .Lgg_next_bad
+ GGET "qword ptr [rsp+80]",tools_key
+ mov r14,rax
+ mov rdi,[rsp+88]
+ call json_object_new_uint64@PLT
+ mov [rsp+96],rax
+ test rax,rax
+ jz .Lgg_next_alloc
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+104],rax
+ mov rdi,r14
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_next_alloc
+ mov qword ptr [rsp+104],0
+ GGET "qword ptr [rsp+72]",on
+ mov rdi,rax
+ mov rsi,[rsp+96]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_next_alloc
+ mov qword ptr [rsp+96],0
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lgg_checkpoint]
+ mov rdx,[rsp+80]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_next_end
+ mov rax,[rsp+72]
+ mov [r13],rax
+ mov qword ptr [rsp+72],0
+ xor eax,eax
+ jmp .Lgg_next_end
+.Lgg_next_bad:
+ mov eax,4
+ jmp .Lgg_next_end
+.Lgg_next_alloc:
+ mov eax,5
+.Lgg_next_end:
+ mov ebp,eax
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ mov rdi,[rsp+80]
+ call json_object_put@PLT
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,128
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_tool_execution: .asciz "toolExecution"
+.Lgg_sequential: .asciz "sequential"
+.Lgg_pending: .asciz "pending"
+
+/* Pending IDs refer to the committed assistant; each receives exactly one
+   aborted result in the same transaction that ends the generation. */
+.text
+.Lgg_abort_unstarted:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ mov [rsp+48],rax
+ GGET rax,pending
+ test rax,rax
+ jz .Lgg_unstarted_ok
+ mov r13,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lgg_unstarted_ok
+ GGET "qword ptr [rsp+48]",assistant
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdi,r12
+ mov rsi,rax
+ xor edx,edx
+ mov rcx,rsp
+ call pg_record_tx_entry@PLT
+ test eax,eax
+ jnz .Lgg_unstarted_bad
+ GGET "qword ptr [rsp]",model
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ GGET rax,content
+ mov r14,rax
+.Lgg_unstarted_next:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp [rsp+24],rax
+ jae .Lgg_unstarted_ok
+ mov rdi,r13
+ mov rsi,[rsp+24]
+ call json_object_array_get_idx@PLT
+ mov [rsp+56],rax
+ mov qword ptr [rsp+32],0
+.Lgg_unstarted_find:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp [rsp+32],rax
+ jae .Lgg_unstarted_skip
+ mov rdi,r14
+ mov rsi,[rsp+32]
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ GGET rax,id
+ mov rdi,rax
+ mov rsi,[rsp+56]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lgg_unstarted_found
+ inc qword ptr [rsp+32]
+ jmp .Lgg_unstarted_find
+.Lgg_unstarted_found:
+ lea rdi,[rip+.Lgg_unstarted_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lgg_unstarted_alloc
+ GGET rax,model
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+72],rax
+ GGET "qword ptr [rsp+64]",id
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lgg_tool_call_id]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_unstarted_end
+ GGET "qword ptr [rsp+64]",name_key
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lgg_tool_name]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_unstarted_end
+ GGET "qword ptr [rsp+8]",data
+ mov [rsp+80],rax
+ GGET "qword ptr [rsp+64]",arguments
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lgg_arguments]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_unstarted_end
+ GGET "qword ptr [rsp+64]",id
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lgg_call_id]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_unstarted_end
+ GGET "qword ptr [rsp+64]",name_key
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lgg_name_key]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_unstarted_end
+ GGET "qword ptr [rbx+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,r12
+ mov rdx,[rsp+8]
+ mov rcx,[rbx+16]
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ lea r9,[rsp+16]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lgg_unstarted_bad
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lgg_unstarted_skip:
+ inc qword ptr [rsp+24]
+ jmp .Lgg_unstarted_next
+.Lgg_unstarted_ok:
+ xor eax,eax
+ jmp .Lgg_unstarted_end
+.Lgg_unstarted_bad:
+ mov eax,4
+ jmp .Lgg_unstarted_end
+.Lgg_unstarted_alloc:
+ mov eax,5
+.Lgg_unstarted_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_unstarted_json: .asciz "{\"kind\":\"pangu.tool-result\",\"model\":[{\"role\":\"toolResult\",\"toolCallId\":\"\",\"toolName\":\"\",\"content\":[{\"type\":\"text\",\"text\":\"Tool call was aborted before execution\"}],\"isError\":true}],\"data\":{\"status\":\"aborted\",\"diagnostics\":[{\"severity\":\"error\",\"code\":\"aborted\",\"message\":\"Tool call was aborted before execution\"}]}}"
+
+.section .rodata
+.Lgg_data: .asciz "data"

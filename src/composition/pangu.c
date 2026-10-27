@@ -197,6 +197,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
  if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
+ const char *execution=getenv("PANGU_TOOL_EXECUTION");if(execution){if(strcmp(execution,"parallel")&&strcmp(execution,"sequential"))return 1;if(json_object_object_add(durable.configuration,"toolExecution",json_object_new_string(execution)))return 1;}
  const char *options=getenv("PANGU_MODEL_OPTIONS");if(options){
   size_t size=strlen(options);if(size>=4096)return 1;struct json_tokener *parser=json_tokener_new();if(!parser)return 1;
   json_tokener_set_flags(parser,JSON_TOKENER_STRICT|JSON_TOKENER_VALIDATE_UTF8);struct json_object *value=json_tokener_parse_ex(parser,options,(int)size+1);
