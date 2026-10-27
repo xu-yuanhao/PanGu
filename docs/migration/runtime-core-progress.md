@@ -564,3 +564,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实际验证：三scope、kind/key/owner过滤、驱逐后转换、退休value身份与重复退休、重建/版本/空ops、12个直接分配/插入/复制故障；直接执行固定上游#observeDocument/atAddress，11组逐事件结果与原生一致。初始测试误为Session/Task definition附加Conversation策略，被实际cache检查拒绝；按scope改正夹具后重跑全部验证。
 - 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过，共享/隔离核心G00和Assembly及隔离产品构建通过。隔离核心树6f64b04a96604d2c76d50c90ed3126c5fe44f87a；其后仅为本组件TODO加完成勾选，6路径最终内容清单摘要（本记录加入前）5937a89c56dd249089b131798f8921c0d74f109c841538311965401ba8eb7202，候选树3747dbe485180ed7d974d365e3f0d6364ce8581c。
 - 同一实施Agent自审结论：地址跟随转换本地通过；下一批连接实际Session监听、pin/unpin、detach/owner结束/close及watch消费。K03完整观察项保持未勾选，TUI工作保留。
+
+## K03 同步observer订阅与回调生命周期
+
+- 固定Pi 8b0caef #observeDocument/guardObserver/endGuarded/#notifyClose与observeDoc调用者，阅读observer detach/end/error/terminal用例；fetch后Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写binding消费已有owned地址状态，登记internal/close监听，按incarnation组合注入pin/unpin；detach在同一publication/registry快照中立即生效，独立release拒绝正在派发的caller storage释放。host回调错误report、detach/end并包含end错误，保持Session健康；Task终态在本批文档变化后结束。实际DocTx修改/退休通过adoption通知抵达binding。
+- 实际验证：六组生命周期矩阵、三种attach allocation/clone/registry故障、两个真实DocTx提交；直接执行Pi #observeDocument/guardObserver/#notifyClose与原生六组pin/advance/end/report结果一致。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过，共享/隔离核心G00/Assembly及隔离产品构建通过。
+- 同一实施Agent自审：6候选路径内容清单摘要（本记录加入前）6f4b6c6416f0d52b2e08c2eb1c8d86fe8c30eb3648f58e5194f98a8419dd88c8；隔离核心树7bcbc74f0c61b4769d1c33da4038f9e8c4af8114。结论为同步订阅生命周期本地通过；native cache pin计数/idle、Session获取/取消与watch消费继续接入，K03全量未完成。TUI工作保留。

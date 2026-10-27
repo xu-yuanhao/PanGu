@@ -749,6 +749,16 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print(f'PASS: {len(changes)} native address-following state transitions match actual Pi 8b0caef observeDocument')
 
+def observer_source_lifecycle():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8');const a=source.indexOf('\n\t#observeDocument<'),b=source.indexOf('\n\tasync #loadDocument',a),c=source.indexOf('function atAddress('),d=source.indexOf('\nfunction cancellationError',c),e=source.indexOf('export function guardObserver'),f=source.indexOf('\n/**',e),g=source.indexOf('\n\t#notifyClose():'),h=source.indexOf('\n\t/**',g);function contained(fn,onError){try{fn()}catch(error){onError(error)}}function checkRecordScope(){}function checkRecordVersion(){}const NO_OPERATIONS=[];const atAddress=eval('('+stripTypeScriptTypes(source.slice(c,d))+')'),guardObserver=eval('('+stripTypeScriptTypes(source.slice(e,f).replace('export ',''))+')');const Probe=eval('('+stripTypeScriptTypes(`class Probe{#failure;#documentSweep;#holdTimer;commits=new Set();#closeListeners=new Set();pins=0;unpins=0;advances=0;ends=0;reports=0;failure=0;guard;record;mode;constructor(mode){this.mode=mode;this.record={id:2,kind:'defer',scope:mode===4?{kind:'task',taskId:100}:{kind:'conversation',conversationId:1}};const observer={advance:()=>{this.advances++;if(mode===1)this.guard.detach();if(mode===2)throw 7},end:f=>{this.ends++;this.failure=f?.error??0;if(mode===2)throw 9}};this.guard=this.#observeDocument({}, {addressId:'a',record:this.record,storedVersion:1,valueVersion:1,tracker:{value:{text:'seed'}}},(value,detach,report)=>guardObserver(observer,detach,report),o=>o.end(undefined))}#pinDocument(){this.pins++;let pinned=true;return ()=>{if(pinned){pinned=false;this.unpins++}}}observeCommits(fn){this.commits.add(fn);return ()=>this.commits.delete(fn)}subscribeClose(fn){this.#closeListeners.add(fn);return ()=>this.#closeListeners.delete(fn)}report(){this.reports++}deliver(changes){for(const fn of [...this.commits])fn({changes},null)}change(id=2,version=1,value={text:'notice'}){return {type:'document',record:{...this.record,id},value,ops:[['s',['text'],'notice']],version}}run(){if(this.mode===5)this.guard.detach();if(this.mode===3){this.#failure={error:3};this.#notifyClose()}this.deliver([...(this.mode===4?[{type:'task',value:{id:100,state:{status:'terminal'}}}]:[]),this.change(),this.change()]);if(this.mode===0){this.deliver([this.change(2,1,null),this.change(20,2)]);this.#notifyClose()}return {pins:this.pins,unpins:this.unpins,advances:this.advances,ends:this.ends,reports:this.reports,failure:this.failure}}`+source.slice(a,b)+source.slice(g,h)+'}')+')');console.log(JSON.stringify(Array.from({length:6},(_,mode)=>new Probe(mode).run())));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    expected=[dict(pins=2 if mode==0 else 1,unpins=2 if mode==0 else 1,advances=[4,1,1,0,2,0][mode],ends=int(mode in [0,2,3,4]),reports=2 if mode==2 else 0,failure=7 if mode==2 else 3 if mode==3 else 0) for mode in range(6)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi observeDocument/guardObserver/notifyClose match native six-scenario lifecycle, pin and contained-host-error matrix')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1042,5 +1052,6 @@ def main():
         adoption_source_order()
         close_source_order()
         observation_source_state(native,library)
+        observer_source_lifecycle()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

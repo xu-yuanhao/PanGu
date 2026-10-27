@@ -568,3 +568,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] durable_session.S/h新增独立owned观察状态与单个Document notice转换：checked loaded初始化后独立持有地址/值，缓存驱逐不影响；相同incarnation直接匹配，其他incarnation按kind/key/scope/owner匹配。退休事件保留上次value身份、空ops并从状态释放value；同址重建/版本改变生成root replacement；同版本空ops不交付。所有fallible准备先于状态替换，失败清空输出且保留原状态。
 - observation_state_tests覆盖三scope、地址过滤、缓存驱逐、退休值身份、重复退休、重建/版本/空ops及12个直接分配/插入/复制故障。test_record_memory.py直接执行固定上游#observeDocument/atAddress，11组逐次事件与原生一致。
 - 下一行为：将转换接入实际Session订阅、pin/unpin、detach/owner终态及close回调，再完成同步observeDoc与watch消费；本批状态转换组件不等同完整watch。
+
+### K03 同步Document observer订阅生命周期
+
+- 固定Pi 8b0caef #observeDocument、guardObserver、endGuarded、#notifyClose及observeDoc调用者；阅读session-observers的detach/end/errors/terminal与session-watches的incarnation行为。fetch后Pi origin保持6c384aa，Harness保持22ddee37。
+- [x] durable_session.S/h接通独立同步observer binding：内部commit与close双订阅，injected pin/unpin随incarnation先释放/转移再交付；detach可在回调中执行、移除两种订阅并阻止当前publication剩余交付；独立release等registry snapshot和callback退出后释放owned状态。host advance错误report后detach/end，end错误只report；Task owner终态在本publication文档变化结束后end。公开既有ABI保持。
+- 原生六组正常/回调detach/host错误/Session失败关闭/Task终态/提前detach，核对pin、通知次数、报告与end原因；三个attach分配/clone/registry故障完整回滚。实际DocTx普通提交与retire通过默认adoption通知进入binding，退休后value与pin释放但地址订阅继续。直接执行实际上游#observeDocument/guardObserver/#notifyClose，六组生命周期矩阵一致。
+- 下一行为：将injected pin服务接入原生缓存计数/idle管理，补齐Session获取/取消入口与异步watch消费；同步binding是watch共用生命周期的已有落点，完整观察项继续按全量验收。

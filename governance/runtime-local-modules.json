@@ -1274,7 +1274,10 @@
         "pg_document_observation_open",
         "pg_document_observation_advance",
         "pg_document_observation_change_release",
-        "pg_document_observation_close"
+        "pg_document_observation_close",
+        "pg_document_observer_open",
+        "pg_document_observer_detach",
+        "pg_document_observer_release"
       ],
       "reference_basis": [
         {
@@ -1335,6 +1338,18 @@
             "packages/durable/src/session/session.ts"
           ],
           "semantics": "#observeDocument and atAddress: detached native state follows logical address and incarnation/version, retirement delivers its last value with no ops and releases retained value, recreation/version change delivers root replacement, same-version empty ops are suppressed; fallible native preparation preserves old state and output ownership",
+          "tests_to_read": [
+            "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#observeDocument and guardObserver synchronous binding registers internal and close listeners, transfers injected incarnation pins before host delivery, stops after detach even within one publication, reports/contains host callback errors and ends once; terminal task owner ends only after all matching document changes; caller storage release waits for registry snapshot dispatch to finish",
           "tests_to_read": [
             "packages/durable/test/session-observers.test.ts",
             "packages/durable/test/session-watches.test.ts"

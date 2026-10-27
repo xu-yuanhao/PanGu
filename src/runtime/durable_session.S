@@ -3873,3 +3873,412 @@ pg_document_observation_advance:
 .section .rodata
 .Lobservation_root_name: .asciz "r"
 .section .note.GNU-stack,"",@progbits
+
+.text
+/* Caller-owned binding survives snapshots until release sees an idle registry. */
+.globl pg_document_observer_detach
+.type pg_document_observer_detach,@function
+pg_document_observer_detach:
+ push rbx
+ mov rbx,rdi
+ test rbx,rbx
+ jz .Lobserver_detach_end
+ cmp dword ptr [rbx+96],0
+ je .Lobserver_detach_end
+ mov dword ptr [rbx+96],0
+ mov rdi,[rbx+40]
+ xor esi,esi
+ lea rdx,[rip+.Lobserver_commit]
+ mov rcx,rbx
+ call pg_session_unlisten
+ mov rdi,[rbx+40]
+ mov esi,2
+ lea rdx,[rip+.Lobserver_close]
+ mov rcx,rbx
+ call pg_session_unlisten
+ mov rsi,[rbx+88]
+ mov qword ptr [rbx+88],0
+ test rsi,rsi
+ jz .Lobserver_detach_end
+ mov rdi,[rbx+48]
+ call [rbx+80]
+.Lobserver_detach_end:
+ pop rbx
+ ret
+.size pg_document_observer_detach,.-pg_document_observer_detach
+
+.globl pg_document_observer_release
+.type pg_document_observer_release,@function
+pg_document_observer_release:
+ mov eax,1
+ test rdi,rdi
+ jz .Lobserver_release_end
+ cmp dword ptr [rdi+100],0
+ jne .Lobserver_release_end
+ mov rax,[rdi+40]
+ test rax,rax
+ jz .Lobserver_release_owned
+ cmp dword ptr [rax+48],0
+ jne .Lobserver_release_invalid
+.Lobserver_release_owned:
+ push rbx
+ mov rbx,rdi
+ call pg_document_observer_detach
+ mov rdi,rbx
+ call pg_document_observation_close
+ pop rbx
+ ret
+.Lobserver_release_invalid:
+ mov eax,1
+.Lobserver_release_end:
+ ret
+.size pg_document_observer_release,.-pg_document_observer_release
+
+.Lobserver_report:
+ mov rax,[rdi+40]
+ cmp qword ptr [rax+40],0
+ je .Lobserver_report_end
+ mov rdi,[rax+32]
+ jmp [rax+40]
+.Lobserver_report_end:
+ ret
+
+.Lobserver_end:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12d,esi
+ cmp dword ptr [rbx+96],0
+ je .Lobserver_end_done
+ call pg_document_observer_detach
+ mov rdi,[rbx+48]
+ mov esi,r12d
+ call [rbx+64]
+ test eax,eax
+ jz .Lobserver_end_done
+ mov rdi,rbx
+ mov esi,eax
+ call .Lobserver_report
+.Lobserver_end_done:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+.Lobserver_close:
+ push rbx
+ mov rbx,rdi
+ mov rax,[rbx+40]
+ mov rax,[rax]
+ mov esi,[rax+52]
+ call .Lobserver_end
+ xor eax,eax
+ pop rbx
+ ret
+
+.Lobserver_pin_update:
+ push rbx
+ mov rbx,rdi
+ mov rax,[rbx+16]
+ cmp rax,[rbx+88]
+ je .Lobserver_pin_ok
+ mov rsi,[rbx+88]
+ mov qword ptr [rbx+88],0
+ test rsi,rsi
+ jz .Lobserver_pin_new
+ mov rdi,[rbx+48]
+ call [rbx+80]
+.Lobserver_pin_new:
+ mov rsi,[rbx+16]
+ test rsi,rsi
+ jz .Lobserver_pin_ok
+ mov rdi,[rbx+48]
+ call [rbx+72]
+ test eax,eax
+ jnz .Lobserver_pin_end
+ mov rax,[rbx+16]
+ mov [rbx+88],rax
+.Lobserver_pin_ok:
+ xor eax,eax
+.Lobserver_pin_end:
+ pop rbx
+ ret
+
+.globl pg_document_observer_open
+.type pg_document_observer_open,@function
+pg_document_observer_open:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov eax,1
+ test rbx,rbx
+ jz .Lobserver_open_end
+ test r12,r12
+ jz .Lobserver_open_end
+ test r14,r14
+ jz .Lobserver_open_end
+ cmp dword ptr [rbx+96],0
+ jne .Lobserver_open_end
+ cmp dword ptr [rbx+100],0
+ jne .Lobserver_open_end
+ cmp dword ptr [r12+52],0
+ jne .Lobserver_open_end
+ mov rax,[r12]
+ test rax,rax
+ jz .Lobserver_open_invalid
+ cmp dword ptr [rax+52],0
+ jne .Lobserver_open_invalid
+ cmp qword ptr [r14+8],0
+ je .Lobserver_open_invalid
+ cmp qword ptr [r14+16],0
+ je .Lobserver_open_invalid
+ cmp qword ptr [r14+24],0
+ je .Lobserver_open_invalid
+ cmp qword ptr [r14+32],0
+ je .Lobserver_open_invalid
+ mov rsi,r13
+ call pg_document_observation_open
+ test eax,eax
+ jnz .Lobserver_open_end
+ mov [rbx+40],r12
+ mov rax,[r14]
+ mov [rbx+48],rax
+ mov rax,[r14+8]
+ mov [rbx+56],rax
+ mov rax,[r14+16]
+ mov [rbx+64],rax
+ mov rax,[r14+24]
+ mov [rbx+72],rax
+ mov rax,[r14+32]
+ mov [rbx+80],rax
+ mov qword ptr [rbx+88],0
+ mov dword ptr [rbx+96],1
+ mov rdi,rbx
+ call .Lobserver_pin_update
+ test eax,eax
+ jnz .Lobserver_open_cleanup
+ mov rdi,r12
+ xor esi,esi
+ lea rdx,[rip+.Lobserver_commit]
+ mov rcx,rbx
+ call pg_session_listen
+ test eax,eax
+ jnz .Lobserver_open_cleanup
+ mov rdi,r12
+ mov esi,2
+ lea rdx,[rip+.Lobserver_close]
+ mov rcx,rbx
+ call pg_session_listen
+ test eax,eax
+ jz .Lobserver_open_end
+.Lobserver_open_cleanup:
+ mov rdi,rbx
+ call pg_document_observer_detach
+ mov rdi,rbx
+ call pg_document_observation_close
+ mov eax,3
+ jmp .Lobserver_open_end
+.Lobserver_open_invalid:
+ mov eax,1
+.Lobserver_open_end:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_observer_open,.-pg_document_observer_open
+
+.Lobserver_commit:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,184
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor ebp,ebp
+ cmp dword ptr [rbx+96],0
+ je .Lobserver_commit_end
+ cmp dword ptr [rbx+100],0
+ jne .Lobserver_commit_invalid
+ mov dword ptr [rbx+100],1
+ mov qword ptr [rsp+96],0
+ mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+112],0
+ mov dword ptr [rsp+144],0
+ mov rdi,[rbx]
+ mov rsi,rsp
+ call pg_document_record_decode@PLT
+ test eax,eax
+ jnz .Lobserver_commit_error
+ mov eax,[rsp+40]
+ mov [rsp+152],eax
+ mov rax,[rsp+32]
+ mov [rsp+160],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lpublication_changes]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lobserver_commit_bad
+ mov [rsp+120],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov r15,rax
+ xor r14d,r14d
+.Lobserver_commit_each:
+ cmp dword ptr [rbx+96],0
+ je .Lobserver_commit_cleanup
+ cmp r14,r15
+ jae .Lobserver_commit_owner
+ mov rdi,[rsp+120]
+ mov rsi,r14
+ inc r14
+ call json_object_array_get_idx@PLT
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lobserver_commit_bad
+ mov [rsp+128],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lpublication_task]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lobserver_commit_task
+ mov rdi,[rsp+128]
+ lea rsi,[rip+.Lnotice_document]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lobserver_commit_each
+ mov rdi,r12
+ lea rsi,[rip+.Lnotice_record]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,rsp
+ call pg_document_record_decode@PLT
+ test eax,eax
+ jnz .Lobserver_commit_error
+ mov rax,rsp
+ mov [rsp+64],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lnotice_value_key]
+ call json_object_object_get@PLT
+ mov [rsp+72],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lnotice_ops]
+ call json_object_object_get@PLT
+ mov [rsp+80],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lnotice_version]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov [rsp+88],rax
+ mov rdi,rbx
+ lea rsi,[rsp+64]
+ lea rdx,[rsp+96]
+ call pg_document_observation_advance
+ cmp eax,8
+ je .Lobserver_commit_each
+ test eax,eax
+ jnz .Lobserver_commit_error
+ mov rdi,rbx
+ call .Lobserver_pin_update
+ test eax,eax
+ jnz .Lobserver_commit_error
+ mov rdi,[rbx+48]
+ lea rsi,[rsp+96]
+ mov rdx,r13
+ call [rbx+56]
+ test eax,eax
+ jz .Lobserver_commit_delivered
+ mov [rsp+168],eax
+ mov rdi,rbx
+ mov esi,eax
+ call .Lobserver_report
+ mov rdi,rbx
+ mov esi,[rsp+168]
+ call .Lobserver_end
+.Lobserver_commit_delivered:
+ lea rdi,[rsp+96]
+ call pg_document_observation_change_release
+ jmp .Lobserver_commit_each
+.Lobserver_commit_task:
+ cmp dword ptr [rsp+152],2
+ jne .Lobserver_commit_each
+ mov rdi,r12
+ lea rsi,[rip+.Lnotice_value_key]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lobserver_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ cmp rax,[rsp+160]
+ jne .Lobserver_commit_each
+ mov rdi,r12
+ lea rsi,[rip+.Lobserver_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lobserver_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lobserver_commit_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lobserver_terminal]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lobserver_commit_each
+ mov dword ptr [rsp+144],1
+ jmp .Lobserver_commit_each
+.Lobserver_commit_owner:
+ cmp dword ptr [rsp+144],0
+ je .Lobserver_commit_cleanup
+ mov rdi,rbx
+ xor esi,esi
+ call .Lobserver_end
+ jmp .Lobserver_commit_cleanup
+.Lobserver_commit_bad:
+ mov eax,1
+.Lobserver_commit_error:
+ mov ebp,eax
+.Lobserver_commit_cleanup:
+ lea rdi,[rsp+96]
+ call pg_document_observation_change_release
+ mov dword ptr [rbx+100],0
+ jmp .Lobserver_commit_end
+.Lobserver_commit_invalid:
+ mov ebp,1
+.Lobserver_commit_end:
+ mov eax,ebp
+ add rsp,184
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lobserver_id: .asciz "id"
+.Lobserver_state: .asciz "state"
+.Lobserver_status: .asciz "status"
+.Lobserver_terminal: .asciz "terminal"
+.section .note.GNU-stack,"",@progbits

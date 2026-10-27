@@ -269,4 +269,29 @@ pg_document_status pg_document_observation_open(pg_document_observation *,const 
 pg_document_status pg_document_observation_advance(pg_document_observation *,const pg_document_observation_input *,pg_document_observation_change *);
 void pg_document_observation_change_release(pg_document_observation_change *);
 pg_document_status pg_document_observation_close(pg_document_observation *);
+typedef struct {
+ void *context;
+ int (*advance)(void *,const pg_document_observation_change *,void *delivery_context);
+ int (*end)(void *,int failure);
+ int (*pin)(void *,uint64_t incarnation);
+ void (*unpin)(void *,uint64_t incarnation);
+} pg_document_observer_host;
+typedef struct {
+ pg_document_observation state;
+ pg_session_listeners *listeners;
+ pg_document_observer_host host;
+ uint64_t pinned;
+ unsigned attached,busy;
+} pg_document_observer;
+/* Mutation-line attachment to an already acquired checked document. Copies the
+   host; listeners/context stay borrowed through release. Pin services serialize
+   cache ownership without user callbacks. Successful pin is undone once.
+   Synchronous advance errors report, detach and end with that error; end errors
+   report. Task owner terminal ends after all its document changes. Detach may
+   run inside advance or another observer, stops the remainder of the snapshot,
+   and keeps caller storage/value alive. Release only outside registry dispatch
+   and callbacks; a rejected release retains all resources. */
+pg_document_status pg_document_observer_open(pg_document_observer *,pg_session_listeners *,const pg_document_loaded *,const pg_document_observer_host *);
+void pg_document_observer_detach(pg_document_observer *);
+pg_document_status pg_document_observer_release(pg_document_observer *);
 #endif
