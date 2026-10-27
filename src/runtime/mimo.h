@@ -14,6 +14,7 @@ typedef struct {
  pg_mimo_call_storage extra[PG_TOOL_BATCH_LIMIT-1];
  pg_model_call calls[PG_TOOL_BATCH_LIMIT];
  unsigned call_count,transport_error;
+ struct json_object *usage; /* owned final provider usage snapshot */
  struct json_object *configuration; /* private owned request identity/options */
 } pg_mimo;
 /* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
@@ -27,6 +28,10 @@ pg_model pg_mimo_model(pg_mimo *);
    max_completion_tokens). 0 success; failure keeps previous binding. Public
    close/cancel releases it; start's transport reset preserves it. */
 int pg_mimo_configure(pg_mimo *,const struct json_object *);
+/* Complete a private assistant JSON before close with stopReason and reported
+   token usage (input/output/cacheRead/cacheWrite/reasoning/totalTokens).
+   Absent provider usage stays absent; this API reports token counts only. */
+int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 /* Bind the same immutable registry used by the executor before starting runs. */
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 /* Internal projection test seam: creates owned request; no network/credentials. */

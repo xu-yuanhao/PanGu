@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/generation.ts` prepare/request保存并使用model/streamOptions、`ai/src/api/openai-completions.ts` buildParams的maxTokens/temperature与maxTokensField兼容映射。本批Pi远端`cd1ea342aea61c6c77127c7a249763dc5227c98d`相关模块无差异；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，固定参考工作树。
-- 实际调用链：产品prepare保存model/endpoint/options；`pg_mimo_configure`在空闲时验证并脱离复制配置，失败保留旧绑定。请求投影/URL选择优先使用该副本；start只重置传输资源，cancel/close释放配置。产品acquire保留工作区绑定检查，直接注入任务保存的配置。`PANGU_MODEL_OPTIONS`是启动时读取的JSON对象，支持maxTokens、temperature、maxTokensField；其公共值随请求持久化，凭据仍由环境提供。
-- 验证：提供者O0/O2专项及ABI/故障路径通过，核对配置副本隔离、环境覆盖、无效候选不替换旧绑定、活动请求拒绝重绑、URL/请求JSON和重复关闭。完整Runtime O0/O2、产品构建、G00/Assembly通过。真实DeepSeek PTY在request checkpoint中断后，用不同的环境model/endpoint/options重开，仍按保存的配置完成实际回答；四工具、exit 7诊断、patch、PanGu身份和历史续聊通过。
-- 接口与自审：`pg_mimo_configure(provider,configuration)`接受拥有model/endpoint与可选options的公开配置；提供者内部增加owned configuration指针，布局头与所有调用者同批重建。pg_model、pg_tools与TUI接口布局不变；构建清单与模块导出已核对。环境中的新设置用于后续prepare，已提交request按自身配置恢复。
-- 剩余与下一交付物：继续B03的完整内容块/协议、usage/thinking/stop reason与工具环境行为，以及K09扩展接入；模型目录、认证配置与TUI设置操作仍按K05/K14完成。现有文本容量和上下文限制保持所属K步骤，完整移植范围不变。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`ai/src/api/openai-completions.ts` parseChunkUsage/mapStopReason/buildParams，以及Durable Generation请求后保存完整assistant的路径。本批Pi远端`72363383ff79d3f12cfa91b03cddb3eb333c6ebc`相关模块无差异，Harness仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，参考工作树固定。
+- 实际调用链：请求启用stream_options.include_usage；SSE在独立空choices分片保留拥有的provider usage。手写`pg_mimo_complete`在模型关闭前写入私有assistant的stopReason/usage，Generation原子保存该消息；错误assistant保留既有失败信息。规范化input扣除cacheRead/cacheWrite并钳制为零，output包含reasoning，totalTokens不重复加reasoning；缓存读取依次取prompt_tokens_details.cached_tokens、prompt_cache_hit_tokens、顶层cached_tokens。length/end成为合法文本终态，工具调用仍验证完整性。close/start清理usage快照。
+- 验证：提供者O0/O2、ABI和故障专项通过，新增缓存字段优先级、写入扣除、reasoning/total及length/end用例。完整Runtime O0/O2、产品构建、G00/Assembly通过；真实DeepSeek PTY四工具、exit 7诊断、patch、PanGu身份和重开续聊通过，并核对每条成功assistant的结束原因和实际token用量。SQLite/JSONL真实Generation重试→read→follow-up→重开及各成功assistant的保存用量检查通过。
+- 接口与自审：`pg_mimo_complete`和Generation host可选complete回调连接提供者结果；host80字节，MiMo内部新增usage所有权字段，布局断言与调用者同批迁移。pg_model、pg_tools、TUI ops/event保持既有布局；只提交核心归属文件，TUI未提交工作保持原位。
+- 剩余与下一交付物：当前记录原生token计数，模型目录价格/cost、聚合usage观察、thinking/image块与其余结束原因/协议仍按K05/K13完成。继续B03模型完整内容/协议和K09扩展实际调用链，完整TODO范围不变。

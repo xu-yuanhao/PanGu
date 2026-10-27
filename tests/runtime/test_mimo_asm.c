@@ -166,7 +166,7 @@ static void test_decode_terminators(void) {
     assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"));
     reset();
     /* 未知结束理由拒绝 */
-    assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}"));
+    assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}")); reset();
     assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"content_filter\"}]}"));
     assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}")); /* 无 id/name */
     reset();
@@ -341,11 +341,23 @@ static void test_saved_configuration(void){
  model.close(model.context);assert(!provider.configuration&&!provider.request);model.close(model.context);unsetenv("PANGU_MODEL_NAME");
 }
 
+static void test_terminal_usage(void){
+ const char *cases[]={
+ "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":30,\"prompt_tokens_details\":{\"cached_tokens\":20,\"cache_write_tokens\":10},\"completion_tokens_details\":{\"reasoning_tokens\":12}}}",
+ "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":30,\"prompt_cache_hit_tokens\":20,\"cached_tokens\":50}}",
+ "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":30,\"cached_tokens\":20}}"};
+ const int expected[][6]={{70,30,20,10,12,130},{80,30,20,0,0,130},{0,30,20,0,0,50}};
+ const char *keys[]={"input","output","cacheRead","cacheWrite","reasoning","totalTokens"};
+ for(size_t j=0;j<3;j++){reset();assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}"));assert(!line(cases[j]));assert(!line("data: [DONE]"));json_object *assistant=json_object_new_object();assert(assistant&&!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(get(assistant,"stopReason")),"length"));json_object *usage=get(assistant,"usage");for(size_t k=0;k<6;k++)assert(json_object_get_int(get(usage,keys[k]))==expected[j][k]);json_object_put(assistant);json_object_put(m.usage);m.usage=0;}
+ reset();assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"end\"}]}"));json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant)&&!strcmp(json_object_get_string(get(assistant,"stopReason")),"stop")&&!get(assistant,"usage"));json_object_put(assistant);
+}
+
 int main(void) {
     test_model_init();
     test_projection_model_env();
     test_empty_tool_text();
     test_saved_configuration();
+    test_terminal_usage();
     test_projection_rejections();
     test_plain_conversation_projection();
     test_decode_terminators();

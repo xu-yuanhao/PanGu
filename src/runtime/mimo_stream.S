@@ -5,7 +5,8 @@
  * 空白），单 choice（长度恰 1）、tool_calls 按整数index 0..7分别累积；id/name/
  * arguments 为增量追加（null 视为缺席），text 为当前分片整串替换。解码出的
  * 字符串含嵌入 NUL、超出定长容量即拒绝。finish_reason：stop 需无工具 id，
- * tool_calls 需所有索引连续、id/name齐备且ID唯一，其余取值拒绝；已 finish 后再收数据→1。
+ * tool_calls 需所有索引连续、id/name齐备且ID唯一；length/end为文本终态。
+ * usage可在空choices分片中更新；已finish后拒绝新的choice，DONE后拒绝数据。
  * event 借用 m 内缓冲，有效期至下一次 decode/生命周期调用。布局见
  * mimo_layout.h；json-c 经 PLT 调用，caller-saved 不跨调用保存活跃值。
  */
@@ -264,6 +265,24 @@ pg_mimo_decode_line:
 1:
  mov rdi, qword ptr [rsp]
  call json_tokener_free@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lstr_usage]
+ call li_get
+ test rax,rax
+ jz .Lusage_absent
+ mov r12,rax
+ mov rdi,rax
+ mov esi,PG_MM_JSON_OBJECT
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldl_bad_put
+ mov rdi,r12
+ call json_object_get@PLT
+ mov r12,rax
+ mov rdi,[rbx+PG_MM_USAGE]
+ call json_object_put@PLT
+ mov [rbx+PG_MM_USAGE],r12
+.Lusage_absent:
  mov rdi, r14
  lea rsi, [rip + .Lstr_choices]
  call li_get
@@ -426,6 +445,10 @@ pg_mimo_decode_line:
  mov rdi,qword ptr [rsp + 56]
  call json_object_get_string_len@PLT
  mov [rsp + 72],eax
+ cmp eax,3
+ je .Lreason_length_ok
+ cmp eax,6
+ je .Lreason_length_ok
  cmp eax,4
  je .Lreason_length_ok
  cmp eax,10
@@ -434,6 +457,30 @@ pg_mimo_decode_line:
  mov rdi, qword ptr [rsp + 56]
  call json_object_get_string@PLT
  mov r12, rax                         /* r */
+ cmp dword ptr [rsp+72],6
+ jne .Lreason_end_alias
+ mov rdi,r12
+ lea rsi,[rip+.Lstr_length]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldl_failed
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
+ jne .Ldl_failed
+ mov dword ptr [rbx+PG_MM_FINISH_REASON],3
+ jmp .Ldl_finish
+.Lreason_end_alias:
+ cmp dword ptr [rsp+72],3
+ jne .Lreason_normal
+ mov rdi,r12
+ lea rsi,[rip+.Lstr_end]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldl_failed
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
+ jne .Ldl_failed
+ mov dword ptr [rbx+PG_MM_FINISH_REASON],1
+ jmp .Ldl_finish
+.Lreason_normal:
  mov rdi, r12
  lea rsi, [rip + .Lstr_stop]
  call strcmp@PLT
@@ -524,3 +571,8 @@ pg_mimo_decode_line:
 .size pg_mimo_decode_line, .-pg_mimo_decode_line
 
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lstr_usage: .asciz "usage"
+.Lstr_length: .asciz "length"
+.Lstr_end: .asciz "end"

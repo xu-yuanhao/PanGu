@@ -1023,6 +1023,19 @@ jmp .Lgg_project_role
  test ebp,ebp
  jnz .Lgg_request_alloc
 .Lgg_request_ready_close:
+ GGET "qword ptr [r14+24]",error_message
+ test rax,rax
+ jnz .Lgg_request_metadata_done
+ mov rax,[r12]
+ cmp qword ptr [rax+72],0
+ je .Lgg_request_metadata_done
+ mov rdi,[rax]
+ lea rsi,[r14+32]
+ mov rdx,[r14+24]
+ call [rax+72]
+ test eax,eax
+ jnz .Lgg_request_invalid
+.Lgg_request_metadata_done:
  mov rax,[r14+64]
  test rax,rax
  jz .Lgg_request_ready_mark

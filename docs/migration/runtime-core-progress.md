@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- `pg_mimo_configure`将已提交请求的model/endpoint/options脱离复制到提供者；传输与请求投影使用该配置，start保留绑定，cancel/close释放它。产品保留工作区绑定校验，按持久request恢复模型配置。
-- 启动时的`PANGU_MODEL_OPTIONS` JSON支持maxTokens、temperature和maxTokensField（max_tokens/max_completion_tokens）。提供者校验类型/预算与有限数值；校验失败保持旧绑定，活动请求不能重绑。
-- 提供者O0/O2、ABI/故障专项、完整Runtime O0/O2与G00/Assembly通过。真实DeepSeek request中断后，以已改变的环境模型/端点/选项重开仍完成保存的请求；四工具、退出码诊断、patch、身份和重开续聊通过。
+- OpenAI SSE保留provider usage，完成回调在关闭前将结束原因及规范化token用量交给私有assistant，与任务结果原子保存。length/end文本终态可正常完成；工具终态仍验证完整参数和ID。
+- usage保存input/output/cacheRead/cacheWrite/reasoning/totalTokens，遵循Pi缓存优先级及reasoning计入output的规则；未报告用量时保持缺席。真实价格/cost与聚合观察按K05/K13继续。
+- 提供者O0/O2/ABI/故障专项、完整Runtime O0/O2、产品构建和G00/Assembly通过。真实DeepSeek PTY四工具、诊断/patch、身份/重开通过，并读取实际assistant的stopReason和usage。
 
 ## 当前接口边界
 

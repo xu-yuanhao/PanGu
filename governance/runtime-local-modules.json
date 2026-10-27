@@ -149,7 +149,8 @@
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
         "pg_mimo_bind_tools",
         "pg_mimo_encode_request (internal projection test seam)",
-        "pg_mimo_configure"
+        "pg_mimo_configure",
+        "pg_mimo_complete"
       ],
       "reference_basis": [
         {

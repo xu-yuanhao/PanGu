@@ -12,7 +12,7 @@ int main(void){
  assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"));assert(m.finish_reason==1);
  assert(!line("data: [DONE]"));assert(m.saw_done);assert(line("data: [DONE]"));
  m=(pg_mimo){0};assert(line("data: [DONE]"));assert(line("data: broken"));assert(line("data: {\"choices\":[]}junk"));
- assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}"));
+ assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}"));assert(m.finish_reason==3);
  m=(pg_mimo){0};
  assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"echo\",\"arguments\":\"{\"}}]}}]}"));
  assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"}\"}}]}}]}"));

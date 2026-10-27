@@ -131,7 +131,7 @@ def workflow(binary, root, env):
     assert secret and secret not in saved
     def records(value):
         if isinstance(value, dict):
-            if value.get('kind') == 'pangu.tool-result':
+            if value.get('kind') in ('pangu.tool-result', 'pangu.assistant'):
                 yield value
             for child in value.values():
                 yield from records(child)
@@ -140,6 +140,7 @@ def workflow(binary, root, env):
                 yield from records(child)
     edits = []
     failed_bash = []
+    model_results = []
     for path in directory.iterdir():
         if path.is_file():
             for line in path.read_bytes().splitlines():
@@ -149,10 +150,15 @@ def workflow(binary, root, env):
                     continue
                 for entry in records(value):
                     message = entry['model'][0]
+                    if entry['kind'] == 'pangu.assistant':
+                        model_results.append(message)
+                        continue
                     if message['toolName'] == 'edit' and not message['isError']:
                         edits.append(entry)
                     if message['toolName'] == 'bash' and message['isError']:
                         failed_bash.append(entry)
+    assert model_results and all(m['stopReason'] in ('stop', 'toolUse', 'length') for m in model_results)
+    assert all(m['usage']['totalTokens'] > 0 and m['usage']['output'] > 0 for m in model_results)
     assert edits, 'missing committed actual edit receipt'
     assert any(e['data']['structuredOutput']['exitCode'] == 7
                and any(d['code'] == 'exit_code' for d in e['data']['diagnostics'])

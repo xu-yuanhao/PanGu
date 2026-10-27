@@ -195,6 +195,19 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
  and qword ptr [rsp + 104],-257
+ lea rdi,[rip+.Lopts_stream_usage_json]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Linvalid
+ mov [rsp+96],rax
+ or qword ptr [rsp+104],512
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lopts_stream_options]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Linvalid
+ and qword ptr [rsp+104],-513
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  mov rsi,[rsp]
  call pg_mimo_apply_options
@@ -1001,3 +1014,7 @@ pg_mimo_apply_options:
 .Lopts_maximum_key: .asciz "maxTokens"
 .Lopts_completion_tokens: .asciz "max_completion_tokens"
 .Lopts_temperature: .asciz "temperature"
+
+.section .rodata
+.Lopts_stream_options: .asciz "stream_options"
+.Lopts_stream_usage_json: .asciz "{\"include_usage\":true}"

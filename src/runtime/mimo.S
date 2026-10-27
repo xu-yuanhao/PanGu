@@ -63,6 +63,9 @@ li_close:
  push rbx
  mov rbx,rdi
  call .Ltransport_close
+ mov rdi,[rbx+PG_MM_USAGE]
+ mov qword ptr [rbx+PG_MM_USAGE],0
+ call json_object_put@PLT
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  mov qword ptr [rbx+PG_MM_CONFIGURATION],0
  call json_object_put@PLT
@@ -175,6 +178,9 @@ li_start:
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* s */
  call .Ltransport_close               /* 保留已绑定请求配置 */
+ mov rdi,[rbx+PG_MM_USAGE]
+ mov qword ptr [rbx+PG_MM_USAGE],0
+ call json_object_put@PLT
  mov qword ptr [rbx + PG_MM_USED], 0
  mov qword ptr [rbx + PG_MM_CONSUMED], 0
  mov dword ptr [rbx + PG_MM_DELIVERED], 0
@@ -188,7 +194,7 @@ li_start:
  mov byte ptr [rbx + PG_MM_NAME], 0
  lea rdi,[rbx+PG_MM_EXTRA]
  xor esi,esi
- mov edx,PG_MM_CONFIGURATION-PG_MM_EXTRA
+ mov edx,PG_MM_USAGE-PG_MM_EXTRA
  call memset@PLT
  lea rdi,[rip+.Lstr_pangu_key]
  call getenv@PLT
@@ -758,3 +764,225 @@ pg_mimo_configure:
 .section .rodata
 .Lcfg_model: .asciz "model"
 .Lcfg_endpoint: .asciz "endpoint"
+.text
+/* Resolve absent usage fields as zero; reject fractional/negative/unsafe counts. */
+.Lmu_count:
+ push rbx
+ call json_object_object_get@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lmu_zero
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lmu_invalid
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lmu_invalid
+ xor edx,edx
+ pop rbx
+ ret
+.Lmu_zero:
+ xor eax,eax
+ xor edx,edx
+ pop rbx
+ ret
+.Lmu_invalid:
+ mov edx,1
+ xor eax,eax
+ pop rbx
+ ret
+.globl pg_mimo_complete
+.type pg_mimo_complete,@function
+pg_mimo_complete:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov ebp,1
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ mov qword ptr [rsp+64],0
+ test rdi,rdi
+ jz .Lmu_end
+ test rsi,rsi
+ jz .Lmu_end
+ mov eax,[rbx+PG_MM_FINISH_REASON]
+ lea rdi,[rip+.Lmu_stop]
+ cmp eax,1
+ je .Lmu_reason
+ lea rdi,[rip+.Lmu_tool_use]
+ cmp eax,2
+ je .Lmu_reason
+ lea rdi,[rip+.Lmu_length]
+ cmp eax,3
+ jne .Lmu_end
+.Lmu_reason:
+ call json_object_new_string@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lmu_end
+ mov rdi,r12
+ lea rsi,[rip+.Lmu_stop_reason]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lmu_end
+ mov qword ptr [rsp+64],0
+ mov r14,[rbx+PG_MM_USAGE]
+ test r14,r14
+ jz .Lmu_success
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_prompt]
+ call .Lmu_count
+ test edx,edx
+ jnz .Lmu_end
+ mov [rsp],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_completion]
+ call .Lmu_count
+ test edx,edx
+ jnz .Lmu_end
+ mov [rsp+8],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_prompt_details]
+ call json_object_object_get@PLT
+ mov [rsp+56],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lmu_cached]
+ lea rdx,[rsp+48]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lmu_deepseek_cache
+ cmp qword ptr [rsp+48],0
+ je .Lmu_deepseek_cache
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lmu_cached]
+ jmp .Lmu_cache_count
+.Lmu_deepseek_cache:
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_hit]
+ lea rdx,[rsp+48]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lmu_top_cache
+ cmp qword ptr [rsp+48],0
+ je .Lmu_top_cache
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_hit]
+ jmp .Lmu_cache_count
+.Lmu_top_cache:
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_cached]
+.Lmu_cache_count:
+ call .Lmu_count
+ test edx,edx
+ jnz .Lmu_end
+ mov [rsp+16],rax
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lmu_cache_write]
+ call .Lmu_count
+ test edx,edx
+ jnz .Lmu_end
+ mov [rsp+24],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lmu_completion_details]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lmu_reasoning_tokens]
+ call .Lmu_count
+ test edx,edx
+ jnz .Lmu_end
+ mov [rsp+32],rax
+ mov rax,[rsp]
+ sub rax,[rsp+16]
+ sub rax,[rsp+24]
+ xor ecx,ecx
+ test rax,rax
+ cmovs rax,rcx
+ mov [rsp],rax
+ add rax,[rsp+8]
+ add rax,[rsp+16]
+ add rax,[rsp+24]
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lmu_end
+ mov [rsp+40],rax
+ call json_object_new_object@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lmu_end
+ xor r14d,r14d
+.Lmu_fields:
+ mov rdi,[rsp+r14*8]
+ call json_object_new_int64@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lmu_end
+ lea rcx,[rip+.Lmu_keys]
+ mov rsi,[rcx+r14*8]
+ mov rdi,r13
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lmu_end
+ mov qword ptr [rsp+64],0
+ inc r14
+ cmp r14,6
+ jb .Lmu_fields
+ mov rdi,r12
+ lea rsi,[rip+.Lmu_usage]
+ mov rdx,r13
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lmu_end
+ xor r13d,r13d
+.Lmu_success:
+ xor ebp,ebp
+.Lmu_end:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,r13
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_complete,.-pg_mimo_complete
+.section .rodata
+.Lmu_stop: .asciz "stop"
+.Lmu_tool_use: .asciz "toolUse"
+.Lmu_length: .asciz "length"
+.Lmu_stop_reason: .asciz "stopReason"
+.Lmu_usage: .asciz "usage"
+.Lmu_prompt: .asciz "prompt_tokens"
+.Lmu_completion: .asciz "completion_tokens"
+.Lmu_prompt_details: .asciz "prompt_tokens_details"
+.Lmu_completion_details: .asciz "completion_tokens_details"
+.Lmu_cached: .asciz "cached_tokens"
+.Lmu_hit: .asciz "prompt_cache_hit_tokens"
+.Lmu_cache_write: .asciz "cache_write_tokens"
+.Lmu_reasoning_tokens: .asciz "reasoning_tokens"
+.Lmu_input: .asciz "input"
+.Lmu_output: .asciz "output"
+.Lmu_cache_read: .asciz "cacheRead"
+.Lmu_cache_write_key: .asciz "cacheWrite"
+.Lmu_reasoning: .asciz "reasoning"
+.Lmu_total: .asciz "totalTokens"
+.section .data.rel.ro
+.Lmu_keys: .quad .Lmu_input,.Lmu_output,.Lmu_cache_read,.Lmu_cache_write_key,.Lmu_reasoning,.Lmu_total

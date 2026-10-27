@@ -17,6 +17,8 @@ typedef struct {
  /* Optional provider failure query, before close; absent means non-retryable. */
  void (*failure)(void *,const pg_model *,pg_model_failure *);
  struct pg_durable_inputs *inputs;
+ /* Before provider close, complete the private assistant with terminal facts. */
+ int (*complete)(void *,const pg_model *,struct json_object *assistant);
 } pg_durable_generation_host;
 typedef struct {
  const pg_durable_generation_host *host;
