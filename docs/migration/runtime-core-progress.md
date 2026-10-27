@@ -18,13 +18,14 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
+| 技能资源 | `skills.S`、`skills_posix.c`：用户/项目默认发现、根技能优先、名称/规范路径去重、YAML元数据、校验诊断与转义XML；提示列表→模型read技能/相对资源→write真实闭环 |
 | 编码工具 | `read_tool.S`、`write_tool.S`、`edit_text.S`、`edit_tool.S`、`bash_tool.S`、`process.S`：真实读改写运行、分页/快照、Unicode匹配、异步进程/取消、原始输出文件 |
 
 ## 本批验证与集成状态
 
-- read/write/edit共享Assembly路径准备：粘贴@/Unicode空白、home、file URL和词法点段；复用libcurl URL/utf8proc、libc home查询。
-- 内部文件服务仅做环境解析，防止edit再次转换已准备的@/Unicode路径；写入missing/../file不会创建多余目录，原始参数继续持久保存。
-- 路径/read/write/edit专项ASan/UBSan、最终URI边界read专项、Runtime整批回归、Assembly ABI和G00/Assembly通过。真实DeepSeek四工具file URL→home/点段→粘贴路径链接→bash及原始持久参数通过；最终产品重建通过。
+- 用户agent目录/skills与项目.pangu/skills接入实际systemPrompt；只列描述/路径，正文由模型按需读取。用户同名优先、禁用自动调用过滤、根SKILL.md优先、隐藏目录跳过与规范路径去重均在Assembly实现。
+- skills/prompt专项ASan/UBSan、Pi现有skills夹具、Runtime整批回归、G00/Assembly和产品构建通过。
+- 真实DeepSeek从描述发现技能，read读取SKILL.md和相对payload，再write生成精确结果；捕获请求与持久工具回执核对实际行为。忽略文件规则、显式路径/配置、刷新和templates继续随K11完成。
 
 ## 当前接口边界
 
@@ -47,6 +48,7 @@ python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
 python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/test_pangu_pty.py --live
+python3 -B tools/runtime/test_pangu_pty.py --live-skills
 python3 -B tools/runtime/test_pangu_pty.py --live-paths
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash

@@ -25,6 +25,7 @@ typedef struct {
  int (*ancestor_probe)(void *,const char *);
  pg_slice git_worktree,git_common_directory;
  int (*canonical)(void *,const char *,char *,size_t);
+ pg_slice skills_prompt; /* Borrowed escaped resource section, before cwd. */
 } pg_prompt_workspace_source;
 /* Pi coding sections: default/custom prefix, declared tools/rules, addendum,
    user/ancestor/project context candidates and cwd. Project SYSTEM/APPEND overrides

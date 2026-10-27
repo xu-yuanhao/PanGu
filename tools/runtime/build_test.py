@@ -140,6 +140,13 @@ def main():
                             '-Wl,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext',
                             *prompt_flags, '-o', prompt_test], check=True)
             subprocess.run([prompt_test], check=True, timeout=15)
+            skills_test = str(Path(directory) / 'test-skills')
+            skills_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'),
+                            str(ROOT / 'tests/runtime/test_skills.c'), *skills_flags, '-o', skills_test], check=True)
+            subprocess.run([skills_test], check=True, timeout=15)
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             for name, sources, wraps in [
                 ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),

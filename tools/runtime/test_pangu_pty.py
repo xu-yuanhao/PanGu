@@ -342,6 +342,84 @@ def path_workflow(binary, root, environment):
         assert any(result.get('model', [{}])[0].get('toolName') == name and result.get('data', {}).get('arguments', {}).get('path') == path for result in saved), (name, 'canonical persisted arguments missing')
     print('PASS: real model file URL read, home/lexical write without extra mkdir, pasted-path symlink edit, bash and unchanged committed arguments', flush=True)
 
+def skill_workflow(binary, root, environment):
+    workspace = root / 'skill-workflow'
+    workspace.mkdir()
+    agent = root / 'skill-user-agent'
+    skill = agent / 'skills' / 'verification-recipe'
+    skill.mkdir(parents=True)
+    marker = 'PANGUSKILL' + os.urandom(5).hex()
+    (skill / 'SKILL.md').write_text('---\nname: verification-recipe\ndescription: Apply the verification recipe to create result.txt from its private payload.\n---\nRead payload.txt relative to this skill directory using read. Use write to create result.txt in the current workspace containing exactly that payload followed by _SKILL. Then report the final content.\n')
+    (skill / 'payload.txt').write_text(marker)
+    project = workspace / '.pangu' / 'skills' / 'verification-recipe'
+    project.mkdir(parents=True)
+    (project / 'SKILL.md').write_text('---\nname: verification-recipe\ndescription: WRONG_PROJECT_SKILL\n---\nWrong duplicate.\n')
+    hidden = project.parent / 'hidden'
+    hidden.mkdir()
+    (hidden / 'SKILL.md').write_text('---\nname: hidden\ndescription: DISABLED_SKILL_DESCRIPTION\ndisable-model-invocation: true\n---\nHidden.\n')
+    env = dict(environment, PANGU_AGENT_DIR=str(agent))
+    env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
+    saved = []
+    def visit(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == 'systemPrompt' and isinstance(child, str):
+                    yield child
+                else:
+                    yield from visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from visit(child)
+    def capture():
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            for path in (workspace / '.pangu').iterdir():
+                if path.is_file():
+                    try:
+                        for line in path.read_bytes().splitlines():
+                            try:
+                                saved.extend(visit(json.loads(line)))
+                            except (ValueError, UnicodeDecodeError):
+                                pass
+                    except FileNotFoundError:
+                        pass
+            if saved:
+                return
+            time.sleep(0.01)
+        raise AssertionError('skill request configuration not captured')
+    terminal = Terminal(binary, workspace, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Use the verification recipe skill to create result.txt. Follow its instructions and report the result.', capture)
+        assert (workspace / 'result.txt').read_text().strip() == marker + '_SKILL'
+        assert (marker + '_SKILL').encode() in output
+        assert saved and any(str(skill / 'SKILL.md') in prompt for prompt in saved)
+        assert all('WRONG_PROJECT_SKILL' not in prompt and 'DISABLED_SKILL_DESCRIPTION' not in prompt and marker not in prompt for prompt in saved)
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    def receipts(value):
+        if isinstance(value, dict):
+            if value.get('kind') == 'pangu.tool-result':
+                yield value
+            for child in value.values():
+                yield from receipts(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from receipts(child)
+    results = []
+    for path in (workspace / '.pangu').iterdir():
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                try:
+                    results.extend(receipts(json.loads(line)))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+    for path in [skill / 'SKILL.md', skill / 'payload.txt']:
+        assert any(result.get('model', [{}])[0].get('toolName') == 'read' and result.get('data', {}).get('arguments', {}).get('path') == str(path) for result in results), 'skill-relative read missing'
+    print('PASS: actual model skill discovery, user-first collision, disabled visibility, on-demand skill/payload reads and workspace write', flush=True)
+
 def thinking_workflow(binary, root, environment):
     root = root / 'thinking-workflow'
     root.mkdir()
@@ -537,6 +615,7 @@ def main():
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
     parser.add_argument('--live-plugin',action='store_true',help='native service substitution and ordered shutdown')
     parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
+    parser.add_argument('--live-skills',action='store_true',help='actual skill discovery, on-demand read and coding workflow')
     parser.add_argument('--live-paths',action='store_true',help='actual model absolute paths and symlink editing')
     parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
     parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
@@ -548,9 +627,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_skills:
+                skill_workflow(binary,root,env)
             if args.live_paths:
                 path_workflow(binary,root,env)
             if args.live_plugin:

@@ -10,7 +10,7 @@
 
 PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格式。参考项目提供行为与实现依据，原生数据协议按PanGu自身的生命周期、恢复和版本规则维护。记忆、工具、循环与提示词沿用参考机制；内置提示词中的产品身份、路径、配置与操作入口适配PanGu，模型以PanGu身份工作。
 
-用户提示资源默认从`~/.pangu/agent`读取，可用`PANGU_AGENT_DIR`指定；项目`.pangu`中的同名SYSTEM/APPEND资源优先，上下文按用户、祖先、项目顺序加载，并按Git worktree关系处理同名指令遮蔽。
+用户提示资源默认从`~/.pangu/agent`读取，可用`PANGU_AGENT_DIR`指定；项目`.pangu`中的同名SYSTEM/APPEND资源优先，上下文按用户、祖先、项目顺序加载，并按Git worktree关系处理同名指令遮蔽。技能从用户agent目录的`skills`与项目`.pangu/skills`发现，将描述与路径提供给模型，再按需读取正文和技能相对资源。
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。
 

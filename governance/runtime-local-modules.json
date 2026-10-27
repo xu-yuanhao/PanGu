@@ -778,7 +778,8 @@
         "tools.registry.local.v0",
         "json-c",
         "system libc",
-        "libgit2"
+        "libgit2",
+        "resources.skills.local.v0"
       ],
       "role": "handwritten workspace prompt sections over injected complete file reads and platform file probes; actual tools, project-over-user SYSTEM/APPEND selection, user then root-to-parent then project context candidates, canonical user-directory deduplication, nested-worktree same-filename shadowing with libgit2 metadata, canonical symlink instruction reads, BOM and transactional output",
       "exports": [
@@ -1915,6 +1916,43 @@
           ]
         }
       ]
+    },
+    {
+      "id": "resources.skills.local.v0",
+      "sources": [
+        "src/runtime/skills.S",
+        "src/runtime/skills.h",
+        "src/runtime/skills_posix.c"
+      ],
+      "dependencies": [
+        "json-c",
+        "libyaml",
+        "libutf8proc",
+        "system libc"
+      ],
+      "role": "Assembly skills discovery, user-first collision handling, canonical file/directory deduplication, YAML metadata validation and escaped model-visible prompt; C bridges POSIX/libyaml layouts",
+      "exports": [
+        "pg_skills_load",
+        "pg_skills_prompt",
+        "pg_skills_directory",
+        "pg_skills_yaml"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/core/skills.ts",
+            "packages/coding-agent/src/core/resource-loader.ts",
+            "packages/coding-agent/src/core/system-prompt.ts",
+            "packages/coding-agent/src/utils/frontmatter.ts"
+          ],
+          "semantics": "default user/project skill roots, directory SKILL.md preference, direct root markdown files, nested discovery, description/name validation, name/canonical deduplication, disabled model invocation, XML descriptors and on-demand read",
+          "tests_to_read": [
+            "packages/coding-agent/test/skills.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
@@ -1974,6 +2012,14 @@
       "license": "GPL-2.0-or-later / LGPL-3.0-or-later (installed package metadata)",
       "purpose": "TUI history search full context-sensitive Unicode lowercase",
       "impact": "Linux TUI external Unicode bridge; handles and replacement allocations are released per call."
+    },
+    {
+      "name": "libyaml",
+      "version": "0.2.5",
+      "source": "system pkg-config yaml-0.1; yaml.h",
+      "license": "MIT",
+      "purpose": "skill frontmatter YAML parsing, multiline/quoted metadata, aliases and syntax errors",
+      "impact": "resource loader external parser; traversal, validation and model prompt remain Assembly"
     }
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",

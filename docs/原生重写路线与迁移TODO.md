@@ -160,6 +160,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Coding Agent `core/{resource-loader,settings-manager,settings-schema,skills,prompt-templates,system-prompt,auth-storage}.ts`、`packages/mcp/src/`；Durable `codemode/`、`tool-search/` 及其测试。
 
+- [x] 用户与项目默认skills接入模型请求：目录SKILL.md优先、根目录Markdown与嵌套发现、名称/描述校验、同名先加载优先、规范路径去重、禁用自动调用过滤和XML描述；真实模型按需读取技能/相对资源并完成写入。
 - [ ] 完成项目/用户配置优先级、AGENTS上下文、system/append/section、skills、prompt templates和资源刷新；配置解析与资源加载成为服务；内置提示词保留参考机制并适配PanGu自称、`.pangu`目录、配置与实际入口。
 - [ ] 完成 MCP stdio/HTTP客户端的发现、调用、取消、认证与清理，并转成现有Tools接口。
 - [ ] 对照 Pi codemode 的工具能力隔离、声明生成和持久嵌套调用，通过QuickJS的C接口完成原生桥接；完成tool search后动态工具声明与实际执行同步。
@@ -217,8 +218,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 tools/path-utils.ts normalizeToolPath、env/node.ts resolvePath及对应tools/env用例；使用Node路径/URL规则对照并修正authority、空路径、非法转义和NUL边界。
-- 实际调用链：read/write参数或edit私有参数 → 共享Assembly路径准备 → 内部ExecutionEnv解析 → 已有POSIX文件服务。粘贴@/Unicode空格转换只在工具入口执行一次；home/file URL和重复分隔符/词法点段统一处理。不存在目录的missing/../file不产生额外mkdir，URL解码后真实文件名在edit内部保持。
-- 验证：read/write/edit专项ASan/UBSan覆盖路径样例、home、file URL、UTF-8/编码NUL、无额外目录、trailing separator、@@文件和URL Unicode文件的真实编辑；最终URI authority校验另跑read专项。Runtime整批回归、Assembly ABI检查、G00/Assembly通过；产品构建与真实DeepSeek四工具验证file URL read→home/点段write→粘贴路径链接edit→bash，持久工具参数保持原始值。最终产品重建通过。
-- 接口与自审：新增tools.path.local.v0由三个当前工具和内部完整文件服务消费，路径准备/解析与私有JSON适配为Assembly；C仅桥接libc home查询，URL/Unicode复用已有libcurl/utf8proc。新增pg_write_file_definition为内部write服务选择环境解析阶段，与模型write共用同一实现；既有结构/函数表布局保持。源、依赖、exports与实际构建输入同步登记。
-- 剩余与下一交付物：K08继续read的Unicode/NFD文件候选、图片/附件、完整截断和ExecutionEnv并发/环境语义；K11配置、skills/templates/刷新与MCP继续按原覆盖表推进。并行TUI工作保持原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 core/skills.ts、resource-loader.ts、system-prompt.ts、utils/frontmatter.ts及skills.test.ts/fixtures；与已获取origin/main比较本批相关源码无差异，沿固定快照实现。
+- 实际调用链：产品启动 → 用户agent目录/skills与项目.pangu/skills → Assembly发现/校验/去重 → libyaml元数据桥接 → Assembly转义XML → systemPrompt的skills节 → 真实Generation/read读取SKILL.md与相对资源 → write写入工作区。用户先加载，同名保留首项；SKILL.md截断目录递归，隐藏目录/node_modules跳过，symlink规范路径去重并限制递归深度。
+- 验证：skills与prompt专项ASan/UBSan、Pi现有skills夹具、Runtime整批回归、G00/Assembly与产品构建通过。真实DeepSeek从技能描述发现技能、按需读取正文和相对payload、生成精确结果；请求捕获核对用户优先、禁用技能过滤、正文未注入systemPrompt，持久工具回执核对实际read路径。
+- 接口与自审：新增resources.skills.local.v0，导出owned JSON技能/诊断快照与有界XML格式接口；pg_prompt_workspace_source追加借用skills_prompt，当前全部调用者同步。C仅暴露目录/stat与libyaml节点布局；遍历、选择、验证、去重和格式为Assembly。libyaml 0.2.5作为成熟解析依赖登记，源/模块/构建同步；控制差异自审通过。TUI未提交工作保持原位。
+- 剩余与下一交付物：K11继续忽略文件规则、显式技能路径/配置、诊断交互、刷新和prompt templates；当前技能正文读取上限1MiB，系统提示沿现有4095字节有界失败，不静默截断。K08其余文件/附件行为及其他K项按原覆盖表保留。

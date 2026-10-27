@@ -10,6 +10,7 @@
 #include "../runtime/bash_tool.h"
 #include "../runtime/profile.h"
 #include "../runtime/prompt.h"
+#include "../runtime/skills.h"
 #include "../runtime/durable_client.h"
 #include "../runtime/record_jsonl.h"
 #include <json-c/json.h>
@@ -193,7 +194,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
- pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0,{0,0},{0,0},0};
+ pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0,{0,0},{0,0},0,{0,0}};
  size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
  if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
  else {
@@ -207,7 +208,15 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
   if(have_user){source.user_files=&user_files;source.user_context=&user_source;source.user_probe=pg_prompt_resource_probe;source.user_directory=(pg_slice){user_canonical,strlen(user_canonical)};}
   source.ancestor_files=&ancestor_files;source.ancestor_context=&ancestor_source;source.ancestor_probe=pg_prompt_resource_probe;source.canonical=pg_prompt_path_canonical;
   char git_worktree[4096],git_common[4096];if(!pg_prompt_git_paths(application.path,git_worktree,sizeof(git_worktree),git_common,sizeof(git_common))){source.git_worktree=(pg_slice){git_worktree,strlen(git_worktree)};source.git_common_directory=(pg_slice){git_common,strlen(git_common)};}
-  int result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);pg_read_tool_close(&resources);if(result)return 1;
+  char user_skills[4096],project_skills[4096],skills_prompt[4096];size_t skills_size=0;struct json_object *skills=0;
+  int n=snprintf(project_skills,sizeof(project_skills),"%s/.pangu/skills",application.path);if(n<0||(size_t)n>=sizeof(project_skills)){pg_read_tool_close(&resources);return 1;}
+  if(have_user){n=snprintf(user_skills,sizeof(user_skills),"%s/skills",user_canonical);if(n<0||(size_t)n>=sizeof(user_skills)){pg_read_tool_close(&resources);return 1;}}
+  unsigned reader=3;for(size_t i=0;i<declared->count;i++){if(!strcmp(declared->entries[i].name,"read")){reader=0;break;}if(!strcmp(declared->entries[i].name,"bash"))reader=1;}
+  int result=pg_skills_load(have_user?user_skills:0,project_skills,&skills);
+  if(!result){struct json_object *diagnostics=json_object_object_get(skills,"diagnostics");for(size_t i=0;i<json_object_array_length(diagnostics);i++){struct json_object *entry=json_object_array_get_idx(diagnostics,i);fprintf(stderr,"Skill warning: %s: %s\n",json_object_get_string(json_object_object_get(entry,"path")),json_object_get_string(json_object_object_get(entry,"message")));}}
+  if(!result)result=pg_skills_prompt(skills,reader,skills_prompt,sizeof(skills_prompt),&skills_size);
+  if(!result){source.skills_prompt=(pg_slice){skills_prompt,skills_size};result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);}
+  json_object_put(skills);pg_read_tool_close(&resources);if(result)return 1;
  }
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;

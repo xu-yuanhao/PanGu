@@ -601,6 +601,10 @@
     "src/runtime/prompt_posix.c": "native-source",
     "src/runtime/tool_path.S": "native-source",
     "src/runtime/tool_path_posix.c": "native-source",
-    "src/runtime/tool_path.h": "native-source"
+    "src/runtime/tool_path.h": "native-source",
+    "src/runtime/skills.S": "native-source",
+    "src/runtime/skills.h": "native-source",
+    "src/runtime/skills_posix.c": "native-source",
+    "tests/runtime/test_skills.c": "native-test"
   }
 }

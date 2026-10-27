@@ -373,6 +373,16 @@ pg_prompt_workspace:
  mov qword ptr [rbp+4160],0
  jmp .Lpw_context_pass
 .Lpw_cwd:
+ mov rsi,[rbx+160]
+ test rsi,rsi
+ jz .Lpw_cwd_section
+ mov rdi,[rbx+152]
+ test rdi,rdi
+ jz .Lpw_fail
+ call .Lpw_append_slice
+ test eax,eax
+ jnz .Lpw_fail
+.Lpw_cwd_section:
  lea rdi,[rip+.Lpw_cwd_open]
  call .Lpw_append
  test eax,eax
