@@ -1238,7 +1238,8 @@
         "session.documents.transaction.local.v0",
         "session.documents.holds.local.v0",
         "session.documents.hold-timer.local.v0",
-        "json-c"
+        "json-c",
+        "session.documents.delta.local.v0"
       ],
       "role": "Serialized Durable Session composition over borrowed initialized primitives: one admitted transaction, deferred/merged settlement, automatic deadline sync and version flush, admission seal, timer job drain, healthy hold flush/failed cleanup, cache close then injected backend close polling; timer arm/release synchronization precedes memory/durable observers",
       "exports": [
@@ -1292,7 +1293,17 @@
         "pg_document_observer_detach",
         "pg_document_observer_release",
         "pg_session_observers_pin_count",
-        "pg_session_observers_pinned"
+        "pg_session_observers_pinned",
+        "pg_document_watch_open",
+        "pg_document_watch_start",
+        "pg_document_watch_advance",
+        "pg_document_watch_next",
+        "pg_document_watch_finish",
+        "pg_document_watch_stop",
+        "pg_document_watch_cancel",
+        "pg_document_watch_end",
+        "pg_document_watch_end_after_delivery",
+        "pg_document_watch_release"
       ],
       "reference_basis": [
         {
@@ -1379,6 +1390,20 @@
           "semantics": "#pinDocument reference-count semantics from live native observer registrations, allocation-free count query and cache hook; subscription and pin state precede injected cache pin/touch so idleness sees current ownership; last detach removes ownership before unpin/touch, failed pin clears tentative count and attachment",
           "tests_to_read": [
             "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/chord/src/watch.ts",
+            "packages/chord/src/delta/pending.ts",
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "Watch/WatchLifecycle native cooperative start/next/finish continuations serialize in-flight delivery and fold pending frames with the existing PendingOps service; lone ops preserve identity, overflow becomes root replacement, retirement accumulates, context follows newest pending frame, delivered value is distinct from newest source value; stop/cancel/source failure drop pending ownership immediately while in-flight data lives through finish; endAfterDelivery drains pending then terminates; late listener errors cannot replace prior termination",
+          "tests_to_read": [
+            "packages/chord/test/watch.test.ts",
             "packages/durable/test/session-watches.test.ts"
           ]
         }

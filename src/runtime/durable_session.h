@@ -301,4 +301,36 @@ pg_document_status pg_document_observer_release(pg_document_observer *);
    removed before unpin, so a callback can immediately update cache idleness. */
 size_t pg_session_observers_pin_count(const pg_session_listeners *,uint64_t incarnation);
 int pg_session_observers_pinned(void *listeners,uint64_t incarnation);
+typedef struct {void *context;void (*detach)(void *);void (*report)(void *,int);} pg_document_watch_host;
+typedef struct {
+ pg_pending_ops ops;
+ struct json_object *value,*newest,*lone_ops,*frame_value,*frame_ops;
+ void *context,*frame_context;
+ pg_document_watch_host host;
+ unsigned started,running,ending,reason;int error;unsigned active,pending,retired,lone,frame_retired,busy,reserved;
+} pg_document_watch;
+typedef struct {const struct json_object *value,*ops;void *context;unsigned retired,reserved;} pg_document_watch_frame;
+enum {PG_WATCH_FRAME,PG_WATCH_WAIT,PG_WATCH_CLOSED,PG_WATCH_INVALID,PG_WATCH_ALLOCATION};
+enum {PG_WATCH_OPEN,PG_WATCH_STOPPED,PG_WATCH_CANCELLED,PG_WATCH_ENDED,PG_WATCH_LISTENER_ERROR,PG_WATCH_FAILED};
+/* Cooperative async Watch: start schedules no inline user call. The host polls
+   next outside adoption and processes one borrowed frame until finish(error).
+   No second frame is issued while one is in flight; advances meanwhile fold.
+   value is acquisition value before delivery, then latest delivered value.
+   JSON inputs/outputs are immutable shared references; context is an opaque
+   cancellation-free delivery context borrowed through pending/frame completion.
+   A lone frame preserves ops identity. Termination drops pending/source refs
+   and calls detach once, retaining the delivered value and in-flight frame.
+   finish after stop still releases the frame; its later error is ignored.
+   release waits for in-flight ownership. Host callbacks return normally; report
+   may stop the Watch. All storage starts zeroed/released, use is serialized. */
+int pg_document_watch_open(pg_document_watch *,const struct json_object *value,const pg_document_watch_host *);
+int pg_document_watch_start(pg_document_watch *);
+int pg_document_watch_advance(pg_document_watch *,const pg_document_observation_change *,void *context);
+int pg_document_watch_next(pg_document_watch *,pg_document_watch_frame *);
+int pg_document_watch_finish(pg_document_watch *,int error);
+void pg_document_watch_stop(pg_document_watch *);
+void pg_document_watch_cancel(pg_document_watch *);
+void pg_document_watch_end(pg_document_watch *,int failure);
+void pg_document_watch_end_after_delivery(pg_document_watch *);
+int pg_document_watch_release(pg_document_watch *);
 #endif

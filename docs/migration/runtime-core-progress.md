@@ -585,3 +585,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - document_reader.S手写独立observe入口与当前snapshot共用读取guard/缓存/受保护provider路径；observe要求mutation line无active Tx，读取成功后附着，晚取消释放已建立的observer，不调用host end。请求/取消服务有显式借用与重入约束；旧ABI保持。
 - 实际验证：12种cold/current、三取消边界、缺失/缺失+取消、Tx/busy/failed/closed/read-only/无取消服务与获取后真实notified提交，24个allocation/clone/registration故障释放partial和guard。原有snapshot/current/history/Storage guard与整个Runtime专项继续通过。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享及隔离核心G00/Assembly和隔离产品构建通过。
 - 同一实施Agent自审6路径候选摘要（本记录加入前）457f6cf4cad3babb9e8642f4ac5bc4e6603cb875ef132400e94cd94797a79cad；隔离核心树d4b920083b50e33995743ec8689632c9ed9026e3。结论为Session观察获取/取消本地通过；watch start/delivery/stop及owner结束后的待交付清理继续，K03全量未完成。TUI工作保留。
+
+## K03 Chord JSON Watch异步交付状态机
+
+- 固定Pi 8b0caef Chord Watch/WatchLifecycle、Durable createWatch/endWatch调用者，阅读watch.test的before-start/slow listener/context/overflow/retirement/endAfterDelivery/termination；真实PendingOps源码与固定工作树一致。Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写cooperative start/next/finish continuation，单帧在途、busy期间PendingOps折叠；单帧ops身份、overflow root、退休累积、最新context、初始/最新delivered value分开。stop/cancel/source失败立即清pending/source并detach一次，在途帧保留到finish；ending等待交付，listener错误报告与先有终止原因保持。新增接口与pending依赖登记，公开旧ABI保持。
+- 实际验证：正常与慢消费、退休/null/lone身份、多种终止与report重入stop、10001-op单帧及溢出根替换；6个交付分配故障安全重试，19个advance分配/复制/插入故障保持原pending。直接执行完整Pi Chord Watch/WatchLifecycle和实际PendingOps，与native连续慢消费两帧/值/context/retired/end逐项一致。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan和来源差异通过；共享/隔离核心G00/Assembly、隔离产品构建通过。同一实施Agent自审6路径候选摘要（本记录加入前）502d33526d1713479f56885afc8eb3187c05a54c93a07739fd5e5ba51783cfa2；隔离核心树50faeba21a6be2566516d8562562d93cfedf4f95。结论为独立JSON Watch引擎本地通过；Session watch接线/Task owner末尾交付与close订阅保留继续，K03全量未完成。TUI工作保留。

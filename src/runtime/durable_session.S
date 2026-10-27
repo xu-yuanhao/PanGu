@@ -4328,3 +4328,480 @@ pg_session_observers_pinned:
  ret
 .size pg_session_observers_pinned,.-pg_session_observers_pinned
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_document_watch_open
+.type pg_document_watch_open,@function
+pg_document_watch_open:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov eax,3
+ test rbx,rbx
+ jz .Lwatch_open_end
+ test r13,r13
+ jz .Lwatch_open_end
+ cmp dword ptr [rbx+132],0
+ jne .Lwatch_open_end
+ cmp dword ptr [rbx+152],0
+ jne .Lwatch_open_end
+ call pg_pending_ops_open@PLT
+ test eax,eax
+ jnz .Lwatch_open_end
+ mov rdi,r12
+ call json_object_get@PLT
+ mov [rbx+32],rax
+ mov rax,[r13]
+ mov [rbx+88],rax
+ mov rax,[r13+8]
+ mov [rbx+96],rax
+ mov rax,[r13+16]
+ mov [rbx+104],rax
+ mov dword ptr [rbx+132],1
+ xor eax,eax
+.Lwatch_open_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_watch_open,.-pg_document_watch_open
+
+.globl pg_document_watch_start
+.type pg_document_watch_start,@function
+pg_document_watch_start:
+ mov eax,3
+ test rdi,rdi
+ jz .Lwatch_start_end
+ cmp dword ptr [rdi+132],1
+ jne .Lwatch_start_end
+ cmp dword ptr [rdi+124],0
+ jne .Lwatch_start_end
+ cmp dword ptr [rdi+112],0
+ jne .Lwatch_start_end
+ mov dword ptr [rdi+112],1
+ xor eax,eax
+.Lwatch_start_end:
+ ret
+.size pg_document_watch_start,.-pg_document_watch_start
+
+/* Terminal state keeps only delivered value and an already borrowed frame. */
+.Lwatch_terminate:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ cmp dword ptr [rbx+124],0
+ jne .Lwatch_terminated
+ mov [rbx+124],esi
+ mov [rbx+128],edx
+ mov rax,[rbx+96]
+ mov [rsp],rax
+ mov rax,[rbx+88]
+ mov [rsp+8],rax
+ mov qword ptr [rbx+88],0
+ mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+104],0
+ call pg_pending_ops_close@PLT
+ mov rdi,[rbx+40]
+ mov qword ptr [rbx+40],0
+ call json_object_put@PLT
+ mov rdi,[rbx+48]
+ mov qword ptr [rbx+48],0
+ call json_object_put@PLT
+ mov qword ptr [rbx+72],0
+ mov dword ptr [rbx+136],0
+ mov dword ptr [rbx+140],0
+ mov dword ptr [rbx+144],0
+ cmp qword ptr [rsp],0
+ je .Lwatch_terminated
+ mov rdi,[rsp+8]
+ call [rsp]
+.Lwatch_terminated:
+ add rsp,16
+ pop rbx
+ ret
+
+.globl pg_document_watch_stop
+.type pg_document_watch_stop,@function
+pg_document_watch_stop:
+ mov esi,1
+ xor edx,edx
+ jmp .Lwatch_end_public
+.globl pg_document_watch_cancel
+.type pg_document_watch_cancel,@function
+pg_document_watch_cancel:
+ mov esi,2
+ xor edx,edx
+ jmp .Lwatch_end_public
+.globl pg_document_watch_end
+.type pg_document_watch_end,@function
+pg_document_watch_end:
+ mov edx,esi
+ mov esi,3
+ test edx,edx
+ jz .Lwatch_end_public
+ mov esi,5
+.Lwatch_end_public:
+ test rdi,rdi
+ jz .Lwatch_end_public_done
+ cmp dword ptr [rdi+132],1
+ jne .Lwatch_end_public_done
+ jmp .Lwatch_terminate
+.Lwatch_end_public_done:
+ ret
+.size pg_document_watch_stop,.-pg_document_watch_stop
+.size pg_document_watch_cancel,.-pg_document_watch_cancel
+.size pg_document_watch_end,.-pg_document_watch_end
+
+.globl pg_document_watch_end_after_delivery
+.type pg_document_watch_end_after_delivery,@function
+pg_document_watch_end_after_delivery:
+ test rdi,rdi
+ jz .Lwatch_ending_done
+ cmp dword ptr [rdi+132],1
+ jne .Lwatch_ending_done
+ cmp dword ptr [rdi+124],0
+ jne .Lwatch_ending_done
+ mov dword ptr [rdi+120],1
+ cmp dword ptr [rdi+116],0
+ jne .Lwatch_ending_done
+ cmp dword ptr [rdi+136],0
+ jne .Lwatch_ending_done
+ mov esi,3
+ xor edx,edx
+ jmp .Lwatch_terminate
+.Lwatch_ending_done:
+ ret
+.size pg_document_watch_end_after_delivery,.-pg_document_watch_end_after_delivery
+
+.globl pg_document_watch_advance
+.type pg_document_watch_advance,@function
+pg_document_watch_advance:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov eax,3
+ test rbx,rbx
+ jz .Lwatch_advance_end
+ cmp dword ptr [rbx+132],1
+ jne .Lwatch_advance_end
+ cmp dword ptr [rbx+152],0
+ jne .Lwatch_advance_end
+ cmp dword ptr [rbx+124],0
+ jne .Lwatch_advance_ignored
+ cmp dword ptr [rbx+120],0
+ jne .Lwatch_advance_ignored
+ test r12,r12
+ jz .Lwatch_advance_end
+ mov dword ptr [rbx+152],1
+ mov rsi,[r12+8]
+ call pg_pending_ops_push@PLT
+ test eax,eax
+ jnz .Lwatch_advance_allocation
+ mov rdi,[rbx+48]
+ mov qword ptr [rbx+48],0
+ call json_object_put@PLT
+ mov dword ptr [rbx+144],0
+ cmp dword ptr [rbx+136],0
+ jne .Lwatch_advance_value
+ mov rdi,[r12+8]
+ call json_object_get@PLT
+ mov [rbx+48],rax
+ mov dword ptr [rbx+144],1
+.Lwatch_advance_value:
+ mov rdi,[rbx+40]
+ call json_object_put@PLT
+ mov rdi,[r12]
+ call json_object_get@PLT
+ mov [rbx+40],rax
+ mov [rbx+72],r13
+ mov dword ptr [rbx+136],1
+ cmp dword ptr [r12+16],0
+ je .Lwatch_advance_ok
+ mov dword ptr [rbx+140],1
+.Lwatch_advance_ok:
+ xor eax,eax
+ jmp .Lwatch_advance_unlock
+.Lwatch_advance_allocation:
+ mov eax,4
+.Lwatch_advance_unlock:
+ mov dword ptr [rbx+152],0
+ jmp .Lwatch_advance_end
+.Lwatch_advance_ignored:
+ xor eax,eax
+.Lwatch_advance_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_document_watch_advance,.-pg_document_watch_advance
+
+/* Own [[r,value]]; partial insertions retain their original ownership. */
+.Lwatch_root:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ xor r12d,r12d
+ xor r13d,r13d
+ mov edi,1
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lwatch_root_bad
+ mov r12,rax
+ mov edi,2
+ call json_object_new_array_ext@PLT
+ test rax,rax
+ jz .Lwatch_root_bad
+ mov r13,rax
+ lea rdi,[rip+.Lobservation_root_name]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lwatch_root_bad
+ mov [rsp],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lwatch_root_item_bad
+ mov rdi,rbx
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lwatch_root_item_bad
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lwatch_root_bad
+ mov rax,r12
+ jmp .Lwatch_root_end
+.Lwatch_root_item_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lwatch_root_bad:
+ mov rdi,r13
+ call json_object_put@PLT
+ mov rdi,r12
+ call json_object_put@PLT
+ xor eax,eax
+.Lwatch_root_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.globl pg_document_watch_next
+.type pg_document_watch_next,@function
+pg_document_watch_next:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,3
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ test r12,r12
+ jz .Lwatch_next_end
+ pxor xmm0,xmm0
+ movups [r12],xmm0
+ movups [r12+16],xmm0
+ test rbx,rbx
+ jz .Lwatch_next_end
+ cmp dword ptr [rbx+132],1
+ jne .Lwatch_next_end
+ cmp dword ptr [rbx+152],0
+ jne .Lwatch_next_end
+ mov ebp,2
+ cmp dword ptr [rbx+124],0
+ jne .Lwatch_next_end
+ mov ebp,1
+ cmp dword ptr [rbx+116],0
+ jne .Lwatch_next_end
+ cmp dword ptr [rbx+112],0
+ je .Lwatch_next_end
+ cmp dword ptr [rbx+136],0
+ je .Lwatch_next_end
+ mov dword ptr [rbx+152],1
+ cmp dword ptr [rbx+144],0
+ jne .Lwatch_next_lone
+ cmp dword ptr [rbx+16],3
+ jne .Lwatch_next_take
+ mov rdi,[rbx+40]
+ call .Lwatch_root
+ test rax,rax
+ jz .Lwatch_next_allocation
+ mov [rsp+16],rax
+ jmp .Lwatch_next_take
+.Lwatch_next_lone:
+ mov rdi,[rbx+48]
+ call json_object_get@PLT
+ mov [rsp+16],rax
+.Lwatch_next_take:
+ mov rdi,rbx
+ mov rsi,rsp
+ call pg_pending_ops_take@PLT
+ test eax,eax
+ jnz .Lwatch_next_allocation
+ cmp qword ptr [rsp+16],0
+ jne .Lwatch_next_discard_ops
+ mov rax,[rsp]
+ mov [rsp+16],rax
+ jmp .Lwatch_next_adopt
+.Lwatch_next_discard_ops:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lwatch_next_adopt:
+ mov rax,[rsp+16]
+ mov [rbx+64],rax
+ mov rax,[rbx+40]
+ mov [rbx+56],rax
+ mov qword ptr [rbx+40],0
+ mov rdi,[rbx+32]
+ call json_object_put@PLT
+ mov rdi,[rbx+56]
+ call json_object_get@PLT
+ mov [rbx+32],rax
+ mov rdi,[rbx+48]
+ mov qword ptr [rbx+48],0
+ call json_object_put@PLT
+ mov rax,[rbx+72]
+ mov [rbx+80],rax
+ mov qword ptr [rbx+72],0
+ mov eax,[rbx+140]
+ mov [rbx+148],eax
+ mov dword ptr [rbx+136],0
+ mov dword ptr [rbx+140],0
+ mov dword ptr [rbx+144],0
+ mov dword ptr [rbx+116],1
+ mov rax,[rbx+56]
+ mov [r12],rax
+ mov rax,[rbx+64]
+ mov [r12+8],rax
+ mov rax,[rbx+80]
+ mov [r12+16],rax
+ mov eax,[rbx+148]
+ mov [r12+24],eax
+ xor ebp,ebp
+ jmp .Lwatch_next_unlock
+.Lwatch_next_allocation:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov ebp,4
+.Lwatch_next_unlock:
+ mov dword ptr [rbx+152],0
+.Lwatch_next_end:
+ mov eax,ebp
+ add rsp,32
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_watch_next,.-pg_document_watch_next
+
+.globl pg_document_watch_finish
+.type pg_document_watch_finish,@function
+pg_document_watch_finish:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12d,esi
+ mov eax,3
+ test rbx,rbx
+ jz .Lwatch_finish_end
+ cmp dword ptr [rbx+132],1
+ jne .Lwatch_finish_end
+ cmp dword ptr [rbx+116],1
+ jne .Lwatch_finish_end
+ cmp dword ptr [rbx+152],0
+ jne .Lwatch_finish_end
+ mov dword ptr [rbx+152],1
+ test r12d,r12d
+ jz .Lwatch_finish_frame
+ cmp dword ptr [rbx+124],0
+ jne .Lwatch_finish_frame
+ cmp qword ptr [rbx+104],0
+ je .Lwatch_finish_failed
+ mov rdi,[rbx+88]
+ mov esi,r12d
+ call [rbx+104]
+.Lwatch_finish_failed:
+ mov rdi,rbx
+ mov esi,4
+ mov edx,r12d
+ call .Lwatch_terminate
+.Lwatch_finish_frame:
+ mov rdi,[rbx+56]
+ mov qword ptr [rbx+56],0
+ call json_object_put@PLT
+ mov rdi,[rbx+64]
+ mov qword ptr [rbx+64],0
+ call json_object_put@PLT
+ mov qword ptr [rbx+80],0
+ mov dword ptr [rbx+148],0
+ mov dword ptr [rbx+116],0
+ mov dword ptr [rbx+152],0
+ cmp dword ptr [rbx+120],0
+ je .Lwatch_finish_ok
+ cmp dword ptr [rbx+136],0
+ jne .Lwatch_finish_ok
+ mov rdi,rbx
+ mov esi,3
+ xor edx,edx
+ call .Lwatch_terminate
+.Lwatch_finish_ok:
+ xor eax,eax
+.Lwatch_finish_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_document_watch_finish,.-pg_document_watch_finish
+
+.globl pg_document_watch_release
+.type pg_document_watch_release,@function
+pg_document_watch_release:
+ mov eax,3
+ test rdi,rdi
+ jz .Lwatch_release_end
+ cmp dword ptr [rdi+152],0
+ jne .Lwatch_release_end
+ mov eax,1
+ cmp dword ptr [rdi+116],0
+ jne .Lwatch_release_end
+ push rbx
+ mov rbx,rdi
+ call pg_document_watch_stop
+ mov rdi,[rbx+32]
+ call json_object_put@PLT
+ pxor xmm0,xmm0
+ movups [rbx],xmm0
+ movups [rbx+16],xmm0
+ movups [rbx+32],xmm0
+ movups [rbx+48],xmm0
+ movups [rbx+64],xmm0
+ movups [rbx+80],xmm0
+ movups [rbx+96],xmm0
+ movups [rbx+112],xmm0
+ movups [rbx+128],xmm0
+ movups [rbx+144],xmm0
+ xor eax,eax
+ pop rbx
+.Lwatch_release_end:
+ ret
+.size pg_document_watch_release,.-pg_document_watch_release
+.section .note.GNU-stack,"",@progbits

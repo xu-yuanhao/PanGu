@@ -589,3 +589,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] document_reader.S/h新增pg_durable_observe及独立请求结构，和当前snapshot共用既有guard/provider/缓存路径；observe在active Tx时等待，成功建立同步observer；三个取消检查点与晚取消detach/release，无callback end副作用。既有snapshot ABI与已准入读取行为保持，取消回调只读取外部取消状态。
 - 原生12组正常cold/current、三个取消边界、缺失及缺失+取消、Tx/busy/failed/closed/read-only/无取消服务，获取后实际notified提交进入observer；24个读取/复制/注册故障保留Session guard、释放所有partial附着。source probe执行实际#attachDocument六组取消/缺失/取消监听清理，与原生场景一致。
 - 下一行为：watch的start/delivery/stop与owner终态等待交付；同步observe获取、状态、订阅和取消已有公开落点，整体观察项继续按完整API验收。
+
+### K03 Chord JSON Watch交付状态机
+
+- 固定Pi 8b0caef的Chord watch.ts WatchLifecycle/Watch及Durable createWatch/endWatch调用者；阅读watch.test的before-start、slow listener、context、overflow、retirement、endAfterDelivery与termination用例。PendingOps源码与固定工作树一致；上游Pi origin保持6c384aa、Harness保持22ddee37。
+- [x] 手写JSON Watch的start/advance/next/finish与stop/cancel/end/end_after_delivery/release。原生cooperative continuation以next取出一帧、finish确认异步消费；start不内联调用用户。保持acquisition/latest-delivered value区别、单帧ops身份、多帧PendingOps折叠/overflow root、retired累积与最新context；endAfterDelivery等pending/在途帧完成，终止立即丢pending/source refs，但在途帧保留到finish，既有终止优先于迟到listener错误。
+- 原生正常/慢消费/退休/null/单帧身份/多种结束与report重入stop，10001-op单帧及溢出根替换；6个交付分配故障可重试，19个advance分配/复制/插入故障保留原pending。实际执行完整Chord Watch/WatchLifecycle及真实PendingOps，与native连续慢消费的两次帧、context、值、退休和最终结束逐项一致。
+- 下一行为：连接Session watch获取/advance/close、Task owner结束后的待交付与close订阅保留；当前JSON Watch引擎可独立运行，整体watch接口继续按完整组合验收。

@@ -778,6 +778,41 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print('PASS: actual Pi attachDocument cancellation before/after load and after attachment, missing-result precedence and cancellation-listener cleanup match native admission scenarios')
 
+def watch_delivery_source(native,library):
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776'
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/chord/src/watch.ts'],text=True)
+    pending=ROOT/'references/pi/packages/chord/src/delta/pending.ts'
+    assert pending.read_bytes()==subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/chord/src/delta/pending.ts'])
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {pathToFileURL} from 'node:url';const source=readFileSync(0,'utf8'),{PendingOps}=await import(pathToFileURL(process.argv[1])),withoutAbortSignal=c=>c;const Watch=eval('(()=>{'+stripTypeScriptTypes(source.slice(source.indexOf('/**')).replaceAll('export ',''))+';return Watch})()');let detached=0,reports=0,resolve;const gate=new Promise(r=>resolve=r),watch=new Watch({text:''},()=>detached++,()=>reports++),frames=[];const feed=(text,append,retired,context)=>watch.advance({value:{text},ops:append===null?[]:[['a',['text'],append]],retired},{tag:context});feed('a','a',false,1);feed('ab','b',false,2);feed('ab',null,true,3);feed('abc','c',false,4);const initial=watch.value;watch.start(async(change,context)=>{frames.push({...structuredClone(change),context:context.tag});if(frames.length===1)await gate});await new Promise(r=>setImmediate(r));feed('abcd','d',false,5);feed('abcde','e',false,6);const during=watch.value;watch.endAfterDelivery();feed('ignored','x',false,7);resolve();const end=await watch.closed;console.log(JSON.stringify({initial,during,value:watch.value,frames,end:end.reason,detached,reports}));
+'''
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(pending)],input=source,text=True,capture_output=True,check=True,timeout=30).stdout)
+    class Host(ctypes.Structure):_fields_=[('context',ctypes.c_void_p),('detach',ctypes.c_void_p),('report',ctypes.c_void_p)]
+    class Change(ctypes.Structure):_fields_=[('value',ctypes.c_void_p),('ops',ctypes.c_void_p),('retired',ctypes.c_uint),('replaced',ctypes.c_uint)]
+    class Frame(ctypes.Structure):_fields_=[('value',ctypes.c_void_p),('ops',ctypes.c_void_p),('context',ctypes.c_void_p),('retired',ctypes.c_uint),('reserved',ctypes.c_uint)]
+    detach_type=ctypes.CFUNCTYPE(None,ctypes.c_void_p);report_type=ctypes.CFUNCTYPE(None,ctypes.c_void_p,ctypes.c_int);counts=[0,0]
+    @detach_type
+    def detach(ctx):counts[0]+=1
+    @report_type
+    def report(ctx,error):counts[1]+=1
+    host=Host(None,ctypes.cast(detach,ctypes.c_void_p),ctypes.cast(report,ctypes.c_void_p));watch=ctypes.create_string_buffer(160)
+    native.pg_document_watch_open.argtypes=[ctypes.c_void_p,ctypes.c_void_p,ctypes.POINTER(Host)];native.pg_document_watch_advance.argtypes=[ctypes.c_void_p,ctypes.POINTER(Change),ctypes.c_void_p];native.pg_document_watch_next.argtypes=[ctypes.c_void_p,ctypes.POINTER(Frame)];native.pg_document_watch_finish.argtypes=[ctypes.c_void_p,ctypes.c_int]
+    for name in ['start','end_after_delivery','release']:getattr(native,'pg_document_watch_'+name).argtypes=[ctypes.c_void_p]
+    make=lambda obj:library.json_tokener_parse(json.dumps(obj).encode())
+    read=lambda ptr:json.loads(library.json_object_to_json_string_ext(ptr,0)) if ptr else None
+    def value():return read(ctypes.c_void_p.from_buffer(watch,32).value)
+    def feed(text,append,retired,context):
+        v=make(dict(text=text));ops=make([] if append is None else [['a',['text'],append]])
+        try:assert not native.pg_document_watch_advance(watch,ctypes.byref(Change(v,ops,retired,0)),context)
+        finally:library.json_object_put(v);library.json_object_put(ops)
+    initial_value=make(dict(text=''));assert not native.pg_document_watch_open(watch,initial_value,ctypes.byref(host));library.json_object_put(initial_value)
+    try:
+        for args in [('a','a',False,1),('ab','b',False,2),('ab',None,True,3),('abc','c',False,4)]:feed(*args)
+        initial=value();assert not native.pg_document_watch_start(watch);frames=[];frame=Frame();assert not native.pg_document_watch_next(watch,ctypes.byref(frame));frames.append(dict(value=read(frame.value),ops=read(frame.ops),retired=bool(frame.retired),context=frame.context));feed('abcd','d',False,5);feed('abcde','e',False,6);during=value();native.pg_document_watch_end_after_delivery(watch);feed('ignored','x',False,7);assert not native.pg_document_watch_finish(watch,0);assert not native.pg_document_watch_next(watch,ctypes.byref(frame));frames.append(dict(value=read(frame.value),ops=read(frame.ops),retired=bool(frame.retired),context=frame.context));assert not native.pg_document_watch_finish(watch,0);assert ctypes.c_uint.from_buffer(watch,124).value==3
+        actual=dict(initial=initial,during=during,value=value(),frames=frames,end='ended',detached=counts[0],reports=counts[1]);assert actual==expected,(actual,expected)
+    finally:assert not native.pg_document_watch_release(watch)
+    print('PASS: native cooperative Watch delivery matches actual Pi Chord Watch folding, busy continuation, context, retirement, delivered value and endAfterDelivery')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1074,5 +1109,6 @@ def main():
         observer_source_lifecycle()
         observer_pin_source()
         observer_attach_source()
+        watch_delivery_source(native,library)
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()
