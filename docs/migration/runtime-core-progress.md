@@ -549,3 +549,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实现：手写timer扩展控制器借用holds通知服务，自动timer job、选定版本重载、健康close使用同一adoption发布；失败close只释放。基础timer/Session布局保持，扩展所有权与结束时点在公开头声明，新增两个导出随模块登记。
 - 实际验证：automatic_flush_tests四种实际Session路径通过，内部观察一次且持久通知仅保存时一次；检查序号、内容、迁移、timer释放与重复关闭。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord和8b方法差异通过。共享及隔离核心G00/Assembly、隔离产品构建通过。生成候选摘要首次被Git中文路径转义影响，改用NUL分隔读取后完成，未影响源或测试。
 - 同一实施Agent自审：8个候选路径内容清单摘要（本记录加入前）97f96b64772a7288f4f6711e9b5de3b666f9b62f56c095408560dbb365aaf9b4；隔离核心树aa6e978f7c4dce7ec1bf8949703da0378d43b4da。结论为自动保存通知本地通过；close listener及地址跟随watch/observeDoc继续。K03全量未完成，TUI工作保留。
+
+## K03 Session关闭通知与最终释放
+
+- 来源：固定Pi 8b0caef的close/#notifyClose/subscribeClose；实际执行#notifyClose，核对停timer先于回调、快照取消不跳过、首回调错误报告后继续及重入一次性。
+- 手写begin_close保存外层dispatch guard，快照分配成功后封闭订阅并移除close集合，保留internal/durable观察直到已接收工作和holds保存完成。独立close_notified在Session封闭准入后停timer/发close，复用实际分阶段关闭，最终排空host queue及释放注册。公开布局保持，新增导出在现有模块登记。
+- 实际验证：直接与观察内部两条begin-close路径、回调取消/错误/重入、快照分配失败重试；四条实际Session自动保存路径核对一次关闭事件/报告、健康close持久通知、失败close不写和重复close。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异和新增8b实际方法probe通过；共享与隔离核心G00/Assembly及隔离产品构建通过。
+- 同一实施Agent自审：6个候选路径内容清单摘要（本记录加入前）81c3f261c068ccae93f779e36253b13f0228edaf0ab8890493d0cac8360b5686；隔离核心树74e3cd6eb5c90e6bd5f68343dd31d06f305d9ff8。结论为关闭通知生命周期本地通过；地址跟随watch/同步observeDoc继续，K03全量未完成。TUI工作保留。

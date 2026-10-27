@@ -1190,6 +1190,8 @@ pg_session_listeners_close:
  jz .Llisteners_close_end
  cmp dword ptr [rbx+48],0
  jne .Llisteners_close_end
+ cmp dword ptr [rbx+52],2
+ je .Llisteners_close_release
  cmp dword ptr [rbx+52],0
  jne .Llisteners_close_ok
  mov dword ptr [rbx+52],1
@@ -1202,6 +1204,7 @@ pg_session_listeners_close:
  mov dword ptr [rbx+52],0
  jmp .Llisteners_close_end
 .Llisteners_close_release:
+ mov dword ptr [rbx+52],1
  mov rdi,[rbx+8]
  call free@PLT
  mov qword ptr [rbx+8],0
@@ -3374,4 +3377,175 @@ pg_session_dispatch_storage_commit:
  pop rbx
  ret
 .size pg_session_dispatch_storage_commit,.-pg_session_dispatch_storage_commit
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_session_listeners_begin_close
+.type pg_session_listeners_begin_close,@function
+pg_session_listeners_begin_close:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov eax,1
+ test rbx,rbx
+ jz .Lbegin_close_end
+ cmp dword ptr [rbx+52],0
+ jne .Lbegin_close_ok
+ mov r13,[rbx+16]
+ xor r14d,r14d
+ test r13,r13
+ jz .Lbegin_close_seal
+ mov rdi,r13
+ mov esi,24
+ call calloc@PLT
+ test rax,rax
+ jz .Lbegin_close_invalid
+ mov r14,rax
+ mov rdi,rax
+ mov rsi,[rbx+8]
+ imul rdx,r13,24
+ call memcpy@PLT
+.Lbegin_close_seal:
+ mov eax,[rbx+48]
+ mov [rsp],eax
+ mov dword ptr [rbx+52],2
+ mov dword ptr [rbx+48],1
+ xor ebp,ebp
+ xor r15d,r15d
+.Lbegin_close_compact:
+ cmp rbp,r13
+ jae .Lbegin_close_compacted
+ imul rax,rbp,24
+ add rax,r14
+ inc rbp
+ cmp dword ptr [rax+16],2
+ je .Lbegin_close_compact
+ imul rdx,r15,24
+ add rdx,[rbx+8]
+ mov rcx,[rax]
+ mov [rdx],rcx
+ mov rcx,[rax+8]
+ mov [rdx+8],rcx
+ mov rcx,[rax+16]
+ mov [rdx+16],rcx
+ inc r15
+ jmp .Lbegin_close_compact
+.Lbegin_close_compacted:
+ mov [rbx+16],r15
+ xor ebp,ebp
+.Lbegin_close_each:
+ cmp rbp,r13
+ jae .Lbegin_close_release
+ imul rax,rbp,24
+ add rax,r14
+ inc rbp
+ cmp dword ptr [rax+16],2
+ jne .Lbegin_close_each
+ mov rcx,[rax]
+ mov rdi,[rax+8]
+ xor esi,esi
+ mov rdx,r12
+ call rcx
+ test eax,eax
+ jz .Lbegin_close_each
+ cmp qword ptr [rbx+40],0
+ je .Lbegin_close_each
+ mov esi,eax
+ mov rdi,[rbx+32]
+ call [rbx+40]
+ jmp .Lbegin_close_each
+.Lbegin_close_release:
+ mov eax,[rsp]
+ mov [rbx+48],eax
+ mov rdi,r14
+ call free@PLT
+.Lbegin_close_ok:
+ xor eax,eax
+ jmp .Lbegin_close_end
+.Lbegin_close_invalid:
+ mov eax,1
+.Lbegin_close_end:
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_session_listeners_begin_close,.-pg_session_listeners_begin_close
+
+.globl pg_durable_session_close_notified
+.type pg_durable_session_close_notified,@function
+pg_durable_session_close_notified:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov eax,-2
+ test rbx,rbx
+ jz .Lnotified_close_end
+ test r12,r12
+ jz .Lnotified_close_end
+ mov rcx,[r12]
+ test rcx,rcx
+ jz .Lnotified_close_end
+ mov rax,[rcx]
+ cmp rax,[rbx]
+ jne .Lnotified_close_invalid
+ mov rax,[r12+24]
+ test rax,rax
+ jz .Lnotified_close_invalid
+ cmp [rax],rcx
+ jne .Lnotified_close_invalid
+ cmp dword ptr [rbx+172],1
+ jne .Lnotified_close_sealed
+ mov dword ptr [rbx+172],2
+.Lnotified_close_sealed:
+ mov eax,[rbx+168]
+ mov [rsp],eax
+ mov dword ptr [rbx+168],1
+ mov rdi,[rbx+24]
+ call pg_hold_timer_stop@PLT
+ mov rdi,[r12]
+ mov rsi,[r12+16]
+ call pg_session_listeners_begin_close
+ mov edx,[rsp]
+ mov [rbx+168],edx
+ test eax,eax
+ jnz .Lnotified_close_pending
+ mov rdi,rbx
+ call pg_durable_session_close
+ mov [rsp+8],eax
+ cmp dword ptr [rbx+172],4
+ jne .Lnotified_close_end
+ mov rdi,[r12+24]
+ call pg_session_dispatch_close
+ test eax,eax
+ jnz .Lnotified_close_pending
+ mov rdi,[r12]
+ mov rsi,[r12+16]
+ call pg_session_listeners_close
+ test eax,eax
+ jnz .Lnotified_close_pending
+ mov eax,[rsp+8]
+ jmp .Lnotified_close_end
+.Lnotified_close_pending:
+ mov eax,1
+ jmp .Lnotified_close_end
+.Lnotified_close_invalid:
+ mov eax,-2
+.Lnotified_close_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_session_close_notified,.-pg_durable_session_close_notified
 .section .note.GNU-stack,"",@progbits

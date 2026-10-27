@@ -131,6 +131,11 @@ int pg_session_listen(pg_session_listeners *,unsigned,pg_session_listener,void *
 void pg_session_unlisten(pg_session_listeners *,unsigned,pg_session_listener,void *);
 int pg_session_deliver(pg_session_listeners *,unsigned,const void *,void *);
 int pg_session_listeners_close(pg_session_listeners *,void *);
+/* Seal registration and snapshot close listeners once, before draining admitted
+   work. Preserve commit observers until final listeners_close. May run inside
+   an observer; restores its dispatch guard. Allocation rejection is retryable
+   and invokes no callback. closed: 0 open, 2 draining, 1 fully released. */
+int pg_session_listeners_begin_close(pg_session_listeners *,void *);
 typedef struct {
  const struct json_object *writes,*observed_documents,*stored_documents;
  uint64_t sequence;
@@ -237,6 +242,11 @@ typedef struct {pg_session_notification_host base;pg_session_dispatch *dispatch;
 int pg_session_adoption_notifications_bind(pg_session_adoption_host *,pg_document_notifications *);
 int pg_session_adoption_deferred_bind(pg_session_adoption_host *,pg_document_notifications *);
 int pg_session_adoption_hold_bind(pg_session_adoption_host *,pg_hold_notifications *);
+/* Seal Session admission, contain close listeners, then finish admitted work
+   and held saves. Final close drains the host queue and releases listeners.
+   Same return convention as Session close; retain host through all retries.
+   Close listeners are synchronous and cannot invoke Session work. */
+int pg_durable_session_close_notified(pg_durable_session *,pg_session_adoption_host *);
 typedef struct {pg_record_storage backend;pg_session_dispatch *dispatch;} pg_session_dispatch_storage;
 /* Synchronous native backend adapter: drain adopted host notifications outside
    the backend's commit/adopt step, before its result reaches failure policy.

@@ -701,6 +701,16 @@ const text=`class Probe{#readOnly=false;#host={};#holds=new Map();#failure;#stor
     assert actual==expected,(actual,expected)
     print('PASS: actual Pi 8b0caef runCommit/publish/notifyHosts adoption order and Storage-over-observer failure precedence match native trace matrix')
 
+def close_source_order():
+    commit='8b0caefc2260a28d2cec0a7ce3daef1d3de24776'
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',commit+':packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8'),a=source.indexOf('\n\t#notifyClose():'),b=source.indexOf('\n\t/**',a);function contained(fn,onError){try{fn()}catch(e){onError(e)}}const Probe=eval('('+stripTypeScriptTypes(`class Probe{#documentSweep;#holdTimer;#closeListeners=new Set();log=[];constructor(){this.#documentSweep={disarm:()=>this.log.push('sweep')};this.#holdTimer={disarm:()=>this.log.push('timer')};const second=()=>this.log.push(2);this.#closeListeners.add(()=>{this.log.push(1);this.#closeListeners.delete(second);this.#notifyClose();throw Error('listener')});this.#closeListeners.add(second);this.#closeListeners.add(()=>this.log.push(3))}report(){this.log.push('report')}run(){this.#notifyClose();this.#notifyClose();return this.log}`+source.slice(a,b)+'}')+')');console.log(JSON.stringify(new Probe().run()));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    assert actual==['sweep','timer',1,'report',2,3],actual
+    print('PASS: actual Pi 8b0caef notifyClose disarms before callbacks, snapshots once, contains failure and permits reentrant close notification')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -992,5 +1002,6 @@ def main():
         document_notices(native,library)
         dispatch_notifications(native,library)
         adoption_source_order()
+        close_source_order()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

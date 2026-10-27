@@ -1268,7 +1268,9 @@
         "pg_session_adoption_notifications_bind",
         "pg_session_adoption_deferred_bind",
         "pg_session_adoption_hold_bind",
-        "pg_session_dispatch_storage_commit"
+        "pg_session_dispatch_storage_commit",
+        "pg_session_listeners_begin_close",
+        "pg_durable_session_close_notified"
       ],
       "reference_basis": [
         {
@@ -1308,6 +1310,18 @@
             "packages/durable/test/session-adoption.test.ts",
             "packages/durable/test/session-observers.test.ts",
             "packages/durable/test/session-deferred-commits.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "close seals admission, #notifyClose disarms timer and snapshots/clears close subscriptions once with contained errors; existing commit registrations survive admitted work and held save before final release; native snapshot failure is retryable before any callback and nested observer dispatch restores its guard",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts",
+            "packages/durable/test/session-adoption.test.ts"
           ]
         }
       ]

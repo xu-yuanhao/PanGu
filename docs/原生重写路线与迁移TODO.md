@@ -554,3 +554,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 手写hold_timer.S新增显式扩展控制器，借用同一hold通知服务到Session最终关闭；durable_session.S将定时、选定incarnation重载和关闭保存接入adoption发布，holds.S提供带通知finish。既有72字节timer及192字节Session布局保持，扩展80字节并在头文件规定有效期。
 - tests/runtime/test_record_memory.c的automatic_flush_tests覆盖实际Session内存采纳后定时保存、版本迁移前保存、正常关闭保存及失败关闭不写；校验内部通知一次、持久通知一次、seq/内容、timer资源和重复关闭。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及来源差异通过；G00和Assembly清单通过。
 - 下一行为：关闭listener生命周期与地址跟随watch/同步observeDoc；K03总验收继续按全量范围执行。
+
+### K03 Session关闭通知生命周期
+
+- 固定Pi 8b0caef的Session.close/#notifyClose/subscribeClose：先封闭准入、停timer，同步快照并清空close listeners，逐个包含错误；commit observers保留到已接收事务和holds保存完成。阅读上述函数及deferred/adoption用例，实际执行上游#notifyClose验证顺序与重入。
+- durable_session.S/h新增begin_close和close_notified独立入口：登记状态open/draining/released，close集合调用前移除，其余观察注册保留；嵌套观察中恢复原busy，快照分配失败在调用前拒绝且允许重试。实际Session关闭封闭准入，停timer后分发close，完成原分阶段清理，再排空host queue并释放listeners，既有ABI保持。
+- 原生专项覆盖三close订阅者的取消/错误/快照、观察内部关闭、分配失败重试；四组自动保存Session路径验证关闭事件仅一次、错误报告、重复关闭重入保护、最终无注册资源，健康close仍发布holds保存而失败close不写。来源probe核对实际上游停timer/快照/错误/重入顺序。
+- 后续继续地址跟随watch及同步observeDoc，K03总验收按全部公开行为核对。
