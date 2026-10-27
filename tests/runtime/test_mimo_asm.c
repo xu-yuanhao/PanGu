@@ -333,9 +333,9 @@ static void test_empty_tool_text(void){
 
 static void test_saved_configuration(void){
  pg_mimo provider={0};pg_model model=pg_mimo_model(&provider);session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;session.messages[0].size=1;strcpy(session.messages[0].text,"x");
- json_object *configuration=json_tokener_parse("{\"model\":\"saved-model\",\"endpoint\":\"https://saved.invalid/chat/completions\",\"options\":{\"maxTokens\":768,\"temperature\":0.25,\"maxTokensField\":\"max_completion_tokens\"}}");assert(configuration&&!pg_mimo_configure(&provider,configuration));
+ json_object *configuration=json_tokener_parse("{\"model\":\"saved-model\",\"endpoint\":\"https://saved.invalid/chat/completions\",\"options\":{\"maxTokens\":768,\"reasoningEffort\":\"high\",\"temperature\":0.25,\"maxTokensField\":\"max_completion_tokens\"}}");assert(configuration&&!pg_mimo_configure(&provider,configuration));
  assert(!json_object_object_add(configuration,"model",json_object_new_string("mutated-model")));json_object_put(configuration);
- assert(!setenv("PANGU_MODEL_NAME","ambient-model",1));assert(!pg_mimo_encode_request(&provider,&session));json_object *body=root_of(provider.request);assert(!strcmp(json_object_get_string(get(body,"model")),"saved-model"));assert(!get(body,"max_tokens")&&json_object_get_int(get(body,"max_completion_tokens"))==768&&json_object_get_double(get(body,"temperature"))==0.25);json_object_put(body);
+ assert(!setenv("PANGU_MODEL_NAME","ambient-model",1));assert(!pg_mimo_encode_request(&provider,&session));json_object *body=root_of(provider.request);assert(!strcmp(json_object_get_string(get(body,"model")),"saved-model"));assert(!get(body,"max_tokens")&&json_object_get_int(get(body,"max_completion_tokens"))==768&&json_object_get_double(get(body,"temperature"))==0.25);assert(!strcmp(json_object_get_string(get(get(body,"thinking"),"type")),"enabled")&&!strcmp(json_object_get_string(get(body,"reasoning_effort")),"high"));json_object_put(body);
  json_object *retained=provider.configuration;configuration=json_tokener_parse("{\"model\":\"other\",\"endpoint\":\"https://other.invalid\",\"options\":{\"maxTokens\":0}}");assert(pg_mimo_configure(&provider,configuration)&&provider.configuration==retained);json_object_put(configuration);
  configuration=json_tokener_parse("{\"model\":\"nul\\u0000model\",\"endpoint\":\"https://other.invalid\"}");assert(pg_mimo_configure(&provider,configuration)&&provider.configuration==retained);json_object_put(configuration);
  model.close(model.context);assert(!provider.configuration&&!provider.request);model.close(model.context);unsetenv("PANGU_MODEL_NAME");
@@ -352,12 +352,24 @@ static void test_terminal_usage(void){
  reset();assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"end\"}]}"));json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant)&&!strcmp(json_object_get_string(get(assistant,"stopReason")),"stop")&&!get(assistant,"usage"));json_object_put(assistant);
 }
 
+static void test_thinking_roundtrip(void){
+ reset();assert(!line("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Inspect \"}}]}"));assert(e.kind==PG_MODEL_WAIT);
+ assert(!line("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"the file.\",\"content\":\"Answer\"}}]}"));assert(e.kind==PG_MODEL_TEXT);
+ assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"));
+ json_object *assistant=json_tokener_parse("{\"content\":[{\"type\":\"text\",\"text\":\"Answer\"}]}");assert(assistant&&!pg_mimo_complete(&m,assistant));json_object *thought=json_object_array_get_idx(get(assistant,"content"),0);assert(!strcmp(json_object_get_string(get(thought,"thinking")),"Inspect the file.")&&!strcmp(json_object_get_string(get(thought,"thinkingSignature")),"reasoning_content"));json_object_put(assistant);
+ session=(pg_session){0};session.count=4;session.messages[0].role=PG_USER;session.messages[0].size=1;strcpy(session.messages[0].text,"x");session.messages[1].role=PG_THINKING;session.messages[1].size=17;strcpy(session.messages[1].text,"Inspect the file.");session.messages[1].size=strlen(session.messages[1].text);strcpy(session.messages[1].tool_name,"reasoning_content");session.messages[2].role=PG_ASSISTANT;session.messages[2].size=6;strcpy(session.messages[2].text,"Answer");session.messages[3].role=PG_USER;session.messages[3].size=4;strcpy(session.messages[3].text,"next");
+ pg_mimo provider={0};assert(!pg_mimo_encode_request(&provider,&session));json_object *body=root_of(provider.request),*messages=get(body,"messages");assert(json_object_array_length(messages)==3);json_object *message=json_object_array_get_idx(messages,1);assert(!strcmp(json_object_get_string(get(message,"content")),"Answer")&&!strcmp(json_object_get_string(get(message,"reasoning_content")),"Inspect the file."));json_object_put(body);free(provider.request);provider.request=0;
+ session.messages[2]=(pg_message){.role=PG_TOOL_CALL,.size=2};strcpy(session.messages[2].text,"{}");strcpy(session.messages[2].call_id,"thinking-read");strcpy(session.messages[2].tool_name,"read");session.messages[3]=(pg_message){.role=PG_TOOL_RESULT,.size=2};strcpy(session.messages[3].text,"ok");strcpy(session.messages[3].call_id,"thinking-read");assert(!pg_mimo_encode_request(&provider,&session));body=root_of(provider.request);message=json_object_array_get_idx(get(body,"messages"),1);assert(get(message,"tool_calls")&&!strcmp(json_object_get_string(get(message,"reasoning_content")),"Inspect the file."));json_object_put(body);free(provider.request);provider.request=0;
+ session.count=2;assert(!pg_mimo_encode_request(&provider,&session));body=root_of(provider.request);assert(!strcmp(json_object_get_string(get(json_object_array_get_idx(get(body,"messages"),1),"reasoning_content")),"Inspect the file."));json_object_put(body);free(provider.request);
+}
+
 int main(void) {
     test_model_init();
     test_projection_model_env();
     test_empty_tool_text();
     test_saved_configuration();
     test_terminal_usage();
+    test_thinking_roundtrip();
     test_projection_rejections();
     test_plain_conversation_projection();
     test_decode_terminators();

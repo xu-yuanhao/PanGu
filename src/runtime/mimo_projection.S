@@ -85,7 +85,7 @@ pg_mimo_encode_request:
  push r13
  push r14
  push r15                  /* 入口 rsp≡8；5 压栈后 ≡0 */
- sub rsp, 128
+ sub rsp, 144
  mov rbx, rdi              /* m */
  mov r12, rsi              /* s */
  mov qword ptr [rsp + 104],0
@@ -252,6 +252,7 @@ pg_mimo_encode_request:
  mov qword ptr [rsp+120],0
  mov qword ptr [rsp + 48], 0           /* i = 0 */
 .Lmsg_loop:
+ mov qword ptr [rsp+128],0
  mov rax, qword ptr [rsp + 48]
  cmp rax, qword ptr [r12 + PG_MM_SES_COUNT]
  jae .Lmsg_done
@@ -262,8 +263,33 @@ pg_mimo_encode_request:
  cmp rax, PG_MM_TEXT_LIMIT
  jae .Linvalid
  mov eax, dword ptr [r13 + PG_MM_MSG_ROLE]
- cmp eax, PG_MM_ROLE_TOOL_RESULT       /* 无符号比较同时拒绝负值/越界 */
+ cmp eax,4
  ja .Linvalid
+ cmp eax,4
+ jne .Lthinking_dispatch_done
+ mov [rsp+128],r13
+ /* A thinking row belongs to the immediately following assistant/tool group. */
+ mov rax,[rsp+48]
+ inc rax
+ cmp rax,[r12+PG_MM_SES_COUNT]
+ jae .Lthinking_standalone
+ imul rcx,rax,PG_MM_MSG_BYTES
+ mov edx,[r12+rcx]
+ cmp edx,PG_MM_ROLE_ASSISTANT
+ je .Lthinking_join
+ cmp edx,PG_MM_ROLE_TOOL_CALL
+ jne .Lthinking_standalone
+.Lthinking_join:
+ mov [rsp+48],rax
+ lea r13,[r12+rcx]
+ mov r14,r13
+ cmp qword ptr [r13+PG_MM_MSG_SIZE],4096
+ jae .Linvalid
+ mov eax,[r13]
+ jmp .Lthinking_dispatch_done
+.Lthinking_standalone:
+ jmp .Lplain_build
+.Lthinking_dispatch_done:
  cmp eax, PG_MM_ROLE_ASSISTANT
  jne .Lrole_dispatch
  /* assistant：紧跟 tool_call 则合并，否则空文本跳过 */
@@ -283,6 +309,8 @@ pg_mimo_encode_request:
  mov eax, dword ptr [r13 + PG_MM_MSG_ROLE]
  jmp .Lrole_dispatch
 .Lempty_assistant:
+ cmp qword ptr [rsp+128],0
+ jne .Lrole_dispatch
  cmp qword ptr [r13 + PG_MM_MSG_SIZE], 0
  jne .Lrole_dispatch
  jmp .Lmsg_next
@@ -534,6 +562,8 @@ pg_mimo_encode_request:
  call li_field
  test eax,eax
  jnz .Linvalid
+ cmp dword ptr [r13],4
+ je .Lmsg_append
  jmp .Lbuild_content
 .Lbuild_user:
  mov rdi, r15
@@ -595,6 +625,43 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-513
 .Lmsg_append:
+ mov rax,[rsp+128]
+ test rax,rax
+ jz .Lthinking_appended
+ lea rdi,[rax+PG_MM_MSG_TOOL_NAME]
+ xor esi,esi
+ mov edx,PG_MM_ID_LIMIT
+ call memchr@PLT
+ test rax,rax
+ jz .Linvalid
+ mov rax,[rsp+128]
+ lea rdi,[rax+PG_MM_MSG_TOOL_NAME]
+ lea rsi,[rip+.Lreasoning_content_key]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Linvalid
+ mov rax,[rsp+128]
+ lea rdi,[rax+PG_MM_MSG_TEXT]
+ mov rsi,[rax+PG_MM_MSG_SIZE]
+ call .Ltool_blank
+ test eax,eax
+ jnz .Lthinking_appended
+ mov rax,[rsp+128]
+ lea rdi,[rax+PG_MM_MSG_TEXT]
+ mov rsi,[rax+PG_MM_MSG_SIZE]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Linvalid
+ mov [rsp+96],rax
+ or qword ptr [rsp+104],512
+ mov rdi,r15
+ lea rsi,[rip+.Lreasoning_content_key]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Linvalid
+ and qword ptr [rsp+104],-513
+.Lthinking_appended:
  mov rdi, qword ptr [rsp + 8]
  mov rsi, r15
  call json_object_array_add@PLT
@@ -775,7 +842,7 @@ pg_mimo_encode_request:
 .Lret_bad:
  mov eax, 1
 .Lout:
- add rsp, 128
+ add rsp, 144
  pop r15
  pop r14
  pop r13
@@ -960,7 +1027,7 @@ pg_mimo_apply_options:
  lea rdx,[rsp+8]
  call json_object_object_get_ex@PLT
  test eax,eax
- jz .Lopts_success
+ jz .Lopts_reasoning
  mov rdi,[rsp+8]
  mov esi,2
  call json_object_is_type@PLT
@@ -986,6 +1053,48 @@ pg_mimo_apply_options:
  jz .Lopts_bad
  mov rdi,r12
  lea rsi,[rip+.Lopts_temperature]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ mov qword ptr [rsp+16],0
+.Lopts_reasoning:
+ mov rdi,r13
+ lea rsi,[rip+.Lopts_reasoning_effort]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lopts_success
+ mov rdi,[rsp+8]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lopts_bad
+ cmp eax,32
+ ja .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lopts_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_reasoning_effort_wire]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ mov qword ptr [rsp+16],0
+ lea rdi,[rip+.Lopts_thinking_enabled]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lopts_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_thinking_key]
  mov rdx,rax
  call json_object_object_add@PLT
  test eax,eax
@@ -1018,3 +1127,14 @@ pg_mimo_apply_options:
 .section .rodata
 .Lopts_stream_options: .asciz "stream_options"
 .Lopts_stream_usage_json: .asciz "{\"include_usage\":true}"
+
+.section .rodata
+.Lreasoning_content_key: .asciz "reasoning_content"
+
+.section .rodata
+.Lopts_reasoning_effort: .asciz "reasoningEffort"
+.Lopts_thinking_key: .asciz "thinking"
+.Lopts_thinking_enabled: .asciz "{\"type\":\"enabled\"}"
+
+.section .rodata
+.Lopts_reasoning_effort_wire: .asciz "reasoning_effort"

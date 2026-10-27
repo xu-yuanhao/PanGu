@@ -372,6 +372,8 @@ pg_durable_generation_init:
  mov rsi,rax
  mov rdx,[rsp+8]
  call memcpy@PLT
+ cmp ebp,4
+ je .Lgg_add_thinking_name
  cmp ebp,2
  jb .Lgg_add_done
  mov rdi,r13
@@ -389,6 +391,7 @@ pg_durable_generation_init:
  mov rsi,rax
  mov rdx,[rsp+8]
  call memcpy@PLT
+ .Lgg_add_thinking_name:
  mov rdi,r14
  call json_object_get_string_len@PLT
  test eax,eax
@@ -529,6 +532,32 @@ jmp .Lgg_project_role
  mov edx,[rsp+24]
  jmp .Lgg_project_one
 .Lgg_project_call:
+ GGET "qword ptr [rsp]",type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_project_normal_call
+ cmp dword ptr [rsp+24],1
+ jne .Lgg_project_bad
+ GGET "qword ptr [rsp]",thinking
+ mov [rsp+8],rax
+ GGET "qword ptr [rsp]",thinking_signature
+ mov r8,rax
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov edx,4
+ xor ecx,ecx
+ xor r9d,r9d
+ call .Lgg_add_message
+ test eax,eax
+ jnz .Lgg_project_bad
+ inc qword ptr [rbx+PG_S_COUNT]
+ inc r14
+ jmp .Lgg_project_block
+.Lgg_project_normal_call:
  cmp dword ptr [rsp+24],1
  jne .Lgg_project_bad
  GGET "qword ptr [rsp]",type
@@ -1971,6 +2000,28 @@ pg_durable_generation_history:
  mov rsi,[rax+72]
  mov edx,PG_S_BYTES
  call memcpy@PLT
+ xor r12d,r12d
+ xor r13d,r13d
+.Lgg_history_visible:
+ cmp r12,[r14+PG_S_COUNT]
+ jae .Lgg_history_visible_done
+ imul rax,r12,PG_MSG_BYTES
+ cmp dword ptr [r14+rax],4
+ je .Lgg_history_visible_next
+ cmp r12,r13
+ je .Lgg_history_visible_keep
+ lea rsi,[r14+rax]
+ imul rax,r13,PG_MSG_BYTES
+ lea rdi,[r14+rax]
+ mov edx,PG_MSG_BYTES
+ call memmove@PLT
+.Lgg_history_visible_keep:
+ inc r13
+.Lgg_history_visible_next:
+ inc r12
+ jmp .Lgg_history_visible
+.Lgg_history_visible_done:
+ mov [r14+PG_S_COUNT],r13
  xor eax,eax
  jmp .Lgg_history_result
 .Lgg_history_alloc:
@@ -2088,3 +2139,7 @@ pg_durable_generation_history:
  pop rbx
  pop rbp
  ret
+
+.section .rodata
+.Lgg_thinking: .asciz "thinking"
+.Lgg_thinking_signature: .asciz "thinkingSignature"

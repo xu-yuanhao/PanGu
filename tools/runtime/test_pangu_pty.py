@@ -295,12 +295,62 @@ def configuration_recovery(binary, root, environment):
                for e in facts('pangu.assistant')), 'saved request did not produce the actual model answer'
     print('PASS: interrupted request reopens with saved model/endpoint/options despite changed environment (actual model)', flush=True)
 
+def thinking_workflow(binary, root, environment):
+    root = root / 'thinking-workflow'
+    root.mkdir()
+    env = dict(environment)
+    env['PANGU_MODEL_OPTIONS'] = '{"maxTokens":768,"reasoningEffort":"high"}'
+    marker = 'PANGUTHINK' + os.urandom(5).hex()
+    (root / 'source.txt').write_text(marker + '\n')
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'> ', 5)
+        answer = run_input(terminal, 'Compute 17 times 23. Think carefully and answer only the result. Do not use tools.')
+        assert b'391' in answer
+        answer = run_input(terminal, 'Use read to inspect source.txt. Answer only the exact file content.')
+        assert marker.encode() in answer
+        answer = run_input(terminal, 'Without tools, repeat the file content you just read. Nothing else.')
+        assert marker.encode() in answer
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    def thinking_blocks(value):
+        if isinstance(value, dict):
+            if value.get('type') == 'thinking' and value.get('thinkingSignature') == 'reasoning_content' and value.get('thinking'):
+                yield value
+            for child in value.values():
+                yield from thinking_blocks(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from thinking_blocks(child)
+    blocks = []
+    for path in (root / '.pangu').iterdir():
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                try:
+                    blocks.extend(thinking_blocks(json.loads(line)))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+    assert blocks, 'actual model did not yield committed signed reasoning blocks'
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'> ', 5)
+        answer = run_input(terminal, 'Without tools, repeat the remembered file content. Nothing else.')
+        assert marker.encode() in answer
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual thinking model/read Tool, subsequent request and reopened context preserve reasoning blocks', flush=True)
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,help='already built product')
     parser.add_argument('--live',action='store_true',help='real coding workflow and committed context reopen')
     parser.add_argument('--live-persistent',action='store_true',help='cooperative exit during an unsafe tool and reopen')
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
+    parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
     parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
     args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
@@ -310,9 +360,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_thinking:
+                thinking_workflow(binary,root,env)
             if args.live_config_recovery:
                 configuration_recovery(binary,root,env)
             if args.live:

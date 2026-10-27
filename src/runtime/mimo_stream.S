@@ -407,6 +407,14 @@ pg_mimo_decode_line:
  cmp rax,[rsp+80]
  jb .Lcall_delta
 .Ldl_content:
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lstr_reasoning_content]
+ call li_get
+ mov rdi,rax
+ lea rsi,[rbx+PG_MM_REASONING]
+ mov edx,PG_MM_TEXT_LIMIT
+ call li_accumulate
+ or r15d,eax
  cmp qword ptr [rsp + 48], 0
  je .Ldl_reason
  mov rdi, qword ptr [rsp + 48]
@@ -576,3 +584,6 @@ pg_mimo_decode_line:
 .Lstr_usage: .asciz "usage"
 .Lstr_length: .asciz "length"
 .Lstr_end: .asciz "end"
+
+.section .rodata
+.Lstr_reasoning_content: .asciz "reasoning_content"

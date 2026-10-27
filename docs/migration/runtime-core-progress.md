@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- OpenAI SSE保留provider usage，完成回调在关闭前将结束原因及规范化token用量交给私有assistant，与任务结果原子保存。length/end文本终态可正常完成；工具终态仍验证完整参数和ID。
-- usage保存input/output/cacheRead/cacheWrite/reasoning/totalTokens，遵循Pi缓存优先级及reasoning计入output的规则；未报告用量时保持缺席。真实价格/cost与聚合观察按K05/K13继续。
-- 提供者O0/O2/ABI/故障专项、完整Runtime O0/O2、产品构建和G00/Assembly通过。真实DeepSeek PTY四工具、诊断/patch、身份/重开通过，并读取实际assistant的stopReason和usage。
+- reasoning_content由SSE独立缓冲并在完成时保存为带签名的thinking块；模型后续投影按签名回传，普通启动历史只展示可见消息。
+- options.reasoningEffort启用当前DeepSeek的thinking/reasoning_effort。推理、可见文本、工具与终态元数据保持各自字段与所有权。
+- 提供者O0/O2/ABI和完整Runtime O0/O2通过；隔离副本使用已提交TUI验证产品。真实DeepSeek专项保存非空thinking，并完成工具、连续请求和重开；接收缓冲回收已消费前缀、保留未完成尾行的修复与专项通过。
 
 ## 当前接口边界
 
@@ -46,6 +46,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
 python3 -B tools/runtime/test_pangu_pty.py --live-config-recovery
+python3 -B tools/runtime/test_pangu_pty.py --live-thinking
 ```
 
 PTY工具支持`--binary`选择已构建的集成程序。真实凭据文档保存在本地Git私有目录。

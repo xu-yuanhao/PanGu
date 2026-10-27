@@ -132,6 +132,26 @@ li_receive:
  mov r14, rsi
  imul r14, r13                        /* n = size*count */
 .Lrx_check:
+ mov rax,[rbx+PG_MM_USED]
+ mov rcx,PG_MM_BODY_LIMIT
+ sub rcx,rax
+ cmp r14,rcx
+ jb .Lrx_capacity
+ mov r15,[rbx+PG_MM_CONSUMED]
+ test r15,r15
+ jz .Lrx_zero
+ cmp r15,rax
+ ja .Lrx_zero
+ sub rax,r15
+ mov r13,rax
+ lea rdi,[rbx+PG_MM_BODY]
+ lea rsi,[rdi+r15]
+ mov rdx,rax
+ call memmove@PLT
+ mov [rbx+PG_MM_USED],r13
+ mov qword ptr [rbx+PG_MM_CONSUMED],0
+ mov byte ptr [rbx+r13+PG_MM_BODY],0
+.Lrx_capacity:
  mov rax, qword ptr [rbx + PG_MM_USED]
  mov rcx, PG_MM_BODY_LIMIT
  sub rcx, rax                         /* 剩余容量（含终止 NUL 位） */
@@ -829,6 +849,38 @@ pg_mimo_complete:
  cmp eax,3
  jne .Lmu_end
 .Lmu_reason:
+ mov [rsp+72],rdi
+ cmp byte ptr [rbx+PG_MM_REASONING],0
+ je .Lmu_reason_without_thinking
+ lea rdi,[rip+.Lmu_thinking_json]
+ call json_tokener_parse@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lmu_end
+ lea rdi,[rbx+PG_MM_REASONING]
+ call json_object_new_string@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lmu_end
+ mov rdi,r13
+ lea rsi,[rip+.Lmu_thinking]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lmu_end
+ mov qword ptr [rsp+64],0
+ mov rdi,r12
+ lea rsi,[rip+.Lmu_content]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ mov rdx,r13
+ call json_object_array_insert_idx@PLT
+ test eax,eax
+ jnz .Lmu_end
+ xor r13d,r13d
+.Lmu_reason_without_thinking:
+ mov rdi,[rsp+72]
  call json_object_new_string@PLT
  mov [rsp+64],rax
  test rax,rax
@@ -986,3 +1038,8 @@ pg_mimo_complete:
 .Lmu_total: .asciz "totalTokens"
 .section .data.rel.ro
 .Lmu_keys: .quad .Lmu_input,.Lmu_output,.Lmu_cache_read,.Lmu_cache_write_key,.Lmu_reasoning,.Lmu_total
+
+.section .rodata
+.Lmu_thinking: .asciz "thinking"
+.Lmu_content: .asciz "content"
+.Lmu_thinking_json: .asciz "{\"type\":\"thinking\",\"thinkingSignature\":\"reasoning_content\"}"

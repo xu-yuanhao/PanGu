@@ -14,6 +14,7 @@ typedef struct {
  pg_mimo_call_storage extra[PG_TOOL_BATCH_LIMIT-1];
  pg_model_call calls[PG_TOOL_BATCH_LIMIT];
  unsigned call_count,transport_error;
+ char reasoning[PG_TEXT_LIMIT];
  struct json_object *usage; /* owned final provider usage snapshot */
  struct json_object *configuration; /* private owned request identity/options */
 } pg_mimo;
@@ -24,7 +25,8 @@ typedef struct {
    fresh/released storage only; close before discarding an instance. */
 pg_model pg_mimo_model(pg_mimo *);
 /* Bind a detached credential-free {model,endpoint,options?} while idle.
-   options: maxTokens, temperature, maxTokensField (max_tokens or
+   options: maxTokens, temperature, reasoningEffort (DeepSeek thinking toggle),
+   maxTokensField (max_tokens or
    max_completion_tokens). 0 success; failure keeps previous binding. Public
    close/cancel releases it; start's transport reset preserves it. */
 int pg_mimo_configure(pg_mimo *,const struct json_object *);

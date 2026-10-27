@@ -7,7 +7,8 @@
 #define PG_ID_LIMIT 64
 #define PG_TOOL_BATCH_LIMIT 8
 #define PG_SESSION_BATCH_LIMIT (PG_TOOL_BATCH_LIMIT+1)
-typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT } pg_role;
+/* THINKING is a model-projection row; committed history exposes visible roles. */
+typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT, PG_THINKING } pg_role;
 typedef struct {
     pg_role role;
     size_t size;

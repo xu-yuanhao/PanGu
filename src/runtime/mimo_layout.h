@@ -97,9 +97,10 @@
 #define PG_MM_CALLS 169048
 #define PG_MM_CALL_COUNT 169432
 #define PG_MM_TRANSPORT_ERROR 169436
-#define PG_MM_USAGE 169440
-#define PG_MM_CONFIGURATION 169448
-#define PG_MM_BYTES 169456
+#define PG_MM_REASONING 169440
+#define PG_MM_USAGE 173536
+#define PG_MM_CONFIGURATION 173544
+#define PG_MM_BYTES 173552
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -208,6 +209,7 @@ PG_MM_ASSERT_OFF(pg_mimo, extra, PG_MM_EXTRA);
 PG_MM_ASSERT_OFF(pg_mimo, calls, PG_MM_CALLS);
 PG_MM_ASSERT_OFF(pg_mimo, call_count, PG_MM_CALL_COUNT);
 PG_MM_ASSERT_OFF(pg_mimo, transport_error, PG_MM_TRANSPORT_ERROR);
+PG_MM_ASSERT_OFF(pg_mimo, reasoning, PG_MM_REASONING);
 PG_MM_ASSERT_OFF(pg_mimo, usage, PG_MM_USAGE);
 PG_MM_ASSERT_OFF(pg_mimo, configuration, PG_MM_CONFIGURATION);
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);

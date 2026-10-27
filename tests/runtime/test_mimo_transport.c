@@ -399,6 +399,7 @@ static void test_receive_bounds(void) {
     assert(m.used == PG_MM_BODY_LIMIT - 1);
     assert(m.body[m.used] == 0);
     assert(captured_write(blob, 1, 1, captured_write_data) == 0); /* 最后 1 字节留给 NUL */
+    m.consumed=m.used-3;memcpy(m.body+m.consumed,"abc",3);char tail[]="wxyz";assert(captured_write(tail,1,4,&m)==4&&m.used==7&&!m.consumed&&!memcmp(m.body,"abcwxyz",8));
     model.close(model.context);
 }
 
