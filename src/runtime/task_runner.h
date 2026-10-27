@@ -66,4 +66,26 @@ pg_task_status pg_task_runner_poll(pg_task_runner *);
    Session mutation line. */
 pg_task_status pg_task_runner_commit(pg_task_runner *,const struct json_object *);
 pg_task_status pg_task_runner_close(pg_task_runner *);
+typedef struct {
+ pg_durable_session *session;
+ const pg_task_runner_host *host;
+ pg_task_runner **runners;
+ size_t count,capacity;
+ uint64_t restart_limit;
+ double next_wake;
+ unsigned busy,active,closing,reserved;
+} pg_task_scheduler;
+/* Zeroed caller storage, one scheduler per writable Session. Open discovers
+   and recovers live tasks before any phase executes. Even failed open must be
+   closed. Each poll discovers newly committed tasks and gives each live runner
+   at most one callback, in ascending task-ID order. Host/definition leases and
+   serialization follow runner rules; close scheduler before Session. No other
+   runner may execute its IDs. next_wake is the earliest sleeping deadline from
+   the last successful poll, infinity when absent. Registry/service changes and
+   native-operation completions request another poll on the injected host loop.
+   A close requested from a callback returns PENDING; call close after unwinding. */
+pg_task_status pg_task_scheduler_open(pg_task_scheduler *,pg_durable_session *,
+ const pg_task_runner_host *,uint64_t restart_limit);
+pg_task_status pg_task_scheduler_poll(pg_task_scheduler *);
+pg_task_status pg_task_scheduler_close(pg_task_scheduler *);
 #endif

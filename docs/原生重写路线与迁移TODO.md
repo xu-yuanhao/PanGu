@@ -113,6 +113,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `tasks.ts`、`timers.ts`、`harness/scheduler.ts`；`harness-tasks*`、`harness-sleep`、`harness-blocked`、`harness-cancellation-barrier` 测试。
 
 - [x] 单任务phase执行器接入实际Durable Session及SQLite/JSONL：定义解析、checkpoint推进、异步续接、sleep/wake、迁移、fault/abort、owned-child completing、正常关闭与进程中断恢复。入口`task_runner.S/h`。
+- [x] 全局协作调度发现已提交活跃任务，打开时先恢复所有running记录；按任务ID逐轮公平推进，动态发现新任务、重试缺失定义、报告sleep截止时间，并在关闭时统一清理。入口`pg_task_scheduler_*`。
 - [ ] 原生落点：任务定义/注册、phase/checkpoint、任务记录和调度服务；接入 K03/K04。
 - [ ] 完成 pending/running/waiting/sleeping/completing/terminal、owner/child、join/allSettled、timer/wake、blocked/restart、abort barrier与关闭恢复。
 - [ ] 验收：每个可恢复边界退出重开；等待取消与任务取消分别验证；父子结束、失败和释放顺序按上游任务场景成立。
@@ -210,7 +211,7 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 ## 核心交接区
 
 - 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`scheduler.ts` open/reserve/fit/run/decide/step/terminate/commitState/join、TaskDefinition/TaskState及`harness-tasks`、`harness-tasks-recovery`、`harness-sleep`。本批核对Pi远端`531340f100c6b682a602657b699a0ac27d522c30`，取消通知移出采纳回调的修复与本实现poll/cleanup边界一致；Harness仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链与实现入口：`pg_task_runner_poll/commit/close`→Durable Session→Record Tx→SQLite/JSONL。手写汇编执行单个phase并保存checkpoint、等待到期、迁移和终态；普通owned任务结束后父任务从completing完成。定义与回调按租约借用，cleanup在Storage采纳外执行。`records.S`仅过滤批次根数组的私有元数据，保留嵌套JSON浮点序列化数据，修复重开后再次提交崩溃。
-- 已运行命令/结果：Task/Session双后端O0 ASan/UBSan专项、`python3 -B tools/runtime/build_test.py`完整O0/O2回归和Pi/PanGu独立存储行为对照通过。独立核心树G00与产品构建通过；Assembly清单检查通过。共享树G00仅报告TUI并行新增文件未登记。
-- 剩余行为差异或阻断：单任务执行已到位；全局任务选择、持久waiting/join/allSettled依赖图、级联取消与多记录phase事务仍属于K06。Generation/Tool和应用组合接线属于B02后续；SQLite恢复成本随批次历史增长。
-- 下一可运行交付物：接通全局调度与持久等待，然后将Generation/Tool沿同一Session提交线接入现有模型、编码工具和TUI桥接。
+- 实际调用链与实现入口：`pg_task_runner_poll/commit/close`→Durable Session→Record Tx→SQLite/JSONL。手写汇编执行单个phase并保存checkpoint、等待到期、迁移和终态；普通owned任务结束后父任务从completing完成。`pg_task_scheduler_*`扫描五种live状态、统一恢复后逐轮执行，稳定runner地址跨原生异步操作存活，二分查找已发现ID，轮末统一压缩已结束项；`next_wake`供宿主时钟接线。定义与回调按租约借用，cleanup在Storage采纳外执行。`records.S`仅过滤批次根数组的私有元数据，保留嵌套JSON浮点序列化数据，修复重开后再次提交崩溃。
+- 已运行命令/结果：Task/Session双后端O0 ASan/UBSan专项、`python3 -B tools/runtime/build_test.py`完整O0/O2回归和Pi/PanGu独立存储行为对照通过。独立核心树G00与产品构建通过；Assembly清单检查通过。共享树G00仅报告TUI并行新增文件未登记。调度扩展的双后端O0/O2 ASan/UBSan专项通过，覆盖260任务分页、公平性、动态发现、注册恢复、休眠、全任务进程中断恢复及回调内请求关闭。
+- 剩余行为差异或阻断：全局协作调度与单任务执行已到位；持久waiting/join/allSettled依赖图、级联取消、abandonOnRestart/abort重启上限收敛与多记录phase事务仍属于K06。Generation/Tool和应用组合接线属于B02后续；SQLite恢复成本随批次历史增长。
+- 下一可运行交付物：接通持久等待和取消依赖图，然后将Generation/Tool沿同一Session提交线接入现有模型、编码工具和TUI桥接。

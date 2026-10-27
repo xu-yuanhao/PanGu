@@ -1647,12 +1647,15 @@
         "session.records.local.v0",
         "json-c"
       ],
-      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion",
+      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline",
       "exports": [
         "pg_task_runner_open",
         "pg_task_runner_poll",
         "pg_task_runner_commit",
-        "pg_task_runner_close"
+        "pg_task_runner_close",
+        "pg_task_scheduler_open",
+        "pg_task_scheduler_poll",
+        "pg_task_scheduler_close"
       ],
       "reference_basis": [
         {
@@ -1662,7 +1665,7 @@
             "packages/durable/src/harness/scheduler.ts",
             "packages/durable/src/types.ts"
           ],
-          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; global selection and durable wait graph remain separate scheduler work",
+          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; live-status selection and all-task recovery; durable wait graph and cancellation cascade remain scheduler work",
           "tests_to_read": [
             "packages/durable/test/harness-tasks.test.ts",
             "packages/durable/test/harness-tasks-recovery.test.ts",

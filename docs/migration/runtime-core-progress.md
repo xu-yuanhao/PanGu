@@ -86,3 +86,5 @@ SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合
 ## B02 持久Task phase执行（2026-10-27）
 
 `task_runner.S/h`以手写汇编接入实际Durable Session和两个持久后端，成组实现phase/checkpoint、协作pending、sleep/wake、定义版本迁移、错误/取消、owned-child completing与关闭/中断恢复。现有`test_durable_storage.c`组合验证普通推进、无进度故障、异步续接、终态重开及真实子进程中断；修复批次深拷贝丢失嵌套JSON浮点序列化数据的问题。全局调度和Generation/Tool继续按核心TODO完成。
+
+全局协作调度`pg_task_scheduler_*`已接到相同Session与任务执行器：活跃状态分页发现、所有中断记录先恢复、逐轮任务公平推进、异步资源稳定地址、定义恢复重试和sleep截止时间；双后端O0/O2 ASan/UBSan专项通过，包含260任务分页和回调关闭。持久等待与取消依赖图继续沿上游完成。

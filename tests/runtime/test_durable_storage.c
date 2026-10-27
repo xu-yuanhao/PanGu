@@ -69,8 +69,8 @@ static void cleanup(fixture *f,const char *parent){
  if(f->kind){DIR *d=opendir(f->path);assert(d);struct dirent *e;while((e=readdir(d))){if(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."))continue;char p[800];snprintf(p,sizeof(p),"%s/%s",f->path,e->d_name);assert(!unlink(p));}assert(!closedir(d)&&!rmdir(f->path));}else assert(!unlink(f->path));assert(!rmdir(parent));
 }
 typedef struct {
- fixture f;pg_task_runner_host host;pg_task_definition definition;pg_task_phase phase;
- unsigned mode,calls,cleanups,available,reports,seen[16],seen_count,first_restart;
+ fixture f;pg_task_runner_host host;pg_task_definition definition;pg_task_phase phase;pg_task_scheduler *scheduler;
+ unsigned mode,calls,cleanups,available,reports,seen[1024],seen_count,first_restart;
 } task_case;
 _Static_assert(sizeof(pg_task_runner)==112&&offsetof(pg_task_runner,error)==96,"Task runner ABI");
 _Static_assert(sizeof(pg_task_definition)==80&&offsetof(pg_task_definition,migrate)==72,"Task definition ABI");
@@ -89,7 +89,7 @@ static int task_phase(void *p,pg_task_runner *runner,const struct json_object *r
  assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(record,"state"),"status")),"running"));
  if(runner->operation)return 0;
  unsigned n=(unsigned)json_object_get_int(json_object_object_get(json_object_object_get(json_object_object_get(record,"state"),"checkpoint"),"n"));
- assert(t->seen_count<16);if(!t->seen_count)t->first_restart=(unsigned)json_object_get_int(json_object_object_get(record,"restarts"));t->seen[t->seen_count++]=n;
+ assert(t->seen_count<1024);if(!t->seen_count)t->first_restart=(unsigned)json_object_get_int(json_object_object_get(record,"restarts"));t->seen[t->seen_count++]=n;
  if(t->mode==1)return 0;
  if(t->mode==2){runner->error=(pg_slice){"boom",4};return -17;}
  if(t->mode==6){runner->operation=t;return 1;}
@@ -99,6 +99,7 @@ static int task_phase(void *p,pg_task_runner *runner,const struct json_object *r
  else if(t->mode==4&&!n)snprintf(text,sizeof(text),"{\"status\":\"sleeping\",\"checkpoint\":{\"phase\":\"count\",\"n\":1},\"until\":150}");
  else snprintf(text,sizeof(text),"{\"status\":\"running\",\"checkpoint\":{\"phase\":\"count\",\"n\":%u}}",n+1);
  struct json_object *next=json_tokener_parse(text);assert(next);int cr=pg_task_runner_commit(runner,next);assert(!cr);json_object_put(next);
+ if(t->mode==9){assert(t->scheduler&&pg_task_scheduler_close(t->scheduler)==PG_TASK_PENDING);}
  if(t->mode==3&&!n){runner->operation=t;return 1;}return 0;
 }
 static int task_migration(void *p,const struct json_object *input,const struct json_object *checkpoint,uint64_t from,struct json_object **out){(void)p;(void)input;(void)checkpoint;assert(from==1);*out=json_tokener_parse("{\"input\":{\"to\":3},\"checkpoint\":{\"phase\":\"count\",\"n\":1}}");return *out?0:1;}
@@ -154,7 +155,41 @@ static void task_tests(void){
  }
  puts("PASS: durable Task phases, cooperative pending, sleep/wake, migration, fault/abort and outcome reopen on SQLite/JSONL");
 }
+static void scheduler_tests(void){
+ _Static_assert(sizeof(pg_task_scheduler)==72&&offsetof(pg_task_scheduler,next_wake)==48,"Scheduler ABI");
+ for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<5;scenario++){
+  char parent[]="/tmp/pangu-scheduler-XXXXXX";assert(mkdtemp(parent));task_case t={.f={.kind=kind,.now=100}};
+  snprintf(t.f.path,sizeof(t.f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&t.f);seed(&t.f);open_session(&t.f);task_bind(&t);
+  unsigned count=scenario==3?260:3;uint64_t ids[260];for(unsigned i=0;i<count;i++)ids[i]=task_create(&t,0,scenario>=3?1:3);
+  pg_task_scheduler scheduler={0};t.scheduler=&scheduler;
+  if(scenario==4)t.mode=9;
+  if(scenario==2){
+   assert(!pg_durable_session_close(&t.f.session));pid_t child=fork();assert(child>=0);
+   if(!child){backend_open(&t.f);open_session(&t.f);t.mode=6;assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3));assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count);_exit(0);}
+   int status=0;assert(waitpid(child,&status,0)==child&&WIFEXITED(status)&&!WEXITSTATUS(status));backend_open(&t.f);open_session(&t.f);
+  }
+  if(scenario==1){t.mode=4;t.available=0;}
+  assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3)&&scheduler.count==count&&!t.calls);
+  if(scenario==2)for(unsigned i=0;i<count;i++){struct json_object *row=task_row(&t,ids[i]);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(row,"state"),"status")),"pending")&&json_object_get_int(json_object_object_get(row,"restarts"))==1);json_object_put(row);}
+  if(scenario==1){
+   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_BLOCKED&&!t.calls);t.available=1;
+   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count&&scheduler.next_wake==150);
+   assert(!pg_task_scheduler_close(&scheduler)&&!pg_task_scheduler_close(&scheduler));
+   assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3));assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count);
+   ids[count++]=task_create(&t,0,1);assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PROGRESS&&t.calls==count);
+   t.f.now=150;
+  }
+  if(scenario==4){assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_CLOSED&&t.calls==1&&scheduler.count==2);assert(!pg_task_scheduler_close(&scheduler)&&!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));cleanup(&t.f,parent);continue;}
+  int result=PG_TASK_PENDING;for(unsigned i=0;i<10&&result!=PG_TASK_DONE;i++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);}
+  assert(result==PG_TASK_DONE&&!scheduler.count);
+  if(scenario==0){assert(t.seen_count==9);for(unsigned i=0;i<9;i++)assert(t.seen[i]==i/3);}
+  for(unsigned i=0;i<count;i++){struct json_object *row=task_row(&t,ids[i]);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(row,"state"),"status")),"terminal"));json_object_put(row);}
+  assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));cleanup(&t.f,parent);
+ }
+ puts("PASS: Durable Scheduler stable phase fairness, live discovery/pagination, registry unblock, sleep deadline and all-task crash recovery on SQLite/JSONL");
+}
 int main(void){
+ scheduler_tests();
  task_tests();
  for(unsigned kind=0;kind<2;kind++)for(unsigned mode=0;mode<6;mode++){
   char parent[]="/tmp/pangu-durable-store-XXXXXX";assert(mkdtemp(parent));fixture f={.kind=kind,.now=100};snprintf(f.path,sizeof(f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&f);seed(&f);open_session(&f);

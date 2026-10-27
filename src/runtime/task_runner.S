@@ -1730,4 +1730,435 @@ pg_task_runner_close:
  .long .Ltr_sleeping_name-.Ltr_status_names,.Ltr_completing_name-.Ltr_status_names,.Ltr_terminal_name-.Ltr_status_names
 .balign 8
 .Ltr_missing_phase: .zero 40
+.text
+/* Live-status scans admit stable runner allocations before any phase runs. */
+.Lts_discover:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+ mov qword ptr [rsp+32],64
+ mov dword ptr [rsp+128],0
+ mov rdi,[rbx]
+ mov ebp,7
+ cmp dword ptr [rdi+172],1
+ jne .Lts_discover_end
+ mov rax,[rdi]
+ mov ebp,6
+ cmp dword ptr [rax+52],0
+ jne .Lts_discover_end
+ call pg_durable_session_idle@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Lts_discover_end
+.Lts_scan_page:
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rax+16]
+ mov ebp,6
+ test eax,eax
+ jnz .Lts_discover_end
+ xor r12d,r12d
+.Lts_scan_row:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lts_scan_next
+ mov rdi,[rsp+112]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ TGET rax,id
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Lts_discover_end
+ mov r13,rax
+ xor r14d,r14d
+ mov r8,[rbx+24]
+ mov r10,[rbx+16]
+.Lts_find_runner:
+ cmp r14,r8
+ jae .Lts_new_runner
+ lea r9,[r14+r8]
+ shr r9,1
+ mov rax,[r10+r9*8]
+ cmp [rax+16],r13
+ je .Lts_scan_skip
+ jb .Lts_find_after
+ mov r8,r9
+ jmp .Lts_find_runner
+.Lts_find_after:
+ lea r14,[r9+1]
+ jmp .Lts_find_runner
+.Lts_new_runner:
+ mov [rsp+136],r14
+ mov rax,[rbx+24]
+ cmp rax,[rbx+32]
+ jb .Lts_allocate_runner
+ mov r14,[rbx+32]
+ test r14,r14
+ jnz .Lts_grow_runner
+ mov r14,8
+ jmp .Lts_reallocate
+.Lts_grow_runner:
+ shl r14,1
+ jc .Lts_discover_allocation
+.Lts_reallocate:
+ mov rdi,[rbx+16]
+ mov rsi,r14
+ mov edx,8
+ call reallocarray@PLT
+ test rax,rax
+ jz .Lts_discover_allocation
+ mov [rbx+16],rax
+ mov [rbx+32],r14
+.Lts_allocate_runner:
+ mov edi,1
+ mov esi,112
+ call calloc@PLT
+ test rax,rax
+ jz .Lts_discover_allocation
+ mov r14,rax
+ mov rdi,rax
+ mov rsi,[rbx]
+ mov rdx,r13
+ mov rcx,[rbx+8]
+ mov r8,[rbx+40]
+ call pg_task_runner_open@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_free_failed
+ mov rax,[rbx+16]
+ mov rcx,[rbx+24]
+ mov rdx,[rsp+136]
+.Lts_insert_runner:
+ cmp rcx,rdx
+ jbe .Lts_insert_ready
+ mov rsi,[rax+rcx*8-8]
+ mov [rax+rcx*8],rsi
+ dec rcx
+ jmp .Lts_insert_runner
+.Lts_insert_ready:
+ mov [rax+rdx*8],r14
+ inc qword ptr [rbx+24]
+.Lts_scan_skip:
+ inc r12
+ jmp .Lts_scan_row
+.Lts_scan_next:
+ cmp dword ptr [rsp+132],0
+ je .Lts_next_status
+ mov rax,[rsp+120]
+ cmp dword ptr [rsp+8],0
+ je .Lts_scan_cursor
+ cmp rax,[rsp+16]
+ jbe .Lts_discover_end
+.Lts_scan_cursor:
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],1
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Lts_scan_page
+.Lts_next_status:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ mov dword ptr [rsp+8],0
+ mov dword ptr [rsp+12],0
+ mov qword ptr [rsp+16],0
+ inc dword ptr [rsp+96]
+ cmp dword ptr [rsp+96],5
+ jb .Lts_scan_page
+ /* Recover every newly discovered running record before invoking any handler. */
+ xor r12d,r12d
+.Lts_recover:
+ cmp r12,[rbx+24]
+ jae .Lts_discover_ok
+ mov rax,[rbx+16]
+ mov r14,[rax+r12*8]
+ cmp dword ptr [r14+88],0
+ jne .Lts_recover_next
+ mov rdi,r14
+ call .Ltr_fetch
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_discover_end
+ mov rdi,[r14+24]
+ call .Ltr_record_state
+ cmp eax,1
+ jne .Lts_recovered
+ mov rdi,r14
+ mov esi,1
+ call .Ltr_park
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_discover_end
+.Lts_recovered:
+ mov dword ptr [r14+88],1
+.Lts_recover_next:
+ inc r12
+ jmp .Lts_recover
+.Lts_free_failed:
+ mov rdi,r14
+ call free@PLT
+ jmp .Lts_discover_end
+.Lts_discover_allocation:
+ mov ebp,5
+ jmp .Lts_discover_end
+.Lts_discover_ok:
+ xor ebp,ebp
+.Lts_discover_end:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.globl pg_task_scheduler_open
+.type pg_task_scheduler_open,@function
+pg_task_scheduler_open:
+ push rbx
+ mov rbx,rdi
+ mov eax,4
+ test rdi,rdi
+ jz .Lts_open_return
+ cmp dword ptr [rdi+60],0
+ jne .Lts_open_return
+ test rsi,rsi
+ jz .Lts_open_return
+ test rdx,rdx
+ jz .Lts_open_return
+ test rcx,rcx
+ jz .Lts_open_return
+ cmp dword ptr [rsi+172],1
+ jne .Lts_open_return
+ mov r8,[rsi]
+ cmp dword ptr [r8+52],0
+ jne .Lts_open_return
+ cmp dword ptr [r8+56],0
+ jne .Lts_open_return
+ mov r8d,8
+.Lts_open_host:
+ cmp qword ptr [rdx+r8],0
+ je .Lts_open_return
+ add r8,8
+ cmp r8,48
+ jb .Lts_open_host
+ mov [rdi],rsi
+ mov [rdi+8],rdx
+ mov [rdi+40],rcx
+ mov qword ptr [rdi+16],0
+ mov qword ptr [rdi+24],0
+ mov qword ptr [rdi+32],0
+ movabs rax,0x7ff0000000000000
+ mov [rdi+48],rax
+ mov qword ptr [rdi+64],0
+ mov dword ptr [rdi+56],1
+ mov dword ptr [rdi+60],1
+ call .Lts_discover
+ mov dword ptr [rbx+56],0
+.Lts_open_return:
+ pop rbx
+ ret
+.size pg_task_scheduler_open,.-pg_task_scheduler_open
+
+.globl pg_task_scheduler_poll
+.type pg_task_scheduler_poll,@function
+pg_task_scheduler_poll:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov ebp,4
+ test rdi,rdi
+ jz .Lts_poll_return
+ cmp dword ptr [rbx+56],0
+ jne .Lts_poll_return
+ mov ebp,7
+ cmp dword ptr [rbx+60],1
+ jne .Lts_poll_return
+ cmp dword ptr [rbx+64],0
+ jne .Lts_poll_return
+ mov rdi,[rbx]
+ call pg_durable_session_idle@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Lts_poll_return
+ mov dword ptr [rbx+56],1
+ mov rdi,rbx
+ call .Lts_discover
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_poll_unlock
+ mov ebp,3
+ xor r12d,r12d
+ movabs rax,0x7ff0000000000000
+ mov [rbx+48],rax
+.Lts_poll_each:
+ cmp r12,[rbx+24]
+ jae .Lts_poll_finished
+ cmp dword ptr [rbx+64],0
+ jne .Lts_poll_closed
+ mov rax,[rbx+16]
+ mov r14,[rax+r12*8]
+ mov rdi,r14
+ call pg_task_runner_poll@PLT
+ cmp eax,4
+ jae .Lts_poll_error
+ cmp eax,2
+ je .Lts_poll_remove
+ test eax,eax
+ jz .Lts_poll_progress
+ cmp eax,1
+ jne .Lts_poll_deadline
+ test ebp,ebp
+ jz .Lts_poll_deadline
+ mov ebp,1
+ jmp .Lts_poll_deadline
+.Lts_poll_progress:
+ xor ebp,ebp
+.Lts_poll_deadline:
+ mov rdi,[r14+24]
+ call .Ltr_record_state
+ cmp eax,3
+ jne .Lts_poll_next
+ TGET "qword ptr [r14+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lts_poll_next
+ TGET "qword ptr [r14+24]",state_key
+ TGET rax,until
+ mov rdi,rax
+ call json_object_get_double@PLT
+ minsd xmm0,qword ptr [rbx+48]
+ movsd [rbx+48],xmm0
+.Lts_poll_next:
+ inc r12
+ jmp .Lts_poll_each
+.Lts_poll_remove:
+ mov rdi,r14
+ call pg_task_runner_close@PLT
+ test eax,eax
+ jnz .Lts_poll_error
+ mov rdi,r14
+ call free@PLT
+ mov rax,[rbx+16]
+ mov qword ptr [rax+r12*8],0
+ xor ebp,ebp
+ inc r12
+ jmp .Lts_poll_each
+.Lts_poll_finished:
+ /* Compact once per pass; settled runner removal is linear in live count. */
+ mov rax,[rbx+16]
+ xor ecx,ecx
+ xor edx,edx
+.Lts_poll_compact:
+ cmp rcx,[rbx+24]
+ jae .Lts_poll_compacted
+ mov rsi,[rax+rcx*8]
+ inc rcx
+ test rsi,rsi
+ jz .Lts_poll_compact
+ mov [rax+rdx*8],rsi
+ inc rdx
+ jmp .Lts_poll_compact
+.Lts_poll_compacted:
+ mov [rbx+24],rdx
+ test rdx,rdx
+ jnz .Lts_poll_unlock
+ cmp ebp,4
+ jae .Lts_poll_unlock
+ mov ebp,2
+ jmp .Lts_poll_unlock
+.Lts_poll_closed:
+ mov ebp,7
+ jmp .Lts_poll_finished
+.Lts_poll_error:
+ mov ebp,eax
+ jmp .Lts_poll_finished
+.Lts_poll_unlock:
+ mov dword ptr [rbx+56],0
+.Lts_poll_return:
+ mov eax,ebp
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_task_scheduler_poll,.-pg_task_scheduler_poll
+
+.globl pg_task_scheduler_close
+.type pg_task_scheduler_close,@function
+pg_task_scheduler_close:
+ push rbp
+ push rbx
+ push r12
+ mov rbx,rdi
+ mov ebp,4
+ test rdi,rdi
+ jz .Lts_close_return
+ xor ebp,ebp
+ cmp dword ptr [rbx+60],0
+ je .Lts_close_return
+ mov dword ptr [rbx+64],1
+ mov ebp,1
+ cmp dword ptr [rbx+56],0
+ jne .Lts_close_return
+ mov dword ptr [rbx+56],1
+ xor ebp,ebp
+.Lts_close_each:
+ cmp qword ptr [rbx+24],0
+ je .Lts_close_free
+ dec qword ptr [rbx+24]
+ mov rax,[rbx+16]
+ mov rcx,[rbx+24]
+ mov r12,[rax+rcx*8]
+ mov rdi,r12
+ call pg_task_runner_close@PLT
+ test ebp,ebp
+ cmovz ebp,eax
+ mov rdi,r12
+ call free@PLT
+ jmp .Lts_close_each
+.Lts_close_free:
+ mov rdi,[rbx+16]
+ call free@PLT
+ mov qword ptr [rbx+16],0
+ mov qword ptr [rbx+32],0
+ mov qword ptr [rbx+56],0
+.Lts_close_return:
+ mov eax,ebp
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_task_scheduler_close,.-pg_task_scheduler_close
+
 .section .note.GNU-stack,"",@progbits
