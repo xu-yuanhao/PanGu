@@ -189,6 +189,10 @@
     "src/runtime/durable_tool.S": {
       "role": "assembly-core",
       "reason": "手写持久工具任务call/execute、意图提交、replay恢复、异步续接/取消和结果Entry原子结算"
+    },
+    "src/runtime/durable_generation.S": {
+      "role": "assembly-core",
+      "reason": "手写Generation prepare/request/tools阶段、保存请求配置与cutoff、上下文投影、模型流续接和原子工具轮次交接"
     }
   }
 }

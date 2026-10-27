@@ -4,6 +4,8 @@
 #include "../../src/runtime/record_jsonl.h"
 #include "../../src/runtime/task_runner.h"
 #include "../../src/runtime/durable_tool.h"
+#include "../../src/runtime/durable_generation.h"
+#include "../../src/runtime/mimo.h"
 #include "../../src/runtime/read_tool.h"
 #include "../../src/runtime/write_tool.h"
 #include "../../src/runtime/bash_tool.h"
@@ -318,7 +320,41 @@ static void durable_tool_tests(void){
  puts("PASS: native pangu.tool actual workspace read/write/bash, atomic transcript receipt, safe/unsafe/current-policy recovery, async abort/drain, suspend/reopen and busy lease on SQLite/JSONL");
 }
 
-int main(void){
+typedef struct {durable_tool_case tools;pg_durable_generation generation;pg_durable_generation_host host;pg_mimo provider;unsigned model_open,requests,deltas;} generation_case;
+static int generation_prepare(void *p,uint64_t conversation,struct json_object **out){(void)p;assert(conversation==1);*out=json_tokener_parse("{\"systemPrompt\":\"You are PanGu, a coding assistant. Use the read tool to inspect requested files. Return the exact requested content.\",\"model\":\"mimo-v2.6-pro\"}");const char *model=getenv("MIMO_MODEL");if(model&&*out)assert(!json_object_object_add(*out,"model",json_object_new_string(model)));return *out?0:1;}
+static int generation_acquire(void *p,const struct json_object *configuration,pg_model *out){generation_case *g=p;if(g->model_open)return 1;const char *model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(strcmp(model,json_object_get_string(json_object_object_get(configuration,"model"))))return 2;*out=pg_mimo_model(&g->provider);pg_mimo_bind_tools(&g->provider,&g->tools.registry);g->model_open=1;g->requests++;return 0;}
+static void generation_release(void *p,const pg_model *model){generation_case *g=p;assert(g->model_open);if(model->close)model->close(model->context);g->model_open=0;}
+static void generation_progress(void *p,uint64_t id,pg_slice text){generation_case *g=p;(void)id;assert(text.size<=4096);g->deltas++;}
+static int generation_resolve(void *p,pg_slice name,const pg_task_definition **out){generation_case *g=p;if(name.size==10&&!memcmp(name.data,"pangu.tool",10)){*out=&g->tools.tool.definition;return 0;}if(name.size==16&&!memcmp(name.data,"pangu.generation",16)){*out=&g->generation.definition;return 0;}*out=0;return 1;}
+static int generation_flow(unsigned live){
+ if(live&&!getenv("MIMO_API_KEY")){fputs("MIMO_API_KEY required for real Durable model/tool flow\n",stderr);return 2;}
+ assert(!curl_global_init(CURL_GLOBAL_DEFAULT));
+ for(unsigned kind=0;kind<2;kind++){
+  char parent[]="/tmp/pangu-generation-live-XXXXXX";assert(mkdtemp(parent));generation_case *g=calloc(1,sizeof(*g));assert(g);durable_tool_case *tools=&g->tools;task_case *base=&tools->base;base->f.kind=kind;base->f.now=100;tools->reader.directory=-1;
+  snprintf(base->f.path,sizeof(base->f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&base->f);seed(&base->f);open_session(&base->f);task_bind(base);
+  char path[512],expected[80];snprintf(path,sizeof(path),"%s/hello.txt",parent);snprintf(expected,sizeof(expected),"PANGU-DURABLE-%ld-%u",(long)getpid(),kind);FILE *file=fopen(path,"w");assert(file&&fprintf(file,"%s\n",expected)>0&&!fclose(file));
+  assert(!pg_read_tool_open(&tools->reader,parent));pg_tool_definition read=pg_read_tool_definition(&tools->reader);assert(!pg_tool_registry_init(&tools->registry,&read,1));tools->tool_host=(pg_durable_tool_host){tools,durable_tool_acquire,durable_tool_release,task_mint,durable_tool_progress};assert(!pg_durable_tool_init(&tools->tool,&tools->tool_host));
+  g->host=(pg_durable_generation_host){g,generation_prepare,generation_acquire,generation_release,task_mint,generation_progress,&tools->tool.definition};assert(!pg_durable_generation_init(&g->generation,&g->host));base->host.resolve=generation_resolve;
+  pg_record_tx tx={0};pg_document_tx docs={0};struct json_object *draft=json_tokener_parse("{\"kind\":\"pangu.user\",\"model\":[{\"role\":\"user\",\"content\":\"Read hello.txt with the read tool. Reply with its exact first line and nothing else.\"}]}"),*entry=0;assert(draft&&!pg_durable_session_begin(&base->f.session,&tx,&docs,base->f.memory,read_record)&&!pg_record_tx_append_entry(&tx,1,draft,0,(int(*)(void *,uint64_t *))pg_record_memory_mint,&entry)&&!pg_durable_session_settle(&base->f.session,0,0,0));json_object_put(draft);json_object_put(entry);
+  struct json_object *definition=json_tokener_parse("{\"name\":\"pangu.generation\",\"version\":1}"),*input=json_object_new_object(),*options=json_tokener_parse("{\"ownership\":{\"kind\":\"conversation\"}}");assert(!pg_durable_session_begin(&base->f.session,&tx,&docs,g,task_read));pg_task_creation creation={.context=g,.initial=g->generation.definition.initial,.mint=task_mint,.conversation_id=1};uint64_t id=0;int creation_result=pg_record_tx_create_task(&tx,definition,input,options,&creation,&id);int creation_commit=creation_result?99:pg_durable_session_settle(&base->f.session,0,0,0);assert(!creation_result&&!creation_commit);json_object_put(definition);json_object_put(input);json_object_put(options);
+  pg_task_scheduler scheduler={0};assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3));
+  if(!live){
+   /* Exercise the real phase/context path while the model lease is occupied;
+      no model response is synthesized and no network request is started. */
+   g->model_open=1;assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PROGRESS);assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&!g->requests&&!base->reports);struct json_object *saved=task_row(base,id),*checkpoint=json_object_object_get(json_object_object_get(saved,"state"),"checkpoint");assert(!strcmp(json_object_get_string(json_object_object_get(checkpoint,"phase")),"request")&&json_object_get_int64(json_object_object_get(checkpoint,"cutoff"))>0&&json_object_object_get(checkpoint,"configuration"));json_object_put(saved);
+   assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3)&&pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&!g->requests&&!base->reports);assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));g->model_open=0;pg_read_tool_close(&tools->reader);assert(!unlink(path));cleanup(&base->f,parent);free(g);continue;
+  }
+  int result=1;for(unsigned i=0;i<12000&&result!=PG_TASK_DONE;i++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);if(result!=PG_TASK_DONE)nanosleep(&(struct timespec){0,10000000},0);}assert(result==PG_TASK_DONE&&!g->model_open);
+  pg_memory_query query={.table=PG_TABLE_ENTRY,.order=PG_SCAN_ASCENDING,.limit=64,.flags=PG_SCAN_CONVERSATION,.conversation_id=1};pg_memory_page page={0};assert(!task_scan(base,&query,&page));unsigned assistants=0,results=0,marker=0;for(size_t i=0;i<json_object_array_length(page.items);i++){struct json_object *e=json_object_array_get_idx(page.items,i);const char *kind_name=json_object_get_string(json_object_object_get(e,"kind"));if(!strcmp(kind_name,"pangu.assistant")){assistants++;if(strstr(json_object_to_json_string(e),expected))marker++;}if(!strcmp(kind_name,"pangu.tool-result"))results++;}json_object_put(page.items);
+  fprintf(stderr,"Durable real model backend=%u requests=%u assistants=%u tools=%u marker=%u faults=%u HTTP=%ld\n",kind,g->requests,assistants,results,marker,base->reports,g->provider.http);if(base->reports){struct json_object *failed=task_row(base,id);fprintf(stderr,"Generation state: %s\n",json_object_to_json_string(json_object_object_get(failed,"state")));json_object_put(failed);}assert(!base->reports&&g->requests>=2&&assistants>=2&&results>=1&&marker&&!tools->leased);
+  assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));backend_open(&base->f);assert(!pg_record_memory_read(base->f.memory,PG_TABLE_TASK,id,&entry));assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(entry,"state"),"status")),"terminal"));json_object_put(entry);assert(!(kind?pg_record_jsonl_close(&base->f.backend.jsonl):pg_record_sqlite_close(&base->f.backend.sql)));pg_read_tool_close(&tools->reader);assert(!unlink(path));cleanup(&base->f,parent);free(g);
+ }
+ curl_global_cleanup();puts(live?"PASS: real MiMo Generation -> durable read Tool -> follow-up Generation -> result/reopen on SQLite/JSONL":"PASS: Generation prepare/request context projection, saved configuration/cutoff and occupied model lease reopen on SQLite/JSONL (no model response)");return 0;
+}
+
+int main(int argc,char **argv){
+ if(argc==2&&!strcmp(argv[1],"--live-generation"))return generation_flow(1);
+ assert(!generation_flow(0));
  durable_tool_tests();
  wait_tests();
  scheduler_tests();

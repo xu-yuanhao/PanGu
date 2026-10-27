@@ -59,7 +59,7 @@ def main():
             native_paths.append(library)
         for mode in ('-O0', '-O2'):
             sqlite_test = str(Path(directory) / 'test-record-sqlite')
-            sqlite_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3'], text=True).split()
+            sqlite_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'record_sqlite']],
@@ -74,7 +74,7 @@ def main():
             durable_store_test = str(Path(directory) / 'test-durable-storage')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']],
+                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']],
                             str(ROOT / 'tests/runtime/test_durable_storage.c'), *sqlite_flags, '-o', durable_store_test], check=True)
             subprocess.run([durable_store_test], check=True, timeout=30)
             host_test = str(Path(directory) / 'test-host')

@@ -100,3 +100,7 @@ SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合
 ## B02 真实工具持久任务（2026-10-27）
 
 `durable_tool.S/h`实现model-issued `pangu.tool`的call/execute/abort消费者，接入已存在的真实read/write/bash服务：意图提交后执行、双safe恢复、异步输出/关闭和操作租约清理，结果Entry与Task终态原子入库。SQLite/JSONL组合通过实际文件/子进程验证；子进程在write副作用后、结果提交前退出，重开结算interrupted且不重复副作用。Generation与嵌套调用/hooks/丰富进度的剩余范围见核心TODO。
+
+## B02 Generation接线候选（2026-10-27）
+
+`durable_generation.S/h`将prepare/request/tools接入现有Task/Scheduler和模型/工具服务，包含请求配置/cutoff、原生上下文投影、流续接及原子assistant/子任务/waiting与后继Generation。当前已验证配置与上下文读取、租约等待及重开；完整Runtime O0/O2回归通过。真实MiMo请求返回HTTP 401，成功模型—工具闭环仍待有效凭据验证，K07整体保持未完成。

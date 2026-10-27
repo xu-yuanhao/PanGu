@@ -213,6 +213,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
+- 当前Generation接线：`durable_generation.S/h`新增prepare/request/tools定义与原生消息投影，prepare保存配置与cutoff；request保存assistant并创建owned Tool/waiting，tools原子交给下一Generation。完整成功闭环尚未验证，K07整体保持未完成。`test_durable_storage.c --live-generation`运行真实提供者；此前MiMo Token请求返回HTTP 401。用户计划改用DeepSeek额度，后续接入后继续真实验收。prepare/request上下文投影、模型租约忙时的持久请求重开，以及现有Tool/Session链的完整Runtime O0/O2回归通过。
+
 - 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Generation `prepare/startToolRound`、ToolTask `call/execute/abort/readCall/settle/appendToolResult`、Scheduler `validateWait/waitCycle/reconcile`与Transaction最终owner检查；已读`harness-tools-recovery`的safe/unsafe、工具撤销、实际bash重开场景。Pi远端`531340f100c6b682a602657b699a0ac27d522c30`的Tool源码相对固定提交无变化；Harness固定`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
 - 实际调用链与实现入口：`pangu.tool`定义→`pg_task_scheduler_*`→`durable_tool.S`→真实`pg_tools`提供者→`pg_task_runner_commit_with`→Session→SQLite/JSONL。model-issued调用从同会话的`pangu.assistant` Entry读取；执行前持久化arguments/replay，恢复同时核对已存和当前safe策略；异步输出与续接、cancel及关闭资源通过操作租约交回宿主排空。工具结果`pangu.tool-result` Entry与Task receipt原子提交。原子phase事务同时支持Entry、Document、新子任务与waiting，候选覆盖参与图检查。
 - 已运行命令/结果：`python3 -B tools/runtime/build_test.py`完整O0/O2 Runtime回归及独立Pi/PanGu存储对照通过；Tool/Session组合O0/O2 ASan/UBSan专项通过，最终专项覆盖双后端14场景，包括实际文件读写/bash、async取消/暂停排空、safe/unsafe/当前策略恢复、缺工具/忙租约。真实子进程在write副作用已发生、结果提交前退出；重开后保留人工修改的文件并结算interrupted，未重复write。Assembly检查通过；核心提交树G00与产品构建通过。

@@ -1708,6 +1708,37 @@
           ]
         }
       ]
+    },
+    {
+      "id": "task.generation.local.v0",
+      "sources": [
+        "src/runtime/durable_generation.h",
+        "src/runtime/durable_generation.S"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "task.tool.local.v0",
+        "json-c"
+      ],
+      "role": "Generation prepare/request/tools consumer: durable configuration/cutoff, bounded existing model protocol projection, cooperative stream, assistant/owned-tool/wait atomic round and successor generation handoff; live successful flow pending valid credentials",
+      "exports": [
+        "pg_durable_generation_init"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/generation.ts"
+          ],
+          "semantics": "prepare/request/startToolRound/finishToolRound mapped to native services and pangu Entry/Task identities; retry/deferred/compaction/hooks/queue boundaries and sequential mode remain K07/K10/K12 coverage",
+          "tests_to_read": [
+            "packages/durable/test/harness-generation.test.ts",
+            "packages/durable/test/harness-generation-recovery.test.ts",
+            "packages/durable/test/harness-tools-recovery.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
