@@ -96,3 +96,7 @@ SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合
 ## B02 Generation/Tool 原子phase提交（2026-10-27）
 
 `pg_task_runner_commit_with`接入Durable Session实际事务：同步回调读写Entry、Document并创建工具子任务，返回下一checkpoint/waiting状态一起提交。图校验合并最新候选，已提交事实与新建子任务一同参与等待/所有权决策；终结owner同时新建owned任务按上游最终owner规则拒绝。双后端专项验证成功批次和回调/环/owner拒绝时记录、文档及任务整体撤销；NULL下一状态保留本阶段。下一消费者是Generation/Tool任务与现有模型/工具服务。
+
+## B02 真实工具持久任务（2026-10-27）
+
+`durable_tool.S/h`实现model-issued `pangu.tool`的call/execute/abort消费者，接入已存在的真实read/write/bash服务：意图提交后执行、双safe恢复、异步输出/关闭和操作租约清理，结果Entry与Task终态原子入库。SQLite/JSONL组合通过实际文件/子进程验证；子进程在write副作用后、结果提交前退出，重开结算interrupted且不重复副作用。Generation与嵌套调用/hooks/丰富进度的剩余范围见核心TODO。

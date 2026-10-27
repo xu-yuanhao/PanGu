@@ -124,6 +124,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `harness/{generation,tool,partial-changes,provider,live}.ts`；`harness-generation*`、`harness-tools-recovery`、`harness-deferred-progress` 测试。
 
 - [x] 接通Generation/Tool共用的原子phase事务：Entry、Document、工具子任务及waiting/checkpoint同批提交；等待和所有权检查使用最新候选，回调/环/最终owner校验失败整体撤销。入口`pg_task_runner_commit_with`。
+- [x] model-issued `pangu.tool`接入真实read/write/bash服务与Task/Scheduler：call/execute意图先存、双safe恢复、异步输出/关闭、abort、暂停排空及原子结果Entry/终态。入口`durable_tool.S/h`；Generation和嵌套工具按下面剩余项继续。
 - [ ] 在现有 `agent.S/h` 上完成 generation/tool任务、turn/run/settled、草稿与提交事实、流进度、批量调用、顺序/并行工具轮次和结果关联。
 - [ ] 完成可恢复模型重试、deferred生成、partial变化、工具中断结算和副作用恢复策略；模型请求沿用已提交配置与身份。
 - [ ] 验收：无工具、单/多工具、错误、取消、暂停与进程恢复的状态/事件/副作用逐项对照；达到消息/输出预算前给出可处理结果。
@@ -212,8 +213,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`scheduler.ts` open/reserve/fit/run/decide/step/terminate/commitState/join、TaskDefinition/TaskState及`harness-tasks`、`harness-tasks-recovery`、`harness-sleep`及`harness-structured`的waitCycle/validateWait/reconcile用例。Generation `prepare/startToolRound`与Tool `call/settle`的runtime.commit调用和Transaction `validateOwners`约束映射到`commit_with`。本批核对Pi远端`531340f100c6b682a602657b699a0ac27d522c30`，取消通知移出采纳回调的修复与本实现poll/cleanup边界一致；Harness仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链与实现入口：`pg_task_runner_poll/commit/close`→Durable Session→Record Tx→SQLite/JSONL。手写汇编执行单个phase并保存checkpoint、等待到期、迁移和终态；普通owned任务结束后父任务从completing完成。`commit_with`将同步phase回调的Entry/Document/子任务与下一状态提交到同一Session事务；候选图合并最新Task/Conversation后校验，失败统一discard。`pg_task_scheduler_*`扫描五种live状态、统一恢复后逐轮执行，稳定runner地址跨原生异步操作存活，二分查找已发现ID，轮末统一压缩已结束项；`next_wake`供宿主时钟接线。waiting提交用排序的原生节点/邻接链及有界于节点数的visited/队列检查等待与所有权环；图仅装载live Task和Conversation，已终态成员通过单项查询读取。failFast与取消派生标记先原子提交，再逐层运行abort，持有失败的completing结果也会取消其普通后代。定义与回调按租约借用，cleanup在Storage采纳外执行。`records.S`仅过滤批次根数组的私有元数据，保留嵌套JSON浮点序列化数据，修复重开后再次提交崩溃。
-- 已运行命令/结果：Task/Session双后端O0 ASan/UBSan专项、`python3 -B tools/runtime/build_test.py`完整O0/O2回归和Pi/PanGu独立存储行为对照通过。独立核心树G00与产品构建通过；Assembly清单检查通过。共享树G00仅报告TUI并行新增文件未登记。调度扩展的双后端O0/O2 ASan/UBSan专项通过，覆盖260任务分页、公平性、动态发现、注册恢复、休眠、全任务进程中断恢复及回调内请求关闭。等待/取消专项覆盖双后端14组：allSettled/failFast、自等/互等/子等父/owned-conversation环、缺失/foreign成员、后台隔离、菱形join、已终态成员、持有失败与on外兄弟隔离、原子取消标记和等待重开；本批`python3 -B tools/runtime/build_test.py`完整O0/O2 Runtime回归与独立存储对照通过。原子phase增加双后端Entry+Document+新子任务+waiting组合、回调失败、等待环拒绝、终结owner时新建子任务拒绝及无状态变化提交用例；新增接口整合的完整O0/O2 Runtime回归与独立存储行为对照通过。
-- 剩余行为差异或阻断：全局协作调度与单任务执行已到位；abandonOnRestart/abort重启上限收敛、缺失定义取消的orphaned结算、外部join/outcomes接口仍属于K06。Generation/Tool和应用组合接线属于B02后续；SQLite恢复成本随批次历史增长。
-- 下一可运行交付物：直接实现Generation prepare/request/tools与Tool call/execute任务，将现有模型和编码工具接入这条持久执行链；同批收敛K06剩余恢复/孤儿行为。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Generation `prepare/startToolRound`、ToolTask `call/execute/abort/readCall/settle/appendToolResult`、Scheduler `validateWait/waitCycle/reconcile`与Transaction最终owner检查；已读`harness-tools-recovery`的safe/unsafe、工具撤销、实际bash重开场景。Pi远端`531340f100c6b682a602657b699a0ac27d522c30`的Tool源码相对固定提交无变化；Harness固定`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链与实现入口：`pangu.tool`定义→`pg_task_scheduler_*`→`durable_tool.S`→真实`pg_tools`提供者→`pg_task_runner_commit_with`→Session→SQLite/JSONL。model-issued调用从同会话的`pangu.assistant` Entry读取；执行前持久化arguments/replay，恢复同时核对已存和当前safe策略；异步输出与续接、cancel及关闭资源通过操作租约交回宿主排空。工具结果`pangu.tool-result` Entry与Task receipt原子提交。原子phase事务同时支持Entry、Document、新子任务与waiting，候选覆盖参与图检查。
+- 已运行命令/结果：`python3 -B tools/runtime/build_test.py`完整O0/O2 Runtime回归及独立Pi/PanGu存储对照通过；Tool/Session组合O0/O2 ASan/UBSan专项通过，最终专项覆盖双后端14场景，包括实际文件读写/bash、async取消/暂停排空、safe/unsafe/当前策略恢复、缺工具/忙租约。真实子进程在write副作用已发生、结果提交前退出；重开后保留人工修改的文件并结算interrupted，未重复write。Assembly检查通过；核心提交树G00与产品构建通过。
+- 剩余行为差异：Generation prepare/request/tools、实际应用/TUI调度组合继续接线；Tool嵌套调用文档、hooks/修复后的参数在意图前校验、结构化输出/用量与持久partial进度按K07/K09补齐。K06的abandonOnRestart、abort重启上限、缺定义orphaned与外部任务操作接口仍保留。SQLite恢复成本随批次历史增长。
+- 下一可运行交付物：Generation直接使用上述工具任务和原子phase事务，完成模型生成→assistant保存/创建工具子任务→waiting→工具结果入库→继续模型生成的完整闭环；沿实际消费者补齐相关恢复入口。

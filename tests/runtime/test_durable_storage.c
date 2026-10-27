@@ -3,6 +3,11 @@
 #include "../../src/runtime/record_sqlite.h"
 #include "../../src/runtime/record_jsonl.h"
 #include "../../src/runtime/task_runner.h"
+#include "../../src/runtime/durable_tool.h"
+#include "../../src/runtime/read_tool.h"
+#include "../../src/runtime/write_tool.h"
+#include "../../src/runtime/bash_tool.h"
+#include <time.h>
 #include <sys/wait.h>
 #include <assert.h>
 #include <dirent.h>
@@ -274,7 +279,47 @@ static void wait_tests(void){
  puts("PASS: atomic phase Entry/Document/child/wait commit and callback/cycle/owner rollback; Durable allSettled/failFast, missing/foreign/self/mutual/owned-conversation wait cycles, background isolation, diamond joins, cancellation cascade and waiting reopen on SQLite/JSONL");
 }
 
+typedef struct {task_case base;pg_durable_tool tool;pg_durable_tool_host tool_host;pg_tool_registry registry;pg_read_tool reader;pg_process process;pg_bash_tool shell;unsigned leased,acquired,released,busy_once,progress,unavailable; } durable_tool_case;
+static int durable_tool_acquire(void *p,uint64_t id,pg_tools *out){durable_tool_case *t=p;(void)id;if(t->unavailable)return 2;if(t->busy_once){t->busy_once=0;return 1;}assert(!t->leased);t->leased=1;t->acquired++;*out=pg_tool_registry_service(&t->registry);return 0;}
+static void durable_tool_release(void *p,uint64_t id,const pg_tools *tools){durable_tool_case *t=p;(void)id;assert(t->leased);if(tools->close){int result=1;for(unsigned i=0;i<1000&&result==1;i++){result=tools->close(tools->context);if(result==1)nanosleep(&(struct timespec){0,1000000},0);}assert(!result);}t->leased=0;t->released++;}
+static void durable_tool_progress(void *p,uint64_t id,pg_slice text){durable_tool_case *t=p;(void)id;assert(text.size<=4096);t->progress++;}
+static int durable_tool_resolve(void *p,pg_slice kind,const pg_task_definition **out){durable_tool_case *t=p;assert(kind.size==10&&!memcmp(kind.data,"pangu.tool",10));*out=&t->tool.definition;return 0;}
+static pg_record_storage tool_crash_storage;
+static int durable_tool_crash_commit(void *p,const struct json_object *writes,pg_records_adopt adopt,void *ctx,uint64_t *seq){
+ for(size_t i=0;i<json_object_array_length(writes);i++){struct json_object *write=json_object_array_get_idx(writes,i),*record=json_object_object_get(write,"value");const char *kind=json_object_get_string(json_object_object_get(record,"kind"));if(kind&&!strcmp(kind,"pangu.tool-result"))_exit(0);}
+ return tool_crash_storage.commit(p,writes,adopt,ctx,seq);
+}
+static void durable_tool_tests(void){
+ _Static_assert(sizeof(pg_durable_tool)==168&&offsetof(pg_durable_tool,phases)==88,"Durable Tool ABI");
+ for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<14;scenario++){
+  char parent[]="/tmp/pangu-durable-tool-XXXXXX";assert(mkdtemp(parent));durable_tool_case t={.base={.f={.kind=kind,.now=100}},.reader={.directory=-1}};task_case *base=&t.base;
+  snprintf(base->f.path,sizeof(base->f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&base->f);seed(&base->f);open_session(&base->f);task_bind(base);
+  char path[512];snprintf(path,sizeof(path),"%s/hello.txt",parent);FILE *file=fopen(path,"w");assert(file&&fputs("durable real read\n",file)>=0&&!fclose(file));
+  assert(!pg_read_tool_open(&t.reader,parent));pg_write_tool writer={.directory=t.reader.directory};pg_tool_definition read=scenario>=6&&scenario<12?pg_write_tool_definition(&writer):pg_read_tool_definition(&t.reader);if(scenario>=8&&scenario<=10){pg_process_init(&t.process);pg_process_ops ops=pg_process_service(&t.process);assert(!pg_bash_tool_init(&t.shell,&ops,t.reader.directory,0));read=pg_bash_tool_definition(&t.shell);}assert(!pg_tool_registry_init(&t.registry,&read,1));
+  t.tool_host=(pg_durable_tool_host){&t,durable_tool_acquire,durable_tool_release,task_mint,durable_tool_progress};assert(!pg_durable_tool_init(&t.tool,&t.tool_host));base->host.resolve=durable_tool_resolve;
+  pg_record_tx tx={0};pg_document_tx docs={0};struct json_object *entry=0,*draft=json_tokener_parse("{\"kind\":\"pangu.assistant\",\"model\":[{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"read file\"},{\"type\":\"toolCall\",\"id\":\"read1\",\"name\":\"read\",\"arguments\":{\"path\":\"hello.txt\"}}]}]}");if(scenario==6||scenario==7||scenario==11){struct json_object *call=json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(json_object_object_get(draft,"model"),0),"content"),1);assert(!json_object_object_add(call,"name",json_object_new_string("write"))&&!json_object_object_add(json_object_object_get(call,"arguments"),"content",json_object_new_string("durable real write\n")));}
+  if(scenario>=8&&scenario<=10){struct json_object *call=json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(json_object_object_get(draft,"model"),0),"content"),1);struct json_object *arguments=json_object_new_object();assert(arguments&&!json_object_object_add(call,"name",json_object_new_string("bash"))&&!json_object_object_add(arguments,"command",json_object_new_string(scenario==8?"printf 'durable real bash\\n'":"printf 'durable real bash\\n'; /bin/sleep 30"))&&!json_object_object_add(call,"arguments",arguments));}
+  assert(draft&&!pg_durable_session_begin(&base->f.session,&tx,&docs,base->f.memory,read_record)&&!pg_record_tx_append_entry(&tx,1,draft,0,(int(*)(void *,uint64_t *))pg_record_memory_mint,&entry));json_object_put(draft);
+  uint64_t assistant=(uint64_t)json_object_get_int64(json_object_object_get(entry,"id"));json_object_put(entry);assert(!pg_durable_session_settle(&base->f.session,0,0,0));
+  assert(!pg_durable_session_begin(&base->f.session,&tx,&docs,&t,task_read));struct json_object *definition=json_tokener_parse("{\"name\":\"pangu.tool\",\"version\":2}"),*input=json_tokener_parse("{\"kind\":\"model\",\"assistant\":0,\"callId\":\"read1\"}"),*options=json_tokener_parse("{\"ownership\":{\"kind\":\"conversation\"}}");assert(!json_object_object_add(input,"assistant",json_object_new_int64((int64_t)assistant)));pg_task_creation creation={.context=&t,.initial=t.tool.definition.initial,.mint=task_mint,.conversation_id=1};uint64_t id=0;assert(!pg_record_tx_create_task(&tx,definition,input,options,&creation,&id)&&!pg_durable_session_settle(&base->f.session,0,0,0));json_object_put(definition);json_object_put(input);json_object_put(options);
+  if(scenario==1||scenario==2||scenario==3||scenario==7||scenario==13){struct json_object *row=task_row(base,id);struct json_object *state=json_tokener_parse(scenario==2||scenario==7?"{\"status\":\"pending\",\"checkpoint\":{\"phase\":\"execute\",\"arguments\":{\"path\":\"hello.txt\"},\"replay\":\"unsafe\"}}":"{\"status\":\"pending\",\"checkpoint\":{\"phase\":\"execute\",\"arguments\":{\"path\":\"hello.txt\"},\"replay\":\"safe\"}}");assert(!json_object_object_add(row,"state",state)&&!pg_durable_session_begin(&base->f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,base,task_now)&&!pg_durable_session_settle(&base->f.session,0,0,0));json_object_put(row);assert(!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);if(scenario==3){read.replay_safe=0;assert(!pg_tool_registry_init(&t.registry,&read,1));}}
+  if(scenario==4){struct json_object *row=task_row(base,id);assert(!json_object_object_add(row,"abortRequested",json_object_new_boolean(1))&&!pg_durable_session_begin(&base->f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,base,task_now)&&!pg_durable_session_settle(&base->f.session,0,0,0));json_object_put(row);}
+  if(scenario==5)t.busy_once=1;
+  if(scenario>=12)t.unavailable=1;
+  pg_task_scheduler scheduler={0};
+  if(scenario==11){assert(!pg_durable_session_close(&base->f.session));pid_t child=fork();assert(child>=0);if(!child){backend_open(&base->f);open_session(&base->f);tool_crash_storage=base->f.records.storage;base->f.records.storage.commit=durable_tool_crash_commit;assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3));for(unsigned j=0;j<20;j++)(void)pg_task_scheduler_poll(&scheduler);_exit(99);}int status=0;assert(waitpid(child,&status,0)==child&&WIFEXITED(status)&&!WEXITSTATUS(status));file=fopen(path,"r");assert(file);char written[80];assert(fgets(written,sizeof(written),file)&&!strcmp(written,"durable real write\n")&&!fclose(file));file=fopen(path,"w");assert(file&&fputs("changed after interrupted effect\n",file)>=0&&!fclose(file));backend_open(&base->f);open_session(&base->f);}
+  assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3));int result=1;
+  if(scenario==9||scenario==10){assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.leased);if(scenario==9){struct json_object *r=task_row(base,id);assert(!json_object_object_add(r,"abortRequested",json_object_new_boolean(1))&&!pg_durable_session_begin(&base->f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,r,base,task_now)&&!pg_durable_session_settle(&base->f.session,0,0,0));json_object_put(r);}else{assert(!pg_task_scheduler_close(&scheduler)&&!t.leased&&!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3));}}
+  for(unsigned j=0;j<1000&&result!=PG_TASK_DONE;j++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);if(result!=PG_TASK_DONE)nanosleep(&(struct timespec){0,1000000},0);}assert(result==PG_TASK_DONE&&!t.leased&&t.acquired==t.released);
+  struct json_object *row=task_row(base,id),*outcome=json_object_object_get(json_object_object_get(row,"state"),"outcome");const char *expected=scenario==2||scenario==3||scenario==7||scenario==10||scenario==11||scenario==13?"failed":scenario==4||scenario==9?"aborted":"completed";assert(!strcmp(json_object_get_string(json_object_object_get(outcome,"status")),expected));uint64_t receipt=(uint64_t)json_object_get_int64(json_object_object_get(json_object_object_get(outcome,"result"),"entryId"));json_object_put(row);assert(!task_read(base,PG_TABLE_ENTRY,receipt,&entry));struct json_object *message=json_object_array_get_idx(json_object_object_get(entry,"model"),0);assert(!strcmp(json_object_get_string(json_object_object_get(message,"toolCallId")),"read1"));const char *text=json_object_get_string(json_object_object_get(json_object_array_get_idx(json_object_object_get(message,"content"),0),"text"));assert(strstr(text,scenario==2||scenario==3||scenario==7||scenario==10||scenario==11||scenario==13?"interrupted":scenario==4||scenario==9?"aborted":scenario==6?"wrote":scenario==8?"durable real bash":scenario==12?"not available":"durable real read"));json_object_put(entry);
+  if(scenario==6||scenario==7||scenario==11){file=fopen(path,"r");assert(file);char actual[80];assert(fgets(actual,sizeof(actual),file)&&!fclose(file));assert(!strcmp(actual,scenario==6?"durable real write\n":scenario==11?"changed after interrupted effect\n":"durable real read\n"));}
+  assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));pg_read_tool_close(&t.reader);assert(!unlink(path));cleanup(&base->f,parent);
+ }
+ puts("PASS: native pangu.tool actual workspace read/write/bash, atomic transcript receipt, safe/unsafe/current-policy recovery, async abort/drain, suspend/reopen and busy lease on SQLite/JSONL");
+}
+
 int main(void){
+ durable_tool_tests();
  wait_tests();
  scheduler_tests();
  task_tests();

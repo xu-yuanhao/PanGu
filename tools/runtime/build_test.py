@@ -74,7 +74,7 @@ def main():
             durable_store_test = str(Path(directory) / 'test-durable-storage')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner']],
+                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']],
                             str(ROOT / 'tests/runtime/test_durable_storage.c'), *sqlite_flags, '-o', durable_store_test], check=True)
             subprocess.run([durable_store_test], check=True, timeout=30)
             host_test = str(Path(directory) / 'test-host')

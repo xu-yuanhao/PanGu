@@ -185,6 +185,10 @@
     "src/runtime/task_runner.S": {
       "role": "assembly-core",
       "reason": "手写Durable任务phase续接、持久决策、恢复、迁移、sleep及所有者完成状态机"
+    },
+    "src/runtime/durable_tool.S": {
+      "role": "assembly-core",
+      "reason": "手写持久工具任务call/execute、意图提交、replay恢复、异步续接/取消和结果Entry原子结算"
     }
   }
 }
