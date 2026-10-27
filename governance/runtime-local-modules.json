@@ -8,7 +8,8 @@
         "src/contracts/client.h"
       ],
       "dependencies": [
-        "C stddef.h"
+        "C stddef.h",
+        "C stdint.h"
       ],
       "role": "borrowed event slices and client actions; internal source interface",
       "reference_basis": [
@@ -438,7 +439,8 @@
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
-        "main"
+        "main",
+        "pg_tui_runtime_inputs"
       ],
       "reference_basis": [
         {
@@ -1771,6 +1773,7 @@
         "pg_durable_generation_init",
         "pg_durable_generation_history",
         "pg_durable_client_open",
+        "pg_durable_client_inputs_service",
         "pg_durable_client_service",
         "pg_durable_client_suspend",
         "pg_durable_client_emit",
@@ -1804,7 +1807,7 @@
             "packages/ai/src/utils/overflow.ts",
             "packages/durable/src/harness/inbox.ts"
           ],
-          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; text progress uses conversation pangu.live deferred append deltas, request recovery/abort converts saved text to aborted assistant and final classification clears it atomically; model context excludes error/aborted/deferred assistants. Deferred handles persist configuration/cutoff and pollAt, early wake re-sleeps, repeated fetch moves pollAt strictly forward, cancellation cooperatively drains the provider before abort receipt. Global toolExecution sequential mode admits one owned Tool, persists pending call IDs, resumes after each result and emits aborted receipts for unstarted calls on cancellation. Full Live deferred observation, compaction/hooks/queue boundaries and per-tool executionMode remain corresponding TODO coverage.",
+          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; text progress uses conversation pangu.live deferred append deltas, request recovery/abort converts saved text to aborted assistant and final classification clears it atomically; model context excludes error/aborted/deferred assistants. Deferred handles persist configuration/cutoff and pollAt, early wake re-sleeps, repeated fetch moves pollAt strictly forward, cancellation cooperatively drains the provider before abort receipt. Client Inputs operation table exposes typed idle admission, queued submission/status/withdrawal and scoped ascending pages to product/TUI, without changing the existing client event table. Global toolExecution sequential mode admits one owned Tool, persists pending call IDs, resumes after each result and emits aborted receipts for unstarted calls on cancellation. Full Live deferred observation, compaction/hooks/queue boundaries and per-tool executionMode remain corresponding TODO coverage.",
           "tests_to_read": [
             "packages/durable/test/harness-generation.test.ts",
             "packages/durable/test/harness-generation-recovery.test.ts",

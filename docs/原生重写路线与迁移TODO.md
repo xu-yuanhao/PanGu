@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` startToolRound/tools/abort/readCalls/createToolTask，以及 `harness-tools.test.ts` 全局顺序执行和取消场景。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`；本批采用固定快照的轮次语义。
-- 实际调用链：保存的toolExecution=sequential → assistant与首个Tool/wait同批提交 → 剩余call ID保存在pending → 每个结果结算后原子创建下一个owned Tool并更新waiting → 完成后沿Inputs边界启动后继Generation。取消先排空已启动子任务，再按原assistant给未启动调用写aborted结果，和Generation/输入结算同批提交。产品通过PANGU_TOOL_EXECUTION选择parallel/sequential。
-- 验证：SQLite/JSONL持久轮次场景核对单任务准入、实际文件read顺序、中途关闭重开，以及取消后两个call/result精确配对；ASan/UBSan通过。真实DeepSeek两后端均返回双read调用，核对首个Tool开始时tools=1/pending=1、两个结果及follow-up，HTTP 200。最终引用清理修正后的Runtime整批回归、隔离产品构建和G00/Assembly通过。
-- 接口与自审：使用既有Generation/Tool/Inputs/Tx契约，公开函数表和结构布局保持；纯逻辑手写Assembly，C仅把启动配置接入已保存请求配置。pending与task ID数组按原生JSON所有权管理；构建清单沿用现有模块，来源登记更新。
-- 剩余与下一交付物：K07/K09继续补齐按工具executionMode要求的顺序轮次、工具可见集合/环境与hooks、富partial和fault/orphan处理；K10/K13继续将队列、任务及Live事实接入查询操作。deferred取消失败语义和Live观察仍按原覆盖表完成。并行TUI工作保留原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Harness/Conversation submit、harness/submissions.ts、inbox边界与原生现有Inputs服务；使用现有harness-host-inputs/inbox/requestId行为覆盖。Pi远端核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：产品绑定 `pg_tui_runtime_inputs(runtime_ops)` → 独立 `pg_inputs_ops`/`tui_inputs_ops` → Durable Client/Inputs。typed input/write、steer/followUp、按ID回执、会话内升序分页与撤回复用持久提交；空闲输入接通run_started和Scheduler，运行中的队列保持当前root与取消状态；已结算requestId重复仅返回原ID。
+- 验证：输入操作表接入真实DeepSeek，在SQLite/JSONL完成空闲提交→follow-up排队→状态/分页/跨会话拒绝/撤回→read工具→回答/follow-up→重开。最终去重与typed write边界、ASan/UBSan通过。Runtime整批回归及隔离产品构建通过，最终边界修正另跑受影响专项。
+- 接口与自审：公共 `client.h` 新增独立48字节Inputs操作表，TUI头提供别名和可选getter。现有pg_client、TUI ops、bridge布局保持；getter仅在当前前台binding有效，操作表借用至客户端暂停，JSON结果独立拥有/显式release。核心逻辑手写Assembly，C为产品绑定；模块exports登记同步，G00/Assembly核对。
+- 剩余与下一交付物：TUI U06可经新getter接入输入队列交互；本批提供Runtime操作，实际控件由TUI线完成。K10/K13继续会话/任务/Live/usage查询操作，K07/K09按原覆盖表完成富partial、工具环境与hooks及工具级executionMode。并行TUI工作保留原位。

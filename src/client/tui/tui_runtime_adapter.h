@@ -21,6 +21,7 @@
 #define PANGU_TUI_RUNTIME_ADAPTER_H
 
 #include <stddef.h>
+#include "../../contracts/client.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,6 +90,17 @@ typedef struct {
     void (*release)(struct json_object *);
 } tui_tool_observer;
 
+/* Optional durable Submission operations. Draft is Pi-style input/write JSON,
+   with PanGu data/identity; whenBusy selects reject/steer/followUp. All calls
+   are serialized and non-pumping. Results: 0 success, 2 missing, 3 busy,
+   4 invalid, 5 allocation, 6 storage, 7 closed. submit returns a stable ID;
+   status returns an owned record, including queued/placed/settled facts.
+   list returns an owned ascending array, scoped to the active conversation;
+   limit=1..128, after=0 starts, subsequent pages use the last record ID.
+   withdraw result: 0 withdrawn, 1 placed, 2 settled, 3 missing. Owned values
+   survive later calls and are released exactly once with release. */
+typedef pg_inputs_ops tui_inputs_ops;
+
 typedef struct tui_runtime_ops {
 	const char *name; /* 适配来源标识，如 "fake-runtime" */
 	void *ctx;
@@ -100,6 +112,9 @@ typedef struct tui_runtime_ops {
 } tui_runtime_ops;
 /* Optional native extension lookup; NULL for other adapters or no binding. */
 const tui_tool_observer *pg_tui_runtime_tool_observer(const tui_runtime_ops *);
+/* Optional product binding; clients weak-link this lookup. An absent symbol
+   or NULL means this adapter has no durable input operations. */
+const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

@@ -25,6 +25,9 @@
 #include <time.h>
 /* Explicit static composition: neither Loop nor TUI chooses a provider. */
 
+static const tui_runtime_ops *inputs_owner;
+static tui_inputs_ops foreground_inputs;
+const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_inputs:0;}
 static pg_host host,agent_scope;
 static pg_native_plugin extension;
 static pg_model_provider default_model_provider;
@@ -244,7 +247,8 @@ int main(int argc,char **argv){
  if(pg_host_init_child(&agent_scope,parent,&agent_plugin,1)||pg_host_start(&agent_scope)){fprintf(stderr,"Cannot activate Agent consumer (error=%u).\n",agent_scope.error);goto cleanup;}
  tui_tool_observer observer={&durable.client,pg_durable_client_tool_observe,pg_durable_tool_observation_release};
  pg_client *client=pg_host_find(&agent_scope,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history(&bridge,&durable.history)||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
- tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};int reason=tui_app_run(&config);bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;if(rc)fprintf(stderr,"PanGu terminal stopped (reason=%d, bridge=%u).\n",reason,bridge.stop_error);
+ if(pg_durable_client_inputs_service(&durable.client,&foreground_inputs))goto cleanup;inputs_owner=&bridge.ops;
+ tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};int reason=tui_app_run(&config);inputs_owner=0;bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;if(rc)fprintf(stderr,"PanGu terminal stopped (reason=%d, bridge=%u).\n",reason,bridge.stop_error);
 cleanup:
  for(;;){int closing=pg_host_close(&agent_scope);if(!closing)break;if(closing<0){rc=1;goto retain_resources;}struct timespec pause={0,10000000};nanosleep(&pause,0);}
  for(;;){int closing=pg_native_close(&extension);if(!closing)break;if(closing<0){rc=1;goto retain_resources;}struct timespec pause={0,10000000};nanosleep(&pause,0);}

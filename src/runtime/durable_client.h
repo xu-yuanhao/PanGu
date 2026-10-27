@@ -19,6 +19,10 @@ typedef struct {
    the scheduler and returns detached queued events; slices expire next poll.
    Suspend parks the scheduler and discards observations without aborting work;
    drain returned native tool leases before closing the owning Session. */
+/* Binds the optional TUI operation table to this client. Borrow until suspend;
+   no resources allocated. Idle input admission emits the same run boundary as
+   submit, queued inputs preserve the active root/cancellation state. */
+int pg_durable_client_inputs_service(pg_durable_client *,pg_inputs_ops *);
 int pg_durable_client_open(pg_durable_client *,const pg_durable_client_config *);
 pg_client pg_durable_client_service(pg_durable_client *);
 int pg_durable_client_suspend(void *);

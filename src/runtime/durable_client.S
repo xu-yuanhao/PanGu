@@ -902,3 +902,251 @@ pg_durable_client_tool_observe:
  mov eax,4
  ret
 .size pg_durable_client_tool_observe,.-pg_durable_client_tool_observe
+
+.text
+.globl pg_durable_client_inputs_service
+.type pg_durable_client_inputs_service,@function
+pg_durable_client_inputs_service:
+ test rdi,rdi
+ jz .Ldi_factory_bad
+ test rsi,rsi
+ jz .Ldi_factory_bad
+ cmp qword ptr [rdi+16],0
+ je .Ldi_factory_bad
+ mov [rsi],rdi
+ lea rax,[rip+.Ldi_submit]
+ mov [rsi+8],rax
+ lea rax,[rip+.Ldi_status]
+ mov [rsi+16],rax
+ lea rax,[rip+.Ldi_withdraw]
+ mov [rsi+24],rax
+ lea rax,[rip+.Ldi_list]
+ mov [rsi+32],rax
+ lea rax,[rip+.Ldi_release]
+ mov [rsi+40],rax
+ xor eax,eax
+ ret
+.Ldi_factory_bad:
+ mov eax,4
+ ret
+.size pg_durable_client_inputs_service,.-pg_durable_client_inputs_service
+/* Shared check; reads may inspect a failed run, but never a closing client. */
+.Ldi_check:
+ mov eax,7
+ test rdi,rdi
+ jz .Ldi_check_end
+ cmp dword ptr [rdi+68],0
+ jne .Ldi_check_end
+ mov rax,[rdi+16]
+ test rax,rax
+ jz .Ldi_check_closed
+ cmp dword ptr [rax+44],1
+ jne .Ldi_check_closed
+ mov eax,3
+ cmp dword ptr [rdi+56],0
+ jne .Ldi_check_end
+ xor eax,eax
+ ret
+.Ldi_check_closed:
+ mov eax,7
+.Ldi_check_end:
+ ret
+.Ldi_submit:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test rdx,rdx
+ jz .Ldi_submit_invalid
+ mov qword ptr [rdx],0
+ call .Ldi_check
+ test eax,eax
+ jnz .Ldi_submit_end
+ mov dword ptr [rbx+56],1
+ mov rdi,[rbx+16]
+ mov rsi,[rbx+24]
+ mov rdx,r12
+ mov rcx,rsp
+ call pg_durable_inputs_submit@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldi_submit_unlock
+ mov rax,[rsp]
+ mov [r13],rax
+ cmp dword ptr [rbx+60],0
+ jne .Ldi_submit_unlock
+ cmp dword ptr [rsp+16],2
+ je .Ldi_submit_unlock
+ cmp qword ptr [rsp+8],0
+ je .Ldi_submit_unlock
+ mov rax,[rsp+8]
+ mov [rbx+80],rax
+ mov dword ptr [rbx+60],1
+ mov dword ptr [rbx+64],0
+ mov dword ptr [rbx+76],0
+ mov rdi,[rbx+96]
+ call json_object_put@PLT
+ mov qword ptr [rbx+96],0
+ mov rdi,rbx
+ xor esi,esi
+ xor edx,edx
+ call .Ldc_boundary
+.Ldi_submit_unlock:
+ mov dword ptr [rbx+56],0
+ mov eax,ebp
+ jmp .Ldi_submit_end
+.Ldi_submit_invalid:
+ mov eax,4
+.Ldi_submit_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldi_status:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test rdx,rdx
+ jz .Ldi_status_invalid
+ mov qword ptr [rdx],0
+ call .Ldi_check
+ test eax,eax
+ jnz .Ldi_status_end
+ mov rdi,[rbx+16]
+ mov rsi,r12
+ mov rdx,r13
+ call pg_durable_inputs_status@PLT
+ test eax,eax
+ jnz .Ldi_status_end
+ mov rdi,[r13]
+ lea rsi,[rip+.Ldc_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ je .Ldi_status_ok
+ mov rdi,[r13]
+ call json_object_put@PLT
+ mov qword ptr [r13],0
+ mov eax,2
+ jmp .Ldi_status_end
+.Ldi_status_ok:
+ xor eax,eax
+ jmp .Ldi_status_end
+.Ldi_status_invalid:
+ mov eax,4
+.Ldi_status_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Ldi_withdraw:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ call .Ldi_check
+ test eax,eax
+ jnz .Ldi_withdraw_end
+ mov rdi,[rbx+16]
+ mov rsi,[rbx+24]
+ mov rdx,r12
+ mov rcx,r13
+ call pg_durable_inputs_withdraw@PLT
+.Ldi_withdraw_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Ldi_list:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ test rcx,rcx
+ jz .Ldi_list_invalid
+ mov qword ptr [rcx],0
+ test r13,r13
+ jz .Ldi_list_invalid
+ cmp r13,128
+ ja .Ldi_list_invalid
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Ldi_list_invalid
+ call .Ldi_check
+ test eax,eax
+ jnz .Ldi_list_end
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ movdqu [rsp+128],xmm0
+ mov dword ptr [rsp],3
+ mov dword ptr [rsp+4],1
+ test r12,r12
+ setnz byte ptr [rsp+8]
+ mov dword ptr [rsp+12],1
+ mov [rsp+16],r12
+ mov [rsp+24],r13
+ mov qword ptr [rsp+32],1
+ mov rax,[rbx+24]
+ mov [rsp+40],rax
+ mov rax,[rbx+16]
+ mov rax,[rax+8]
+ mov rdi,[rax]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rax+16]
+ mov ebp,eax
+ test eax,eax
+ jnz .Ldi_list_error
+ mov rax,[rsp+112]
+ mov [r14],rax
+ xor eax,eax
+ jmp .Ldi_list_end
+.Ldi_list_error:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,6
+ jmp .Ldi_list_end
+.Ldi_list_invalid:
+ mov eax,4
+.Ldi_list_end:
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Ldc_conversation_id: .asciz "conversationId"
+
+.text
+.Ldi_release:
+ jmp json_object_put@PLT

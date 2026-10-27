@@ -22,14 +22,13 @@
 
 ## 本批验证与集成状态
 
-- 全局toolExecution=sequential接入实际Generation；assistant/首个Tool原子提交，pending调用在前一结果结算后逐个准入，重开继续轮次。
-- 取消排空已启动子任务，并为未启动call原子保存aborted结果，保持模型调用与结果配对。产品入口为`PANGU_TOOL_EXECUTION=parallel|sequential`。
-- SQLite/JSONL实际文件工具顺序、中途重开、取消结果配对专项ASan/UBSan通过；真实DeepSeek双read批次→逐个Tool→模型回答→follow-up均通过，两个后端均HTTP 200。
-- 隔离产品构建通过；最终引用清理修正的Runtime完整回归、G00/Assembly均通过。
+- 公共Inputs操作表接入产品前台：typed input/write、steer/followUp、稳定ID回执、当前会话分页及撤回。TUI通过独立`pg_tui_runtime_inputs(ops)`消费，原函数表/bridge布局保持。
+- 空闲输入产生正常运行边界，队列保持当前运行；已结算requestId重复返回原回执，typed write按持久事实结算。
+- Runtime完整回归、隔离产品构建通过。真实DeepSeek两后端的操作表→队列→工具/follow-up→重开通过；最终去重/write边界与ASan/UBSan通过。
 
 ## 当前接口边界
 
-模型投影为64条消息、单条4096字节；完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务已提供队列/Submission，多会话及TUI队列操作按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
+模型投影为64条消息、单条4096字节；完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
 
 ## 复验入口
 
@@ -46,6 +45,7 @@ python3 -B tools/runtime/build_test.py --live-generation
 python3 -B tools/runtime/build_test.py --live-partial
 python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
+python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
