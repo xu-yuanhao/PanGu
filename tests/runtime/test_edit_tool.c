@@ -137,10 +137,7 @@ int main(int argc,char **argv){
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"a\",\"newText\":7}]}",
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"\",\"newText\":\"b\"}]}",
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"a\\u0000b\",\"newText\":\"c\"}]}",
-  "{\"path\":\"../escape\",\"oldText\":\"a\",\"newText\":\"b\"}",
-  "{\"path\":\"/tmp/escape\",\"oldText\":\"a\",\"newText\":\"b\"}",
-  "{\"path\":\"a//b\",\"oldText\":\"a\",\"newText\":\"b\"}",
-  "{\"path\":\"a/./b\",\"oldText\":\"a\",\"newText\":\"b\"}",
+
   "{\"path\":\"file.txt\",\"oldText\":\"a\"}","{\"path\":\"file.txt\",\"oldText\":\"a\",\"newText\":\"b\",\"other\":1}",
   "{\"path\":\"file.txt\",\"oldText\":\"a\",\"newText\":\"b\"} {}"};
  put("original\n");unsigned before=fds();for(size_t i=0;i<sizeof(bad)/sizeof(*bad);++i){unsigned r=reads,w=writes;assert(!definition.validate(definition.context,s(bad[i])));assert(invoke(bad[i]));assert(reads==r&&writes==w);expect("original\n");}
@@ -156,7 +153,8 @@ int main(int argc,char **argv){
  char escaped[4096];memset(escaped,'\t',3000);memcpy(escaped+3000,"alpha\n",7);put(escaped);w=writes;assert(invoke(shapes[0])&&writes==w&&strstr(last_output,"bounds"));expect(escaped);put("alpha\n");
  assert(!rename("file.txt","quote\"name.txt"));assert(!invoke("{\"path\":\"quote\\\"name.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!rename("quote\"name.txt","file.txt"));expect("ALPHA\n");put("alpha\n");
  assert(invoke("{\"path\":\"missing/file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(access("missing",F_OK));
- assert(!symlink("file.txt","link"));assert(invoke("{\"path\":\"link\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("alpha\n");assert(!unlink("link"));
+ char absolute_args[4096];snprintf(absolute_args,sizeof(absolute_args),"{\"path\":\"%s/file.txt\",\"oldText\":\"alpha\",\"newText\":\"ABS\"}",root);assert(!invoke(absolute_args));expect("ABS\n");put("alpha\n");assert(!invoke("{\"path\":\"./file.txt\",\"oldText\":\"alpha\",\"newText\":\"DOT\"}"));expect("DOT\n");put("alpha\n");
+ assert(!symlink("file.txt","link"));assert(!invoke("{\"path\":\"link\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("ALPHA\n");put("alpha\n");assert(!unlink("link"));
  api_calls=0;assert(!invoke(shapes[0]));unsigned points=api_calls;assert(points>10);for(unsigned failure=1;failure<=points;++failure){put("alpha\n");api_calls=0;fail_api=failure;assert(invoke(shapes[0]));expect("alpha\n");}fail_api=0;printf("edit allocation/setup failure points: %u\n",points);put("alpha\n");
  char out[128];size_t n=999;r=reads;w=writes;assert(definition.execute(definition.context,s(shapes[0]),out,1,&n)&&!n&&reads==r&&writes==w);
  long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));size_t len=strlen(shapes[0]);char *tail=map+page-len;memcpy(tail,shapes[0],len);assert(!definition.execute(definition.context,(pg_slice){tail,len},out,sizeof(out),&n));expect("ALPHA\n");put("alpha\n");r=reads;w=writes;n=999;assert(definition.execute(definition.context,s(shapes[0]),out,63,&n)&&!n&&reads==r&&writes==w);

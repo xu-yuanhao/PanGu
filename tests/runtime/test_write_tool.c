@@ -49,20 +49,18 @@ int main(void){
  assert(!run("{\"path\":\"escaped\",\"content\":\"a\\u0000\\\"fake\\\":1\"}"));expect_file("escaped","a\0\"fake\":1",10);assert(!unlink("escaped"));
  const char *bad[]={"{\"path\":\"safe\",\"path\\u0000ignored\":\"f\",\"content\":\"x\"}","{\"path\":\"f\",\"content\\u0000suffix\" \r\n : \"x\"}","{\"path\\u0000suffix\":\"f\",\"content\":\"x\"}","{\"path\":\"f\",\"content\\u0000suffix\":\"x\"}","{\"path\":\"f\",\"cont\\u0065nt\\u0000\":\"x\"}","", "{}", "[]", "{\"path\":\"f\"}","{\"path\":\"f\",\"content\":7}",
   "{\"path\":\"f\",\"content\":\"x\",\"extra\":0}","{\"path\":\"\",\"content\":\"x\"}",
-  "{\"path\":\"/tmp/escape\",\"content\":\"x\"}","{\"path\":\"../escape\",\"content\":\"x\"}",
-  "{\"path\":\"a/../escape\",\"content\":\"x\"}","{\"path\":\"./f\",\"content\":\"x\"}",
-  "{\"path\":\"a//f\",\"content\":\"x\"}","{\"path\":\"a/\",\"content\":\"x\"}",
   "{\"path\":\"f\\u0000suffix\",\"content\":\"x\"}","{\"path\":\"f\",\"content\":\"x\"} {}",
   "{\"path\":\"f\",\"content\":\"\xff\"}","{\"path\":\"f\",\"content\":\"x\",}"};
  long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));for(size_t cut=0;cut<=strlen(bad[1]);++cut){char *tail=map+page-cut;memcpy(tail,bad[1],cut);assert(!tool.validate(tool.context,(pg_slice){tail,cut}));}assert(!munmap(map,(size_t)page*2));
  unsigned before=descriptors();
  for(size_t i=0;i<sizeof(bad)/sizeof(*bad);++i){assert(!tool.validate(tool.context,slice(bad[i])));assert(run(bad[i]));}
  assert(access("f",F_OK)&&errno==ENOENT);
- assert(!symlink("a","link"));assert(run("{\"path\":\"link/new\",\"content\":\"x\"}"));assert(access("a/new",F_OK));
- assert(!symlink("binary","sym"));assert(run("{\"path\":\"sym\",\"content\":\"x\"}"));expect_file("binary","a\0b",3);
- assert(!link("binary","hard"));assert(run("{\"path\":\"hard\",\"content\":\"x\"}"));expect_file("binary","a\0b",3);
+ assert(!symlink("a","link"));assert(!run("{\"path\":\"link/new\",\"content\":\"x\"}"));expect_file("a/new","x",1);assert(!unlink("a/new"));
+ assert(!symlink("binary","sym"));assert(!run("{\"path\":\"sym\",\"content\":\"x\"}"));expect_file("binary","x",1);
+ assert(!link("binary","hard"));assert(!run("{\"path\":\"hard\",\"content\":\"x\"}"));expect_file("binary","x",1);
  assert(!mkfifo("fifo",0600));assert(run("{\"path\":\"fifo\",\"content\":\"x\"}"));
  assert(run("{\"path\":\"a\",\"content\":\"x\"}"));
+ char absolute_args[4096];snprintf(absolute_args,sizeof(absolute_args),"{\"path\":\"%s/absolute/file\",\"content\":\"absolute\"}",temporary);assert(!run(absolute_args));expect_file("absolute/file","absolute",8);assert(!unlink("absolute/file")&&!rmdir("absolute"));assert(!run("{\"path\":\"./keep\",\"content\":\"dot\"}"));expect_file("keep","dot",3);assert(!run("{\"path\":\"a/../keep\",\"content\":\"parent\"}"));expect_file("keep","parent",6);
  assert(!run("{\"path\":\"keep\",\"content\":\"original\"}"));
  truncate_fail=1;assert(run("{\"path\":\"keep\",\"content\":\"bad\"}"));truncate_fail=0;expect_file("keep","original",8);
  write_mode=1;assert(!run("{\"path\":\"keep\",\"content\":\"retried\"}"));expect_file("keep","retried",7);assert(writes>2);
@@ -70,7 +68,7 @@ int main(void){
  write_mode=3;assert(run("{\"path\":\"keep\",\"content\":\"bad\"}"));expect_file("keep","",0);
  write_mode=4;assert(run("{\"path\":\"keep\",\"content\":\"partial\"}"));expect_file("keep","pa",2);
  write_mode=0;sync_fail=1;assert(run("{\"path\":\"keep\",\"content\":\"written\"}"));sync_fail=0;expect_file("keep","written",7);
- for(unsigned i=0;i<32;++i){assert(run("{\"path\":\"sym\",\"content\":\"x\"}"));assert(!run("{\"path\":\"keep\",\"content\":\"ok\"}"));}
+ for(unsigned i=0;i<32;++i){assert(!run("{\"path\":\"sym\",\"content\":\"x\"}"));assert(!run("{\"path\":\"keep\",\"content\":\"ok\"}"));}
  assert(descriptors()==before);
  char out[64];size_t n=99;assert(tool.execute(tool.context,slice("{\"path\":\"small\",\"content\":\"x\"}"),out,1,&n)&&!n);assert(access("small",F_OK));
  context.directory=-1;assert(!tool.authorize(tool.context,slice("{}")));assert(run("{\"path\":\"closed\",\"content\":\"x\"}"));assert(access("closed",F_OK));

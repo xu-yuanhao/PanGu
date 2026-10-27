@@ -297,6 +297,46 @@ def configuration_recovery(binary, root, environment):
                for e in facts('pangu.assistant')), 'saved request did not produce the actual model answer'
     print('PASS: interrupted request reopens with saved model/endpoint/options despite changed environment (actual model)', flush=True)
 
+def path_workflow(binary, root, environment):
+    workspace = root / 'posix-path-workflow'
+    shared = root / 'posix-path-shared'
+    workspace.mkdir()
+    shared.mkdir()
+    marker = 'PANGUPOSIX' + os.urandom(5).hex()
+    (shared / 'source.txt').write_text(marker + '\n')
+    (workspace / 'alias.txt').symlink_to(shared / 'target.txt')
+    terminal = Terminal(binary, workspace, dict(environment))
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Use read with absolute path ' + str(shared / 'source.txt') + '. Use write with absolute path ' + str(shared / 'target.txt') + ' to copy the first line. Then use edit with path alias.txt (the symbolic link) to append _PATH to that line. Finally run bash command cat ../posix-path-shared/target.txt and reply with its exact content. Use all four tools.')
+        assert (shared / 'target.txt').read_text().strip() == marker + '_PATH'
+        assert (workspace / 'alias.txt').is_symlink()
+        assert (marker + '_PATH').encode() in output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    def results(value):
+        if isinstance(value, dict):
+            if value.get('kind') == 'pangu.tool-result':
+                yield value
+            for child in value.values():
+                yield from results(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from results(child)
+    saved = []
+    for path in (workspace / '.pangu').iterdir():
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                try:
+                    saved.extend(results(json.loads(line)))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+    for name, path in [('read', str(shared / 'source.txt')), ('write', str(shared / 'target.txt')), ('edit', 'alias.txt')]:
+        assert any(result.get('model', [{}])[0].get('toolName') == name and result.get('data', {}).get('arguments', {}).get('path') == path for result in saved), (name, 'canonical persisted arguments missing')
+    print('PASS: real model absolute read/write, symlink edit, parent-relative bash and committed tool arguments', flush=True)
+
 def thinking_workflow(binary, root, environment):
     root = root / 'thinking-workflow'
     root.mkdir()
@@ -492,6 +532,7 @@ def main():
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
     parser.add_argument('--live-plugin',action='store_true',help='native service substitution and ordered shutdown')
     parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
+    parser.add_argument('--live-paths',action='store_true',help='actual model absolute paths and symlink editing')
     parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
     parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
     args=parser.parse_args()
@@ -502,9 +543,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_paths:
+                path_workflow(binary,root,env)
             if args.live_plugin:
                 plugin_workflow(binary,root,env)
             if args.live_resources:

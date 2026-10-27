@@ -3,7 +3,7 @@
 .intel_syntax noprefix
 .section .rodata
 .Lname: .asciz "write"
-.Ldescription: .asciz "Write UTF-8 content to a workspace-relative regular file, creating parent directories. Overwrites existing content. Symlinks, absolute paths and dot segments are refused. An interrupted write may have partially run."
+.Ldescription: .asciz "Write UTF-8 content to a relative or absolute regular file, creating parent directories. Overwrites existing content. Paths follow POSIX resolution, including symbolic links and dot segments. An interrupted write may have partially run."
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Lcontent: .asciz "content"
@@ -171,42 +171,12 @@
  jnz .Lcopy_content
  test r13,r13
  jz .Lparse_bad
- cmp byte ptr [r14],'/'
- je .Lparse_bad
  mov rdi,r14
  xor esi,esi
  mov rdx,r13
  call memchr@PLT
  test rax,rax
  jnz .Lparse_bad
- xor ecx,ecx
- xor edx,edx
-.Lsegment:
- cmp rcx,r13
- je .Lboundary
- cmp byte ptr [r14+rcx],'/'
- je .Lboundary
- inc rcx
- jmp .Lsegment
-.Lboundary:
- mov rax,rcx
- sub rax,rdx
- test rax,rax
- jz .Lparse_bad
- cmp byte ptr [r14+rdx],'.'
- jne .Lsegment_next
- cmp rax,1
- je .Lparse_bad
- cmp rax,2
- jne .Lsegment_next
- cmp byte ptr [r14+rdx+1],'.'
- je .Lparse_bad
-.Lsegment_next:
- cmp rcx,r13
- je .Lcopy_path
- inc rcx
- mov rdx,rcx
- jmp .Lsegment
 .Lcopy_path:
  mov rdi,[rsp+32]
  mov rsi,r14
@@ -303,15 +273,27 @@
  jnz .Lwrite_error
  test rbx,rbx
  jz .Lwrite_error
+ cmp dword ptr [rbx],0
+ jl .Lwrite_error
+ mov r14,rsp
+ cmp byte ptr [rsp],47
+ jne .Lwrite_relative
+ lea rdi,[rip+.Lfilesystem_root]
+ mov esi,PG_WTL_OPEN_PARENT
+ xor eax,eax
+ call open@PLT
+ inc r14
+ jmp .Lwrite_root_ready
+.Lwrite_relative:
  mov edi,[rbx]
  mov esi,PG_RTL_F_DUPFD_CLOEXEC
  xor edx,edx
  xor eax,eax
  call fcntl@PLT
+.Lwrite_root_ready:
  test eax,eax
  js .Lwrite_error
  mov r12d,eax
- mov r14,rsp
 .Lcomponent:
  mov rdi,r14
  mov esi,'/'
@@ -319,6 +301,8 @@
  test rax,rax
  jz .Lfile
  mov r15,rax
+ cmp rax,r14
+ je .Lwrite_empty_component
  mov byte ptr [r15],0
  mov edi,r12d
  mov rsi,r14
@@ -353,6 +337,9 @@
  mov r12d,ebx
  lea r14,[r15+1]
  jmp .Lcomponent
+.Lwrite_empty_component:
+ lea r14,[r15+1]
+ jmp .Lcomponent
 .Lparent_sync_error:
  mov edi,ebx
  call close@PLT
@@ -375,8 +362,6 @@
  mov eax,[rsp+8200+PG_RTL_STAT_MODE]
  and eax,PG_RTL_S_IFMT
  cmp eax,PG_RTL_S_IFREG
- jne .Lwrite_error
- cmp qword ptr [rsp+8200+PG_WTL_STAT_LINKS],1
  jne .Lwrite_error
  mov edi,r13d
  xor esi,esi
@@ -479,3 +464,6 @@ pg_write_tool_definition:
  ret
 .size pg_write_tool_definition,.-pg_write_tool_definition
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lfilesystem_root: .asciz "/"

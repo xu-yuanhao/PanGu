@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` resource-loader.ts 的 findShadowedContextFile/loadProjectContextFiles/loadContextFileFromDir；resource-loader.test.ts 的nested worktree、symlink、distinct filename和bare layout场景；Git元数据复用本机libgit2 1.9.7公开接口。远端Pi核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`。
-- 实际调用链：libgit2发现canonical worktree/common Git路径 → Assembly验证主目录.git及嵌套关系 → 选定worktree指令文件 → 继承时遮蔽主目录同名候选。不同文件名继续继承；没有worktree指令时保留主目录；bare容器未被误判。资源路径经POSIX realpath后交给已有完整快照reader，符号链接指令只在所属层加载一次，prompt沿既有Generation发送/保存。
-- 验证：真实Git仓库/worktree和bare布局专项覆盖遮蔽、链接、不同文件名及无局部上下文继承，ASan/UBSan通过。Runtime整批回归及隔离产品构建通过；最后空指针守卫/bare用例另跑受影响专项。真实TUI/DeepSeek核对嵌套worktree子目录的回答与请求期持久prompt，同时用户/项目覆盖、祖先顺序、fallback/重开通过。
-- 接口与自审：source扩展到152字节，尾部借用worktree/common路径与canonical回调。新增prompt_posix.c仅承担libgit2和POSIX路径/文件服务协议胶水；选择、验证、遮蔽与继承为Assembly。新源、模块exports/依赖与产品/专项构建同步登记，新增pkg-config依赖libgit2；TUI布局不变。
-- 剩余与下一交付物：K11继续配置、skills/templates、资源刷新、MCP等原覆盖行为；上下文完整行为仍由其来源表核对。K10/K13查询操作和K07/K09其余功能按原TODO推进；并行TUI工作保持原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable tools/{read,write,edit,path-utils}.ts、env/node.ts 的 absolutePath/openBinaryReader/openBinaryWriter；按其相对/绝对路径与文件链接行为调整现有编码工具。
+- 实际调用链：模型声明/Tool参数 → 原有Assembly read/write/edit服务 → 注入cwd fd与POSIX openat → 实际文件结果/结构化Entry。read通过一次openat打开路径；write从cwd或文件系统根逐层创建父目录，跟随链接；edit复用相同完整read/write服务。删除路径形式拒绝循环与重复逐组件read遍历；原地保持一个实现。
+- 验证：临时工作区实际绝对/点段路径、文件/目录符号链接、hard link写入及edit专项ASan/UBSan通过；类型/NUL/输出预算、非普通文件、短写/EINTR/部分写与fd清理保持。Runtime完整回归通过，最后关闭fd守卫另跑write专项；隔离产品构建通过。真实DeepSeek四工具验证绝对read/write、链接edit、父目录bash回读及持久参数，该真实模型/持久参数验证通过。
+- 接口与自审：公开函数表/结构尺寸保持；write平台flags断言随实际openat更新，删除已无消费者的单链接数布局。生产逻辑全部在现有Assembly中修改，声明/头/来源登记同步。旧路径拒绝夹具按Pi行为替换为临时目录内的真实副作用断言，参数、容量和失败路径用例保留。
+- 剩余与下一交付物：K08继续完整路径归一化（不存在前缀的点段、home/file URL和Unicode候选）、图片/附件、完整截断及ExecutionEnv/并发语义；K11继续配置、skills/templates/刷新和MCP。并行TUI工作保持原位。

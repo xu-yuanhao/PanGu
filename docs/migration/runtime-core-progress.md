@@ -22,10 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 资源加载接入libgit2 worktree/common目录发现；Assembly核对主目录.git及嵌套关系，仅遮蔽同名主目录指令。不同文件名、无worktree指令和bare容器继承保持。
-- 指令资源经realpath后复用现有完整快照reader，支持符号链接；只读资源服务在prompt生成后关闭。
-- 真实Git/worktree/bare布局专项ASan/UBSan、Runtime完整回归及隔离产品构建通过；真实TUI/DeepSeek验证嵌套worktree回答与请求期持久prompt，同时资源优先级、祖先顺序、fallback/重开通过。
-- 产品与prompt专项增加pkg-config `libgit2`依赖，本机版本1.9.7；新增C源为外部库/POSIX胶水，控制清单与模块登记同步。
+- read/write/edit实际服务接受POSIX相对/绝对路径、点段和符号链接；write保持创建父目录、打开后检查普通文件及unsafe replay语义，hard link写入按实际文件描述符执行。
+- 原地删除路径拒绝与重复read路径遍历，复用openat；类型/NUL/长度、输出/扫描预算和非普通文件检查保持。
+- read/write/edit与prompt受影响专项ASan/UBSan、Runtime完整回归及隔离产品构建通过，最终关闭fd守卫另跑write专项。真实DeepSeek四工具实际副作用及持久参数字段核对通过。
 
 ## 当前接口边界
 
@@ -48,6 +47,7 @@ python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
 python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/test_pangu_pty.py --live
+python3 -B tools/runtime/test_pangu_pty.py --live-paths
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
 python3 -B tools/runtime/test_pangu_pty.py --live-config-recovery

@@ -1,11 +1,6 @@
-/* read_tool.S — 工作目录只读 read 工具。
- *
- * 契约见 read_tool.h：调用方信任并持有根目录 fd；仅相对路径；绝对路径、空分量、
- * "."/".."、嵌入 NUL、任意层符号链接、非普通文件、过长单行与二进制页内容拒绝。
- * 路径按分量逐级 openat（中间目录 O_DIRECTORY、全程 O_NOFOLLOW|O_CLOEXEC|
- * O_NONBLOCK），不拼接字符串、不 realpath；错误路径逐 fd 关闭。JSON 语义：
- * path与可选正整数offset/limit。fstat/struct stat 经公开 libc 与布局断言常量。
- */
+/* POSIX read backend: caller-owned cwd fd; bounded UTF-8 line output.
+   openat resolves relative/absolute paths, dot segments and symbolic links.
+   The opened descriptor is checked as a regular file before reading. */
 #include "read_tool_layout.h"
 #include "tools_layout.h"
 .intel_syntax noprefix
@@ -20,7 +15,7 @@
 .Lmsg_offset: .asciz "read offset is beyond end of file"
 .Lmsg_scan: .asciz "read scan limit exceeded (1 MiB per call)"
 .Lread_name:     .asciz "read"
-.Lread_desc: .asciz "Read a regular UTF-8 text file relative to the workspace. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Absolute paths, symlinks, dot segments and oversized individual lines are refused."
+.Lread_desc: .asciz "Read a regular UTF-8 text file using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Relative and absolute paths follow POSIX resolution. Oversized individual lines are refused."
 .Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
@@ -31,10 +26,8 @@
 
 .section .text
 
-/* ---- int li_parse_path(args.data, args.size, char path[PG_TEXT_LIMIT])
- * 返回 1=非法。文本经 NUL 终止副本交给 json_tokener_parse；
- * path与可选offset/limit，字符串 1..4095 字节、非 '/' 开头、无嵌入 NUL，
- * 逐分量拒绝空段与 "."/".."。rcx指向offset/limit/explicit三槽；栈上保留有界JSON副本及解析状态。 */
+/* Strict JSON path/offset/limit decoding into caller storage; embedded NUL
+   is refused and the byte length is bounded before any filesystem call. */
 .type li_parse_path,@function
 li_parse_path:
  push rbx
@@ -128,8 +121,6 @@ li_parse_path:
  mov rdi, [rsp + 4096]
  call json_object_get_string@PLT
  mov [rsp + 4104], rax /* s：栈槽保存（r14 保持为 json 对象） */
- cmp byte ptr [rax], '/'
- je .Lpp_bad_put
  mov rdi, rax
  xor esi, esi
  mov rdx, r12
@@ -140,38 +131,7 @@ li_parse_path:
  mov rsi, [rsp + 4104]
  lea rdx, [r12 + 1] /* Include the path terminator. */
  call memcpy@PLT
- /* 分量扫描：空段与 "."/".." 拒绝；i==n 处理末段 */
- xor r8d, r8d /* start */
- xor r9d, r9d /* i */
-.Lpp_scan:
- cmp r9, r12
- je .Lpp_bound
- cmp byte ptr [rbx + r9], '/'
- je .Lpp_bound
- inc r9
- jmp .Lpp_scan
-.Lpp_bound:
- mov rax, r9
- sub rax, r8 /* len = i - start */
- test rax, rax
- jz .Lpp_bad_put
- cmp rax, 1
- jne .Lpp_not_dot
- cmp byte ptr [rbx + r8], '.'
- je .Lpp_bad_put
-.Lpp_not_dot:
- cmp rax, 2
- jne .Lpp_next
- cmp byte ptr [rbx + r8], '.'
- jne .Lpp_next
- cmp byte ptr [rbx + r8 + 1], '.'
- je .Lpp_bad_put
-.Lpp_next:
- lea r8, [r9 + 1]
- cmp r9, r12
- je .Lpp_ok
- inc r9
- jmp .Lpp_scan
+ jmp .Lpp_ok
 .Lpp_bad:
  mov eax, 1 /* 无对象需要释放 */
  jmp .Lpp_ret
@@ -466,45 +426,19 @@ li_execute_read:
  test r15, r15
  js .Lrd_root_gone
  mov qword ptr [rsp + 4256], -1
- mov rbx, rsp /* part */
- mov qword ptr [rsp + 4248], rsp /* p */
-.Lrd_walk:
- mov rax, [rsp + 4248]
- movzx ecx, byte ptr [rax]
- cmp cl, '/'
- je .Lrd_sep
- test cl, cl
- jz .Lrd_last
- inc qword ptr [rsp + 4248]
- jmp .Lrd_walk
-.Lrd_sep:
- mov byte ptr [rax], 0
- mov byte ptr [rsp + 4241], 0 /* last 标志存栈：跨 openat/close 调用 */
- mov edx, 0xB0800 /* O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK|O_DIRECTORY */
- jmp .Lrd_openat
-.Lrd_last:
- mov byte ptr [rax], 0
- mov byte ptr [rsp + 4241], 1
- mov edx, 0xA0800 /* Final component is not opened as a directory. */
-.Lrd_openat:
- mov rdi, r15
- mov rsi, rbx
+ mov edi,r15d
+ mov rsi,rsp
+ mov edx,0x80800 /* O_RDONLY|O_CLOEXEC|O_NONBLOCK */
+ xor eax,eax
  call openat@PLT
- movsxd rax, eax
- mov [rsp + 4256], rax /* opened：栈槽跨 close（syscall 摧毁 rcx） */
- mov edi, r15d
+ movsxd rax,eax
+ mov [rsp+4256],rax
+ mov edi,r15d
  call close@PLT
- mov r15, -1
- mov rcx, [rsp + 4256]
- test rcx, rcx
+ mov r15,-1
+ mov rcx,[rsp+4256]
+ test rcx,rcx
  js .Lrd_refused
- cmp byte ptr [rsp + 4241], 0
- jne .Lrd_got_file
- mov r15, rcx /* opened 变为新的目录 fd */
- mov qword ptr [rsp + 4256], -1 /* file 槽恢复 -1 */
- mov rax, [rsp + 4248]
- lea rbx, [rax + 1]
- jmp .Lrd_walk
 .Lrd_got_file: /* [rsp+4256] 已持有文件 fd */
  mov rdi, rcx
  lea rsi, [rsp + 4096]

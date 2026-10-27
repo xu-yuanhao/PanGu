@@ -17,7 +17,7 @@
 #define FRAME 8808
 .section .rodata
 .Lname: .asciz "edit"
-.Ldescription: .asciz "Edit one workspace-relative file using edits: an array of {oldText,newText}. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
+.Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"edits\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":16,\"items\":{\"type\":\"object\",\"properties\":{\"oldText\":{\"type\":\"string\"},\"newText\":{\"type\":\"string\"}},\"required\":[\"oldText\",\"newText\"],\"additionalProperties\":false}}},\"required\":[\"path\",\"edits\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Ledits: .asciz "edits"
@@ -163,43 +163,9 @@
  ret
 
 .Lpath_valid:
- test rsi,rsi
- jz .Lpath_bad
- cmp byte ptr [rdi],'/'
- je .Lpath_bad
- xor ecx,ecx
- xor edx,edx
-.Lpath_loop:
- cmp rcx,rsi
- je .Lpath_boundary
- cmp byte ptr [rdi+rcx],'/'
- je .Lpath_boundary
- inc rcx
- jmp .Lpath_loop
-.Lpath_boundary:
- mov rax,rcx
- sub rax,rdx
- test rax,rax
- jz .Lpath_bad
- cmp byte ptr [rdi+rdx],'.'
- jne .Lpath_next
- cmp rax,1
- je .Lpath_bad
- cmp rax,2
- jne .Lpath_next
- cmp byte ptr [rdi+rdx+1],'.'
- je .Lpath_bad
-.Lpath_next:
- cmp rcx,rsi
- je .Lpath_good
- inc rcx
- mov rdx,rcx
- jmp .Lpath_loop
-.Lpath_good:
  xor eax,eax
- ret
-.Lpath_bad:
- mov eax,1
+ test rsi,rsi
+ setz al
  ret
 
 /* Append old/new JSON strings without modifying the owned source trees. */
