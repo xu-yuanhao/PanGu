@@ -67,6 +67,8 @@ pg_durable_generation_init:
  jb .Lgg_init_host
  cmp qword ptr [rsi+48],0
  je .Lgg_init_return
+ cmp qword ptr [rsi+64],0
+ je .Lgg_init_return
  mov [rdi],rsi
  lea rax,[rip+.Lgg_name]
  mov [rdi+8],rax
@@ -670,6 +672,26 @@ jmp .Lgg_project_role
  jnz .Lgg_context_bad
  cmp dword ptr [rsp+20],0
  jne .Lgg_context_bad
+ mov qword ptr [rsp+24],0
+ xor r12d,r12d
+.Lgg_context_head:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lgg_context_head_done
+ mov rdi,[rsp]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ GGET rax,head
+ test rax,rax
+ jz .Lgg_context_head_next
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+24],rax
+.Lgg_context_head_next:
+ inc r12
+ jmp .Lgg_context_head
+.Lgg_context_head_done:
  xor r12d,r12d
 .Lgg_context_entry:
  mov rdi,[rsp]
@@ -679,7 +701,13 @@ jmp .Lgg_project_role
  mov rdi,[rsp]
  mov rsi,r12
  call json_object_array_get_idx@PLT
- GGET rax,model
+ mov [rsp+32],rax
+ GGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+24]
+ jb .Lgg_context_next
+ GGET "qword ptr [rsp+32]",model
  mov r13,rax
  test rax,rax
  jz .Lgg_context_next
@@ -1021,7 +1049,7 @@ jmp .Lgg_project_role
  push r12
  push r13
  push r14
- sub rsp,160
+ sub rsp,224
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
@@ -1036,6 +1064,27 @@ jmp .Lgg_project_role
  movdqu [rsp+112],xmm0
  movdqu [rsp+128],xmm0
  movdqu [rsp+144],xmm0
+ movdqu [rsp+160],xmm0
+ movdqu [rsp+176],xmm0
+ movdqu [rsp+192],xmm0
+ movdqu [rsp+208],xmm0
+ mov dword ptr [rsp+192],1
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rax,[rax+64]
+ mov [rsp+208],rax
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+200],rax
+ mov rdi,[rsp+208]
+ mov rsi,r12
+ mov rdx,rax
+ lea rcx,[rsp+160]
+ call pg_durable_inputs_prepare@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
  lea rdi,[rip+.Lgg_entry_json]
  call json_tokener_parse@PLT
  mov [rsp+48],rax
@@ -1080,9 +1129,9 @@ jmp .Lgg_project_role
  je .Lgg_stage_success
  mov rdi,[rbx+4360]
  call json_object_get@PLT
- mov [r13],rax
- xor eax,eax
- jmp .Lgg_stage_end
+ mov [rsp+64],rax
+ mov dword ptr [rsp+192],2
+ jmp .Lgg_stage_output
 .Lgg_stage_success:
  lea rdi,[rip+.Lgg_terminal_json]
  call json_tokener_parse@PLT
@@ -1232,6 +1281,36 @@ jmp .Lgg_project_role
  test eax,eax
  jnz .Lgg_stage_end
 .Lgg_stage_output:
+ GGET "qword ptr [rsp+64]",status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_terminal_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_stage_return_state
+ mov rdi,[rsp+208]
+ mov rsi,r12
+ mov rdx,[rsp+160]
+ mov ecx,[rsp+192]
+ mov r8,[rbx+4256]
+ lea r9,[rsp+168]
+ call pg_durable_inputs_apply@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
+ mov rdi,[rsp+168]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lgg_stage_return_state
+ mov rdi,[rsp+208]
+ mov rsi,r12
+ mov rdx,[rsp+200]
+ mov rcx,[rsp+168]
+ lea r8,[rsp+184]
+ call pg_durable_inputs_start@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
+.Lgg_stage_return_state:
  mov rax,[rsp+64]
  mov [r13],rax
  mov qword ptr [rsp+64],0
@@ -1241,6 +1320,10 @@ jmp .Lgg_project_role
  mov eax,5
 .Lgg_stage_end:
  mov ebp,eax
+ mov rdi,[rsp+160]
+ call json_object_put@PLT
+ mov rdi,[rsp+168]
+ call json_object_put@PLT
  mov rdi,[rsp+48]
  call json_object_put@PLT
  mov rdi,[rsp+56]
@@ -1256,7 +1339,7 @@ jmp .Lgg_project_role
  mov rdi,[rsp+96]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,160
+ add rsp,224
  pop r14
  pop r13
  pop r12
@@ -1293,43 +1376,49 @@ jmp .Lgg_project_role
  movdqu [rsp+32],xmm0
  movdqu [rsp+48],xmm0
  movdqu [rsp+64],xmm0
- lea rdi,[rip+.Lgg_generation_definition_json]
- call json_tokener_parse@PLT
- mov [rsp+48],rax
- test rax,rax
- jz .Lgg_handoff_alloc
- lea rdi,[rip+.Lgg_generation_options_json]
- call json_tokener_parse@PLT
- mov [rsp+56],rax
- test rax,rax
- jz .Lgg_handoff_alloc
- mov [rsp],rbx
- lea rcx,[rip+.Lgg_initial]
- mov [rsp+8],rcx
- lea rcx,[rip+.Lgg_child_mint]
- mov [rsp+16],rcx
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r14,[rax+64]
  mov rax,[rbx+8]
- GGET "qword ptr [rax+24]",conversation_id
+ GGET "qword ptr [rax+32]",conversation_id
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov [rsp+32],rax
- lea rdi,[rip+.Lgg_empty_json]
- call json_tokener_parse@PLT
- mov [rsp+72],rax
- test rax,rax
- jz .Lgg_handoff_alloc
- mov rdi,r12
- mov rsi,[rsp+48]
- mov rdx,[rsp+72]
- mov rcx,[rsp+56]
- mov r8,rsp
- lea r9,[rsp+40]
- call pg_record_tx_create_task@PLT
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,rax
+ mov rcx,rsp
+ call pg_durable_inputs_prepare@PLT
  test eax,eax
- jnz .Lgg_handoff_alloc
+ jnz .Lgg_handoff_end
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,[rsp]
+ xor ecx,ecx
+ xor r8d,r8d
+ lea r9,[rsp+16]
+ call pg_durable_inputs_apply@PLT
+ test eax,eax
+ jnz .Lgg_handoff_end
+ cmp dword ptr [rsp+24],0
+ je .Lgg_handoff_start
+ mov rdi,[rsp+16]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lgg_handoff_state
+.Lgg_handoff_start:
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,[rsp+32]
+ mov rcx,[rsp+16]
+ lea r8,[rsp+40]
+ call pg_durable_inputs_start@PLT
+ test eax,eax
+ jnz .Lgg_handoff_end
+.Lgg_handoff_state:
  lea rdi,[rip+.Lgg_terminal_json]
  call json_tokener_parse@PLT
- mov [rsp+64],rax
+ mov [rsp+48],rax
  test rax,rax
  jz .Lgg_handoff_alloc
  GGET rax,outcome
@@ -1345,22 +1434,20 @@ jmp .Lgg_project_role
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_handoff_end
- mov rax,[rsp+64]
+ mov rax,[rsp+48]
  mov [r13],rax
- mov qword ptr [rsp+64],0
+ mov qword ptr [rsp+48],0
  xor eax,eax
  jmp .Lgg_handoff_end
 .Lgg_handoff_alloc:
  mov eax,5
 .Lgg_handoff_end:
  mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
  mov rdi,[rsp+48]
- call json_object_put@PLT
- mov rdi,[rsp+56]
- call json_object_put@PLT
- mov rdi,[rsp+64]
- call json_object_put@PLT
- mov rdi,[rsp+72]
  call json_object_put@PLT
  mov eax,ebp
  add rsp,80
@@ -1384,30 +1471,72 @@ jmp .Lgg_project_role
  neg eax
  pop rbx
  ret
-.Lgg_abort:
+.Lgg_abort_stage:
+ push rbp
  push rbx
  push r12
- sub rsp,8
- mov rbx,rsi
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rcx
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov r14,[rax+64]
+ GGET "qword ptr [rbx+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,rax
+ mov rcx,rsp
+ call pg_durable_inputs_prepare@PLT
+ test eax,eax
+ jnz .Lgg_abort_stage_end
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,[rsp]
+ mov ecx,3
+ xor r8d,r8d
+ lea r9,[rsp+8]
+ call pg_durable_inputs_apply@PLT
+ test eax,eax
+ jnz .Lgg_abort_stage_end
  lea rdi,[rip+.Lgg_abort_json]
  call json_tokener_parse@PLT
- mov r12,rax
+ mov [r13],rax
  test rax,rax
- jz .Lgg_abort_alloc
- mov rdi,rbx
- mov rsi,rax
- call pg_task_runner_commit@PLT
- mov ebx,eax
- mov rdi,r12
+ jz .Lgg_abort_stage_alloc
+ xor eax,eax
+ jmp .Lgg_abort_stage_end
+.Lgg_abort_stage_alloc:
+ mov eax,5
+.Lgg_abort_stage_end:
+ mov ebp,eax
+ mov rdi,[rsp]
  call json_object_put@PLT
- mov eax,ebx
- neg eax
- jmp .Lgg_abort_end
-.Lgg_abort_alloc:
- mov eax,-5
-.Lgg_abort_end:
- add rsp,8
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
  pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lgg_abort:
+ push rbx
+ mov rdi,rsi
+ lea rdx,[rip+.Lgg_abort_stage]
+ call pg_task_runner_commit_with@PLT
+ neg eax
  pop rbx
  ret
 /* Model failures are committed facts; an operation owns the candidate through
@@ -1727,7 +1856,6 @@ jmp .Lgg_project_role
 .Lgg_call_id: .asciz "callId"
 .Lgg_tools_key: .asciz "tools"
 .Lgg_on: .asciz "on"
-.Lgg_empty_json: .asciz "{}"
 .Lgg_retry_name: .asciz "retry"
 .Lgg_attempt: .asciz "attempt"
 .Lgg_until: .asciz "until"
@@ -1753,13 +1881,14 @@ jmp .Lgg_project_role
 .Lgg_text_json: .asciz "{\"type\":\"text\",\"text\":\"\"}"
 .Lgg_call_json: .asciz "{\"type\":\"toolCall\"}"
 .Lgg_entry_json: .asciz "{\"kind\":\"pangu.assistant\",\"model\":[]}"
+.Lgg_head: .asciz "head"
+.Lgg_status: .asciz "status"
+.Lgg_terminal_word: .asciz "terminal"
 .Lgg_terminal_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":{\"entryId\":0}}}"
 .Lgg_tool_definition_json: .asciz "{\"name\":\"pangu.tool\",\"version\":2}"
 .Lgg_tool_options_json: .asciz "{\"ownership\":{\"kind\":\"task\",\"taskId\":0}}"
 .Lgg_tool_input_json: .asciz "{\"kind\":\"model\",\"assistant\":0,\"callId\":\"\"}"
 .Lgg_wait_json: .asciz "{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"tools\",\"pending\":[]},\"on\":[],\"policy\":\"allSettled\"}"
-.Lgg_generation_definition_json: .asciz "{\"name\":\"pangu.generation\",\"version\":1}"
-.Lgg_generation_options_json: .asciz "{\"ownership\":{\"kind\":\"conversation\"}}"
 .Lgg_abort_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"aborted\"}}"
 .text
 .globl pg_durable_generation_history

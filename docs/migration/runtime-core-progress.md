@@ -15,20 +15,20 @@
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
+| Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
 | 编码工具 | `read_tool.S`、`write_tool.S`、`edit_text.S`、`edit_tool.S`、`bash_tool.S`、`process.S`：真实读改写运行、分页/快照、Unicode匹配、异步进程/取消、原始输出文件 |
 
 ## 本批验证与集成状态
 
-- Generation失败响应与下一状态原子入库：按当前策略执行有上限指数退避，deadline持久化；重开、提前唤醒和取消保持任务语义；额度/账户错误与上下文溢出优先排除重试。
-- 错误Entry保留于PanGu存储，模型请求按Pi过滤error/aborted/deferred assistant；失败终态通过Client传出错误详情。重试前重新prepare配置。
-- Runtime完整O0/O2回归、MiMo汇编ABI/传输/分配专项、隔离产品构建、G00与Assembly检查通过；SQLite/JSONL各通过一次故障注入后的真实DeepSeek工具闭环。
-- TUI交接的安全输出、工具预览/尾部/展开及历史/搜索/阅读候选已纳入固定集成树；Clang九客户端程序、二十四组PTY通过。真实DeepSeek整机完成四工具编码、PanGu身份、重开续聊与两种执行中退出恢复。U03/U04/U07的完整验收仍按TUI TODO。
+- 输入入口统一通过Durable Submission服务。PanGu queued draft保存在Submission记录，放置/撤回时移除；Entry、Submission和Generation状态在同一Session事务内推进。
+- 两后端通过去重、busy拒绝、队列选择、写入/reset/stale、失败策略、取消与关闭/重开专项。真实DeepSeek完成当前工具运行后，自动放置并回答持久follow-up；可重查结算。
+- Generation保留持久重试、上下文错误过滤及真实模型/工具链；Runtime/TUI沿既有提交、事件与历史接口工作。固定集成树的完整Runtime O0/O2回归、G00/Assembly与产品构建通过；真实终端四工具、重开续聊、两种执行中退出恢复通过。
 
 ## 当前接口边界
 
-模型投影为64条消息、单条4096字节；完整上下文/压缩按K12完成。前台Client当前接受单个运行，队列/Submission与多会话按K10接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
+模型投影为64条消息、单条4096字节；完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务已提供队列/Submission，多会话及TUI队列操作按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
 
 ## 复验入口
 

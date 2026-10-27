@@ -590,6 +590,8 @@
     "src/client/tui/tui_diff.h": "client-source",
     "src/client/tui/tui_diff.S": "client-source",
     "tests/client/tui/test_tui_tool.c": "client-test",
-    "tests/client/tui/test_tui_diff.c": "client-test"
+    "tests/client/tui/test_tui_diff.c": "client-test",
+    "src/runtime/durable_inputs.S": "native-source",
+    "src/runtime/durable_inputs.h": "native-source"
   }
 }

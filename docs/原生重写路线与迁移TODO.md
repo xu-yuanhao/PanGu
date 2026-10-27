@@ -76,7 +76,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 将静态服务注册、依赖排序、隔离根作用域、激活、失败清理和协作释放接入实际 `src/composition/`。
 - [x] 完成父子作用域的服务继承、局部提供者替换和子级先释放。
 - [ ] 完成服务变化、单插件/绑定撤销与重新激活的生命周期。
-- [ ] Loop、Session、Task/Scheduler、Storage、Model、Tools和基础服务均按服务契约注入。
+- [ ] Loop、Session、Task/Scheduler、Inputs、Storage、Model、Tools和基础服务均按服务契约注入。
 - [x] 原生插件使用服务描述符与版本化清单，提供静态/本地共享库入口；库代码在宿主协作清理完成后卸载。
 - [ ] 验收：替换提供者后消费者行为成立；缺依赖、重复服务、初始化失败和释放时订阅/异步资源的处理与参考对照。
 
@@ -151,6 +151,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `harness/{harness,submissions,inbox}.ts`、`session/forks.ts`；`harness-inbox`、`harness-host-inputs`、`harness-conversations`、`harness-nested-tools*`、`session-forks` 测试。
 
+- [x] 文本Submission接入真实产品：requestId去重、输入/写入admission、状态轮询/撤回、steer/follow-up的one/all边界、忙时reject、展示写入、reset/stale、失败keep/continue/withdraw及持久结算。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -216,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Generation `classify/retry/prepare`、`pi-ai/utils/retry.ts`与`overflow.ts`、上下文`EXCLUDED_STOP_REASONS`，以及generation预算/禁用/非重试/策略变化、generation-recovery退避重开/提前唤醒用例。批次起核对Pi远端`177e2ad7e41e85c16c859f844a0569a3c76f2666`、Harness远端`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`均与上一批核对点一致，继续固定参考树。TUI来源/范围由TUI TODO交接区给出。
-- 实际调用链：模型start/next失败→注入的failure查询→`model_failure.S`分类→`durable_generation.S`将error assistant与sleeping/failed状态同批提交→Scheduler按持久until唤醒→retry/prepare读取当前配置与策略→重新请求；模型上下文过滤error/aborted/deferred响应。`durable_client.S`把正常failed结果与诊断转成真实错误终态。产品已接入；libc POSIX regex仅由布局胶水执行匹配。MiMo/OpenAI-compatible传输保存CURL失败码，非200读取完整有界错误体后分类。TUI交接候选接入安全输出、工具预览/展开、输入历史/搜索/命令选择和会话阅读；结构化diff候选仍由独立测试消费。
-- 验证：两后端错误分类/预算、quota/禁用、动态策略、早醒、退避重开/取消及ABI专项通过；一次瞬时失败注入后，真实DeepSeek各完成重试、read任务和后继回答，HTTP200、零task fault。MiMo汇编ABI/传输/分配专项、固定集成树Runtime完整O0/O2回归、Clang九客户端程序/二十四组PTY、G00/Assembly与产品构建通过。整机真实DeepSeek完成read/write/edit/bash、PanGu身份、历史重开续聊，正常退出和进程终止后恢复均保持一次写入；恢复PTY按文件副作用同步，适配工具按源行缓冲展示。控制登记自审：新增Assembly错误分类与公开failure契约、POSIX regex布局胶水；登记TUI交接的八个文件，产品接入safe/tool，diff候选由专项构建；补充实际libunistring依赖。
-- 剩余行为：K07 deferred/partial、顺序工具/hook/嵌套工具，K10输入队列与多会话，K11资源配置恢复，K12压缩，K13完整观察/用量，以及K06余项继续按所属清单完成。当前模型投影64条消息，启动仍加载所选提示文件；历史目前沿模型上下文投影，完整失败响应视图随K13完成。TUI U03结构化工具参数/diff/附件与U04/U07剩余布局/字素/持久分页按其TODO保持待完成。
-- 下一交付物：沿K07/K10把当前前台输入接入Durable Submission/队列边界；为TUI U03提供真实参数/结构化工具结果接口，继续成组补齐产品调用链。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`submissions.ts` admitSubmission/status/wait/abort、`inbox.ts` prepareBoundary/applyBoundary/appendInput/isDisplayOnly/isStale/withdrawQueuedInputs，以及Generation answer/finishToolRound/endFailedRun/startRun；对应harness-submissions的去重/拒绝/关闭/重开、harness-inbox的队列/reset/stale/失败策略用例。本批核对Pi远端由`177e2ad7e41e85c16c859f844a0569a3c76f2666`前进至`db14038bd847c5bad57de217e0ac0c5ad1ae60ba`，上述三个模块无差异；Harness远端保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，参考工作树沿固定提交。
+- 实际调用链：产品Host导出`inputs`服务；Client文本入口→`durable_inputs.S`去重/判断busy→原子Submission/User Entry/Generation，忙时输入保留为Submission中的PanGu队列draft。Generation在最终回答、postTools、失败及abort阶段使用同一事务处理Entry、队列放置/撤回、Submission结算和后继Task。queued payload在放置/撤回时移除；查询与轮询经Session readOnLine，退出只暂停任务。reset/head边界接入模型上下文；Client配置收敛为实际Session/Scheduler/Inputs/会话依赖，已删除其旧提交工厂。
+- 验证：SQLite/JSONL的request去重（含NUL）、busy reject无写入、撤回、one/all steering/follow-up、展示写入/reset后写入、stale、三种失败策略、取消、关闭竞态和重开专项通过ASan/UBSan；真实DeepSeek各完成故障注入/重试→真实read→回答→持久follow-up自动回答并结算。关闭竞态专项曾发现轮询输出指针复用，修正后复验通过。固定集成树Runtime完整O0/O2回归、G00/Assembly与产品构建通过；真实PTY完成read/write/edit/bash、PanGu身份、重开续聊和正常退出/进程终止后恢复，命令副作用保持一次。控制自审：登记Assembly Inputs/头、实际依赖与导出，原有TUI函数表和事件布局保持不变。
+- 剩余行为：当前Input内容遵循有界UTF-8文本模型ABI，完整内容块随K05完成；前台事件仍在调度空闲时汇总结束，逐Submission/run的视图与TUI队列操作随K13/U06接入。K07 deferred/partial/hook/顺序及嵌套工具，K10多会话/分叉/完整生命周期，K11资源配置，K12压缩，K13观察/用量及K06余项保持原清单。队列与busy查询当前复用通用记录扫描；完整失败历史视图、原生错误载体和长上下文仍按所属步骤补齐；Inputs默认实现已接入Host，完整服务替换与生命周期按K02完成。
+- 下一交付物：提供TUI U03的真实参数与结构化工具结果接口，接通工具状态、diff/首个变更行与附件消费；保持现有文本、队列与真实模型调用链可运行。

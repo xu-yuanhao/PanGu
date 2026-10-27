@@ -29,6 +29,7 @@ static struct {
  pg_task_scheduler scheduler;pg_task_runner_host tasks;
  pg_durable_tool tool;pg_durable_tool_host tool_host;
  pg_durable_generation generation;pg_durable_generation_host generation_host;
+ pg_durable_inputs inputs;pg_record_queries queries;pg_record_requests requests;
  pg_durable_client client;pg_client native_client;pg_session history;
  struct json_object *configuration;
  pg_timer_job fire,queued;void *fire_context,*queued_context;uint64_t deadline;
@@ -140,23 +141,24 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
- durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
+ durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
+ pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
- pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.generation.definition,durable.configuration,mint,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
+ pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  if(pg_durable_generation_history(&durable.tasks,1,durable.configuration,&durable.history))return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
- return pg_host_provide(scope,owner,"client",&application.client);
+ return pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
  if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry"},*const model_exports[]={"model"},*const agent_exports[]={"client"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry"},*const model_exports[]={"model"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model","tools","session","files"};
 static const pg_plugin plugins[]={
- {"agent",0,agent_imports,4,agent_exports,1,agent_start,agent_stop},
+ {"agent",0,agent_imports,4,agent_exports,2,agent_start,agent_stop},
  {"model",0,model_imports,1,model_exports,1,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,2,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},

@@ -33,7 +33,7 @@ pg_durable_client_emit:
  jz .Ldc_emit_end
  test rsi,rsi
  jz .Ldc_emit_end
- cmp dword ptr [rdi+84],0
+ cmp dword ptr [rdi+68],0
  jne .Ldc_emit_end
  cmp qword ptr [rsi+16],4096
  jae .Ldc_emit_fail
@@ -78,22 +78,22 @@ pg_durable_client_emit:
  inc r14
  cmp r14,3
  jb .Ldc_emit_slice
- mov rax,[rbx+56]
+ mov rax,[rbx+40]
  test rax,rax
  jz .Ldc_emit_first
  mov [rax],r13
  jmp .Ldc_emit_tail
 .Ldc_emit_first:
- mov [rbx+48],r13
+ mov [rbx+32],r13
 .Ldc_emit_tail:
- mov [rbx+56],r13
+ mov [rbx+40],r13
  xor eax,eax
  jmp .Ldc_emit_end
 .Ldc_emit_free:
  mov rdi,r13
  call free@PLT
 .Ldc_emit_fail:
- mov dword ptr [rbx+88],1
+ mov dword ptr [rbx+72],1
  mov eax,1
 .Ldc_emit_end:
  pop r14
@@ -118,12 +118,12 @@ pg_durable_client_emit:
  jne .Ldc_boundary_emit
  cmp edx,1
  jne .Ldc_boundary_emit
- mov rdi,[rbx+112]
+ mov rdi,[rbx+96]
  test rdi,rdi
  jz .Ldc_boundary_emit
  call json_object_get_string@PLT
  mov [rsp+8],rax
- mov rdi,[rbx+112]
+ mov rdi,[rbx+96]
  call json_object_get_string_len@PLT
  mov [rsp+16],rax
 .Ldc_boundary_emit:
@@ -158,25 +158,33 @@ pg_durable_client_open:
  cmp qword ptr [rsi+rcx],0
  je .Ldc_open_bad
  add rcx,8
- cmp ecx,48
+ cmp ecx,32
  jb .Ldc_open_validate
- mov ecx,6
+ mov rax,[rsi+16]
+ mov rdx,[rax]
+ cmp rdx,[rsi]
+ jne .Ldc_open_bad
+ mov rdx,[rsi+8]
+ mov rdx,[rdx+8]
+ cmp rdx,[rax+8]
+ jne .Ldc_open_bad
+ mov ecx,4
  cld
  rep movsq
  pxor xmm0,xmm0
+ movdqu [rbx+32],xmm0
  movdqu [rbx+48],xmm0
  movdqu [rbx+64],xmm0
- movdqu [rbx+80],xmm0
+ mov qword ptr [rbx+80],0
  mov qword ptr [rbx+96],0
- mov qword ptr [rbx+112],0
  call json_object_new_object@PLT
- mov [rbx+104],rax
+ mov [rbx+88],rax
  test rax,rax
  jz .Ldc_open_bad
  mov rax,[rbx+8]
  cmp qword ptr [rax+24],0
  je .Ldc_open_ok
- mov dword ptr [rbx+76],1
+ mov dword ptr [rbx+60],1
  mov rdi,rbx
  xor esi,esi
  xor edx,edx
@@ -191,23 +199,13 @@ pg_durable_client_open:
  pop rbx
  ret
 .size pg_durable_client_open,.-pg_durable_client_open
-.Ldc_initial:
- mov rax,[rdi+16]
- mov rdi,[rax+24]
- jmp [rax+32]
-.Ldc_mint:
- mov rax,[rdi+32]
- mov rdi,[rdi+8]
- mov rdi,[rdi+8]
- mov rdi,[rdi]
- jmp rax
 .Ldc_submit:
  push rbp
  push rbx
  push r12
  push r13
  push r14
- sub rsp,224
+ sub rsp,48
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -215,25 +213,16 @@ pg_durable_client_open:
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
- movdqu [rsp+48],xmm0
- movdqu [rsp+64],xmm0
- movdqu [rsp+80],xmm0
- movdqu [rsp+96],xmm0
- movdqu [rsp+112],xmm0
- movdqu [rsp+128],xmm0
- movdqu [rsp+144],xmm0
- movdqu [rsp+160],xmm0
- movdqu [rsp+176],xmm0
- movdqu [rsp+192],xmm0
- movdqu [rsp+208],xmm0
  mov ebp,1
+ cmp qword ptr [rbx+16],0
+ je .Ldc_submit_end
+ cmp dword ptr [rbx+56],0
+ jne .Ldc_submit_end
+ cmp dword ptr [rbx+60],0
+ jne .Ldc_submit_end
+ cmp dword ptr [rbx+68],0
+ jne .Ldc_submit_end
  cmp dword ptr [rbx+72],0
- jne .Ldc_submit_end
- cmp dword ptr [rbx+76],0
- jne .Ldc_submit_end
- cmp dword ptr [rbx+84],0
- jne .Ldc_submit_end
- cmp dword ptr [rbx+88],0
  jne .Ldc_submit_end
  test r12,r12
  jz .Ldc_submit_end
@@ -241,130 +230,48 @@ pg_durable_client_open:
  jz .Ldc_submit_end
  cmp r13,4096
  jae .Ldc_submit_end
- xor r14d,r14d
-.Ldc_submit_utf8:
- lea rdi,[r12+r14]
- mov rsi,r13
- sub rsi,r14
- lea rdx,[rsp+192]
- call utf8proc_iterate@PLT
- test rax,rax
- jle .Ldc_submit_end
- cmp dword ptr [rsp+192],0
- je .Ldc_submit_end
- add r14,rax
- cmp r14,r13
- jb .Ldc_submit_utf8
- mov dword ptr [rbx+72],1
- lea rdi,[rip+.Ldc_user_json]
+ mov dword ptr [rbx+56],1
+ lea rdi,[rip+.Ldc_input_json]
  call json_tokener_parse@PLT
- mov [rsp+136],rax
+ mov [rsp],rax
  test rax,rax
  jz .Ldc_submit_unlock
- CGET rax,model
- mov rdi,rax
- xor esi,esi
- call json_object_array_get_idx@PLT
- mov r14,rax
  mov rdi,r12
  mov esi,r13d
  call json_object_new_string_len@PLT
- test rax,rax
- jz .Ldc_submit_unlock
- mov rdi,r14
+ mov rdi,[rsp]
  lea rsi,[rip+.Ldc_content]
  mov rdx,rax
  call .Ldc_set_owned
  test eax,eax
  jnz .Ldc_submit_unlock
- mov r14,[rbx+8]
- mov r14,[r14+8]
- mov rdi,[rbx]
- mov rsi,rsp
- lea rdx,[rsp+48]
- mov rcx,[r14]
- mov r8,[r14+8]
- call pg_durable_session_begin@PLT
+ mov rdi,[rbx+16]
+ mov rsi,[rbx+24]
+ mov rdx,[rsp]
+ lea rcx,[rsp+8]
+ call pg_durable_inputs_submit@PLT
  test eax,eax
  jnz .Ldc_submit_unlock
- mov rdi,rsp
- mov rsi,[rbx+40]
- mov rdx,[rsp+136]
- xor ecx,ecx
- mov r8,[rbx+32]
- lea r9,[rsp+144]
- call pg_record_tx_append_entry@PLT
- test eax,eax
- jnz .Ldc_submit_abort
- lea rdi,[rip+.Ldc_definition_json]
- call json_tokener_parse@PLT
- mov [rsp+152],rax
- test rax,rax
- jz .Ldc_submit_abort
- lea rdi,[rip+.Ldc_options_json]
- call json_tokener_parse@PLT
- mov [rsp+160],rax
- test rax,rax
- jz .Ldc_submit_abort
- call json_object_new_object@PLT
- mov [rsp+168],rax
- test rax,rax
- jz .Ldc_submit_abort
- mov [rsp+96],rbx
- lea rax,[rip+.Ldc_initial]
- mov [rsp+104],rax
- lea rax,[rip+.Ldc_mint]
- mov [rsp+112],rax
- mov rax,[rbx+40]
- mov [rsp+128],rax
- mov rdi,rsp
- mov rsi,[rsp+152]
- mov rdx,[rsp+168]
- mov rcx,[rsp+160]
- lea r8,[rsp+96]
- lea r9,[rsp+176]
- call pg_record_tx_create_task@PLT
- test eax,eax
- jnz .Ldc_submit_abort
- mov rdi,[rbx]
- xor esi,esi
- xor edx,edx
- xor ecx,ecx
- call pg_durable_session_settle@PLT
- test eax,eax
- jnz .Ldc_submit_abort
- mov rax,[rsp+176]
- mov [rbx+96],rax
- mov dword ptr [rbx+76],1
- mov dword ptr [rbx+80],0
- mov dword ptr [rbx+92],0
- mov rdi,[rbx+112]
+ mov rax,[rsp+16]
+ mov [rbx+80],rax
+ mov dword ptr [rbx+60],1
+ mov dword ptr [rbx+64],0
+ mov dword ptr [rbx+76],0
+ mov rdi,[rbx+96]
  call json_object_put@PLT
- mov qword ptr [rbx+112],0
+ mov qword ptr [rbx+96],0
  mov rdi,rbx
  xor esi,esi
  xor edx,edx
  call .Ldc_boundary
  xor ebp,ebp
- jmp .Ldc_submit_unlock
-.Ldc_submit_abort:
- mov rdi,[rbx]
- call pg_durable_session_abort@PLT
 .Ldc_submit_unlock:
- mov dword ptr [rbx+72],0
+ mov dword ptr [rbx+56],0
 .Ldc_submit_end:
- mov rdi,[rsp+136]
- call json_object_put@PLT
- mov rdi,[rsp+144]
- call json_object_put@PLT
- mov rdi,[rsp+152]
- call json_object_put@PLT
- mov rdi,[rsp+160]
- call json_object_put@PLT
- mov rdi,[rsp+168]
+ mov rdi,[rsp]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,224
+ add rsp,48
  pop r14
  pop r13
  pop r12
@@ -385,12 +292,12 @@ pg_durable_client_open:
  xor eax,eax
  cld
  rep stosq
- cmp dword ptr [rbx+76],1
+ cmp dword ptr [rbx+60],1
  jne .Ldc_cancel_end
- cmp dword ptr [rbx+72],0
+ cmp dword ptr [rbx+56],0
  jne .Ldc_cancel_end
- mov dword ptr [rbx+80],1
- mov dword ptr [rbx+72],1
+ mov dword ptr [rbx+64],1
+ mov dword ptr [rbx+56],1
  call json_object_new_array@PLT
  mov [rsp+96],rax
  test rax,rax
@@ -401,7 +308,7 @@ pg_durable_client_open:
  mov dword ptr [rsp+116],1
  mov qword ptr [rsp+136],256
  mov qword ptr [rsp+144],321
- mov rax,[rbx+40]
+ mov rax,[rbx+24]
  mov [rsp+152],rax
 .Ldc_cancel_scan:
  mov rdi,[r13]
@@ -504,9 +411,9 @@ pg_durable_client_open:
  mov rdi,[rbx]
  call pg_durable_session_abort@PLT
 .Ldc_cancel_error:
- mov dword ptr [rbx+88],1
+ mov dword ptr [rbx+72],1
 .Ldc_cancel_unlock:
- mov dword ptr [rbx+72],0
+ mov dword ptr [rbx+56],0
 .Ldc_cancel_end:
  mov rdi,[rsp+96]
  call json_object_put@PLT
@@ -528,17 +435,17 @@ pg_durable_client_open:
  mov rbx,rdi
  mov r12,rsi
  xor eax,eax
- cmp dword ptr [rbx+72],0
+ cmp dword ptr [rbx+56],0
  jne .Ldc_poll_end
- cmp dword ptr [rbx+84],0
+ cmp dword ptr [rbx+68],0
  jne .Ldc_poll_end
- mov dword ptr [rbx+72],1
- mov rdi,[rbx+64]
+ mov dword ptr [rbx+56],1
+ mov rdi,[rbx+48]
  call free@PLT
- mov qword ptr [rbx+64],0
- cmp qword ptr [rbx+48],0
+ mov qword ptr [rbx+48],0
+ cmp qword ptr [rbx+32],0
  jne .Ldc_poll_take
- cmp dword ptr [rbx+76],1
+ cmp dword ptr [rbx+60],1
  jne .Ldc_poll_empty
  mov rdi,[rbx+8]
  call pg_task_scheduler_poll@PLT
@@ -546,35 +453,35 @@ pg_durable_client_open:
  je .Ldc_poll_finish
  cmp eax,4
  jb .Ldc_poll_take
- mov dword ptr [rbx+88],1
+ mov dword ptr [rbx+72],1
 .Ldc_poll_finish:
- mov dword ptr [rbx+76],0
+ mov dword ptr [rbx+60],0
  mov rdi,rbx
  mov esi,4
  xor edx,edx
- cmp dword ptr [rbx+80],0
+ cmp dword ptr [rbx+64],0
  je .Ldc_poll_outcome
  mov edx,2
  jmp .Ldc_poll_emit_end
 .Ldc_poll_outcome:
- mov eax,[rbx+88]
- or eax,[rbx+92]
+ mov eax,[rbx+72]
+ or eax,[rbx+76]
  test eax,eax
  setnz dl
  movzx edx,dl
 .Ldc_poll_emit_end:
  call .Ldc_boundary
 .Ldc_poll_take:
- mov rax,[rbx+48]
+ mov rax,[rbx+32]
  test rax,rax
  jz .Ldc_poll_empty
  mov rcx,[rax]
- mov [rbx+48],rcx
+ mov [rbx+32],rcx
  test rcx,rcx
  jnz .Ldc_poll_copy
- mov qword ptr [rbx+56],0
+ mov qword ptr [rbx+40],0
 .Ldc_poll_copy:
- mov [rbx+64],rax
+ mov [rbx+48],rax
  lea rsi,[rax+8]
  mov rdi,r12
  mov edx,56
@@ -583,11 +490,11 @@ pg_durable_client_open:
  jmp .Ldc_poll_unlock
 .Ldc_poll_empty:
  xor eax,eax
- cmp dword ptr [rbx+88],0
+ cmp dword ptr [rbx+72],0
  je .Ldc_poll_unlock
  mov eax,-1
 .Ldc_poll_unlock:
- mov dword ptr [rbx+72],0
+ mov dword ptr [rbx+56],0
 .Ldc_poll_end:
  add rsp,8
  pop r12
@@ -600,33 +507,33 @@ pg_durable_client_suspend:
  sub rsp,16
  mov rbx,rdi
  mov eax,1
- cmp dword ptr [rbx+72],0
+ cmp dword ptr [rbx+56],0
  jne .Ldc_suspend_end
- mov dword ptr [rbx+84],1
+ mov dword ptr [rbx+68],1
  mov rdi,[rbx+8]
  call pg_task_scheduler_close@PLT
  test eax,eax
  jnz .Ldc_suspend_end
 .Ldc_suspend_queue:
- mov rdi,[rbx+48]
+ mov rdi,[rbx+32]
  test rdi,rdi
  jz .Ldc_suspend_delivered
  mov rax,[rdi]
- mov [rbx+48],rax
+ mov [rbx+32],rax
  call free@PLT
  jmp .Ldc_suspend_queue
 .Ldc_suspend_delivered:
- mov rdi,[rbx+64]
+ mov rdi,[rbx+48]
  call free@PLT
- mov qword ptr [rbx+64],0
- mov qword ptr [rbx+56],0
- mov dword ptr [rbx+76],0
- mov rdi,[rbx+104]
+ mov qword ptr [rbx+48],0
+ mov qword ptr [rbx+40],0
+ mov dword ptr [rbx+60],0
+ mov rdi,[rbx+88]
  call json_object_put@PLT
- mov qword ptr [rbx+104],0
- mov rdi,[rbx+112]
+ mov qword ptr [rbx+88],0
+ mov rdi,[rbx+96]
  call json_object_put@PLT
- mov qword ptr [rbx+112],0
+ mov qword ptr [rbx+96],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -649,7 +556,7 @@ pg_durable_client_service:
 .globl pg_durable_client_fault
 .type pg_durable_client_fault,@function
 pg_durable_client_fault:
- mov dword ptr [rdi+92],1
+ mov dword ptr [rdi+76],1
  ret
 .size pg_durable_client_fault,.-pg_durable_client_fault
 .globl pg_durable_client_tool
@@ -684,7 +591,7 @@ pg_durable_client_output:
  movdqu [rsp+48],xmm0
  movdqu [rsp+64],xmm0
  mov rdi,rbx
- cmp dword ptr [rdi+84],0
+ cmp dword ptr [rdi+68],0
  jne .Ldc_tool_end
  lea rdi,[rsp+96]
  mov esi,32
@@ -692,7 +599,7 @@ pg_durable_client_output:
  mov rcx,r12
  xor eax,eax
  call snprintf@PLT
- mov rdi,[rbx+104]
+ mov rdi,[rbx+88]
  lea rsi,[rsp+96]
  call json_object_object_get@PLT
  mov rdi,rax
@@ -834,14 +741,14 @@ pg_durable_client_output:
  call json_object_new_int@PLT
  test rax,rax
  jz .Ldc_tool_fail
- mov rdi,[rbx+104]
+ mov rdi,[rbx+88]
  lea rsi,[rsp+96]
  mov rdx,rax
  call .Ldc_set_owned
  test eax,eax
  jz .Ldc_tool_end
 .Ldc_tool_fail:
- mov dword ptr [rbx+88],1
+ mov dword ptr [rbx+72],1
 .Ldc_tool_end:
  mov rdi,[rsp]
  call json_object_put@PLT
@@ -867,7 +774,7 @@ pg_durable_client_publish:
  sub rsp,8
  mov rbx,rdi
  mov r12,rsi
- cmp dword ptr [rbx+84],0
+ cmp dword ptr [rbx+68],0
  jne .Ldc_publish_end
  xor r13d,r13d
 .Ldc_publish_each:
@@ -918,10 +825,10 @@ pg_durable_client_publish:
  mov rdi,rax
  call json_object_get@PLT
  mov r14,rax
- mov rdi,[rbx+112]
+ mov rdi,[rbx+96]
  call json_object_put@PLT
- mov [rbx+112],r14
- mov dword ptr [rbx+92],1
+ mov [rbx+96],r14
+ mov dword ptr [rbx+76],1
 .Ldc_publish_next:
  inc r13
  jmp .Ldc_publish_each
@@ -958,7 +865,5 @@ pg_durable_client_publish:
 .Ldc_message: .asciz "message"
 .Ldc_task: .asciz "task"
 .Ldc_id_format: .asciz "%llu"
-.Ldc_user_json: .asciz "{\"kind\":\"pangu.user\",\"model\":[{\"role\":\"user\",\"content\":\"\"}]}"
-.Ldc_definition_json: .asciz "{\"name\":\"pangu.generation\",\"version\":1}"
-.Ldc_options_json: .asciz "{\"ownership\":{\"kind\":\"conversation\"}}"
+.Ldc_input_json: .asciz "{\"type\":\"input\",\"content\":\"\",\"whenBusy\":\"reject\"}"
 .section .note.GNU-stack,"",@progbits

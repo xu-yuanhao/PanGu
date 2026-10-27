@@ -1,12 +1,10 @@
 #ifndef PANGU_DURABLE_CLIENT_H
 #define PANGU_DURABLE_CLIENT_H
-#include "durable_generation.h"
+#include "durable_inputs.h"
 typedef struct {
  pg_durable_session *session;
  pg_task_scheduler *scheduler;
- const pg_task_definition *generation;
- const struct json_object *configuration;
- int (*mint)(void *,uint64_t *);
+ pg_durable_inputs *inputs;
  uint64_t conversation;
 } pg_durable_client_config;
 typedef struct {
@@ -17,7 +15,7 @@ typedef struct {
  struct json_object *tool_events,*error_message;
 } pg_durable_client;
 /* Single foreground client on its scheduler, borrowed providers/configuration.
-   Submit atomically appends a User Entry and creates Generation. Poll pumps
+   Submit delegates atomic Submission/Entry/Generation admission to inputs. Poll pumps
    the scheduler and returns detached queued events; slices expire next poll.
    Suspend parks the scheduler and discards observations without aborting work;
    drain returned native tool leases before closing the owning Session. */

@@ -2,6 +2,7 @@
 #define PANGU_DURABLE_GENERATION_H
 #include "durable_tool.h"
 #include "model_failure.h"
+struct pg_durable_inputs;
 typedef struct {
  void *context;
  /* Owned strict JSON {systemPrompt,model,...request options}. The provider
@@ -15,6 +16,7 @@ typedef struct {
  const pg_task_definition *tool;
  /* Optional provider failure query, before close; absent means non-retryable. */
  void (*failure)(void *,const pg_model *,pg_model_failure *);
+ struct pg_durable_inputs *inputs;
 } pg_durable_generation_host;
 typedef struct {
  const pg_durable_generation_host *host;

@@ -1740,7 +1740,9 @@
         "src/runtime/durable_client.h",
         "src/runtime/model_failure.h",
         "src/runtime/model_failure.S",
-        "src/runtime/model_regex_posix.c"
+        "src/runtime/model_regex_posix.c",
+        "src/runtime/durable_inputs.h",
+        "src/runtime/durable_inputs.S"
       ],
       "dependencies": [
         "task.runner.local.v0",
@@ -1749,7 +1751,7 @@
         "libutf8proc",
         "system libc POSIX regex"
       ],
-      "role": "Native Generation/Tool/Client: atomic input and assistant/state transactions, durable configurable retry sleep/reprepare, current policy, error-filtered model projection, scheduler events, cancellation, suspend and startup history.",
+      "role": "Native Generation/Tool/Client and Submission/Inbox behavior: durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions.",
       "exports": [
         "pg_durable_generation_init",
         "pg_durable_generation_history",
@@ -1761,7 +1763,15 @@
         "pg_durable_client_publish",
         "pg_durable_client_fault",
         "pg_durable_client_output",
-        "pg_model_retryable"
+        "pg_model_retryable",
+        "pg_durable_inputs_open",
+        "pg_durable_inputs_submit",
+        "pg_durable_inputs_status",
+        "pg_durable_inputs_poll",
+        "pg_durable_inputs_withdraw",
+        "pg_durable_inputs_prepare",
+        "pg_durable_inputs_apply",
+        "pg_durable_inputs_start"
       ],
       "reference_basis": [
         {
@@ -1775,14 +1785,17 @@
             "packages/ai/src/utils/retry.ts",
             "packages/durable/src/harness/context.ts",
             "packages/durable/src/harness/agent.ts",
-            "packages/ai/src/utils/overflow.ts"
+            "packages/ai/src/utils/overflow.ts",
+            "packages/durable/src/harness/inbox.ts"
           ],
           "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; model context excludes error/aborted/deferred assistants. Deferred/compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
           "tests_to_read": [
             "packages/durable/test/harness-generation.test.ts",
             "packages/durable/test/harness-generation-recovery.test.ts",
             "packages/durable/test/harness-tools-recovery.test.ts",
-            "packages/durable/test/harness-host-inputs.test.ts"
+            "packages/durable/test/harness-host-inputs.test.ts",
+            "packages/durable/test/harness-submissions.test.ts",
+            "packages/durable/test/harness-inbox.test.ts"
           ]
         }
       ]
