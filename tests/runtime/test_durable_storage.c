@@ -188,7 +188,71 @@ static void scheduler_tests(void){
  }
  puts("PASS: Durable Scheduler stable phase fairness, live discovery/pagination, registry unblock, sleep deadline and all-task crash recovery on SQLite/JSONL");
 }
+typedef struct {
+ task_case base;uint64_t ids[8];unsigned count,behavior[8],policy[8],calls[8],resumes[8],gate,aborted[8],abort_count,check_marks;
+ struct json_object *on[8];
+} wait_case;
+static unsigned wait_index(wait_case *w,uint64_t id){for(unsigned i=0;i<w->count;i++)if(w->ids[i]==id)return i;assert(!"unknown task");return 0;}
+static int wait_phase(void *p,pg_task_runner *runner,const struct json_object *record){
+ wait_case *w=p;unsigned i=wait_index(w,runner->id);w->calls[i]++;assert(!w->base.f.records.busy);
+ unsigned n=(unsigned)json_object_get_int(json_object_object_get(json_object_object_get(json_object_object_get(record,"state"),"checkpoint"),"n"));
+ if(w->behavior[i]==2&&!w->gate)return 1;
+ struct json_object *next=0;
+ if(w->behavior[i]==1&&!n){
+  next=json_tokener_parse("{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"count\",\"n\":1}}");assert(next&&w->on[i]);
+  assert(!json_object_object_add(next,"on",json_object_get(w->on[i]))&&!json_object_object_add(next,"policy",json_object_new_string(w->policy[i]?"failFast":"allSettled")));
+ }else if(w->behavior[i]==3)next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"failed\",\"error\":{\"message\":\"test failed\"}}}");
+ else{if(w->behavior[i]==1)w->resumes[i]++;next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":null}}");}
+ assert(next);int result=pg_task_runner_commit(runner,next);json_object_put(next);return result?-(int)result:0;
+}
+static int wait_abort(void *p,pg_task_runner *runner,const struct json_object *record){
+ wait_case *w=p;unsigned i=wait_index(w,runner->id);(void)record;assert(!w->base.f.records.busy&&w->abort_count<8);
+ if(w->check_marks)for(unsigned j=0;j<4;j++){struct json_object *r=task_row(&w->base,w->ids[j]);assert(json_object_get_boolean(json_object_object_get(r,"abortRequested")));json_object_put(r);}
+ w->aborted[w->abort_count++]=i;struct json_object *next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"aborted\"}}");assert(next);int result=pg_task_runner_commit(runner,next);json_object_put(next);return result?-(int)result:0;
+}
+static void wait_spawn(wait_case *w,uint64_t owner,uint64_t conversation,unsigned behavior){unsigned i=w->count++;assert(i<8);w->ids[i]=task_create_at(&w->base,owner,conversation,1);w->behavior[i]=behavior;}
+static void wait_on(wait_case *w,unsigned i,unsigned policy,unsigned count,const unsigned *targets){w->policy[i]=policy;w->on[i]=json_object_new_array();assert(w->on[i]);for(unsigned j=0;j<count;j++)assert(!json_object_array_add(w->on[i],json_object_new_int64((int64_t)w->ids[targets[j]])));}
+static void wait_save(wait_case *w,struct json_object *record){pg_record_tx tx={0};pg_document_tx docs={0};assert(!pg_durable_session_begin(&w->base.f.session,&tx,&docs,w->base.f.memory,read_record)&&!pg_record_tx_set_task(&tx,record,&w->base,task_now)&&!pg_durable_session_settle(&w->base.f.session,0,0,0));}
+static void wait_background(wait_case *w,unsigned i){struct json_object *row=task_row(&w->base,w->ids[i]);assert(!json_object_object_add(row,"background",json_object_new_boolean(1)));wait_save(w,row);json_object_put(row);}
+static uint64_t wait_conversation(wait_case *w,uint64_t owner){pg_record_tx tx={0};pg_document_tx docs={0};struct json_object *c=0;assert(!pg_durable_session_begin(&w->base.f.session,&tx,&docs,w->base.f.memory,read_record)&&!pg_record_tx_create_conversation(&tx,owner,0,(int(*)(void *,uint64_t *))pg_record_memory_mint,&c));uint64_t id=(uint64_t)json_object_get_int64(json_object_object_get(c,"id"));json_object_put(c);assert(!pg_durable_session_settle(&w->base.f.session,0,0,0));return id;}
+static const char *wait_outcome(wait_case *w,unsigned i){static char text[32];struct json_object *r=task_row(&w->base,w->ids[i]);snprintf(text,sizeof(text),"%s",json_object_get_string(json_object_object_get(json_object_object_get(json_object_object_get(r,"state"),"outcome"),"status")));json_object_put(r);return text;}
+static void wait_tests(void){
+ for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<14;scenario++){
+  char parent[]="/tmp/pangu-wait-XXXXXX";assert(mkdtemp(parent));wait_case w={.base={.f={.kind=kind,.now=100}}};task_case *t=&w.base;
+  snprintf(t->f.path,sizeof(t->f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&t->f);seed(&t->f);open_session(&t->f);task_bind(t);
+  t->phase.context=&w;t->phase.poll=wait_phase;t->phase.cleanup=0;t->definition.context=&w;t->definition.abort=wait_abort;t->definition.abort_cleanup=0;
+  if(scenario<2){wait_spawn(&w,0,1,1);wait_spawn(&w,w.ids[0],1,3);wait_spawn(&w,w.ids[0],1,2);wait_on(&w,0,scenario,2,(unsigned[]){1,2});}
+  else if(scenario==2){wait_spawn(&w,0,1,1);wait_on(&w,0,0,1,(unsigned[]){0});}
+  else if(scenario==3){wait_spawn(&w,0,1,1);w.on[0]=json_tokener_parse("[999999]");}
+  else if(scenario==4){wait_spawn(&w,0,1,1);wait_spawn(&w,0,1,2);wait_on(&w,0,1,1,(unsigned[]){1});w.gate=1;}
+  else if(scenario==5||scenario==6){wait_spawn(&w,0,1,1);wait_spawn(&w,scenario==6?w.ids[0]:0,1,1);wait_on(&w,0,0,1,(unsigned[]){1});wait_on(&w,1,0,1,(unsigned[]){0});}
+  else if(scenario==7){wait_spawn(&w,0,1,1);uint64_t c=wait_conversation(&w,w.ids[0]);wait_spawn(&w,0,c,1);wait_on(&w,0,0,1,(unsigned[]){1});wait_on(&w,1,0,1,(unsigned[]){0});}
+  else if(scenario==8||scenario==13){if(scenario==13)w.gate=1;wait_spawn(&w,0,1,2);uint64_t c=wait_conversation(&w,w.ids[0]);wait_spawn(&w,0,c,1);wait_background(&w,1);wait_on(&w,1,0,1,(unsigned[]){0});}
+  else if(scenario==9){for(unsigned i=0;i<4;i++)wait_spawn(&w,0,1,i==3?0:1);wait_on(&w,0,0,2,(unsigned[]){1,2});wait_on(&w,1,0,1,(unsigned[]){3});wait_on(&w,2,0,1,(unsigned[]){3});}
+  else if(scenario==10){wait_spawn(&w,0,1,2);wait_spawn(&w,w.ids[0],1,2);wait_spawn(&w,w.ids[1],1,2);uint64_t c=wait_conversation(&w,w.ids[0]);wait_spawn(&w,0,c,2);wait_spawn(&w,0,c,2);wait_background(&w,4);w.check_marks=1;}
+  else if(scenario==12){wait_spawn(&w,0,1,1);wait_spawn(&w,w.ids[0],1,3);wait_spawn(&w,w.ids[0],1,2);wait_spawn(&w,w.ids[1],1,2);wait_spawn(&w,w.ids[0],1,2);wait_on(&w,0,1,2,(unsigned[]){1,2});}
+  else{wait_spawn(&w,0,1,1);wait_spawn(&w,w.ids[0],1,2);wait_on(&w,0,0,1,(unsigned[]){1});}
+  pg_task_scheduler scheduler={0};assert(!pg_task_scheduler_open(&scheduler,&t->f.session,&t->host,3));
+  int result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);
+  if(scenario<2){assert(w.calls[0]==1&&w.calls[2]==1&&!w.abort_count);result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);if(!scenario)assert(!w.abort_count&&!w.resumes[0]);else assert(w.abort_count==1&&w.aborted[0]==2);w.gate=1;}
+  if(scenario==8){assert(!w.resumes[1]);w.gate=1;}
+  if(scenario==10){struct json_object *r=task_row(t,w.ids[0]);assert(!json_object_object_add(r,"abortRequested",json_object_new_boolean(1)));wait_save(&w,r);json_object_put(r);for(unsigned j=0;j<5;j++)assert(pg_task_scheduler_poll(&scheduler)<=PG_TASK_BLOCKED);assert(w.abort_count==4&&w.aborted[0]==2&&w.aborted[3]==0);w.gate=1;}
+  if(scenario==11){assert(!w.resumes[0]&&!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t->f.session));backend_open(&t->f);open_session(&t->f);assert(!pg_task_scheduler_open(&scheduler,&t->f.session,&t->host,3));assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&!w.resumes[0]);w.gate=1;}
+  if(scenario==12){for(unsigned j=0;j<4;j++)assert(pg_task_scheduler_poll(&scheduler)<=PG_TASK_BLOCKED);assert(w.abort_count==2&&w.resumes[0]==1);struct json_object *r=task_row(t,w.ids[4]);assert(!json_object_get_boolean(json_object_object_get(r,"abortRequested")));json_object_put(r);w.gate=1;}
+  for(unsigned j=0;j<20&&result!=PG_TASK_DONE;j++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);}assert(result==PG_TASK_DONE);
+  if(scenario<2)assert(!strcmp(wait_outcome(&w,0),"completed")&&!strcmp(wait_outcome(&w,1),"failed")&&!strcmp(wait_outcome(&w,2),scenario?"aborted":"completed")&&w.resumes[0]==1);
+  if(scenario>=2&&scenario<=4){assert(!strcmp(wait_outcome(&w,0),"faulted"));struct json_object *r=task_row(t,w.ids[0]);const char *message=json_object_get_string(json_object_object_get(json_object_object_get(json_object_object_get(json_object_object_get(r,"state"),"outcome"),"error"),"message"));assert(strstr(message,scenario==2?"wait cycle":scenario==3?"missing task":"only on tasks it owns"));json_object_put(r);}
+  if(scenario>=5&&scenario<=7)assert(!strcmp(wait_outcome(&w,0),"completed")&&!strcmp(wait_outcome(&w,1),"faulted"));
+  if(scenario==8||scenario==13)assert(!strcmp(wait_outcome(&w,1),"completed")&&w.resumes[1]==1);
+  if(scenario==9||scenario==11)for(unsigned i=0;i<w.count;i++)assert(!strcmp(wait_outcome(&w,i),"completed"));
+  if(scenario==10||scenario==12)assert(!strcmp(wait_outcome(&w,4),"completed"));
+  assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t->f.session));for(unsigned i=0;i<w.count;i++)json_object_put(w.on[i]);cleanup(&t->f,parent);
+ }
+ puts("PASS: Durable allSettled/failFast, missing/foreign/self/mutual/owned-conversation wait cycles, background isolation, diamond joins, cancellation cascade and waiting reopen on SQLite/JSONL");
+}
+
 int main(void){
+ wait_tests();
  scheduler_tests();
  task_tests();
  for(unsigned kind=0;kind<2;kind++)for(unsigned mode=0;mode<6;mode++){

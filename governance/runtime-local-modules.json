@@ -1647,7 +1647,7 @@
         "session.records.local.v0",
         "json-c"
       ],
-      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline",
+      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline; persisted allSettled/failFast waits, native iterative wait-for graph including owned conversations/background barriers, atomic derived cancellation marks and bottom-up abort",
       "exports": [
         "pg_task_runner_open",
         "pg_task_runner_poll",
@@ -1665,11 +1665,12 @@
             "packages/durable/src/harness/scheduler.ts",
             "packages/durable/src/types.ts"
           ],
-          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; live-status selection and all-task recovery; durable wait graph and cancellation cascade remain scheduler work",
+          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; live-status selection and all-task recovery; validateWait/waitCycle/reconcile wait graph, failFast and cancellation cascade",
           "tests_to_read": [
             "packages/durable/test/harness-tasks.test.ts",
             "packages/durable/test/harness-tasks-recovery.test.ts",
-            "packages/durable/test/harness-sleep.test.ts"
+            "packages/durable/test/harness-sleep.test.ts",
+            "packages/durable/test/harness-structured.test.ts"
           ]
         }
       ]

@@ -58,12 +58,16 @@ typedef enum {PG_TASK_PROGRESS,PG_TASK_PENDING,PG_TASK_DONE,PG_TASK_BLOCKED,
 pg_task_status pg_task_runner_open(pg_task_runner *,pg_durable_session *,uint64_t,
  const pg_task_runner_host *,uint64_t restart_limit);
 pg_task_status pg_task_runner_poll(pg_task_runner *);
-/* Commit the running phase's next running/sleeping/terminal state through the
+/* Commit the running phase's next running/waiting/sleeping/terminal state through the
    Durable mutation line. Terminal becomes completing while ordinary owned
    tasks/conversations are live. Decisions use fresh committed state. State is
    borrowed during call; successful return has stored a detached snapshot.
-   Task graph admission and multi-record transactions compose on the same
-   Session mutation line. */
+   Waiting requires existing task IDs and allSettled or failFast; failFast
+   members must be directly owned. Admission rejects cycles through waits and
+   ordinary ownership, including owned conversations; abort handlers cannot
+   wait. Rejected waits leave durable state unchanged and expose borrowed error
+   text until the handler returns. Multi-record phase transactions compose on
+   the same Session mutation line. */
 pg_task_status pg_task_runner_commit(pg_task_runner *,const struct json_object *);
 pg_task_status pg_task_runner_close(pg_task_runner *);
 typedef struct {
@@ -83,6 +87,9 @@ typedef struct {
    runner may execute its IDs. next_wake is the earliest sleeping deadline from
    the last successful poll, infinity when absent. Registry/service changes and
    native-operation completions request another poll on the injected host loop.
+   Before handlers, persisted cancellation intent and failed failFast members
+   derive ordinary descendant/sibling marks in one Session commit. Aborts drain
+   children first; background task branches remain independent.
    A close requested from a callback returns PENDING; call close after unwinding. */
 pg_task_status pg_task_scheduler_open(pg_task_scheduler *,pg_durable_session *,
  const pg_task_runner_host *,uint64_t restart_limit);

@@ -826,6 +826,8 @@ pg_task_runner_commit:
  mov r13d,eax
  cmp eax,1
  je .Ltr_commit_checkpoint
+ cmp eax,2
+ je .Ltr_commit_checkpoint
  cmp eax,3
  je .Ltr_commit_checkpoint
  cmp eax,5
@@ -904,6 +906,17 @@ pg_task_runner_commit:
  mov ebp,7
  jmp .Ltr_commit_cleanup
 .Ltr_commit_owner_check:
+ cmp r13d,2
+ jne .Ltr_commit_terminal_check
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ltw_validate
+ mov ebp,eax
+ cmp eax,6
+ je .Ltr_commit_storage_active
+ test eax,eax
+ jnz .Ltr_commit_cleanup
+.Ltr_commit_terminal_check:
  cmp r13d,5
  jne .Ltr_commit_replace
  mov rdi,[rbx+8]
@@ -1379,7 +1392,14 @@ pg_task_runner_poll:
  cmp rax,[rbx+64]
  jae .Ltr_poll_blocked
  cmp r12d,2
- je .Ltr_poll_pending
+ jne .Ltr_poll_sleep_check
+ mov rdi,rbx
+ call .Ltw_waiting
+ test eax,eax
+ js .Ltr_poll_storage_active
+ jnz .Ltr_poll_pending
+ jmp .Ltr_poll_resolve
+.Ltr_poll_sleep_check:
  cmp r12d,3
  jne .Ltr_poll_resolve
  TGET "qword ptr [rbx+24]",state_key
@@ -1894,13 +1914,13 @@ pg_task_runner_close:
  jae .Lts_discover_ok
  mov rax,[rbx+16]
  mov r14,[rax+r12*8]
- cmp dword ptr [r14+88],0
- jne .Lts_recover_next
  mov rdi,r14
  call .Ltr_fetch
  mov ebp,eax
  test eax,eax
  jnz .Lts_discover_end
+ cmp dword ptr [r14+88],0
+ jne .Lts_recover_next
  mov rdi,[r14+24]
  call .Ltr_record_state
  cmp eax,1
@@ -2012,6 +2032,11 @@ pg_task_scheduler_poll:
  mov dword ptr [rbx+56],1
  mov rdi,rbx
  call .Lts_discover
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_poll_unlock
+ mov rdi,rbx
+ call .Ltw_reconcile
  mov ebp,eax
  test eax,eax
  jnz .Lts_poll_unlock
@@ -2160,5 +2185,948 @@ pg_task_scheduler_close:
  pop rbp
  ret
 .size pg_task_scheduler_close,.-pg_task_scheduler_close
+
+.text
+/* Temporary wait graph: sorted nodes (id,parent,record,first,next,status,table),
+   stable native pointers, owned record snapshots; queue and visited are bounded
+   by node count. Background tasks break ordinary ownership edges. */
+.Ltw_compare:
+ mov rax,[rdi]
+ cmp rax,[rsi]
+ setg al
+ setl dl
+ movzx eax,al
+ movzx edx,dl
+ sub eax,edx
+ ret
+.Ltw_find:
+ mov r8,[rdi]
+ xor ecx,ecx
+ mov r9,[rdi+8]
+.Ltw_find_each:
+ cmp rcx,r9
+ jae .Ltw_find_missing
+ lea r10,[rcx+r9]
+ shr r10,1
+ imul rax,r10,48
+ add rax,r8
+ cmp [rax],rsi
+ je .Ltw_find_return
+ jb .Ltw_find_after
+ mov r9,r10
+ jmp .Ltw_find_each
+.Ltw_find_after:
+ lea rcx,[r10+1]
+ jmp .Ltw_find_each
+.Ltw_find_missing:
+ xor eax,eax
+.Ltw_find_return:
+ ret
+.Ltw_push:
+ test rsi,rsi
+ jz .Ltw_push_return
+ mov rax,rsi
+ sub rax,[rdi]
+ xor edx,edx
+ mov ecx,48
+ div rcx
+ mov rcx,[rdi+32]
+ cmp byte ptr [rcx+rax],0
+ jne .Ltw_push_return
+ mov byte ptr [rcx+rax],1
+ mov rcx,[rdi+24]
+ mov rax,[rdi+40]
+ mov [rcx+rax*8],rsi
+ inc qword ptr [rdi+40]
+.Ltw_push_return:
+ ret
+.Ltw_release:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ xor r12d,r12d
+.Ltw_release_each:
+ cmp r12,[rbx+8]
+ jae .Ltw_release_arrays
+ imul rax,r12,48
+ add rax,[rbx]
+ mov rdi,[rax+16]
+ call json_object_put@PLT
+ inc r12
+ jmp .Ltw_release_each
+.Ltw_release_arrays:
+ mov rdi,[rbx]
+ call free@PLT
+ mov rdi,[rbx+24]
+ call free@PLT
+ mov rdi,[rbx+32]
+ call free@PLT
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ltw_snapshot:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r14,rsi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ mov qword ptr [rsp+128],0
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+ mov qword ptr [rsp+32],64
+.Ltw_snapshot_page:
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rbx+16]
+ mov ebp,6
+ test eax,eax
+ jnz .Ltw_snapshot_end
+ xor r12d,r12d
+.Ltw_snapshot_row:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_snapshot_next
+ mov rdi,[rsp+112]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov [rsp+136],rax
+ mov rax,[r14+8]
+ cmp rax,[r14+16]
+ jb .Ltw_snapshot_append
+ mov r13,[r14+16]
+ test r13,r13
+ jnz .Ltw_snapshot_grow
+ mov r13,16
+ jmp .Ltw_snapshot_resize
+.Ltw_snapshot_grow:
+ shl r13,1
+ jc .Ltw_snapshot_alloc
+.Ltw_snapshot_resize:
+ mov rdi,[r14]
+ mov rsi,r13
+ mov edx,48
+ call reallocarray@PLT
+ test rax,rax
+ jz .Ltw_snapshot_alloc
+ mov [r14],rax
+ mov [r14+16],r13
+.Ltw_snapshot_append:
+ imul r13,qword ptr [r14+8],48
+ add r13,[r14]
+ pxor xmm0,xmm0
+ movdqu [r13],xmm0
+ movdqu [r13+16],xmm0
+ movdqu [r13+32],xmm0
+ mov rdi,[rsp+136]
+ call json_object_get@PLT
+ mov [r13+16],rax
+ inc qword ptr [r14+8]
+ TGET rax,id
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_snapshot_bad
+ mov [r13],rax
+ mov eax,[rsp]
+ mov [r13+44],eax
+ test eax,eax
+ jz .Ltw_snapshot_conversation
+ mov rdi,[r13+16]
+ call .Ltr_record_state
+ test eax,eax
+ js .Ltw_snapshot_bad
+ mov [r13+40],eax
+ TGET "qword ptr [r13+16]",background
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltw_snapshot_skip
+ TGET "qword ptr [r13+16]",owner
+ test rax,rax
+ jnz .Ltw_snapshot_parent
+ TGET "qword ptr [r13+16]",conversation_id
+ jmp .Ltw_snapshot_parent
+.Ltw_snapshot_conversation:
+ TGET "qword ptr [r13+16]",owner
+ TGET rax,task_id
+ test rax,rax
+ jz .Ltw_snapshot_skip
+.Ltw_snapshot_parent:
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_snapshot_bad
+ mov [r13+8],rax
+.Ltw_snapshot_skip:
+ inc r12
+ jmp .Ltw_snapshot_row
+.Ltw_snapshot_next:
+ cmp dword ptr [rsp+132],0
+ je .Ltw_snapshot_table
+ mov rax,[rsp+120]
+ cmp dword ptr [rsp+8],0
+ je .Ltw_snapshot_cursor
+ cmp rax,[rsp+16]
+ jbe .Ltw_snapshot_bad
+.Ltw_snapshot_cursor:
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],1
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Ltw_snapshot_page
+.Ltw_snapshot_table:
+ cmp dword ptr [rsp],0
+ je .Ltw_snapshot_sort
+ inc dword ptr [rsp+96]
+ cmp dword ptr [rsp+96],5
+ jb .Ltw_snapshot_reset
+ mov dword ptr [rsp],0
+ mov qword ptr [rsp+32],0
+ mov dword ptr [rsp+96],0
+.Ltw_snapshot_reset:
+ mov dword ptr [rsp+8],0
+ mov dword ptr [rsp+12],0
+ mov qword ptr [rsp+16],0
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Ltw_snapshot_page
+.Ltw_snapshot_sort:
+ mov rdi,[r14]
+ mov rsi,[r14+8]
+ mov edx,48
+ lea rcx,[rip+.Ltw_compare]
+ call qsort@PLT
+ xor r12d,r12d
+.Ltw_snapshot_edges:
+ cmp r12,[r14+8]
+ jae .Ltw_snapshot_buffers
+ imul r13,r12,48
+ add r13,[r14]
+ mov rsi,[r13+8]
+ test rsi,rsi
+ jz .Ltw_snapshot_edge_next
+ mov rdi,r14
+ call .Ltw_find
+ test rax,rax
+ jz .Ltw_snapshot_edge_next
+ mov rcx,[rax+24]
+ mov [r13+32],rcx
+ lea rcx,[r12+1]
+ mov [rax+24],rcx
+.Ltw_snapshot_edge_next:
+ inc r12
+ jmp .Ltw_snapshot_edges
+.Ltw_snapshot_buffers:
+ mov rdi,[r14+8]
+ mov esi,8
+ call calloc@PLT
+ mov [r14+24],rax
+ test rax,rax
+ jz .Ltw_snapshot_alloc
+ mov rdi,[r14+8]
+ mov esi,1
+ call calloc@PLT
+ mov [r14+32],rax
+ test rax,rax
+ jz .Ltw_snapshot_alloc
+ xor ebp,ebp
+ jmp .Ltw_snapshot_end
+.Ltw_snapshot_bad:
+ mov ebp,6
+ jmp .Ltw_snapshot_end
+.Ltw_snapshot_alloc:
+ mov ebp,5
+.Ltw_snapshot_end:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Admission checks the wait-for graph with ordinary ownership edges and
+   committed waits. The Session line is synchronous through this decision. */
+.Ltw_validate:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ mov qword ptr [rsp+64],0
+ mov ebp,4
+ cmp qword ptr [rbx+48],0
+ je .Ltw_validate_end
+ TGET r12,on
+ mov [rsp+72],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltw_validate_end
+ TGET r12,policy
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ltw_fail_fast]
+ call .Ltr_equal
+ mov [rsp+80],eax
+ test eax,eax
+ jnz .Ltw_validate_snapshot
+ mov rdi,r13
+ lea rsi,[rip+.Ltw_all_settled]
+ call .Ltr_equal
+ test eax,eax
+ jz .Ltw_validate_end
+.Ltw_validate_snapshot:
+ mov rdi,[rbx+8]
+ mov rsi,rsp
+ call .Ltw_snapshot
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltw_validate_end
+ xor r12d,r12d
+.Ltw_validate_target:
+ mov rdi,[rsp+72]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_validate_walk
+ mov rdi,[rsp+72]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_validate_invalid
+ test rax,rax
+ jz .Ltw_validate_invalid
+ mov rsi,rax
+ mov rdi,rsp
+ call .Ltw_find
+ test rax,rax
+ jz .Ltw_validate_read_target
+ mov r13,rax
+ cmp dword ptr [r13+44],2
+ jne .Ltw_validate_missing
+ mov rax,[r13+16]
+ mov [rsp+88],rax
+ jmp .Ltw_validate_owner
+.Ltw_validate_read_target:
+ mov rdi,[rsp+72]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov esi,2
+ lea rcx,[rsp+64]
+ call [rax+8]
+ cmp eax,1
+ je .Ltw_validate_missing
+ test eax,eax
+ jnz .Ltw_validate_storage
+ cmp qword ptr [rsp+64],0
+ je .Ltw_validate_storage
+ mov rdi,[rsp+64]
+ call .Ltr_record_state
+ cmp eax,5
+ jne .Ltw_validate_storage
+ xor r13d,r13d
+ mov rax,[rsp+64]
+ mov [rsp+88],rax
+.Ltw_validate_owner:
+ cmp dword ptr [rsp+80],0
+ je .Ltw_validate_live
+ TGET "qword ptr [rsp+88]",owner
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_validate_ownership
+ cmp rax,[rbx+16]
+ jne .Ltw_validate_ownership
+.Ltw_validate_live:
+ test r13,r13
+ jz .Ltw_validate_next
+ cmp dword ptr [r13+40],5
+ je .Ltw_validate_next
+ mov rdi,rsp
+ mov rsi,r13
+ call .Ltw_push
+.Ltw_validate_next:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov qword ptr [rsp+64],0
+ inc r12
+ jmp .Ltw_validate_target
+.Ltw_validate_walk:
+ mov rax,[rsp+48]
+ cmp rax,[rsp+40]
+ jae .Ltw_validate_ok
+ mov rcx,[rsp+24]
+ mov r13,[rcx+rax*8]
+ inc qword ptr [rsp+48]
+ mov rax,[rbx+16]
+ cmp [r13],rax
+ je .Ltw_validate_cycle
+ cmp dword ptr [r13+44],0
+ je .Ltw_validate_children
+ cmp dword ptr [r13+40],5
+ je .Ltw_validate_walk
+ cmp dword ptr [r13+40],2
+ jne .Ltw_validate_children
+ TGET "qword ptr [r13+16]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltw_validate_children
+ TGET "qword ptr [r13+16]",state_key
+ TGET rax,on
+ mov r14,rax
+ xor r12d,r12d
+.Ltw_validate_wait_edge:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_validate_children
+ mov rdi,r14
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdi,rsp
+ mov rsi,rax
+ call .Ltw_find
+ mov rdi,rsp
+ mov rsi,rax
+ call .Ltw_push
+ inc r12
+ jmp .Ltw_validate_wait_edge
+.Ltw_validate_children:
+ mov r12,[r13+24]
+.Ltw_validate_child:
+ test r12,r12
+ jz .Ltw_validate_walk
+ lea rax,[r12-1]
+ imul rax,48
+ add rax,[rsp]
+ mov r12,[rax+32]
+ mov rdi,rsp
+ mov rsi,rax
+ call .Ltw_push
+ jmp .Ltw_validate_child
+.Ltw_validate_ok:
+ xor ebp,ebp
+ jmp .Ltw_validate_end
+.Ltw_validate_missing:
+ lea rax,[rip+.Ltw_missing]
+ jmp .Ltw_validate_error
+.Ltw_validate_ownership:
+ lea rax,[rip+.Ltw_ownership]
+ jmp .Ltw_validate_error
+.Ltw_validate_cycle:
+ lea rax,[rip+.Ltw_cycle]
+.Ltw_validate_error:
+ mov [rbx+96],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [rbx+104],rax
+.Ltw_validate_invalid:
+ mov ebp,4
+ jmp .Ltw_validate_end
+.Ltw_validate_storage:
+ mov ebp,6
+.Ltw_validate_end:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,rsp
+ call .Ltw_release
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ltr_on: .asciz "on"
+.Ltr_policy: .asciz "policy"
+.Ltr_background: .asciz "background"
+.Ltr_conversation_id: .asciz "conversationId"
+.Ltr_task_id: .asciz "taskId"
+.Ltw_fail_fast: .asciz "failFast"
+.Ltw_all_settled: .asciz "allSettled"
+.Ltw_missing: .asciz "Task wait names a missing task"
+.Ltw_ownership: .asciz "Task can wait failFast only on tasks it owns"
+.Ltw_cycle: .asciz "Task wait would create a wait cycle"
+
+.text
+/* 0 ready, 1 live dependency, -1 provider failure. */
+.Ltw_waiting:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,on
+ mov r13,rax
+ xor r12d,r12d
+.Ltw_waiting_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_waiting_ready
+ mov rdi,r13
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov r14,[rbx+8]
+ mov rdi,[r14]
+ mov esi,2
+ mov rcx,rsp
+ call [r14+8]
+ cmp eax,1
+ je .Ltw_waiting_missing
+ test eax,eax
+ jnz .Ltw_waiting_error
+ cmp qword ptr [rsp],0
+ je .Ltw_waiting_error
+ mov rdi,[rsp]
+ call .Ltr_record_state
+ cmp eax,5
+ jne .Ltw_waiting_pending
+.Ltw_waiting_missing:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ inc r12
+ jmp .Ltw_waiting_each
+.Ltw_waiting_ready:
+ xor ebp,ebp
+ jmp .Ltw_waiting_end
+.Ltw_waiting_pending:
+ mov ebp,1
+ jmp .Ltw_waiting_end
+.Ltw_waiting_error:
+ mov ebp,-1
+.Ltw_waiting_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ltw_children:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,[rsi+24]
+.Ltw_children_each:
+ test r12,r12
+ jz .Ltw_children_end
+ lea rax,[r12-1]
+ imul rax,48
+ add rax,[rbx]
+ mov r12,[rax+32]
+ mov rsi,rax
+ mov rdi,rbx
+ call .Ltw_push
+ jmp .Ltw_children_each
+.Ltw_children_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ltw_failed:
+ xor eax,eax
+ cmp dword ptr [rdi+44],2
+ jne .Ltw_failed_return
+ cmp dword ptr [rdi+40],4
+ jb .Ltw_failed_return
+ sub rsp,8
+ TGET "qword ptr [rdi+16]",state_key
+ TGET rax,outcome
+ TGET rax,status
+ mov rdi,rax
+ lea rsi,[rip+.Ltw_completed]
+ call .Ltr_equal
+ xor eax,1
+ add rsp,8
+.Ltw_failed_return:
+ ret
+/* Derive cancellation from persisted intent and failed join members, before
+   reserving handlers. All new marks share a single real Session transaction. */
+.Ltw_reconcile:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,208
+ mov rbx,rdi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ movdqu [rsp+128],xmm0
+ movdqu [rsp+144],xmm0
+ movdqu [rsp+160],xmm0
+ movdqu [rsp+176],xmm0
+ movdqu [rsp+192],xmm0
+ xor r12d,r12d
+ xor ebp,ebp
+.Ltw_reconcile_needed:
+ cmp r12,[rbx+24]
+ jae .Ltw_reconcile_end
+ mov rax,[rbx+16]
+ mov r13,[rax+r12*8]
+ TGET "qword ptr [r13+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_snapshot
+ mov rdi,[r13+24]
+ call .Ltr_record_state
+ cmp eax,2
+ je .Ltw_reconcile_snapshot
+ cmp eax,4
+ je .Ltw_reconcile_snapshot
+ inc r12
+ jmp .Ltw_reconcile_needed
+.Ltw_reconcile_snapshot:
+ mov rdi,[rbx+8]
+ mov rsi,rsp
+ call .Ltw_snapshot
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltw_reconcile_end
+ call json_object_new_array@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Ltw_reconcile_alloc
+ xor r12d,r12d
+.Ltw_reconcile_owner:
+ cmp r12,[rsp+8]
+ jae .Ltw_reconcile_walk
+ imul r13,r12,48
+ add r13,[rsp]
+ cmp dword ptr [r13+44],2
+ jne .Ltw_reconcile_owner_next
+ cmp dword ptr [r13+40],5
+ je .Ltw_reconcile_owner_next
+ TGET "qword ptr [r13+16]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_intent
+ mov rdi,r13
+ call .Ltw_failed
+ test eax,eax
+ jz .Ltw_reconcile_join
+.Ltw_reconcile_intent:
+ mov rdi,rsp
+ mov rsi,r13
+ call .Ltw_children
+.Ltw_reconcile_join:
+ cmp dword ptr [r13+40],2
+ jne .Ltw_reconcile_owner_next
+ TGET "qword ptr [r13+16]",state_key
+ TGET rax,policy
+ mov rdi,rax
+ lea rsi,[rip+.Ltw_fail_fast]
+ call .Ltr_equal
+ test eax,eax
+ jz .Ltw_reconcile_owner_next
+ TGET "qword ptr [r13+16]",state_key
+ TGET rax,on
+ mov [rsp+192],rax
+ xor r14d,r14d
+.Ltw_reconcile_failed:
+ mov rdi,[rsp+192]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ltw_reconcile_owner_next
+ mov rdi,[rsp+192]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdi,rsp
+ mov rsi,[rbx+8]
+ mov rdx,rax
+ call .Ltw_member_failed
+ test eax,eax
+ js .Ltw_reconcile_storage
+ jnz .Ltw_reconcile_members
+.Ltw_reconcile_failed_next:
+ inc r14
+ jmp .Ltw_reconcile_failed
+.Ltw_reconcile_members:
+ xor r14d,r14d
+.Ltw_reconcile_member:
+ mov rdi,[rsp+192]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ltw_reconcile_owner_next
+ mov rdi,[rsp+192]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdi,rsp
+ mov rsi,rax
+ call .Ltw_find
+ mov [rsp+200],rax
+ test rax,rax
+ jz .Ltw_reconcile_member_next
+ mov rdi,rax
+ call .Ltw_failed
+ test eax,eax
+ jnz .Ltw_reconcile_member_next
+ mov rdi,rsp
+ mov rsi,[rsp+200]
+ call .Ltw_push
+.Ltw_reconcile_member_next:
+ inc r14
+ jmp .Ltw_reconcile_member
+.Ltw_reconcile_owner_next:
+ inc r12
+ jmp .Ltw_reconcile_owner
+.Ltw_reconcile_walk:
+ mov rax,[rsp+48]
+ cmp rax,[rsp+40]
+ jae .Ltw_reconcile_commit
+ mov rcx,[rsp+24]
+ mov r13,[rcx+rax*8]
+ inc qword ptr [rsp+48]
+ cmp dword ptr [r13+44],0
+ je .Ltw_reconcile_descend
+ cmp dword ptr [r13+40],5
+ je .Ltw_reconcile_walk
+ mov rdi,r13
+ call .Ltw_failed
+ test eax,eax
+ jnz .Ltw_reconcile_descend
+ TGET "qword ptr [r13+16]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Ltw_reconcile_mark
+ TGET "qword ptr [r13+16]",abort_reason
+ test rax,rax
+ jz .Ltw_reconcile_descend
+.Ltw_reconcile_mark:
+ mov rdi,[r13+16]
+ lea rsi,[rsp+184]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_alloc
+ mov edi,1
+ call json_object_new_boolean@PLT
+ test rax,rax
+ jz .Ltw_reconcile_alloc
+ mov rdx,rax
+ mov rdi,[rsp+184]
+ lea rsi,[rip+.Ltr_abort_requested]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltw_reconcile_alloc
+ mov rdi,[rsp+184]
+ lea rsi,[rip+.Ltr_abort_reason]
+ call json_object_object_del@PLT
+ mov rdi,[rsp+64]
+ mov rsi,[rsp+184]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_alloc
+ mov qword ptr [rsp+184],0
+.Ltw_reconcile_descend:
+ mov rdi,rsp
+ mov rsi,r13
+ call .Ltw_children
+ jmp .Ltw_reconcile_walk
+.Ltw_reconcile_commit:
+ mov rdi,[rsp+64]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ltw_reconcile_ok
+ mov r14,[rbx+8]
+ mov rdi,[rbx]
+ lea rsi,[rsp+72]
+ lea rdx,[rsp+120]
+ mov rcx,[r14]
+ mov r8,[r14+8]
+ call pg_durable_session_begin@PLT
+ mov ebp,1
+ test eax,eax
+ jnz .Ltw_reconcile_end
+ xor r12d,r12d
+.Ltw_reconcile_stage:
+ mov rdi,[rsp+64]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_reconcile_settle
+ mov rdi,[rsp+64]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rsi,rax
+ lea rdi,[rsp+72]
+ mov rdx,[r14]
+ mov rcx,[r14+40]
+ call pg_record_tx_set_task@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_reject
+ inc r12
+ jmp .Ltw_reconcile_stage
+.Ltw_reconcile_settle:
+ mov rdi,[rbx]
+ xor esi,esi
+ xor edx,edx
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Ltw_reconcile_reject
+.Ltw_reconcile_ok:
+ xor ebp,ebp
+ jmp .Ltw_reconcile_end
+.Ltw_reconcile_reject:
+ mov rdi,[rbx]
+ call pg_durable_session_abort@PLT
+ mov ebp,6
+ jmp .Ltw_reconcile_end
+.Ltw_reconcile_alloc:
+ mov ebp,5
+ jmp .Ltw_reconcile_end
+.Ltw_reconcile_storage:
+ mov ebp,6
+.Ltw_reconcile_end:
+ cmp ebp,6
+ jne .Ltw_reconcile_release
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltw_reconcile_release
+ mov dword ptr [rax+52],3
+.Ltw_reconcile_release:
+ mov rdi,[rsp+184]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,rsp
+ call .Ltw_release
+ mov eax,ebp
+ add rsp,208
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ltr_abort_reason: .asciz "abortReason"
+.Ltw_completed: .asciz "completed"
+
+.text
+/* Live graph omits settled history; direct lookup tests settled join receipts. */
+.Ltw_member_failed:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rsi
+ mov r12,rdx
+ mov qword ptr [rsp],0
+ mov rsi,rdx
+ call .Ltw_find
+ test rax,rax
+ jz .Ltw_member_read
+ mov rdi,rax
+ call .Ltw_failed
+ jmp .Ltw_member_end
+.Ltw_member_read:
+ mov rdi,[rbx]
+ mov esi,2
+ mov rdx,r12
+ mov rcx,rsp
+ call [rbx+8]
+ cmp eax,1
+ je .Ltw_member_none
+ test eax,eax
+ jnz .Ltw_member_error
+ cmp qword ptr [rsp],0
+ je .Ltw_member_error
+ mov rdi,[rsp]
+ call .Ltr_record_state
+ cmp eax,4
+ jb .Ltw_member_none
+ TGET "qword ptr [rsp]",state_key
+ TGET rax,outcome
+ TGET rax,status
+ mov rdi,rax
+ lea rsi,[rip+.Ltw_completed]
+ call .Ltr_equal
+ xor eax,1
+ jmp .Ltw_member_end
+.Ltw_member_none:
+ xor eax,eax
+ jmp .Ltw_member_end
+.Ltw_member_error:
+ mov eax,-1
+.Ltw_member_end:
+ mov r12d,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r12d
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
 
 .section .note.GNU-stack,"",@progbits
