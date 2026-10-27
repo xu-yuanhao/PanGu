@@ -224,12 +224,78 @@ def recovery(binary, root, env, crash=False):
         terminal.close()
     print('PASS: Durable '+('process death' if crash else 'cooperative exit')+' and unsafe-tool recovery without repeating effects',flush=True)
 
+def configuration_recovery(binary, root, environment):
+    root = root / 'configuration-recovery'
+    root.mkdir()
+    env = dict(environment)
+    env['PANGU_MODEL_OPTIONS'] = json.dumps({'maxTokens': 768, 'temperature': 0})
+    directory = root / '.pangu'
+    marker = 'PANGUSAVED' + os.urandom(6).hex()
+    def facts(kind):
+        def walk(value):
+            if isinstance(value, dict):
+                if value.get('kind') == kind:
+                    yield value
+                for child in value.values():
+                    yield from walk(child)
+            elif isinstance(value, list):
+                for child in value:
+                    yield from walk(child)
+        if directory.exists():
+            for path in directory.iterdir():
+                if path.is_file():
+                    for line in path.read_bytes().splitlines():
+                        try:
+                            value = json.loads(line)
+                        except (ValueError, UnicodeDecodeError):
+                            continue
+                        yield from walk(value)
+    terminal = Terminal(binary, root, env)
+    try:
+        terminal.until(b'> ', 5)
+        terminal.send(('Reply with exactly this token and nothing else: ' + marker).encode() + b'\r')
+        deadline = time.monotonic() + 15
+        saved = None
+        while time.monotonic() < deadline:
+            for task in facts('pangu.generation'):
+                state = task.get('state', {})
+                checkpoint = state.get('checkpoint', {})
+                if state.get('status') == 'running' and checkpoint.get('phase') == 'request':
+                    saved = checkpoint['configuration']
+                    break
+            if saved is not None:
+                terminal.process.kill()
+                terminal.process.wait(timeout=5)
+                break
+            time.sleep(.005)
+        assert saved and saved['model'] == env['PANGU_MODEL_NAME']
+        assert saved['endpoint'] == env['PANGU_MODEL_ENDPOINT']
+        assert saved['options'] == {'maxTokens': 768, 'temperature': 0}
+    finally:
+        terminal.close()
+    assert not list(facts('pangu.assistant')), 'model completed before the request interruption'
+    changed = dict(env)
+    changed.update(PANGU_MODEL_NAME='changed-model',
+                   PANGU_MODEL_ENDPOINT='https://changed.invalid/chat/completions',
+                   PANGU_MODEL_OPTIONS='{"maxTokens":1536,"temperature":1}')
+    terminal = Terminal(binary, root, changed)
+    try:
+        terminal.until(b'[run] finished: success', 160)
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert any(''.join(b.get('text', '') for m in e['model'] for b in m.get('content', [])).strip() == marker
+               for e in facts('pangu.assistant')), 'saved request did not produce the actual model answer'
+    print('PASS: interrupted request reopens with saved model/endpoint/options despite changed environment (actual model)', flush=True)
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,help='already built product')
     parser.add_argument('--live',action='store_true',help='real coding workflow and committed context reopen')
     parser.add_argument('--live-persistent',action='store_true',help='cooperative exit during an unsafe tool and reopen')
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
+    parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
     args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-pty-') as directory:
         root=Path(directory);binary=args.binary or build(root/'pangu')
@@ -238,9 +304,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_config_recovery:
+                configuration_recovery(binary,root,env)
             if args.live:
                 workflow(binary,root,env)
             if args.live_persistent:

@@ -481,6 +481,15 @@ static void test_injected_connection(void){
  model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.request);
  unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
 }
+static void test_saved_connection(void){
+ reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();
+ struct json_object *configuration=json_tokener_parse("{\"model\":\"saved-model\",\"endpoint\":\"https://saved.invalid/chat/completions\",\"options\":{\"maxTokens\":768,\"temperature\":0.25}}");assert(configuration&&!pg_mimo_configure(&m,configuration));json_object_put(configuration);
+ assert(!setenv("PANGU_MODEL_ENDPOINT","https://ambient.invalid",1)&&!setenv("PANGU_MODEL_NAME","ambient-model",1));assert(!setenv("PANGU_MODEL_API_KEY","configured-transport-unit-key",1));
+ assert(!start()&&!strcmp(captured_url,"https://saved.invalid/chat/completions"));assert(strstr(captured_post,"\"model\":\"saved-model\"")&&strstr(captured_post,"\"max_tokens\":768")&&strstr(captured_post,"\"temperature\":0.25"));assert(m.configuration);
+ configuration=json_tokener_parse("{\"model\":\"blocked\",\"endpoint\":\"https://blocked.invalid\"}");assert(pg_mimo_configure(&m,configuration));json_object_put(configuration);model.close(model.context);assert(!m.configuration&&!m.request&&!m.easy&&!m.multi);
+ unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
+}
+
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -493,6 +502,7 @@ int main(void) {
     test_batch_stream();
     test_batch_rejection();
     test_injected_connection();
+    test_saved_connection();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

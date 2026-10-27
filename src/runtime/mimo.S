@@ -2,7 +2,7 @@
  *
  * 适配器只做投影、传输与协议事件，不持有 Session 提交/恢复/工具执行（契约见
  * agent.h pg_model 与 Pi durable generation 的宿主边界）。start 复用 MIMO_API_KEY/
- * MIMO_MODEL 环境与固定端点，max_tokens/thinking/认证来源不变；easy/multi/headers/
+ * MIMO_MODEL 环境提供默认连接；持久请求配置优先决定模型/端点与请求选项；easy/multi/headers/
  * request 为本实例所有，cancel/close 全量释放，重复 close 幂等，半初始化可安全关闭。
  * next 是非阻塞推进：multi_perform 轮询→HTTP 状态→行拆分（跨接收块换行、CRLF、
  * 未完成末行）→decode_line；transport 完成后按 [DONE]+finish 出终态，工具参数须
@@ -60,6 +60,15 @@ pg_mimo_bind_tools:
  * 依赖 curl_slist_free_all/free 的 NULL 安全；重复调用幂等。文件内私有。 */
 .type li_close,@function
 li_close:
+ push rbx
+ mov rbx,rdi
+ call .Ltransport_close
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ mov qword ptr [rbx+PG_MM_CONFIGURATION],0
+ call json_object_put@PLT
+ pop rbx
+ ret
+.Ltransport_close:
  push rbx                             /* 入口 rsp≡8 → 0，可调用 */
  mov rbx, rdi
  mov rdi, qword ptr [rbx + PG_MM_MULTI]
@@ -165,7 +174,7 @@ li_start:
  sub rsp, 544
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* s */
- call li_close                        /* 复用：释放上一请求 */
+ call .Ltransport_close               /* 保留已绑定请求配置 */
  mov qword ptr [rbx + PG_MM_USED], 0
  mov qword ptr [rbx + PG_MM_CONSUMED], 0
  mov dword ptr [rbx + PG_MM_DELIVERED], 0
@@ -179,16 +188,31 @@ li_start:
  mov byte ptr [rbx + PG_MM_NAME], 0
  lea rdi,[rbx+PG_MM_EXTRA]
  xor esi,esi
- mov edx,PG_MM_BYTES-PG_MM_EXTRA
+ mov edx,PG_MM_CONFIGURATION-PG_MM_EXTRA
  call memset@PLT
  lea rdi,[rip+.Lstr_pangu_key]
  call getenv@PLT
  test rax,rax
  jnz .Lst_key_ready
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ test rdi,rdi
+ jz .Lst_check_environment_endpoint
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lstr_endpoint]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lst_bad
+ jmp .Lst_default_key
+.Lst_check_environment_endpoint:
  lea rdi,[rip+.Lstr_pangu_endpoint]
  call getenv@PLT
  test rax,rax
  jnz .Lst_bad
+ .Lst_default_key:
  lea rdi, [rip + .Lstr_env_key]
  call getenv@PLT
  test rax, rax
@@ -252,6 +276,16 @@ li_start:
  test r15, r15
  jz .Lst_bad
  /* 变参 setopt：整数/指针变参在 rdx，al=0（无向量参数） */
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ test rdi,rdi
+ jz .Lst_environment_endpoint
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdx,rax
+ jmp .Lst_endpoint_ready
+.Lst_environment_endpoint:
  lea rdi,[rip+.Lstr_pangu_endpoint]
  call getenv@PLT
  test rax,rax
@@ -609,3 +643,118 @@ li_next:
  pop rbx
  ret
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_mimo_configure
+.type pg_mimo_configure,@function
+pg_mimo_configure:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov ebp,1
+ test rdi,rdi
+ jz .Lcfg_end
+ cmp qword ptr [rdi+PG_MM_EASY],0
+ jne .Lcfg_end
+ cmp qword ptr [rdi+PG_MM_MULTI],0
+ jne .Lcfg_end
+ mov rdi,rsi
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcfg_end
+ mov rdi,r12
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,256
+ call .Lcfg_string
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,r12
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,2048
+ call .Lcfg_string
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcfg_end
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lcfg_end
+ mov rdi,[rsp]
+ mov rsi,rax
+ call pg_mimo_apply_options@PLT
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+PG_MM_CONFIGURATION],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+.Lcfg_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_configure,.-pg_mimo_configure
+.Lcfg_string:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12d,esi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcfg_string_bad
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lcfg_string_bad
+ cmp eax,r12d
+ jae .Lcfg_string_bad
+ mov r13d,eax
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ mov rdi,rax
+ xor esi,esi
+ mov edx,r13d
+ call memchr@PLT
+ test rax,rax
+ jnz .Lcfg_string_bad
+ xor eax,eax
+ jmp .Lcfg_string_end
+.Lcfg_string_bad:
+ mov eax,1
+.Lcfg_string_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lcfg_model: .asciz "model"
+.Lcfg_endpoint: .asciz "endpoint"

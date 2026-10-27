@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- bash通过原生snapshot提供结构化退出码、截断、尾部、完整/部分输出文件和类型化诊断；结果随工具Entry原子保存，TUI独立观察接口可读取。
-- 工具诊断按Pi格式成为模型文本块；Generation将一个toolResult内的文本块合为一条工具消息，避免重复call ID。OpenAI请求投影为纯空白输出提供源实现规定的占位文本。
-- 两后端实际结果/诊断→历史→请求JSON专项、bash状态/故障专项、完整Runtime O0/O2、产品构建与G00/Assembly通过。真实DeepSeek PTY四工具、exit 7后的回答与持久诊断、patch反向匹配、身份及重开续聊通过。
+- `pg_mimo_configure`将已提交请求的model/endpoint/options脱离复制到提供者；传输与请求投影使用该配置，start保留绑定，cancel/close释放它。产品保留工作区绑定校验，按持久request恢复模型配置。
+- 启动时的`PANGU_MODEL_OPTIONS` JSON支持maxTokens、temperature和maxTokensField（max_tokens/max_completion_tokens）。提供者校验类型/预算与有限数值；校验失败保持旧绑定，活动请求不能重绑。
+- 提供者O0/O2、ABI/故障专项、完整Runtime O0/O2与G00/Assembly通过。真实DeepSeek request中断后，以已改变的环境模型/端点/选项重开仍完成保存的请求；四工具、退出码诊断、patch、身份和重开续聊通过。
 
 ## 当前接口边界
 
@@ -45,6 +45,7 @@ python3 -B tools/runtime/build_test.py --live-generation
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
+python3 -B tools/runtime/test_pangu_pty.py --live-config-recovery
 ```
 
 PTY工具支持`--binary`选择已构建的集成程序。真实凭据文档保存在本地Git私有目录。

@@ -3,6 +3,7 @@
 #include "agent.h"
 #include "tools.h"
 #include <curl/curl.h>
+struct json_object;
 typedef struct { char arguments[PG_TEXT_LIMIT],id[PG_ID_LIMIT],name[PG_ID_LIMIT]; } pg_mimo_call_storage;
 typedef struct {
  CURL *easy; CURLM *multi; struct curl_slist *headers;
@@ -13,6 +14,7 @@ typedef struct {
  pg_mimo_call_storage extra[PG_TOOL_BATCH_LIMIT-1];
  pg_model_call calls[PG_TOOL_BATCH_LIMIT];
  unsigned call_count,transport_error;
+ struct json_object *configuration; /* private owned request identity/options */
 } pg_mimo;
 /* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -20,6 +22,11 @@ typedef struct {
    Environment stays immutable throughout active requests. Initialize
    fresh/released storage only; close before discarding an instance. */
 pg_model pg_mimo_model(pg_mimo *);
+/* Bind a detached credential-free {model,endpoint,options?} while idle.
+   options: maxTokens, temperature, maxTokensField (max_tokens or
+   max_completion_tokens). 0 success; failure keeps previous binding. Public
+   close/cancel releases it; start's transport reset preserves it. */
+int pg_mimo_configure(pg_mimo *,const struct json_object *);
 /* Bind the same immutable registry used by the executor before starting runs. */
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 /* Internal projection test seam: creates owned request; no network/credentials. */

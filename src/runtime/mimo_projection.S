@@ -112,6 +112,15 @@ pg_mimo_encode_request:
  jz .Linvalid
  mov qword ptr [rsp + 8], rax          /* messages */
  or qword ptr [rsp + 104],1
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ test rdi,rdi
+ jz .Lconfigured_model_environment
+ lea rsi,[rip+.Lstr_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ jmp 1f
+.Lconfigured_model_environment:
  lea rdi,[rip+.Lstr_pangu_model]
  call getenv@PLT
  test rax,rax
@@ -186,6 +195,11 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
  and qword ptr [rsp + 104],-257
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ mov rsi,[rsp]
+ call pg_mimo_apply_options
+ test eax,eax
+ jnz .Linvalid
  /* 可选 system 前置消息 */
  cmp qword ptr [r12 + PG_MM_SES_SYSTEM_SIZE], 0
  je .Lno_system
@@ -823,3 +837,167 @@ pg_mimo_encode_request:
  ret
 .section .rodata
 .Ltool_no_output: .asciz "(no tool output)"
+
+.text
+.globl pg_mimo_apply_options
+.hidden pg_mimo_apply_options
+.type pg_mimo_apply_options,@function
+pg_mimo_apply_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov qword ptr [rsp+16],0
+ test rdi,rdi
+ jz .Lopts_success
+ lea rsi,[rip+.Lopts_options]
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lopts_success
+ mov r13,[rsp]
+ mov rdi,r13
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+ lea r14,[rip+.Lstr_max_tokens]
+ mov rdi,r13
+ lea rsi,[rip+.Lopts_max_field]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lopts_maximum
+ mov rdi,[rsp+8]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get_string_len@PLT
+ mov ebp,eax
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ mov [rsp+24],rax
+ cmp ebp,10
+ jne .Lopts_completion
+ mov rdi,rax
+ mov rsi,r14
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ jmp .Lopts_maximum
+.Lopts_completion:
+ cmp ebp,21
+ jne .Lopts_bad
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lopts_completion_tokens]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ lea r14,[rip+.Lopts_completion_tokens]
+.Lopts_maximum:
+ mov rdi,r13
+ lea rsi,[rip+.Lopts_maximum_key]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lopts_default_maximum
+ mov rdi,[rsp+8]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Lopts_bad
+ cmp rax,2147483647
+ ja .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ jmp .Lopts_maximum_value
+.Lopts_default_maximum:
+ mov edi,512
+ call json_object_new_int@PLT
+.Lopts_maximum_value:
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lopts_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lstr_max_tokens]
+ call json_object_object_del@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_completion_tokens]
+ call json_object_object_del@PLT
+ mov rdi,r12
+ mov rsi,r14
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ mov qword ptr [rsp+16],0
+ mov rdi,r13
+ lea rsi,[rip+.Lopts_temperature]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lopts_success
+ mov rdi,[rsp+8]
+ mov esi,2
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lopts_number
+ mov rdi,[rsp+8]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+.Lopts_number:
+ mov rdi,[rsp+8]
+ call json_object_get_double@PLT
+ movq rax,xmm0
+ shr rax,52
+ and eax,2047
+ cmp eax,2047
+ je .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lopts_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_temperature]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lopts_bad
+ mov qword ptr [rsp+16],0
+.Lopts_success:
+ xor ebp,ebp
+ jmp .Lopts_end
+.Lopts_bad:
+ mov ebp,1
+.Lopts_end:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_apply_options,.-pg_mimo_apply_options
+.section .rodata
+.Lopts_options: .asciz "options"
+.Lopts_max_field: .asciz "maxTokensField"
+.Lopts_maximum_key: .asciz "maxTokens"
+.Lopts_completion_tokens: .asciz "max_completion_tokens"
+.Lopts_temperature: .asciz "temperature"

@@ -115,8 +115,11 @@ static int storage_stop(void *ctx){
 }
 static int prepare(void *ctx,uint64_t conversation,struct json_object **out){(void)ctx;(void)conversation;*out=0;return json_object_deep_copy(durable.configuration,out,0);}
 static int model_acquire(void *ctx,const struct json_object *configuration,pg_model *out){
- (void)ctx;if(durable.model_leased)return 1;if(!json_object_equal((struct json_object *)configuration,durable.configuration))return 2;
- application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);*out=application.model;durable.model_leased=1;return 0;
+ (void)ctx;if(durable.model_leased)return 1;
+ const char *workspace=json_object_get_string(json_object_object_get(configuration,"workspace"));if(workspace&&strcmp(workspace,application.path))return 2;
+ application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,&registry);
+ if(pg_mimo_configure(&provider,configuration)){application.model.close(application.model.context);return 2;}
+ *out=application.model;durable.model_leased=1;return 0;
 }
 static void model_release(void *ctx,const pg_model *model){(void)ctx;if(model->close)model->close(model->context);durable.model_leased=0;}
 static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out){
@@ -149,6 +152,12 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
  if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
+ const char *options=getenv("PANGU_MODEL_OPTIONS");if(options){
+  size_t size=strlen(options);if(size>=4096)return 1;struct json_tokener *parser=json_tokener_new();if(!parser)return 1;
+  json_tokener_set_flags(parser,JSON_TOKENER_STRICT|JSON_TOKENER_VALIDATE_UTF8);struct json_object *value=json_tokener_parse_ex(parser,options,(int)size+1);
+  int invalid=json_tokener_get_error(parser)!=json_tokener_success||!json_object_is_type(value,json_type_object);json_tokener_free(parser);
+  if(invalid){json_object_put(value);return 1;}if(json_object_object_add(durable.configuration,"options",value)){json_object_put(value);return 1;}
+ }
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
  durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;

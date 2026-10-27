@@ -331,10 +331,21 @@ static void test_empty_tool_text(void){
  }
 }
 
+static void test_saved_configuration(void){
+ pg_mimo provider={0};pg_model model=pg_mimo_model(&provider);session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;session.messages[0].size=1;strcpy(session.messages[0].text,"x");
+ json_object *configuration=json_tokener_parse("{\"model\":\"saved-model\",\"endpoint\":\"https://saved.invalid/chat/completions\",\"options\":{\"maxTokens\":768,\"temperature\":0.25,\"maxTokensField\":\"max_completion_tokens\"}}");assert(configuration&&!pg_mimo_configure(&provider,configuration));
+ assert(!json_object_object_add(configuration,"model",json_object_new_string("mutated-model")));json_object_put(configuration);
+ assert(!setenv("PANGU_MODEL_NAME","ambient-model",1));assert(!pg_mimo_encode_request(&provider,&session));json_object *body=root_of(provider.request);assert(!strcmp(json_object_get_string(get(body,"model")),"saved-model"));assert(!get(body,"max_tokens")&&json_object_get_int(get(body,"max_completion_tokens"))==768&&json_object_get_double(get(body,"temperature"))==0.25);json_object_put(body);
+ json_object *retained=provider.configuration;configuration=json_tokener_parse("{\"model\":\"other\",\"endpoint\":\"https://other.invalid\",\"options\":{\"maxTokens\":0}}");assert(pg_mimo_configure(&provider,configuration)&&provider.configuration==retained);json_object_put(configuration);
+ configuration=json_tokener_parse("{\"model\":\"nul\\u0000model\",\"endpoint\":\"https://other.invalid\"}");assert(pg_mimo_configure(&provider,configuration)&&provider.configuration==retained);json_object_put(configuration);
+ model.close(model.context);assert(!provider.configuration&&!provider.request);model.close(model.context);unsetenv("PANGU_MODEL_NAME");
+}
+
 int main(void) {
     test_model_init();
     test_projection_model_env();
     test_empty_tool_text();
+    test_saved_configuration();
     test_projection_rejections();
     test_plain_conversation_projection();
     test_decode_terminators();

@@ -125,7 +125,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 接通Generation/Tool共用的原子phase事务：Entry、Document、工具子任务及waiting/checkpoint同批提交；等待和所有权检查使用最新候选，回调/环/最终owner校验失败整体撤销。入口`pg_task_runner_commit_with`。
 - [x] model-issued `pangu.tool`接入真实read/write/bash服务与Task/Scheduler：call/execute意图先存、双safe恢复、异步输出/关闭、abort、暂停排空及原子结果Entry/终态。入口`durable_tool.S/h`；Generation和嵌套工具按下面剩余项继续。
-- [x] Generation prepare/request/tools接通真实模型→assistant/owned工具任务→waiting→结果入库→后继Generation；请求配置和cutoff持久化，SQLite/JSONL上的真实DeepSeek Flash闭环与重开通过。入口`durable_generation.S/h`。
+- [x] Generation prepare/request/tools接通真实模型→assistant/owned工具任务→waiting→结果入库→后继Generation；请求配置和cutoff持久化，提供者从已提交配置恢复模型/端点及maxTokens/temperature；SQLite/JSONL上的真实DeepSeek Flash闭环与重开通过。入口`durable_generation.S/h`。
 - [ ] 在原生Generation/Tool与Client调用链完成turn/run/settled、草稿与提交事实、流进度、批量调用、顺序/并行工具轮次和结果关联。
 - [x] 接通模型错误分类、失败assistant/Task状态原子结算、当前重试策略、持久指数退避/截止时间、提前唤醒、重开续试及取消；真实模型在一次故障注入后完成工具闭环。
 - [ ] 完成deferred生成、partial变化、完整工具中断结算和副作用恢复策略；模型请求沿用已提交配置与身份。
@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts` appendToolResult/renderDiagnostics、`tools/bash.ts` executeShell及`ai/src/api/openai-completions.ts`工具文本join/空输出占位。本批Pi远端`269afc66abfd5fdd37ff0eedfe2b749b6050a420`的上述模块无差异，Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，保留固定参考工作树。
-- 实际调用链：`pg_bash_tool_snapshot`在关闭前读取原生最终状态，返回拥有的structuredOutput（output/truncated/exitCode/fullOutputPath）和full_output/exit_code/timeout/aborted/output_error/output_truncated诊断；产品注入此提供者。`durable_tool.S`同批保存structuredOutput到Entry.data、diagnostics到data，并按Pi格式追加模型文本块。`durable_generation.S`将同一工具结果的所有文本按LF合为一条原生消息，删除旧的逐块工具结果路径；`mimo_projection.S`按ECMAScript空白规则为无工具输出生成占位，保持call ID配对。
-- 验证：SQLite/JSONL真实工具结果→Generation历史投影→实际请求JSON核对同一调用只有一条tool消息，诊断存在；原生bash专项核对结构化退出、截断、输出长度、故障与资源释放。工具/诊断专项ASan/UBSan、完整Runtime O0/O2、产品构建和G00/Assembly通过；真实DeepSeek PTY完成四工具、明确exit 7命令的后续回答/结构化退出与诊断、patch反向匹配、身份及重开续聊。控制自审：只新增bash snapshot导出与结果字段；模型、工具和TUI函数表布局保持不变。
-- TUI接口：继续使用`pg_tui_runtime_tool_observer(ops)`；拥有的entry.data.structuredOutput提供bash退出码、完整输出文件路径和保留尾部，entry.data.diagnostics提供类型化诊断；模型content单独包含格式化诊断。已有diff/patch/firstChangedLine接口保持原入口。
-- 剩余与下一交付物：当前模型ABI仍为单条4095字节文本与64条消息，合并超限会拒绝投影；完整内容块/图片、输出预算及长上下文按K05/K08/K12完成。核心继续B03模型与工具行为覆盖，TUI按已有独立观察接口消费结构化结果；其他功能保留原清单。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/generation.ts` prepare/request保存并使用model/streamOptions、`ai/src/api/openai-completions.ts` buildParams的maxTokens/temperature与maxTokensField兼容映射。本批Pi远端`cd1ea342aea61c6c77127c7a249763dc5227c98d`相关模块无差异；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，固定参考工作树。
+- 实际调用链：产品prepare保存model/endpoint/options；`pg_mimo_configure`在空闲时验证并脱离复制配置，失败保留旧绑定。请求投影/URL选择优先使用该副本；start只重置传输资源，cancel/close释放配置。产品acquire保留工作区绑定检查，直接注入任务保存的配置。`PANGU_MODEL_OPTIONS`是启动时读取的JSON对象，支持maxTokens、temperature、maxTokensField；其公共值随请求持久化，凭据仍由环境提供。
+- 验证：提供者O0/O2专项及ABI/故障路径通过，核对配置副本隔离、环境覆盖、无效候选不替换旧绑定、活动请求拒绝重绑、URL/请求JSON和重复关闭。完整Runtime O0/O2、产品构建、G00/Assembly通过。真实DeepSeek PTY在request checkpoint中断后，用不同的环境model/endpoint/options重开，仍按保存的配置完成实际回答；四工具、exit 7诊断、patch、PanGu身份和历史续聊通过。
+- 接口与自审：`pg_mimo_configure(provider,configuration)`接受拥有model/endpoint与可选options的公开配置；提供者内部增加owned configuration指针，布局头与所有调用者同批重建。pg_model、pg_tools与TUI接口布局不变；构建清单与模块导出已核对。环境中的新设置用于后续prepare，已提交request按自身配置恢复。
+- 剩余与下一交付物：继续B03的完整内容块/协议、usage/thinking/stop reason与工具环境行为，以及K09扩展接入；模型目录、认证配置与TUI设置操作仍按K05/K14完成。现有文本容量和上下文限制保持所属K步骤，完整移植范围不变。
