@@ -132,11 +132,45 @@ def compare(binary, tool=False):
             assert left['output'] == cases[i]['content'], (i, cases[i], left)
     print(f'PASS: {len(cases)} edit {"file/prepare" if tool else "text"} cases against actual Pi Durable {COMMIT[:12]} (exact output or rejection)')
 
+def compare_diff(binary, module):
+    manifest = module.resolve().parents[1] / 'package.json'
+    assert json.loads(manifest.read_text())['version'] == '8.0.4', 'jsdiff version mismatch'
+    rng = random.Random(54)
+    cases = [{'before': '', 'after': ''}, {'before': 'same', 'after': 'same'},
+             {'before': '\ufeffone\r\ntwo\r\n', 'after': '\ufeffone\r\nTWO\r\n'},
+             {'before': '\n' * 2048 + 'tail', 'after': '\n' * 2048 + 'changed'}]
+    for _ in range(240):
+        a = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n']) for _ in range(rng.randrange(28)))
+        b = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n']) for _ in range(rng.randrange(28)))
+        if rng.randrange(3) == 0: a = a.rstrip('\n')
+        if rng.randrange(3) == 0: b = b.rstrip('\n')
+        cases.append({'before': a, 'after': b})
+    code = r'''import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+import {pathToFileURL} from 'node:url';
+const module=pathToFileURL(process.argv[2]).href;
+const source=readFileSync(process.argv[1],'utf8').replace('from "diff"', 'from '+JSON.stringify(module));
+const pi=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source,{mode:'strip'})).toString('base64'));
+const cases=JSON.parse(readFileSync(0,'utf8'));
+console.log(JSON.stringify(cases.map(({before,after})=>{before=before.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n');after=after.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n');return {...pi.generateDiffString(before,after),patch:pi.generateUnifiedPatch('case.txt',before,after)};})));
+'''
+    expected = json.loads(subprocess.check_output(['node', '--input-type=module', '-e', code,
+                           str(REFERENCE), str(module.resolve())], input=json.dumps(cases).encode(), timeout=30))
+    actual = [json.loads(line) for line in subprocess.check_output([str(binary), '--diff-json'],
+              input=''.join(json.dumps(c)+'\n' for c in cases).encode(), timeout=30).splitlines()]
+    assert actual == expected, next(((c, a, e) for c, a, e in zip(cases, actual, expected) if a != e), 'result count')
+    print(f'PASS: {len(cases)} numbered diff/patch/firstChangedLine cases match actual Pi and jsdiff 8.0.4')
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path)
     parser.add_argument('--tool-binary', type=Path)
+    parser.add_argument('--diff-module', type=Path, help='local jsdiff 8.0.4 ESM entry for upstream diff comparison')
     args = parser.parse_args()
+    if args.diff_module:
+        if not args.tool_binary: parser.error("--diff-module requires --tool-binary")
+        compare_diff(args.tool_binary, args.diff_module)
+        return
     if args.tool_binary:
         compare(args.tool_binary, tool=True)
         return

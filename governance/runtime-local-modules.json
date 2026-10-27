@@ -365,7 +365,10 @@
         "tui_tool_output",
         "tui_tool_finished",
         "tui_tool_expand",
-        "tui_tool_flush"
+        "tui_tool_flush",
+        "pg_tui_bridge_set_tool_observer",
+        "pg_tui_bridge_tool_observer",
+        "pg_tui_runtime_tool_observer"
       ],
       "reference_basis": [
         {
@@ -623,11 +626,13 @@
         "tools.registry.local.v0",
         "tools.edit.text.local.v0",
         "json-c",
-        "system libc"
+        "system libc",
+        "tools.edit.diff.local.v0"
       ],
       "role": "handwritten canonical/legacy argument preparation and one synchronous read-transform-write operation through an injected pg_tools read/write service; preserves inner validation/authorization, borrows no POSIX backend internals, unsafe replay policy",
       "exports": [
-        "pg_edit_tool_definition"
+        "pg_edit_tool_definition",
+        "pg_edit_tool_clear"
       ],
       "reference_basis": [
         {
@@ -1714,7 +1719,9 @@
       ],
       "role": "Model-issued pangu.tool durable call/execute consumer: service operation leases, intent before effects, stored/current safe replay conjunction, cooperative async output/cleanup, atomic toolResult Entry and terminal Task receipt; native host owns returned operation drainage",
       "exports": [
-        "pg_durable_tool_init"
+        "pg_durable_tool_init",
+        "pg_durable_tool_observe",
+        "pg_durable_tool_observation_release"
       ],
       "reference_basis": [
         {
@@ -1771,7 +1778,8 @@
         "pg_durable_inputs_withdraw",
         "pg_durable_inputs_prepare",
         "pg_durable_inputs_apply",
-        "pg_durable_inputs_start"
+        "pg_durable_inputs_start",
+        "pg_durable_client_tool_observe"
       ],
       "reference_basis": [
         {
@@ -1821,6 +1829,32 @@
             "packages/coding-agent/src/modes/interactive/components/diff.ts"
           ],
           "semantics": "Numbered diff groups, line color and current bounded prefix/suffix intraline candidate."
+        }
+      ]
+    },
+    {
+      "id": "tools.edit.diff.local.v0",
+      "sources": [
+        "src/runtime/edit_diff.h",
+        "src/runtime/edit_diff.S"
+      ],
+      "dependencies": [
+        "json-c",
+        "system libc"
+      ],
+      "role": "Pi Durable four-line numbered diff and unified patch over native normalized line tokens and jsdiff Myers path semantics",
+      "exports": [
+        "pg_edit_diff_create"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/edit-diff.ts",
+            "packages/durable/src/tools/edit.ts"
+          ],
+          "semantics": "generateDiffString/generateUnifiedPatch and jsdiff 8.0.4 diff/base, diff/line and patch/create (BSD-3-Clause)"
         }
       ]
     }

@@ -33,4 +33,9 @@ typedef struct {
    say safe. Result Entry and Task outcome commit atomically through Session.
    Tool output and model-facing identity use PanGu's own Entry namespace. */
 int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
+/* Serialized read, no scheduler advancement. 0 transfers owned
+   {task,call,entry?}, 1 missing; other values are read/argument errors. The
+   conversation and call ID select the latest matching native Tool task. */
+int pg_durable_tool_observe(const pg_task_runner_host *,uint64_t conversation,pg_slice call_id,struct json_object **);
+void pg_durable_tool_observation_release(struct json_object *);
 #endif

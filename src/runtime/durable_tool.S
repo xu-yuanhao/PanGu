@@ -915,3 +915,247 @@ pg_durable_tool_init:
 .Ldt_outcome_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":{\"kind\":\"model\",\"entryId\":0}}}"
 .Ldt_error_json: .asciz "{\"message\":\"\"}"
 .section .note.GNU-stack,"",@progbits
+.text
+/* Serialized committed read: the scan page and referenced entries remain
+   owned until the detached observation has acquired its own references. */
+.globl pg_durable_tool_observe
+.type pg_durable_tool_observe,@function
+pg_durable_tool_observe:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,200
+ mov [rsp+192],rcx
+ mov rbx,rdi
+ mov rbp,rsi
+ mov [rsp+160],r8
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,20
+ rep stosq
+ mov qword ptr [rsp+168],0
+ mov qword ptr [rsp+176],0
+ mov qword ptr [rsp+184],0
+ mov r12d,4
+ test r8,r8
+ jz .Ldto_end
+ mov qword ptr [r8],0
+ test rbx,rbx
+ jz .Ldto_end
+ cmp qword ptr [rbx+8],0
+ je .Ldto_end
+ cmp qword ptr [rbx+16],0
+ je .Ldto_end
+ test rbp,rbp
+ jz .Ldto_end
+ test rdx,rdx
+ jz .Ldto_end
+ cmp qword ptr [rsp+192],0
+ je .Ldto_end
+ cmp qword ptr [rsp+192],64
+ jae .Ldto_end
+ mov rdi,rdx
+ mov rsi,[rsp+192]
+ call json_object_new_string_len@PLT
+ mov [rsp+168],rax
+ test rax,rax
+ jz .Ldto_alloc
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],2
+ mov qword ptr [rsp+24],32
+ mov qword ptr [rsp+32],33
+ mov [rsp+40],rbp
+ lea rax,[rip+.Ldt_task_name]
+ mov [rsp+80],rax
+ mov qword ptr [rsp+88],10
+.Ldto_page:
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rbx+16]
+ test eax,eax
+ jnz .Ldto_status
+ mov r14,[rsp+112]
+ xor r13d,r13d
+.Ldto_task:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldto_next_page
+ mov rdi,r14
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r15,rax
+ DGET r15,input
+ DGET rax,call_id
+ mov rdi,rax
+ mov rsi,[rsp+168]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldto_found
+ inc r13
+ jmp .Ldto_task
+.Ldto_next_page:
+ cmp dword ptr [rsp+132],0
+ je .Ldto_missing
+ mov rax,[rsp+120]
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],2
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Ldto_page
+.Ldto_found:
+ DGET r15,input
+ DGET rax,assistant
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rdi,[rbx]
+ mov esi,1
+ lea rcx,[rsp+144]
+ call [rbx+8]
+ test eax,eax
+ jnz .Ldto_status
+ DGET "qword ptr [rsp+144]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,rbp
+ jne .Ldto_invalid
+ DGET "qword ptr [rsp+144]",model_key
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ DGET rax,content
+ mov [rsp+184],rax
+ xor r13d,r13d
+.Ldto_call:
+ mov rdi,[rsp+184]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldto_invalid
+ mov rdi,[rsp+184]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ DGET r14,id
+ mov rdi,rax
+ mov rsi,[rsp+168]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldto_result
+ inc r13
+ jmp .Ldto_call
+.Ldto_result:
+ DGET r15,state
+ DGET rax,outcome
+ DGET rax,result
+ DGET rax,entry_id
+ test rax,rax
+ jz .Ldto_build
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rdi,[rbx]
+ mov esi,1
+ lea rcx,[rsp+152]
+ call [rbx+8]
+ test eax,eax
+ jnz .Ldto_status
+ DGET "qword ptr [rsp+152]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,rbp
+ jne .Ldto_invalid
+ DGET "qword ptr [rsp+152]",model_key
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ DGET rax,tool_call_id
+ mov rdi,rax
+ mov rsi,[rsp+168]
+ call json_object_equal@PLT
+ test eax,eax
+ jz .Ldto_invalid
+.Ldto_build:
+ call json_object_new_object@PLT
+ mov [rsp+176],rax
+ test rax,rax
+ jz .Ldto_alloc
+ mov rdi,r15
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+176]
+ lea rsi,[rip+.Ldto_task_key]
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldto_status
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+176]
+ lea rsi,[rip+.Ldto_call_key]
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldto_status
+ mov rdi,[rsp+152]
+ test rdi,rdi
+ jz .Ldto_success
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+176]
+ lea rsi,[rip+.Ldto_entry_key]
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldto_status
+.Ldto_success:
+ mov rax,[rsp+160]
+ mov rdx,[rsp+176]
+ mov [rax],rdx
+ mov qword ptr [rsp+176],0
+ xor r12d,r12d
+ jmp .Ldto_end
+.Ldto_missing:
+ mov r12d,1
+ jmp .Ldto_end
+.Ldto_invalid:
+ mov r12d,4
+ jmp .Ldto_end
+.Ldto_alloc:
+ mov eax,5
+.Ldto_status:
+ mov r12d,eax
+.Ldto_end:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov rdi,[rsp+144]
+ call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov rdi,[rsp+168]
+ call json_object_put@PLT
+ mov rdi,[rsp+176]
+ call json_object_put@PLT
+ mov eax,r12d
+ add rsp,200
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_tool_observe,.-pg_durable_tool_observe
+.globl pg_durable_tool_observation_release
+.type pg_durable_tool_observation_release,@function
+pg_durable_tool_observation_release:
+ jmp json_object_put@PLT
+.size pg_durable_tool_observation_release,.-pg_durable_tool_observation_release
+.section .rodata
+.Ldto_task_key: .asciz "task"
+.Ldto_call_key: .asciz "call"
+.Ldto_entry_key: .asciz "entry"

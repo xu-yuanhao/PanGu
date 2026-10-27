@@ -71,7 +71,7 @@ static int tools_start(void *ctx,pg_host *scope,size_t owner){
  if(pg_tool_registry_init(&registry,definitions,4))return 1;application.tools=pg_tool_registry_service(&registry);
  return pg_host_provide(scope,owner,"tools",&application.tools)||pg_host_provide(scope,owner,"tool.registry",&registry);
 }
-static int tools_stop(void *ctx){(void)ctx;return application.tools.close?application.tools.close(application.tools.context):0;}
+static int tools_stop(void *ctx){(void)ctx;int result=application.tools.close?application.tools.close(application.tools.context):0;if(result!=1)pg_edit_tool_clear(&editor);return result;}
 static int model_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_tool_registry *tools=pg_host_get(scope,owner,"tool.registry");if(!tools)return 1;
  application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);return pg_host_provide(scope,owner,"model",&application.model);
@@ -125,15 +125,14 @@ static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out)
  *out=(pg_model_failure){.message={message,(size_t)n},.retryable=(unsigned)pg_model_retryable((pg_slice){source->body,source->used},source->http,source->transport_error),.http_status=(unsigned)source->http,.transport_error=source->transport_error};
 }
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
-static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){(void)ctx;if(durable.tools_leased)return 1;durable.tools_leased=1;editor.first_changed_line=0;*out=application.tools;pg_durable_client_tool(&durable.client,id,0);return 0;}
+static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){(void)ctx;if(durable.tools_leased)return 1;durable.tools_leased=1;pg_edit_tool_clear(&editor);*out=application.tools;pg_durable_client_tool(&durable.client,id,0);return 0;}
 static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
 static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
  const char *name=json_object_get_string(json_object_object_get(call,"name"));
- if(!name||strcmp(name,"edit")||!editor.first_changed_line)return 0;
- struct json_object *value=json_object_new_object(),*details=json_object_new_object(),*line=json_object_new_uint64(editor.first_changed_line);
- if(!value||!details||!line){json_object_put(value);json_object_put(details);json_object_put(line);return 5;}
- if(json_object_object_add(details,"firstChangedLine",line)){json_object_put(line);json_object_put(details);json_object_put(value);return 5;}
+ if(!name||strcmp(name,"edit")||!editor.details)return 0;
+ struct json_object *value=json_object_new_object();if(!value)return 5;
+ struct json_object *details=json_object_get(editor.details);
  if(json_object_object_add(value,"details",details)){json_object_put(details);json_object_put(value);return 5;}
  *out=value;return 0;
 }
@@ -184,7 +183,8 @@ int main(int argc,char **argv){
  int rc=2;char *workspace=realpath(argc==2?argv[1]:".",0),*directory=0;if(!workspace)goto cleanup;application.path=workspace;
  const char *selected=getenv("PANGU_SESSION_DIR");if(selected){directory=strdup(selected);}else{size_t n=strlen(workspace)+8;directory=malloc(n);if(directory)snprintf(directory,n,"%s/.pangu",workspace);}if(!directory)goto cleanup;application.session_directory=directory;
  if(pg_host_init(&host,plugins,sizeof(plugins)/sizeof(*plugins))||pg_host_start(&host)){fprintf(stderr,"Cannot activate native plugin %s (error=%u).\n",host.error_owner<host.count?plugins[host.error_owner].name:"composition",host.error);goto cleanup;}
- pg_client *client=pg_host_find(&host,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history(&bridge,&durable.history)||pg_tui_bridge_set_detach(&bridge,agent_suspend,0))goto cleanup;
+ tui_tool_observer observer={&durable.client,pg_durable_client_tool_observe,pg_durable_tool_observation_release};
+ pg_client *client=pg_host_find(&host,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history(&bridge,&durable.history)||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
  tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};int reason=tui_app_run(&config);bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;if(rc)fprintf(stderr,"PanGu terminal stopped (reason=%d, bridge=%u).\n",reason,bridge.stop_error);
 cleanup:
  for(;;){int closing=pg_host_close(&host);if(!closing)break;if(closing<0){rc=1;break;}struct timespec pause={0,10000000};nanosleep(&pause,0);}free(directory);free(workspace);curl_global_cleanup();return rc;

@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- 工具参数从持久assistant toolCall送到TOOL_STARTED.text，TUI桥接将其交给detail，沿用既有事件布局。
-- 工具host可选snapshot在执行完成、关闭前转移元数据所有权；结果Entry与任务回执同批保存参数、明确状态、details及diagnostics。恢复中未执行的工具不会取用提供者陈旧元数据；真实edit提供firstChangedLine。
-- SQLite/JSONL工具、恢复/取消与编辑专项、完整Runtime O0/O2、G00/Assembly和产品构建通过。真实DeepSeek PTY四工具、PanGu身份和重开续聊通过；实际编辑回执的参数、status与firstChangedLine检查通过。
+- `edit_diff.S`将Pi/jsdiff的行比较、四行上下文和统一patch移植为手写汇编，拥有的diff/patch/firstChangedLine随实际edit结果原子入库；写失败、下一租约与关闭清理旧元数据。
+- 独立`tui_tool_observer`已绑定到产品桥接。按会话/call ID读取拥有的task、call和结果Entry，不推进调度；参数、状态、diff/patch与诊断可从明确字段读取。桥接控制块288字节，既有事件与ops布局不变。
+- 244组可复验上游实际diff差异比较、编辑91组语料和失败/恢复专项（最终节点回收实现ASan/UBSan通过）、两后端观察/重开、完整Runtime O0/O2及产品构建通过；真实DeepSeek PTY四工具/身份/重开续聊及实际patch反向匹配、两后端真实Generation/工具观察/follow-up通过。
 
 ## 当前接口边界
 

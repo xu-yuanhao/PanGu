@@ -136,7 +136,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `tools/{read,write,edit,bash,edit-diff,image-processor}.ts`、`env/`、`images/`、`truncate.ts`；`tools.test.ts`、`tools-read-differential.test.ts`、`tools-images.test.ts`、`env-node.test.ts`。
 
 - [ ] 在现有 read/write/edit/bash 服务上补齐上游输入准备、路径/目录、分页/完整文件、UTF-8/二进制/图片、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
-- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供firstChangedLine。diff/patch、附件与完整ExecutionEnv待补齐。
+- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询。附件、诊断文本渲染与完整ExecutionEnv待补齐。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
 ### K09 — 完整原生 Extension 能力
@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts` Reported、appendToolResult和`tools/edit.ts`返回details；Coding Agent工具渲染以参数/结果消费为入口。本批Pi远端为`842c73170a3658d4e3b39fcc84690211ed503e09`，上述模块及edit-diff无差异；沿固定参考工作树开发。
-- 实际调用链：`durable_tool.S`在工具完成、关闭/释放前调用注入snapshot；拥有metadata直至原子提交并释放。结果Entry保存模型消息details与data中的arguments/diagnostics/status，明确completed/error/aborted/interrupted。恢复中未重新执行的工具不采集当前提供者的陈旧结果。产品edit将首个变更行作为details持久化；工具租约开始时清空其旧元数据。`durable_client.S`从已提交toolCall读取真实参数，canonical JSON随TOOL_STARTED.text经既有桥接到TUI detail；事件/函数表布局不变。
-- 验证：SQLite/JSONL工具任务专项核对参数、details、diagnostics和各恢复/取消状态；编辑专项核对成功元数据。完整Runtime O0/O2回归、产品构建、G00/Assembly通过；真实DeepSeek PTY完成四工具、PanGu身份与重开续聊，实际成功edit回执的参数、status与firstChangedLine检查通过。控制自审：仅扩展原生工具host可选回调和editor私有控制布局，旧工具定义、pg_tools、pg_event和TUI ops尺寸保持不变。
-- 剩余行为：edit diff/patch、诊断的模型文本渲染、图片附件和独立结构化观察接口/TUI消费继续在K08/K13/U03完成；当前details持久记录仅首行来自真实edit，专项中的diff/patch为测试提供者数据，不能当作产品实现。K05完整内容块、K07 deferred/partial/hooks、K10多会话/分叉、K11资源配置、K12压缩、K13观察/用量及K02服务替换按原清单推进。
-- 下一交付物：沿Pi edit-diff接通实际diff/patch和结构化观察消费者，与既有真实模型工具链集中联调。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`tools/edit.ts`、`edit-diff.ts` generateDiffString/generateUnifiedPatch和`harness/tool.ts`；其依赖jsdiff 8.0.4的Myers路径、行分词、buildValues替换排序和patch/create格式。本批沿Pi远端`842c73170a3658d4e3b39fcc84690211ed503e09`核对的相同工具模块开发；Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，保留固定参考工作树。
+- 实际调用链：`edit_tool.S`在写入前以原始快照/候选内容生成拥有所有权的details，写成功后经Tool host snapshot与任务回执原子入库，错误/下一租约/关闭时释放。`edit_diff.S`手写行分词、Myers路径、引用计数回收路径节点、四行上下文编号diff、统一patch和EOF标记，保留BOM/CRLF文件变换，展示按Pi规范归一化；移除编辑器旧首字节公共前缀行号算法。`pg_durable_tool_observe`按会话/call ID分页查询最新匹配工具，返回独立拥有的{task,call,entry?}；`pg_durable_client_tool_observe`提供前台绑定。
+- 验证：原生diff与固定Pi实际函数/jsdiff的244组可复验语料比较通过（另有开发中502组对照），包含重复行、Unicode、空内容、无末尾换行、CRLF/BOM及长上下文；编辑已有91组准备/文件语料和失败/写后崩溃专项通过；最终节点回收实现的编辑/差异专项ASan/UBSan通过。SQLite/JSONL观察专项核对结果、缺失、跨会话隔离与存储重开。Runtime完整O0/O2与产品构建通过；真实DeepSeek PTY四工具/身份/重开续聊及实际patch反向匹配通过；两后端真实模型重试→read→follow-up→重开通过，工具开始事件查询接口返回真实参数。控制自审：登记Assembly diff实现及实际模块/构建输入；桥接控制块288字节，既有pg_event与tui_runtime_ops布局不变，工具元数据所有权纳入清理。
+- TUI可用接口：`pg_tui_runtime_tool_observer(ops)`返回借用的`tui_tool_observer`；read(context,call_id,len,&json)同步读取、不会推进调度，0为拥有的快照、1为缺失，其他为错误；其他适配器的可选接口查找返回NULL。call.arguments为真实参数，entry.model[0].details含diff/patch/firstChangedLine，entry.data含status/diagnostics/arguments；无entry表示尚无结果。调用release释放快照；后续读取不使旧快照失效。产品已绑定此接口，TUI U03按此入口接线；同一call ID重复时查询最新匹配任务，返回task.id供客户端保留身份。
+- 剩余与下一交付物：TUI具体diff控件/取消结果消费由TUI归属文件接入；核心继续K08诊断文本渲染、图片与工具环境行为，以及B03模型/扩展实际调用链。K05/K07/K09–K14的其他范围保持原清单。

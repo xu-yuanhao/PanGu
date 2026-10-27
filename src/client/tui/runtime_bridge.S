@@ -428,3 +428,59 @@ pg_tui_bridge_set_history:
 .section .rodata
 .Lruntime_name: .asciz "PanGu Durable"
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_tui_bridge_set_tool_observer
+.type pg_tui_bridge_set_tool_observer,@function
+pg_tui_bridge_set_tool_observer:
+ mov eax,1
+ test rdi,rdi
+ jz .Lobserver_bind_end
+ test rsi,rsi
+ jz .Lobserver_bind_end
+ cmp dword ptr [rdi+PG_B_STOPPED],0
+ jne .Lobserver_bind_end
+ cmp qword ptr [rsi+8],0
+ je .Lobserver_bind_end
+ cmp qword ptr [rsi+16],0
+ je .Lobserver_bind_end
+ movdqu xmm0,[rsi]
+ movdqu [rdi+PG_B_TOOL_OBSERVER],xmm0
+ mov rax,[rsi+16]
+ mov [rdi+PG_B_TOOL_OBSERVER+16],rax
+ xor eax,eax
+.Lobserver_bind_end:
+ ret
+.size pg_tui_bridge_set_tool_observer,.-pg_tui_bridge_set_tool_observer
+.globl pg_tui_bridge_tool_observer
+.type pg_tui_bridge_tool_observer,@function
+pg_tui_bridge_tool_observer:
+ xor eax,eax
+ test rdi,rdi
+ jz .Lobserver_get_end
+ cmp dword ptr [rdi+PG_B_STOPPED],0
+ jne .Lobserver_get_end
+ cmp qword ptr [rdi+PG_B_TOOL_OBSERVER+8],0
+ je .Lobserver_get_end
+ lea rax,[rdi+PG_B_TOOL_OBSERVER]
+.Lobserver_get_end:
+ ret
+.size pg_tui_bridge_tool_observer,.-pg_tui_bridge_tool_observer
+.text
+.globl pg_tui_runtime_tool_observer
+.type pg_tui_runtime_tool_observer,@function
+pg_tui_runtime_tool_observer:
+ xor eax,eax
+ test rdi,rdi
+ jz .Lobserver_ops_end
+ lea rcx,[rip+.Lsubmit]
+ cmp [rdi+TUI_LI_OPS_SUBMIT],rcx
+ jne .Lobserver_ops_end
+ lea rcx,[rip+.Lpoll]
+ cmp [rdi+TUI_LI_OPS_POLL],rcx
+ jne .Lobserver_ops_end
+ mov rdi,[rdi+TUI_LI_OPS_CTX]
+ jmp pg_tui_bridge_tool_observer
+.Lobserver_ops_end:
+ ret
+.size pg_tui_runtime_tool_observer,.-pg_tui_runtime_tool_observer

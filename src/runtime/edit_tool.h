@@ -6,9 +6,10 @@
    Both inner operations retain validation/authorization. The injected read must
    provide a complete file snapshot; a model-facing line pager is not that service.
    An interrupted edit is unsafe to replay; output capacity must be >=64.
-   Success reports replacement count and the first differing byte's 1-based line
-   in the preserved file content. first_changed_line is zero until successful
-   completion and is reset on every execution. Native text/argument limits apply. */
-typedef struct { pg_tools files; uint64_t first_changed_line; } pg_edit_tool;
+   details owns the last successful {diff,patch,firstChangedLine}. It is reset
+   by execution/clear; consumers retain their own JSON reference if needed. */
+struct json_object;
+typedef struct { pg_tools files; struct json_object *details; } pg_edit_tool;
+void pg_edit_tool_clear(pg_edit_tool *);
 pg_tool_definition pg_edit_tool_definition(pg_edit_tool *);
 #endif

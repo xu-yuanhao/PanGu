@@ -878,3 +878,27 @@ pg_durable_client_publish:
 .Ldc_id_format: .asciz "%llu"
 .Ldc_input_json: .asciz "{\"type\":\"input\",\"content\":\"\",\"whenBusy\":\"reject\"}"
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_client_tool_observe
+.type pg_durable_client_tool_observe,@function
+pg_durable_client_tool_observe:
+ test rdi,rdi
+ jz .Ldc_observe_invalid
+ cmp dword ptr [rdi+68],0
+ jne .Ldc_observe_invalid
+ mov r8,rcx
+ mov rcx,rdx
+ mov rdx,rsi
+ mov rsi,[rdi+24]
+ mov rdi,[rdi+8]
+ mov rdi,[rdi+8]
+ jmp pg_durable_tool_observe@PLT
+.Ldc_observe_invalid:
+ test rcx,rcx
+ jz .Ldc_observe_invalid_return
+ mov qword ptr [rcx],0
+.Ldc_observe_invalid_return:
+ mov eax,4
+ ret
+.size pg_durable_client_tool_observe,.-pg_durable_client_tool_observe

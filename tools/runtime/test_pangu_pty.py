@@ -151,6 +151,10 @@ def workflow(binary, root, env):
     assert edits, 'missing committed actual edit receipt'
     assert all(e['data']['status'] == 'completed' and e['data']['arguments']['path'] == 'target.txt'
                and e['model'][0]['details']['firstChangedLine'] == 1 for e in edits)
+    assert all(e['model'][0]['details']['diff'] and e['model'][0]['details']['patch'] for e in edits)
+    subprocess.run(['git', 'apply', '--reverse', '--check', '-'], cwd=root,
+                   input=edits[-1]['model'][0]['details']['patch'].encode(), check=True,
+                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     terminal = Terminal(binary, root, env)
     try:
         terminal.until(b'> ', 5)

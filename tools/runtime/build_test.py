@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
-DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']]
+DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
 PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
     'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
     'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
@@ -35,7 +35,7 @@ def main():
             output = str(Path(directory) / 'live-model-batch')
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
-                            *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_tool'),
+                            *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_diff'), implementation('src/runtime/edit_tool'),
                             str(ROOT / 'tests/runtime/live_mimo_batch.c'), *model_flags, '-o', output], check=True)
             subprocess.run([output, *(['--capacity'] if '--live-capacity' in sys.argv else ['--snapshot'] if '--live-snapshot-edit' in sys.argv else ['--execute'] if '--live-batch-execute' in sys.argv else [])], check=True, timeout=150)
             return 0
@@ -205,7 +205,7 @@ def main():
                             '--binary', edit_test], check=True, timeout=45)
             edit_tool_test = str(Path(directory) / 'test-edit-tool')
             edit_tool_sources = ['agent', 'session', 'submissions', 'journal', 'journal_posix',
-                                 'tools', 'read_tool', 'write_tool', 'edit_text', 'edit_tool']
+                                 'tools', 'read_tool', 'write_tool', 'edit_text', 'edit_diff', 'edit_tool']
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in edit_tool_sources],

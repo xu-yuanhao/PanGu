@@ -78,6 +78,17 @@ typedef struct tui_history_entry {
     int tool_ok;
 } tui_history_entry;
 
+/* Independent committed tool view. read does not advance execution. 0 returns
+   owned {task,call,entry?}; 1 missing, other values error. call has real arguments,
+   entry contains model[0].details and data.{status,arguments,diagnostics}.
+   release is valid after subsequent reads; all strings are JSON-owned. */
+struct json_object;
+typedef struct {
+    void *context;
+    int (*read)(void *,const char *call_id,size_t,struct json_object **);
+    void (*release)(struct json_object *);
+} tui_tool_observer;
+
 typedef struct tui_runtime_ops {
 	const char *name; /* 适配来源标识，如 "fake-runtime" */
 	void *ctx;
@@ -87,6 +98,8 @@ typedef struct tui_runtime_ops {
 	int (*shutdown)(void *ctx); /* 0=released, 1=pending; repeat after waiting. */
     int (*history)(void *ctx, size_t index, tui_history_entry *out); /* optional */
 } tui_runtime_ops;
+/* Optional native extension lookup; NULL for other adapters or no binding. */
+const tui_tool_observer *pg_tui_runtime_tool_observer(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

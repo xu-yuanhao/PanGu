@@ -11,10 +11,12 @@
 #define PG_B_STOP_ERROR 240
 #define PG_B_HISTORY 248
 #define PG_B_HISTORY_COUNT 256
-#define PG_B_BYTES 264
+#define PG_B_TOOL_OBSERVER 264
+#define PG_B_BYTES 288
 #ifndef __ASSEMBLER__
 #include "runtime_bridge.h"
 #include "tui_layout.h"
+_Static_assert(offsetof(pg_tui_bridge,tool_observer)==PG_B_TOOL_OBSERVER&&sizeof(tui_tool_observer)==24,"tool observation layout");
 _Static_assert(sizeof(pg_tui_bridge)==PG_B_BYTES,"bridge size");
 _Static_assert(offsetof(pg_tui_bridge,ops)==PG_B_OPS,"bridge ops");
 _Static_assert(offsetof(pg_tui_bridge,active)==PG_B_ACTIVE,"bridge active");

@@ -642,10 +642,15 @@
  sub rsp,616
  mov rbp,rsp
  mov rbx,rdi
- mov qword ptr [rbx+56],0
  mov r12,rcx
  mov r13,r8
  mov r14,r9
+ push rsi
+ push rdx
+ mov rdi,rbx
+ call pg_edit_tool_clear
+ pop rdx
+ pop rsi
  mov qword ptr [rbp+TREE],0
  lea r15,[rip+.Linvalid]
  test r12,r12
@@ -734,25 +739,25 @@
  lea r15,[rip+.Linvalid]
  jmp .Lcleanup
 .Lwrite_request:
- xor ecx,ecx
- mov r8d,1
- mov rdx,[rbp+FIRST_LINE]
-.Lfirst_line:
- cmp rcx,rdx
- jae .Lfirst_line_done
- cmp rcx,[rbp+IO_SIZE]
- jae .Lfirst_line_done
- mov al,[rbp+CONTENT+rcx]
- cmp al,[rbp+RESULT+rcx]
- jne .Lfirst_line_done
- cmp al,10
- jne .Lfirst_line_next
- inc r8
-.Lfirst_line_next:
- inc rcx
- jmp .Lfirst_line
-.Lfirst_line_done:
- mov [rbp+FIRST_LINE],r8
+ mov rdi,[rbp+P_PATH]
+ mov rsi,[rbp+P_PATH_N]
+ lea rdx,[rbp+CONTENT]
+ mov rcx,[rbp+FIRST_LINE]
+ lea r8,[rbp+RESULT]
+ mov r9,[rbp+IO_SIZE]
+ sub rsp,16
+ lea rax,[rbx+56]
+ mov [rsp],rax
+ call pg_edit_diff_create@PLT
+ add rsp,16
+ test eax,eax
+ jnz .Lmemory_error
+ mov rdi,[rbx+56]
+ lea rsi,[rip+.Lfirst_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rbp+FIRST_LINE],rax
  mov rdi,rbp
  lea rsi,[rbp+RESULT]
  mov rdx,[rbp+IO_SIZE]
@@ -791,6 +796,12 @@
 .Lquota_error:
  lea r15,[rip+.Lquota]
 .Lcleanup:
+ lea rax,[rip+.Lok]
+ cmp r15,rax
+ je .Lcleanup_keep_details
+ mov rdi,rbx
+ call pg_edit_tool_clear
+.Lcleanup_keep_details:
  mov rdi,[rbp+TREE]
  test rdi,rdi
  jz .Lcleanup_parsed
@@ -813,11 +824,11 @@
  cmp rax,r13
  jae .Lsummary_failed
  mov [r14],rax
- mov rax,[rbp+FIRST_LINE]
- mov [rbx+56],rax
  xor eax,eax
  jmp .Lexecute_return
 .Lsummary_failed:
+ mov rdi,rbx
+ call pg_edit_tool_clear
  lea r15,[rip+.Lsummary_error]
 .Lcopy_message:
  mov rdi,r15
@@ -893,3 +904,18 @@ pg_edit_tool_definition:
  ret
 .size pg_edit_tool_definition,.-pg_edit_tool_definition
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_edit_tool_clear
+.type pg_edit_tool_clear,@function
+pg_edit_tool_clear:
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rbx+56]
+ mov qword ptr [rbx+56],0
+ call json_object_put@PLT
+ pop rbx
+ ret
+.size pg_edit_tool_clear,.-pg_edit_tool_clear
+.section .rodata
+.Lfirst_key: .asciz "firstChangedLine"

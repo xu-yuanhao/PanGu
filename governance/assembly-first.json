@@ -218,6 +218,10 @@
     "src/runtime/durable_inputs.S": {
       "role": "assembly-core",
       "reason": "手写Durable输入admission、request去重、队列/结算/撤回与Generation边界事务；借用既有Storage查询"
+    },
+    "src/runtime/edit_diff.S": {
+      "role": "assembly-core",
+      "reason": "手写Pi/jsdiff Myers行路径、替换排序、四行上下文和统一patch格式；json-c负责结构化结果所有权"
     }
   }
 }

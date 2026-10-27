@@ -5,6 +5,7 @@
 #include "../../src/runtime/task_runner.h"
 #include "../../src/runtime/durable_tool.h"
 #include "../../src/runtime/durable_client.h"
+#include "../../src/client/tui/runtime_bridge.h"
 #include "../../src/runtime/mimo.h"
 #include "../../src/runtime/read_tool.h"
 #include "../../src/runtime/write_tool.h"
@@ -295,6 +296,7 @@ static int durable_tool_crash_commit(void *p,const struct json_object *writes,pg
  for(size_t i=0;i<json_object_array_length(writes);i++){struct json_object *write=json_object_array_get_idx(writes,i),*record=json_object_object_get(write,"value");const char *kind=json_object_get_string(json_object_object_get(record,"kind"));if(kind&&!strcmp(kind,"pangu.tool-result"))_exit(0);}
  return tool_crash_storage.commit(p,writes,adopt,ctx,seq);
 }
+static int observation_read(void *p,const char *id,size_t size,struct json_object **out){return pg_durable_tool_observe(p,1,(pg_slice){id,size},out);}
 static void durable_tool_tests(void){
  _Static_assert(sizeof(pg_durable_tool)==168&&offsetof(pg_durable_tool,phases)==88,"Durable Tool ABI");
  for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<14;scenario++){
@@ -321,6 +323,19 @@ static void durable_tool_tests(void){
   const char *status=json_object_get_string(json_object_object_get(data,"status"));assert(!strcmp(status,scenario==2||scenario==3||scenario==7||scenario==10||scenario==11||scenario==13?"interrupted":scenario==4||scenario==9?"aborted":scenario==12?"error":"completed"));
   if(scenario==0||scenario==1||scenario==5||scenario==6||scenario==8){assert(json_object_get_int(json_object_object_get(json_object_object_get(message,"details"),"firstChangedLine"))==7);assert(json_object_array_length(json_object_object_get(data,"diagnostics"))==1);}
   else assert(!json_object_object_get(message,"details"));json_object_put(entry);
+  struct json_object *observation=0;assert(!pg_durable_tool_observe(&base->host,1,(pg_slice){"read1",5},&observation));
+  assert(json_object_get_uint64(json_object_object_get(json_object_object_get(observation,"task"),"id"))==id);
+  assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(observation,"call"),"id")),"read1"));
+  assert(json_object_object_get(observation,"entry"));struct json_object *missing=(void*)1;
+  assert(pg_durable_tool_observe(&base->host,1,(pg_slice){"unknown",7},&missing)==1&&!missing);
+  assert(pg_durable_tool_observe(&base->host,99,(pg_slice){"read1",5},&missing)==1&&!missing);
+  pg_durable_tool_observation_release(observation);
+  if(!scenario){pg_durable_client unused={0};pg_tui_bridge bridge;assert(!pg_tui_bridge_init(&bridge,pg_durable_client_service(&unused)));
+   assert(!pg_tui_runtime_tool_observer(&bridge.ops));tui_tool_observer binding={&base->host,observation_read,pg_durable_tool_observation_release};assert(!pg_tui_bridge_set_tool_observer(&bridge,&binding));
+   const tui_tool_observer *observer=pg_tui_runtime_tool_observer(&bridge.ops);assert(observer&&observer->read==observation_read);assert(!observer->read(observer->context,"read1",5,&observation));assert(json_object_object_get(observation,"entry"));observer->release(observation);
+   tui_runtime_ops other={0};assert(!pg_tui_runtime_tool_observer(&other));}
+  if(!scenario){assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);
+   observation=0;assert(!pg_durable_tool_observe(&base->host,1,(pg_slice){"read1",5},&observation));assert(json_object_object_get(observation,"entry"));pg_durable_tool_observation_release(observation);}
   if(scenario==6||scenario==7||scenario==11){file=fopen(path,"r");assert(file);char actual[80];assert(fgets(actual,sizeof(actual),file)&&!fclose(file));assert(!strcmp(actual,scenario==6?"durable real write\n":scenario==11?"changed after interrupted effect\n":"durable real read\n"));}
   assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&base->f.session));pg_read_tool_close(&t.reader);assert(!unlink(path));cleanup(&base->f,parent);
  }
@@ -364,7 +379,7 @@ static int generation_flow(unsigned mode){
    g->model_open=1;assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PROGRESS);assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&!g->requests&&!base->reports);struct json_object *saved=task_row(base,id),*checkpoint=json_object_object_get(json_object_object_get(saved,"state"),"checkpoint");assert(!strcmp(json_object_get_string(json_object_object_get(checkpoint,"phase")),"request")&&json_object_get_int64(json_object_object_get(checkpoint,"cutoff"))>0&&json_object_object_get(checkpoint,"configuration"));json_object_put(saved);
    assert(!pg_durable_client_suspend(&g->client)&&!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);assert(!pg_task_scheduler_open(&scheduler,&base->f.session,&base->host,3));assert(!(pg_durable_client_open(&g->client,&config)));client=pg_durable_client_service(&g->client);assert(client.poll(client.context,&event)==1&&event.kind==PG_RUN_STARTED);assert(client.poll(client.context,&event)==0&&!g->requests&&!base->reports);client.cancel(client.context);unsigned finished=0;for(unsigned i=0;i<30&&!finished;i++){int n=client.poll(client.context,&event);assert(n>=0);if(n&&event.kind==PG_RUN_FINISHED){assert(event.outcome==2);finished=1;}}assert(finished&&!g->requests);pg_session *history=calloc(1,sizeof(*history));assert(history&&!pg_durable_generation_history(&base->host,1,configuration,history)&&history->count==1);free(history);assert(!pg_durable_client_suspend(&g->client)&&!pg_durable_session_close(&base->f.session));json_object_put(configuration);g->model_open=0;pg_read_tool_close(&tools->reader);assert(!unlink(path));cleanup(&base->f,parent);free(g);continue;
   }
-  unsigned finished=0,text_events=0,tool_starts=0,tool_ends=0,reopened=0;for(unsigned i=0;i<12000&&!finished;i++){int n=client.poll(client.context,&event);assert(n>=0);if(n&&event.kind==PG_TEXT_DELTA)text_events++;if(n&&event.kind==PG_TOOL_STARTED){assert(event.call_id.size&&event.tool_name.size&&event.text.size);struct json_object *arguments=json_tokener_parse(event.text.data);assert(arguments&&json_object_object_get(arguments,"path"));json_object_put(arguments);tool_starts++;}if(n&&event.kind==PG_TOOL_FINISHED){assert(event.call_id.size&&event.tool_name.size&&event.text.size);tool_ends++;}if(n&&event.kind==PG_RUN_FINISHED){assert(event.outcome==(live?PG_SUCCESS:mode==7?PG_CANCELLED:PG_ERROR));if(!live&&mode!=7)assert(event.text.size);finished=1;}if(!live||mode==8){
+  unsigned finished=0,text_events=0,tool_starts=0,tool_ends=0,reopened=0;for(unsigned i=0;i<12000&&!finished;i++){int n=client.poll(client.context,&event);assert(n>=0);if(n&&event.kind==PG_TEXT_DELTA)text_events++;if(n&&event.kind==PG_TOOL_STARTED){assert(event.call_id.size&&event.tool_name.size&&event.text.size);struct json_object *arguments=json_tokener_parse(event.text.data);assert(arguments&&json_object_object_get(arguments,"path"));json_object_put(arguments);struct json_object *view=0;assert(!pg_durable_client_tool_observe(&g->client,event.call_id.data,event.call_id.size,&view));assert(json_object_object_get(json_object_object_get(view,"call"),"arguments"));pg_durable_tool_observation_release(view);tool_starts++;}if(n&&event.kind==PG_TOOL_FINISHED){assert(event.call_id.size&&event.tool_name.size&&event.text.size);tool_ends++;}if(n&&event.kind==PG_RUN_FINISHED){assert(event.outcome==(live?PG_SUCCESS:mode==7?PG_CANCELLED:PG_ERROR));if(!live&&mode!=7)assert(event.text.size);finished=1;}if(!live||mode==8){
     struct json_object *row=task_row(base,id),*state=json_object_object_get(row,"state");const char *status=json_object_get_string(json_object_object_get(state,"status"));
     if(!strcmp(status,"sleeping")){
      double until=json_object_get_double(json_object_object_get(state,"until"));
