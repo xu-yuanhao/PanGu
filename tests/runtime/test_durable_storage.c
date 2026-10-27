@@ -72,7 +72,7 @@ typedef struct {
  fixture f;pg_task_runner_host host;pg_task_definition definition;pg_task_phase phase;pg_task_scheduler *scheduler;
  unsigned mode,calls,cleanups,available,reports,seen[1024],seen_count,first_restart;
 } task_case;
-_Static_assert(sizeof(pg_task_runner)==112&&offsetof(pg_task_runner,error)==96,"Task runner ABI");
+_Static_assert(sizeof(pg_task_runner)==120&&offsetof(pg_task_runner,error)==96&&offsetof(pg_task_runner,mutation)==112,"Task runner ABI");
 _Static_assert(sizeof(pg_task_definition)==80&&offsetof(pg_task_definition,migrate)==72,"Task definition ABI");
 static int task_read(void *p,unsigned table,uint64_t id,struct json_object **v){task_case *t=p;return pg_record_memory_read(t->f.memory,(pg_record_table)table,id,v);}
 static int task_scan(void *p,const pg_memory_query *q,pg_memory_page *page){return pg_record_memory_scan(((task_case *)p)->f.memory,q,page);}
@@ -190,13 +190,34 @@ static void scheduler_tests(void){
 }
 typedef struct {
  task_case base;uint64_t ids[8];unsigned count,behavior[8],policy[8],calls[8],resumes[8],gate,aborted[8],abort_count,check_marks;
- struct json_object *on[8];
+ struct json_object *on[8];pg_task_runner *round_runner;uint64_t round_entry;unsigned round_kind;
 } wait_case;
 static unsigned wait_index(wait_case *w,uint64_t id){for(unsigned i=0;i<w->count;i++)if(w->ids[i]==id)return i;assert(!"unknown task");return 0;}
+static pg_task_status phase_round_stage(void *p,pg_record_tx *tx,pg_document_tx *docs,struct json_object **next){
+ wait_case *w=p;task_case *t=&w->base;pg_document_change *change=0;
+ assert(!pg_document_tx_get(docs,&t->f.definition,&t->f.address,0,0,&change));
+ struct json_object *ops=json_tokener_parse("[[\"a\",[\"text\"],\"+phase\"]]");assert(ops&&!pg_document_change_append(change,ops));json_object_put(ops);
+ struct json_object *draft=json_tokener_parse("{\"kind\":\"pangu.assistant\",\"model\":[{\"role\":\"assistant\",\"content\":[]}]}");struct json_object *entry=0;
+ assert(draft&&!pg_record_tx_append_entry(tx,1,draft,w->round_runner->id,task_mint,&entry));w->round_entry=(uint64_t)json_object_get_int64(json_object_object_get(entry,"id"));json_object_put(draft);json_object_put(entry);
+ if(w->round_kind==3)return PG_TASK_PROGRESS;
+ struct json_object *definition=json_tokener_parse("{\"name\":\"counter\",\"version\":1}"),*input=json_tokener_parse("{\"to\":1}"),*options=json_tokener_parse("{\"ownership\":{\"kind\":\"task\"}}");assert(definition&&input&&options);
+ assert(!json_object_object_add(json_object_object_get(options,"ownership"),"taskId",json_object_new_int64((int64_t)w->round_runner->id)));
+ pg_task_creation creation={.context=t,.initial=task_initial,.mint=task_mint,.conversation_id=1};uint64_t child=0;assert(!pg_record_tx_create_task(tx,definition,input,options,&creation,&child));json_object_put(definition);json_object_put(input);json_object_put(options);
+ w->ids[w->count]=child;w->behavior[w->count++]=0;
+ if(w->round_kind==2)*next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":null}}");
+ else{char text[256];snprintf(text,sizeof(text),"{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"count\",\"n\":1},\"on\":[%llu],\"policy\":\"allSettled\"}",(unsigned long long)(w->round_kind==4?w->round_runner->id:child));*next=json_tokener_parse(text);}
+ assert(*next);return w->round_kind==1?PG_TASK_INVALID:PG_TASK_PROGRESS;
+}
 static int wait_phase(void *p,pg_task_runner *runner,const struct json_object *record){
  wait_case *w=p;unsigned i=wait_index(w,runner->id);w->calls[i]++;assert(!w->base.f.records.busy);
  unsigned n=(unsigned)json_object_get_int(json_object_object_get(json_object_object_get(json_object_object_get(record,"state"),"checkpoint"),"n"));
  if(w->behavior[i]==2&&!w->gate)return 1;
+ if(w->behavior[i]==4&&!n){w->round_runner=runner;uint64_t before=w->base.f.records.sequence;int r=pg_task_runner_commit_with(runner,w,phase_round_stage);struct json_object *entry=0;
+  assert(!runner->mutation&&pg_durable_session_idle(&w->base.f.session));
+  if(r){assert(r==PG_TASK_INVALID&&w->base.f.records.sequence==before&&!w->base.f.records.failed);value(&w->base.f,"seed");assert(task_read(&w->base,PG_TABLE_ENTRY,w->round_entry,&entry)==PG_MEMORY_MISSING&&!entry);assert(task_read(&w->base,PG_TABLE_TASK,w->ids[1],&entry)==PG_MEMORY_MISSING&&!entry);return -r;}
+  assert(w->base.f.records.sequence==before+1);value(&w->base.f,"seed+phase");assert(!task_read(&w->base,PG_TABLE_ENTRY,w->round_entry,&entry));json_object_put(entry);if(w->round_kind!=3)return 0;
+ }
+
  struct json_object *next=0;
  if(w->behavior[i]==1&&!n){
   next=json_tokener_parse("{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"count\",\"n\":1}}");assert(next&&w->on[i]);
@@ -217,11 +238,12 @@ static void wait_background(wait_case *w,unsigned i){struct json_object *row=tas
 static uint64_t wait_conversation(wait_case *w,uint64_t owner){pg_record_tx tx={0};pg_document_tx docs={0};struct json_object *c=0;assert(!pg_durable_session_begin(&w->base.f.session,&tx,&docs,w->base.f.memory,read_record)&&!pg_record_tx_create_conversation(&tx,owner,0,(int(*)(void *,uint64_t *))pg_record_memory_mint,&c));uint64_t id=(uint64_t)json_object_get_int64(json_object_object_get(c,"id"));json_object_put(c);assert(!pg_durable_session_settle(&w->base.f.session,0,0,0));return id;}
 static const char *wait_outcome(wait_case *w,unsigned i){static char text[32];struct json_object *r=task_row(&w->base,w->ids[i]);snprintf(text,sizeof(text),"%s",json_object_get_string(json_object_object_get(json_object_object_get(json_object_object_get(r,"state"),"outcome"),"status")));json_object_put(r);return text;}
 static void wait_tests(void){
- for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<14;scenario++){
+ for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<19;scenario++){
   char parent[]="/tmp/pangu-wait-XXXXXX";assert(mkdtemp(parent));wait_case w={.base={.f={.kind=kind,.now=100}}};task_case *t=&w.base;
   snprintf(t->f.path,sizeof(t->f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&t->f);seed(&t->f);open_session(&t->f);task_bind(t);
   t->phase.context=&w;t->phase.poll=wait_phase;t->phase.cleanup=0;t->definition.context=&w;t->definition.abort=wait_abort;t->definition.abort_cleanup=0;
-  if(scenario<2){wait_spawn(&w,0,1,1);wait_spawn(&w,w.ids[0],1,3);wait_spawn(&w,w.ids[0],1,2);wait_on(&w,0,scenario,2,(unsigned[]){1,2});}
+  if(scenario>=14){w.round_kind=scenario-14;wait_spawn(&w,0,1,4);}
+  else if(scenario<2){wait_spawn(&w,0,1,1);wait_spawn(&w,w.ids[0],1,3);wait_spawn(&w,w.ids[0],1,2);wait_on(&w,0,scenario,2,(unsigned[]){1,2});}
   else if(scenario==2){wait_spawn(&w,0,1,1);wait_on(&w,0,0,1,(unsigned[]){0});}
   else if(scenario==3){wait_spawn(&w,0,1,1);w.on[0]=json_tokener_parse("[999999]");}
   else if(scenario==4){wait_spawn(&w,0,1,1);wait_spawn(&w,0,1,2);wait_on(&w,0,1,1,(unsigned[]){1});w.gate=1;}
@@ -240,6 +262,7 @@ static void wait_tests(void){
   if(scenario==11){assert(!w.resumes[0]&&!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t->f.session));backend_open(&t->f);open_session(&t->f);assert(!pg_task_scheduler_open(&scheduler,&t->f.session,&t->host,3));assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&!w.resumes[0]);w.gate=1;}
   if(scenario==12){for(unsigned j=0;j<4;j++)assert(pg_task_scheduler_poll(&scheduler)<=PG_TASK_BLOCKED);assert(w.abort_count==2&&w.resumes[0]==1);struct json_object *r=task_row(t,w.ids[4]);assert(!json_object_get_boolean(json_object_object_get(r,"abortRequested")));json_object_put(r);w.gate=1;}
   for(unsigned j=0;j<20&&result!=PG_TASK_DONE;j++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);}assert(result==PG_TASK_DONE);
+  if(scenario>=14){assert(!strcmp(wait_outcome(&w,0),scenario==14||scenario==17?"completed":"faulted"));value(&t->f,scenario==14||scenario==17?"seed+phase":"seed");}
   if(scenario<2)assert(!strcmp(wait_outcome(&w,0),"completed")&&!strcmp(wait_outcome(&w,1),"failed")&&!strcmp(wait_outcome(&w,2),scenario?"aborted":"completed")&&w.resumes[0]==1);
   if(scenario>=2&&scenario<=4){assert(!strcmp(wait_outcome(&w,0),"faulted"));struct json_object *r=task_row(t,w.ids[0]);const char *message=json_object_get_string(json_object_object_get(json_object_object_get(json_object_object_get(json_object_object_get(r,"state"),"outcome"),"error"),"message"));assert(strstr(message,scenario==2?"wait cycle":scenario==3?"missing task":"only on tasks it owns"));json_object_put(r);}
   if(scenario>=5&&scenario<=7)assert(!strcmp(wait_outcome(&w,0),"completed")&&!strcmp(wait_outcome(&w,1),"faulted"));
@@ -248,7 +271,7 @@ static void wait_tests(void){
   if(scenario==10||scenario==12)assert(!strcmp(wait_outcome(&w,4),"completed"));
   assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t->f.session));for(unsigned i=0;i<w.count;i++)json_object_put(w.on[i]);cleanup(&t->f,parent);
  }
- puts("PASS: Durable allSettled/failFast, missing/foreign/self/mutual/owned-conversation wait cycles, background isolation, diamond joins, cancellation cascade and waiting reopen on SQLite/JSONL");
+ puts("PASS: atomic phase Entry/Document/child/wait commit and callback/cycle/owner rollback; Durable allSettled/failFast, missing/foreign/self/mutual/owned-conversation wait cycles, background isolation, diamond joins, cancellation cascade and waiting reopen on SQLite/JSONL");
 }
 
 int main(void){

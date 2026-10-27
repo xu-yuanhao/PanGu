@@ -434,6 +434,8 @@
  mov [rsp+112],rax
  mov rax,[r13+24]
  mov [rsp+120],rax
+ cmp qword ptr [rbx+112],0
+ jne .Ltr_store_admitted
  mov rdi,[rbx]
  mov rsi,rsp
  lea rdx,[rsp+48]
@@ -443,22 +445,46 @@
  mov ebp,1
  test eax,eax
  jnz .Ltr_store_cleanup
+.Ltr_store_admitted:
+ mov rdi,[rbx+112]
+ test rdi,rdi
+ jnz .Ltr_store_set
  mov rdi,rsp
+.Ltr_store_set:
  mov rsi,r12
  mov rdx,[r13]
  mov rcx,[r13+40]
  call pg_record_tx_set_task@PLT
  test eax,eax
  jnz .Ltr_store_reject
+ mov rdi,[rbx+112]
+ test rdi,rdi
+ jnz .Ltr_store_candidates
  mov rdi,rsp
+.Ltr_store_candidates:
  lea rsi,[rsp+96]
  call pg_record_tx_staged_tasks@PLT
  test eax,eax
  jnz .Ltr_store_reject
+ xor r14d,r14d
+.Ltr_store_find_snapshot:
  mov rdi,[rsp+96]
- xor esi,esi
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ltr_store_alloc
+ mov rdi,[rsp+96]
+ mov rsi,r14
  call json_object_array_get_idx@PLT
+ mov [rsp+128],rax
+ TGET rax,id
  mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+16]
+ je .Ltr_store_snapshot
+ inc r14
+ jmp .Ltr_store_find_snapshot
+.Ltr_store_snapshot:
+ mov rdi,[rsp+128]
  call json_object_get@PLT
  mov [rsp+104],rax
  test rax,rax
@@ -628,6 +654,7 @@ pg_task_runner_open:
  mov qword ptr [rdi+88],0
  mov qword ptr [rdi+96],0
  mov qword ptr [rdi+104],0
+ mov qword ptr [rdi+112],0
  xor eax,eax
 .Ltr_open_return:
  ret
@@ -919,9 +946,24 @@ pg_task_runner_commit:
 .Ltr_commit_terminal_check:
  cmp r13d,5
  jne .Ltr_commit_replace
+ cmp qword ptr [rbx+112],0
+ je .Ltr_commit_owned_stored
+ mov rdi,rbx
+ call .Ltw_has_owned
+ cmp eax,-4
+ jne .Ltr_commit_owned_allocation
+ mov ebp,4
+ jmp .Ltr_commit_cleanup
+.Ltr_commit_owned_allocation:
+ cmp eax,-5
+ jne .Ltr_commit_owned_status
+ mov ebp,5
+ jmp .Ltr_commit_cleanup
+.Ltr_commit_owned_stored:
  mov rdi,[rbx+8]
  mov rsi,[rbx+16]
  call .Ltr_owned
+.Ltr_commit_owned_status:
  test eax,eax
  js .Ltr_commit_storage_active
  jz .Ltr_commit_replace
@@ -1851,7 +1893,7 @@ pg_task_runner_close:
  mov [rbx+32],r14
 .Lts_allocate_runner:
  mov edi,1
- mov esi,112
+ mov esi,120
  call calloc@PLT
  test rax,rax
  jz .Lts_discover_allocation
@@ -2330,50 +2372,13 @@ pg_task_scheduler_close:
 .Ltw_snapshot_append:
  imul r13,qword ptr [r14+8],48
  add r13,[r14]
- pxor xmm0,xmm0
- movdqu [r13],xmm0
- movdqu [r13+16],xmm0
- movdqu [r13+32],xmm0
- mov rdi,[rsp+136]
- call json_object_get@PLT
- mov [r13+16],rax
  inc qword ptr [r14+8]
- TGET rax,id
- mov rdi,rax
- call pg_document_safe_number@PLT
- test edx,edx
- jz .Ltw_snapshot_bad
- mov [r13],rax
- mov eax,[rsp]
- mov [r13+44],eax
+ mov rdi,r13
+ mov rsi,[rsp+136]
+ mov edx,[rsp]
+ call .Ltw_node
  test eax,eax
- jz .Ltw_snapshot_conversation
- mov rdi,[r13+16]
- call .Ltr_record_state
- test eax,eax
- js .Ltw_snapshot_bad
- mov [r13+40],eax
- TGET "qword ptr [r13+16]",background
- mov rdi,rax
- call json_object_get_boolean@PLT
- test eax,eax
- jnz .Ltw_snapshot_skip
- TGET "qword ptr [r13+16]",owner
- test rax,rax
- jnz .Ltw_snapshot_parent
- TGET "qword ptr [r13+16]",conversation_id
- jmp .Ltw_snapshot_parent
-.Ltw_snapshot_conversation:
- TGET "qword ptr [r13+16]",owner
- TGET rax,task_id
- test rax,rax
- jz .Ltw_snapshot_skip
-.Ltw_snapshot_parent:
- mov rdi,rax
- call pg_document_safe_number@PLT
- test edx,edx
- jz .Ltw_snapshot_bad
- mov [r13+8],rax
+ jnz .Ltw_snapshot_bad
 .Ltw_snapshot_skip:
  inc r12
  jmp .Ltw_snapshot_row
@@ -2411,45 +2416,9 @@ pg_task_scheduler_close:
  mov qword ptr [rsp+112],0
  jmp .Ltw_snapshot_page
 .Ltw_snapshot_sort:
- mov rdi,[r14]
- mov rsi,[r14+8]
- mov edx,48
- lea rcx,[rip+.Ltw_compare]
- call qsort@PLT
- xor r12d,r12d
-.Ltw_snapshot_edges:
- cmp r12,[r14+8]
- jae .Ltw_snapshot_buffers
- imul r13,r12,48
- add r13,[r14]
- mov rsi,[r13+8]
- test rsi,rsi
- jz .Ltw_snapshot_edge_next
  mov rdi,r14
- call .Ltw_find
- test rax,rax
- jz .Ltw_snapshot_edge_next
- mov rcx,[rax+24]
- mov [r13+32],rcx
- lea rcx,[r12+1]
- mov [rax+24],rcx
-.Ltw_snapshot_edge_next:
- inc r12
- jmp .Ltw_snapshot_edges
-.Ltw_snapshot_buffers:
- mov rdi,[r14+8]
- mov esi,8
- call calloc@PLT
- mov [r14+24],rax
- test rax,rax
- jz .Ltw_snapshot_alloc
- mov rdi,[r14+8]
- mov esi,1
- call calloc@PLT
- mov [r14+32],rax
- test rax,rax
- jz .Ltw_snapshot_alloc
- xor ebp,ebp
+ call .Ltw_index
+ mov ebp,eax
  jmp .Ltw_snapshot_end
 .Ltw_snapshot_bad:
  mov ebp,6
@@ -2514,6 +2483,15 @@ pg_task_scheduler_close:
  mov ebp,eax
  test eax,eax
  jnz .Ltw_validate_end
+ cmp qword ptr [rbx+112],0
+ je .Ltw_validate_targets_start
+ mov rdi,rsp
+ mov rsi,[rbx+112]
+ call .Ltw_overlay
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltw_validate_end
+.Ltw_validate_targets_start:
  xor r12d,r12d
 .Ltw_validate_target:
  mov rdi,[rsp+72]
@@ -3127,6 +3105,425 @@ pg_task_scheduler_close:
  add rsp,24
  pop r12
  pop rbx
+ ret
+
+.text
+.globl pg_task_runner_commit_with
+.type pg_task_runner_commit_with,@function
+pg_task_runner_commit_with:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,128
+ mov rbx,rdi
+ mov r13,rsi
+ mov r12,rdx
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ mov qword ptr [rsp+96],0
+ mov ebp,4
+ test rbx,rbx
+ jz .Ltc_return
+ test r12,r12
+ jz .Ltc_return
+ cmp dword ptr [rbx+76],1
+ jne .Ltc_return
+ cmp qword ptr [rbx+32],0
+ je .Ltc_return
+ cmp qword ptr [rbx+112],0
+ jne .Ltc_return
+ cmp dword ptr [rbx+92],0
+ jne .Ltc_return
+ mov ebp,7
+ cmp dword ptr [rbx+84],0
+ jne .Ltc_return
+ mov rdi,[rbx]
+ call pg_durable_session_idle@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Ltc_return
+ mov r14,[rbx+8]
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,[r14]
+ mov r8,[r14+8]
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Ltc_return
+ mov [rbx+112],rsp
+ mov dword ptr [rbx+92],1
+ mov rdi,r13
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ lea rcx,[rsp+96]
+ call r12
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltc_callback_error
+ mov dword ptr [rbx+92],0
+ cmp qword ptr [rsp+96],0
+ jne .Ltc_decide
+ mov rdi,rbx
+ call .Ltr_fetch
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltc_cleanup
+ TGET "qword ptr [rbx+24]",state_key
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+96],rax
+.Ltc_decide:
+ mov rdi,rbx
+ mov rsi,[rsp+96]
+ call pg_task_runner_commit@PLT
+ mov ebp,eax
+ jmp .Ltc_cleanup
+.Ltc_callback_error:
+ cmp ebp,4
+ jae .Ltc_cleanup
+ mov ebp,4
+.Ltc_cleanup:
+ mov dword ptr [rbx+92],0
+ mov rdi,[rbx]
+ cmp [rdi+152],rsp
+ jne .Ltc_release
+ call pg_durable_session_abort@PLT
+.Ltc_release:
+ mov qword ptr [rbx+112],0
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+.Ltc_return:
+ mov eax,ebp
+ add rsp,128
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_task_runner_commit_with,.-pg_task_runner_commit_with
+
+/* Replace/admit a detached staged record in a temporary graph node. */
+.Ltw_node:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12d,edx
+ pxor xmm0,xmm0
+ movdqu [rbx],xmm0
+ movdqu [rbx+16],xmm0
+ movdqu [rbx+32],xmm0
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov [rbx+16],rax
+ mov [rbx+44],r12d
+ TGET rax,id
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_node_bad
+ test rax,rax
+ jz .Ltw_node_bad
+ mov [rbx],rax
+ test r12d,r12d
+ jz .Ltw_node_conversation
+ mov rdi,[rbx+16]
+ call .Ltr_record_state
+ test eax,eax
+ js .Ltw_node_bad
+ mov [rbx+40],eax
+ TGET "qword ptr [rbx+16]",background
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltw_node_good
+ TGET "qword ptr [rbx+16]",owner
+ test rax,rax
+ jnz .Ltw_node_parent
+ TGET "qword ptr [rbx+16]",conversation_id
+ jmp .Ltw_node_parent
+.Ltw_node_conversation:
+ TGET "qword ptr [rbx+16]",owner
+ TGET rax,task_id
+ test rax,rax
+ jz .Ltw_node_good
+.Ltw_node_parent:
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_node_bad
+ mov [rbx+8],rax
+.Ltw_node_good:
+ xor eax,eax
+ jmp .Ltw_node_end
+.Ltw_node_bad:
+ mov eax,4
+.Ltw_node_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ltw_index:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ mov edx,48
+ lea rcx,[rip+.Ltw_compare]
+ call qsort@PLT
+ xor r12d,r12d
+.Ltw_index_clear:
+ cmp r12,[rbx+8]
+ jae .Ltw_index_link_start
+ imul rax,r12,48
+ add rax,[rbx]
+ mov qword ptr [rax+24],0
+ mov qword ptr [rax+32],0
+ inc r12
+ jmp .Ltw_index_clear
+.Ltw_index_link_start:
+ xor r12d,r12d
+.Ltw_index_link:
+ cmp r12,[rbx+8]
+ jae .Ltw_index_buffers
+ imul r13,r12,48
+ add r13,[rbx]
+ mov rsi,[r13+8]
+ test rsi,rsi
+ jz .Ltw_index_next
+ mov rdi,rbx
+ call .Ltw_find
+ test rax,rax
+ jz .Ltw_index_next
+ mov rcx,[rax+24]
+ mov [r13+32],rcx
+ lea rcx,[r12+1]
+ mov [rax+24],rcx
+.Ltw_index_next:
+ inc r12
+ jmp .Ltw_index_link
+.Ltw_index_buffers:
+ mov qword ptr [rbx+40],0
+ mov qword ptr [rbx+48],0
+ mov rdi,[rbx+24]
+ call free@PLT
+ mov qword ptr [rbx+24],0
+ mov rdi,[rbx+32]
+ call free@PLT
+ mov qword ptr [rbx+32],0
+ mov rdi,[rbx+8]
+ mov esi,8
+ call calloc@PLT
+ mov [rbx+24],rax
+ test rax,rax
+ jz .Ltw_index_alloc
+ mov rdi,[rbx+8]
+ mov esi,1
+ call calloc@PLT
+ mov [rbx+32],rax
+ test rax,rax
+ jz .Ltw_index_alloc
+ xor eax,eax
+ jmp .Ltw_index_end
+.Ltw_index_alloc:
+ mov eax,5
+.Ltw_index_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* Merge the Tx's latest detached candidates before graph decisions. */
+.Ltw_overlay:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,r12
+ mov rsi,rsp
+ call pg_record_tx_staged_tasks@PLT
+ mov ebp,5
+ test eax,eax
+ jnz .Ltw_overlay_end
+ mov rdi,r12
+ lea rsi,[rsp+8]
+ call pg_record_tx_staged_conversations@PLT
+ test eax,eax
+ jnz .Ltw_overlay_end
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ mov r12,rax
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ add r12,rax
+ jc .Ltw_overlay_end
+ add r12,[rbx+8]
+ jc .Ltw_overlay_end
+ cmp r12,[rbx+16]
+ jbe .Ltw_overlay_start
+ mov rdi,[rbx]
+ mov rsi,r12
+ mov edx,48
+ call reallocarray@PLT
+ test rax,rax
+ jz .Ltw_overlay_end
+ mov [rbx],rax
+ mov [rbx+16],r12
+.Ltw_overlay_start:
+ xor r12d,r12d
+ mov dword ptr [rsp+24],2
+.Ltw_overlay_each:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltw_overlay_next_table
+ mov rdi,[rsp]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ TGET rax,id
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltw_overlay_invalid
+ mov r14,rax
+ xor r13d,r13d
+.Ltw_overlay_find:
+ cmp r13,[rbx+8]
+ jae .Ltw_overlay_append
+ imul rax,r13,48
+ add rax,[rbx]
+ cmp [rax],r14
+ je .Ltw_overlay_replace
+ inc r13
+ jmp .Ltw_overlay_find
+.Ltw_overlay_replace:
+ mov rdi,[rax+16]
+ call json_object_put@PLT
+ jmp .Ltw_overlay_node
+.Ltw_overlay_append:
+ inc qword ptr [rbx+8]
+.Ltw_overlay_node:
+ imul rdi,r13,48
+ add rdi,[rbx]
+ mov rsi,[rsp+16]
+ mov edx,[rsp+24]
+ call .Ltw_node
+ test eax,eax
+ jnz .Ltw_overlay_invalid
+ inc r12
+ jmp .Ltw_overlay_each
+.Ltw_overlay_next_table:
+ cmp dword ptr [rsp+24],0
+ je .Ltw_overlay_index
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],0
+ mov dword ptr [rsp+24],0
+ xor r12d,r12d
+ jmp .Ltw_overlay_each
+.Ltw_overlay_index:
+ mov rdi,rbx
+ call .Ltw_index
+ mov ebp,eax
+ jmp .Ltw_overlay_end
+.Ltw_overlay_invalid:
+ mov ebp,4
+.Ltw_overlay_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ltw_has_owned:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,64
+ mov rbx,rdi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ mov rdi,[rbx+8]
+ mov rsi,rsp
+ call .Ltw_snapshot
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltw_owned_error
+ mov rdi,rsp
+ mov rsi,[rbx+112]
+ call .Ltw_overlay
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltw_owned_error
+ mov rdi,rsp
+ mov rsi,[rbx+16]
+ call .Ltw_find
+ test rax,rax
+ jz .Ltw_owned_storage
+ mov rdi,rsp
+ mov rsi,rax
+ call .Ltw_children
+.Ltw_owned_walk:
+ mov rax,[rsp+48]
+ cmp rax,[rsp+40]
+ jae .Ltw_owned_none
+ mov rcx,[rsp+24]
+ mov r12,[rcx+rax*8]
+ inc qword ptr [rsp+48]
+ cmp dword ptr [r12+44],0
+ je .Ltw_owned_conversation
+ cmp dword ptr [r12+40],5
+ je .Ltw_owned_walk
+ mov ebp,1
+ jmp .Ltw_owned_end
+.Ltw_owned_conversation:
+ mov rdi,rsp
+ mov rsi,r12
+ call .Ltw_children
+ jmp .Ltw_owned_walk
+.Ltw_owned_none:
+ xor ebp,ebp
+ jmp .Ltw_owned_end
+.Ltw_owned_storage:
+ mov ebp,6
+.Ltw_owned_error:
+ neg ebp
+.Ltw_owned_end:
+ mov rdi,rsp
+ call .Ltw_release
+ mov eax,ebp
+ add rsp,64
+ pop r12
+ pop rbx
+ pop rbp
  ret
 
 .section .note.GNU-stack,"",@progbits

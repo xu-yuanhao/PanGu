@@ -92,3 +92,7 @@ SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合
 ## B02 持久等待与取消图（2026-10-27）
 
 `task_runner.S`按Durable `validateWait/waitCycle/reconcile`接入waiting提交和恢复、allSettled/failFast、等待/普通所有权环校验、owned-conversation与后台边界。迭代图遍历以live节点为界，已终态成员按ID单项读取；取消派生标记在一个Session事务中提交，abort按子级到父级运行。双后端专项覆盖等待重开、自等/互等/子等父/跨会话环、菱形依赖、持有失败、兄弟隔离与后台分支。当前接口与完整缺口见核心TODO交接区。
+
+## B02 Generation/Tool 原子phase提交（2026-10-27）
+
+`pg_task_runner_commit_with`接入Durable Session实际事务：同步回调读写Entry、Document并创建工具子任务，返回下一checkpoint/waiting状态一起提交。图校验合并最新候选，已提交事实与新建子任务一同参与等待/所有权决策；终结owner同时新建owned任务按上游最终owner规则拒绝。双后端专项验证成功批次和回调/环/owner拒绝时记录、文档及任务整体撤销；NULL下一状态保留本阶段。下一消费者是Generation/Tool任务与现有模型/工具服务。

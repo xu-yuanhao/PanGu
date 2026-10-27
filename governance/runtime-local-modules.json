@@ -1647,7 +1647,7 @@
         "session.records.local.v0",
         "json-c"
       ],
-      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline; persisted allSettled/failFast waits, native iterative wait-for graph including owned conversations/background barriers, atomic derived cancellation marks and bottom-up abort",
+      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline; persisted allSettled/failFast waits, native iterative wait-for graph including owned conversations/background barriers, atomic derived cancellation marks and bottom-up abort; synchronous phase transaction stages Entry/Document/child work and next state atomically, final overlay drives wait and owned-work decisions",
       "exports": [
         "pg_task_runner_open",
         "pg_task_runner_poll",
@@ -1655,7 +1655,8 @@
         "pg_task_runner_close",
         "pg_task_scheduler_open",
         "pg_task_scheduler_poll",
-        "pg_task_scheduler_close"
+        "pg_task_scheduler_close",
+        "pg_task_runner_commit_with"
       ],
       "reference_basis": [
         {
@@ -1663,9 +1664,12 @@
           "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
           "paths": [
             "packages/durable/src/harness/scheduler.ts",
-            "packages/durable/src/types.ts"
+            "packages/durable/src/types.ts",
+            "packages/durable/src/harness/generation.ts",
+            "packages/durable/src/harness/tool.ts",
+            "packages/durable/src/session/transaction.ts"
           ],
-          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; live-status selection and all-task recovery; validateWait/waitCycle/reconcile wait graph, failFast and cancellation cascade",
+          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; live-status selection and all-task recovery; validateWait/waitCycle/reconcile wait graph, failFast and cancellation cascade; Generation startToolRound/prepare and Tool intent/settle use runtime.commit; staged tasks/conversations override committed graph and final-owner validation rejects new work in the commit finishing an owner",
           "tests_to_read": [
             "packages/durable/test/harness-tasks.test.ts",
             "packages/durable/test/harness-tasks-recovery.test.ts",
