@@ -1481,9 +1481,20 @@ pg_document_holds_merge_bind:
 .globl pg_document_holds_finish
 .type pg_document_holds_finish,@function
 pg_document_holds_finish:
+ xor edx,edx
+ jmp .Lfinish_common
+.globl pg_document_holds_finish_observed
+.type pg_document_holds_finish_observed,@function
+pg_document_holds_finish_observed:
+ test rdx,rdx
+ jz .Linvalid
+.Lfinish_common:
  push rbx
  push r12
  push r13
+ push r14
+ sub rsp,8
+ mov r14,rdx
  mov rbx,rdi
  mov r12,rsi
  mov r13d,1
@@ -1507,7 +1518,15 @@ pg_document_holds_finish:
  mov r13d,[r12+52]
  test r13d,r13d
  jnz .Lfinish_cleanup
+ test r14,r14
+ jz .Lfinish_plain
+ mov rcx,r14
+ xor edx,edx
+ call pg_document_holds_flush_observed@PLT
+ jmp .Lfinish_flushed
+.Lfinish_plain:
  call pg_document_holds_flush@PLT
+.Lfinish_flushed:
  mov r13d,eax
  test eax,eax
  jz .Lfinish_cleanup
@@ -1531,11 +1550,14 @@ pg_document_holds_finish:
  mov r13d,[r12+52]
 .Lfinish_return:
  mov eax,r13d
+ add rsp,8
+ pop r14
  pop r13
  pop r12
  pop rbx
  ret
 .size pg_document_holds_finish,.-pg_document_holds_finish
+.size pg_document_holds_finish_observed,.-pg_document_holds_finish_observed
 .section .note.GNU-stack,"",@progbits
 
 .text

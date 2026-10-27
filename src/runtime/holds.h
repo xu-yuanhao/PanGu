@@ -70,4 +70,9 @@ typedef struct {
    Services and inputs remain borrowed only through this synchronous call. */
 pg_records_status pg_document_holds_flush_observed(pg_document_holds *,pg_record_session *,
  uint64_t id,const pg_hold_notifications *);
+/* Finish with the same notification service used by selected/timer flush.
+   Healthy held values store and notify once; failed Session cleanup writes
+   nothing. Descriptor stays borrowed through this call, including retries. */
+pg_records_status pg_document_holds_finish_observed(pg_document_holds *,pg_record_session *,
+ const pg_hold_notifications *);
 #endif

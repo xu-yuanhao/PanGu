@@ -547,3 +547,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - 验证真实MemoryStorage的adopt→observed→adopted→host→resolve顺序，adopt前/后拒绝、内部观察错误、二者并发的Storage主因/observer报告。直接执行8b0caef实际#runCommit/#publish/#notifyHosts方法，五组结果/顺序/优先级与原生矩阵一致。held flush三组及实际Session stored/memory/混合三组通过。新绑定的普通/memory/held故障测试分别73/62/65次拒绝或fail-stop，另两次host snapshot分配故障在回调前安全重试成功；未把重试记成拒绝。
 - 一个旧Session故障用例原先要求任何故障都使commit返回失败，已按新语义限定为：成功memory采纳后的observer/timer错误可保留提交结果，同时Session失败且holds仍持有。最终专项/完整Runtime见当前实现记录。
 - 下一行为：自动timer/reload/close接入queued adoption通知服务，继续地址跟随watch与同步observeDoc；K03总验收未完成。
+
+### K03 自动holds通知接线
+
+- 固定Pi 8b0caefc2260a28d2cec0a7ce3daef1d3de24776：Session.#armHoldTimer排队调用#storeHolds、#loadDocument版本重载前保存、close健康保存与失败清理；对照session-deferred-commits的timer、close、version用例及session-adoption。上游检查Pi origin保持6c384aa，Harness origin/master保持22ddee37，工作树固定基线未变。
+- 手写hold_timer.S新增显式扩展控制器，借用同一hold通知服务到Session最终关闭；durable_session.S将定时、选定incarnation重载和关闭保存接入adoption发布，holds.S提供带通知finish。既有72字节timer及192字节Session布局保持，扩展80字节并在头文件规定有效期。
+- tests/runtime/test_record_memory.c的automatic_flush_tests覆盖实际Session内存采纳后定时保存、版本迁移前保存、正常关闭保存及失败关闭不写；校验内部通知一次、持久通知一次、seq/内容、timer资源和重复关闭。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及来源差异通过；G00和Assembly清单通过。
+- 下一行为：关闭listener生命周期与地址跟随watch/同步observeDoc；K03总验收继续按全量范围执行。

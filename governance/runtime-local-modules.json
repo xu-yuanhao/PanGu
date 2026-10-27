@@ -1140,7 +1140,8 @@
         "pg_document_holds_merge_bind",
         "pg_document_holds_flush_one",
         "pg_document_holds_finish",
-        "pg_document_holds_flush_observed"
+        "pg_document_holds_flush_observed",
+        "pg_document_holds_finish_observed"
       ],
       "reference_basis": [
         {
@@ -1160,7 +1161,7 @@
           "paths": [
             "packages/durable/src/session/session.ts"
           ],
-          "semantics": "notification publication follows successful native state adoption inside Storage.adopt, before backend settlement; cleanup and ordinary publication hooks retain their own settlement/release duties; adopted notification survives post-adopt backend rejection",
+          "semantics": "notification publication follows successful native state adoption inside Storage.adopt, before backend settlement; cleanup and ordinary publication hooks retain their own settlement/release duties; adopted notification survives post-adopt backend rejection; healthy Session close uses the same prepared notification service while failed Session teardown performs no write",
           "tests_to_read": [
             "packages/durable/test/session-adoption.test.ts"
           ]
@@ -1182,7 +1183,8 @@
       "exports": [
         "pg_hold_timer_open",
         "pg_hold_timer_sync",
-        "pg_hold_timer_stop"
+        "pg_hold_timer_stop",
+        "pg_hold_timer_open_observed"
       ],
       "reference_basis": [
         {
@@ -1195,6 +1197,18 @@
           "semantics": "#armHoldTimer arms minimum deadline, preserves fired timer until queued job, disarms replaced deadline, infinity has no timer, queued callback stores all held docs only while active/healthy; timer/queue services are injected native providers; queued tickets own callback storage through drain; foreground delivery and mutation-line enqueue are never inline",
           "tests_to_read": [
             "packages/durable/test/session-deferred-commits.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#armHoldTimer, #loadDocument and close route held persistence through #storeHolds with adoption-time durable publication; an explicitly extended native timer borrows the notification service through final Session close while preserving the base timer and Session layouts",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts",
+            "packages/durable/test/session-adoption.test.ts"
           ]
         }
       ]

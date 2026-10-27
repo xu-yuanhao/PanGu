@@ -37,4 +37,11 @@ typedef struct {
 pg_records_status pg_hold_timer_open(pg_hold_timer *,pg_document_holds *,pg_record_session *,const pg_hold_timer_host *);
 pg_records_status pg_hold_timer_sync(pg_hold_timer *);
 int pg_hold_timer_stop(pg_hold_timer *);
+typedef struct {pg_hold_timer timer;const pg_hold_notifications *notifications;} pg_observed_hold_timer;
+/* Extended caller-owned controller, preserving pg_hold_timer's 72-byte ABI.
+   Its notifications remain borrowed through the owning Session's final close,
+   including version reload and close flush after timer stop. Pass &timer to
+   existing Session APIs; the private state tag identifies this extension. */
+pg_records_status pg_hold_timer_open_observed(pg_observed_hold_timer *,pg_document_holds *,
+ pg_record_session *,const pg_hold_timer_host *,const pg_hold_notifications *);
 #endif

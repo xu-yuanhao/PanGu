@@ -182,7 +182,15 @@ pg_durable_session_open:
  mov rdx,[rsi+72]
  mov rdi,[rbx+16]
  mov rsi,[rbx]
+ mov rax,[rbx+24]
+ cmp dword ptr [rax+68],1
+ jne .Ldurable_flush_plain
+ mov rcx,[rax+72]
+ call pg_document_holds_flush_observed@PLT
+ jmp .Ldurable_flushed
+.Ldurable_flush_plain:
  call pg_document_holds_flush_one@PLT
+.Ldurable_flushed:
  test eax,eax
  jnz .Ldurable_flush_end
  cmp dword ptr [rbx+172],1
@@ -451,7 +459,15 @@ pg_durable_session_close:
  jne .Ldurable_close_wait
  mov rdi,[rbx+16]
  mov rsi,r12
+ mov rax,[rbx+24]
+ cmp dword ptr [rax+68],1
+ jne .Ldurable_finish_plain
+ mov rdx,[rax+72]
+ call pg_document_holds_finish_observed@PLT
+ jmp .Ldurable_finished
+.Ldurable_finish_plain:
  call pg_document_holds_finish@PLT
+.Ldurable_finished:
  mov rdi,[rbx+8]
  call pg_document_cache_close@PLT
  test eax,eax

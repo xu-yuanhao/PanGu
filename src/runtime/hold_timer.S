@@ -214,7 +214,15 @@ pg_hold_timer_sync:
  jne .Ltimer_job_free
  mov rdi,[rbx]
  mov rsi,rax
+ cmp dword ptr [rbx+68],1
+ jne .Ltimer_flush_plain
+ mov rcx,[rbx+72]
+ xor edx,edx
+ call pg_document_holds_flush_observed@PLT
+ jmp .Ltimer_flushed
+.Ltimer_flush_plain:
  call pg_document_holds_flush@PLT
+.Ltimer_flushed:
  test eax,eax
  jz .Ltimer_job_free
  mov esi,eax
@@ -271,4 +279,44 @@ pg_hold_timer_stop:
  pop rbx
  ret
 .size pg_hold_timer_stop,.-pg_hold_timer_stop
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_hold_timer_open_observed
+.type pg_hold_timer_open_observed,@function
+pg_hold_timer_open_observed:
+ mov eax,1
+ test r8,r8
+ jz .Lobserved_timer_invalid
+ cmp qword ptr [r8+8],0
+ je .Lobserved_timer_invalid
+ cmp qword ptr [r8+16],0
+ je .Lobserved_timer_invalid
+ cmp qword ptr [r8+24],0
+ je .Lobserved_timer_invalid
+ cmp qword ptr [r8+32],0
+ je .Lobserved_timer_invalid
+ cmp qword ptr [r8+40],0
+ je .Lobserved_timer_invalid
+ cmp qword ptr [r8+48],0
+ je .Lobserved_timer_invalid
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,r8
+ call pg_hold_timer_open
+ test eax,eax
+ jnz .Lobserved_timer_done
+ mov [rbx+72],r12
+ mov dword ptr [rbx+68],1
+.Lobserved_timer_done:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Lobserved_timer_invalid:
+ mov eax,1
+ ret
+.size pg_hold_timer_open_observed,.-pg_hold_timer_open_observed
 .section .note.GNU-stack,"",@progbits

@@ -542,3 +542,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实际验证：五组真实MemoryStorage adopt/observed/adopted/host/resolve顺序、adopt前/后拒绝、observer错误及双错误优先级；三组held flush及三组实际Session stored/memory/混合路径。直接执行新Pi实际#runCommit/#publish/#notifyHosts方法，五组矩阵一致。普通/memory/held故障分别73/62/65次fail-stop或拒绝，另2次host snapshot失败在回调前安全重试并完整派发，未作为拒绝或遗漏。一个旧故障断言按成功memory采纳后Session失败但提交结果保留的语义修正。差异probe首次缺少未执行分支的私有#hold声明，补齐测试stub后重跑；调试导入产生的空__pycache__目录由G00拦截，清理后检查通过。
 - 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、固定Pi/Chord差异基线与新8b0caef方法矩阵通过；共享/隔离核心G00/Assembly、隔离产品构建通过。
 - 同一实施Agent自审：既有DocTx/holds通知时点、Session独立queued服务/错误捕获/Storage适配器、来源/专项/TODO；公开旧布局、门禁和预算保持。10个候选路径内容清单摘要（本记录加入前）：8feb50c8bbf8a460235f9a2744730a55ba8a64babb900dd420202f2a405c40e6；隔离核心树7bd21f05ab4bc8ec228b504225436f886583eb08。结论为实际adoption发布与错误结算本地通过；自动timer/reload/close通知接线、地址跟随watch/observeDoc继续，K03总验收未完成。TUI工作树保留。
+
+## K03 定时、重载与关闭的自动持久通知
+
+- 来源：固定Pi 8b0caef的Session.#armHoldTimer/#storeHolds/#loadDocument/close与deferred/adoption测试；fetch后Pi origin保持6c384aa、Harness origin/master保持22ddee37。
+- 实现：手写timer扩展控制器借用holds通知服务，自动timer job、选定版本重载、健康close使用同一adoption发布；失败close只释放。基础timer/Session布局保持，扩展所有权与结束时点在公开头声明，新增两个导出随模块登记。
+- 实际验证：automatic_flush_tests四种实际Session路径通过，内部观察一次且持久通知仅保存时一次；检查序号、内容、迁移、timer释放与重复关闭。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan及固定Pi/Chord和8b方法差异通过。共享及隔离核心G00/Assembly、隔离产品构建通过。生成候选摘要首次被Git中文路径转义影响，改用NUL分隔读取后完成，未影响源或测试。
+- 同一实施Agent自审：8个候选路径内容清单摘要（本记录加入前）97f96b64772a7288f4f6711e9b5de3b666f9b62f56c095408560dbb365aaf9b4；隔离核心树aa6e978f7c4dce7ec1bf8949703da0378d43b4da。结论为自动保存通知本地通过；close listener及地址跟随watch/observeDoc继续。K03全量未完成，TUI工作保留。
