@@ -28,7 +28,7 @@ int pg_durable_inputs_poll(pg_durable_inputs *,uint64_t id,struct json_object **
 int pg_durable_inputs_withdraw(pg_durable_inputs *,uint64_t conversation,uint64_t id,unsigned *result);
 /* Phase transaction helpers: prepare precedes table writes. Plan and boundary
    users are owned even on later failure. apply uses committed/staged facts only;
-   kind=postTools(0),final(1),model failure(2),abort(3),withdraw queued inputs(4).
+   kind=postTools(0),final(1),model failure(2),abort(3),withdraw queued inputs(4),restart limit(5, failure policy).
    Callers create a successor only when selected users or a continuing tool run
    require it, and commit state/Entries/Submission changes together. */
 int pg_durable_inputs_prepare(pg_durable_inputs *,pg_record_tx *,uint64_t,struct json_object **plan);

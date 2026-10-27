@@ -541,6 +541,12 @@ pg_durable_inputs_apply:
  mov r12,rsi
  mov r13,rdx
  mov r14,r9
+ mov dword ptr [rsp+104],0
+ cmp ecx,5
+ jne .Li_apply_kind_ready
+ mov dword ptr [rsp+104],1
+ mov ecx,2
+.Li_apply_kind_ready:
  mov [rsp+76],ecx
  mov [rsp+80],r8
  pxor xmm0,xmm0
@@ -630,6 +636,9 @@ pg_durable_inputs_apply:
  cmp dword ptr [rsp+76],2
  jne .Li_apply_reason_reset
  lea rdi,[rip+.Li_model_error]
+ cmp dword ptr [rsp+104],0
+ je .Li_apply_reason_string
+ lea rdi,[rip+.Li_restart_limit]
  jmp .Li_apply_reason_string
 .Li_apply_reason_reset:
  cmp dword ptr [rsp+76],0
@@ -1601,3 +1610,6 @@ pg_durable_inputs_withdraw:
 .Li_all: .asciz "all"
 .Li_request_id: .asciz "requestId"
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Li_restart_limit: .asciz "restart_limit"

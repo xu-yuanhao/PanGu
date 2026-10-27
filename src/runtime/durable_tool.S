@@ -65,7 +65,7 @@ pg_durable_tool_init:
  mov [rdi+32],rdi
  lea rax,[rip+.Ldt_initial]
  mov [rdi+40],rax
- lea rax,[rdi+88]
+ lea rax,[rdi+96]
  mov [rdi+48],rax
  mov qword ptr [rdi+56],2
  lea rax,[rip+.Ldt_abort]
@@ -73,22 +73,24 @@ pg_durable_tool_init:
  lea rax,[rip+.Ldt_cleanup]
  mov [rdi+72],rax
  mov qword ptr [rdi+80],0
- lea rax,[rip+.Ldt_call_phase]
+ lea rax,[rip+.Ldt_cutoff]
  mov [rdi+88],rax
- mov qword ptr [rdi+96],4
- mov [rdi+104],rdi
+ lea rax,[rip+.Ldt_call_phase]
+ mov [rdi+96],rax
+ mov qword ptr [rdi+104],4
+ mov [rdi+112],rdi
  lea rax,[rip+.Ldt_poll]
- mov [rdi+112],rax
- lea rax,[rip+.Ldt_cleanup]
  mov [rdi+120],rax
- lea rax,[rip+.Ldt_execute_phase]
- mov [rdi+128],rax
- mov qword ptr [rdi+136],7
- mov [rdi+144],rdi
- lea rax,[rip+.Ldt_poll]
- mov [rdi+152],rax
  lea rax,[rip+.Ldt_cleanup]
+ mov [rdi+128],rax
+ lea rax,[rip+.Ldt_execute_phase]
+ mov [rdi+136],rax
+ mov qword ptr [rdi+144],7
+ mov [rdi+152],rdi
+ lea rax,[rip+.Ldt_poll]
  mov [rdi+160],rax
+ lea rax,[rip+.Ldt_cleanup]
+ mov [rdi+168],rax
  xor eax,eax
 .Ldt_init_end:
  ret
@@ -429,6 +431,9 @@ pg_durable_tool_init:
  cmp dword ptr [rbx+4280],0
  je .Ldt_data_abort
  lea rdi,[rip+.Ldt_interrupted]
+ cmp dword ptr [rbx+4280],2
+ jne .Ldt_data_abort
+ lea rdi,[rip+.Ldt_restart_limit]
 .Ldt_data_abort:
  cmp dword ptr [rbx+4256],2
  jne .Ldt_data_status
@@ -568,6 +573,16 @@ pg_durable_tool_init:
  mov rdi,r14
  lea rsi,[rip+.Ldt_error]
  mov rdx,rbp
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ cmp dword ptr [rbx+4280],2
+ jne .Ldt_stage_receipt
+ lea rdi,[rip+.Ldt_cutoff_detail_json]
+ call json_tokener_parse@PLT
+ mov rdx,rax
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_error]
  call .Ldt_set
  test eax,eax
  jnz .Ldt_stage_end
@@ -1329,3 +1344,46 @@ pg_durable_tool_observation_release:
 
 .section .rodata
 .Ldt_structured_output: .asciz "structuredOutput"
+
+.text
+.Ldt_cutoff:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ mov r12,rdi
+ call .Ldt_open
+ test eax,eax
+ jnz .Ldt_cutoff_end
+ mov r12,[rbx+56]
+ mov dword ptr [r12+4252],1
+ mov dword ptr [r12+4256],1
+ mov dword ptr [r12+4280],2
+ lea rdi,[rip+.Ldt_cutoff_metadata]
+ call json_tokener_parse@PLT
+ mov [r12+4272],rax
+ test rax,rax
+ jz .Ldt_cutoff_alloc
+ mov rdi,r12
+ lea rsi,[rip+.Ldt_cutoff_message]
+ call .Ldt_message_output
+ mov rdi,r12
+ call .Ldt_finish
+.Ldt_cutoff_end:
+ neg eax
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ldt_cutoff_alloc:
+ mov eax,5
+ jmp .Ldt_cutoff_end
+.section .rodata
+.Ldt_cutoff_message: .asciz "Tool reached the consecutive restart limit; it is not run again"
+.Ldt_restart_limit: .asciz "restart_limit"
+
+.section .rodata
+.Ldt_cutoff_detail_json: .asciz "{\"message\":\"Tool reached the consecutive restart limit\",\"detail\":{\"reason\":\"restart_limit\"}}"
+
+.section .rodata
+.Ldt_cutoff_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"restart_limit\",\"message\":\"Tool reached the consecutive restart limit; it is not run again\"}]}"

@@ -22,6 +22,10 @@ typedef struct {
  void (*abort_cleanup)(void *,pg_task_runner *);
  /* Owned {input,checkpoint}; borrowed arguments are immutable. */
  int (*migrate)(void *,const struct json_object *,const struct json_object *,uint64_t,struct json_object **);
+ /* Optional terminal recovery handler, invoked instead of a phase once the
+    consecutive restart limit is reached. Uses abort_cleanup for its resources;
+    must settle its Task/owned work and product receipts without new effects. */
+ int (*cutoff)(void *,pg_task_runner *,const struct json_object *);
 } pg_task_definition;
 typedef struct {
  void *context;

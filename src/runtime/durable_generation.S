@@ -77,7 +77,7 @@ pg_durable_generation_init:
  mov [rdi+32],rdi
  lea rax,[rip+.Lgg_initial]
  mov [rdi+40],rax
- lea rax,[rdi+88]
+ lea rax,[rdi+96]
  mov [rdi+48],rax
  mov qword ptr [rdi+56],4
  lea rax,[rip+.Lgg_abort]
@@ -85,38 +85,40 @@ pg_durable_generation_init:
  lea rax,[rip+.Lgg_cleanup]
  mov [rdi+72],rax
  mov qword ptr [rdi+80],0
- lea rax,[rip+.Lgg_prepare_name]
+ lea rax,[rip+.Lgg_cutoff_handler]
  mov [rdi+88],rax
- mov qword ptr [rdi+96],7
- mov [rdi+104],rdi
+ lea rax,[rip+.Lgg_prepare_name]
+ mov [rdi+96],rax
+ mov qword ptr [rdi+104],7
+ mov [rdi+112],rdi
  lea rax,[rip+.Lgg_prepare]
- mov [rdi+112],rax
- lea rax,[rip+.Lgg_cleanup]
  mov [rdi+120],rax
- lea rax,[rip+.Lgg_request_name]
+ lea rax,[rip+.Lgg_cleanup]
  mov [rdi+128],rax
- mov qword ptr [rdi+136],7
- mov [rdi+144],rdi
+ lea rax,[rip+.Lgg_request_name]
+ mov [rdi+136],rax
+ mov qword ptr [rdi+144],7
+ mov [rdi+152],rdi
  lea rax,[rip+.Lgg_request]
- mov [rdi+152],rax
- lea rax,[rip+.Lgg_cleanup]
  mov [rdi+160],rax
- lea rax,[rip+.Lgg_tools_name]
+ lea rax,[rip+.Lgg_cleanup]
  mov [rdi+168],rax
- mov qword ptr [rdi+176],5
- mov [rdi+184],rdi
+ lea rax,[rip+.Lgg_tools_name]
+ mov [rdi+176],rax
+ mov qword ptr [rdi+184],5
+ mov [rdi+192],rdi
  lea rax,[rip+.Lgg_tools]
- mov [rdi+192],rax
- lea rax,[rip+.Lgg_cleanup]
  mov [rdi+200],rax
- lea rax,[rip+.Lgg_retry_name]
- mov [rdi+208],rax
- mov qword ptr [rdi+216],5
- mov [rdi+224],rdi
- lea rax,[rip+.Lgg_retry]
- mov [rdi+232],rax
  lea rax,[rip+.Lgg_cleanup]
+ mov [rdi+208],rax
+ lea rax,[rip+.Lgg_retry_name]
+ mov [rdi+216],rax
+ mov qword ptr [rdi+224],5
+ mov [rdi+232],rdi
+ lea rax,[rip+.Lgg_retry]
  mov [rdi+240],rax
+ lea rax,[rip+.Lgg_cleanup]
+ mov [rdi+248],rax
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -1561,12 +1563,37 @@ jmp .Lgg_project_role
  mov rsi,r12
  mov rdx,[rsp]
  mov ecx,3
+ cmp qword ptr [rbx+48],0
+ jne .Lgg_end_boundary_ready
+ GGET "qword ptr [rbx+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov ecx,3
+ test eax,eax
+ jnz .Lgg_end_boundary_ready
+ mov rax,[rbx+24]
+ GGET rax,restarts
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+64]
+ mov ecx,3
+ jb .Lgg_end_boundary_ready
+ mov ecx,5
+.Lgg_end_boundary_ready:
+ mov [rsp+40],ecx
+ mov rdi,r14
+ mov rsi,r12
+ mov rdx,[rsp]
  xor r8d,r8d
  lea r9,[rsp+8]
  call pg_durable_inputs_apply@PLT
  test eax,eax
  jnz .Lgg_abort_stage_end
  lea rdi,[rip+.Lgg_abort_json]
+ cmp dword ptr [rsp+40],5
+ jne .Lgg_end_json_ready
+ lea rdi,[rip+.Lgg_cutoff_json]
+.Lgg_end_json_ready:
  call json_tokener_parse@PLT
  mov [r13],rax
  test rax,rax
@@ -2143,3 +2170,13 @@ pg_durable_generation_history:
 .section .rodata
 .Lgg_thinking: .asciz "thinking"
 .Lgg_thinking_signature: .asciz "thinkingSignature"
+
+.text
+.Lgg_cutoff_handler:
+ jmp .Lgg_abort
+.section .rodata
+.Lgg_restarts: .asciz "restarts"
+.Lgg_cutoff_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"failed\",\"error\":{\"message\":\"Generation reached the consecutive restart limit\",\"detail\":{\"reason\":\"restart_limit\"}}}}"
+
+.section .rodata
+.Lgg_abort_requested: .asciz "abortRequested"

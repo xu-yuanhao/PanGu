@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`harness/tool.ts`最终output/details/structuredOutput/diagnostics分离及`registry.ts`工具集合解析；Harness/Cordis服务随作用域提供和释放。本批核对远端Pi`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`，新增Tool restart_limit结算属于下一次恢复行为评估，当前元数据路径沿固定快照。
-- 实际调用链：`tools.provider`将借用的执行器、catalog、snapshot和identity作为同一ABI1描述符注入Agent；模型声明和Tool执行使用该描述符。插件snapshot在工具关闭前转移拥有的details/structuredOutput/diagnostics，经既有Assembly Tool事务保存并由观察接口读取，诊断沿模型文本投影送入后继Generation。删除按context指针判断静态工具元数据的分支，默认与插件均走显式提供者。
-- 验证：产品隔离构建、G00/Assembly；实际DSO夹具提供自己的snapshot，计数模型configure、工具execute和snapshot，真实模型read→结果诊断→回答→重开，核对持久details/diagnostics及关闭回执。真实插件闭环、持久元数据、释放回执及默认四工具/diagnostics/patch/身份/历史流程均通过。
-- 接口与自审：`tool_provider.h`的tools.provider ABI1为96字节，snapshot偏移80，目录/执行/结果元数据共同借用至操作释放；新头已登记。Agent依赖tools.provider代替分别读取tools与tool.registry，默认tools.provider.base供插件组合。已有pg_tools/pg_model/TUI事件布局不变，新增生产代码为契约及C组合接线，复用现有Assembly执行/事务/宿主。
-- 剩余与下一交付物：完整extension registry、动态多个扩展/更新/撤销、hooks及自定义任务按K02/K09继续；新上游连续重启限额对应终态/诊断需成组接入Task/Generation/Tool，保留原覆盖范围。TUI进行中工作保持原位，仅提交核心明确路径。
+- 来源：Pi 固定快照的 Task/Generation/Tool 调用链，并采用上游 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e` 中 `harness/{live,tool,generation}.ts` 的连续重启限额与可见失败结算语义。
+- 实际调用链：Scheduler → TaskRunner 的可选 cutoff 回调 → Generation/Tool 原子结算。Tool 在取得执行租约前写入失败结果、restart_limit 诊断与终态；Generation 结束任务，并按既有失败队列策略将输入结算为 unanswered/restart_limit。取消意图优先；没有 cutoff 回调的自定义任务保持原阻塞处理。
+- 验证：SQLite/JSONL 定向场景覆盖任务超限、工具未执行、输入回执和关闭重开；ASan/UBSan通过。Runtime完整回归通过；最终输入回执改动另跑受影响专项。产品使用已提交TUI隔离构建，保留并行TUI工作树。真实模型验证结果见当前实现记录。
+- 接口与自审：`pg_task_definition` 末尾新增 cutoff 回调，尺寸88字节、偏移80，资源使用 abort_cleanup 清理；Generation/Tool 内嵌定义及phase布局随消费者同步。Inputs边界5复用失败队列策略并保存具体原因。已有模型/工具/TUI函数表不变；实现使用手写Assembly，构建与文件清单沿用现有登记，G00/Assembly通过。
+- 剩余与下一交付物：K07 的 partial/deferred恢复、进度与完整工具中断策略继续按参考实现成组补齐；随后接入K10/K13的实际队列/观察消费者。完整extension生命周期仍按K02/K09覆盖表推进。TUI在开发的文件不纳入核心提交。

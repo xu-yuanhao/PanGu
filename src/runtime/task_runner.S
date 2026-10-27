@@ -1432,7 +1432,10 @@ pg_task_runner_poll:
  mov rdi,rax
  call json_object_get_uint64@PLT
  cmp rax,[rbx+64]
- jae .Ltr_poll_blocked
+ jb .Ltr_restart_allowed
+ mov r13d,2
+ jmp .Ltr_poll_resolve
+.Ltr_restart_allowed:
  cmp r12d,2
  jne .Ltr_poll_sleep_check
  mov rdi,rbx
@@ -1469,6 +1472,12 @@ pg_task_runner_poll:
  mov ebp,eax
  test eax,eax
  jnz .Ltr_poll_unlock
+ cmp r13d,2
+ jne .Ltr_cutoff_available
+ mov rax,[rbx+40]
+ cmp qword ptr [rax+80],0
+ je .Ltr_poll_blocked
+.Ltr_cutoff_available:
  cmp r12d,1
  jne .Ltr_poll_reserve_state
  test dword ptr [rbx+88],2
@@ -1517,6 +1526,10 @@ pg_task_runner_poll:
 .Ltr_poll_invoke_abort:
  mov rax,[rbx+40]
  mov r12,[rax+56]
+ cmp r13d,2
+ jne .Ltr_handler_selected
+ mov r12,[rax+80]
+.Ltr_handler_selected:
  mov rdi,[rax+24]
 .Ltr_poll_handler:
  test r12,r12

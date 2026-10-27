@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- tools.provider ABI1将执行器、声明目录与结构化结果快照共同注入实际Agent；默认与扩展均使用同一契约。
-- 插件结果的details/structuredOutput/diagnostics沿现有Assembly Tool事务原子保存，诊断进入后继模型请求，TUI沿独立观察接口读取。
-- 隔离产品构建与G00/Assembly通过；真实插件调用/元数据持久化/关闭回执/重开及默认四工具、诊断、patch、身份和历史工作流通过。
+- TaskRunner接入可选重启超限结算；Generation/Tool写入restart_limit失败终态，Tool在获取执行租约前结束，Generation同时保存输入unanswered回执。
+- SQLite/JSONL覆盖工具零执行、任务/输入结算与重开；受影响专项ASan/UBSan通过。Runtime完整回归通过，最终输入原因变更另跑专项；已提交TUI与本批核心的隔离产品构建通过，G00/Assembly通过。
+- 真实DeepSeek Flash在SQLite/JSONL均以HTTP 200完成临时失败注入→持久重试→read工具→后续回答→重开；两后端各4次模型尝试、1次工具执行，测试通过。
 
 ## 当前接口边界
 
