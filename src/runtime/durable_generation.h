@@ -31,6 +31,9 @@ typedef struct {
    receipt. A provider failure appends an error assistant and commits bounded
    retry sleep or a failed receipt; retry prepares current configuration after
    the durable deadline. tools hands off to a new generation task after results commit.
+   Text progress appends to conversation pangu.live using throttled deferred
+   document commits; request recovery/abort converts saved progress into an
+   aborted assistant, and terminal classification clears it atomically.
    Caller holds host/model/definition leases until cleanup. Model service uses
    the existing bounded pg_session protocol; unsupported content rejects rather
    than silently losing model context. */

@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi 固定快照的 Task/Generation/Tool 调用链，并采用上游 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e` 中 `harness/{live,tool,generation}.ts` 的连续重启限额与可见失败结算语义。
-- 实际调用链：Scheduler → TaskRunner 的可选 cutoff 回调 → Generation/Tool 原子结算。Tool 在取得执行租约前写入失败结果、restart_limit 诊断与终态；Generation 结束任务，并按既有失败队列策略将输入结算为 unanswered/restart_limit。取消意图优先；没有 cutoff 回调的自定义任务保持原阻塞处理。
-- 验证：SQLite/JSONL 定向场景覆盖任务超限、工具未执行、输入回执和关闭重开；ASan/UBSan通过。Runtime完整回归通过；最终输入回执改动另跑受影响专项。产品使用已提交TUI隔离构建，保留并行TUI工作树。真实模型验证结果见当前实现记录。
-- 接口与自审：`pg_task_definition` 末尾新增 cutoff 回调，尺寸88字节、偏移80，资源使用 abort_cleanup 清理；Generation/Tool 内嵌定义及phase布局随消费者同步。Inputs边界5复用失败队列策略并保存具体原因。已有模型/工具/TUI函数表不变；实现使用手写Assembly，构建与文件清单沿用现有登记，G00/Assembly通过。
-- 剩余与下一交付物：K07 的 partial/deferred恢复、进度与完整工具中断策略继续按参考实现成组补齐；随后接入K10/K13的实际队列/观察消费者。完整extension生命周期仍按K02/K09覆盖表推进。TUI在开发的文件不纳入核心提交。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` streamResponse/convertPartial、`partial-changes.ts` 和 generation-recovery/deferred-progress 用例。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`、Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，本批沿固定快照移植文本进度。
+- 实际调用链：Generation接收文本 → conversation范围pangu.live Document → 节流追加delta/Session deferred hold → 现有进度事件。请求恢复前将已保存partial转为aborted assistant并清除；取消/超限同事务转换，最终assistant/工具任务分类同事务清除。重发继续使用既有配置与cutoff，aborted历史不进入模型上下文。
+- 验证：受影响Durable专项ASan/UBSan通过；Runtime完整回归通过；已提交TUI与本批核心隔离产品构建通过。真实DeepSeek在SQLite/JSONL均完成流中暂停→重开→partial转历史→重发→read工具→follow-up；最终Live清除断言通过，两后端均HTTP 200。
+- 接口与自审：现有公开函数表/结构尺寸保持；Generation私有operation增加节流时刻、已写文本长度与初始化标记。Live使用现有Document事务、delta、deferred hold和关闭排空，100ms节流/1000ms持久窗口；模块登记补充Document事务依赖。产品逻辑手写Assembly，G00/Assembly通过。
+- 剩余与下一交付物：K07继续覆盖thinking/流中tool参数partial、进度配置、fault/orphan处理与deferred provider handle的poll/cancel；文本partial的真实进程崩溃场景仍待对应故障验证。K02/K09完整扩展生命周期与K10/K13队列/观察消费者保持原覆盖表。并行TUI工作原位保留。

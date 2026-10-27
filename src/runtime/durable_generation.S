@@ -134,7 +134,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,4384
+ mov esi,4416
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -901,6 +901,15 @@ jmp .Lgg_project_role
  test eax,eax
  jnz .Lgg_request_error
  mov r14,[rbx+56]
+ cmp dword ptr [r14+4400],0
+ jne .Lgg_request_live_ready
+ mov rdi,r14
+ xor esi,esi
+ call .Lgg_live_write
+ test eax,eax
+ jnz .Lgg_request_error
+ mov dword ptr [r14+4400],1
+.Lgg_request_live_ready:
  cmp dword ptr [r14+88],0
  jne .Lgg_request_settle
  cmp qword ptr [r14+16],0
@@ -1002,6 +1011,11 @@ jmp .Lgg_project_role
  jz .Lgg_request_invalid
  call memcpy@PLT
  add [r14+4192],r13
+ mov rdi,r14
+ mov esi,1
+ call .Lgg_live_write
+ test eax,eax
+ jnz .Lgg_request_error
  mov rax,[r12]
  mov r8,[rax+40]
  test r8,r8
@@ -1128,6 +1142,7 @@ jmp .Lgg_project_role
  movdqu [rsp+176],xmm0
  movdqu [rsp+192],xmm0
  movdqu [rsp+208],xmm0
+ mov [rsp+216],rdx
  mov dword ptr [rsp+192],1
  mov rax,[rbx]
  mov rax,[rax]
@@ -1143,6 +1158,15 @@ jmp .Lgg_project_role
  mov rdx,rax
  lea rcx,[rsp+160]
  call pg_durable_inputs_prepare@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
+ mov rdi,[rbx+8]
+ mov rsi,r12
+ mov rdx,[rsp+216]
+ mov ecx,2
+ xor r8d,r8d
+ xor r9d,r9d
+ call .Lgg_live_apply
  test eax,eax
  jnz .Lgg_stage_end
  lea rdi,[rip+.Lgg_entry_json]
@@ -1545,6 +1569,7 @@ jmp .Lgg_project_role
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
+ mov [rsp+32],rdx
  mov rax,[rbx+40]
  mov rax,[rax+24]
  mov rax,[rax]
@@ -1557,6 +1582,15 @@ jmp .Lgg_project_role
  mov rdx,rax
  mov rcx,rsp
  call pg_durable_inputs_prepare@PLT
+ test eax,eax
+ jnz .Lgg_abort_stage_end
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp+32]
+ mov ecx,3
+ xor r8d,r8d
+ xor r9d,r9d
+ call .Lgg_live_apply
  test eax,eax
  jnz .Lgg_abort_stage_end
  mov rdi,r14
@@ -2180,3 +2214,328 @@ pg_durable_generation_history:
 
 .section .rodata
 .Lgg_abort_requested: .asciz "abortRequested"
+
+/* Pi generation streamResponse/convertPartial; conversation-scoped trailing
+   text deltas use Session deferred writes. Final facts clear the same draft. */
+.text
+.Lgg_live_initial:
+ push rbx
+ mov rbx,rdx
+ call json_object_new_object@PLT
+ mov [rbx],rax
+ test rax,rax
+ setz al
+ movzx eax,al
+ pop rbx
+ ret
+/* runner, records, documents, mode(reset/append/clear/abort), delta, bytes */
+.Lgg_live_apply:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,208
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov [rsp+160],ecx
+ mov [rsp+168],r9
+ mov [rsp+176],r8
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ movdqu [rsp+128],xmm0
+ movdqu [rsp+144],xmm0
+ mov qword ptr [rsp+184],0
+ lea rax,[rip+.Lgg_live_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],10
+ GGET "qword ptr [rbx+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+32],rax
+ mov dword ptr [rsp+40],1
+ lea rax,[rip+.Lgg_live_definition]
+ mov [rsp+48],rax
+ lea rax,[rsp]
+ mov [rsp+56],rax
+ lea rax,[rip+.Lgg_live_initializer]
+ mov [rsp+72],rax
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov rax,[rax+32]
+ mov [rsp+80],rax
+ mov rdi,r13
+ lea rsi,[rsp+48]
+ lea rdx,[rsp+112]
+ call pg_document_tx_doc@PLT
+ test eax,eax
+ jnz .Lgg_live_bad
+ mov rdi,[rsp+112]
+ lea rsi,[rsp+120]
+ call pg_document_change_snapshot@PLT
+ test eax,eax
+ jnz .Lgg_live_bad
+ GGET "qword ptr [rsp+120]",generation
+ GGET rax,message
+ mov [rsp+136],rax
+ cmp dword ptr [rsp+160],1
+ je .Lgg_live_append
+ cmp dword ptr [rsp+160],2
+ je .Lgg_live_clear
+ test rax,rax
+ jz .Lgg_live_clear
+ # Detach before changing the partial's terminal reason.
+ mov rdi,rax
+ lea rsi,[rsp+144]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lgg_live_alloc
+ lea rdi,[rip+.Lgg_aborted_word]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+144]
+ lea rsi,[rip+.Lgg_stop_reason]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_live_end
+ lea rdi,[rip+.Lgg_entry_json]
+ call json_tokener_parse@PLT
+ mov [rsp+152],rax
+ test rax,rax
+ jz .Lgg_live_alloc
+ mov rdi,[rsp+144]
+ call json_object_get@PLT
+ mov r14,rax
+ GGET "qword ptr [rsp+152]",model
+ mov rdi,rax
+ mov rsi,r14
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_live_array_error
+ mov rdi,r12
+ mov rsi,[rsp+32]
+ mov rdx,[rsp+152]
+ mov rcx,[rbx+16]
+ lea r9,[rsp+184]
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lgg_live_bad
+.Lgg_live_clear:
+ lea rdi,[rip+.Lgg_live_clear_json]
+ call json_tokener_parse@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_live_alloc
+ jmp .Lgg_live_edit
+.Lgg_live_append:
+ cmp qword ptr [rsp+136],0
+ jne .Lgg_live_append_existing
+ lea rdi,[rip+.Lgg_live_start_json]
+ call json_tokener_parse@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_live_alloc
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov esi,2
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,[rbx+16]
+ call json_object_new_uint64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_task_id]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_live_end
+ GGET r14,message
+ GGET rax,content
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,[rsp+176]
+ mov esi,[rsp+168]
+ call json_object_new_string_len@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_text]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_live_end
+ jmp .Lgg_live_edit
+.Lgg_live_append_existing:
+ lea rdi,[rip+.Lgg_live_append_json]
+ call json_tokener_parse@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_live_alloc
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,[rsp+176]
+ mov esi,[rsp+168]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Lgg_live_alloc
+ mov rdi,r14
+ mov esi,2
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lgg_live_alloc
+.Lgg_live_edit:
+ mov rdi,[rsp+112]
+ mov rsi,[rsp+128]
+ call pg_document_change_append@PLT
+ test eax,eax
+ jnz .Lgg_live_bad
+ xor eax,eax
+ jmp .Lgg_live_end
+.Lgg_live_array_error:
+ mov rdi,r14
+ call json_object_put@PLT
+.Lgg_live_alloc:
+ mov eax,5
+ jmp .Lgg_live_end
+.Lgg_live_bad:
+ mov eax,4
+.Lgg_live_end:
+ mov ebp,eax
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov rdi,[rsp+128]
+ call json_object_put@PLT
+ mov rdi,[rsp+144]
+ call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov rdi,[rsp+184]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,208
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* operation, reset or append. No phase transition or provider call occurs. */
+.Lgg_live_write:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,112
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,[rbx+8]
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ mov qword ptr [rsp+96],0
+ mov rax,[r13+8]
+ mov rdi,[rax]
+ call [rax+40]
+ movsd [rsp+104],xmm0
+ test r12d,r12d
+ jz .Lgg_live_write_begin
+ mov rax,[rbx+4192]
+ cmp rax,[rbx+4392]
+ je .Lgg_live_write_ok
+ cmp qword ptr [rbx+4392],0
+ je .Lgg_live_write_begin
+ subsd xmm0,[rbx+4384]
+ ucomisd xmm0,[rip+.Lgg_live_interval]
+ jb .Lgg_live_write_ok
+.Lgg_live_write_begin:
+ mov r14,[r13]
+ mov rax,[r13+8]
+ mov rdi,r14
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,[rax]
+ mov r8,[rax+8]
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Lgg_live_write_bad
+ mov rdi,r13
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov ecx,r12d
+ mov rax,[rbx+4392]
+ lea r8,[rbx+rax+96]
+ mov r9,[rbx+4192]
+ sub r9,rax
+ call .Lgg_live_apply
+ test eax,eax
+ jnz .Lgg_live_write_abort
+ mov rdi,r14
+ mov esi,r12d
+ mov edx,1000
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Lgg_live_write_bad
+ mov rax,[rsp+104]
+ mov [rbx+4384],rax
+ mov rax,[rbx+4192]
+ mov [rbx+4392],rax
+.Lgg_live_write_ok:
+ xor eax,eax
+ jmp .Lgg_live_write_end
+.Lgg_live_write_abort:
+ mov ebp,eax
+ mov rdi,r14
+ call pg_durable_session_abort@PLT
+ mov eax,ebp
+ jmp .Lgg_live_write_end
+.Lgg_live_write_bad:
+ mov eax,6
+.Lgg_live_write_end:
+ add rsp,112
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_live_kind: .asciz "pangu.live"
+.Lgg_generation: .asciz "generation"
+.Lgg_message: .asciz "message"
+.Lgg_live_clear_json: .asciz "[[\"d\",[\"generation\"]]]"
+.Lgg_live_start_json: .asciz "[[\"s\",[\"generation\"],{\"taskId\":0,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"\"}]}}]]"
+.Lgg_live_append_json: .asciz "[[\"a\",[\"generation\",\"message\",\"content\",0,\"text\"],\"\"]]"
+.balign 8
+.Lgg_live_interval: .double 100.0
+.section .data.rel.ro
+.balign 8
+.Lgg_live_definition:
+ .quad .Lgg_live_kind,10,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lgg_live_initializer:
+ .quad 0,.Lgg_live_initial

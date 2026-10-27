@@ -1760,6 +1760,7 @@
       ],
       "dependencies": [
         "task.runner.local.v0",
+        "session.documents.transaction.local.v0",
         "task.tool.local.v0",
         "json-c",
         "libutf8proc",
@@ -1803,7 +1804,7 @@
             "packages/ai/src/utils/overflow.ts",
             "packages/durable/src/harness/inbox.ts"
           ],
-          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; model context excludes error/aborted/deferred assistants. Deferred/compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
+          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; text progress uses conversation pangu.live deferred append deltas, request recovery/abort converts saved text to aborted assistant and final classification clears it atomically; model context excludes error/aborted/deferred assistants. Deferred/compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
           "tests_to_read": [
             "packages/durable/test/harness-generation.test.ts",
             "packages/durable/test/harness-generation-recovery.test.ts",

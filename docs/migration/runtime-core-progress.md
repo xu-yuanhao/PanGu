@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- TaskRunner接入可选重启超限结算；Generation/Tool写入restart_limit失败终态，Tool在获取执行租约前结束，Generation同时保存输入unanswered回执。
-- SQLite/JSONL覆盖工具零执行、任务/输入结算与重开；受影响专项ASan/UBSan通过。Runtime完整回归通过，最终输入原因变更另跑专项；已提交TUI与本批核心的隔离产品构建通过，G00/Assembly通过。
-- 真实DeepSeek Flash在SQLite/JSONL均以HTTP 200完成临时失败注入→持久重试→read工具→后续回答→重开；两后端各4次模型尝试、1次工具执行，测试通过。
+- Generation文本流以100ms节流追加到conversation范围`pangu.live`；Session deferred hold采用1000ms持久窗口，正常关闭排空。TUI继续消费既有文本事件。
+- 请求恢复将已保存文本转为`stopReason: aborted`的assistant历史，保持原请求cutoff；取消/超限原子转换，最终分类原子清除Live进度。
+- Durable专项ASan/UBSan、Runtime完整回归、已提交TUI的隔离产品构建、G00/Assembly通过。真实DeepSeek在SQLite/JSONL完成流中暂停重开、partial转历史、重发、工具及follow-up；最终Live清除断言通过；两后端均HTTP 200、4次模型请求、1次read工具，包含一次流中中断重发。
 
 ## 当前接口边界
 
@@ -42,6 +42,7 @@ python3 -B tools/runtime/test_pangu_pty.py
 
 ```bash
 python3 -B tools/runtime/build_test.py --live-generation
+python3 -B tools/runtime/build_test.py --live-partial
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
