@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
+DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']]
 PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
     'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
     'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
@@ -19,6 +20,15 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
+        if '--live-generation' in sys.argv:
+            if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
+                raise SystemExit('Model API key required in the environment')
+            output = str(Path(directory) / 'live-durable-generation')
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
+                            *DURABLE_SOURCES, str(ROOT / 'tests/runtime/test_durable_storage.c'), *flags, '-o', output], check=True)
+            subprocess.run([output, '--live-generation'], check=True, timeout=350)
+            return 0
         if any(flag in sys.argv for flag in ('--live-batch', '--live-batch-execute', '--live-snapshot-edit', '--live-capacity')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; environment only')
@@ -74,7 +84,7 @@ def main():
             durable_store_test = str(Path(directory) / 'test-durable-storage')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'write_tool', 'bash_tool', 'process', 'stream_decode']],
+                            *DURABLE_SOURCES,
                             str(ROOT / 'tests/runtime/test_durable_storage.c'), *sqlite_flags, '-o', durable_store_test], check=True)
             subprocess.run([durable_store_test], check=True, timeout=30)
             host_test = str(Path(directory) / 'test-host')

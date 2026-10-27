@@ -100,8 +100,11 @@ static const pg_plugin plugins[]={
 };
 
 int main(int argc,char **argv){
- if(argc>2 || (argc==2 && (!strcmp(argv[1],"--help")||!strcmp(argv[1],"-h")))){fprintf(stderr,"Usage: pangu [workspace-directory]\nSet MIMO_API_KEY in the environment; MIMO_MODEL is optional. PANGU_SYSTEM_PROMPT_FILE optionally replaces the default system prompt from a workspace-relative UTF-8 file. PANGU_SESSION_DIR optionally selects an existing private directory for session.pgj. Ctrl-C cancels while busy and exits while idle; Ctrl-D exits. Persistent exit preserves pending work. Tools: read, write, edit and bash. Commands are not sandboxed; shell environment contains PATH and LANG only.\n");return argc>2?2:0;}
- if(!getenv("MIMO_API_KEY") || !*getenv("MIMO_API_KEY")){fputs("MIMO_API_KEY is required (environment only).\n",stderr);return 2;}
+ if(argc>2 || (argc==2 && (!strcmp(argv[1],"--help")||!strcmp(argv[1],"-h")))){fprintf(stderr,"Usage: pangu [workspace-directory]\nSet PANGU_MODEL_ENDPOINT, PANGU_MODEL_NAME and PANGU_MODEL_API_KEY for an OpenAI-compatible provider, or MIMO_API_KEY with optional MIMO_MODEL. PANGU_SYSTEM_PROMPT_FILE optionally replaces the default system prompt from a workspace-relative UTF-8 file. PANGU_SESSION_DIR optionally selects an existing private directory for session.pgj. Ctrl-C cancels while busy and exits while idle; Ctrl-D exits. Persistent exit preserves pending work. Tools: read, write, edit and bash. Commands are not sandboxed; shell environment contains PATH and LANG only.\n");return argc>2?2:0;}
+ const char *endpoint=getenv("PANGU_MODEL_ENDPOINT"),*api_key=getenv("PANGU_MODEL_API_KEY"),*selected_model=getenv("PANGU_MODEL_NAME");
+ if(endpoint&&(!*endpoint||!selected_model||!*selected_model)){fputs("Custom model connection requires PANGU_MODEL_ENDPOINT and PANGU_MODEL_NAME.\n",stderr);return 2;}
+ if(!api_key&&!endpoint)api_key=getenv("MIMO_API_KEY");
+ if(!api_key||!*api_key){fputs("Model API key is required in the environment.\n",stderr);return 2;}
  if(!isatty(STDIN_FILENO)||!isatty(STDOUT_FILENO)){fputs("PanGu requires an interactive terminal.\n",stderr);return 2;}
  if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
  int rc=2;
@@ -116,10 +119,10 @@ int main(int argc,char **argv){
  if(!source||!agent||!client||!root||!file_service||!tool_registry)goto cleanup;
  if(session_directory){
   struct stat status;unsigned char identity[4096];size_t identity_size=0;
-  const char *model_name=getenv("MIMO_MODEL");if(!model_name)model_name="mimo-v2.6-pro";
+  const char *model_name=selected_model;if(!model_name)model_name=getenv("MIMO_MODEL");if(!model_name)model_name="mimo-v2.6-pro";
   workspace=realpath(path,0);
   if(!workspace || fstat(root->directory,&status)){fputs("Cannot identify workspace.\n",stderr);goto cleanup;}
-  pg_profile_spec profile={.provider={"mimo-token-plan-cn/v1",sizeof("mimo-token-plan-cn/v1")-1},.model={model_name,strlen(model_name)},.workspace={workspace,strlen(workspace)},.implementation={"pangu.native.read-write-edit-bash-v2",sizeof("pangu.native.read-write-edit-bash-v2")-1},.tools=tool_registry,.device=(uint64_t)status.st_dev,.inode=(uint64_t)status.st_ino};
+  pg_profile_spec profile={.provider={endpoint?endpoint:"mimo-token-plan-cn/v1",strlen(endpoint?endpoint:"mimo-token-plan-cn/v1")},.model={model_name,strlen(model_name)},.workspace={workspace,strlen(workspace)},.implementation={"pangu.native.read-write-edit-bash-v2",sizeof("pangu.native.read-write-edit-bash-v2")-1},.tools=tool_registry,.device=(uint64_t)status.st_dev,.inode=(uint64_t)status.st_ino};
   if(pg_profile_encode(&profile,identity,sizeof(identity),&identity_size)){fputs("Runtime profile exceeds supported bounds or contains invalid configuration.\n",stderr);goto cleanup;}
   if(source->load(source->context,&agent->session,&agent->commits)){fputs("Cannot open persistent session (directory, lock or journal validation).\n",stderr);goto cleanup;}
   if(!agent->commits.profile_size && agent->commits.sequence){fputs("Persistent session has no runtime identity; automatic adoption is refused.\n",stderr);goto cleanup;}

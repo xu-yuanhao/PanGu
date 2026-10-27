@@ -467,7 +467,20 @@ static void test_batch_rejection(void){pg_model_event e;
  for(unsigned bad=0;bad<6;++bad){batch_begin();feed_call(0,"a","read","{}");feed_call(bad==2?2:1,bad==0?"a":"b",bad==1?0:"write",bad==3?"{":bad==4?"[]":"{}");if(bad==5)feed_call(8,"ninth","read","{}");batch_end();finish_transport();int rejected=0;for(unsigned i=0;i<10;++i){int rc=nxt(&e);assert(e.kind!=PG_MODEL_BATCH&&e.kind!=PG_MODEL_CALL);if(rc){rejected=1;break;}}assert(rejected&&!m.delivered&&m.failed&&nxt(&e)==1);model.close(model.context);}
  batch_begin();feed_call(0,"a","read","{}");feed_call(1,"b","write","{}");feed("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n");finish_transport();waiting_lines(3);assert(nxt(&e)==1&&!m.delivered);model.close(model.context);
 }
+static void test_injected_connection(void){
+ reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();
+ assert(!setenv("PANGU_MODEL_ENDPOINT","https://api.deepseek.com/chat/completions",1));
+ assert(!setenv("PANGU_MODEL_NAME","deepseek-flash",1));
+ unsetenv("PANGU_MODEL_API_KEY");assert(start()==1&&!m.easy&&!m.multi);
+ assert(!setenv("PANGU_MODEL_API_KEY","deepseek-transport-unit-key",1));
+ assert(!start());assert(!strcmp(captured_url,"https://api.deepseek.com/chat/completions"));
+ assert(strstr(captured_post,"\"model\":\"deepseek-flash\""));
+ unsigned key_found=0;for(const struct curl_slist *header=captured_headers;header;header=header->next)if(strstr(header->data,"deepseek-transport-unit-key"))key_found++;assert(key_found==1);
+ model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.request);
+ unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
+}
 int main(void) {
+    unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
     test_text_stream();
     test_tool_stream();
@@ -477,6 +490,7 @@ int main(void) {
     test_setup_failures();
     test_batch_stream();
     test_batch_rejection();
+    test_injected_connection();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

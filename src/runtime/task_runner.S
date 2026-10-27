@@ -2161,6 +2161,14 @@ pg_task_scheduler_poll:
  jnz .Lts_poll_unlock
  cmp ebp,4
  jae .Lts_poll_unlock
+ /* A phase can hand over to a newly committed conversation-owned task. */
+ mov rdi,rbx
+ call .Lts_discover
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_poll_unlock
+ cmp qword ptr [rbx+24],0
+ jne .Lts_poll_unlock
  mov ebp,2
  jmp .Lts_poll_unlock
 .Lts_poll_closed:

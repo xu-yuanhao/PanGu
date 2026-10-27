@@ -14,7 +14,11 @@ typedef struct {
  pg_model_call calls[PG_TOOL_BATCH_LIMIT];
  unsigned call_count;
 } pg_mimo;
-/* Initialize fresh/released storage only; close before discarding an instance. */
+/* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
+   PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
+   requires its explicit key. Default MiMo connection reads MIMO_API_KEY/MODEL.
+   Environment stays immutable throughout active requests. Initialize
+   fresh/released storage only; close before discarding an instance. */
 pg_model pg_mimo_model(pg_mimo *);
 /* Bind the same immutable registry used by the executor before starting runs. */
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);

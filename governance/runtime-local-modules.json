@@ -143,7 +143,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated",
+      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -1720,7 +1720,7 @@
         "task.tool.local.v0",
         "json-c"
       ],
-      "role": "Generation prepare/request/tools consumer: durable configuration/cutoff, bounded existing model protocol projection, cooperative stream, assistant/owned-tool/wait atomic round and successor generation handoff; live successful flow pending valid credentials",
+      "role": "Generation prepare/request/tools consumer: durable configuration/cutoff, bounded existing model protocol projection, cooperative stream, assistant/owned-tool/wait atomic round and successor generation handoff; real DeepSeek Flash model/tool/successor flow verified on SQLite and JSONL",
       "exports": [
         "pg_durable_generation_init"
       ],

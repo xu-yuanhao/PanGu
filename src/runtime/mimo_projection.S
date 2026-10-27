@@ -12,6 +12,7 @@
 .intel_syntax noprefix
 
 .section .rodata
+.Lstr_pangu_model: .asciz "PANGU_MODEL_NAME"
 .Lstr_env_model:     .asciz "MIMO_MODEL"
 .Lstr_default_model: .asciz "mimo-v2.6-pro"
 .Lstr_model:         .asciz "model"
@@ -111,6 +112,10 @@ pg_mimo_encode_request:
  jz .Linvalid
  mov qword ptr [rsp + 8], rax          /* messages */
  or qword ptr [rsp + 104],1
+ lea rdi,[rip+.Lstr_pangu_model]
+ call getenv@PLT
+ test rax,rax
+ jnz 1f
  lea rdi, [rip + .Lstr_env_model]
  call getenv@PLT
  test rax, rax

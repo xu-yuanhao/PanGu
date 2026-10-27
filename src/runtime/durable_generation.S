@@ -514,7 +514,7 @@ pg_durable_generation_init:
  jz .Lgg_project_bad
  GGET "qword ptr [rsp]",id
  mov [rsp+16],rax
- GGET "qword ptr [rsp]",name
+ GGET "qword ptr [rsp]",name_key
  mov r8,rax
  mov rcx,[rsp+16]
  mov rsi,[rsp+8]

@@ -18,6 +18,8 @@
 .Lstr_https:        .asciz "https"
 .Lstr_content_type: .asciz "Content-Type: application/json"
 .Lstr_auth_prefix:  .asciz "Authorization: Bearer "
+.Lstr_pangu_key: .asciz "PANGU_MODEL_API_KEY"
+.Lstr_pangu_endpoint: .asciz "PANGU_MODEL_ENDPOINT"
 .Lstr_env_key:      .asciz "MIMO_API_KEY"
 
 .section .text
@@ -179,13 +181,24 @@ li_start:
  xor esi,esi
  mov edx,PG_MM_BYTES-PG_MM_EXTRA
  call memset@PLT
+ lea rdi,[rip+.Lstr_pangu_key]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lst_key_ready
+ lea rdi,[rip+.Lstr_pangu_endpoint]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lst_bad
  lea rdi, [rip + .Lstr_env_key]
  call getenv@PLT
  test rax, rax
  jz .Lst_bad
+.Lst_key_ready:
  mov r13, rax                         /* key */
  mov rdi, rax
  call strlen@PLT
+ test rax,rax
+ jz .Lst_bad
  cmp rax, 400
  ja .Lst_bad
  mov rdi, r13
@@ -239,9 +252,19 @@ li_start:
  test r15, r15
  jz .Lst_bad
  /* 变参 setopt：整数/指针变参在 rdx，al=0（无向量参数） */
+ lea rdi,[rip+.Lstr_pangu_endpoint]
+ call getenv@PLT
+ test rax,rax
+ jz .Lst_default_endpoint
+ cmp byte ptr [rax],0
+ je .Lst_bad
+ mov rdx,rax
+ jmp .Lst_endpoint_ready
+.Lst_default_endpoint:
+ lea rdx,[rip+.Lstr_endpoint]
+.Lst_endpoint_ready:
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_URL
- lea rdx, [rip + .Lstr_endpoint]
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax
