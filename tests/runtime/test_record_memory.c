@@ -1572,8 +1572,8 @@ static void observation_state_tests(void){
 }
 
 typedef struct {deferred_fixture f;pg_session_listeners listeners;pg_document_observer observer;unsigned pins,unpins,advances,ends,reports,detach,fail,end_failure;uint64_t pinned;} observer_fixture;
-static int observer_pin(void *ctx,uint64_t id){observer_fixture *f=ctx;assert(!f->pinned);f->pinned=id;++f->pins;return 0;}
-static void observer_unpin(void *ctx,uint64_t id){observer_fixture *f=ctx;assert(f->pinned==id);f->pinned=0;++f->unpins;}
+static int observer_pin(void *ctx,uint64_t id){observer_fixture *f=ctx;assert(!f->pinned&&pg_session_observers_pin_count(&f->listeners,id)==1);f->pinned=id;++f->pins;return 0;}
+static void observer_unpin(void *ctx,uint64_t id){observer_fixture *f=ctx;assert(f->pinned==id&&!pg_session_observers_pin_count(&f->listeners,id));f->pinned=0;++f->unpins;}
 static void observer_report(void *ctx,int error){observer_fixture *f=ctx;assert(error==7||error==9);++f->reports;}
 static int observer_advance(void *ctx,const pg_document_observation_change *change,void *delivery){observer_fixture *f=ctx;assert(delivery==f&&f->observer.busy&&f->observer.attached&&f->listeners.busy&&change->value&&change->ops);assert(pg_document_observer_release(&f->observer)==PG_DOC_INVALID);++f->advances;if(f->detach)pg_document_observer_detach(&f->observer);return f->fail?7:0;}
 static int observer_end(void *ctx,int failure){observer_fixture *f=ctx;assert(!f->observer.attached&&!f->pinned&&f->listeners.busy);++f->ends;f->end_failure=(unsigned)failure;return f->fail?9:0;}
@@ -1593,7 +1593,21 @@ static void observer_binding_tests(void){
  puts("PASS: actual internal/close subscription delivery, pin transfer, guarded host errors, detach mid-publication and terminal task ending");
 }
 
+typedef struct {deferred_fixture f;pg_session_listeners listeners;pg_document_observer observers[2];unsigned pins,unpins,fail_pin,touches;} observer_cache_fixture;
+static uint64_t observer_cache_clock(void *ctx){observer_cache_fixture *f=ctx;assert(f->f.cache.busy);++f->touches;return f->f.now;}
+static int observer_cache_pinned(void *ctx,uint64_t id){observer_cache_fixture *f=ctx;assert(f->f.cache.busy);return pg_session_observers_pinned(&f->listeners,id);}
+static int observer_cache_pin(void *ctx,uint64_t id){observer_cache_fixture *f=ctx;assert(pg_session_observers_pin_count(&f->listeners,id)>=1);if(f->fail_pin)return PG_DOC_CAPACITY;++f->pins;assert(!pg_document_cache_touch_incarnation(&f->f.cache,&f->f.address,id));return 0;}
+static void observer_cache_unpin(void *ctx,uint64_t id){observer_cache_fixture *f=ctx;++f->unpins;assert(!pg_document_cache_touch_incarnation(&f->f.cache,&f->f.address,id));}
+static int observer_cache_advance(void *ctx,const pg_document_observation_change *change,void *delivery){(void)ctx;(void)change;(void)delivery;return 0;}
+static int observer_cache_end(void *ctx,int failure){(void)ctx;(void)failure;return 0;}
+static void observer_cache_tests(void){
+ observer_cache_fixture f={0};deferred_open(&f.f,PG_DOC_CONVERSATION,PG_DOC_LATEST,PG_DOC_INITIAL);f.listeners.records=&f.f.session;f.f.cache.context=&f;f.f.cache.clock=observer_cache_clock;f.f.cache.pinned=observer_cache_pinned;pg_document_loaded *loaded=0;assert(!pg_document_cache_get(&f.f.cache,&f.f.definition,&f.f.address,&loaded));pg_document_observer_host host={&f,observer_cache_advance,observer_cache_end,observer_cache_pin,observer_cache_unpin};assert(f.f.cache.idle_head);for(unsigned i=0;i<2;++i){assert(!pg_document_observer_open(f.observers+i,&f.listeners,loaded,&host)&&pg_session_observers_pin_count(&f.listeners,2)==i+1&&!f.f.cache.idle_head);assert(!pg_document_cache_sweep(&f.f.cache)&&f.f.cache.count==1);}pg_document_observer_detach(f.observers);assert(pg_session_observers_pin_count(&f.listeners,2)==1&&!f.f.cache.idle_head);assert(!pg_document_cache_sweep(&f.f.cache)&&f.f.cache.count==1);pg_document_observer_detach(f.observers+1);assert(!pg_session_observers_pin_count(&f.listeners,2)&&f.f.cache.idle_head&&f.pins==2&&f.unpins==2);unsigned touches=f.touches;assert(!pg_document_cache_touch_incarnation(&f.f.cache,&f.f.address,20)&&f.touches==touches);assert(pg_document_cache_touch_incarnation(&f.f.cache,&f.f.address,0)==PG_DOC_INVALID&&f.touches==touches);assert(!pg_document_cache_sweep(&f.f.cache)&&!f.f.cache.count);for(unsigned i=0;i<2;++i)assert(!pg_document_observer_release(f.observers+i));
+ assert(!pg_document_cache_get(&f.f.cache,&f.f.definition,&f.f.address,&loaded));f.fail_pin=1;assert(pg_document_observer_open(f.observers,&f.listeners,loaded,&host)==PG_DOC_ALLOCATION&&!f.listeners.count&&!pg_session_observers_pin_count(&f.listeners,2)&&!f.observers[0].attached&&!f.observers[0].state.active&&f.pins==f.unpins);assert(!pg_document_observer_release(f.observers));f.fail_pin=0;assert(!pg_document_observer_open(f.observers,&f.listeners,loaded,&host));f.fail_pin=1;struct json_object *notice=json_tokener_parse("{\"changes\":[{\"type\":\"document\",\"record\":{\"id\":20,\"kind\":\"defer\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\",\"createdAt\":3},\"value\":{},\"ops\":[],\"version\":1}]}");assert(notice&&!pg_session_deliver(&f.listeners,0,notice,&f)&&f.f.session.failed==PG_RECORDS_ADOPTION_FAILED&&!pg_session_observers_pin_count(&f.listeners,20)&&!f.observers[0].pinned&&f.observers[0].attached&&f.pins==f.unpins);json_object_put(notice);assert(!pg_session_listeners_begin_close(&f.listeners,&f)&&!pg_document_observer_release(f.observers)&&!pg_session_listeners_close(&f.listeners,&f));deferred_close(&f.f);
+ puts("PASS: native observer pin counts compose with real cache idleness/sweep, last-owner release, incarnation touch and failed pin rollback");
+}
+
 int main(void){
+ observer_cache_tests();
  observer_binding_tests();
  observation_state_tests();
  listener_begin_close_tests();

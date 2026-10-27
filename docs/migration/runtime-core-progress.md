@@ -571,3 +571,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 手写binding消费已有owned地址状态，登记internal/close监听，按incarnation组合注入pin/unpin；detach在同一publication/registry快照中立即生效，独立release拒绝正在派发的caller storage释放。host回调错误report、detach/end并包含end错误，保持Session健康；Task终态在本批文档变化后结束。实际DocTx修改/退休通过adoption通知抵达binding。
 - 实际验证：六组生命周期矩阵、三种attach allocation/clone/registry故障、两个真实DocTx提交；直接执行Pi #observeDocument/guardObserver/#notifyClose与原生六组pin/advance/end/report结果一致。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过，共享/隔离核心G00/Assembly及隔离产品构建通过。
 - 同一实施Agent自审：6候选路径内容清单摘要（本记录加入前）6f4b6c6416f0d52b2e08c2eb1c8d86fe8c30eb3648f58e5194f98a8419dd88c8；隔离核心树7bcbc74f0c61b4769d1c33da4038f9e8c4af8114。结论为同步订阅生命周期本地通过；native cache pin计数/idle、Session获取/取消与watch消费继续接入，K03全量未完成。TUI工作保留。
+
+## K03 observer pin计数与真实缓存idle
+
+- 固定Pi 8b0caef #pinDocument与#observeDocument；实际执行#pinDocument核对双owner计数、幂等释放、最后owner进入idle、同址替换后旧release不touch。上游Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写计数/布尔查询复用当前observer订阅集合，无额外索引分配；登记与暂定pin先于注入pin/touch，移除先于unpin，失败清除暂定计数并回滚附着。新增cache按incarnation条件touch，保持旧guard和缺失no-op语义。
+- 实际验证：真实cache双observer阻止sweep、最后detach恢复idle并evict、旧identity/零ID、首次pin失败回滚及已附着pin转移失败内部锁存/关闭清理，现有observer回调同步核对native计数。新增失败用例发现新分支清除暂定pin后误落入成功返回，修正跳转保留错误后重跑；未将初次失败记为通过。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过；共享/隔离核心G00/Assembly及隔离产品构建通过。同一实施Agent自审8路径候选清单摘要（本记录加入前）10ed59895d84eea78526b6ecc247d73bada4c17150227079e44be4f3214fbffd；隔离核心树23802aeee10c825ff4f42725146bf857d6709268。结论为计数与缓存idle组合本地通过；Session获取/取消及watch消费继续，K03全量未完成。TUI工作保留。

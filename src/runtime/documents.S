@@ -1432,16 +1432,34 @@ pg_document_cache_peek:
 .globl pg_document_cache_touch
 .type pg_document_cache_touch,@function
 pg_document_cache_touch:
+ xor ecx,ecx
  xor edx,edx
  jmp .Lcache_touch_public_common
 .globl pg_document_cache_touch_flushing
 .type pg_document_cache_touch_flushing,@function
 pg_document_cache_touch_flushing:
+ xor ecx,ecx
  mov edx,2
+ jmp .Lcache_touch_public_common
+.globl pg_document_cache_touch_incarnation
+.type pg_document_cache_touch_incarnation,@function
+pg_document_cache_touch_incarnation:
+ mov eax,1
+ test rdx,rdx
+ jz .Lcache_touch_incarnation_invalid
+ mov rcx,9007199254740991
+ cmp rdx,rcx
+ ja .Lcache_touch_incarnation_invalid
+ mov rcx,rdx
+ xor edx,edx
+ jmp .Lcache_touch_public_common
+.Lcache_touch_incarnation_invalid:
+ ret
 .Lcache_touch_public_common:
  push rbx
  sub rsp,32
  mov rbx,rdi
+ mov [rsp+24],rcx
  mov eax,1
  test rbx,rbx
  jz .Lcache_public_touch_return
@@ -1470,6 +1488,13 @@ pg_document_cache_touch_flushing:
  call lh_table_lookup_ex@PLT
  test eax,eax
  jz .Lcache_public_touch_done
+ mov rcx,[rsp+24]
+ test rcx,rcx
+ jz .Lcache_touch_identity_ready
+ mov rax,[rsp]
+ cmp [rax+120],rcx
+ jne .Lcache_public_touch_done
+.Lcache_touch_identity_ready:
  mov rdi,rbx
  mov rsi,[rsp]
  call .Lcache_touch_node
@@ -1487,6 +1512,7 @@ pg_document_cache_touch_flushing:
  ret
 .size pg_document_cache_touch,.-pg_document_cache_touch
 .size pg_document_cache_touch_flushing,.-pg_document_cache_touch_flushing
+.size pg_document_cache_touch_incarnation,.-pg_document_cache_touch_incarnation
 
 .globl pg_document_cache_evict
 .type pg_document_cache_evict,@function

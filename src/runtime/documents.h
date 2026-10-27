@@ -118,6 +118,9 @@ pg_document_status pg_document_cache_get(pg_document_cache *,const pg_document_d
    borrows its handle under the same mutation-line lifetime as get. */
 pg_document_status pg_document_cache_peek(pg_document_cache *,const pg_document_definition *,const pg_document_address *,pg_document_loaded **);
 pg_document_status pg_document_cache_touch(pg_document_cache *,const pg_document_address *);
+/* Touch only if the cached incarnation still matches; absence/replacement is
+   a successful no-op. Used when releasing an observer's old incarnation. */
+pg_document_status pg_document_cache_touch_incarnation(pg_document_cache *,const pg_document_address *,uint64_t incarnation);
 /* Only inside this cache's version-reload flush callback, after confirmed
    persistence/unpin. Preserves the mutation guard; all public cache reentry
    stays refused. No allocations or eviction. */

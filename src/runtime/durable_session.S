@@ -3993,12 +3993,13 @@ pg_document_observer_release:
  mov rsi,[rbx+16]
  test rsi,rsi
  jz .Lobserver_pin_ok
+ mov [rbx+88],rsi
  mov rdi,[rbx+48]
  call [rbx+72]
  test eax,eax
- jnz .Lobserver_pin_end
- mov rax,[rbx+16]
- mov [rbx+88],rax
+ jz .Lobserver_pin_end
+ mov qword ptr [rbx+88],0
+ jmp .Lobserver_pin_end
 .Lobserver_pin_ok:
  xor eax,eax
 .Lobserver_pin_end:
@@ -4060,10 +4061,6 @@ pg_document_observer_open:
  mov [rbx+80],rax
  mov qword ptr [rbx+88],0
  mov dword ptr [rbx+96],1
- mov rdi,rbx
- call .Lobserver_pin_update
- test eax,eax
- jnz .Lobserver_open_cleanup
  mov rdi,r12
  xor esi,esi
  lea rdx,[rip+.Lobserver_commit]
@@ -4076,6 +4073,10 @@ pg_document_observer_open:
  lea rdx,[rip+.Lobserver_close]
  mov rcx,rbx
  call pg_session_listen
+ test eax,eax
+ jnz .Lobserver_open_cleanup
+ mov rdi,rbx
+ call .Lobserver_pin_update
  test eax,eax
  jz .Lobserver_open_end
 .Lobserver_open_cleanup:
@@ -4281,4 +4282,49 @@ pg_document_observer_open:
 .Lobserver_state: .asciz "state"
 .Lobserver_status: .asciz "status"
 .Lobserver_terminal: .asciz "terminal"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_session_observers_pin_count
+.type pg_session_observers_pin_count,@function
+pg_session_observers_pin_count:
+ xor eax,eax
+ test rdi,rdi
+ jz .Lobserver_count_end
+ test rsi,rsi
+ jz .Lobserver_count_end
+ mov r8,[rdi+8]
+ mov rcx,[rdi+16]
+ lea r9,[rip+.Lobserver_commit]
+.Lobserver_count_each:
+ test rcx,rcx
+ jz .Lobserver_count_end
+ cmp dword ptr [r8+16],0
+ jne .Lobserver_count_next
+ cmp [r8],r9
+ jne .Lobserver_count_next
+ mov rdx,[r8+8]
+ cmp dword ptr [rdx+96],0
+ je .Lobserver_count_next
+ cmp [rdx+88],rsi
+ jne .Lobserver_count_next
+ inc rax
+.Lobserver_count_next:
+ add r8,24
+ dec rcx
+ jmp .Lobserver_count_each
+.Lobserver_count_end:
+ ret
+.size pg_session_observers_pin_count,.-pg_session_observers_pin_count
+.globl pg_session_observers_pinned
+.type pg_session_observers_pinned,@function
+pg_session_observers_pinned:
+ sub rsp,8
+ call pg_session_observers_pin_count
+ test rax,rax
+ setne al
+ movzx eax,al
+ add rsp,8
+ ret
+.size pg_session_observers_pinned,.-pg_session_observers_pinned
 .section .note.GNU-stack,"",@progbits

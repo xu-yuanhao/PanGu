@@ -877,7 +877,8 @@
         "pg_document_cache_evict_reserved",
         "pg_document_cache_touch_flushing",
         "pg_document_loaded_open_at",
-        "pg_document_cache_peek"
+        "pg_document_cache_peek",
+        "pg_document_cache_touch_incarnation"
       ],
       "reference_basis": [
         {
@@ -892,6 +893,18 @@
             "packages/durable/src/session/transaction.ts"
           ],
           "semantics": "resolveAddress/addressId distinguish optional family key, preserve signed safe integer owner and encode [kind, scope, owner-or-null, key-or-null]; checkRecordScope/checkRecordVersion/materializeDocumentValue mapped to native enums, safe-integer versions and owned JSON copies; isJsonValue rejects non-finite numbers and ancestor cycles, accepts shared DAG children; native explicit depth quota 256; uncached loadDocument current find/read, record decoding, stored/value version split and detached migrated value ownership; loadDocument cached version reuse/flush/drop/reload, touchDocument granule, sweepDocuments idle retention and incarnation-aware eviction; native hash table via json-c linkhash and explicit host scheduling; documentCreate new-incarnation identity/semantics and Transaction.doc/acquire detached family seed, owned initializer result validation and copy; Transaction.adopt created branch/Session host.install mapped to prepared detached nodes, public linkhash reservation and post-confirmation stamp/install; findRetirement cached record before current find without value load/migration; reserved conditional eviction preserves install capacity; reload flush callback retains exclusive mutation guard, dedicated allocation-free touch preserves guard and refuses nested flush-touch from clock/pin callbacks; point-aware find/document reuse identical decode/materialize ownership, historical current-only refusal; Session.snapshot cached-version fast access only touches and checks semantics"
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#pinDocument release touches cache idleness only if address still holds the released incarnation; native conditional touch preserves normal cache guard and performs no allocation",
+          "tests_to_read": [
+            "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
         }
       ]
     },
@@ -1277,7 +1290,9 @@
         "pg_document_observation_close",
         "pg_document_observer_open",
         "pg_document_observer_detach",
-        "pg_document_observer_release"
+        "pg_document_observer_release",
+        "pg_session_observers_pin_count",
+        "pg_session_observers_pinned"
       ],
       "reference_basis": [
         {
@@ -1350,6 +1365,18 @@
             "packages/durable/src/session/session.ts"
           ],
           "semantics": "#observeDocument and guardObserver synchronous binding registers internal and close listeners, transfers injected incarnation pins before host delivery, stops after detach even within one publication, reports/contains host callback errors and ends once; terminal task owner ends only after all matching document changes; caller storage release waits for registry snapshot dispatch to finish",
+          "tests_to_read": [
+            "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "#pinDocument reference-count semantics from live native observer registrations, allocation-free count query and cache hook; subscription and pin state precede injected cache pin/touch so idleness sees current ownership; last detach removes ownership before unpin/touch, failed pin clears tentative count and attachment",
           "tests_to_read": [
             "packages/durable/test/session-observers.test.ts",
             "packages/durable/test/session-watches.test.ts"

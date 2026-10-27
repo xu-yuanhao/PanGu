@@ -759,6 +759,15 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print('PASS: actual Pi observeDocument/guardObserver/notifyClose match native six-scenario lifecycle, pin and contained-host-error matrix')
 
+def observer_pin_source():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8'),a=source.indexOf('\n\t#pinDocument('),b=source.indexOf('\n\tasync #runCommit',a);const Probe=eval('('+stripTypeScriptTypes(`class Probe{#attachedDocuments=new Map();#idleDocuments=new Map([['a',true]]);#documents=new Map([['a',{record:{id:2}}]]);touches=0;#touchDocument(a){this.touches++;this.#idleDocuments.set(a,true)}run(){const first=this.#pinDocument('a',2),second=this.#pinDocument('a',2),out=[];const snap=()=>out.push([this.#attachedDocuments.get(2)??0,this.#idleDocuments.has('a'),this.touches]);snap();first();first();snap();second();snap();const old=this.#pinDocument('a',2);this.#documents.set('a',{record:{id:20}});old();snap();return out}`+source.slice(a,b)+'}')+')');console.log(JSON.stringify(new Probe().run()));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    assert actual==[[2,False,0],[1,False,0],[0,True,1],[0,False,1]],actual
+    print('PASS: actual Pi pinDocument last-owner idleness, idempotent release and replaced-incarnation no-touch match native cache scenarios')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1053,5 +1062,6 @@ def main():
         close_source_order()
         observation_source_state(native,library)
         observer_source_lifecycle()
+        observer_pin_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

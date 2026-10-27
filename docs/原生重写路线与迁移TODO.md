@@ -575,3 +575,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] durable_session.S/h接通独立同步observer binding：内部commit与close双订阅，injected pin/unpin随incarnation先释放/转移再交付；detach可在回调中执行、移除两种订阅并阻止当前publication剩余交付；独立release等registry snapshot和callback退出后释放owned状态。host advance错误report后detach/end，end错误只report；Task owner终态在本publication文档变化结束后end。公开既有ABI保持。
 - 原生六组正常/回调detach/host错误/Session失败关闭/Task终态/提前detach，核对pin、通知次数、报告与end原因；三个attach分配/clone/registry故障完整回滚。实际DocTx普通提交与retire通过默认adoption通知进入binding，退休后value与pin释放但地址订阅继续。直接执行实际上游#observeDocument/guardObserver/#notifyClose，六组生命周期矩阵一致。
 - 下一行为：将injected pin服务接入原生缓存计数/idle管理，补齐Session获取/取消入口与异步watch消费；同步binding是watch共用生命周期的已有落点，完整观察项继续按全量验收。
+
+### K03 observer pin计数与缓存idle
+
+- 固定Pi 8b0caef #pinDocument及#observeDocument的pin/unpin调用顺序，source probe直接执行#pinDocument核对两个观察者、幂等释放、最后owner回到idle及同址替换时不touch旧incarnation。上游Pi origin保持6c384aa、Harness保持22ddee37。
+- [x] 手写pg_session_observers_pin_count/pinned从现有observer订阅提供无分配的当前pin查询；绑定先登记/设置pin再进入注入pin服务，使cache hooks看到真实ownership；解除先清除ownership再unpin。documents.S/h新增按incarnation条件touch，复用原cache guard，旧identity/缺失不影响新节点。
+- 实际cache测试组合native计数与cache hooks：两个observer共同阻止sweep，首次detach仍pin，最后detach进入idle并允许evict；错误incarnation/零ID验证、初次pin失败完整回滚、已附着观察转移pin失败锁存Session内部失败后正常关闭清理。已有observer回调同步核对计数，所有旧注册故障/来源矩阵继续通过。
+- 后续接入Session获取/取消入口与watch消费；计数服务按现有监听集合扫描，具体组合仍经公开cache hooks注入。

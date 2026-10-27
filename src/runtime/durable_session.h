@@ -294,4 +294,11 @@ typedef struct {
 pg_document_status pg_document_observer_open(pg_document_observer *,pg_session_listeners *,const pg_document_loaded *,const pg_document_observer_host *);
 void pg_document_observer_detach(pg_document_observer *);
 pg_document_status pg_document_observer_release(pg_document_observer *);
+/* Allocation-free pin queries over active observer subscriptions. No separate
+   ownership index is retained. Compatible pinned callback for cache hooks;
+   a composition combines this result with holds/other existing pin owners.
+   Registration and pin state are installed before the host's pin callback and
+   removed before unpin, so a callback can immediately update cache idleness. */
+size_t pg_session_observers_pin_count(const pg_session_listeners *,uint64_t incarnation);
+int pg_session_observers_pinned(void *listeners,uint64_t incarnation);
 #endif
