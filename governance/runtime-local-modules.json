@@ -1399,7 +1399,8 @@
       "role": "Current detached snapshots include deferred adoption; matching cache version fast path while a Tx is admitted, miss/version change waits for mutation line; Entry historical snapshots resolve visible ancestor conversation and committed sequence without cache or migration writes; guarded synchronous backend reads and close-waits admission",
       "exports": [
         "pg_durable_snapshot",
-        "pg_durable_snapshot_as_of"
+        "pg_durable_snapshot_as_of",
+        "pg_durable_observe"
       ],
       "reference_basis": [
         {
@@ -1413,6 +1414,18 @@
           "tests_to_read": [
             "packages/durable/test/session-document-retention.test.ts",
             "packages/durable/test/session-checkpoints-migrations.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "observeDoc and #attachDocument serialized acquisition/attachment with cancellation before and after load and after attachment; native common current-read guard/provider path preserves snapshot behavior, observation waits for active transactions, late cancellation detaches/releases the candidate without ending the host; missing plus cancellation follows source precedence",
+          "tests_to_read": [
+            "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
           ]
         }
       ]

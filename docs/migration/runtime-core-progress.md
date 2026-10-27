@@ -578,3 +578,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 手写计数/布尔查询复用当前observer订阅集合，无额外索引分配；登记与暂定pin先于注入pin/touch，移除先于unpin，失败清除暂定计数并回滚附着。新增cache按incarnation条件touch，保持旧guard和缺失no-op语义。
 - 实际验证：真实cache双observer阻止sweep、最后detach恢复idle并evict、旧identity/零ID、首次pin失败回滚及已附着pin转移失败内部锁存/关闭清理，现有observer回调同步核对native计数。新增失败用例发现新分支清除暂定pin后误落入成功返回，修正跳转保留错误后重跑；未将初次失败记为通过。
 - 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan与来源差异通过；共享/隔离核心G00/Assembly及隔离产品构建通过。同一实施Agent自审8路径候选清单摘要（本记录加入前）10ed59895d84eea78526b6ecc247d73bada4c17150227079e44be4f3214fbffd；隔离核心树23802aeee10c825ff4f42725146bf857d6709268。结论为计数与缓存idle组合本地通过；Session获取/取消及watch消费继续，K03全量未完成。TUI工作保留。
+
+## K03 Session同步观察获取与取消
+
+- 固定Pi 8b0caef observeDoc/#attachDocument，三个取消边界及缺失结果优先级；source probe直接执行实际#attachDocument六种场景并检查临时abort listener清理。上游Pi origin保持6c384aa、Harness保持22ddee37。
+- document_reader.S手写独立observe入口与当前snapshot共用读取guard/缓存/受保护provider路径；observe要求mutation line无active Tx，读取成功后附着，晚取消释放已建立的observer，不调用host end。请求/取消服务有显式借用与重入约束；旧ABI保持。
+- 实际验证：12种cold/current、三取消边界、缺失/缺失+取消、Tx/busy/failed/closed/read-only/无取消服务与获取后真实notified提交，24个allocation/clone/registration故障释放partial和guard。原有snapshot/current/history/Storage guard与整个Runtime专项继续通过。O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享及隔离核心G00/Assembly和隔离产品构建通过。
+- 同一实施Agent自审6路径候选摘要（本记录加入前）457f6cf4cad3babb9e8642f4ac5bc4e6603cb875ef132400e94cd94797a79cad；隔离核心树d4b920083b50e33995743ec8689632c9ed9026e3。结论为Session观察获取/取消本地通过；watch start/delivery/stop及owner结束后的待交付清理继续，K03全量未完成。TUI工作保留。

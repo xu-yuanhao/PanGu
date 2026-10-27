@@ -1606,7 +1606,26 @@ static void observer_cache_tests(void){
  puts("PASS: native observer pin counts compose with real cache idleness/sweep, last-owner release, incarnation touch and failed pin rollback");
 }
 
+typedef struct {durable_fixture d;pg_session_listeners listeners;pg_document_observer observer;unsigned checks,cancel_at,pins,unpins,advances,ends;} acquisition_fixture;
+static int acquisition_cancelled(void *ctx){acquisition_fixture *f=ctx;assert(f->d.session.busy);++f->checks;return f->cancel_at&&f->checks>=f->cancel_at;}
+static int acquisition_pin(void *ctx,uint64_t id){acquisition_fixture *f=ctx;assert(f->d.session.busy&&id==2&&pg_session_observers_pin_count(&f->listeners,id)==1);++f->pins;return 0;}
+static void acquisition_unpin(void *ctx,uint64_t id){acquisition_fixture *f=ctx;assert(id==2&&!pg_session_observers_pin_count(&f->listeners,id));++f->unpins;}
+static int acquisition_advance(void *ctx,const pg_document_observation_change *change,void *delivery){acquisition_fixture *f=ctx;assert(delivery==f&&change->value&&change->ops);++f->advances;return 0;}
+static int acquisition_end(void *ctx,int failure){acquisition_fixture *f=ctx;assert(!failure&&!f->observer.attached&&f->pins==f->unpins);++f->ends;return 0;}
+static void acquisition_open(acquisition_fixture *f,pg_document_observer_host *host,pg_document_observe_request *request){memset(f,0,sizeof(*f));durable_open(&f->d);deferred_fixture *base=&f->d.native.n.f;f->listeners.records=&base->session;*host=(pg_document_observer_host){f,acquisition_advance,acquisition_end,acquisition_pin,acquisition_unpin};*request=(pg_document_observe_request){&base->definition,&base->address,&f->listeners,host,f,acquisition_cancelled};}
+static void acquisition_close(acquisition_fixture *f){assert(!pg_document_observer_release(&f->observer)&&f->pins==f->unpins&&!f->listeners.count);pg_session_dispatch queue={.listeners=&f->listeners};pg_session_adoption_host host={{&f->listeners,&f->d.native.n.holds,f},&queue};int expected=f->d.native.n.f.session.failed?-1:0;assert(pg_durable_session_close_notified(&f->d.session,&host)==expected);durable_closed(&f->d,expected);}
+static void observer_acquisition_tests(void){
+ _Static_assert(sizeof(pg_document_observe_request)==48,"observe request ABI");
+ for(unsigned mode=0;mode<12;++mode){acquisition_fixture f;pg_document_observer_host host;pg_document_observe_request request;acquisition_open(&f,&host,&request);deferred_fixture *base=&f.d.native.n.f;pg_document_definition absent=base->definition;absent.kind=(pg_slice){"absent",6};pg_document_address address=base->address;address.kind=absent.kind;if(mode>=1&&mode<=3)f.cancel_at=mode;if(mode==4||mode==10){request.definition=&absent;request.address=&address;if(mode==10)f.cancel_at=2;}if(mode==5)durable_edit(&f.d,0);if(mode==6)f.d.session.busy=1;if(mode==7)base->session.failed=PG_RECORDS_STORAGE_FAILED;if(mode==8)f.d.session.phase=2;if(mode==9)base->session.read_only=1;if(mode==11)request.cancelled=0;int expected=(mode>=1&&mode<=3)||mode==10?PG_DOCUMENT_OBSERVE_CANCELLED:mode==4?PG_DOC_MISSING:mode==5||mode==6?PG_DOCUMENT_READ_PENDING:mode==7?PG_DOCUMENT_SESSION_FAILED:mode==8?PG_DOCUMENT_SESSION_CLOSED:0;int status=pg_durable_observe(&f.d.session,&request,&f.observer);assert(status==expected);if(mode==6)f.d.session.busy=0;if(mode==5){assert(!f.checks&&!pg_durable_session_abort(&f.d.session));assert(!pg_durable_observe(&f.d.session,&request,&f.observer));expected=0;}assert(!f.d.session.busy);if(expected)assert(!f.observer.attached&&!f.observer.state.active&&!f.listeners.count&&f.pins==f.unpins);else{assert(f.observer.attached&&f.observer.state.value&&f.pins==1&&!f.unpins&&f.listeners.count==2);pg_session_dispatch queue={.listeners=&f.listeners};pg_session_adoption_host adoption={{&f.listeners,&f.d.native.n.holds,&f},&queue};pg_document_notifications notices={0};assert(!pg_session_adoption_notifications_bind(&adoption,&notices));if(mode!=9){durable_edit(&f.d,"acquire");assert(!pg_durable_session_settle_notified(&f.d.session,0,&notices)&&f.advances==1);}assert(!pg_session_dispatch_close(&queue));}if(mode==1)assert(!base->cache.count&&!f.pins);if(mode==2)assert(base->cache.count==1&&!f.pins);if(mode==3)assert(base->cache.count==1&&f.pins==1&&f.unpins==1);acquisition_close(&f);
+ }
+#ifdef PG_MEMORY_FAULTS
+ unsigned count=0;for(unsigned fault=0;;++fault){acquisition_fixture f;pg_document_observer_host host;pg_document_observe_request request;acquisition_open(&f,&host,&request);doc_tracking=1;doc_calls=0;doc_fail=fault;int status=pg_durable_observe(&f.d.session,&request,&f.observer);doc_tracking=0;doc_fail=0;if(!fault){assert(!status);count=doc_calls;}else assert(status&&!f.observer.attached&&!f.observer.state.active&&!f.listeners.count&&f.pins==f.unpins);assert(!f.d.session.busy&&!f.d.native.n.f.cache.busy);acquisition_close(&f);if(fault==count)break;}printf("PASS: Session observation acquisition and %u allocation/clone/registration failures\n",count);
+#endif
+ puts("PASS: cold/current Session observation, three cancellation boundaries, missing, active Tx/busy/failed/closed/read-only admission and actual notified commit");
+}
+
 int main(void){
+ observer_acquisition_tests();
  observer_cache_tests();
  observer_binding_tests();
  observation_state_tests();

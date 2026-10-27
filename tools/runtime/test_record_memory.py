@@ -768,6 +768,16 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==[[2,False,0],[1,False,0],[0,True,1],[0,False,1]],actual
     print('PASS: actual Pi pinDocument last-owner idleness, idempotent release and replaced-incarnation no-touch match native cache scenarios')
 
+def observer_attach_source():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8'),a=source.indexOf('\n\tasync #attachDocument<'),b=source.indexOf('\n\t/**',a);const cancellationError=signal=>signal.reason;const Probe=eval('('+stripTypeScriptTypes(`class Probe{mode;listeners=new Set();loads=0;created=0;detached=0;signal;constructor(mode){this.mode=mode;this.signal={aborted:mode===1,reason:Error('cancel'),addEventListener:(name,fn)=>this.listeners.add(fn),removeEventListener:(name,fn)=>this.listeners.delete(fn)}}abort(){this.signal.aborted=true;for(const fn of [...this.listeners])fn()}#assertHealthy(){}#enqueue(job){return Promise.resolve().then(job)}async #loadDocument(){this.loads++;if(this.mode===2||this.mode===5)this.abort();return this.mode===4||this.mode===5?undefined:{value:1}}async run(){let status;try{const result=await this.#attachDocument({}, {id:'a',address:{}},{abortSignal:this.signal},loaded=>{this.created++;if(this.mode===3)this.abort();return {loaded}},attached=>{this.detached++});status=result===undefined?'missing':'ok'}catch{status='cancelled'}return {status,loads:this.loads,created:this.created,detached:this.detached,listeners:this.listeners.size}}`+source.slice(a,b)+'}')+')');const out=[];for(let mode=0;mode<6;mode++)out.push(await new Probe(mode).run());console.log(JSON.stringify(out));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    expected=[dict(status=['ok','cancelled','cancelled','cancelled','missing','cancelled'][mode],loads=int(mode!=1),created=int(mode in [0,3]),detached=int(mode==3),listeners=0) for mode in range(6)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi attachDocument cancellation before/after load and after attachment, missing-result precedence and cancellation-listener cleanup match native admission scenarios')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1063,5 +1073,6 @@ def main():
         observation_source_state(native,library)
         observer_source_lifecycle()
         observer_pin_source()
+        observer_attach_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

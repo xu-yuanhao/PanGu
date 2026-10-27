@@ -7,6 +7,7 @@
 #define PG_DOCUMENT_ENTRY_NOT_VISIBLE 12
 #define PG_DOCUMENT_SESSION_FAILED 13
 #define PG_DOCUMENT_SESSION_CLOSED 14
+#define PG_DOCUMENT_OBSERVE_CANCELLED 15
 typedef struct {
  pg_document_storage documents;
  void *context;
@@ -28,4 +29,21 @@ typedef struct {
 int pg_durable_snapshot(pg_durable_session *,const pg_document_definition *,const pg_document_address *,struct json_object **);
 int pg_durable_snapshot_as_of(pg_durable_session *,const pg_document_history_reader *,const pg_document_definition *,
  const pg_document_address *,uint64_t entry,struct json_object **);
+typedef struct {
+ const pg_document_definition *definition;
+ const pg_document_address *address;
+ pg_session_listeners *listeners;
+ const pg_document_observer_host *host;
+ void *context;
+ int (*cancelled)(void *);
+} pg_document_observe_request;
+/* Acquires and attaches on the Session mutation line. PENDING requests retry
+   after admitted work; unlike snapshot it never attaches during an active Tx.
+   Uses the same guarded cache/provider path as current snapshot. Cancellation
+   is checked before/after acquisition and after attachment; a late cancellation
+   detaches/releases the tentative observer before returning CANCELLED. Optional
+   cancellation callback only reads caller state and cannot call Session work.
+   Request and address expire on return; definition can stay cached. Observer
+   starts zeroed/released; success follows observer_open ownership/lifetime. */
+int pg_durable_observe(pg_durable_session *,const pg_document_observe_request *,pg_document_observer *);
 #endif

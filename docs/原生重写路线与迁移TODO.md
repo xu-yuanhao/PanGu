@@ -582,3 +582,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] 手写pg_session_observers_pin_count/pinned从现有observer订阅提供无分配的当前pin查询；绑定先登记/设置pin再进入注入pin服务，使cache hooks看到真实ownership；解除先清除ownership再unpin。documents.S/h新增按incarnation条件touch，复用原cache guard，旧identity/缺失不影响新节点。
 - 实际cache测试组合native计数与cache hooks：两个observer共同阻止sweep，首次detach仍pin，最后detach进入idle并允许evict；错误incarnation/零ID验证、初次pin失败完整回滚、已附着观察转移pin失败锁存Session内部失败后正常关闭清理。已有observer回调同步核对计数，所有旧注册故障/来源矩阵继续通过。
 - 后续接入Session获取/取消入口与watch消费；计数服务按现有监听集合扫描，具体组合仍经公开cache hooks注入。
+
+### K03 Session观察获取与取消
+
+- 固定Pi 8b0caef Session.observeDoc/#attachDocument及调用者：准入同一mutation line，load后附着避免漏提交，before/after load和after attach取消检查，晚取消撤销附着。fetch后Pi origin保持6c384aa，Harness保持22ddee37。
+- [x] document_reader.S/h新增pg_durable_observe及独立请求结构，和当前snapshot共用既有guard/provider/缓存路径；observe在active Tx时等待，成功建立同步observer；三个取消检查点与晚取消detach/release，无callback end副作用。既有snapshot ABI与已准入读取行为保持，取消回调只读取外部取消状态。
+- 原生12组正常cold/current、三个取消边界、缺失及缺失+取消、Tx/busy/failed/closed/read-only/无取消服务，获取后实际notified提交进入observer；24个读取/复制/注册故障保留Session guard、释放所有partial附着。source probe执行实际#attachDocument六组取消/缺失/取消监听清理，与原生场景一致。
+- 下一行为：watch的start/delivery/stop与owner终态等待交付；同步observe获取、状态、订阅和取消已有公开落点，整体观察项继续按完整API验收。

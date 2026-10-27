@@ -78,12 +78,30 @@
 .globl pg_durable_snapshot
 .type pg_durable_snapshot,@function
 pg_durable_snapshot:
+ xor r8d,r8d
+ jmp .Lsnapshot_common
+.globl pg_durable_observe
+.type pg_durable_observe,@function
+pg_durable_observe:
+ mov eax,1
+ test rsi,rsi
+ jz .Lobserve_invalid
+ mov r8,rsi
+ mov rcx,rdx
+ mov rdx,[rsi+8]
+ mov rsi,[rsi]
+ jmp .Lsnapshot_common
+.Lobserve_invalid:
+ ret
+.Lsnapshot_common:
  push rbp
  push rbx
  push r12
  push r13
  push r14
- sub rsp,80
+ push r15
+ sub rsp,88
+ mov r15,r8
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -95,13 +113,47 @@ pg_durable_snapshot:
  rep stosq
  test r14,r14
  jz .Lsnapshot_end
+ test r15,r15
+ jz .Lsnapshot_output_clear
+ cmp dword ptr [r14+32],0
+ jne .Lsnapshot_end
+ cmp dword ptr [r14+36],0
+ jne .Lsnapshot_end
+ cmp dword ptr [r14+96],0
+ jne .Lsnapshot_end
+ cmp dword ptr [r14+100],0
+ jne .Lsnapshot_end
+ mov rax,[r15+16]
+ test rax,rax
+ jz .Lsnapshot_end
+ test rbx,rbx
+ jz .Lsnapshot_end
+ mov rcx,[rbx]
+ cmp [rax],rcx
+ jne .Lsnapshot_end
+ cmp qword ptr [r15+24],0
+ je .Lsnapshot_end
+ jmp .Lsnapshot_guard
+.Lsnapshot_output_clear:
  mov qword ptr [r14],0
+.Lsnapshot_guard:
  mov rdi,rbx
  call .Lreader_guard
  mov ebp,eax
  test eax,eax
  jnz .Lsnapshot_end
  mov dword ptr [rbx+168],1
+ test r15,r15
+ jz .Lsnapshot_cache
+ cmp qword ptr [rbx+160],0
+ jne .Lsnapshot_pending
+ mov rax,[r15+16]
+ cmp dword ptr [rax+48],0
+ jne .Lsnapshot_pending
+ call .Lobserve_cancelled
+ test eax,eax
+ jnz .Lobserve_cancelled_result
+.Lsnapshot_cache:
  mov rdi,[rbx+8]
  mov rsi,r12
  mov rdx,r13
@@ -133,6 +185,18 @@ pg_durable_snapshot:
  call pg_document_cache_get@PLT
 .Lsnapshot_loaded:
  mov ebp,eax
+ test r15,r15
+ jz .Lsnapshot_loaded_status
+ test eax,eax
+ jz .Lobserve_check_loaded
+ cmp eax,8
+ jne .Lsnapshot_loaded_status
+.Lobserve_check_loaded:
+ call .Lobserve_cancelled
+ test eax,eax
+ jnz .Lobserve_cancelled_result
+ mov eax,ebp
+.Lsnapshot_loaded_status:
  cmp eax,9
  je .Lsnapshot_storage
  test eax,eax
@@ -140,6 +204,8 @@ pg_durable_snapshot:
  mov rax,[rbx]
  cmp dword ptr [rax+52],0
  jne .Lsnapshot_failed
+ test r15,r15
+ jnz .Lobserve_attach
  mov rax,[rsp]
  mov rdi,[rax+8]
  mov rsi,r14
@@ -151,6 +217,28 @@ pg_durable_snapshot:
  call json_object_put@PLT
  mov qword ptr [r14],0
  mov ebp,3
+ jmp .Lsnapshot_unlock
+.Lobserve_attach:
+ cmp dword ptr [rbx+172],1
+ jne .Lobserve_closed
+ mov rdi,r14
+ mov rsi,[r15+16]
+ mov rdx,[rsp]
+ mov rcx,[r15+24]
+ call pg_document_observer_open@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lsnapshot_unlock
+ call .Lobserve_cancelled
+ test eax,eax
+ jz .Lsnapshot_unlock
+ mov rdi,r14
+ call pg_document_observer_release@PLT
+.Lobserve_cancelled_result:
+ mov ebp,15
+ jmp .Lsnapshot_unlock
+.Lobserve_closed:
+ mov ebp,14
  jmp .Lsnapshot_unlock
 .Lsnapshot_storage:
  cmp qword ptr [rsp+48],0
@@ -176,7 +264,8 @@ pg_durable_snapshot:
  mov dword ptr [rbx+168],0
 .Lsnapshot_end:
  mov eax,ebp
- add rsp,80
+ add rsp,88
+ pop r15
  pop r14
  pop r13
  pop r12
@@ -184,6 +273,17 @@ pg_durable_snapshot:
  pop rbp
  ret
 .size pg_durable_snapshot,.-pg_durable_snapshot
+.size pg_durable_observe,.-pg_durable_observe
+
+.Lobserve_cancelled:
+ mov rax,[r15+40]
+ test rax,rax
+ jz .Lobserve_not_cancelled
+ mov rdi,[r15+32]
+ jmp rax
+.Lobserve_not_cancelled:
+ xor eax,eax
+ ret
 
 .globl pg_durable_snapshot_as_of
 .type pg_durable_snapshot_as_of,@function
