@@ -1396,4 +1396,83 @@ pg_durable_generation_init:
 .Lgg_generation_definition_json: .asciz "{\"name\":\"pangu.generation\",\"version\":1}"
 .Lgg_generation_options_json: .asciz "{\"ownership\":{\"kind\":\"conversation\"}}"
 .Lgg_abort_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"aborted\"}}"
+.text
+.globl pg_durable_generation_history
+.type pg_durable_generation_history,@function
+pg_durable_generation_history:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ mov ecx,18
+ xor eax,eax
+ cld
+ rep stosq
+ mov [rsp+8],rbx
+ lea rdi,[rip+.Lgg_history_json]
+ call json_tokener_parse@PLT
+ mov [rsp+120],rax
+ test rax,rax
+ jz .Lgg_history_alloc
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_conversation_id]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_history_result
+ mov rax,[rsp+120]
+ mov [rsp+32],rax
+ mov edi,1
+ mov esi,4320
+ call calloc@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_history_alloc
+ mov [rax+8],rsp
+ mov [rax+16],r13
+ mov rdi,rax
+ call .Lgg_project
+ test eax,eax
+ jnz .Lgg_history_result
+ mov rax,[rsp+128]
+ mov rdi,r14
+ mov rsi,[rax+72]
+ mov edx,PG_S_BYTES
+ call memcpy@PLT
+ xor eax,eax
+ jmp .Lgg_history_result
+.Lgg_history_alloc:
+ mov eax,5
+.Lgg_history_result:
+ mov ebp,eax
+ mov rax,[rsp+128]
+ test rax,rax
+ jz .Lgg_history_release
+ mov rdi,[rax+72]
+ call free@PLT
+ mov rdi,[rsp+128]
+ call free@PLT
+.Lgg_history_release:
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_generation_history,.-pg_durable_generation_history
+.section .rodata
+.Lgg_history_json: .asciz "{\"conversationId\":1,\"state\":{\"checkpoint\":{\"cutoff\":9007199254740991}}}"
 .section .note.GNU-stack,"",@progbits

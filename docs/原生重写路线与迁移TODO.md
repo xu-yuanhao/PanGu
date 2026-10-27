@@ -126,7 +126,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 接通Generation/Tool共用的原子phase事务：Entry、Document、工具子任务及waiting/checkpoint同批提交；等待和所有权检查使用最新候选，回调/环/最终owner校验失败整体撤销。入口`pg_task_runner_commit_with`。
 - [x] model-issued `pangu.tool`接入真实read/write/bash服务与Task/Scheduler：call/execute意图先存、双safe恢复、异步输出/关闭、abort、暂停排空及原子结果Entry/终态。入口`durable_tool.S/h`；Generation和嵌套工具按下面剩余项继续。
 - [x] Generation prepare/request/tools接通真实模型→assistant/owned工具任务→waiting→结果入库→后继Generation；请求配置和cutoff持久化，SQLite/JSONL上的真实DeepSeek Flash闭环与重开通过。入口`durable_generation.S/h`。
-- [ ] 在现有 `agent.S/h` 上完成 generation/tool任务、turn/run/settled、草稿与提交事实、流进度、批量调用、顺序/并行工具轮次和结果关联。
+- [ ] 在原生Generation/Tool与Client调用链完成turn/run/settled、草稿与提交事实、流进度、批量调用、顺序/并行工具轮次和结果关联。
 - [ ] 完成可恢复模型重试、deferred生成、partial变化、工具中断结算和副作用恢复策略；模型请求沿用已提交配置与身份。
 - [ ] 验收：无工具、单/多工具、错误、取消、暂停与进程恢复的状态/事件/副作用逐项对照；达到消息/输出预算前给出可处理结果。
 
@@ -183,6 +183,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `Harness` 与 Coding Agent `core/agent-session.ts` 的模型、资源、会话操作；现有 `src/composition/pangu.c`。
 
+- [x] 产品前台接入Durable Client/Session/Scheduler/Generation/Tool：默认`.pangu` JSONL、模型/工具事件、取消、暂停与已提交历史。核心专项与真实模型编码工作流通过；TUI候选整合见交接区。
 - [ ] 将 K02–K13 的服务组合成实际程序：工作区、模型/凭据、资源、存储、宿主与TUI桥接；完善启动参数、配置加载与关闭顺序。
 - [ ] 对接TUI TODO的所有操作请求，按已实现头文件逐项联调；完成会话选择、导入/导出、模型/思考配置与扩展刷新所需Runtime服务。
 - [ ] 验收：从干净临时工作区启动，真实模型完成编码工作流、会话管理、压缩、扩展调用、暂停/恢复，操作数据逐项可核对。
@@ -214,8 +215,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Generation `prepare/request/startToolRound/finishToolRound`、ToolTask `call/execute/abort/settle`、OpenAI `api/openai-completions.ts`的baseUrl/model/apiKey注入与对应恢复测试。Pi远端`531340f100c6b682a602657b699a0ac27d522c30`沿用已核对快照；Harness固定`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`pangu.generation`→保存configuration/cutoff→原生上下文投影→模型stream→原子assistant/owned `pangu.tool`/waiting→真实工具→原子result Entry/Task receipt→后继Generation→最终答案。调度器在宣布空闲前重新发现本轮刚提交的接管任务；修复toolCall上下文name字段定位。模型连接接受`PANGU_MODEL_ENDPOINT`、`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`，会话身份包含端点和模型；密钥通过环境传递。
-- 验证：真实DeepSeek Flash在SQLite和JSONL各完成2次模型请求、1次真实read任务、2个assistant Entry，返回模型事先不知道的文件独有标记；两后端HTTP 200、零任务fault、重开记录通过，O0 ASan/UBSan运行通过。完整Runtime O0/O2回归通过；模型配置/传输专项覆盖独立端点、模型名、凭据选择及缺失凭据拒绝。命令入口`python3 -B tools/runtime/build_test.py --live-generation`，使用环境凭据。密钥及账户余额记录保存在Git私有目录。
-- 剩余行为：当前完整模型—工具链通过原生Session组合运行；产品组合/TUI仍需切换到Durable服务。顺序工具轮次、重试/deferred/compaction、队列边界、hooks、持久partial/用量、嵌套工具及K06剩余恢复/任务操作按所属项完成；SQLite恢复成本随批次历史增长。
-- 下一交付物：将已验证的Durable执行链接入`src/composition/`与Runtime/TUI桥接，直接从终端对话、调用工具并重开恢复；沿实际调用者补齐配置与会话入口。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Harness `Conversation.submit/abort`、`bindConversation/Harness.open`、Generation `prepare/request/startToolRound/finishToolRound`、Tool `call/execute/abort/settle`及`harness-host-inputs`、generation/tools recovery测试；Coding Agent交互层消费提交/取消/事件/历史。已检查Pi远端从`531340f`至`177e2ad7e41e85c16c859f844a0569a3c76f2666`的本批模块差异：新增observe与telemetry隔离、adopt后取消通知；原生取消处理已在提交外调度，观察扩展随K13接入。Harness远端仍为`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，本批参考工作树保持固定提交。
+- 实际调用链：`pangu.c`原生Host→JSONL Durable Session→`durable_client.S`原子User Entry/Generation→Scheduler→已提交配置/上下文→模型流→owned Tool/wait→真实read/write/edit/bash→结果入库→后继Generation。Client拥有事件字节，桥接消费submit/cancel/poll/history；退出暂停并排空资源，默认工作区`.pangu`，重开投影历史与继续持久任务。
+- 验证：Client严格UTF-8拒绝不写入、输入/任务原子创建、忙时拒绝、prepare暂停重开/取消、历史与ABI在SQLite/JSONL通过ASan/UBSan；真实DeepSeek两后端Client闭环各2次请求/1次read/2个assistant、HTTP200、零fault。Runtime完整O0/O2回归、隔离核心树G00/Assembly与产品构建通过；真实终端完成四种编码工具、PanGu身份、历史重开与继续对话。PTY恢复定位到已提交TUI Unicode宽度常量的前向汇编错误；隔离基线采用显式立即数修正后，真实工具执行中退出重开及进程终止重开均通过，命令副作用保持一次；当前TUI候选已有表/常量前置修正。控制登记自审：新增Assembly Client/头、Generation历史导出与实际组合依赖，沿既有门禁登记，验证范围如上。
+- 剩余行为：TUI候选尚待交接，临时候选整机构建通过，其自身测试当前停在`tests/client/tui/test_tui_view.c:270`的控制转义断言；未编辑/暂存TUI归属文件。K05/K07重试/deferred/partial、顺序工具/hook、K10输入队列与多会话、K11资源配置恢复、K12压缩、K13完整观察/用量和K06余项继续按所属清单完成；当前模型投影仍为64条消息，启动仍加载所选提示文件。
+- 下一交付物：接收TUI候选后统一登记与终端回归；核心继续按Generation/工具恢复用例成组补齐持久模型重试及错误结算，把已接通的产品链扩展为完整K07行为。

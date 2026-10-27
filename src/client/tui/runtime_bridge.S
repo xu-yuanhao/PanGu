@@ -426,5 +426,5 @@ pg_tui_bridge_set_history:
     pop rbx
     ret
 .section .rodata
-.Lruntime_name: .asciz "native-agent / MiMo"
+.Lruntime_name: .asciz "PanGu Durable"
 .section .note.GNU-stack,"",@progbits

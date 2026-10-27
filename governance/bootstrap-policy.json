@@ -577,6 +577,8 @@
     "src/runtime/durable_tool.S": "native-source",
     "src/runtime/durable_tool.h": "native-source",
     "src/runtime/durable_generation.S": "native-source",
-    "src/runtime/durable_generation.h": "native-source"
+    "src/runtime/durable_generation.h": "native-source",
+    "src/runtime/durable_client.S": "native-source",
+    "src/runtime/durable_client.h": "native-source"
   }
 }
