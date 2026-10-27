@@ -19,11 +19,15 @@ typedef struct {
  struct pg_durable_inputs *inputs;
  /* Before provider close, complete the private assistant with terminal facts. */
  int (*complete)(void *,const pg_model *,struct json_object *assistant);
+ /* Fetch begins a provider event stream; cancellation may cooperatively pend.
+    Both borrow the durable handle and acquired provider until cleanup. */
+ int (*fetch_deferred)(void *,const pg_model *,const struct json_object *);
+ int (*cancel_deferred)(void *,const pg_model *,const struct json_object *);
 } pg_durable_generation_host;
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
- pg_task_phase phases[4];
+ pg_task_phase phases[5];
 } pg_durable_generation;
 /* Resolve pangu.generation alongside pangu.tool. prepare saves configuration
    and context cutoff; request streams through the native model service, then

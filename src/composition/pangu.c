@@ -91,7 +91,7 @@ static int tools_stop(void *ctx){(void)ctx;int result=application.tools.close?ap
 static int model_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_tool_registry *tools=pg_host_get(scope,owner,"tool.registry");if(!tools)return 1;
  application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);
- default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1"};
+ default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1",0,0};
  return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider);
 }
 static int model_stop(void *ctx){(void)ctx;if(application.model.close)application.model.close(application.model.context);return 0;}
@@ -152,6 +152,8 @@ static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out)
  else *out=(pg_model_failure){.message={"Model request failed",20}};
 }
 static int model_complete(void *ctx,const pg_model *model,struct json_object *assistant){(void)ctx;return durable.model_provider->complete?durable.model_provider->complete(model->context,assistant):0;}
+static int model_fetch_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->fetch_deferred?durable.model_provider->fetch_deferred(model->context,handle):-1;}
+static int model_cancel_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->cancel_deferred?durable.model_provider->cancel_deferred(model->context,handle):0;}
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
 static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){(void)ctx;if(durable.tools_leased)return 1;durable.tools_leased=1;pg_edit_tool_clear(&editor);*out=durable.selected_tools;pg_durable_client_tool(&durable.client,id,0);return 0;}
 static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
@@ -204,7 +206,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(json_object_object_add(durable.configuration,"provider",json_object_new_string(selected->identity)))return 1;
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
- durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
+ durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete,model_fetch_deferred,model_cancel_deferred};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
  pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;

@@ -79,7 +79,7 @@ pg_durable_generation_init:
  mov [rdi+40],rax
  lea rax,[rdi+96]
  mov [rdi+48],rax
- mov qword ptr [rdi+56],4
+ mov qword ptr [rdi+56],5
  lea rax,[rip+.Lgg_abort]
  mov [rdi+64],rax
  lea rax,[rip+.Lgg_cleanup]
@@ -119,6 +119,14 @@ pg_durable_generation_init:
  mov [rdi+240],rax
  lea rax,[rip+.Lgg_cleanup]
  mov [rdi+248],rax
+ lea rax,[rip+.Lgg_poll_name]
+ mov [rdi+256],rax
+ mov qword ptr [rdi+264],4
+ mov [rdi+272],rdi
+ lea rax,[rip+.Lgg_poll]
+ mov [rdi+280],rax
+ lea rax,[rip+.Lgg_cleanup]
+ mov [rdi+288],rax
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -901,6 +909,12 @@ jmp .Lgg_project_role
  test eax,eax
  jnz .Lgg_request_error
  mov r14,[rbx+56]
+ mov rdi,rbx
+ call .Lgg_poll_wait
+ test eax,eax
+ js .Lgg_request_end
+ cmp eax,1
+ je .Lgg_request_reslept
  cmp dword ptr [r14+4400],0
  jne .Lgg_request_live_ready
  mov rdi,r14
@@ -948,10 +962,26 @@ jmp .Lgg_project_role
  je .Lgg_request_invalid
  cmp qword ptr [r14+48],0
  je .Lgg_request_invalid
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ GGET rax,handle
+ test rax,rax
+ jz .Lgg_request_stream_start
+ mov rcx,[r12]
+ cmp qword ptr [rcx+80],0
+ je .Lgg_request_invalid
+ mov rdi,[rcx]
+ lea rsi,[r14+32]
+ mov rdx,rax
+ mov dword ptr [r14+84],1
+ call [rcx+80]
+ jmp .Lgg_request_start_result
+.Lgg_request_stream_start:
  mov rdi,[r14+32]
  mov rsi,[r14+72]
  mov dword ptr [r14+84],1
  call [r14+40]
+.Lgg_request_start_result:
  test eax,eax
  jnz .Lgg_request_model_error
 .Lgg_request_started:
@@ -1090,12 +1120,25 @@ jmp .Lgg_project_role
  mov dword ptr [r14+84],0
  mov dword ptr [r14+88],1
 .Lgg_request_settle:
+ GGET "qword ptr [r14+24]",deferred
+ test rax,rax
+ jz .Lgg_request_final_settle
+ mov rdi,r14
+ call .Lgg_defer
+ test eax,eax
+ jnz .Lgg_request_error
+ xor eax,eax
+ jmp .Lgg_request_end
+.Lgg_request_final_settle:
  mov rdi,rbx
  mov rsi,r14
  lea rdx,[rip+.Lgg_stage]
  call pg_task_runner_commit_with@PLT
  test eax,eax
  jnz .Lgg_request_error
+ xor eax,eax
+ jmp .Lgg_request_end
+.Lgg_request_reslept:
  xor eax,eax
  jmp .Lgg_request_end
 .Lgg_request_pending:
@@ -1652,10 +1695,70 @@ jmp .Lgg_project_role
  ret
 .Lgg_abort:
  push rbx
- mov rdi,rsi
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ mov r12,rdi
+ call .Lgg_operation
+ test eax,eax
+ jnz .Lgg_abort_error
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ mov [rsp],rax
+ GGET rax,handle
+ test rax,rax
+ jz .Lgg_abort_commit
+ mov rax,[r12]
+ cmp qword ptr [rax+88],0
+ je .Lgg_abort_commit
+ mov rsi,[rbx+56]
+ cmp dword ptr [rsi+80],0
+ jne .Lgg_abort_cancel
+ GGET "qword ptr [rsp]",configuration
+ mov rsi,rax
+ mov rax,[r12]
+ mov rdi,[rax]
+ mov rdx,[rbx+56]
+ add rdx,32
+ call [rax+16]
+ cmp eax,1
+ je .Lgg_abort_pending
+ test eax,eax
+ jnz .Lgg_abort_commit
+ mov rsi,[rbx+56]
+ mov dword ptr [rsi+80],1
+.Lgg_abort_cancel:
+ GGET "qword ptr [rsp]",handle
+ mov rdx,rax
+ mov rax,[r12]
+ mov rdi,[rax]
+ mov rsi,[rbx+56]
+ add rsi,32
+ call [rax+88]
+ cmp eax,1
+ je .Lgg_abort_pending
+ test eax,eax
+ jz .Lgg_abort_commit
+ mov rax,[rbx+8]
+ cmp qword ptr [rax+48],0
+ je .Lgg_abort_commit
+ mov rdi,[rax]
+ mov rsi,[rbx+16]
+ mov edx,-1
+ call [rax+48]
+.Lgg_abort_commit:
+ mov rdi,rbx
+ mov rsi,rbx
  lea rdx,[rip+.Lgg_abort_stage]
  call pg_task_runner_commit_with@PLT
+.Lgg_abort_error:
  neg eax
+ jmp .Lgg_abort_return
+.Lgg_abort_pending:
+ mov eax,1
+.Lgg_abort_return:
+ add rsp,8
+ pop r12
  pop rbx
  ret
 /* Model failures are committed facts; an operation owns the candidate through
@@ -2539,3 +2642,234 @@ pg_durable_generation_history:
  .quad 0,0
 .Lgg_live_initializer:
  .quad 0,.Lgg_live_initial
+
+.text
+.Lgg_poll:
+ jmp .Lgg_request
+/* Re-sleep an early wake without invoking the provider. */
+.Lgg_poll_wait:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ mov r12,rax
+ GGET rax,poll_at
+ test rax,rax
+ jz .Lgg_poll_wait_ready
+ mov rdi,rax
+ call json_object_get_double@PLT
+ movsd [rsp+8],xmm0
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ ucomisd xmm0,[rsp+8]
+ jae .Lgg_poll_wait_ready
+ lea rdi,[rip+.Lgg_retry_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_poll_wait_alloc
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_checkpoint]
+ mov rdx,r12
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_poll_wait_error
+ movsd xmm0,[rsp+8]
+ call json_object_new_double@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_until]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_poll_wait_error
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call pg_task_runner_commit@PLT
+ test eax,eax
+ jnz .Lgg_poll_wait_error
+ mov r12d,1
+ jmp .Lgg_poll_wait_return
+.Lgg_poll_wait_alloc:
+ mov eax,5
+.Lgg_poll_wait_error:
+ neg eax
+ mov r12d,eax
+ jmp .Lgg_poll_wait_return
+.Lgg_poll_wait_ready:
+ xor r12d,r12d
+.Lgg_poll_wait_return:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r12d
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+/* Persist provider handle with the pinned request configuration and cutoff. */
+.Lgg_defer:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,[rdi+8]
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp qword ptr [rax+80],0
+ je .Lgg_defer_invalid
+ GGET "qword ptr [rbx+24]",stop_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_defer_invalid
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_deferred_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_defer_invalid
+ GGET "qword ptr [r12+32]",state
+ GGET rax,checkpoint
+ mov rdi,rax
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lgg_defer_alloc
+ GGET "qword ptr [rbx+24]",deferred
+ mov r13,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_defer_invalid
+ GGET r13,id
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jle .Lgg_defer_invalid
+ GGET r13,poll_after
+ test rax,rax
+ jz .Lgg_defer_default
+ mov r14,rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,2
+ je .Lgg_defer_numeric
+ cmp eax,3
+ jne .Lgg_defer_invalid
+.Lgg_defer_numeric:
+ mov rdi,r14
+ call json_object_get_double@PLT
+ xorpd xmm1,xmm1
+ ucomisd xmm0,xmm1
+ jb .Lgg_defer_invalid
+ jp .Lgg_defer_invalid
+ jmp .Lgg_defer_delay
+.Lgg_defer_default:
+ movsd xmm0,[rip+.Lgg_poll_default]
+.Lgg_defer_delay:
+ movsd [rsp+16],xmm0
+ mov rax,[r12+8]
+ mov rdi,[rax]
+ call [rax+40]
+ addsd xmm0,[rsp+16]
+ movsd [rsp+16],xmm0
+ GGET "qword ptr [rsp+8]",poll_at
+ test rax,rax
+ jz .Lgg_defer_time
+ mov rdi,rax
+ call json_object_get_double@PLT
+ addsd xmm0,[rip+.Lgg_poll_one]
+ maxsd xmm0,[rsp+16]
+ movsd [rsp+16],xmm0
+.Lgg_defer_time:
+ movsd xmm0,[rsp+16]
+ movq rax,xmm0
+ shr rax,52
+ and eax,0x7ff
+ cmp eax,0x7ff
+ je .Lgg_defer_invalid
+ lea rdi,[rip+.Lgg_poll_name]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lgg_phase]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_defer_end
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lgg_handle]
+ mov rdx,r13
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_defer_end
+ movsd xmm0,[rsp+16]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lgg_poll_at]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_defer_end
+ lea rdi,[rip+.Lgg_retry_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_defer_alloc
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_checkpoint]
+ mov rdx,[rsp+8]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_defer_end
+ movsd xmm0,[rsp+16]
+ call json_object_new_double@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_until]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_defer_end
+ mov rdi,r12
+ mov rsi,[rsp]
+ call pg_task_runner_commit@PLT
+ jmp .Lgg_defer_end
+.Lgg_defer_alloc:
+ mov eax,5
+ jmp .Lgg_defer_end
+.Lgg_defer_invalid:
+ mov eax,4
+.Lgg_defer_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_poll_name: .asciz "poll"
+.Lgg_handle: .asciz "handle"
+.Lgg_deferred: .asciz "deferred"
+.Lgg_poll_at: .asciz "pollAt"
+.Lgg_poll_after: .asciz "pollAfterMs"
+.balign 8
+.Lgg_poll_default: .double 5000.0
+.Lgg_poll_one: .double 1.0
+
+.section .rodata
+.Lgg_phase: .asciz "phase"

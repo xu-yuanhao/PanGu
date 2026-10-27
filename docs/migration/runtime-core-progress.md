@@ -22,9 +22,10 @@
 
 ## 本批验证与集成状态
 
-- Generation文本流以100ms节流追加到conversation范围`pangu.live`；Session deferred hold采用1000ms持久窗口，正常关闭排空。TUI继续消费既有文本事件。
-- 请求恢复将已保存文本转为`stopReason: aborted`的assistant历史，保持原请求cutoff；取消/超限原子转换，最终分类原子清除Live进度。
-- Durable专项ASan/UBSan、Runtime完整回归、已提交TUI的隔离产品构建、G00/Assembly通过。真实DeepSeek在SQLite/JSONL完成流中暂停重开、partial转历史、重发、工具及follow-up；最终Live清除断言通过；两后端均HTTP 200、4次模型请求、1次read工具，包含一次流中中断重发。
+- Generation新增deferred poll phase：handle和已保存请求配置/cutoff/pollAt持久化；提前唤醒重新睡眠，反复pending取回严格推进pollAt。取消协作排空提供者后保存终态。
+- model.provider ABI2增加可选fetch/cancel入口，实际插件组合同步；pg_model/TUI函数表保持。
+- SQLite/JSONL取消/租约/终态重开专项ASan/UBSan通过。测试提供者提供deferred句柄和一次pending取回，最终连接真实DeepSeek，两个后端均通过sleeping重开→两次fetch→真实模型/read/follow-up，HTTP 200；这验证原生deferred协议，真实API部分使用普通completions。
+- Runtime完整回归和隔离产品构建通过；原生插件ABI2真实模型/read、顺序释放和重开流程通过。
 
 ## 当前接口边界
 
@@ -43,6 +44,7 @@ python3 -B tools/runtime/test_pangu_pty.py
 ```bash
 python3 -B tools/runtime/build_test.py --live-generation
 python3 -B tools/runtime/build_test.py --live-partial
+python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash

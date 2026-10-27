@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` streamResponse/convertPartial、`partial-changes.ts` 和 generation-recovery/deferred-progress 用例。核对远端Pi `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`、Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`，本批沿固定快照移植文本进度。
-- 实际调用链：Generation接收文本 → conversation范围pangu.live Document → 节流追加delta/Session deferred hold → 现有进度事件。请求恢复前将已保存partial转为aborted assistant并清除；取消/超限同事务转换，最终assistant/工具任务分类同事务清除。重发继续使用既有配置与cutoff，aborted历史不进入模型上下文。
-- 验证：受影响Durable专项ASan/UBSan通过；Runtime完整回归通过；已提交TUI与本批核心隔离产品构建通过。真实DeepSeek在SQLite/JSONL均完成流中暂停→重开→partial转历史→重发→read工具→follow-up；最终Live清除断言通过，两后端均HTTP 200。
-- 接口与自审：现有公开函数表/结构尺寸保持；Generation私有operation增加节流时刻、已写文本长度与初始化标记。Live使用现有Document事务、delta、deferred hold和关闭排空，100ms节流/1000ms持久窗口；模块登记补充Document事务依赖。产品逻辑手写Assembly，G00/Assembly通过。
-- 剩余与下一交付物：K07继续覆盖thinking/流中tool参数partial、进度配置、fault/orphan处理与deferred provider handle的poll/cancel；文本partial的真实进程崩溃场景仍待对应故障验证。K02/K09完整扩展生命周期与K10/K13队列/观察消费者保持原覆盖表。并行TUI工作原位保留。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `generation.ts` classify/poll/abort、pi-ai `DeferredHandle` 和 harness-generation 的deferred轮询/取消/提前唤醒用例。核对Pi远端 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`、Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`；本批沿固定快照实现deferred调用链。
+- 实际调用链：provider complete返回deferred handle → Generation保存handle、原配置/cutoff、pollAt与sleeping Task → Scheduler定时恢复 → provider fetch驱动既有事件流 → 最终assistant/工具原子分类。重复pending取回的pollAt严格前进；提前唤醒重新睡眠。取消先取得提供者、协作等待cancel完成、释放租约并保存aborted终态。
+- 验证：SQLite/JSONL取消专项覆盖pending取消、零fetch、lease释放和终态重开；ASan/UBSan通过。最终真实DeepSeek闭环使用测试提供者模拟远端deferred句柄/一次pending取回，再连接真实API，核对sleeping重开、两次fetch、工具/follow-up、HTTP 200。Runtime完整回归、隔离产品构建及ABI2原生插件实际流程的结果见当前实现记录。
+- 接口与自审：model.provider ABI2为96字节，尾部加入fetch_deferred/cancel_deferred；现有pg_model事件布局保持。Generation host为96字节，新增poll phase后模块296字节；公开消费者、组合和插件夹具同步。默认OpenAI-completions保持原配置/传输，deferred能力由提供者声明；生产纯逻辑手写Assembly，C只负责服务接线。
+- 剩余与下一交付物：K07继续补齐thinking/流中tool参数partial、进度配置、fault/orphan和deferred Live观察/取消失败语义；K10/K13将现有队列与任务事实接入实际查询操作。K02/K09完整扩展生命周期按覆盖表继续；并行TUI工作保留原位。

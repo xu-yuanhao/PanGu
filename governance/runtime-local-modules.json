@@ -144,7 +144,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials",
+      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI2 adds optional fetch_deferred/cancel_deferred operations alongside unchanged model event ABI",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -1804,7 +1804,7 @@
             "packages/ai/src/utils/overflow.ts",
             "packages/durable/src/harness/inbox.ts"
           ],
-          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; text progress uses conversation pangu.live deferred append deltas, request recovery/abort converts saved text to aborted assistant and final classification clears it atomically; model context excludes error/aborted/deferred assistants. Deferred/compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
+          "semantics": "Generation prepare/request/tools/classify/retry mapped to native services, atomic assistant/task receipts, current retry policy and persistent backoff; text progress uses conversation pangu.live deferred append deltas, request recovery/abort converts saved text to aborted assistant and final classification clears it atomically; model context excludes error/aborted/deferred assistants. Deferred handles persist configuration/cutoff and pollAt, early wake re-sleeps, repeated fetch moves pollAt strictly forward, cancellation cooperatively drains the provider before abort receipt. Full Live deferred observation, compaction/hooks/queue boundaries/sequential mode remain corresponding TODO coverage.",
           "tests_to_read": [
             "packages/durable/test/harness-generation.test.ts",
             "packages/durable/test/harness-generation-recovery.test.ts",

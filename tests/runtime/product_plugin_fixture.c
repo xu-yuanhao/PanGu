@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-_Static_assert(sizeof(pg_model_provider)==80&&offsetof(pg_model_provider,identity)==72,"model provider ABI");
+_Static_assert(sizeof(pg_model_provider)==96&&offsetof(pg_model_provider,identity)==72,"model provider ABI");
 static const pg_model_provider *base;
 static pg_model_provider wrapped;
 static pg_tools executor;

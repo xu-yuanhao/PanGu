@@ -14,6 +14,12 @@ typedef struct {
  void (*failure)(void *,pg_model_failure *);
  int (*complete)(void *,struct json_object *assistant);
  const char *identity;
+ /* Optional deferred operation: start fetching into the existing model event
+    stream, using a borrowed persisted handle. 0 started, other values error.
+    cancel_deferred returns 0 finished, 1 pending, negative released failure;
+    it must be repeatable after process interruption. No credentials in handles. */
+ int (*fetch_deferred)(void *,const struct json_object *handle);
+ int (*cancel_deferred)(void *,const struct json_object *handle);
 } pg_model_provider;
-#define PG_MODEL_PROVIDER_ABI 1u
+#define PG_MODEL_PROVIDER_ABI 2u
 #endif
