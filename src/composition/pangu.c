@@ -13,6 +13,7 @@
 #include "../client/tui/runtime_bridge.h"
 #include "../client/tui/tui_app.h"
 #include <fcntl.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -145,11 +146,20 @@ static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)i
 static int client_submit(void *ctx,pg_slice text){(void)ctx;return durable.native_client.submit(durable.native_client.context,text);}
 static void client_cancel(void *ctx){(void)ctx;durable.native_client.cancel(durable.native_client.context);}
 static int client_poll(void *ctx,pg_event *event){(void)ctx;foreground();return durable.native_client.poll(durable.native_client.context,event);}
+static int prompt_probe(void *context,const char *path){
+ pg_read_tool *root=context;struct stat metadata;
+ if(fstatat(root->directory,path,&metadata,AT_SYMLINK_NOFOLLOW))return errno==ENOENT||errno==ENOTDIR?0:-1;
+ return S_ISREG(metadata.st_mode)?1:0;
+}
 static int agent_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;if(!pg_host_get(scope,owner,"model")||!pg_host_get(scope,owner,"tools")||!pg_host_get(scope,owner,"session"))return 1;
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
- const char *prompt="You are PanGu, a minimal native coding agent. Answer concisely. Use read to inspect workspace files, edit for targeted replacements, write to create or overwrite files, and bash for commands. Paths are relative to the workspace. Commands are not sandboxed. The shell receives PATH and LANG only. For long output inspect the reported raw output file. If a tool was interrupted, inspect current state before repeating a write or command. Never claim an action that was not executed.";
- size_t prompt_size=strlen(prompt);const char *file=getenv("PANGU_SYSTEM_PROMPT_FILE");if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;prompt=configured_prompt;}
+ pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
+ pg_tool_registry *declared=pg_host_get(scope,owner,"tool.registry");if(!declared)return 1;
+ pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)}};
+ size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
+ if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
+ else if(pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
  if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
@@ -176,9 +186,9 @@ static int agent_stop(void *ctx){
  if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry"},*const model_exports[]={"model"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model","tools","session","files"};
+static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model","tools","session","files","workspace","tool.registry"};
 static const pg_plugin plugins[]={
- {"agent",0,agent_imports,4,agent_exports,2,agent_start,agent_stop},
+ {"agent",0,agent_imports,6,agent_exports,2,agent_start,agent_stop},
  {"model",0,model_imports,1,model_exports,1,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,2,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},

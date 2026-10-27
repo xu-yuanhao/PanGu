@@ -22,9 +22,9 @@
 
 ## 本批验证与集成状态
 
-- reasoning_content由SSE独立缓冲并在完成时保存为带签名的thinking块；模型后续投影按签名回传，普通启动历史只展示可见消息。
-- options.reasoningEffort启用当前DeepSeek的thinking/reasoning_effort。推理、可见文本、工具与终态元数据保持各自字段与所有权。
-- 提供者O0/O2/ABI和完整Runtime O0/O2通过；隔离副本使用已提交TUI验证产品。真实DeepSeek专项保存非空thinking，并完成工具、连续请求和重开；接收缓冲回收已消费前缀、保留未完成尾行的修复与专项通过。
+- 默认系统提示词采用Pi Coding Agent的分节机制和工具贡献，身份适配PanGu；从注入的实际工具表选择snippets/rules。
+- 工作区.pangu/SYSTEM.md和APPEND_SYSTEM.md、首个AGENTS/CLAUDE上下文候选通过完整文件服务加载，剥离BOM并接入持久Generation配置。显式PANGU_SYSTEM_PROMPT_FILE保持完整替换；工作区和工具表依赖已在Host声明。
+- 提示词专项与完整Runtime O0/O2通过；隔离副本使用已提交TUI进行产品构建。真实DeepSeek项目自定义/追加/上下文覆盖指令与重开、默认提示词四工具/诊断/patch/身份/历史流程通过。
 
 ## 当前接口边界
 
@@ -47,6 +47,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-persistent
 python3 -B tools/runtime/test_pangu_pty.py --live-crash
 python3 -B tools/runtime/test_pangu_pty.py --live-config-recovery
 python3 -B tools/runtime/test_pangu_pty.py --live-thinking
+python3 -B tools/runtime/test_pangu_pty.py --live-resources
 ```
 
 PTY工具支持`--binary`选择已构建的集成程序。真实凭据文档保存在本地Git私有目录。

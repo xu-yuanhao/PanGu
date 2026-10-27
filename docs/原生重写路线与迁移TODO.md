@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的`ai/src/api/openai-completions.ts` reasoning_content流处理、DeepSeek thinking/reasoning_effort映射及thinkingSignature回传；Durable Generation保存和投影完整assistant。Pi远端`72363383ff79d3f12cfa91b03cddb3eb333c6ebc`相关模块无差异，固定参考工作树。
-- 实际调用链：OpenAI SSE将reasoning_content追加到独立有界缓冲；完成回调将thinking块和reasoning_content签名放在assistant可见文本前，同批保存。Generation投影通过原生PG_THINKING行保留该内容与签名，模型请求将它与相邻assistant/toolCall组合后回传reasoning_content。启动历史过滤内部thinking投影行，普通回答与工具ID布局不变。当前DeepSeek配置的options.reasoningEffort启用thinking并发送reasoning_effort。接收缓冲容量不足时回收已解析SSE前缀，保留未完成行；避免长分片流累积已消费数据。
-- 验证：提供者O0/O2/ABI专项核对分片推理+文本、thinking持久消息构造、普通回答/工具组/纯thinking请求投影。Runtime完整O0/O2通过。真实DeepSeek专项通过：固定算术请求保存实际非空thinking，随后read、后续对话与重开均成功；断言读取持久记录中的签名和内容。开发中实测暴露SSE累计容量问题，修复后接收边界/未完成尾行保留专项通过；纯简单请求可能返回空推理，未把空记录算作通过。隔离副本使用已提交TUI和本批核心源码构建，避免进行中的TUI diff链接变化。
-- 接口与自审：PG_THINKING仅用于模型投影，pg_message布局不变；MiMo增加4096字节reasoning缓冲，布局断言和调用者同批迁移。TUI ops/event与公共工具接口不变；当前推理保存/回传入口保持与完成结果同一所有权路径。只暂存核心归属文件。
-- 剩余与下一交付物：当前接通reasoning_content签名；其他reasoning字段/结构签名、推理增量客户端事件、跨模型兼容与image内容按K05/K13继续。聚合usage/cost、模型目录及其余协议保持原清单，继续B03完整调用链。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Coding Agent `core/system-prompt.ts` normalize/buildRules/buildSystemPromptSections/renderProjectContext、`resource-loader.ts` loadContextFileFromDir/discoverSystemPromptFile/discoverAppendSystemPromptFile及read/bash/edit/write prompt贡献。Pi远端`b3a29f1111114fac696e2cfcd65acdb382a6ed5e`这些入口无差异，固定参考工作树。
+- 实际调用链：产品Agent依赖显式注入workspace/tool.registry/files；原生`pg_prompt_workspace`用平台probe和既有完整文件服务加载工作区.pangu/SYSTEM.md、APPEND_SYSTEM.md及首个上下文候选（AGENTS.override.md、AGENTS.md、AGENTS.MD、CLAUDE.md、CLAUDE.MD）。手写Assembly按default/custom前缀、实际工具snippets/rules、addendum、project_context和cwd顺序拼接，剥离文件BOM；PanGu身份和真实平台工具约束适配参考文本。结果沿既有prepare/configuration进入持久Generation和实际模型请求。显式PANGU_SYSTEM_PROMPT_FILE保持完整替换入口。
+- 验证：提示词专项核对实际工具选择、自定义前缀、append、上下文候选优先级、BOM、probe失败与输出容量拒绝；完整Runtime O0/O2通过。隔离副本以已提交TUI加本批核心源码构建，真实DeepSeek工作区指令/重开以及默认提示词下四工具、exit 7诊断、patch、身份/历史流程通过；平台服务依赖遗漏曾使Agent激活失败，补齐显式import后复验。
+- 接口与自审：`pg_prompt_workspace_source`48字节，借用files/probe/tools/workspace；函数失败清空输出，拥有文件服务的组合负责生命周期。登记prompt导出/实际来源和模块职责；静态组合只承担fstatat/errno布局胶水与服务接线，提示词选择/拼接为Assembly。TUI进行中源码保持原位，核心暂存明确路径。
+- 剩余与下一交付物：本批加载工作区范围；用户级与祖先目录继承、资源刷新、sections/hooks、skills/templates/信任设置仍在K11原清单。当前模型prompt上限4095字节，资源超限明确失败；动态预算/长上下文按K05/K12完成。继续B03模型/扩展调用链与B04资源工作流，完整TODO不变。

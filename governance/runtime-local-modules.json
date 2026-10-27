@@ -770,9 +770,10 @@
         "json-c",
         "system libc"
       ],
-      "role": "bounded explicit system prompt file source using injected synchronous complete UTF-8 file service; no discovery, Session mutation, fallback or asynchronous provider ownership",
+      "role": "handwritten workspace prompt sections over injected complete file reads and platform file probes; actual tools, project custom/append instructions, first context candidate, BOM and transactional output",
       "exports": [
-        "pg_prompt_from_file"
+        "pg_prompt_from_file",
+        "pg_prompt_workspace"
       ],
       "reference_basis": [
         {
@@ -781,9 +782,10 @@
           "paths": [
             "packages/durable/src/harness/agent.ts",
             "packages/durable/src/harness/types.ts",
-            "packages/coding-agent/src/core/resource-loader.ts"
+            "packages/coding-agent/src/core/resource-loader.ts",
+            "packages/coding-agent/src/core/system-prompt.ts"
           ],
-          "semantics": "Durable explicit instructions and Coding Agent context-file loading; native user-selected workspace file replaces default system text, no automatic discovery",
+          "semantics": "Pi Coding Agent preamble/tool snippets/rules/addendum/project_context/cwd; workdir-scoped SYSTEM/APPEND and AGENTS.override/AGENTS/CLAUDE candidate ordering; PanGu identity and namespace",
           "tests_to_read": [
             "packages/durable/test/harness-conversations.test.ts",
             "packages/durable/test/harness-registry.test.ts"

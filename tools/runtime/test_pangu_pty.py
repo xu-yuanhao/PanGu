@@ -344,12 +344,39 @@ def thinking_workflow(binary, root, environment):
         terminal.close()
     print('PASS: actual thinking model/read Tool, subsequent request and reopened context preserve reasoning blocks', flush=True)
 
+def resource_workflow(binary, root, environment):
+    root = root / 'resource-workflow'
+    root.mkdir()
+    private = root / '.pangu'
+    private.mkdir()
+    marker = 'PANGURESOURCE' + os.urandom(5).hex()
+    append = 'PANGUAPPEND' + os.urandom(5).hex()
+    (private / 'SYSTEM.md').write_text('You are PanGu, a coding assistant. Follow the project instructions. Answer concisely.')
+    (private / 'APPEND_SYSTEM.md').write_text('The append token is ' + append + '.')
+    (root / 'AGENTS.md').write_text('The project marker is WRONG_PRIORITY.')
+    (root / 'AGENTS.override.md').write_text('The project marker is ' + marker + '.')
+    env = dict(environment)
+    env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
+    for reopen in (False, True):
+        terminal = Terminal(binary, root, env)
+        try:
+            terminal.until(b'> ', 5)
+            output = run_input(terminal, 'Report the project marker and append token exactly. Use no tools.')
+            assert marker.encode() in output and append.encode() in output
+            assert b'WRONG_PRIORITY' not in output
+            terminal.send(b'\x04')
+            terminal.finish()
+        finally:
+            terminal.close()
+    print('PASS: actual project custom/append/override resources and reopened PanGu context', flush=True)
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary',type=Path,help='already built product')
     parser.add_argument('--live',action='store_true',help='real coding workflow and committed context reopen')
     parser.add_argument('--live-persistent',action='store_true',help='cooperative exit during an unsafe tool and reopen')
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
+    parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
     parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
     parser.add_argument('--live-config-recovery',action='store_true',help='saved request identity/options survive changed environment')
     args=parser.parse_args()
@@ -360,9 +387,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_resources:
+                resource_workflow(binary,root,env)
             if args.live_thinking:
                 thinking_workflow(binary,root,env)
             if args.live_config_recovery:
