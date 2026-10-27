@@ -217,8 +217,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` resource-loader.ts 的 loadProjectContextFiles/loadContextFileFromDir，以及 resource-loader.test.ts 的ancestor layering、override与目录候选用例；远端核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`。
-- 实际调用链：产品提供临时只读完整文件服务 → Assembly从canonical workspace逐层枚举根至父目录 → 每目录按override/AGENTS/CLAUDE选择一个 → 按用户、祖先、本地顺序组装 → Generation保存prompt并发送模型。已由用户目录加载的同一canonical目录在继承/本地阶段跳过，保持单次加载。
-- 验证：prompt专项ASan/UBSan核对多层顺序、override、用户目录位于祖先或cwd时去重；隔离产品构建、G00/Assembly通过。真实TUI核对用户/祖先/项目标记、父级override、关闭重开、fallback和请求期持久prompt顺序；以上真实TUI验证及Runtime整批回归均通过。
-- 接口与自审：prompt source为112字节，尾部增加ancestor_files/context/probe，接收相对文件系统根的候选路径。路径遍历、选择、去重与拼接为Assembly；C仅处理canonical路径和只读根服务的打开/关闭。新增路径缓冲与读入缓冲分离，有界失败清空保持；源登记/职责同步，无TUI布局变化。
-- 剩余与下一交付物：K11继续worktree主目录遮蔽/符号链接语义、配置、skills/templates与刷新、MCP等原覆盖行为。K10/K13继续查询操作；既有Inputs表供TUI线消费，并行文件保持原位。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` resource-loader.ts 的 findShadowedContextFile/loadProjectContextFiles/loadContextFileFromDir；resource-loader.test.ts 的nested worktree、symlink、distinct filename和bare layout场景；Git元数据复用本机libgit2 1.9.7公开接口。远端Pi核对 `b3a29f1111114fac696e2cfcd65acdb382a6ed5e`。
+- 实际调用链：libgit2发现canonical worktree/common Git路径 → Assembly验证主目录.git及嵌套关系 → 选定worktree指令文件 → 继承时遮蔽主目录同名候选。不同文件名继续继承；没有worktree指令时保留主目录；bare容器未被误判。资源路径经POSIX realpath后交给已有完整快照reader，符号链接指令只在所属层加载一次，prompt沿既有Generation发送/保存。
+- 验证：真实Git仓库/worktree和bare布局专项覆盖遮蔽、链接、不同文件名及无局部上下文继承，ASan/UBSan通过。Runtime整批回归及隔离产品构建通过；最后空指针守卫/bare用例另跑受影响专项。真实TUI/DeepSeek核对嵌套worktree子目录的回答与请求期持久prompt，同时用户/项目覆盖、祖先顺序、fallback/重开通过。
+- 接口与自审：source扩展到152字节，尾部借用worktree/common路径与canonical回调。新增prompt_posix.c仅承担libgit2和POSIX路径/文件服务协议胶水；选择、验证、遮蔽与继承为Assembly。新源、模块exports/依赖与产品/专项构建同步登记，新增pkg-config依赖libgit2；TUI布局不变。
+- 剩余与下一交付物：K11继续配置、skills/templates、资源刷新、MCP等原覆盖行为；上下文完整行为仍由其来源表核对。K10/K13查询操作和K07/K09其余功能按原TODO推进；并行TUI工作保持原位。

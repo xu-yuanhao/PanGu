@@ -597,6 +597,7 @@
     "src/runtime/edit_diff.S": "native-source",
     "src/runtime/model_provider.h": "native-source",
     "tests/runtime/product_plugin_fixture.c": "native-test",
-    "src/runtime/tool_provider.h": "native-source"
+    "src/runtime/tool_provider.h": "native-source",
+    "src/runtime/prompt_posix.c": "native-source"
   }
 }

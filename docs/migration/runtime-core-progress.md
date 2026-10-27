@@ -22,9 +22,10 @@
 
 ## 本批验证与集成状态
 
-- 项目上下文按用户目录→根至父目录→当前项目加载；每目录保持override/AGENTS/CLAUDE顺序，用户目录处于祖先或当前目录时按canonical路径去重。
-- 祖先路径遍历/组装为Assembly，复用完整只读文件服务；文件服务在prompt生成后关闭，实际prompt继续沿Generation保存配置/恢复。
-- prompt专项ASan/UBSan、隔离产品构建、G00/Assembly通过；Runtime整批回归与真实TUI/DeepSeek继承、重开、fallback及请求期持久prompt顺序均通过。
+- 资源加载接入libgit2 worktree/common目录发现；Assembly核对主目录.git及嵌套关系，仅遮蔽同名主目录指令。不同文件名、无worktree指令和bare容器继承保持。
+- 指令资源经realpath后复用现有完整快照reader，支持符号链接；只读资源服务在prompt生成后关闭。
+- 真实Git/worktree/bare布局专项ASan/UBSan、Runtime完整回归及隔离产品构建通过；真实TUI/DeepSeek验证嵌套worktree回答与请求期持久prompt，同时资源优先级、祖先顺序、fallback/重开通过。
+- 产品与prompt专项增加pkg-config `libgit2`依赖，本机版本1.9.7；新增C源为外部库/POSIX胶水，控制清单与模块登记同步。
 
 ## 当前接口边界
 

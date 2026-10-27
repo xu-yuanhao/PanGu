@@ -173,7 +173,7 @@ pg_prompt_workspace:
  push r13
  push r14
  push r15
- sub rsp,8192
+ sub rsp,12288
  mov byte ptr [rsp],0
  sub rsp,72
  mov rbp,rsp
@@ -399,7 +399,7 @@ pg_prompt_workspace:
 .Lpw_invalid:
  mov eax,1
 .Lpw_end:
- add rsp,8264
+ add rsp,12360
  pop r15
  pop r14
  pop r13
@@ -595,6 +595,7 @@ pg_prompt_workspace:
  sub rsp,40
  cmp qword ptr [rbx+88],0
  je .Lpw_ancestor_ok
+ call .Lpw_worktree_shadow
  mov rax,[rbx+40]
  cmp rax,1
  jbe .Lpw_ancestor_ok
@@ -657,6 +658,17 @@ pg_prompt_workspace:
  je .Lpw_ancestor_next_candidate
  test eax,eax
  jnz .Lpw_ancestor_end
+ mov rax,[rsp]
+ test rax,rax
+ jnz .Lpw_ancestor_shadow_size
+ mov eax,1
+.Lpw_ancestor_shadow_size:
+ cmp rax,[rbp+4144]
+ jne .Lpw_ancestor_emit
+ mov rax,[rsp+8]
+ cmp rax,[rbp+4152]
+ je .Lpw_ancestor_parent
+.Lpw_ancestor_emit:
  call .Lpw_emit_context
  test eax,eax
  jnz .Lpw_ancestor_end
@@ -706,3 +718,134 @@ pg_prompt_workspace:
 .Lpw_not_user_directory:
  xor eax,eax
  ret
+
+/* Pi findShadowedContextFile: only a nested checkout's same filename shadows
+   the canonical main worktree, verified through its .git directory. */
+.Lpw_worktree_shadow:
+ sub rsp,40
+ mov qword ptr [rbp+4144],0
+ cmp qword ptr [rbx+144],0
+ je .Lpw_shadow_end
+ mov rcx,[rbx+136]
+ cmp rcx,2
+ jb .Lpw_shadow_end
+ cmp rcx,4096
+ jae .Lpw_shadow_end
+ mov rdx,[rbx+128]
+ test rdx,rdx
+ jz .Lpw_shadow_end
+.Lpw_shadow_parent:
+ dec rcx
+ cmp byte ptr [rdx+rcx],47
+ je .Lpw_shadow_parent_found
+ test rcx,rcx
+ jnz .Lpw_shadow_parent
+ jmp .Lpw_shadow_end
+.Lpw_shadow_parent_found:
+ test rcx,rcx
+ jnz .Lpw_shadow_parent_size
+ mov ecx,1
+.Lpw_shadow_parent_size:
+ mov [rsp],rcx
+ mov rax,[rbx+120]
+ cmp rax,rcx
+ jbe .Lpw_shadow_end
+ cmp rax,4096
+ jae .Lpw_shadow_end
+ mov rdi,[rbx+112]
+ test rdi,rdi
+ jz .Lpw_shadow_end
+ cmp rcx,1
+ je .Lpw_shadow_prefix
+ cmp byte ptr [rdi+rcx],47
+ jne .Lpw_shadow_end
+.Lpw_shadow_prefix:
+ mov rsi,rdx
+ mov rdx,rcx
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lpw_shadow_end
+ mov rdx,[rbx+120]
+ cmp rdx,[rbx+40]
+ ja .Lpw_shadow_end
+ mov rdi,[rbx+32]
+ test rdi,rdi
+ jz .Lpw_shadow_end
+ cmp rdx,[rbx+40]
+ je .Lpw_shadow_workspace
+ cmp byte ptr [rdi+rdx],47
+ jne .Lpw_shadow_end
+.Lpw_shadow_workspace:
+ mov rsi,[rbx+112]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lpw_shadow_end
+ mov rdx,[rsp]
+ add rdx,6
+ cmp rdx,4096
+ ja .Lpw_shadow_end
+ lea rdi,[rbp+4168]
+ mov rsi,[rbx+128]
+ mov rdx,[rsp]
+ call memcpy@PLT
+ mov rax,[rsp]
+ lea rdi,[rbp+rax+4168]
+ lea rsi,[rip+.Lpw_git_suffix]
+ call strcpy@PLT
+ mov rdi,[rbx+96]
+ lea rsi,[rbp+4168]
+ lea rdx,[rbp+8264]
+ mov ecx,4096
+ call [rbx+144]
+ test eax,eax
+ jnz .Lpw_shadow_end
+ lea rdi,[rbp+8264]
+ call strlen@PLT
+ cmp rax,[rbx+136]
+ jne .Lpw_shadow_end
+ lea rdi,[rbp+8264]
+ mov rsi,[rbx+128]
+ mov rdx,rax
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lpw_shadow_end
+ mov qword ptr [rsp+8],0
+.Lpw_shadow_candidate:
+ mov rax,[rsp+8]
+ cmp rax,5
+ jae .Lpw_shadow_end
+ lea rcx,[rip+.Lpw_context_names]
+ mov rdi,[rcx+rax*8]
+ mov [rsp+16],rdi
+ call strlen@PLT
+ add rax,[rbx+120]
+ cmp rax,4096
+ jae .Lpw_shadow_end
+ lea rdi,[rbp+4168]
+ mov rsi,[rbx+112]
+ inc rsi
+ mov rdx,[rbx+120]
+ dec rdx
+ call memcpy@PLT
+ mov rax,[rbx+120]
+ mov byte ptr [rbp+rax+4167],47
+ lea rdi,[rbp+rax+4168]
+ mov rsi,[rsp+16]
+ call strcpy@PLT
+ mov rdi,[rbx+96]
+ lea rsi,[rbp+4168]
+ call [rbx+104]
+ cmp eax,1
+ je .Lpw_shadow_found
+ inc qword ptr [rsp+8]
+ jmp .Lpw_shadow_candidate
+.Lpw_shadow_found:
+ mov rax,[rsp]
+ mov [rbp+4144],rax
+ mov rax,[rsp+8]
+ mov [rbp+4152],rax
+.Lpw_shadow_end:
+ add rsp,40
+ ret
+.section .rodata
+.Lpw_git_suffix: .asciz "/.git"

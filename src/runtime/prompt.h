@@ -23,10 +23,20 @@ typedef struct {
  const pg_tools *ancestor_files;
  void *ancestor_context;
  int (*ancestor_probe)(void *,const char *);
+ pg_slice git_worktree,git_common_directory;
+ int (*canonical)(void *,const char *,char *,size_t);
 } pg_prompt_workspace_source;
 /* Pi coding sections: default/custom prefix, declared tools/rules, addendum,
    user/ancestor/project context candidates and cwd. Project SYSTEM/APPEND overrides
    the corresponding user resource; user instructions precede project ones. Owns no source resources; output <4096.
    Failure clears output/size. Calls are serialized with the file service. */
 int pg_prompt_workspace(const pg_prompt_workspace_source *,char *,size_t,size_t *);
+/* POSIX/libgit2 bridges. complete is a borrowed root-/ snapshot definition;
+   resource paths resolve symlinks before using that existing complete reader. */
+typedef struct {const pg_tool_definition *complete;const char *directory;} pg_prompt_file_source;
+pg_tools pg_prompt_resource_files(pg_prompt_file_source *);
+int pg_prompt_resource_probe(void *,const char *);
+int pg_prompt_path_canonical(void *,const char *,char *,size_t);
+/* 0 canonical worktree/common paths, 1 unavailable; output buffers >=4096. */
+int pg_prompt_git_paths(const char *,char *,size_t,char *,size_t);
 #endif

@@ -382,11 +382,11 @@ def resource_workflow(binary, root, environment):
             for child in value:
                 yield from prompts(child)
     saved = []
-    def capture_request():
+    def capture_request(directory=private):
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             found = []
-            for path in private.iterdir():
+            for path in directory.iterdir():
                 if path.is_file():
                     try:
                         for line in path.read_bytes().splitlines():
@@ -398,7 +398,7 @@ def resource_workflow(binary, root, environment):
                         pass
             if found:
                 saved.extend(found)
-                return
+                return found
             time.sleep(0.01)
         raise AssertionError('in-flight persisted request configuration not found')
     for reopen in (False, True):
@@ -424,7 +424,28 @@ def resource_workflow(binary, root, environment):
     finally:
         terminal.close()
     assert saved and all(user_prefix not in prompt and user_append not in prompt and user_marker in prompt and ancestor_marker in prompt and prompt.index(user_marker) < prompt.index(ancestor_marker) < prompt.index(marker) and 'WRONG_PARENT_PRIORITY' not in prompt for prompt in saved)
-    print('PASS: user/project resource priority, ordered user/ancestor/project AGENTS, actual saved prompt, user fallback and reopened PanGu context', flush=True)
+    main_repo = root.parent / 'resource-main'
+    subprocess.run(['git','init','-q',str(main_repo)],check=True,capture_output=True)
+    subprocess.run(['git','-C',str(main_repo),'-c','user.name=PanGu','-c','user.email=pangu@example.invalid','-c','core.hooksPath=/dev/null','commit','-q','--allow-empty','-m','initial'],check=True,capture_output=True)
+    worktree = main_repo / 'worktrees' / 'feature'
+    subprocess.run(['git','-C',str(main_repo),'worktree','add','-q','-b','feature',str(worktree)],check=True,capture_output=True)
+    checkout_marker = 'PANGUWORKTREE' + os.urandom(5).hex()
+    (main_repo / 'AGENTS.md').write_text('The checkout marker is WRONG_MAIN_WORKTREE.')
+    (worktree / 'AGENTS.md').write_text('The checkout marker is ' + checkout_marker + '.')
+    nested = worktree / 'src'
+    nested.mkdir()
+    worktree_saved = []
+    terminal = Terminal(binary, nested, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Report the checkout marker and user context marker exactly. Use no tools.', lambda: worktree_saved.extend(capture_request(nested / '.pangu')))
+        assert checkout_marker.encode() in output and user_marker.encode() in output and b'WRONG_MAIN_WORKTREE' not in output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    assert worktree_saved and all(checkout_marker in prompt and 'WRONG_MAIN_WORKTREE' not in prompt for prompt in worktree_saved)
+    print('PASS: user/project priority, ordered inherited AGENTS, saved prompt, fallback/reopen and actual nested Git worktree context shadow', flush=True)
 
 def plugin_workflow(binary, root, environment):
     root = root / 'plugin-workflow'

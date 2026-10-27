@@ -767,17 +767,23 @@
       "id": "context.prompt.local.v0",
       "sources": [
         "src/runtime/prompt.S",
-        "src/runtime/prompt.h"
+        "src/runtime/prompt.h",
+        "src/runtime/prompt_posix.c"
       ],
       "dependencies": [
         "tools.registry.local.v0",
         "json-c",
-        "system libc"
+        "system libc",
+        "libgit2"
       ],
-      "role": "handwritten workspace prompt sections over injected complete file reads and platform file probes; actual tools, project-over-user SYSTEM/APPEND selection, user then root-to-parent then project context candidates, canonical user-directory deduplication, BOM and transactional output",
+      "role": "handwritten workspace prompt sections over injected complete file reads and platform file probes; actual tools, project-over-user SYSTEM/APPEND selection, user then root-to-parent then project context candidates, canonical user-directory deduplication, nested-worktree same-filename shadowing with libgit2 metadata, canonical symlink instruction reads, BOM and transactional output",
       "exports": [
         "pg_prompt_from_file",
-        "pg_prompt_workspace"
+        "pg_prompt_workspace",
+        "pg_prompt_resource_files",
+        "pg_prompt_resource_probe",
+        "pg_prompt_path_canonical",
+        "pg_prompt_git_paths"
       ],
       "reference_basis": [
         {
@@ -789,7 +795,7 @@
             "packages/coding-agent/src/core/resource-loader.ts",
             "packages/coding-agent/src/core/system-prompt.ts"
           ],
-          "semantics": "Pi Coding Agent preamble/tool snippets/rules/addendum/project_context/cwd; workdir .pangu SYSTEM/APPEND overrides corresponding user agent-directory files; user AGENTS precedes root-to-parent and local context, skipping its canonical directory on the inherited walk, each scope selects AGENTS.override/AGENTS/CLAUDE candidates in source order; PanGu identity and namespace",
+          "semantics": "Pi Coding Agent preamble/tool snippets/rules/addendum/project_context/cwd; workdir .pangu SYSTEM/APPEND overrides corresponding user agent-directory files; user AGENTS precedes root-to-parent and local context, skipping its canonical directory on the inherited walk, each scope selects AGENTS.override/AGENTS/CLAUDE candidates in source order; nested worktree context shadows only the same filename in a verified main worktree, bare container context remains inherited, instruction symlinks resolve before complete read; PanGu identity and namespace",
           "tests_to_read": [
             "packages/durable/test/harness-conversations.test.ts",
             "packages/durable/test/harness-registry.test.ts"

@@ -222,6 +222,11 @@
     "src/runtime/edit_diff.S": {
       "role": "assembly-core",
       "reason": "手写Pi/jsdiff Myers行路径、替换排序、四行上下文和统一patch格式；json-c负责结构化结果所有权"
+    },
+    "src/runtime/prompt_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "external-library",
+      "reason": "libgit2元数据发现及POSIX stat/realpath与完整文件服务的协议胶水；继承、遮蔽、优先级由Assembly实现"
     }
   }
 }

@@ -131,10 +131,10 @@ def main():
                             *delta_flags, '-o', delta_test], check=True)
             subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
-            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c'], text=True).split()
+            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libgit2'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ('prompt', 'tools', 'read_tool')],
+                            *[implementation('src/runtime/' + name) for name in ('prompt', 'prompt_posix', 'tools', 'read_tool')],
                             str(ROOT / 'tests/runtime/test_prompt.c'),
                             '-Wl,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext',
                             *prompt_flags, '-o', prompt_test], check=True)

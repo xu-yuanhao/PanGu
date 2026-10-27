@@ -9,6 +9,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <ftw.h>
 static unsigned calls,fail_at,executed;
 static int mode,denied;
 static const char *expected="rules\".txt";
@@ -23,7 +26,7 @@ int __wrap_json_object_object_add(json_object *o,const char *k,json_object *v){r
 const char *__wrap_json_object_to_json_string_ext(json_object *o,int f){return ++calls==fail_at?0:__real_json_object_to_json_string_ext(o,f);}
 static int allow(void *ctx,pg_slice name,pg_slice args){(void)ctx;assert(name.size==4&&!memcmp(name.data,"read",4));json_object *o=json_tokener_parse(args.data),*v=0;assert(o&&json_object_object_get_ex(o,"path",&v)&&!strcmp(json_object_get_string(v),expected));json_object_put(o);return !denied;}
 static int execute(void *ctx,pg_slice name,pg_slice args,char *out,size_t cap,size_t *n){(void)ctx;(void)name;(void)args;++executed;*n=0;if(mode==4){*n=cap;return PG_TOOL_OK;}if(mode==5){*n=4096;return PG_TOOL_OK;}if(cap<4)return PG_TOOL_ERROR;memcpy(out,"abc",3);*n=3;return mode==1?PG_TOOL_PARTIAL:mode==2?PG_TOOL_WAIT:mode==3?PG_TOOL_ERROR:PG_TOOL_OK;}
-_Static_assert(sizeof(pg_prompt_workspace_source)==112&&offsetof(pg_prompt_workspace_source,tools)==24&&offsetof(pg_prompt_workspace_source,workspace)==32,"prompt source layout");
+_Static_assert(sizeof(pg_prompt_workspace_source)==152&&offsetof(pg_prompt_workspace_source,tools)==24&&offsetof(pg_prompt_workspace_source,workspace)==32,"prompt source layout");
 static unsigned resource_mode;
 static int resource_probe(void *context,const char *path){(void)context;if(resource_mode==2)return -1;if(resource_mode==1&&(!strcmp(path,".pangu/SYSTEM.md")||!strcmp(path,".pangu/APPEND_SYSTEM.md")))return 1;return !strcmp(path,"AGENTS.override.md")||!strcmp(path,"AGENTS.md");}
 static int resource_allow(void *context,pg_slice name,pg_slice args){(void)context;(void)name;(void)args;return 1;}
@@ -37,7 +40,7 @@ static int ancestor_execute(void *context,pg_slice name,pg_slice args,char *out,
 
 static void workspace_prompt(void){
  pg_tools source={.authorize=resource_allow,.execute=resource_execute};pg_tool_registry tools={0};tools.count=2;tools.entries[0].name="read";tools.entries[1].name="edit";
- pg_prompt_workspace_source input={&source,0,resource_probe,&tools,{"/workspace",10},0,0,0,{0,0},0,0,0};char output[4096];size_t size=0;
+ pg_prompt_workspace_source input={&source,0,resource_probe,&tools,{"/workspace",10},0,0,0,{0,0},0,0,0,{0,0},{0,0},0};char output[4096];size_t size=0;
  assert(!pg_prompt_workspace(&input,output,sizeof(output),&size)&&size==strlen(output));
  assert(strstr(output,"inside PanGu")&&strstr(output,"- read: Read file contents")&&strstr(output,"- edit: Make precise file edits"));assert(!strstr(output,"- bash:")&&!strstr(output,"Use bash for"));
  assert(strstr(output,"<project_instructions path=\"AGENTS.override.md\">\nAlways use project conventions."));assert(strstr(output,"<cwd>\n/workspace\n</cwd>"));assert(!strstr(output,"\xef\xbb\xbf"));
@@ -55,7 +58,21 @@ static void workspace_prompt(void){
  input.ancestor_files=0;input.ancestor_probe=0;
  input.user_files=0;input.user_probe=0;input.user_directory=(pg_slice){0};user_modes=0;
 }
-int main(void){workspace_prompt();pg_tools files={0,allow,execute,0,0,0,0};char out[5000];size_t n;
+static void git_command(char *const argv[]){pid_t child=fork();assert(child>=0);if(!child){execvp("git",argv);_exit(127);}int status=0;assert(waitpid(child,&status,0)==child&&WIFEXITED(status)&&!WEXITSTATUS(status));}
+static void put_file(const char *directory,const char *name,const char *text){char path[4096];assert(snprintf(path,sizeof(path),"%s/%s",directory,name)>0);FILE *file=fopen(path,"w");assert(file&&fputs(text,file)>=0&&!fclose(file));}
+static int remove_entry(const char *path,const struct stat *metadata,int type,struct FTW *walk){(void)metadata;(void)type;(void)walk;return remove(path);}
+static void worktree_prompt(void){
+ char temporary[]="/tmp/pangu-prompt-worktree-XXXXXX";assert(mkdtemp(temporary));char main[4096],worktree[4096],workspace[4096],main_agents[4096],child_agents[4096],main_claude[4096];snprintf(main,sizeof(main),"%s/main",temporary);snprintf(worktree,sizeof(worktree),"%s/main/worktrees/feature",temporary);snprintf(workspace,sizeof(workspace),"%s/main/worktrees/feature/src",temporary);
+ char *init[]={"git","init","-q",main,0};git_command(init);char *commit[]={"git","-C",main,"-c","user.name=PanGu","-c","user.email=pangu@example.invalid","-c","core.hooksPath=/dev/null","commit","-q","--allow-empty","-m","initial",0};git_command(commit);char *add[]={"git","-C",main,"worktree","add","-q","-b","feature",worktree,0};git_command(add);assert(!mkdir(workspace,0700));
+ put_file(main,"AGENTS.md","MAIN_WT_CONTEXT");put_file(worktree,"AGENTS.md","CHILD_WT_CONTEXT");snprintf(main_agents,sizeof(main_agents),"%s/AGENTS.md",main);snprintf(child_agents,sizeof(child_agents),"%s/AGENTS.md",worktree);snprintf(main_claude,sizeof(main_claude),"%s/CLAUDE.md",main);
+ char git_worktree[4096],common[4096];assert(!pg_prompt_git_paths(workspace,git_worktree,sizeof(git_worktree),common,sizeof(common)));pg_read_tool root={.directory=-1};assert(!pg_read_tool_open(&root,"/"));pg_tool_definition complete=pg_read_snapshot_definition(&root);pg_prompt_file_source project={&complete,workspace},ancestors={&complete,"/"};pg_tools local=pg_prompt_resource_files(&project),inherited=pg_prompt_resource_files(&ancestors);pg_tool_registry tools={0};pg_prompt_workspace_source source={.files=&local,.context=&project,.probe=pg_prompt_resource_probe,.tools=&tools,.workspace={workspace,strlen(workspace)},.ancestor_files=&inherited,.ancestor_context=&ancestors,.ancestor_probe=pg_prompt_resource_probe,.git_worktree={git_worktree,strlen(git_worktree)},.git_common_directory={common,strlen(common)},.canonical=pg_prompt_path_canonical};char prompt[4096];size_t size=0;
+ assert(!pg_prompt_workspace(&source,prompt,sizeof(prompt),&size)&&strstr(prompt,"CHILD_WT_CONTEXT")&&!strstr(prompt,"MAIN_WT_CONTEXT"));
+ assert(!unlink(child_agents)&&!symlink(main_agents,child_agents));assert(!pg_prompt_workspace(&source,prompt,sizeof(prompt),&size));const char *linked=strstr(prompt,"MAIN_WT_CONTEXT");assert(linked&&!strstr(linked+15,"MAIN_WT_CONTEXT"));
+ assert(!unlink(child_agents)&&!rename(main_agents,main_claude));put_file(worktree,"AGENTS.md","CHILD_WT_CONTEXT");assert(!pg_prompt_workspace(&source,prompt,sizeof(prompt),&size)&&strstr(prompt,"MAIN_WT_CONTEXT")&&strstr(prompt,"CHILD_WT_CONTEXT"));assert(!unlink(child_agents));assert(!pg_prompt_workspace(&source,prompt,sizeof(prompt),&size)&&strstr(prompt,"MAIN_WT_CONTEXT"));
+ char container[4096],bare[4096],bare_worktree[4096];snprintf(container,sizeof(container),"%s/container",temporary);assert(!mkdir(container,0700));snprintf(bare,sizeof(bare),"%s/container/.bare",temporary);snprintf(bare_worktree,sizeof(bare_worktree),"%s/container/main",temporary);char *bare_init[]={"git","init","-q","--bare",bare,0};git_command(bare_init);char *push[]={"git","-C",main,"push","-q",bare,"HEAD:main",0};git_command(push);char *bare_add[]={"git","--git-dir",bare,"worktree","add","-q",bare_worktree,"main",0};git_command(bare_add);put_file(container,"AGENTS.md","BARE_CONTAINER_CONTEXT");put_file(bare_worktree,"AGENTS.md","BARE_CHILD_CONTEXT");assert(!pg_prompt_git_paths(bare_worktree,git_worktree,sizeof(git_worktree),common,sizeof(common)));project.directory=bare_worktree;source.workspace=(pg_slice){bare_worktree,strlen(bare_worktree)};source.git_worktree.size=strlen(git_worktree);source.git_common_directory.size=strlen(common);assert(!pg_prompt_workspace(&source,prompt,sizeof(prompt),&size)&&strstr(prompt,"BARE_CONTAINER_CONTEXT")&&strstr(prompt,"BARE_CHILD_CONTEXT"));
+ pg_read_tool_close(&root);assert(!nftw(temporary,remove_entry,32,FTW_DEPTH|FTW_PHYS));puts("PASS: real libgit2 nested worktree discovery, main context shadow, symlink single load, distinct filenames and inheritance without local context");
+}
+int main(void){workspace_prompt();worktree_prompt();pg_tools files={0,allow,execute,0,0,0,0};char out[5000];size_t n;
  assert(!pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&n==3&&!memcmp(out,"abc",4));
  for(unsigned i=1;i<=4;++i){calls=0;fail_at=i;unsigned before=executed;assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&!n&&!out[0]&&before==executed);}fail_at=0;
  denied=1;unsigned before=executed;assert(pg_prompt_from_file(&files,s(expected),out,sizeof(out),&n)&&!n&&!out[0]&&before==executed);denied=0;

@@ -193,17 +193,21 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
- pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0};
+ pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0,{0,0},{0,0},0};
  size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
  if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
  else {
   char user_path[4096],user_canonical[4096];const char *agent_dir=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");
   if(!agent_dir&&home){int n=snprintf(user_path,sizeof(user_path),"%s/.pangu/agent",home);if(n<0||(size_t)n>=sizeof(user_path))return 1;agent_dir=user_path;}
-  pg_read_tool user={.directory=-1};pg_tool_registry user_registry={0};pg_tools user_files={0};
-  if(agent_dir){struct stat metadata;if(!stat(agent_dir,&metadata)){if(!S_ISDIR(metadata.st_mode)||pg_read_tool_open(&user,agent_dir))return 1;pg_tool_definition definition=pg_read_snapshot_definition(&user);if(pg_tool_registry_init(&user_registry,&definition,1)){pg_read_tool_close(&user);return 1;}user_files=pg_tool_registry_service(&user_registry);source.user_files=&user_files;source.user_context=&user;source.user_probe=prompt_probe;if(!realpath(agent_dir,user_canonical)){pg_read_tool_close(&user);return 1;}source.user_directory=(pg_slice){user_canonical,strlen(user_canonical)};}else if(errno!=ENOENT&&errno!=ENOTDIR)return 1;}
-  pg_read_tool ancestors={.directory=-1};pg_tool_registry ancestor_registry={0};pg_tools ancestor_files={0};
-  if(pg_read_tool_open(&ancestors,"/")){pg_read_tool_close(&user);return 1;}pg_tool_definition ancestor_definition=pg_read_snapshot_definition(&ancestors);if(pg_tool_registry_init(&ancestor_registry,&ancestor_definition,1)){pg_read_tool_close(&ancestors);pg_read_tool_close(&user);return 1;}ancestor_files=pg_tool_registry_service(&ancestor_registry);source.ancestor_files=&ancestor_files;source.ancestor_context=&ancestors;source.ancestor_probe=prompt_probe;
-  int result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);pg_read_tool_close(&ancestors);pg_read_tool_close(&user);if(result)return 1;
+  int have_user=0;if(agent_dir){struct stat metadata;if(!stat(agent_dir,&metadata)){if(!S_ISDIR(metadata.st_mode)||!realpath(agent_dir,user_canonical))return 1;have_user=1;}else if(errno!=ENOENT&&errno!=ENOTDIR)return 1;}
+  pg_read_tool resources={.directory=-1};if(pg_read_tool_open(&resources,"/"))return 1;pg_tool_definition complete=pg_read_snapshot_definition(&resources);
+  pg_prompt_file_source project_source={&complete,application.path},user_source={&complete,user_canonical},ancestor_source={&complete,"/"};
+  pg_tools project_files=pg_prompt_resource_files(&project_source),user_files=pg_prompt_resource_files(&user_source),ancestor_files=pg_prompt_resource_files(&ancestor_source);
+  source.files=&project_files;source.context=&project_source;source.probe=pg_prompt_resource_probe;
+  if(have_user){source.user_files=&user_files;source.user_context=&user_source;source.user_probe=pg_prompt_resource_probe;source.user_directory=(pg_slice){user_canonical,strlen(user_canonical)};}
+  source.ancestor_files=&ancestor_files;source.ancestor_context=&ancestor_source;source.ancestor_probe=pg_prompt_resource_probe;source.canonical=pg_prompt_path_canonical;
+  char git_worktree[4096],git_common[4096];if(!pg_prompt_git_paths(application.path,git_worktree,sizeof(git_worktree),git_common,sizeof(git_common))){source.git_worktree=(pg_slice){git_worktree,strlen(git_worktree)};source.git_common_directory=(pg_slice){git_common,strlen(git_common)};}
+  int result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);pg_read_tool_close(&resources);if(result)return 1;
  }
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
