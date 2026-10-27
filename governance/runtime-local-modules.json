@@ -878,7 +878,8 @@
         "pg_document_cache_touch_flushing",
         "pg_document_loaded_open_at",
         "pg_document_cache_peek",
-        "pg_document_cache_touch_incarnation"
+        "pg_document_cache_touch_incarnation",
+        "pg_document_cache_clear"
       ],
       "reference_basis": [
         {
@@ -903,6 +904,18 @@
           "semantics": "#pinDocument release touches cache idleness only if address still holds the released incarnation; native conditional touch preserves normal cache guard and performs no allocation",
           "tests_to_read": [
             "packages/durable/test/session-observers.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "unloadDocuments clears cached/idle loaded trackers without ending address observers; native reusable cache clear invalidates temporary loaded handles after owner settles transactions/holds, preserves provider/hooks/index, and allocates no new storage",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-watches.test.ts"
           ]
         }
@@ -1306,7 +1319,8 @@
         "pg_document_watch_release",
         "pg_document_watch_source_release",
         "pg_document_watch_observe_cancellation",
-        "pg_document_watch_cancellation_release"
+        "pg_document_watch_cancellation_release",
+        "pg_durable_session_unload_documents"
       ],
       "reference_basis": [
         {
@@ -1432,6 +1446,18 @@
           "semantics": "WatchLifecycle.observeCancellation installs once and checks already-aborted state; termination removes cancellation listener before source detach, preserves in-flight ownership and ignores late listener failure; native fallible subscription supports owned partial handles, inline cancellation while installing, quiescent removal and rollback without losing the old source host",
           "tests_to_read": [
             "packages/chord/test/watch.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "unloadDocuments maintenance on the admitted native Session line: save held values with the configured adoption notification service, synchronize timer and clear reusable cache only after success; failed flush retains nodes and first failure; independent observers and in-flight Watch data survive cold reload",
+          "tests_to_read": [
+            "packages/durable/test/session-deferred-commits.test.ts",
             "packages/durable/test/session-watches.test.ts"
           ]
         }

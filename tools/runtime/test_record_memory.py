@@ -837,6 +837,16 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print('PASS: actual Chord Watch observeCancellation matches native once-only/already-aborted/lifetime cleanup, unsubscribe-before-source-detach and in-flight late-error precedence')
 
+def session_unload_source():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/durable/src/session/session.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const source=readFileSync(0,'utf8'),a=source.indexOf('\n\tunloadDocuments():'),b=source.indexOf('\n\t/**',a),BACKGROUND_CONTEXT={};const Probe=eval('('+stripTypeScriptTypes(`class Probe{#failure;#holds=new Map();#documents=new Map([[2,{value:{text:'held'}}]]);#idleDocuments=new Map([[2,1]]);#attachedDocuments=new Map([[2,1]]);stores=0;mode;constructor(mode){this.mode=mode;if(mode!==2)this.#holds.set(2,{value:{text:'held'}})}#enqueue(job){return Promise.resolve().then(job)}async #storeHolds(holds){if(!holds.length)return;this.stores++;if(this.mode===1)throw Error('Storage');this.#holds.clear()}async run(){let ok;try{await this.unloadDocuments();ok=true}catch{ok=false}return {ok,cached:this.#documents.size,idle:this.#idleDocuments.size,held:this.#holds.size,attached:this.#attachedDocuments.size,stores:this.stores}}`+source.slice(a,b)+'}')+')');const out=[];for(let mode=0;mode<3;mode++)out.push(await new Probe(mode).run());console.log(JSON.stringify(out));
+'''
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code],input=source,text=True,capture_output=True,check=True).stdout)
+    expected=[dict(ok=mode!=1,cached=int(mode==1),idle=int(mode==1),held=int(mode==1),attached=1,stores=int(mode!=2)) for mode in range(3)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Pi unloadDocuments stores holds before dropping cache, preserves cache on flush rejection and retains observer pins, matching native maintenance scenarios')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1136,5 +1146,6 @@ def main():
         watch_delivery_source(native,library)
         session_watch_owner_source()
         watch_cancellation_source()
+        session_unload_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

@@ -128,6 +128,10 @@ pg_document_status pg_document_cache_touch_flushing(pg_document_cache *,const pg
 pg_document_status pg_document_cache_evict(pg_document_cache *,const pg_document_address *,uint64_t incarnation);
 pg_document_status pg_document_cache_sweep(pg_document_cache *);
 pg_document_status pg_document_cache_retention(pg_document_cache *,uint64_t);
+/* Drop loaded nodes while preserving providers/hooks and the reusable index.
+   Caller first settles active Tx and flushes/releases held loaded references.
+   Independent observers remain valid; temporary loaded handles expire. */
+pg_document_status pg_document_cache_clear(pg_document_cache *);
 pg_document_status pg_document_cache_close(pg_document_cache *);
 typedef struct {
  pg_document_cache *cache;

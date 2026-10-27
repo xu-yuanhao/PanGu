@@ -5165,3 +5165,95 @@ pg_document_watch_cancellation_release:
  ret
 .size pg_document_watch_cancellation_release,.-pg_document_watch_cancellation_release
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_session_unload_documents
+.type pg_durable_session_unload_documents,@function
+pg_durable_session_unload_documents:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Lunload_end
+ cmp dword ptr [rbx+172],1
+ jne .Lunload_closed
+ mov r12,[rbx]
+ mov eax,13
+ cmp dword ptr [r12+52],0
+ jne .Lunload_end
+ mov eax,11
+ cmp dword ptr [rbx+168],0
+ jne .Lunload_end
+ cmp qword ptr [rbx+160],0
+ jne .Lunload_end
+ cmp dword ptr [r12+48],0
+ jne .Lunload_end
+ mov rax,[rbx+8]
+ cmp qword ptr [rax+104],0
+ jne .Lunload_pending
+ mov rax,[rbx+16]
+ cmp dword ptr [rax+48],0
+ jne .Lunload_pending
+ mov rax,[rbx+24]
+ cmp dword ptr [rax+56],0
+ jne .Lunload_pending
+ mov dword ptr [rbx+168],1
+ mov rdi,[rbx+16]
+ mov rsi,r12
+ cmp dword ptr [rax+68],1
+ jne .Lunload_plain
+ mov rcx,[rax+72]
+ xor edx,edx
+ call pg_document_holds_flush_observed@PLT
+ jmp .Lunload_flushed
+.Lunload_plain:
+ call pg_document_holds_flush@PLT
+.Lunload_flushed:
+ test eax,eax
+ jnz .Lunload_flush_error
+ mov rdi,[rbx+24]
+ call pg_hold_timer_sync@PLT
+ test eax,eax
+ jnz .Lunload_failed
+ mov rdi,[rbx+8]
+ call pg_document_cache_clear@PLT
+ jmp .Lunload_unlock
+.Lunload_flush_error:
+ cmp eax,5
+ je .Lunload_allocation
+ cmp eax,3
+ je .Lunload_storage
+ cmp dword ptr [r12+52],0
+ jne .Lunload_failed
+ cmp eax,2
+ jne .Lunload_unlock
+ mov eax,4
+ jmp .Lunload_unlock
+.Lunload_allocation:
+ mov eax,3
+ jmp .Lunload_unlock
+.Lunload_storage:
+ mov eax,9
+ jmp .Lunload_unlock
+.Lunload_failed:
+ mov eax,13
+.Lunload_unlock:
+ mov dword ptr [rbx+168],0
+ jmp .Lunload_end
+.Lunload_closed:
+ mov eax,14
+ cmp dword ptr [rbx+172],2
+ jae .Lunload_end
+ mov eax,1
+ jmp .Lunload_end
+.Lunload_pending:
+ mov eax,11
+.Lunload_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_session_unload_documents,.-pg_durable_session_unload_documents
+.section .note.GNU-stack,"",@progbits

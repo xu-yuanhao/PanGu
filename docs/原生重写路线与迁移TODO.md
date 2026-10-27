@@ -611,3 +611,10 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] document_reader.S/h新增pg_durable_watch_cancellable，同时检查请求与服务取消状态，获取后安装持续监听；预取消不读Storage，安装时取消返回CANCELLED并清source/binding，服务拒绝清理tentative资源。
 - 原生12组Watch安装/终止/在途场景、真实Session source后续取消，另4组组合获取的预取消/安装内取消/部分拒绝/正常后取消；source probe执行完整Chord Watch六组安装一次、already-aborted、终止移除顺序及在途迟到错误，与native结果一致。
 - 下一行为：核对K03剩余公开事务/查询与观察总验收；整机host的Watch轮询随K14产品组合接入。
+
+### K03 API核对：unloadDocuments
+
+- 核对Session/Transaction公开方法后发现unloadDocuments尚无原生入口。固定Pi 8b0caef Session.unloadDocuments及session-deferred-commits、session-watches的卸载后继续观察用例；上游Pi origin保持6c384aa、Harness保持22ddee37。
+- [x] documents.S/h增加可复用cache clear，释放loaded节点并保留provider/hooks/index，临时句柄到期、独立观察仍有效；durable_session.S与document_reader.h增加健康开放Session的mutation-line卸载：先flush holds（含已配置通知），同步timer，成功后clear。保存失败保留节点/首因，已接收事务或服务忙时返回PENDING。
+- 原生正常held保存/冷加载、无holds clear无分配、8类admission、实际Storage拒绝、38个flush分配/clone/Storage故障；实际Watch跨两次unload及在途帧后继续同incarnation ops；observed timer组合新增unload持久通知一次验证。source probe执行实际unloadDocuments核对先保存/失败不清缓存/保留观察pin。
+- 后续核对readOnLine、conversationDocumentOnLine、Session显式fail和其余事务查询入口，再做K03全量验收；整机host Watch消费由K14组合。

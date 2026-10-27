@@ -64,4 +64,9 @@ int pg_durable_watch(pg_durable_session *,const pg_document_watch_request *,pg_d
    Provider rejection releases the tentative source and partial subscription.
    Successful source and cancellation binding have their ordinary lifetimes. */
 int pg_durable_watch_cancellable(pg_durable_session *,const pg_document_watch_request *,pg_document_watch_source *,pg_document_watch_cancellation *,const pg_document_watch_cancellation_provider *);
+/* Mutation-line maintenance on an open healthy Session: save holds (including
+   configured durable notifications), synchronize timer, then drop loaded cache
+   nodes. Providers, definitions and observer subscriptions remain usable.
+   PENDING during admitted work; a flush error preserves nodes and first cause. */
+int pg_durable_session_unload_documents(pg_durable_session *);
 #endif

@@ -2466,3 +2466,35 @@ pg_document_cache_evict_reserved:
  pop rbx
  ret
 .size pg_document_cache_evict_reserved,.-pg_document_cache_evict_reserved
+
+.text
+.globl pg_document_cache_clear
+.type pg_document_cache_clear,@function
+pg_document_cache_clear:
+ push rbx
+ mov rbx,rdi
+ mov eax,1
+ test rbx,rbx
+ jz .Lcache_clear_end
+ cmp qword ptr [rbx],0
+ je .Lcache_clear_end
+ cmp qword ptr [rbx+104],0
+ jne .Lcache_clear_end
+ /* Suppress last-node index shrink; keep the existing reusable table. */
+ mov dword ptr [rbx+104],1
+ mov dword ptr [rbx+108],1
+.Lcache_clear_each:
+ mov rsi,[rbx+8]
+ test rsi,rsi
+ jz .Lcache_clear_done
+ mov rdi,rbx
+ call .Lcache_drop_node
+ jmp .Lcache_clear_each
+.Lcache_clear_done:
+ mov qword ptr [rbx+104],0
+ xor eax,eax
+.Lcache_clear_end:
+ pop rbx
+ ret
+.size pg_document_cache_clear,.-pg_document_cache_clear
+.section .note.GNU-stack,"",@progbits
