@@ -341,4 +341,30 @@ typedef struct {pg_document_observer observer;pg_document_watch watch;pg_documen
    listener registry remain caller-owned through source_release. Returns WAIT
    for an in-flight consumer, INVALID during registry/source callbacks. */
 int pg_document_watch_source_release(pg_document_watch_source *);
+typedef struct {
+ void *context;
+ /* 0 success with an owned non-NULL handle, nonzero with optional partial
+    handle. May notify inline; abort state remains available to cancelled. */
+ int (*subscribe)(void *,void (*notify)(void *),void *notify_context,void **handle);
+ /* Removes current callback safely and quiesces future delivery before return.
+    May run inside that callback. Neither operation runs application work. */
+ void (*unsubscribe)(void *,void *handle);
+ int (*cancelled)(void *);
+} pg_document_watch_cancellation_provider;
+typedef struct {
+ pg_document_watch *watch;
+ pg_document_watch_host previous;
+ pg_document_watch_cancellation_provider provider;
+ void *handle;
+ unsigned state,busy;
+} pg_document_watch_cancellation;
+/* Install once on a live Watch, then check already-cancelled state. Termination
+   unsubscribes before detaching the original source, including inline cancel
+   during subscribe. A provider rejection restores the original host and leaves
+   an open Watch usable; partial handles are removed. Finished Watches ignore
+   installation. All state starts zeroed/released. Provider context and binding
+   stay alive through unsubscribe and cancellation_release; callbacks serialize
+   with Watch operations. release waits for termination and rejects reentry. */
+int pg_document_watch_observe_cancellation(pg_document_watch *,pg_document_watch_cancellation *,const pg_document_watch_cancellation_provider *);
+int pg_document_watch_cancellation_release(pg_document_watch_cancellation *);
 #endif

@@ -1304,7 +1304,9 @@
         "pg_document_watch_end",
         "pg_document_watch_end_after_delivery",
         "pg_document_watch_release",
-        "pg_document_watch_source_release"
+        "pg_document_watch_source_release",
+        "pg_document_watch_observe_cancellation",
+        "pg_document_watch_cancellation_release"
       ],
       "reference_basis": [
         {
@@ -1420,6 +1422,18 @@
             "packages/durable/test/session-watches.test.ts",
             "packages/chord/test/watch.test.ts"
           ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/chord/src/watch.ts"
+          ],
+          "semantics": "WatchLifecycle.observeCancellation installs once and checks already-aborted state; termination removes cancellation listener before source detach, preserves in-flight ownership and ignores late listener failure; native fallible subscription supports owned partial handles, inline cancellation while installing, quiescent removal and rollback without losing the old source host",
+          "tests_to_read": [
+            "packages/chord/test/watch.test.ts",
+            "packages/durable/test/session-watches.test.ts"
+          ]
         }
       ]
     },
@@ -1440,7 +1454,8 @@
         "pg_durable_snapshot",
         "pg_durable_snapshot_as_of",
         "pg_durable_observe",
-        "pg_durable_watch"
+        "pg_durable_watch",
+        "pg_durable_watch_cancellable"
       ],
       "reference_basis": [
         {
@@ -1478,6 +1493,18 @@
           "tests_to_read": [
             "packages/durable/test/session-watches.test.ts",
             "packages/durable/test/session-observers.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "8b0caefc2260a28d2cec0a7ce3daef1d3de24776",
+          "paths": [
+            "packages/durable/src/session/session.ts"
+          ],
+          "semantics": "watchDoc/#attachDocument combine acquisition-context cancellation with installed Watch cancellation; native combined acquisition checks both request and provider, returns CANCELLED with cleaned source/binding on inline installation abort, and rolls back the candidate on provider rejection",
+          "tests_to_read": [
+            "packages/durable/test/session-watches.test.ts",
+            "packages/chord/test/watch.test.ts"
           ]
         }
       ]

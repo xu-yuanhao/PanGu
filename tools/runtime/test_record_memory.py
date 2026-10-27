@@ -826,6 +826,17 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
     assert actual==expected,(actual,expected)
     print('PASS: actual Pi Session observeDocument + Chord Watch match native terminal-Task drain, close subscription retention, Session-close drop and in-flight listener-error precedence')
 
+def watch_cancellation_source():
+    source=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show','8b0caefc2260a28d2cec0a7ce3daef1d3de24776:packages/chord/src/watch.ts'],text=True)
+    code=r'''
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {pathToFileURL} from 'node:url';const source=readFileSync(0,'utf8'),{PendingOps}=await import(pathToFileURL(process.argv[1])),withoutAbortSignal=c=>c,Watch=eval('(()=>{'+stripTypeScriptTypes(source.slice(source.indexOf('/**')).replaceAll('export ',''))+';return Watch})()');const out=[];for(let mode=0;mode<6;mode++){const listeners=new Set(),order=[];let added=0,removed=0,detached=0,reports=0,duplicate=false,reject;const signal={aborted:mode===1,addEventListener:(name,fn)=>{added++;listeners.add(fn)},removeEventListener:(name,fn)=>{removed++;order.push('unsubscribe');listeners.delete(fn)}};const abort=()=>{signal.aborted=true;for(const fn of [...listeners])fn()};const watch=new Watch(0,()=>{detached++;order.push('detach')},()=>reports++);watch.observeCancellation(signal);if(mode===0){try{watch.observeCancellation(signal)}catch{duplicate=true}}if(mode===0)abort();if(mode===2)watch.stop();if(mode===3)watch.end({error:9});if(mode===4){watch.start(async()=>{throw Error('listener')});watch.advance({value:1,ops:[['r',1]],retired:false},{});}if(mode===5){const gate=new Promise((yes,no)=>reject=no);watch.start(async()=>await gate);watch.advance({value:1,ops:[['r',1]],retired:false},{});await new Promise(r=>setImmediate(r));abort();reject(Error('late'));}const end=await watch.closed;await new Promise(r=>setImmediate(r));watch.observeCancellation(signal);out.push({reason:end.reason,added,removed,detached,reports,duplicate,order,listeners:listeners.size,value:watch.value})}console.log(JSON.stringify(out));
+'''
+    pending=ROOT/'references/pi/packages/chord/src/delta/pending.ts'
+    actual=json.loads(subprocess.run(['node','--input-type=module','-e',code,str(pending)],input=source,text=True,capture_output=True,check=True,timeout=30).stdout)
+    expected=[dict(reason=['cancelled','cancelled','stopped','failed','listener_error','cancelled'][mode],added=1,removed=1,detached=1,reports=int(mode==4),duplicate=mode==0,order=['unsubscribe','detach'],listeners=0,value=int(mode>=4)) for mode in range(6)]
+    assert actual==expected,(actual,expected)
+    print('PASS: actual Chord Watch observeCancellation matches native once-only/already-aborted/lifetime cleanup, unsubscribe-before-source-detach and in-flight late-error precedence')
+
 def main():
     for name in ('packages/durable/src/session/session.ts','packages/durable/src/session/transaction.ts','packages/durable/src/storage/memory.ts','packages/durable/src/storage/scan.ts','packages/durable/src/session/forks.ts','packages/durable/src/documents.ts','packages/durable/src/errors.ts','packages/durable/src/ids.ts','packages/chord/src/delta/index.ts'):
         frozen=subprocess.check_output(['git','-C',str(ROOT/'references/pi'),'show',COMMIT+':'+name])
@@ -1124,5 +1135,6 @@ def main():
         observer_attach_source()
         watch_delivery_source(native,library)
         session_watch_owner_source()
+        watch_cancellation_source()
     print(f'PASS: {len(operations)} table/document batch/read/scan/entry/head/ID operations match actual fixed Pi MemoryStorage')
 if __name__=='__main__':main()

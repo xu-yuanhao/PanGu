@@ -551,3 +551,108 @@ pg_durable_watch:
  ret
 .size pg_durable_watch,.-pg_durable_watch
 .section .note.GNU-stack,"",@progbits
+
+.text
+.Lwatch_acquire_cancelled:
+ push rbx
+ mov rbx,rdi
+ mov rax,[rbx+8]
+ test rax,rax
+ jz .Lwatch_acquire_token
+ mov rdi,[rbx]
+ call rax
+ test eax,eax
+ jnz .Lwatch_acquire_cancelled_done
+.Lwatch_acquire_token:
+ mov rax,[rbx+16]
+ mov rdi,[rax]
+ mov rax,[rax+24]
+ pop rbx
+ jmp rax
+.Lwatch_acquire_cancelled_done:
+ pop rbx
+ ret
+
+.globl pg_durable_watch_cancellable
+.type pg_durable_watch_cancellable,@function
+pg_durable_watch_cancellable:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,80
+ mov r12,rdi
+ mov r13,rsi
+ mov rbx,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov eax,1
+ test r13,r13
+ jz .Lwatch_cancellable_end
+ test r14,r14
+ jz .Lwatch_cancellable_end
+ test r15,r15
+ jz .Lwatch_cancellable_end
+ cmp qword ptr [r14+72],0
+ jne .Lwatch_cancellable_end
+ cmp qword ptr [r15+8],0
+ je .Lwatch_cancellable_end
+ cmp qword ptr [r15+16],0
+ je .Lwatch_cancellable_end
+ cmp qword ptr [r15+24],0
+ je .Lwatch_cancellable_end
+ mov rax,[r13]
+ mov [rsp],rax
+ mov rax,[r13+8]
+ mov [rsp+8],rax
+ mov rax,[r13+16]
+ mov [rsp+16],rax
+ mov rax,[r13+24]
+ mov [rsp+24],rax
+ lea rax,[rsp+48]
+ mov [rsp+32],rax
+ lea rax,[rip+.Lwatch_acquire_cancelled]
+ mov [rsp+40],rax
+ mov rax,[r13+32]
+ mov [rsp+48],rax
+ mov rax,[r13+40]
+ mov [rsp+56],rax
+ mov [rsp+64],r15
+ mov rdi,r12
+ mov rsi,rsp
+ mov rdx,rbx
+ call pg_durable_watch
+ test eax,eax
+ jnz .Lwatch_cancellable_end
+ lea rdi,[rbx+104]
+ mov rsi,r14
+ mov rdx,r15
+ call pg_document_watch_observe_cancellation@PLT
+ test eax,eax
+ jnz .Lwatch_cancellable_error
+ cmp dword ptr [rbx+228],2
+ jne .Lwatch_cancellable_end
+ mov r12d,15
+ jmp .Lwatch_cancellable_cleanup
+.Lwatch_cancellable_error:
+ mov r12d,1
+ cmp eax,4
+ jne .Lwatch_cancellable_cleanup
+ mov r12d,3
+.Lwatch_cancellable_cleanup:
+ mov rdi,rbx
+ call pg_document_watch_source_release@PLT
+ mov rdi,r14
+ call pg_document_watch_cancellation_release@PLT
+ mov eax,r12d
+.Lwatch_cancellable_end:
+ add rsp,80
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_watch_cancellable,.-pg_durable_watch_cancellable
+.section .note.GNU-stack,"",@progbits

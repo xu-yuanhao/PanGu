@@ -4923,3 +4923,245 @@ pg_document_watch_source_release:
  ret
 .size pg_document_watch_source_release,.-pg_document_watch_source_release
 .section .note.GNU-stack,"",@progbits
+
+.text
+/* Provider callbacks and unsubscribe are serialized, including inline abort. */
+.Lwatch_cancel_event:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ mov eax,[rbx+72]
+ dec eax
+ cmp eax,1
+ ja .Lwatch_cancel_event_done
+ mov eax,[rbx+76]
+ mov [rsp],eax
+ mov dword ptr [rbx+76],1
+ mov rdi,[rbx]
+ call pg_document_watch_cancel
+ mov eax,[rsp]
+ mov [rbx+76],eax
+.Lwatch_cancel_event_done:
+ add rsp,16
+ pop rbx
+ ret
+
+/* Clear provider ownership before unsubscribe can reenter the callback. */
+.Lwatch_cancel_remove:
+ push rbx
+ mov rbx,rdi
+ mov rsi,[rbx+64]
+ mov qword ptr [rbx+64],0
+ test rsi,rsi
+ jz .Lwatch_cancel_remove_clear
+ mov rdi,[rbx+32]
+ call [rbx+48]
+.Lwatch_cancel_remove_clear:
+ pxor xmm0,xmm0
+ movups [rbx+32],xmm0
+ movups [rbx+48],xmm0
+ pop rbx
+ ret
+
+.Lwatch_cancel_detach:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov eax,[rbx+72]
+ cmp eax,1
+ je .Lwatch_cancel_detach_installing
+ cmp eax,2
+ je .Lwatch_cancel_detach_ready
+ cmp eax,3
+ jne .Lwatch_cancel_detach_end
+.Lwatch_cancel_detach_ready:
+ mov dword ptr [rbx+72],4
+ jmp .Lwatch_cancel_detach_save
+.Lwatch_cancel_detach_installing:
+ mov dword ptr [rbx+72],3
+ mov qword ptr [rbx],0
+ jmp .Lwatch_cancel_detach_end
+.Lwatch_cancel_detach_save:
+ mov eax,[rbx+76]
+ mov [rsp],eax
+ mov dword ptr [rbx+76],1
+ mov r12,[rbx+8]
+ mov r13,[rbx+16]
+ mov qword ptr [rbx],0
+ pxor xmm0,xmm0
+ movups [rbx+8],xmm0
+ mov qword ptr [rbx+24],0
+ call .Lwatch_cancel_remove
+.Lwatch_cancel_detach_source:
+ test r13,r13
+ jz .Lwatch_cancel_detach_restore
+ mov rdi,r12
+ call r13
+.Lwatch_cancel_detach_restore:
+ mov eax,[rsp]
+ mov [rbx+76],eax
+.Lwatch_cancel_detach_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.Lwatch_cancel_report:
+ mov rax,[rdi+24]
+ test rax,rax
+ jz .Lwatch_cancel_report_end
+ mov rdi,[rdi+8]
+ jmp rax
+.Lwatch_cancel_report_end:
+ ret
+
+.globl pg_document_watch_observe_cancellation
+.type pg_document_watch_observe_cancellation,@function
+pg_document_watch_observe_cancellation:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,8
+ mov r12,rdi
+ mov rbx,rsi
+ mov r13,rdx
+ mov ebp,3
+ test r12,r12
+ jz .Lwatch_cancel_install_end
+ cmp dword ptr [r12+132],1
+ jne .Lwatch_cancel_install_end
+ cmp dword ptr [r12+124],0
+ jne .Lwatch_cancel_install_ended
+ test rbx,rbx
+ jz .Lwatch_cancel_install_end
+ test r13,r13
+ jz .Lwatch_cancel_install_end
+ cmp dword ptr [r12+156],0
+ jne .Lwatch_cancel_install_end
+ cmp dword ptr [rbx+72],0
+ jne .Lwatch_cancel_install_end
+ cmp dword ptr [rbx+76],0
+ jne .Lwatch_cancel_install_end
+ cmp qword ptr [r13+8],0
+ je .Lwatch_cancel_install_end
+ cmp qword ptr [r13+16],0
+ je .Lwatch_cancel_install_end
+ cmp qword ptr [r13+24],0
+ je .Lwatch_cancel_install_end
+ mov [rbx],r12
+ mov rax,[r12+88]
+ mov [rbx+8],rax
+ mov rax,[r12+96]
+ mov [rbx+16],rax
+ mov rax,[r12+104]
+ mov [rbx+24],rax
+ mov rax,[r13]
+ mov [rbx+32],rax
+ mov rax,[r13+8]
+ mov [rbx+40],rax
+ mov rax,[r13+16]
+ mov [rbx+48],rax
+ mov rax,[r13+24]
+ mov [rbx+56],rax
+ mov qword ptr [rbx+64],0
+ mov dword ptr [rbx+72],1
+ mov dword ptr [rbx+76],1
+ mov [r12+88],rbx
+ lea rax,[rip+.Lwatch_cancel_detach]
+ mov [r12+96],rax
+ lea rax,[rip+.Lwatch_cancel_report]
+ mov [r12+104],rax
+ mov dword ptr [r12+156],1
+ mov rdi,[rbx+32]
+ lea rsi,[rip+.Lwatch_cancel_event]
+ mov rdx,rbx
+ lea rcx,[rbx+64]
+ call [rbx+40]
+ test eax,eax
+ jnz .Lwatch_cancel_install_failed
+ cmp qword ptr [rbx+64],0
+ je .Lwatch_cancel_install_failed
+ cmp dword ptr [rbx+72],3
+ je .Lwatch_cancel_install_closed
+ mov dword ptr [rbx+72],2
+ mov rdi,[rbx+32]
+ call [rbx+56]
+ test eax,eax
+ jz .Lwatch_cancel_install_ok
+ mov rdi,r12
+ call pg_document_watch_cancel
+ jmp .Lwatch_cancel_install_ok
+.Lwatch_cancel_install_closed:
+ mov rdi,rbx
+ call .Lwatch_cancel_detach
+ jmp .Lwatch_cancel_install_ok
+.Lwatch_cancel_install_failed:
+ mov ebp,4
+ cmp dword ptr [rbx+72],3
+ je .Lwatch_cancel_install_failed_cancelled
+ mov rax,[rbx+8]
+ mov [r12+88],rax
+ mov rax,[rbx+16]
+ mov [r12+96],rax
+ mov rax,[rbx+24]
+ mov [r12+104],rax
+ mov dword ptr [r12+156],0
+ mov dword ptr [rbx+72],4
+ mov qword ptr [rbx],0
+ pxor xmm0,xmm0
+ movups [rbx+8],xmm0
+ mov qword ptr [rbx+24],0
+ mov rdi,rbx
+ call .Lwatch_cancel_remove
+ jmp .Lwatch_cancel_install_unlock
+.Lwatch_cancel_install_failed_cancelled:
+ mov rdi,rbx
+ call .Lwatch_cancel_detach
+ jmp .Lwatch_cancel_install_unlock
+.Lwatch_cancel_install_ok:
+ xor ebp,ebp
+.Lwatch_cancel_install_unlock:
+ mov dword ptr [rbx+76],0
+ jmp .Lwatch_cancel_install_end
+.Lwatch_cancel_install_ended:
+ xor ebp,ebp
+.Lwatch_cancel_install_end:
+ mov eax,ebp
+ add rsp,8
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_document_watch_observe_cancellation,.-pg_document_watch_observe_cancellation
+
+.globl pg_document_watch_cancellation_release
+.type pg_document_watch_cancellation_release,@function
+pg_document_watch_cancellation_release:
+ mov eax,3
+ test rdi,rdi
+ jz .Lwatch_cancel_release_end
+ cmp dword ptr [rdi+76],0
+ jne .Lwatch_cancel_release_end
+ cmp dword ptr [rdi+72],1
+ je .Lwatch_cancel_release_end
+ cmp dword ptr [rdi+72],3
+ je .Lwatch_cancel_release_end
+ mov eax,1
+ cmp dword ptr [rdi+72],2
+ je .Lwatch_cancel_release_end
+ pxor xmm0,xmm0
+ movups [rdi],xmm0
+ movups [rdi+16],xmm0
+ movups [rdi+32],xmm0
+ movups [rdi+48],xmm0
+ movups [rdi+64],xmm0
+ xor eax,eax
+.Lwatch_cancel_release_end:
+ ret
+.size pg_document_watch_cancellation_release,.-pg_document_watch_cancellation_release
+.section .note.GNU-stack,"",@progbits

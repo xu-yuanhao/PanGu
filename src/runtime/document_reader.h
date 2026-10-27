@@ -58,4 +58,10 @@ typedef struct {
    is copied; its context is borrowed until termination. Report uses Session
    listeners. Source starts zeroed/released; drive source.watch outside adopt. */
 int pg_durable_watch(pg_durable_session *,const pg_document_watch_request *,pg_document_watch_source *);
+/* Combine request cancellation checks with this provider throughout acquisition,
+   then install its lifetime subscription. An abort during installation returns
+   CANCELLED with source/binding cleaned, as a late acquisition cancellation.
+   Provider rejection releases the tentative source and partial subscription.
+   Successful source and cancellation binding have their ordinary lifetimes. */
+int pg_durable_watch_cancellable(pg_durable_session *,const pg_document_watch_request *,pg_document_watch_source *,pg_document_watch_cancellation *,const pg_document_watch_cancellation_provider *);
 #endif

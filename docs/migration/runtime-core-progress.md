@@ -600,3 +600,10 @@ O0/O2 ASan/UBSan专项通过：漏/重复adopt、错误序号、采纳错误、�
 - 实际验证：12组真实Session普通提交/慢消费/stop/cancel/listener error/健康及失败close、read-only/missing/晚取消，Task终态同批扫描自动退休后的before-start drain、Session close-drop、in-flight末尾帧与listener-error；24个获取allocation/clone/registry故障回滚。初始Task测试漏传现有接口所要求的scan服务，提交准入拒绝；补入真实MemoryStorage scan并使用自动退休后全部通过，未将初次拒绝记为通过。
 - source probe组合实际上游#observeDocument与完整Chord Watch，四组Task末尾交付/close/在途错误的commit/close订阅、pin、退休帧、值和结束原因一致。最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享/隔离核心G00/Assembly及隔离产品构建通过。
 - 同一实施Agent自审8路径候选摘要（本记录加入前）fe0a8dc6c778420bdb27cbd2f92e3e902d5b5efac9ecead8c821beb02fe9f32b；隔离核心树27a442155f694dd67eb3f1a1102af590881101cd。结论为Session Watch组合本地通过；获取后取消服务及整机host Watch轮询继续，K03全量未完成。TUI工作保留。
+
+## K03 Watch获取后持续取消服务
+
+- 固定Pi 8b0caef Chord WatchLifecycle.observeCancellation/#terminate与Durable watchDoc/#attachDocument，读取取消/重复安装/不保留signal/在途消费用例；上游Pi origin保持6c384aa、Harness保持22ddee37。
+- 手写独立取消binding包装既有host，安装一次、检查already-aborted，终止unsubscribe先于原source detach。支持subscribe内同步取消：等待句柄交回后quiescent移除并释放source；失败/partial/empty结果恢复开放Watch原host、清部分句柄，release拒绝回调重入并等待终止，结束后无provider/source借用。新增Session组合入口同时检查请求/服务取消并装持续监听，安装内取消返回CANCELLED且清candidate，提供者拒绝完整回滚。公开旧布局保持。
+- 实际验证：12种原生安装/终止/错误/在途情况，真实Session Watch后续取消，另4种组合获取预取消/安装内取消/partial拒绝/正常后取消；fake unsubscribe内再次触发通知验证状态封闭，核对移除先于pin/source释放和所有借用清空。source probe执行完整实际Chord Watch六种once/already-aborted/stop/failure/listener-error/in-flight情形，移除顺序与终止原因一致。
+- 最终O0/O2 ASan/UBSan、完整Runtime O0/O2 UBSan、来源差异、共享/隔离核心G00/Assembly及隔离产品构建通过。同一实施Agent自审8路径候选摘要（本记录加入前）844b5801d00d390912558ac4bac8c26ccc203730cacd7b480da2bbe55533ca59；隔离核心树0c6ca994436f32ee23dfafddff1517675da65162。结论为Watch持续取消及Session组合本地通过；下一批核对K03剩余API与观察总验收，整机轮询随K14接入，K03全量未完成。TUI工作保留。

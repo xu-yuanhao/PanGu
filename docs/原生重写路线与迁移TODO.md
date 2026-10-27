@@ -603,3 +603,11 @@ TUI Agent 维护其余 `src/client/tui/`、`tests/client/tui/`、`tools/client/t
 - [x] document_reader.S/h新增pg_durable_watch，复用observe的准入/取消/guarded load，组合扩展source与既有Watch引擎。durable_session.S/h维护私有watch标记，内部queue准备失败仍为内部观察失败；Task terminal仅取消commit订阅并释放pin，保留close订阅直到pending/in-flight完成；Session close立即终止、丢pending。停止/结束清除observer owned状态及借用pin provider context，消费中source_release返回WAIT。既有同步observer ABI保持。
 - 原生12组真实Session提交通知、慢消费、stop/cancel/listener error/健康与失败close、read-only/missing/晚获取取消，以及Task终态事务自动扫描/退休后的before-start drain、close-drop、in-flight末尾帧和listener-error；24个获取分配/clone/registry故障清理。source probe组合实际#observeDocument与完整Chord Watch，四组Task末尾交付/close/在途错误的订阅计数、pin、帧与结束原因一致。
 - 下一行为：补齐获取后取消服务与整机host的Watch轮询组合，核对完整观察验收及K03剩余公开API；已有Session Watch组合可运行。
+
+### K03 Watch持续取消订阅
+
+- 固定Pi 8b0caef Chord WatchLifecycle.observeCancellation/#terminate和Durable watchDoc/#attachDocument；读取watch.test取消、重复安装、终止后不保留signal与在途listener结束场景。Pi origin保持6c384aa，Harness保持22ddee37。
+- [x] 手写可注入的持续取消服务，独立binding保存原host，安装一次并检查already-cancelled；所有终止先移除取消监听再detach原source，安装内同步取消等句柄返回后完成清理。部分/空/失败句柄回滚，开放Watch恢复原host可重试；回调/移除期间release拒绝，终止后不保留provider/source借用。
+- [x] document_reader.S/h新增pg_durable_watch_cancellable，同时检查请求与服务取消状态，获取后安装持续监听；预取消不读Storage，安装时取消返回CANCELLED并清source/binding，服务拒绝清理tentative资源。
+- 原生12组Watch安装/终止/在途场景、真实Session source后续取消，另4组组合获取的预取消/安装内取消/部分拒绝/正常后取消；source probe执行完整Chord Watch六组安装一次、already-aborted、终止移除顺序及在途迟到错误，与native结果一致。
+- 下一行为：核对K03剩余公开事务/查询与观察总验收；整机host的Watch轮询随K14产品组合接入。
