@@ -1635,6 +1635,41 @@
           ]
         }
       ]
+    },
+    {
+      "id": "task.runner.local.v0",
+      "sources": [
+        "src/runtime/task_runner.h",
+        "src/runtime/task_runner.S"
+      ],
+      "dependencies": [
+        "session.durable.lifecycle.local.v0",
+        "session.records.local.v0",
+        "json-c"
+      ],
+      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion",
+      "exports": [
+        "pg_task_runner_open",
+        "pg_task_runner_poll",
+        "pg_task_runner_commit",
+        "pg_task_runner_close"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/scheduler.ts",
+            "packages/durable/src/types.ts"
+          ],
+          "semantics": "open/reserve/fit/run/decide/step/terminate/commitState/join; per-task execution, sleep, abort and completion; global selection and durable wait graph remain separate scheduler work",
+          "tests_to_read": [
+            "packages/durable/test/harness-tasks.test.ts",
+            "packages/durable/test/harness-tasks-recovery.test.ts",
+            "packages/durable/test/harness-sleep.test.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",

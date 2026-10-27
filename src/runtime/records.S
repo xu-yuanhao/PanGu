@@ -3700,14 +3700,19 @@ pg_record_tx_staged_conversations:
 .section .note.GNU-stack,"",@progbits
 
 .text
+/* Only the batch root owns private Tx metadata. Nested JSON values retain
+   serializer userdata, including the token text of parsed floating numbers. */
 .Ltask_copy_plain:
- sub rsp,8
+ push rbx
+ mov rbx,rsi
  call json_c_shallow_copy_default@PLT
- add rsp,8
  test eax,eax
  js .Ltask_copy_plain_end
+ test rbx,rbx
+ jnz .Ltask_copy_plain_end
  mov eax,2
 .Ltask_copy_plain_end:
+ pop rbx
  ret
 .section .note.GNU-stack,"",@progbits
 

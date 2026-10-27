@@ -82,3 +82,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live-prompt-snapshot
 ## B01完整Session关闭与即时维护（2026-10-27）
 
 SQLite/JSONL与实际Durable Session、Document Tx、holds、timer及cache组合验证通过：延迟内容关闭保存、混合批次、已接收事务在关闭中结算、已入队timer排空、失败关闭与版本迁移重开。JSONL在采纳后回收终态Task/current-only checkpoint，临时重写失败保持提交成功并由重开维护重试。验证与当前批次见核心TODO交接区。
+
+## B02 持久Task phase执行（2026-10-27）
+
+`task_runner.S/h`以手写汇编接入实际Durable Session和两个持久后端，成组实现phase/checkpoint、协作pending、sleep/wake、定义版本迁移、错误/取消、owned-child completing与关闭/中断恢复。现有`test_durable_storage.c`组合验证普通推进、无进度故障、异步续接、终态重开及真实子进程中断；修复批次深拷贝丢失嵌套JSON浮点序列化数据的问题。全局调度和Generation/Tool继续按核心TODO完成。

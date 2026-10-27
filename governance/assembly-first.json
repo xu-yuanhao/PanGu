@@ -181,6 +181,10 @@
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "DIR、dirent与stat布局的目录读取胶水"
+    },
+    "src/runtime/task_runner.S": {
+      "role": "assembly-core",
+      "reason": "手写Durable任务phase续接、持久决策、恢复、迁移、sleep及所有者完成状态机"
     }
   }
 }

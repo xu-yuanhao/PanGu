@@ -571,6 +571,8 @@
     "src/runtime/record_jsonl.h": "native-source",
     "src/runtime/record_jsonl_posix.c": "native-source",
     "tests/runtime/test_record_jsonl.c": "native-test",
-    "tests/runtime/test_durable_storage.c": "native-test"
+    "tests/runtime/test_durable_storage.c": "native-test",
+    "src/runtime/task_runner.S": "native-source",
+    "src/runtime/task_runner.h": "native-source"
   }
 }

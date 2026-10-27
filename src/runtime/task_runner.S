@@ -1,0 +1,1733 @@
+.intel_syntax noprefix
+.macro TGET object,key
+ mov rdi,\object
+ lea rsi,[rip+.Ltr_\key]
+ call json_object_object_get@PLT
+.endm
+.text
+.Ltr_equal:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_equal_return
+ mov rdi,r12
+ call strlen@PLT
+ mov [rsp],rax
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ cmp rax,[rsp]
+ jne .Ltr_not_equal
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ jmp .Ltr_equal_return
+.Ltr_not_equal:
+ xor eax,eax
+.Ltr_equal_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Pi jsonEqual treats integral/floating JSON numbers as one numeric type. */
+.Ltr_json_equal:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ cmp rdi,rsi
+ je .Ltr_json_yes
+ call json_object_get_type@PLT
+ mov r13d,eax
+ mov rdi,r12
+ call json_object_get_type@PLT
+ mov r14d,eax
+ cmp r13d,2
+ je .Ltr_json_left_number
+ cmp r13d,3
+ jne .Ltr_json_types
+.Ltr_json_left_number:
+ cmp r14d,2
+ je .Ltr_json_numbers
+ cmp r14d,3
+ je .Ltr_json_numbers
+.Ltr_json_types:
+ cmp r13d,r14d
+ jne .Ltr_json_no
+ cmp r13d,5
+ je .Ltr_json_array
+ cmp r13d,4
+ je .Ltr_json_object
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_equal@PLT
+ jmp .Ltr_json_return
+.Ltr_json_numbers:
+ mov rdi,rbx
+ call json_object_get_double@PLT
+ movsd [rsp],xmm0
+ mov rdi,r12
+ call json_object_get_double@PLT
+ ucomisd xmm0,qword ptr [rsp]
+ jp .Ltr_json_no
+ jne .Ltr_json_no
+ jmp .Ltr_json_yes
+.Ltr_json_array:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ mov r13,rax
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp rax,r13
+ jne .Ltr_json_no
+ xor r14d,r14d
+.Ltr_json_array_each:
+ cmp r14,r13
+ jae .Ltr_json_yes
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rbp
+ mov rsi,rax
+ call .Ltr_json_equal
+ test eax,eax
+ jz .Ltr_json_no
+ inc r14
+ jmp .Ltr_json_array_each
+.Ltr_json_object:
+ mov rdi,rbx
+ call json_object_object_length@PLT
+ mov r13d,eax
+ mov rdi,r12
+ call json_object_object_length@PLT
+ cmp eax,r13d
+ jne .Ltr_json_no
+ mov rdi,rbx
+ call json_object_iter_begin@PLT
+ mov [rsp+8],rax
+ mov rdi,rbx
+ call json_object_iter_end@PLT
+ mov [rsp+16],rax
+.Ltr_json_object_each:
+ lea rdi,[rsp+8]
+ lea rsi,[rsp+16]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Ltr_json_yes
+ lea rdi,[rsp+8]
+ call json_object_iter_peek_name@PLT
+ mov rdi,r12
+ mov rsi,rax
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ltr_json_no
+ lea rdi,[rsp+8]
+ call json_object_iter_peek_value@PLT
+ mov rdi,rax
+ mov rsi,[rsp+24]
+ call .Ltr_json_equal
+ test eax,eax
+ jz .Ltr_json_no
+ lea rdi,[rsp+8]
+ call json_object_iter_next@PLT
+ jmp .Ltr_json_object_each
+.Ltr_json_yes:
+ mov eax,1
+ jmp .Ltr_json_return
+.Ltr_json_no:
+ xor eax,eax
+.Ltr_json_return:
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Take an owned JSON field; preserve ownership on allocation failures. */
+.Ltr_set:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Ltr_set_done
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Ltr_set_done:
+ pop rbx
+ ret
+/* State -> 0 pending,1 running,2 waiting,3 sleeping,4 completing,5 terminal. */
+.Ltr_state:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_state_bad
+ TGET rbx,status
+ mov rbx,rax
+ xor r12d,r12d
+.Ltr_state_each:
+ lea rax,[rip+.Ltr_status_names]
+ movsxd rsi,dword ptr [rax+r12*4]
+ add rsi,rax
+ mov rdi,rbx
+ call .Ltr_equal
+ test eax,eax
+ jnz .Ltr_state_found
+ inc r12
+ cmp r12,6
+ jb .Ltr_state_each
+.Ltr_state_bad:
+ mov eax,-1
+ jmp .Ltr_state_return
+.Ltr_state_found:
+ mov eax,r12d
+.Ltr_state_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ltr_record_state:
+ sub rsp,8
+ TGET rdi,state_key
+ mov rdi,rax
+ call .Ltr_state
+ add rsp,8
+ ret
+/* One task-owned or conversation-owned scan, return 1 live,0 none,-1 error. */
+.Ltr_scan_live:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r13,rsi
+ mov r14,rdx
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ mov qword ptr [rsp+128],0
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+ mov [rsp+32],rsi
+ cmp esi,4
+ jne .Ltr_live_conversation
+ mov qword ptr [rsp+32],0
+ jmp .Ltr_live_page
+.Ltr_live_conversation:
+ mov [rsp+40],rdx
+.Ltr_live_page:
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rbx+16]
+ test eax,eax
+ jnz .Ltr_live_error
+ xor r12d,r12d
+.Ltr_live_row:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ltr_live_next_page
+ mov rdi,[rsp+112]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ cmp r13d,4
+ jne .Ltr_live_check_state
+ mov [rsp+136],rax
+ TGET rax,owner
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltr_live_skip
+ cmp rax,r14
+ jne .Ltr_live_skip
+ mov rax,[rsp+136]
+.Ltr_live_check_state:
+ mov rdi,rax
+ call .Ltr_record_state
+ cmp eax,5
+ jne .Ltr_live_found
+.Ltr_live_skip:
+ inc r12
+ jmp .Ltr_live_row
+.Ltr_live_next_page:
+ cmp dword ptr [rsp+132],0
+ je .Ltr_live_none
+ mov rax,[rsp+120]
+ cmp dword ptr [rsp+8],0
+ je .Ltr_live_cursor
+ cmp rax,[rsp+16]
+ jbe .Ltr_live_error
+.Ltr_live_cursor:
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],1
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Ltr_live_page
+.Ltr_live_found:
+ mov ebp,1
+ jmp .Ltr_live_cleanup
+.Ltr_live_none:
+ xor ebp,ebp
+ jmp .Ltr_live_cleanup
+.Ltr_live_error:
+ mov ebp,-1
+.Ltr_live_cleanup:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Ordinary owned tasks plus top-level work in conversations owned by a task. */
+.Ltr_owned:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rsi
+ mov esi,4
+ mov rdx,r12
+ call .Ltr_scan_live
+ test eax,eax
+ jnz .Ltr_owned_return
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ movdqu [rsp+112],xmm0
+ mov qword ptr [rsp+128],0
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+ mov qword ptr [rsp+32],4
+ mov [rsp+56],r12
+.Ltr_owned_page:
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rbx+16]
+ test eax,eax
+ jnz .Ltr_owned_error
+ xor r13d,r13d
+.Ltr_owned_row:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ltr_owned_page_done
+ mov rdi,[rsp+112]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ TGET rax,id
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltr_owned_error
+ mov rdi,rbx
+ mov esi,257
+ mov rdx,rax
+ call .Ltr_scan_live
+ test eax,eax
+ jnz .Ltr_owned_clean_result
+ inc r13
+ jmp .Ltr_owned_row
+.Ltr_owned_page_done:
+ cmp dword ptr [rsp+132],0
+ je .Ltr_owned_none
+ mov rax,[rsp+120]
+ cmp dword ptr [rsp+8],0
+ je .Ltr_owned_cursor
+ cmp rax,[rsp+16]
+ jbe .Ltr_owned_error
+.Ltr_owned_cursor:
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],1
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Ltr_owned_page
+.Ltr_owned_error:
+ mov eax,-1
+ jmp .Ltr_owned_clean_result
+.Ltr_owned_none:
+ xor eax,eax
+.Ltr_owned_clean_result:
+ mov ebp,eax
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,ebp
+.Ltr_owned_return:
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Persist a candidate and retain its timestamped Tx snapshot before admission. */
+.Ltr_store:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rsi
+ pxor xmm0,xmm0
+ movdqu [rsp],xmm0
+ movdqu [rsp+16],xmm0
+ movdqu [rsp+32],xmm0
+ movdqu [rsp+48],xmm0
+ movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ mov r13,[rbx+8]
+ mov rax,[r13]
+ mov [rsp+112],rax
+ mov rax,[r13+24]
+ mov [rsp+120],rax
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,[r13]
+ mov r8,[r13+8]
+ call pg_durable_session_begin@PLT
+ mov ebp,1
+ test eax,eax
+ jnz .Ltr_store_cleanup
+ mov rdi,rsp
+ mov rsi,r12
+ mov rdx,[r13]
+ mov rcx,[r13+40]
+ call pg_record_tx_set_task@PLT
+ test eax,eax
+ jnz .Ltr_store_reject
+ mov rdi,rsp
+ lea rsi,[rsp+96]
+ call pg_record_tx_staged_tasks@PLT
+ test eax,eax
+ jnz .Ltr_store_reject
+ mov rdi,[rsp+96]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+104],rax
+ test rax,rax
+ jz .Ltr_store_alloc
+ mov rdi,[rbx]
+ xor esi,esi
+ xor edx,edx
+ lea rcx,[rsp+112]
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Ltr_store_reject
+ mov rdi,[rbx+24]
+ call json_object_put@PLT
+ mov rax,[rsp+104]
+ mov [rbx+24],rax
+ mov qword ptr [rsp+104],0
+ xor ebp,ebp
+ jmp .Ltr_store_cleanup
+.Ltr_store_alloc:
+ mov eax,4
+.Ltr_store_reject:
+ mov ebp,4
+ cmp eax,4
+ jne .Ltr_store_status
+ mov ebp,5
+.Ltr_store_status:
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ je .Ltr_store_abort
+ mov ebp,6
+.Ltr_store_abort:
+ mov rdi,[rbx]
+ mov rax,[rdi+152]
+ lea rdx,[rsp]
+ cmp rax,rdx
+ jne .Ltr_store_cleanup
+ call pg_durable_session_abort@PLT
+.Ltr_store_cleanup:
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Clone the record, replace state, reset progress counters and persist. */
+.Ltr_replace:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,edx
+ mov qword ptr [rsp],0
+ mov rdi,[rbx+24]
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ mov ebp,5
+ test eax,eax
+ jnz .Ltr_replace_cleanup
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_state_key]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_replace_cleanup
+ mov rdi,r12
+ call .Ltr_state
+ cmp eax,4
+ jb .Ltr_replace_progress
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_memos]
+ call json_object_object_del@PLT
+ jmp .Ltr_replace_reset
+.Ltr_replace_progress:
+ test r13d,r13d
+ jz .Ltr_replace_store
+ TGET "qword ptr [rbx+24]",state_key
+ mov rdi,rax
+ mov rsi,r12
+ call .Ltr_json_equal
+ test eax,eax
+ jnz .Ltr_replace_store
+.Ltr_replace_reset:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_restarts]
+ call json_object_object_del@PLT
+.Ltr_replace_store:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Ltr_store
+ mov ebp,eax
+.Ltr_replace_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.globl pg_task_runner_open
+.type pg_task_runner_open,@function
+pg_task_runner_open:
+ mov eax,4
+ test rdi,rdi
+ jz .Ltr_open_return
+ test rsi,rsi
+ jz .Ltr_open_return
+ test rcx,rcx
+ jz .Ltr_open_return
+ test rdx,rdx
+ jz .Ltr_open_return
+ mov r9,9007199254740991
+ cmp rdx,r9
+ ja .Ltr_open_return
+ test r8,r8
+ jz .Ltr_open_return
+ cmp dword ptr [rdi+76],0
+ jne .Ltr_open_return
+ cmp dword ptr [rdi+72],0
+ jne .Ltr_open_return
+ cmp dword ptr [rsi+172],1
+ jne .Ltr_open_return
+ mov r9,[rsi]
+ cmp dword ptr [r9+52],0
+ jne .Ltr_open_return
+ cmp dword ptr [r9+56],0
+ jne .Ltr_open_return
+ cmp qword ptr [rcx+8],0
+ je .Ltr_open_return
+ cmp qword ptr [rcx+16],0
+ je .Ltr_open_return
+ cmp qword ptr [rcx+24],0
+ je .Ltr_open_return
+ cmp qword ptr [rcx+32],0
+ je .Ltr_open_return
+ cmp qword ptr [rcx+40],0
+ je .Ltr_open_return
+ mov [rdi],rsi
+ mov [rdi+8],rcx
+ mov [rdi+16],rdx
+ mov qword ptr [rdi+24],0
+ mov qword ptr [rdi+32],0
+ mov qword ptr [rdi+40],0
+ mov qword ptr [rdi+48],0
+ mov qword ptr [rdi+56],0
+ mov [rdi+64],r8
+ mov dword ptr [rdi+76],1
+ mov qword ptr [rdi+80],0
+ mov qword ptr [rdi+88],0
+ mov qword ptr [rdi+96],0
+ mov qword ptr [rdi+104],0
+ xor eax,eax
+.Ltr_open_return:
+ ret
+.size pg_task_runner_open,.-pg_task_runner_open
+
+/* Read failures are Storage failures; a missing task is a blocked execution. */
+.Ltr_fetch:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,[rbx+8]
+ mov qword ptr [rsp],0
+ mov rdi,[r12]
+ mov esi,2
+ mov rdx,[rbx+16]
+ mov rcx,rsp
+ call [r12+8]
+ test eax,eax
+ jz .Ltr_fetch_ok
+ cmp eax,1
+ je .Ltr_fetch_missing
+ .Ltr_fetch_provider_failed:
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_fetch_failed
+ mov dword ptr [rax+52],3
+.Ltr_fetch_failed:
+ mov r12d,6
+ jmp .Ltr_fetch_cleanup
+.Ltr_fetch_missing:
+ mov r12d,3
+ jmp .Ltr_fetch_cleanup
+.Ltr_fetch_ok:
+ cmp qword ptr [rsp],0
+ je .Ltr_fetch_provider_failed
+ mov rdi,[rbx+24]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+24],rax
+ mov qword ptr [rsp],0
+ xor r12d,r12d
+.Ltr_fetch_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r12d
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* New {status,checkpoint/outcome}, retaining the supplied value. */
+.Ltr_make_state:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov r12,rdi
+ mov r13,rsi
+ mov r14,rdx
+ call json_object_new_object@PLT
+ test rax,rax
+ jz .Ltr_make_return
+ mov rbx,rax
+ mov rdi,r12
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ltr_make_bad
+ mov rdx,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Ltr_status]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_make_bad
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,rbx
+ mov rsi,r13
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_make_bad
+ mov rax,rbx
+ jmp .Ltr_make_return
+.Ltr_make_bad:
+ mov rdi,rbx
+ call json_object_put@PLT
+ xor eax,eax
+.Ltr_make_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+/* Park running work; crash recovery alone increments its restart count. */
+.Ltr_park:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12d,esi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,checkpoint
+ mov rdx,rax
+ lea rdi,[rip+.Ltr_pending_name]
+ lea rsi,[rip+.Ltr_checkpoint]
+ call .Ltr_make_state
+ mov [rsp+8],rax
+ mov ebp,5
+ test rax,rax
+ jz .Ltr_park_cleanup
+ mov rdi,[rbx+24]
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltr_park_cleanup
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_state_key]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_park_cleanup
+ test r12d,r12d
+ jz .Ltr_park_store
+ TGET "qword ptr [rbx+24]",restarts
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ lea rdi,[rax+1]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ltr_park_cleanup
+ mov rdx,rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_restarts]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_park_cleanup
+.Ltr_park_store:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Ltr_store
+ mov ebp,eax
+.Ltr_park_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.globl pg_task_runner_commit
+.type pg_task_runner_commit,@function
+pg_task_runner_commit:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov ebp,4
+ test rbx,rbx
+ jz .Ltr_commit_return
+ cmp dword ptr [rbx+76],1
+ jne .Ltr_commit_return
+ cmp dword ptr [rbx+84],0
+ jne .Ltr_commit_closed
+ cmp dword ptr [rbx+92],0
+ jne .Ltr_commit_return
+ cmp qword ptr [rbx+32],0
+ je .Ltr_commit_return
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ltr_commit_return
+ mov rdi,r12
+ call .Ltr_state
+ mov r13d,eax
+ cmp eax,1
+ je .Ltr_commit_checkpoint
+ cmp eax,3
+ je .Ltr_commit_checkpoint
+ cmp eax,5
+ jne .Ltr_commit_return
+ TGET r12,outcome
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_commit_return
+ jmp .Ltr_commit_admit
+.Ltr_commit_checkpoint:
+ TGET r12,checkpoint
+ mov r14,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_commit_return
+ TGET r14,phase
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_commit_return
+ cmp r13d,3
+ jne .Ltr_commit_admit
+ TGET r12,until
+ mov r14,rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,2
+ je .Ltr_commit_sleep_number
+ cmp eax,3
+ jne .Ltr_commit_return
+.Ltr_commit_sleep_number:
+ mov rdi,r14
+ call json_object_get_double@PLT
+ movq rax,xmm0
+ shr rax,52
+ and eax,0x7ff
+ cmp eax,0x7ff
+ je .Ltr_commit_return
+ xorpd xmm1,xmm1
+ ucomisd xmm0,xmm1
+ jb .Ltr_commit_return
+.Ltr_commit_admit:
+ mov rax,[rbx]
+ cmp dword ptr [rax+172],1
+ jne .Ltr_commit_closed
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_commit_storage
+ mov dword ptr [rbx+92],1
+ mov rdi,rbx
+ call .Ltr_fetch
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_commit_cleanup
+ mov rdi,[rbx+24]
+ call .Ltr_record_state
+ mov ebp,4
+ cmp eax,1
+ jne .Ltr_commit_cleanup
+ TGET "qword ptr [rbx+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Ltr_commit_owner_check
+ cmp qword ptr [rbx+48],0
+ jne .Ltr_commit_active_abort
+ cmp r13d,5
+ jne .Ltr_commit_cleanup
+ jmp .Ltr_commit_owner_check
+.Ltr_commit_active_abort:
+ mov ebp,7
+ jmp .Ltr_commit_cleanup
+.Ltr_commit_owner_check:
+ cmp r13d,5
+ jne .Ltr_commit_replace
+ mov rdi,[rbx+8]
+ mov rsi,[rbx+16]
+ call .Ltr_owned
+ test eax,eax
+ js .Ltr_commit_storage_active
+ jz .Ltr_commit_replace
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ mov ebp,5
+ test eax,eax
+ jnz .Ltr_commit_cleanup
+ lea rdi,[rip+.Ltr_completing_name]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ltr_commit_cleanup
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_status]
+ mov rdx,rax
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_commit_cleanup
+ mov r12,[rsp]
+.Ltr_commit_replace:
+ mov rdi,rbx
+ mov rsi,r12
+ mov edx,1
+ call .Ltr_replace
+ mov ebp,eax
+ jmp .Ltr_commit_cleanup
+.Ltr_commit_storage_active:
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_commit_storage
+ mov dword ptr [rax+52],3
+.Ltr_commit_storage:
+ mov ebp,6
+ jmp .Ltr_commit_cleanup
+.Ltr_commit_closed:
+ mov ebp,7
+.Ltr_commit_cleanup:
+ mov dword ptr [rbx+92],0
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ltr_commit_return:
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_task_runner_commit,.-pg_task_runner_commit
+
+/* Release the phase lease outside the Storage adoption call stack. */
+.Ltr_end_phase:
+ push rbx
+ mov rbx,rdi
+ cmp qword ptr [rbx+32],0
+ je .Ltr_end_phase_done
+ mov rax,[rbx+48]
+ test rax,rax
+ jz .Ltr_end_abort
+ mov rdx,[rax+32]
+ mov rdi,[rax+16]
+ jmp .Ltr_end_callback
+.Ltr_end_abort:
+ mov rax,[rbx+40]
+ mov rdx,[rax+64]
+ mov rdi,[rax+24]
+.Ltr_end_callback:
+ test rdx,rdx
+ jz .Ltr_end_reference
+ mov rsi,rbx
+ call rdx
+.Ltr_end_reference:
+ mov rdi,[rbx+32]
+ call json_object_put@PLT
+ mov qword ptr [rbx+32],0
+ mov qword ptr [rbx+40],0
+ mov qword ptr [rbx+48],0
+ mov qword ptr [rbx+56],0
+ mov dword ptr [rbx+80],0
+.Ltr_end_phase_done:
+ pop rbx
+ ret
+
+/* Faults become durable outcomes; an already committed non-running state wins. */
+.Ltr_fault:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12d,esi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov ebp,5
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ltr_fault_cleanup
+ mov rdi,[rbx+96]
+ mov rsi,[rbx+104]
+ cmp rsi,2147483647
+ ja .Ltr_fault_cleanup
+ test rsi,rsi
+ jnz .Ltr_fault_message
+ lea rdi,[rip+.Ltr_phase_failed]
+ lea rsi,[rip+.Ltr_phase_failed_end]
+ sub rsi,rdi
+ dec rsi
+.Ltr_fault_message:
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ltr_fault_cleanup
+ mov rdx,rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_message]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_fault_cleanup
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ltr_fault_cleanup
+ lea rdi,[rip+.Ltr_faulted]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Ltr_fault_cleanup
+ mov rdx,rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltr_status]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_fault_cleanup
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltr_error]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_fault_cleanup
+ lea rdi,[rip+.Ltr_terminal_name]
+ lea rsi,[rip+.Ltr_outcome]
+ mov rdx,[rsp+8]
+ call .Ltr_make_state
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Ltr_fault_cleanup
+ mov rdi,rbx
+ mov rsi,rax
+ call pg_task_runner_commit@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_fault_cleanup
+ mov rax,[rbx+8]
+ cmp qword ptr [rax+48],0
+ je .Ltr_fault_cleanup
+ mov rdi,[rax]
+ mov rsi,[rbx+16]
+ mov edx,r12d
+ call [rax+48]
+.Ltr_fault_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Resolve one borrowed definition, locally materializing migrations before reservation. */
+.Ltr_resolve:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,[rbx+8]
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ TGET "qword ptr [rbx+24]",kind
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ mov ebp,3
+ test eax,eax
+ jz .Ltr_resolve_cleanup
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov r13,rax
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[r12]
+ mov rdx,r13
+ mov rcx,rsp
+ call [r12+32]
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ mov r12,[rsp]
+ test r12,r12
+ jz .Ltr_resolve_cleanup
+ cmp qword ptr [r12+16],0
+ je .Ltr_resolve_cleanup
+ cmp [r12+8],r13
+ jne .Ltr_resolve_cleanup
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,[r12]
+ mov rdx,r13
+ call memcmp@PLT
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ TGET "qword ptr [rbx+24]",version
+ mov rdi,rax
+ call pg_document_safe_number@PLT
+ test edx,edx
+ jz .Ltr_resolve_cleanup
+ test rax,rax
+ jz .Ltr_resolve_cleanup
+ cmp rax,[r12+16]
+ ja .Ltr_resolve_cleanup
+ je .Ltr_resolve_ready
+ cmp qword ptr [r12+72],0
+ je .Ltr_resolve_cleanup
+ mov [rsp+32],rax
+ TGET "qword ptr [rbx+24]",input
+ mov [rsp+24],rax
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,checkpoint
+ mov rdx,rax
+ mov rdi,[r12+24]
+ mov rsi,[rsp+24]
+ mov rcx,[rsp+32]
+ lea r8,[rsp+8]
+ call [r12+72]
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ mov rdi,[rsp+8]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Ltr_resolve_cleanup
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ltr_input]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ltr_resolve_cleanup
+ TGET "qword ptr [rsp+8]",checkpoint
+ mov r14,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_resolve_cleanup
+ mov rdi,[rbx+24]
+ lea rsi,[rsp+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ mov ebp,5
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ltr_input]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ TGET "qword ptr [rsp+16]",state_key
+ mov r13,rax
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Ltr_checkpoint]
+ mov rdx,rax
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ mov rdi,[r12+16]
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ltr_resolve_cleanup
+ mov rdx,rax
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ltr_version]
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_resolve_cleanup
+ mov rdi,[rbx+24]
+ call json_object_put@PLT
+ mov rax,[rsp+16]
+ mov [rbx+24],rax
+ mov qword ptr [rsp+16],0
+ or dword ptr [rbx+88],2
+.Ltr_resolve_ready:
+ mov [rbx+40],r12
+ xor ebp,ebp
+.Ltr_resolve_cleanup:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.Ltr_find_phase:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,checkpoint
+ TGET rax,phase
+ mov r12,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltr_phase_absent
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov r13,rax
+ mov r14,[rbx+40]
+ xor ebx,ebx
+.Ltr_phase_each:
+ cmp rbx,[r14+48]
+ jae .Ltr_phase_absent
+ imul rax,rbx,40
+ add rax,[r14+40]
+ mov [rsp],rax
+ cmp [rax+8],r13
+ jne .Ltr_phase_next
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rax,[rsp]
+ mov rsi,[rax]
+ mov rdx,r13
+ call memcmp@PLT
+ test eax,eax
+ jz .Ltr_phase_found
+.Ltr_phase_next:
+ inc rbx
+ jmp .Ltr_phase_each
+.Ltr_phase_found:
+ mov rax,[rsp]
+ jmp .Ltr_find_phase_return
+.Ltr_phase_absent:
+ lea rax,[rip+.Ltr_missing_phase]
+.Ltr_find_phase_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.globl pg_task_runner_poll
+.type pg_task_runner_poll,@function
+pg_task_runner_poll:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ mov ebp,4
+ test rbx,rbx
+ jz .Ltr_poll_return
+ cmp dword ptr [rbx+72],0
+ jne .Ltr_poll_return
+ cmp dword ptr [rbx+92],0
+ jne .Ltr_poll_return
+ cmp dword ptr [rbx+76],1
+ jne .Ltr_poll_closed
+ cmp dword ptr [rbx+84],0
+ jne .Ltr_poll_closed
+ mov rax,[rbx]
+ cmp dword ptr [rax+172],1
+ jne .Ltr_poll_closed
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_poll_storage
+ mov rdi,[rbx]
+ call pg_durable_session_idle@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Ltr_poll_return
+ mov dword ptr [rbx+72],1
+ mov rdi,rbx
+ call .Ltr_fetch
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_unlock
+ cmp qword ptr [rbx+32],0
+ je .Ltr_poll_no_invocation
+ TGET "qword ptr [rbx+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Ltr_poll_invoke
+ cmp qword ptr [rbx+48],0
+ je .Ltr_poll_invoke
+ mov rdi,rbx
+ call .Ltr_end_phase
+.Ltr_poll_no_invocation:
+ mov rdi,[rbx+24]
+ call .Ltr_record_state
+ mov r12d,eax
+ cmp eax,5
+ je .Ltr_poll_done
+ cmp eax,4
+ je .Ltr_poll_completing
+ test eax,eax
+ js .Ltr_poll_invalid
+ cmp dword ptr [rbx+88],0
+ jne .Ltr_poll_recovered
+ cmp eax,1
+ jne .Ltr_poll_set_recovered
+ mov rdi,rbx
+ mov esi,1
+ call .Ltr_park
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_unlock
+ xor r12d,r12d
+.Ltr_poll_set_recovered:
+ mov dword ptr [rbx+88],1
+.Ltr_poll_recovered:
+ TGET "qword ptr [rbx+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov r13d,eax
+ test eax,eax
+ jnz .Ltr_poll_abort_ready
+ TGET "qword ptr [rbx+24]",restarts
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+64]
+ jae .Ltr_poll_blocked
+ cmp r12d,2
+ je .Ltr_poll_pending
+ cmp r12d,3
+ jne .Ltr_poll_resolve
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,until
+ mov rdi,rax
+ call json_object_get_double@PLT
+ movsd [rsp+8],xmm0
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ ucomisd xmm0,qword ptr [rsp+8]
+ jb .Ltr_poll_pending
+ jp .Ltr_poll_invalid
+ jmp .Ltr_poll_resolve
+.Ltr_poll_abort_ready:
+ mov rdi,[rbx+8]
+ mov rsi,[rbx+16]
+ call .Ltr_owned
+ test eax,eax
+ js .Ltr_poll_storage_active
+ jnz .Ltr_poll_pending
+.Ltr_poll_resolve:
+ mov rdi,rbx
+ call .Ltr_resolve
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_unlock
+ cmp r12d,1
+ jne .Ltr_poll_reserve_state
+ test dword ptr [rbx+88],2
+ jz .Ltr_poll_reserved
+.Ltr_poll_reserve_state:
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,checkpoint
+ mov rdx,rax
+ lea rdi,[rip+.Ltr_running_name]
+ lea rsi,[rip+.Ltr_checkpoint]
+ call .Ltr_make_state
+ mov [rsp],rax
+ test rax,rax
+ jz .Ltr_poll_allocation
+ mov rdi,rbx
+ mov rsi,rax
+ xor edx,edx
+ call .Ltr_replace
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_unlock
+ and dword ptr [rbx+88],1
+.Ltr_poll_reserved:
+ test r13d,r13d
+ jnz .Ltr_poll_abort_phase
+ mov rdi,rbx
+ call .Ltr_find_phase
+ mov [rbx+48],rax
+ jmp .Ltr_poll_phase_record
+.Ltr_poll_abort_phase:
+ mov qword ptr [rbx+48],0
+.Ltr_poll_phase_record:
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov [rbx+32],rax
+ mov dword ptr [rbx+80],1
+.Ltr_poll_invoke:
+ mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+104],0
+ mov rax,[rbx+48]
+ test rax,rax
+ jz .Ltr_poll_invoke_abort
+ mov r12,[rax+24]
+ mov rdi,[rax+16]
+ jmp .Ltr_poll_handler
+.Ltr_poll_invoke_abort:
+ mov rax,[rbx+40]
+ mov r12,[rax+56]
+ mov rdi,[rax+24]
+.Ltr_poll_handler:
+ test r12,r12
+ jz .Ltr_poll_missing
+ mov rsi,rbx
+ mov rdx,[rbx+32]
+ call r12
+ mov r12d,eax
+ cmp dword ptr [rbx+84],0
+ jne .Ltr_poll_requested_close
+ cmp eax,1
+ je .Ltr_poll_pending
+ mov rdi,rbx
+ call .Ltr_fetch
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_end_error
+ mov rdi,[rbx+24]
+ call .Ltr_record_state
+ cmp eax,1
+ jne .Ltr_poll_phase_ended
+ test r12d,r12d
+ js .Ltr_poll_fault
+ /* Abort handlers must decide an outcome; a running checkpoint is not enough. */
+ cmp qword ptr [rbx+48],0
+ je .Ltr_poll_no_progress
+ TGET "qword ptr [rbx+32]",state_key
+ TGET rax,checkpoint
+ mov r13,rax
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,checkpoint
+ mov rdi,r13
+ mov rsi,rax
+ call .Ltr_json_equal
+ test eax,eax
+ jnz .Ltr_poll_no_progress
+ mov rdi,rbx
+ call .Ltr_end_phase
+ xor ebp,ebp
+ jmp .Ltr_poll_unlock
+.Ltr_poll_no_progress:
+ cmp qword ptr [rbx+48],0
+ je .Ltr_poll_abort_no_progress
+ TGET "qword ptr [rbx+32]",kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r13,rax
+ TGET "qword ptr [rbx+32]",state_key
+ TGET rax,checkpoint
+ TGET rax,phase
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rcx,rax
+ mov rdx,r13
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Ltr_no_progress_format]
+ xor eax,eax
+ call asprintf@PLT
+ jmp .Ltr_poll_no_progress_ready
+.Ltr_poll_abort_no_progress:
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Ltr_abort_no_progress_format]
+ mov rdx,[rbx+16]
+ xor eax,eax
+ call asprintf@PLT
+.Ltr_poll_no_progress_ready:
+ test eax,eax
+ js .Ltr_poll_allocation
+ mov rcx,[rsp+16]
+ mov [rbx+96],rcx
+ mov [rbx+104],rax
+ mov r12d,-1
+ jmp .Ltr_poll_fault
+.Ltr_poll_missing:
+ mov r12d,-2
+.Ltr_poll_fault:
+ mov rdi,rbx
+ mov esi,r12d
+ call .Ltr_fault
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_end_error
+ mov rdi,[rbx+24]
+ call .Ltr_record_state
+.Ltr_poll_phase_ended:
+ mov r12d,eax
+ mov rdi,rbx
+ call .Ltr_end_phase
+ cmp r12d,5
+ je .Ltr_poll_done
+ cmp r12d,1
+ je .Ltr_poll_progress
+ jmp .Ltr_poll_pending
+.Ltr_poll_end_error:
+ mov rdi,rbx
+ call .Ltr_end_phase
+ jmp .Ltr_poll_unlock
+.Ltr_poll_completing:
+ mov rdi,[rbx+8]
+ mov rsi,[rbx+16]
+ call .Ltr_owned
+ test eax,eax
+ js .Ltr_poll_storage_active
+ jnz .Ltr_poll_pending
+ TGET "qword ptr [rbx+24]",state_key
+ TGET rax,outcome
+ mov rdx,rax
+ lea rdi,[rip+.Ltr_terminal_name]
+ lea rsi,[rip+.Ltr_outcome]
+ call .Ltr_make_state
+ mov [rsp],rax
+ test rax,rax
+ jz .Ltr_poll_allocation
+ mov rdi,rbx
+ mov rsi,rax
+ mov edx,1
+ call .Ltr_replace
+ mov ebp,eax
+ test eax,eax
+ jnz .Ltr_poll_unlock
+.Ltr_poll_done:
+ mov ebp,2
+ jmp .Ltr_poll_unlock
+.Ltr_poll_progress:
+ xor ebp,ebp
+ jmp .Ltr_poll_unlock
+.Ltr_poll_pending:
+ mov ebp,1
+ jmp .Ltr_poll_unlock
+.Ltr_poll_blocked:
+ mov ebp,3
+ jmp .Ltr_poll_unlock
+.Ltr_poll_invalid:
+ mov ebp,4
+ jmp .Ltr_poll_unlock
+.Ltr_poll_allocation:
+ mov ebp,5
+ jmp .Ltr_poll_unlock
+.Ltr_poll_storage_active:
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_poll_storage
+ mov dword ptr [rax+52],3
+.Ltr_poll_storage:
+ mov ebp,6
+ jmp .Ltr_poll_unlock
+.Ltr_poll_requested_close:
+ mov rdi,rbx
+ call .Ltr_close_locked
+ mov ebp,eax
+ jmp .Ltr_poll_unlock
+.Ltr_poll_closed:
+ mov ebp,7
+ jmp .Ltr_poll_return
+.Ltr_poll_unlock:
+ mov dword ptr [rbx+72],0
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+104],0
+.Ltr_poll_return:
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_task_runner_poll,.-pg_task_runner_poll
+
+.Ltr_close_locked:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov dword ptr [rbx+84],1
+ call .Ltr_end_phase
+ xor r12d,r12d
+ cmp qword ptr [rbx+24],0
+ je .Ltr_close_release
+ mov rax,[rbx]
+ cmp dword ptr [rax+172],1
+ jne .Ltr_close_release
+ mov rax,[rax]
+ cmp dword ptr [rax+52],0
+ jne .Ltr_close_release
+ mov rdi,rbx
+ call .Ltr_fetch
+ mov r12d,eax
+ test eax,eax
+ jnz .Ltr_close_release
+ mov rdi,[rbx+24]
+ call .Ltr_record_state
+ cmp eax,1
+ jne .Ltr_close_release
+ mov rdi,rbx
+ xor esi,esi
+ call .Ltr_park
+ mov r12d,eax
+.Ltr_close_release:
+ mov rdi,[rbx+24]
+ call json_object_put@PLT
+ mov qword ptr [rbx+24],0
+ mov dword ptr [rbx+76],0
+ mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+104],0
+ mov eax,r12d
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.globl pg_task_runner_close
+.type pg_task_runner_close,@function
+pg_task_runner_close:
+ mov eax,4
+ test rdi,rdi
+ jz .Ltr_close_return
+ cmp dword ptr [rdi+92],0
+ jne .Ltr_close_busy
+ cmp dword ptr [rdi+72],0
+ jne .Ltr_close_busy
+ xor eax,eax
+ cmp dword ptr [rdi+76],0
+ je .Ltr_close_return
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+72],1
+ call .Ltr_close_locked
+ mov dword ptr [rbx+72],0
+ pop rbx
+ ret
+.Ltr_close_busy:
+ mov dword ptr [rdi+84],1
+ mov eax,1
+.Ltr_close_return:
+ ret
+.size pg_task_runner_close,.-pg_task_runner_close
+
+.section .rodata
+.Ltr_owner: .asciz "owner"
+.Ltr_id: .asciz "id"
+.Ltr_status: .asciz "status"
+.Ltr_state_key: .asciz "state"
+.Ltr_checkpoint: .asciz "checkpoint"
+.Ltr_phase: .asciz "phase"
+.Ltr_kind: .asciz "kind"
+.Ltr_version: .asciz "version"
+.Ltr_input: .asciz "input"
+.Ltr_outcome: .asciz "outcome"
+.Ltr_message: .asciz "message"
+.Ltr_error: .asciz "error"
+.Ltr_memos: .asciz "memos"
+.Ltr_restarts: .asciz "restarts"
+.Ltr_abort_requested: .asciz "abortRequested"
+.Ltr_until: .asciz "until"
+.Ltr_pending_name: .asciz "pending"
+.Ltr_running_name: .asciz "running"
+.Ltr_waiting_name: .asciz "waiting"
+.Ltr_sleeping_name: .asciz "sleeping"
+.Ltr_completing_name: .asciz "completing"
+.Ltr_terminal_name: .asciz "terminal"
+.Ltr_faulted: .asciz "faulted"
+.Ltr_phase_failed: .asciz "Task phase failed"
+.Ltr_phase_failed_end:
+.Ltr_no_progress_format: .asciz "Task %s phase %s returned without durable progress"
+.Ltr_abort_no_progress_format: .asciz "Abort handler of task %llu returned without a terminal outcome"
+.Ltr_status_names:
+ .long .Ltr_pending_name-.Ltr_status_names,.Ltr_running_name-.Ltr_status_names,.Ltr_waiting_name-.Ltr_status_names
+ .long .Ltr_sleeping_name-.Ltr_status_names,.Ltr_completing_name-.Ltr_status_names,.Ltr_terminal_name-.Ltr_status_names
+.balign 8
+.Ltr_missing_phase: .zero 40
+.section .note.GNU-stack,"",@progbits
