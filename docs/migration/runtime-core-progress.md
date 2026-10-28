@@ -31,13 +31,13 @@
 
 ## 本批验证与集成状态
 
-- 后台旧摘要保存后延迟放置，新摘要先提交；旧place重开后经既有Submission/head判定结算stale，不追加Entry，不覆盖新head。
-- 手动start与自动/后台任务共用pg_durable_compaction_create，删除重复定义/选项及mint路径，内部帧缩至208字节。
-- 两后端真实模型摘要竞争和后续回忆、Durable ASan/UBSan及当前回归/构建结果见核心交接。owned阻塞竞争和hook仍保留在K12。
+- beforeCompact通过可替换compaction.hooks Host服务接入select；固定上下文/配置，按序首决定，错误报告后继续，支持decline/summary与原生pending/cancel。
+- 插件提供的摘要保存place并复用既有Live/Submission/Entry事务；无需另起模型或摘要路径。
+- 两后端ASan/UBSan覆盖错误、顺序、拒绝、摘要、pending和取消；实际产品Host服务替换摘要通过。Runtime回归与隔离检查/构建见核心交接。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续hook与stale/阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续摘要模型/system基线与owned阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 

@@ -188,6 +188,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 压缩Live生命周期接入创建/阶段/终态事务：taskId/reason/blocking/attempt列表、取消/完成移除、失败保留compactionFailure，成功放置清除旧失败；同任务阶段更新保持列表顺序。两后端创建同序列、重开/取消/失败与真实自动/后台压缩通过。
 - [x] 压缩失败按当前retry策略进入持久retry/sleep：保留范围和请求配置、指数退避/上限/预算、提前唤醒重睡、attempt递增及Live.retry更新/清除。两后端预算耗尽专项及一次503→退避重开→真实摘要/放置/回忆通过。
 - [x] 后台摘要延迟放置与新摘要竞争：真实摘要保存后挂起，后续范围的新摘要先提交；旧摘要重开后经同一Submission路径结算stale、不追加Entry且保持新head。SQLite/JSONL真实摘要/回忆及原子写入检查通过；手动与自动任务共用一个构造函数。
+- [x] beforeCompact接入原生Host可替换compaction.hooks服务：按序回调、首个决定、错误报告后跳过、decline/summary、协作挂起/续接与取消；固定旧范围/配置的hook摘要进入同一place/Submission链。两后端专项与产品Host插件替换通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -236,8 +237,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts placeSummary、submissions.ts admitSubmission/isStale及harness-compaction.test.ts后台旧摘要竞争用例。沿现有head比较和Submission admission实现，固定快照不变。
-- 实际调用链：后台真实summary保存place → 持久sleep延迟旧摘要 → 新工作Entry及新真实摘要先放置 → 唤醒/重开旧place → 同一Inputs admission结算旧Submission为unanswered/stale → 不追加旧Entry，新head保持 → 后续真实模型读取有效摘要。手动start改用已有pg_durable_compaction_create，共用任务/Live事务，删除重复定义/选项构造与mint回调。
-- 验证：SQLite/JSONL真实模型完成两份摘要，旧摘要重开后stale receipt、无Entry的原子终态、winner head不变及后续回忆通过；共用构造后的Durable ASan/UBSan、创建Live/取消/重试等专项通过。Runtime整批回归、核心隔离G00/Assembly、产品构建与离线资源服务验证通过。
-- 接口与自审：公开接口、布局、模块依赖及文件登记保持；手动构造帧从272缩至208字节，沿一个底层任务/Live构造入口。当前竞争用例的新摘要为conversation-owned手动摘要；Generation-owned阻塞摘要与后台摘要的完整组合仍需K12覆盖。并行TUI和规划改动保留。
-- 剩余与下一交付物：K12继续beforeCompact/afterCompact等hook、摘要模型选择/system基线以及owned阻塞竞争；K13完成usage与Live客户端事件/观察。下一批以实际扩展消费者和压缩调用链接通hook，provider/工具边界及其他K项保持原范围。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts beforeCompact/summarizedMessages、CompactionHooks类型及harness-compaction.test.ts首决定/抛错/拒绝用例。固定上游只有beforeCompact决策，不新增另一种压缩hook。
+- 实际调用链：Host parent可选compaction.hooks → select固定配置/旧Entry与已配对messages → 有序原生回调 → 首个decline完成无摘要，首个summary保存place checkpoint，pass进入真实模型；pending沿同一request续接，取消/暂停清理通知当前回调并释放owner。hook提供的摘要进入既有Live/Entry/Submission原子提交路径。
+- 验证：SQLite/JSONL ASan/UBSan覆盖首回调失败报告后跳过、decline、提供摘要、pending第二次续接、取消回调及后续回调不执行；实际产品Host插件服务替换摘要、无模型请求和最终compaction Entry通过。Runtime整批回归、更新后专项、核心隔离G00/Assembly与产品构建通过。
+- 接口与自审：compaction.hooks ABI1/40字节、entry24字节与state48字节，函数/借用/owner与cancel契约见compaction_hooks.h；内部compaction模块264字节，新增hooks绑定，Host和TUI既有函数表保持。回调顺序、快照、续接与清理为Assembly，C组合只查询/校验/绑定服务；新增源、导出、来源及实际构建登记自审通过。并行TUI/规划修改保留。
+- 剩余与下一交付物：K09继续通用扩展注册/撤销及其他Generation/Tool hook消费者，K12继续摘要模型选择/system基线与Generation-owned阻塞摘要竞争；K13继续usage和完整Live客户端事件/观察。provider/工具边界和TUI动态历史消费按所属K/U项保持完整范围。

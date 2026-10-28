@@ -1783,7 +1783,9 @@
         "src/runtime/durable_inputs.h",
         "src/runtime/durable_inputs.S",
         "src/runtime/durable_compaction.h",
-        "src/runtime/durable_compaction.S"
+        "src/runtime/durable_compaction.S",
+        "src/runtime/compaction_hooks.S",
+        "src/runtime/compaction_hooks.h"
       ],
       "dependencies": [
         "task.runner.local.v0",
@@ -1829,7 +1831,11 @@
         "pg_durable_compaction_create",
         "pg_durable_compaction_threshold",
         "pg_durable_generation_bind_compaction",
-        "pg_durable_request_read"
+        "pg_durable_request_read",
+        "pg_durable_compaction_bind_hooks",
+        "pg_compaction_hook_open",
+        "pg_compaction_hook_poll",
+        "pg_compaction_hook_close"
       ],
       "reference_basis": [
         {
@@ -1863,7 +1869,7 @@
             "packages/durable/src/harness/compaction.ts",
             "packages/ai/src/utils/estimate.ts"
           ],
-          "semantics": "selectCut/isCandidate, UTF-16 token estimate, summarizedMessages/serializeConversation, structured summary prompts; pinned select/summarize/place with write admission and atomic task receipt.",
+          "semantics": "beforeCompact ordered callbacks, first decision, reported errors, native pending continuation/cancel and pinned summarized entries/messages; selectCut/isCandidate, UTF-16 token estimate, summarizedMessages/serializeConversation, structured summary prompts; pinned select/summarize/place with write admission and atomic task receipt.",
           "tests_to_read": [
             "packages/durable/test/harness-compaction.test.ts",
             "packages/durable/test/harness-context.test.ts"

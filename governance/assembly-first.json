@@ -282,6 +282,10 @@
     "src/runtime/request_context.S": {
       "role": "assembly-core",
       "reason": "Dynamic canonical context projection and owned OpenAI request/history strings"
+    },
+    "src/runtime/compaction_hooks.S": {
+      "role": "assembly-core",
+      "reason": "Durable beforeCompact ordered native callback continuation, cancellation and pinned request ownership"
     }
   }
 }

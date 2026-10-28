@@ -1282,6 +1282,7 @@ pg_durable_compaction_init:
  cmp qword ptr [rsi+72],0
  je .Lcc_init_return
  mov [rdi],rsi
+ mov qword ptr [rdi+256],0
  lea rax,[rip+.Lcc_task_name]
  mov [rdi+8],rax
  mov qword ptr [rdi+16],16
@@ -1383,6 +1384,8 @@ pg_durable_compaction_init:
  lea rsi,[r12+32]
  call [rax+24]
 .Lcc_cleanup_values:
+ mov rdi,[r12+176]
+ call pg_compaction_hook_close@PLT
  mov rdi,[r12+16]
  call json_object_put@PLT
  mov rdi,[r12+88]
@@ -1410,6 +1413,23 @@ pg_durable_compaction_init:
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
+ mov rax,[r12+56]
+ test rax,rax
+ jz .Lcc_select_read_current
+ mov rax,[rax+176]
+ test rax,rax
+ jz .Lcc_select_read_current
+ mov [rsp+72],rax
+ mov rdi,[rax+16]
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov rax,[rsp+72]
+ CGET "qword ptr [rax+8]",firstKept
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+8],rax
+ jmp .Lcc_select_hooks
+.Lcc_select_read_current:
  CGET r13,conversationId
  mov rdi,rax
  call json_object_get_uint64@PLT
@@ -1432,13 +1452,88 @@ pg_durable_compaction_init:
  test eax,eax
  jnz .Lcc_select_phase_bad
  cmp qword ptr [rsp+8],0
- jne .Lcc_select_phase_prepare
+ jne .Lcc_select_hooks
  mov rdi,r12
  lea rsi,[rip+.Lcc_completed_json]
  call .Lcc_commit_json
  mov ebp,eax
  jmp .Lcc_select_phase_end
+.Lcc_select_hooks:
+ cmp qword ptr [rbx+256],0
+ je .Lcc_select_phase_prepare
+ cmp qword ptr [r12+56],0
+ jne .Lcc_select_hook_storage
+ mov edi,1
+ mov esi,184
+ call calloc@PLT
+ mov [r12+56],rax
+ test rax,rax
+ jz .Lcc_select_phase_bad
+ mov [rax],rbx
+ mov [rax+8],r12
+.Lcc_select_hook_storage:
+ mov rax,[r12+56]
+ cmp qword ptr [rax+176],0
+ jne .Lcc_select_hook_poll
+ CGET r13,conversationId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[rbx]
+ mov rdi,[rax]
+ mov rcx,[r12+56]
+ lea rdx,[rcx+16]
+ call [rax+8]
+ test eax,eax
+ jnz .Lcc_select_phase_bad
+ CGET r13,input
+ mov rcx,rax
+ mov rdi,[rbx+256]
+ mov rsi,[rsp]
+ mov rdx,[rsp+8]
+ mov rax,[r12+56]
+ lea r8,[rax+176]
+ call pg_compaction_hook_open@PLT
+ test eax,eax
+ jnz .Lcc_select_phase_bad
+.Lcc_select_hook_poll:
+ mov rax,[r12+56]
+ mov rdi,[rax+176]
+ call pg_compaction_hook_poll@PLT
+ cmp eax,1
+ je .Lcc_select_hook_pending
+ test eax,eax
+ jnz .Lcc_select_phase_bad
+ mov rax,[r12+56]
+ mov rax,[rax+176]
+ CGET "qword ptr [rax+24]",decline
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lcc_select_phase_prepare
+ mov rdi,r12
+ lea rsi,[rip+.Lcc_completed_json]
+ call .Lcc_commit_json
+ mov ebp,eax
+ jmp .Lcc_select_phase_end
+.Lcc_select_hook_pending:
+ mov ebp,1
+ jmp .Lcc_select_phase_end
 .Lcc_select_phase_prepare:
+ CGET r13,conversationId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+48],rax
+ mov rax,[r12+56]
+ test rax,rax
+ jz .Lcc_select_prepare_now
+ cmp qword ptr [rax+16],0
+ je .Lcc_select_prepare_now
+ mov rdi,[rax+16]
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ jmp .Lcc_select_configuration_ready
+.Lcc_select_prepare_now:
  mov rax,[rbx]
  mov rdi,[rax]
  mov rsi,[rsp+48]
@@ -1446,6 +1541,7 @@ pg_durable_compaction_init:
  call [rax+8]
  test eax,eax
  jnz .Lcc_select_phase_bad
+.Lcc_select_configuration_ready:
  CGET "qword ptr [rsp+16]",options
  mov [rsp+56],rax
  test rax,rax
@@ -1555,6 +1651,30 @@ pg_durable_compaction_init:
  call .Lcc_set
  test eax,eax
  jnz .Lcc_select_phase_bad
+ mov rax,[r12+56]
+ test rax,rax
+ jz .Lcc_select_commit
+ mov rax,[rax+176]
+ test rax,rax
+ jz .Lcc_select_commit
+ CGET "qword ptr [rax+24]",summary
+ test rax,rax
+ jz .Lcc_select_commit
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_summary]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_select_phase_bad
+ lea rdi,[rip+.Lcc_place_name]
+ call json_object_new_string@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_phase]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_select_phase_bad
+.Lcc_select_commit:
  mov rdi,r12
  mov rsi,[rsp+24]
  call .Lcc_commit_state
@@ -1582,7 +1702,7 @@ pg_durable_compaction_init:
  cmp qword ptr [r12+56],0
  jne .Lcc_summarize_acquire
  mov edi,1
- mov esi,176
+ mov esi,184
  call calloc@PLT
  mov [r12+56],rax
  test rax,rax
@@ -3402,3 +3522,13 @@ pg_durable_compaction_threshold:
  CE 32
 .section .rodata
 .Lcc_retry_at: .asciz "at"
+
+.text
+.globl pg_durable_compaction_bind_hooks
+.type pg_durable_compaction_bind_hooks,@function
+pg_durable_compaction_bind_hooks:
+ mov [rdi+256],rsi
+ ret
+
+.section .rodata
+.Lcc_decline: .asciz "decline"
