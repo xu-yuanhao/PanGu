@@ -20,6 +20,7 @@
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
+| 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
 | 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
 | 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
@@ -30,10 +31,10 @@
 
 ## 本批验证与集成状态
 
-- 后台容量阈值在prepare事务中检查已有压缩，创建conversation-owned/background Task并保留正常request；摘要经现有Submission路径放置。
-- Client以前台活跃任务判定运行结束，空闲poll继续调度后台，Esc仅取消前台；Task故障按owner链隔离后台分支。查询优先最新running任务并限制1条结果。
-- SQLite/JSONL真实DeepSeek验证前台结束、重复触发去重、Esc隔离、两次阶段重开、摘要放置与后续回忆；实际产品Host同一后台闭环通过。Runtime整批回归、Durable ASan/UBSan及后台真实专项、隔离核心G00/Assembly与产品构建通过。
-- K05接入默认模型目录与modelOverrides，K12继续取消/失败Live/hook、stale/阻塞竞争及完整动态请求。
+- 默认Host提供model.metadata：内置聊天目录由固定Pi生成器产出，Assembly读取用户agent目录models.json并选择公开模型容量；prepare按canonical provider/model逐字段应用compaction.modelOverrides。
+- metadata与策略为独立所有权，只公开provider/id/api及容量；配置刷新沿已有资源整体采纳。默认模型桥接将私有HTTP响应体的已检查overflow分类传入Generation，公开失败结构尺寸保持32字节。
+- ASan/UBSan模型专项、Runtime整批回归、隔离核心G00/Assembly、产品构建和离线资源刷新通过；真实DeepSeek经默认目录、用户models.json及per-model设置通过自动与后台压缩。
+- 下一交付集中接通动态Generation/历史请求与大摘要输出，继续K12完整范围及K05其余协议/认证/配置行为。
 
 ## 当前接口边界
 

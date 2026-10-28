@@ -3,6 +3,7 @@
 #include "../runtime/host.h"
 #include "../runtime/native_plugin.h"
 #include "../runtime/model_provider.h"
+#include "../runtime/models.h"
 #include "../runtime/tool_provider.h"
 #include "../runtime/read_tool.h"
 #include "../runtime/write_tool.h"
@@ -103,11 +104,13 @@ static int tools_start(void *ctx,pg_host *scope,size_t owner){
  return pg_host_provide(scope,owner,"tools",&application.tools)||pg_host_provide(scope,owner,"tool.registry",&registry)||pg_host_provide(scope,owner,"tools.base",&application.tools)||pg_host_provide(scope,owner,"tool.registry.base",&registry)||pg_host_provide(scope,owner,"tools.provider",&default_tool_provider)||pg_host_provide(scope,owner,"tools.provider.base",&default_tool_provider);
 }
 static int tools_stop(void *ctx){(void)ctx;int result=application.tools.close?application.tools.close(application.tools.context):0;if(result!=1)pg_edit_tool_clear(&editor);return result;}
+static int native_model_describe(void *ctx,const struct json_object *configuration,struct json_object **out){(void)ctx;return pg_models_describe(json_object_object_get(durable.resources.current.settings,"modelCatalog"),configuration,out);}
+static pg_model_metadata default_model_metadata={PG_MODEL_METADATA_ABI,sizeof(pg_model_metadata),0,native_model_describe};
 static int model_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_tool_registry *tools=pg_host_get(scope,owner,"tool.registry");if(!tools)return 1;
  application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);
  default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1",0,0};
- return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider);
+ return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider)||pg_host_provide(scope,owner,"model.metadata",&default_model_metadata);
 }
 static int model_stop(void *ctx){(void)ctx;if(application.model.close)application.model.close(application.model.context);return 0;}
 static uint64_t monotonic(void *ctx){(void)ctx;struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now))abort();return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;}
@@ -151,13 +154,14 @@ static int prepare(void *ctx,uint64_t conversation,struct json_object **out){
  struct json_object *settings=json_object_object_get(durable.resources.current.settings,"settings"),*policy=json_object_object_get(settings,"compaction"),*copy=0;
  if(policy){if(json_object_deep_copy(policy,&copy,0)||json_object_object_add(*out,"compaction",copy))goto failed;copy=0;}
  if(durable.model_metadata){if(durable.model_metadata->describe(durable.model_metadata->context,*out,&copy)||!copy||!json_object_is_type(copy,json_type_object)||!pg_document_value_valid(copy))goto failed;if(json_object_object_add(*out,"modelInfo",copy))goto failed;copy=0;}
+ if(pg_models_compaction_policy(*out,&copy)||json_object_object_add(*out,"compaction",copy))goto failed;copy=0;
  return 0;
 failed:json_object_put(copy);json_object_put(*out);*out=0;return 1;
 }
 static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);return pg_mimo_configure(ctx,configuration);}
 static void native_model_failure(void *ctx,pg_model_failure *out){
  pg_mimo *source=ctx;static char message[128];int n=snprintf(message,sizeof(message),"Model request failed (HTTP %ld, transport %u)",source->http,source->transport_error);
- *out=(pg_model_failure){.message={message,(size_t)n},.retryable=(unsigned)pg_model_retryable((pg_slice){source->body,source->used},source->http,source->transport_error),.http_status=(unsigned)source->http,.transport_error=source->transport_error};
+ *out=(pg_model_failure){.message={message,(size_t)n},.retryable=(unsigned)pg_model_retryable((pg_slice){source->body,source->used},source->http,source->transport_error),.http_status=(unsigned)source->http,.transport_error=source->transport_error,.flags=PG_MODEL_FAILURE_CONTEXT_CHECKED|((unsigned)pg_model_context_overflow((pg_slice){source->body,source->used},source->http)*PG_MODEL_FAILURE_CONTEXT_OVERFLOW)};
 }
 static int native_model_complete(void *ctx,struct json_object *assistant){return pg_mimo_complete(ctx,assistant);}
 static int acquire_model(const struct json_object *configuration,const pg_tool_registry *tools,pg_model *out){
@@ -230,6 +234,9 @@ static int resource_build(void *context,pg_resource_candidate *out){
   if(have_user){n=snprintf(user_settings,sizeof(user_settings),"%s/settings.json",user_canonical);if(n<0||(size_t)n>=sizeof(user_settings)){pg_read_tool_close(&resources);return 1;}}
   unsigned reader=3;for(size_t i=0;i<declared->count;i++){if(!strcmp(declared->entries[i].name,"read")){reader=0;break;}if(!strcmp(declared->entries[i].name,"bash"))reader=1;}
   int result=pg_settings_load(have_user?user_settings:0,project_settings,&settings);
+  if(!result){char models_path[4096];struct json_object *catalog=0;int n=have_user?snprintf(models_path,sizeof(models_path),"%s/models.json",user_canonical):0;if(n<0||(size_t)n>=sizeof(models_path))result=1;else if(pg_models_load(have_user?models_path:0,&catalog))result=1;else if(json_object_object_add(settings,"modelCatalog",catalog)){json_object_put(catalog);result=1;}}
+
+  if(!result){struct json_object *catalog=json_object_object_get(settings,"modelCatalog"),*diagnostics=json_object_object_get(catalog,"diagnostics");for(size_t i=0;i<json_object_array_length(diagnostics);i++){struct json_object *entry=json_object_array_get_idx(diagnostics,i);fprintf(stderr,"Models warning: %s: %s\n",json_object_get_string(json_object_object_get(entry,"path")),json_object_get_string(json_object_object_get(entry,"message")));}}
   if(!result){struct json_object *diagnostics=json_object_object_get(settings,"diagnostics");for(size_t i=0;i<json_object_array_length(diagnostics);i++){struct json_object *entry=json_object_array_get_idx(diagnostics,i);fprintf(stderr,"Settings warning: %s: %s\n",json_object_get_string(json_object_object_get(entry,"path")),json_object_get_string(json_object_object_get(entry,"message")));}}
   if(!result)result=pg_settings_resource_sources(settings,"skills",have_user?user_canonical:0,project_base,&skill_paths);
   if(!result)result=pg_settings_resource_sources(settings,"prompts",have_user?user_canonical:0,project_base,&prompt_paths);
@@ -287,11 +294,11 @@ static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
  if(durable.tools_draining)return 1;durable.records.publish=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs","resources","compaction"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,4,agent_start,agent_stop};
 static const pg_plugin plugins[]={
- {"model",0,model_imports,1,model_exports,3,model_start,model_stop},
+ {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},

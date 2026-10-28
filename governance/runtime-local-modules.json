@@ -437,7 +437,8 @@
         "task.generation.local.v0",
         "storage.jsonl.local.v1",
         "session.durable.lifecycle.local.v0",
-        "resources.lifecycle.local.v0"
+        "resources.lifecycle.local.v0",
+        "models.catalog.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2150,6 +2151,40 @@
           "tests_to_read": [
             "packages/coding-agent/test/package-manager.test.ts"
           ]
+        }
+      ]
+    },
+    {
+      "id": "models.catalog.local.v0",
+      "sources": [
+        "src/runtime/models.h",
+        "src/runtime/models.S",
+        "src/runtime/models_data.S"
+      ],
+      "dependencies": [
+        "resources.settings.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "Assembly model metadata selection from generated Pi chat data and PanGu user models.json; detached public descriptors and field-wise compaction.modelOverrides resolution. Static model.metadata service consumes the current resource snapshot.",
+      "exports": [
+        "pg_models_load",
+        "pg_models_describe",
+        "pg_models_compaction_policy",
+        "pg_models_builtin_json"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/models.ts",
+            "packages/ai/scripts/generate-models.ts",
+            "packages/coding-agent/src/core/model-config.ts",
+            "packages/coding-agent/src/core/provider-composer.ts",
+            "packages/durable/src/harness/compaction.ts"
+          ],
+          "semantics": "public chat contextWindow/maxTokens, custom-model metadata defaults and model overrides; Durable compactionPolicy field-wise per-model resolution. Builtin metadata generated in an isolated copy using the fixed upstream script, with input digest recorded in models_data.S."
         }
       ]
     }

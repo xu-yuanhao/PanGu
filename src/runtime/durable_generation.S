@@ -2850,10 +2850,17 @@ pg_durable_context_order:
  call [rax+8]
  test eax,eax
  jnz .Lgg_failure_invalid
+ mov eax,[r14+4348]
+ test eax,1
+ jz .Lgg_failure_infer_overflow
+ and eax,2
+ jmp .Lgg_failure_overflow_classified
+.Lgg_failure_infer_overflow:
  mov rdi,[r14+4320]
  mov rsi,[r14+4328]
  mov edx,[r14+4340]
  call pg_model_context_overflow@PLT
+.Lgg_failure_overflow_classified:
  test eax,eax
  jz .Lgg_failure_retry_policy
  mov dword ptr [r14+4336],0

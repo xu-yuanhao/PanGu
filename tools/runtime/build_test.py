@@ -159,7 +159,7 @@ def main():
             settings_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ('settings', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix', 'resource_select', 'resource_match_posix')],
+                            *[implementation('src/runtime/' + name) for name in ('settings', 'models', 'models_data', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix', 'resource_select', 'resource_match_posix')],
                             str(ROOT / 'tests/runtime/test_settings.c'), *settings_flags, '-o', settings_test], check=True)
             subprocess.run([settings_test], check=True, timeout=15)
             select_test = str(Path(directory) / 'test-resource-select')

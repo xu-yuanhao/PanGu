@@ -270,6 +270,14 @@
     "src/runtime/durable_compaction.S": {
       "role": "assembly-core",
       "reason": "Durable context cut selection, summary request, persistent compaction phases and atomic Submission receipt"
+    },
+    "src/runtime/models.S": {
+      "role": "assembly-core",
+      "reason": "Pi model catalog selection, user model metadata composition and Durable per-model compaction policy"
+    },
+    "src/runtime/models_data.S": {
+      "role": "assembly-core",
+      "reason": "Read-only public chat metadata emitted by the fixed Pi catalog generator; no executable logic"
     }
   }
 }

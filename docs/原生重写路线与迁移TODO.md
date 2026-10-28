@@ -104,6 +104,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：pi-ai `types.ts`、`models.ts`、`api/`、`auth/`、`utils/provider-retry.ts` 及对应 provider 测试。
 
+- [x] 默认model.metadata接通原生内置聊天模型元数据、用户agent目录models.json的容量/输出覆盖与自定义模型元数据；按provider/model或endpoint/model选择，只输出公开字段。默认prepare按canonical provider/model逐字段应用compaction.modelOverrides，刷新、隔离所有权和真实自动/后台压缩通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -230,8 +231,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts prepare/background threshold、compaction.ts createCompaction/place与harness-compaction.test.ts background threshold compaction；Client沿Conversation.waitForIdle/abort的后台隔离语义。沿既有固定快照完成，Pi/Harness缓存差异已核对。
-- 实际调用链：容量/usage估算命中background → prepare事务查询本会话未终止压缩 → conversation-owned/background Task与正常request状态同批提交 → 前台生成独立结束 → Client空闲poll继续推进摘要 → 固定tail摘要经Submission放置 → 后续生成读取摘要。前台只查询非后台活跃状态，Esc不标记后台；Task fault沿owner链识别后台分支，后台故障不污染前台结果。
-- 验证：真实DeepSeek在SQLite/JSONL通过前台独立完成、重复prepare不多建任务、Esc隔离、select/summarize与place两次阶段重开、原子Submission/Entry/任务终态及摘要后回忆；实际产品Host后台摘要、空闲调度与后续真实回答通过。Runtime整批回归、Durable ASan/UBSan及真实后台专项、隔离核心G00/Assembly与产品构建通过。
-- 接口与自审：新增pg_durable_client_fault_task供组合层报告Task故障；函数表、Client和Generation公开布局保持。后台触发/去重/所有权、空闲判断与故障隔离均为Assembly，C组合只转发Task ID；导出已登记并自审。前台活跃检查优先查询最新running任务并限制结果为1，随后查其余非终态；并行TUI与其他规划改动保留。
-- 剩余与下一交付物：K05接入默认模型目录元数据与modelOverrides，使默认产品阈值获得模型容量；当前可选model.metadata已能替换注入。K12继续取消/失败Live/hook、后台stale/阻塞竞争与system基线；常规Generation/历史64行、单文本及摘要输出4096字节，随完整动态请求链完成。TUI使用既有/compact操作表，其他K项保留原覆盖范围。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的pi-ai models.ts/generate-models.ts、Coding Agent model-config.ts/provider-composer.ts及Durable compactionPolicy。固定上游生成器在临时副本产出公开聊天目录；投影字段和完整生成JSON摘要记于models_data.S。Pi/Harness仍沿已核对固定快照。
+- 实际调用链：资源build读取PanGu用户agent目录models.json → Assembly组合内置元数据/用户配置 → 默认model.metadata按端点与模型选择公开容量 → prepare保存独立modelInfo并逐字段解析compaction.modelOverrides → 既有阻塞/后台/overflow压缩链。配置刷新复用资源整体采纳；私有配置/API key和URL不进入公开metadata。默认模型桥接传递私有HTTP响应体的已检查overflow事实，Generation使用可选flags或既有文本推断。
+- 验证：模型专项ASan/UBSan覆盖内置/自定义/默认值/覆盖、端点与provider选择、公开metadata可修改而不影响目录、坏JSON诊断和凭据排除；Runtime整批回归及真实产品自动/后台压缩通过。真实DeepSeek使用默认Host服务、用户models.json和per-model策略，移除了专用metadata测试插件。隔离核心G00/Assembly、产品构建与离线资源刷新通过；私有HTTP overflow/throttling分类经默认桥接验证。
+- 接口与自审：models.h提供私有catalog加载、公开describe及策略解析，models.S为手写Assembly；models_data.S为固定上游生成器的只读公开数据。默认Host新增model.metadata导出；pg_model_failure沿原32字节布局赋予原保留位可选flags语义，零flags保持文本推断。新源、导出、依赖和构建输入已登记并自审；并行TUI修改保留。
+- 剩余与下一交付物：接通完整动态Generation/历史请求，解除64行/单文本4096字节边界，并完成大摘要输出；继续K12取消/失败Live/hook、stale/阻塞竞争及system基线。K05继续完整模型协议、能力、认证/凭据与models配置行为。TUI候选的主构建接线需纳入tui_diff.S；当前核心产品验证使用已提交TUI快照。

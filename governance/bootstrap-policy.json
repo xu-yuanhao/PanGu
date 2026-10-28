@@ -624,6 +624,9 @@
     "tests/runtime/test_resource_select.c": "native-test",
     "tools/runtime/test_resource_select.py": "gate",
     "src/runtime/durable_compaction.S": "native-source",
-    "src/runtime/durable_compaction.h": "native-source"
+    "src/runtime/durable_compaction.h": "native-source",
+    "src/runtime/models.h": "native-source",
+    "src/runtime/models.S": "native-source",
+    "src/runtime/models_data.S": "native-source"
   }
 }
