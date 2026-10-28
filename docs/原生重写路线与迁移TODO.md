@@ -149,6 +149,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `harness/{define,registry,agent,prompt,tool}.ts`；`harness-registry`、`harness-lifecycle`、`harness-ownership`、`harness-tools` 测试。
 
+- [x] 自定义Task接入Host task.definitions：汇编校验/查找、内置与扩展重名拒绝、真实Scheduler执行/暂停重开；动态库经公开任务提交ABI保存checkpoint与终态，消费者清理后卸载。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -259,8 +260,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts Submission→inbox_update→usage_changed顺序、inbox.ts queued视图；复用PanGu自身Submission存储，不引入另一种队列协议。
-- 实际调用链：Client打开时readOnLine分页读取当前queued记录 → 已提交Submission替换更新观察基线 → 深比较/ID排序 → PG_INBOX_UPDATED完整队列 → 既有动态事件队列；先发对应Submission事件，再发一次队列刷新。正常阶段或重复结算未改变队列时不刷新；暂停释放基线。会话视图与Client共享原有队列扫描入口。
-- 验证：双后端Durable ASan/UBSan覆盖重开Client恢复256项队列、只读初始化、暂停释放及原有队列撤回/边界场景；实际Host发布夹具覆盖入队、撤回、重复终态只发Submission不重复队列刷新、排序/会话隔离。DeepSeek双后端真实retry/工具/follow-up检查队列事件JSON、ID顺序和queued状态，整批结果见当前实现记录。
-- 接口与自审：pg_event尾部追加PG_INBOX_UPDATED，内部Client144字节增加仅用于事件比较的inbox引用，布局断言/初始化/清理同步；旧TUI执行适配跳过结构事件，状态消费仍由公开查询/观察入口接入。导出共享队列读取与模块依赖更新，无新增源码/存储实现。
-- 剩余与下一交付物：结构化message_update、完整report与Agent/Provider文档及最终TUI消费仍按K05/K09/K13覆盖。下一批转向实际扩展/Agent配置消费者，避免只继续增加事件辅助层；完整TODO范围保持。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/registry.ts` Snapshot任务表、`define.ts`及`harness-registry.test.ts`内置任务/冲突/替换用例；Harness `22ddee3792402c3e70ec5f86a63c3e3e895a2f60` / Cordis服务作用域生命周期。核对已有上游跟踪Pi `a87b742` / Harness `f3803c9`：registry及Cordis该入口无变化，define新增afterRun辅助入口，当前批次按固定快照完成。
+- 实际调用链：原生插件提供task.definitions → Agent启动校验完整候选表 → Task resolve先内置再扩展 → Scheduler执行插件phase → commit_with保存checkpoint → 暂停/重开Scheduler → commit保存终态 → 关闭Agent消费者 → 关闭插件作用域并卸载库。定义与代码随插件作用域借用；校验/查找为手写task_provider.S，产品链接导出两个实际被动态库调用的提交入口。
+- 验证：`python3 -B tools/runtime/test_product_resources.py --native-tasks`及追加`--sanitize`通过，覆盖真实DSO解析、两种提交接口、checkpoint重开、operation cleanup与卸载；同场景保留内置/重复任务及ABI拒绝、compaction hook与实际产品资源调用链。产品构建、G00及Assembly职责检查通过；本批Runtime集成回归结果见当前实现记录。
+- 接口与自审：pg_task_provider ABI1为24字节，定义名/版本/初始回调/phase表及重名在Scheduler打开前校验；既有Task布局不变。复用现有动态库夹具和产品专项，新增任务服务与源/模块登记已核对；两个提交符号由产品与专项共用导出清单。
+- 剩余与下一交付物：K09仍需完整extension选择、prompt section/wrapper、generation/tool hooks与配置发布/撤销；当前自定义Task来自已加载插件作用域，完整Registry配置事务及运行中扩展更新尚待接通。下一批沿Agent配置/扩展选择进入实际Generation提示词与工具集合，成组补齐配置发布和消费者；K05/K13余项保留在覆盖表。

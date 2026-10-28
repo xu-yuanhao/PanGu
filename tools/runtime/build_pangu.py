@@ -8,6 +8,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 # The approved inventory is the single product input list. No .c default/fallback.
 SOURCES = list(json.loads((ROOT / 'governance/assembly-first.json').read_text())['sources'])
+PLUGIN_EXPORTS = ['-Wl,--export-dynamic-symbol=' + name for name in
+                  ('pg_host_*', 'pg_task_runner_commit', 'pg_task_runner_commit_with')]
+
 def implementation(stem):
     matches = [name for name in SOURCES if str(Path(name).with_suffix('')) == stem]
     if len(matches) != 1:
@@ -31,7 +34,7 @@ def build(output):
     flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc', 'sqlite3', 'libgit2', 'yaml-0.1', 'libpcre2-8'], text=True).split()
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
-                    '-Wl,--export-dynamic-symbol=pg_host_*',
+                    *PLUGIN_EXPORTS,
                     *[str(ROOT / p) for p in SOURCES], *flags, '-ldl', '-o', str(output)], check=True)
     return output
 if __name__ == '__main__':

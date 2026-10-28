@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
+| 扩展任务 | `task_provider.S`：可选Host task.definitions校验/查找，保留内置任务、拒绝重名/无效定义；原生DSO通过公开commit/commit_with执行checkpoint与终态，Scheduler重开后继续，消费者清理先于库卸载 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
@@ -34,13 +35,13 @@
 
 ## 本批验证与集成状态
 
-- Client从现有Submission存储分页初始化队列基线，提交后按实际变化发布PG_INBOX_UPDATED，顺序为Submission→队列→用量；暂停释放。
-- 双后端ASan/UBSan验证重开恢复256项队列；实际Host覆盖入队/撤回/重复通知去重和所有权。
-- DeepSeek SQLite/JSONL真实retry/工具/follow-up的队列ID/status顺序与清空通过；Runtime整批回归、产品构建、G00/Assembly通过。
+- 自定义Task服务通过task_provider.S接入实际Agent/Scheduler；校验ABI、必要定义字段、内置及扩展重名，定义与代码借用父插件作用域。
+- `python3 -B tools/runtime/test_product_resources.py --native-tasks`与追加`--sanitize`通过：真实动态库phase分别调用commit_with/commit，保存checkpoint后暂停/重开Scheduler，终态结果入库；operation cleanup完成后释放消费者与动态库。复用产品资源与compaction hook场景，无模型请求。
+- 产品构建、G00、Assembly职责检查通过；`python3 -B tools/runtime/build_test.py`整批退出0，包含两后端Durable/Task恢复、Host/DSO生命周期、Runtime/TUI桥接及独立Pi/PanGu存储行为对照。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry期间queued摘要等剩余组合，K13接入客户端用量及完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry期间queued摘要等剩余组合，K13补齐结构化message_update、report及剩余Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 
@@ -49,6 +50,7 @@ python3 -B tools/runtime/build_test.py
 python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu
 python3 -B tools/runtime/test_pangu_pty.py
 python3 -B tools/runtime/test_product_resources.py
+python3 -B tools/runtime/test_product_resources.py --native-tasks --sanitize
 ```
 
 真实模型通过`PANGU_MODEL_ENDPOINT`、`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`注入，默认MiMo连接接受`MIMO_API_KEY`。
