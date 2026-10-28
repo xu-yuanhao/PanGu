@@ -335,7 +335,7 @@ static int durable_tool_crash_commit(void *p,const struct json_object *writes,pg
 }
 static int observation_read(void *p,const char *id,size_t size,struct json_object **out){return pg_durable_tool_observe(p,1,(pg_slice){id,size},out);}
 static void durable_tool_tests(void){
- _Static_assert(sizeof(pg_durable_tool)==176&&offsetof(pg_durable_tool,phases)==96,"Durable Tool ABI");
+ _Static_assert(sizeof(pg_durable_tool)==184&&offsetof(pg_durable_tool,phases)==96,"Durable Tool ABI");
  for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<15;scenario++){
   char parent[]="/tmp/pangu-durable-tool-XXXXXX";assert(mkdtemp(parent));durable_tool_case t={.base={.f={.kind=kind,.now=100}},.reader={.directory=-1}};task_case *base=&t.base;
   snprintf(base->f.path,sizeof(base->f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&base->f);seed(&base->f);open_session(&base->f);task_bind(base);

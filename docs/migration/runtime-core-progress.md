@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
+| Tool hooks | `extensions.S`/`durable_tool.S`：原生beforeTool/afterTool进入意图前与结果提交前，参数与结果按选中扩展顺序传递，拦截/异常、两次校验、pending/取消/重开；工具结果保留最终参数及hook元数据 |
 | 扩展选择与组合 | `extensions.S`：extensions.registry的稳定名称选择、同名工具/section保序覆盖、同步wrapper与失败报告、标签渲染和请求固定选择；工具分派保留未改动的注入提供者，扩展实现进入同一Durable Tool链 |
 | Agent配置 | `agent_state.S`：Host agent.state事务写pangu.agent，稳定名称配置、字段清除/去重提交、独立读取；instructions在资源提示后进入Generation请求，tools/modelTools筛选模型声明，执行gate保持原提供者lease并拒绝禁用名字 |
 | 扩展任务 | `task_provider.S`：可选Host task.definitions校验/查找，保留内置任务、拒绝重名/无效定义；原生DSO通过公开commit/commit_with执行checkpoint与终态，Scheduler重开后继续，消费者清理先于库卸载 |
@@ -37,9 +38,9 @@
 
 ## 本批验证与集成状态
 
-- 原生DSO中的扩展快照进入真实Generation提示词/工具声明和Durable工具执行，选择固定在请求配置，运行中工具重新解析当前Agent配置；组合和插件代码保留至模型/工具及pending close释放。
-- 产品`--native-tasks --sanitize`通过选择/覆盖/wrapper/标签、错误移除与归属报告、基础提供者保留分派、组合工具执行、配置固定及库卸载。
-- `--live-extensions`实际DeepSeek通过基础写入及扩展native_echo声明/执行/返回；Runtime整批退出0，最终产品构建通过。G00/Assembly随最终登记核对。
+- beforeTool在意图前运行并二次校验；最终参数进入既有checkpoint与工具结果，assistant原记录保持。afterTool在原生结果/元数据快照后、提交前运行，异常或不合法结果报告后保留前项结果。
+- 产品`--native-tasks --sanitize`通过顺序/参数/结果链、Scheduler重开、拦截与异常无效果、非法参数二次拒绝、挂起/取消及原生库清理；原有SQLite/JSONL Durable Tool/恢复专项及Runtime整批退出0。
+- `--live-extensions`真实DeepSeek发起write(original.txt)，插件挂起后改写为hooked.txt/HOOK_ARGUMENTS，结果经afterTool后继续回答；同场景保留资源刷新、Agent配置、扩展native_echo。最终产品构建、G00/Assembly检查通过。
 
 ## 当前接口边界
 

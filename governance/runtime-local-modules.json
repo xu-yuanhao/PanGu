@@ -220,7 +220,8 @@
       "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe; optional async next/cancel/close, one active operation retained until released, transient progress distinct from final result",
       "exports": [
         "pg_tool_registry_init",
-        "pg_tool_registry_service"
+        "pg_tool_registry_service",
+        "pg_tool_registry_check_json"
       ],
       "reference_basis": [
         {
@@ -1766,7 +1767,8 @@
       "exports": [
         "pg_durable_tool_init",
         "pg_durable_tool_observe",
-        "pg_durable_tool_observation_release"
+        "pg_durable_tool_observation_release",
+        "pg_durable_tool_bind_hooks"
       ],
       "reference_basis": [
         {
@@ -2367,7 +2369,10 @@
         "pg_extensions_resolve",
         "pg_extensions_prepare",
         "pg_extensions_close",
-        "pg_extension_tools_service"
+        "pg_extension_tools_service",
+        "pg_extension_tool_hook_open",
+        "pg_extension_tool_hook_poll",
+        "pg_extension_tool_hook_close"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/{registry,agent,prompt}.ts"

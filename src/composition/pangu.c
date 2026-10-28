@@ -206,6 +206,12 @@ static int model_complete(void *ctx,const pg_model *model,struct json_object *as
 static int model_fetch_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->fetch_deferred?durable.model_provider->fetch_deferred(model->context,handle):-1;}
 static int model_cancel_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->cancel_deferred?durable.model_provider->cancel_deferred(model->context,handle):0;}
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
+static int extension_tool_hook_poll(void *ctx,uint64_t id,unsigned event,const json_object *request,void **state,json_object **out){
+ (void)ctx;(void)id;*out=0;if(!*state&&pg_extension_tool_hook_open(&durable.tool_extensions,event,request,state))return -5;int result=pg_extension_tool_hook_poll(*state,out);if(!result){pg_extension_tool_hook_close(*state);*state=0;}return result;
+}
+static void extension_tool_hook_close(void *ctx,void *state){(void)ctx;pg_extension_tool_hook_close(state);}
+static int extension_tool_validate(void *ctx,const json_object *call){(void)ctx;return pg_tool_registry_check_json(&durable.allowed_tools,call);}
+static const pg_durable_tool_hooks extension_tool_hooks={0,extension_tool_hook_poll,extension_tool_hook_close,extension_tool_validate};
 static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
  (void)ctx;if(durable.tools_leased)return 1;json_object *task=0,*state=0;if(record_read(0,PG_TABLE_TASK,id,&task))return 2;uint64_t conversation=json_object_get_uint64(json_object_object_get(task,"conversationId"));json_object_put(task);
  int result=pg_agent_state_read(&durable.session,conversation,&state);if(!result)result=pg_extensions_resolve(durable.extensions,state,durable.declared_tools,&durable.tool_extensions);if(!result)result=pg_agent_tools_select(&durable.tool_extensions.tools,state,1,&durable.allowed_tools);json_object_put(state);if(result){pg_extensions_close(&durable.tool_extensions);return 2;}
@@ -309,7 +315,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.resource_host=(pg_resource_host){0,resource_build,resource_busy};if(pg_resources_open(&durable.resources,&durable.resource_host,durable.configuration))return 1;
  foreground_resources=(pg_resource_ops){&durable.resources,pg_resources_reload,pg_resources_snapshot,resource_release,pg_resources_expand};
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
- durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
+ durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;if(durable.extensions)pg_durable_tool_bind_hooks(&durable.tool,&extension_tool_hooks);
  durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete,model_fetch_deferred,model_cancel_deferred};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
  durable.compaction_host=durable.generation_host;durable.compaction_host.acquire=compaction_acquire;durable.compaction_host.progress=0;if(pg_durable_compaction_init(&durable.compaction,&durable.compaction_host))return 1;pg_durable_generation_bind_compaction(&durable.generation,&durable.compaction.definition);const pg_compaction_hooks *hooks=pg_host_find(scope->parent,"compaction.hooks");if(hooks&&(hooks->abi!=PG_COMPACTION_HOOKS_ABI||hooks->size!=sizeof(*hooks)||!hooks->report||(hooks->count&&!hooks->entries)))return 1;pg_durable_compaction_bind_hooks(&durable.compaction,hooks);
  durable.compaction_binding=(pg_compaction_binding){&durable.compaction,&durable.session,&durable.tasks,&durable.scheduler};pg_durable_compaction_service(&durable.compaction_binding,&durable.compaction_ops);foreground_compaction=durable.compaction_ops;

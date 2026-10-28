@@ -321,7 +321,7 @@
     },
     "src/runtime/extensions.S": {
       "role": "assembly-core",
-      "reason": "Pi Extension名称选择、工具/提示段组合、wrapper与提示渲染"
+      "reason": "Pi Extension名称选择、工具/提示段组合与wrapper，Tool hooks协作挂起/参数结果链及取消"
     }
   }
 }

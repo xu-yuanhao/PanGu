@@ -29,4 +29,8 @@ typedef struct {
    Inline nested sync calls remain allowed; async start reserves ownership. */
 int pg_tool_registry_init(pg_tool_registry *, const pg_tool_definition *, size_t);
 pg_tools pg_tool_registry_service(pg_tool_registry *);
+/* Read-only pre-intent validation of {name,arguments}: 1 valid, 0 bad
+   arguments, -1 unavailable. Uses the executor's same lookup/JSON/validator
+   path; authorization remains immediately before the effect. */
+int pg_tool_registry_check_json(const pg_tool_registry *,const struct json_object *);
 #endif

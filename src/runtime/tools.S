@@ -715,3 +715,86 @@ li_close:
  ret
 
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_tool_registry_check_json
+.type pg_tool_registry_check_json,@function
+pg_tool_registry_check_json:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rsi
+ mov r12,rdi
+ mov rdi,rbx
+ lea rsi,[rip+.Lcheck_name]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcheck_missing
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov rbp,rax
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov rdi,r12
+ mov rsi,rbp
+ mov edx,eax
+ call li_lookup
+ mov r14,rax
+ test rax,rax
+ jz .Lcheck_missing
+ mov rdi,rbx
+ lea rsi,[rip+.Lcheck_arguments]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcheck_invalid
+ mov rdi,r13
+ mov esi,256
+ call json_object_to_json_string_ext@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lcheck_invalid
+ mov rdi,rax
+ call strlen@PLT
+ mov r13,rax
+ mov rdi,rbp
+ mov rsi,r13
+ call li_parse_object
+ test rax,rax
+ jz .Lcheck_invalid
+ mov rdi,rax
+ call json_object_put@PLT
+ mov rdi,[r14+PG_TL_DEF_CONTEXT]
+ mov rsi,rbp
+ mov rdx,r13
+ call [r14+PG_TL_DEF_VALIDATE]
+ test eax,eax
+ setnz al
+ movzx eax,al
+ jmp .Lcheck_end
+.Lcheck_missing:
+ mov eax,-1
+ jmp .Lcheck_end
+.Lcheck_invalid:
+ xor eax,eax
+.Lcheck_end:
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcheck_name: .asciz "name"
+.Lcheck_arguments: .asciz "arguments"

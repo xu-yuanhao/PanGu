@@ -23,10 +23,15 @@ typedef struct {
     as a separate model text block; structuredOutput is stored in Entry.data. */
  int (*snapshot)(void *,uint64_t task_id,const struct json_object *call,struct json_object **);
 } pg_durable_tool_host;
+/* poll returns 0 with owned final {call,result?}, 1 pending, negative error.
+   state is closed before the executor lease; validate returns 1/0/-1 for
+   valid arguments/invalid arguments/unavailable tool. */
+typedef struct {void *context;int (*poll)(void *,uint64_t,unsigned,const struct json_object *,void **,struct json_object **);void (*close)(void *,void *);int (*validate)(void *,const struct json_object *);} pg_durable_tool_hooks;
 typedef struct {
  const pg_durable_tool_host *host;
  pg_task_definition definition;
  pg_task_phase phases[2];
+ const pg_durable_tool_hooks *hooks;
 } pg_durable_tool;
 /* Borrowed host lives through all tasks and native cleanup. Resolve this
    definition as pangu.tool. Input {kind:"model",assistant,callId} references
@@ -35,6 +40,8 @@ typedef struct {
    say safe. Result Entry and Task outcome commit atomically through Session.
    Tool output and model-facing identity use PanGu's own Entry namespace. */
 int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
+/* Binding borrows callback table through all phase and hook cleanup. */
+void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned
    {task,call,entry?}, 1 missing; other values are read/argument errors. The
    conversation and call ID select the latest matching native Tool task. */

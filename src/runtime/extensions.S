@@ -321,7 +321,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],1
+ cmp dword ptr [rbx],2
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],48
  jne .Lx_validate_bad
@@ -441,6 +441,28 @@ pg_extensions_close:
  inc r14
  jmp .Lx_validate_wrap_each
 .Lx_validate_next:
+ cmp qword ptr [r13+64],2147483647
+ ja .Lx_validate_bad
+ cmp qword ptr [r13+64],0
+ je .Lx_validate_next_done
+ cmp qword ptr [r13+56],0
+ je .Lx_validate_bad
+ xor r14d,r14d
+.Lx_validate_hook_each:
+ cmp r14,[r13+64]
+ jae .Lx_validate_next_done
+ mov rax,r14
+ shl rax,5
+ add rax,[r13+56]
+ cmp dword ptr [rax],1
+ jb .Lx_validate_bad
+ cmp dword ptr [rax],2
+ ja .Lx_validate_bad
+ cmp qword ptr [rax+16],0
+ je .Lx_validate_bad
+ inc r14
+ jmp .Lx_validate_hook_each
+.Lx_validate_next_done:
  inc r12
  jmp .Lx_validate_extension
 .Lx_validate_bad:
@@ -661,7 +683,7 @@ pg_extensions_resolve:
 .Lx_close_tag: .asciz "\n</%s>"
 .section .data.rel.ro
 .balign 8
-.Lx_coding: .quad .Lx_coding_name,0,0,0,0,0,0
+.Lx_coding: .quad .Lx_coding_name,0,0,0,0,0,0,0,0
 .section .note.GNU-stack,"",@progbits
 .text
 /* Report is observational; native callbacks return errors instead of throwing. */
@@ -1151,3 +1173,278 @@ pg_extension_tools_service:
  jmp rax
 .Lx_dispatch_return:
  ret
+.text
+/* Hook state: result, private request, decision, extension index, hook index,
+   active hook, pending, event. Selected extension descriptors remain leased. */
+.globl pg_extension_tool_hook_open
+.type pg_extension_tool_hook_open,@function
+pg_extension_tool_hook_open:
+ XF 32
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [r14],0
+ mov edi,1
+ mov esi,64
+ call calloc@PLT
+ test rax,rax
+ jz .Lxh_open_bad
+ mov [r14],rax
+ mov [rax],rbx
+ mov [rax+52],r12d
+ mov rdi,r13
+ lea rsi,[rax+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lxh_open_release
+ xor eax,eax
+ jmp .Lxh_open_end
+.Lxh_open_release:
+ mov rdi,[r14]
+ call pg_extension_tool_hook_close
+ mov qword ptr [r14],0
+.Lxh_open_bad:
+ mov eax,5
+.Lxh_open_end:
+ XE 32
+.globl pg_extension_tool_hook_close
+.type pg_extension_tool_hook_close,@function
+pg_extension_tool_hook_close:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lxh_close_end
+ cmp dword ptr [rbx+48],0
+ je .Lxh_close_json
+ mov rax,[rbx+40]
+ test rax,rax
+ jz .Lxh_close_json
+ cmp qword ptr [rax+24],0
+ je .Lxh_close_json
+ mov rdi,[rax+8]
+ mov rsi,[rbx+8]
+ call [rax+24]
+.Lxh_close_json:
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rdi,rbx
+ call free@PLT
+.Lxh_close_end:
+ pop rbx
+ ret
+/* Move an owned decision field into a request object, preserving ownership on
+   failure. No callbacks run while applying a completed decision. */
+.Lxh_set:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lxh_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,5
+.Lxh_set_end:
+ pop rbx
+ ret
+.globl pg_extension_tool_hook_poll
+.type pg_extension_tool_hook_poll,@function
+pg_extension_tool_hook_poll:
+ XF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [r12],0
+.Lxh_poll_extension:
+ mov r13,[rbx]
+ mov rax,[rbx+24]
+ cmp rax,[r13+1208]
+ jae .Lxh_poll_done
+ mov rdx,[r13+1200]
+ mov r14,[rdx+rax*8]
+.Lxh_poll_hook:
+ mov rax,[rbx+32]
+ cmp rax,[r14+64]
+ jae .Lxh_poll_next_extension
+ shl rax,5
+ add rax,[r14+56]
+ mov rbp,rax
+ mov edx,[rbx+52]
+ cmp edx,[rbp]
+ jne .Lxh_poll_next_hook
+ mov [rbx+40],rbp
+ mov qword ptr [rbx+16],0
+ mov rdi,[rbp+8]
+ mov rsi,[rbx+8]
+ lea rdx,[rbx+16]
+ call [rbp+16]
+ cmp eax,1
+ je .Lxh_poll_pending
+ mov dword ptr [rbx+48],0
+ test eax,eax
+ jnz .Lxh_poll_callback_error
+ cmp qword ptr [rbx+16],0
+ je .Lxh_poll_next_hook
+ mov rdi,[rbx+16]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ mov rdi,[rbx+16]
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ cmp dword ptr [rbx+52],1
+ jne .Lxh_poll_after
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_block]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lxh_poll_arguments
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_block]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_stop
+.Lxh_poll_arguments:
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_arguments]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lxh_poll_next_hook
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_call]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lxh_arguments]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_next_hook
+.Lxh_poll_after:
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_output]
+ call json_object_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ mov rdi,[rsp+24]
+ call json_object_get_string_len@PLT
+ cmp eax,4096
+ ja .Lxh_poll_invalid
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_diagnostics]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lxh_poll_after_install
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+.Lxh_poll_after_install:
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_result]
+ mov rdx,[rbx+16]
+ mov qword ptr [rbx+16],0
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_next_hook
+.Lxh_poll_invalid:
+ mov eax,-5
+.Lxh_poll_callback_error:
+ mov [rsp+16],eax
+ mov rdi,r13
+ mov rsi,[r14]
+ lea rdx,[rip+.Lxh_before]
+ cmp dword ptr [rbx+52],1
+ je .Lxh_poll_report
+ lea rdx,[rip+.Lxh_after]
+.Lxh_poll_report:
+ mov ecx,[rsp+16]
+ call .Lx_report
+ cmp dword ptr [rbx+52],1
+ jne .Lxh_poll_next_hook
+ lea rdi,[rip+.Lxh_failure]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lxh_poll_bad
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_block]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+.Lxh_poll_stop:
+ mov rax,[r13+1208]
+ mov [rbx+24],rax
+ jmp .Lxh_poll_done
+.Lxh_poll_next_hook:
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov qword ptr [rbx+16],0
+ mov qword ptr [rbx+40],0
+ inc qword ptr [rbx+32]
+ jmp .Lxh_poll_hook
+.Lxh_poll_next_extension:
+ inc qword ptr [rbx+24]
+ mov qword ptr [rbx+32],0
+ jmp .Lxh_poll_extension
+.Lxh_poll_pending:
+ mov dword ptr [rbx+48],1
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov qword ptr [rbx+16],0
+ mov eax,1
+ jmp .Lxh_poll_end
+.Lxh_poll_done:
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov qword ptr [rbx+16],0
+ mov rdi,[rbx+8]
+ call json_object_get@PLT
+ mov [r12],rax
+ xor eax,eax
+ jmp .Lxh_poll_end
+.Lxh_poll_bad:
+ mov eax,-5
+.Lxh_poll_end:
+ XE 48
+.section .rodata
+.Lxh_call: .asciz "call"
+.Lxh_result: .asciz "result"
+.Lxh_arguments: .asciz "arguments"
+.Lxh_block: .asciz "block"
+.Lxh_before: .asciz "beforeTool"
+.Lxh_after: .asciz "afterTool"
+.Lxh_failure: .asciz "beforeTool hook failed"
+
+.section .rodata
+.Lxh_output: .asciz "output"
+.Lxh_diagnostics: .asciz "diagnostics"

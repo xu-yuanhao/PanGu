@@ -58,6 +58,7 @@ pg_durable_tool_init:
  cmp qword ptr [rsi+24],0
  je .Ldt_init_end
  mov [rdi],rsi
+ mov qword ptr [rdi+176],0
  lea rax,[rip+.Ldt_task_name]
  mov [rdi+8],rax
  mov qword ptr [rdi+16],10
@@ -109,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,4288
+ mov esi,4320
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -224,8 +225,12 @@ pg_durable_tool_init:
  jmp .Ldt_open_call
 .Ldt_open_found:
  mov rdi,r13
- call json_object_get@PLT
- mov [r14+16],rax
+ lea rsi,[r14+16]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldt_open_alloc
+ mov rax,[r14+16]
  DGET rax,name
  mov r13,rax
  mov rdi,rax
@@ -321,6 +326,21 @@ pg_durable_tool_init:
  mov r12,[rsi+56]
  test r12,r12
  jz .Ldt_cleanup_end
+ mov rax,[r12]
+ mov rax,[rax+176]
+ test rax,rax
+ jz .Ldt_cleanup_hook_json
+ cmp qword ptr [r12+4288],0
+ je .Ldt_cleanup_hook_json
+ mov rdi,[rax]
+ mov rsi,[r12+4288]
+ call [rax+16]
+ mov qword ptr [r12+4288],0
+.Ldt_cleanup_hook_json:
+ mov rdi,[r12+4296]
+ call json_object_put@PLT
+ mov rdi,[r12+4304]
+ call json_object_put@PLT
  cmp dword ptr [r12+4236],0
  je .Ldt_cleanup_json
  mov rax,[r12+80]
@@ -713,7 +733,7 @@ pg_durable_tool_init:
  cmp dword ptr [r14+4264],0
  jne .Ldt_poll_final
  cmp dword ptr [r14+4236],0
- jne .Ldt_poll_active
+ jne .Ldt_poll_hook_resume
  mov rax,[r12]
  mov rdi,[rax]
  mov rsi,[rbx+16]
@@ -725,7 +745,8 @@ pg_durable_tool_init:
  jnz .Ldt_poll_unavailable
  mov dword ptr [r14+4236],1
  cmp dword ptr [r14+4244],0
- je .Ldt_poll_intent
+ je .Ldt_poll_before_hooks
+ mov dword ptr [r14+4312],1
  cmp dword ptr [r14+4248],1
  jne .Ldt_poll_interrupted
  mov rax,[r14+56]
@@ -738,6 +759,26 @@ pg_durable_tool_init:
  cmp eax,1
  jne .Ldt_poll_interrupted
  jmp .Ldt_poll_execute
+.Ldt_poll_hook_resume:
+ cmp dword ptr [r14+4312],0
+ jne .Ldt_poll_active
+.Ldt_poll_before_hooks:
+ mov rdi,r12
+ mov rsi,rbx
+ mov rdx,r14
+ mov ecx,1
+ call .Ldt_hooks
+ cmp eax,1
+ je .Ldt_poll_pending
+ cmp eax,2
+ je .Ldt_poll_hook_blocked
+ test eax,eax
+ jnz .Ldt_poll_error
+ mov dword ptr [r14+4312],1
+ jmp .Ldt_poll_intent
+.Ldt_poll_hook_blocked:
+ mov dword ptr [r14+4312],1
+ jmp .Ldt_poll_close
 .Ldt_poll_intent:
  lea rdi,[rip+.Ldt_intent_json]
  call json_tokener_parse@PLT
@@ -877,6 +918,19 @@ pg_durable_tool_init:
 .Ldt_snapshot_mark:
  mov dword ptr [r14+4268],1
 .Ldt_snapshot_done:
+ cmp dword ptr [r14+4316],0
+ jne .Ldt_after_hooks_done
+ mov rdi,r12
+ mov rsi,rbx
+ mov rdx,r14
+ mov ecx,2
+ call .Ldt_hooks
+ cmp eax,1
+ je .Ldt_poll_pending
+ test eax,eax
+ jnz .Ldt_poll_error
+ mov dword ptr [r14+4316],1
+.Ldt_after_hooks_done:
  cmp dword ptr [r14+4236],0
  je .Ldt_poll_final
  mov rax,[r14+80]
@@ -1412,3 +1466,296 @@ pg_durable_tool_observation_release:
 .section .rodata
 .Ldt_usage: .asciz "usage"
 .Ldt_tools_bucket: .asciz "tools"
+.text
+.globl pg_durable_tool_bind_hooks
+.type pg_durable_tool_bind_hooks,@function
+pg_durable_tool_bind_hooks:
+ mov [rdi+176],rsi
+ ret
+/* Runs before intent or before result settlement; a pending hook keeps the
+   executor and its extension scope leased through the next Scheduler poll. */
+.Ldt_hooks:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14d,ecx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rbp,[rbx+176]
+ test rbp,rbp
+ jz .Ldt_hooks_ok
+ cmp qword ptr [r13+4296],0
+ jne .Ldt_hooks_poll
+ cmp r14d,1
+ jne .Ldt_hooks_build
+ cmp qword ptr [rbp+24],0
+ je .Ldt_hooks_build
+ mov rdi,[rbp]
+ mov rsi,[r13+16]
+ call [rbp+24]
+ cmp eax,1
+ jne .Ldt_hooks_validation_error
+.Ldt_hooks_build:
+ call json_object_new_object@PLT
+ mov [r13+4296],rax
+ test rax,rax
+ jz .Ldt_hooks_bad
+ mov rdi,[r13+16]
+ call json_object_get@PLT
+ mov rdi,[r13+4296]
+ lea rsi,[rip+.Ldt_hook_call]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ cmp r14d,2
+ jne .Ldt_hooks_poll
+ mov rdi,[r13+4272]
+ test rdi,rdi
+ jz .Ldt_hooks_new_result
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ jmp .Ldt_hooks_result
+.Ldt_hooks_new_result:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldt_hooks_bad
+.Ldt_hooks_result:
+ lea rdi,[r13+128]
+ mov esi,[r13+4224]
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_hook_output]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ mov edi,[r13+4252]
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_is_error]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ mov rdi,[r13+4296]
+ lea rsi,[rip+.Ldt_hook_result]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_hooks_bad
+.Ldt_hooks_poll:
+ mov rdi,[rbp]
+ mov rsi,[r12+16]
+ mov edx,r14d
+ mov rcx,[r13+4296]
+ lea r8,[r13+4288]
+ lea r9,[r13+4304]
+ call [rbp+8]
+ cmp eax,1
+ je .Ldt_hooks_pending
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ cmp r14d,2
+ je .Ldt_hooks_after
+ DGET "qword ptr [r13+4304]",hook_block
+ test rax,rax
+ jnz .Ldt_hooks_block
+ DGET "qword ptr [r13+4304]",hook_call
+ DGET rax,arguments
+ mov [rsp+16],rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_hooks_bad
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[r13+24]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [r13+24],rax
+ mov qword ptr [rsp+8],0
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[r13+16]
+ lea rsi,[rip+.Ldt_arguments]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ mov rdi,[r13+24]
+ mov esi,256
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Ldt_hooks_bad
+ mov [r13+104],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [r13+112],rax
+ cmp qword ptr [rbp+24],0
+ je .Ldt_hooks_ok
+ mov rdi,[rbp]
+ mov rsi,[r13+16]
+ call [rbp+24]
+ cmp eax,1
+ jne .Ldt_hooks_validation_error
+ jmp .Ldt_hooks_ok
+.Ldt_hooks_validation_error:
+ lea r14,[rip+.Ldt_hook_invalid_arguments]
+ lea r12,[rip+.Ldt_hook_invalid_metadata]
+ test eax,eax
+ jns .Ldt_hooks_validation_text
+ lea r14,[rip+.Ldt_hook_unavailable]
+ lea r12,[rip+.Ldt_hook_unavailable_metadata]
+.Ldt_hooks_validation_text:
+ mov rdi,r14
+ call strlen@PLT
+ mov [r13+4224],rax
+ lea rdi,[r13+128]
+ mov rsi,r14
+ mov rdx,rax
+ call memcpy@PLT
+ mov dword ptr [r13+4232],1
+ mov dword ptr [r13+4252],1
+ mov rdi,r12
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Ldt_hooks_bad
+ mov [r13+4272],rax
+ mov ebx,2
+ jmp .Ldt_hooks_complete
+.Ldt_hooks_block:
+ mov [rsp+16],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ cmp eax,4076
+ jbe .Ldt_hooks_block_length
+ mov eax,4076
+.Ldt_hooks_block_length:
+ mov [rsp+24],rax
+ lea rdi,[r13+128]
+ lea rsi,[rip+.Ldt_hook_prefix]
+ mov edx,19
+ call memcpy@PLT
+ mov rdi,[rsp+16]
+ call json_object_get_string@PLT
+ mov rsi,rax
+ lea rdi,[r13+147]
+ mov rdx,[rsp+24]
+ call memcpy@PLT
+ mov rax,[rsp+24]
+ add rax,19
+ mov [r13+4224],rax
+ mov dword ptr [r13+4232],1
+ mov dword ptr [r13+4252],1
+ lea rdi,[rip+.Ldt_hook_block_metadata]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Ldt_hooks_bad
+ mov [r13+4272],rax
+ mov ebx,2
+ jmp .Ldt_hooks_complete
+.Ldt_hooks_after:
+ DGET "qword ptr [r13+4304]",hook_result
+ mov [rsp+16],rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_hooks_bad
+ DGET "qword ptr [rsp+16]",hook_output
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_hooks_bad
+ mov rdi,[rsp+24]
+ call json_object_get_string_len@PLT
+ cmp eax,4096
+ ja .Ldt_hooks_bad
+ mov [rsp+32],rax
+ DGET "qword ptr [rsp+16]",diagnostics
+ test rax,rax
+ jz .Ldt_hooks_after_copy
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_hooks_bad
+.Ldt_hooks_after_copy:
+ mov rdi,[rsp+24]
+ call json_object_get_string@PLT
+ mov rsi,rax
+ lea rdi,[r13+128]
+ mov rdx,[rsp+32]
+ call memcpy@PLT
+ mov rax,[rsp+32]
+ mov [r13+4224],rax
+ DGET "qword ptr [rsp+16]",is_error
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov [r13+4252],eax
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[r13+4272]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [r13+4272],rax
+ mov qword ptr [rsp+8],0
+.Ldt_hooks_ok:
+ xor ebx,ebx
+ jmp .Ldt_hooks_complete
+.Ldt_hooks_bad:
+ mov ebx,5
+ jmp .Ldt_hooks_end
+.Ldt_hooks_pending:
+ mov ebx,1
+ jmp .Ldt_hooks_end
+.Ldt_hooks_complete:
+ mov rdi,[r13+4296]
+ call json_object_put@PLT
+ mov qword ptr [r13+4296],0
+ mov rdi,[r13+4304]
+ call json_object_put@PLT
+ mov qword ptr [r13+4304],0
+.Ldt_hooks_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_hook_call: .asciz "call"
+.Ldt_hook_result: .asciz "result"
+.Ldt_hook_output: .asciz "output"
+.Ldt_hook_block: .asciz "block"
+.Ldt_hook_prefix: .asciz "Tool call blocked: "
+.Ldt_hook_block_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"blocked\",\"message\":\"Tool call blocked\"}]}"
+
+.section .rodata
+.Ldt_hook_invalid_arguments: .asciz "Tool arguments are invalid"
+.Ldt_hook_unavailable: .asciz "Tool is not available"
+.Ldt_hook_invalid_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"invalid_arguments\",\"message\":\"Tool arguments are invalid\"}]}"
+.Ldt_hook_unavailable_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"tool_unavailable\",\"message\":\"Tool is not available\"}]}"
