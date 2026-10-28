@@ -4,6 +4,7 @@
 /* Owned {templates:[],diagnostics:[]} snapshot. Absolute optional roots, user
    before project. Markdown children only, preserving source order/duplicates. */
 int pg_prompt_templates_load(const char *,const char *,struct json_object **);
+/* Extra absolute strings or owning-scope source descriptors. */
 int pg_prompt_templates_load_config(const char *,const char *,const struct json_object *,struct json_object **);
 /* Quotes group arguments; values/defaults are substituted once. All output
    buffers must be disjoint from borrowed inputs; failure clears output/size. */

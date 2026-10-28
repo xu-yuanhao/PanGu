@@ -141,17 +141,17 @@ def main():
                             *prompt_flags, '-o', prompt_test], check=True)
             subprocess.run([prompt_test], check=True, timeout=15)
             skills_test = str(Path(directory) / 'test-skills')
-            skills_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1'], text=True).split()
+            skills_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'),
+                            implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'), implementation('src/runtime/resource_select'), implementation('src/runtime/resource_match_posix'), *PATH_SOURCES,
                             str(ROOT / 'tests/runtime/test_skills.c'), *skills_flags, '-o', skills_test], check=True)
             subprocess.run([skills_test], check=True, timeout=15)
             templates_test = str(Path(directory) / 'test-templates')
-            templates_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8'], text=True).split()
+            templates_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'), implementation('src/runtime/prompt_templates'),
+                            implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'), implementation('src/runtime/resource_select'), implementation('src/runtime/resource_match_posix'), *PATH_SOURCES, implementation('src/runtime/prompt_templates'),
                             str(ROOT / 'tests/runtime/test_prompt_templates.c'), *templates_flags, '-o', templates_test], check=True)
             subprocess.run([templates_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_prompt_templates.py'), '--binary', templates_test], check=True, timeout=30)
@@ -159,13 +159,19 @@ def main():
             settings_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ('settings', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix')],
+                            *[implementation('src/runtime/' + name) for name in ('settings', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix', 'resource_select', 'resource_match_posix')],
                             str(ROOT / 'tests/runtime/test_settings.c'), *settings_flags, '-o', settings_test], check=True)
             subprocess.run([settings_test], check=True, timeout=15)
+            select_test = str(Path(directory) / 'test-resource-select')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            implementation('src/runtime/resource_select'), implementation('src/runtime/resource_match_posix'), *PATH_SOURCES,
+                            str(ROOT / 'tests/runtime/test_resource_select.c'), *settings_flags, '-o', select_test], check=True)
+            subprocess.run([select_test], check=True, timeout=15)
             resources_test = str(Path(directory) / 'test-resources')
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
-                            *[implementation('src/runtime/' + name) for name in ('resources', 'skills', 'skills_posix', 'prompt_templates')],
+                            *[implementation('src/runtime/' + name) for name in ('resources', 'skills', 'skills_posix', 'prompt_templates', 'resource_select', 'resource_match_posix', 'tool_path', 'tool_path_posix')],
                             str(ROOT / 'tests/runtime/test_resources.c'), '-Wl,--wrap=json_object_object_add', *templates_flags, '-o', resources_test], check=True)
             subprocess.run([resources_test], check=True, timeout=15)
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()

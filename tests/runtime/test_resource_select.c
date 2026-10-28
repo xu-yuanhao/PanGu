@@ -1,0 +1,12 @@
+#define _XOPEN_SOURCE 700
+#include "../../src/runtime/resource_select.h"
+#include <assert.h>
+#include <json-c/json.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+static void selected(const char *path,const char *patterns,int defaults,int expected){json_object *source=json_object_new_object(),*array=json_tokener_parse(patterns);assert(source&&array);assert(!json_object_object_add(source,"base",json_object_new_string("/tmp/agent")));assert(!json_object_object_add(source,"patterns",array));assert(!json_object_object_add(source,"defaults",json_object_new_boolean(defaults)));assert(pg_resource_selected(path,source)==expected);json_object_put(source);}
+int main(int argc,char **argv){if(argc==2&&!strcmp(argv[1],"--cases")){char *line=0;size_t capacity=0;while(getline(&line,&capacity,stdin)>=0){json_object *value=json_tokener_parse(line);assert(value);int result=pg_resource_glob(json_object_get_string(json_object_object_get(value,"pattern")),json_object_get_string(json_object_object_get(value,"path")));printf("%d\n",result);json_object_put(value);}free(line);return 0;}
+ selected("/tmp/agent/skills/keep/SKILL.md","[\"!skills/**\",\"+skills/keep\"]",1,1);selected("/tmp/agent/skills/drop/SKILL.md","[\"!skills/**\",\"+skills/keep\"]",1,0);selected("/tmp/agent/skills/keep/SKILL.md","[\"-skills/keep\",\"+skills/keep\"]",1,0);selected("/tmp/agent/skills/keep/SKILL.md","[\"!keep\",\"+keep\"]",1,0);selected("/tmp/agent/skills/keep/SKILL.md","[\"!keep\",\"+./skills/keep\"]",1,1);
+ selected("/tmp/agent/extras/keep.md","[\"*.md\"]",0,1);selected("/tmp/agent/extras/drop.txt","[\"*.md\"]",0,0);selected("/tmp/agent/extras/drop.txt","[\"*.md\"]",1,1);selected("/tmp/team/SKILL.md","[\"!../team\"]",1,0);selected("/tmp/team/SKILL.md","[\"!**\",\"+/tmp/team\"]",1,1);selected("/tmp/agent/.hidden.md","[\"!*.md\"]",1,1);
+ assert(pg_resource_glob("**/*.md","a/b/file.md")==1);assert(pg_resource_glob("**/*.md","file.md")==1);assert(pg_resource_glob("**/*.md","a/.hidden/file.md")==0);assert(pg_resource_glob("{one,two}/?.md","two/a.md")==1);assert(pg_resource_glob("{03..01}.md","02.md")==1);assert(pg_resource_glob("{-2..2..2}.md","1.md")==0);assert(pg_resource_glob("{a..e..2}.md","c.md")==1);assert(pg_resource_glob("{#foo,bar}","#foo")==1);assert(pg_resource_glob("?","🎉")==0&&pg_resource_glob("??","🎉")==1);puts("PASS: scoped resource include/exclude/force selection, skill-parent and glob path variants");}

@@ -164,6 +164,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 用户/项目默认prompt templates与显式技能命令接入前台提交：引号参数、位置/全部参数、默认值和切片单次展开；/skill:name读取当前正文（含禁用自动调用的技能），展开后的实际输入进入Durable持久执行。
 - [x] 用户/项目settings.json接入资源调用链：保留两层及递归覆盖结果，BOM/缺失/错误诊断，skills/prompts中的普通文件与目录路径按所属作用域解析，复用实际技能发现和模板提交。
 - [x] 核心resources服务接通配置/技能/模板/系统提示的空闲整体刷新、失败保留、独立快照与前台展开；提供Host服务和可选TUI资源操作表，真实模型验证刷新前后及失败后的继续执行。
+- [x] 应用资源选择接入默认/配置目录：`!`/`+`/`-`优先级、显式资源优先和同层项目优先；筛选先于同名采纳，记录已排除路径避免自动发现重新加入，模板按应用名称去重；常见glob、brace/range与1978组固定上游匹配对照通过。
 - [ ] 完成项目/用户配置优先级、AGENTS上下文、system/append/section、skills、prompt templates和资源刷新；配置解析与资源加载成为服务；内置提示词保留参考机制并适配PanGu自称、`.pangu`目录、配置与实际入口。
 - [ ] 完成 MCP stdio/HTTP客户端的发现、调用、取消、认证与清理，并转成现有Tools接口。
 - [ ] 对照 Pi codemode 的工具能力隔离、声明生成和持久嵌套调用，通过QuickJS的C接口完成原生桥接；完成tool search后动态工具声明与实际执行同步。
@@ -221,8 +222,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 resource-loader.ts reload/getSkills/getPromptTemplates、agent-session.ts reload和interactive-mode.ts handleReloadCommand（流/压缩运行时等待）；与已获取origin/main比较相关源码无差异，Harness仍固定22ddee3792402c3e70ec5f86a63c3e3e895a2f60。
-- 实际调用链：Agent组合注入resource_build/busy → Assembly pg_resources_open/reload → 配置/技能/模板/系统提示完整候选 → 更新当前model configuration的systemPrompt并整体采纳 → resources.expand → 原有Durable提交。前台使用同一资源服务；实际产品Host导出resources。刷新成功递增revision，失败保持原目录和提示；配置值从公开快照省略，快照完全独立。
-- 验证：资源服务专项ASan/UBSan覆盖候选失败、畸形目录、配置采纳失败、忙/重入、快照修改隔离和关闭；Runtime整批回归通过。实际产品组合/可选TUI绑定、配置路径/新增技能/模板与系统提示刷新、失败保留的离线验证通过，并覆盖提交后首poll前的busy窗口。真实DeepSeek刷新前后使用不同模板和系统token，超长提示刷新失败后仍完成原模板工具调用。最终产品构建、PTY目录/恢复/终端验证、Assembly和隔离核心G00通过。
-- 接口与自审：新增resources.lifecycle.local.v0，pg_resources为64字节、候选32字节；public pg_resource_ops为40字节（context/reload/snapshot/release/expand）。TUI可弱查询pg_tui_runtime_resources(&ops)，仅匹配当前有效产品绑定；借用表至关闭，snapshot返回owned JSON须release。旧TUI/Client布局、枚举保持。候选生命周期/采纳/快照/展开为Assembly，C仅组合现有资源与平台桥接。新增源/模块/实际构建登记自审通过；并行TUI与规划文档修改保持未提交。
-- 剩余与下一交付物：TUI线消费新资源表完成刷新交互；K11继续资源选择模式、忽略文件、完整设置字段消费者、诊断/选择控件、MCP/代码工具。K09扩展模块刷新按其生命周期条目完成；其余K项保持完整覆盖表范围。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 package-manager.ts resolve/splitPatterns/isEnabledByOverrides/applyPatterns/路径变体匹配，resource-loader.ts dedupePrompts与项目资源碰撞用例；依赖锁定minimatch10.2.6、brace-expansion5.0.12，范围算法保留MIT来源。固定快照继续采用，已获取上游package-manager差异仅npm安装参数。
+- 实际调用链：作用域设置 → Assembly来源描述符（显式路径先于自动目录、各层项目先于用户）→ 技能/模板发现 → !/+/-选择 → 已选名称/规范文件去重 → 原有资源候选/系统提示/前台命令。默认目录只应用覆盖规则，显式路径再应用正向glob；SKILL.md同时匹配父目录变体，强制选择使用精确路径。被排除的同一路径记录发现状态，自动目录不重新启用；不同路径同名可由后继已选资源接替。
+- 验证：选择、目录碰撞、显式优先与排除后不重新加入的真实文件树专项ASan/UBSan通过；1978组常见glob/brace/范围/UTF-16匹配与固定minimatch原函数对照通过。发现应用级优先级与旧底层便捷加载顺序不同后按上游碰撞用例修正，最终Runtime整批回归、产品构建、Assembly及隔离核心G00通过。真实DeepSeek验证屏蔽同名默认资源、强制恢复配置技能/模板及项目同名技能/模板优先，完成实际read/write/bash。
+- 接口与自审：新增resources.selection.local.v0；Assembly处理来源顺序、相对路径、优先级、globstar/brace/range与JS UTF-16单元匹配适配，C仅桥接libc fnmatch/scoped locale。pg_settings_resource_sources输出owned来源描述符，现有加载入口共用同一实现接收字符串或描述符，应用模板增加名称去重与碰撞诊断。删除组合层重复的默认目录构造，新增源/依赖/构建登记自审通过；并行TUI与规划文档保持原位。
+- 剩余与下一交付物：K11继续忽略文件、Minimatch的POSIX类/少见嵌套brace等剩余边界、来源/诊断交互、完整设置字段消费者及MCP/代码工具；原生匹配继续保留显式长度/容量与展开限制。TUI资源表及其他K项保持原覆盖表范围。

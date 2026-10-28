@@ -30,6 +30,7 @@ SOFTWARE.*/
 .Lcanonical: .asciz "canonical"
 .Lkind: .asciz "kind"
 .Lbody: .asciz "body"
+.Ldefaults: .asciz "defaults"
 .Ldisabled: .asciz "disable-model-invocation"
 .Lfile: .asciz "filePath"
 .Lbase: .asciz "baseDir"
@@ -185,7 +186,7 @@ pg_skills_load:
 .globl pg_skills_load_config
 .type pg_skills_load_config,@function
 pg_skills_load_config:
- enter 80
+ enter 96
  mov [rsp+56],rdx
  mov rdx,rcx
  mov rbx,rdi
@@ -199,6 +200,8 @@ pg_skills_load_config:
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
  mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+72],0
+ mov qword ptr [rsp+88],0
  call json_object_new_array@PLT
  mov [rsp],rax
  test rax,rax
@@ -216,6 +219,10 @@ pg_skills_load_config:
  add r14,8
  cmp r14,40
  jb .Lload_maps
+ call json_object_new_object@PLT
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lload_fail
  test rbx,rbx
  jz .Lload_project
  mov rdi,rsp
@@ -252,9 +259,30 @@ pg_skills_load_config:
  mov rdi,[rsp+56]
  mov rsi,[rsp+64]
  call json_object_array_get_idx@PLT
+ mov [rsp+72],rax
  mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz 1f
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lpath]
+ call .Lfield
+ jmp 2f
+1: mov rdi,[rsp+72]
+ mov qword ptr [rsp+72],0
  call json_object_get_string@PLT
- mov rsi,rax
+2: test rax,rax
+ jz .Lload_fail
+ mov [rsp+80],rax
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov qword ptr [rsp+32],0
+ call json_object_new_object@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lload_fail
+ mov rsi,[rsp+80]
  mov rdi,rsp
  call .Lload_path
  test eax,eax
@@ -291,11 +319,13 @@ pg_skills_load_config:
  add r14,8
  cmp r14,48
  jb 1b
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
  mov eax,[rsp+48]
- exit 80
+ exit 96
 .Lload_invalid:
  mov eax,4
- exit 80
+ exit 96
 .size pg_skills_load_config,.-pg_skills_load_config
 /* An explicit path is a directory or a Markdown file. */
 .Lload_path:
@@ -352,7 +382,18 @@ pg_skills_load_config:
  cmp eax,5
  je .Lpath_end
 .Lpath_warning:
- mov rdi,rbx
+ mov rdi,[rbx+72]
+ test rdi,rdi
+ jz 1f
+ lea rsi,[rip+.Ldefaults]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz 1f
+ xor eax,eax
+ jmp .Lpath_end
+1: mov rdi,rbx
  mov rsi,r12
  lea rdx,[rip+.Lread_error]
  call .Ldiag
@@ -819,6 +860,26 @@ pg_resource_trim:
  lea rsi,[rip+.Lpath]
  call .Lfield
  mov r13,rax
+ cmp qword ptr [rbx+72],0
+ je .Lfile_select
+ mov rdi,[rbx+88]
+ mov rsi,r13
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lfile_ok
+ mov rdi,[rbx+88]
+ mov rsi,r13
+ mov rdx,r13
+ call .Lstring
+ test eax,eax
+ jnz .Lfile_memory
+.Lfile_select:
+ mov rdi,r13
+ mov rsi,[rbx+72]
+ call pg_resource_selected
+ test eax,eax
+ js .Lfile_memory
+ jz .Lfile_ok
  mov rdi,r12
  lea rsi,[rip+.Lcanonical]
  call .Lfield

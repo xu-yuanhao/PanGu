@@ -18,6 +18,7 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
+| 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
 | 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
 | 设置与资源路径 | `settings.S`：用户/项目JSON层、递归覆盖与错误诊断、独立所有权；配置skills/prompts的普通文件/目录进入技能发现与模板命令，路径相对所属配置目录解析 |
 | 提示模板/显式技能 | `prompt_templates.S`：用户/项目Markdown模板、引号参数、位置/全部/默认/切片参数单次替换；前台/模板和/skill:name展开后进入持久Submission，显式技能读取当前正文 |
@@ -26,9 +27,9 @@
 
 ## 本批验证与集成状态
 
-- resources服务统一持有配置层、技能、模板和系统提示，刷新仅在当前run空闲时执行；完整候选成功后更新模型提示并统一采纳，失败继续使用原版本。前台展开和Host/TUI查询共用该服务。
-- 资源专项ASan/UBSan、Runtime整批回归、实际产品组合/可选TUI绑定、最终产品构建与现有离线PTY通过；Assembly及隔离核心G00通过。提交后首poll前也按活动run拒绝刷新。
-- 真实DeepSeek验证刷新前后模板/提示改变，失败刷新后原模板仍完成真实工具执行；新增技能通过实际快照与系统提示核对。TUI刷新控件、资源选择模式与忽略规则继续随K11推进。
+- 配置与默认资源共用带作用域的来源描述符：显式资源优先、同层项目优先；`!`/`+`/`-`优先级在名称采纳前应用，自动发现不会重新加入已排除路径。应用模板按名称去重并报告碰撞。
+- 原生选择/目录/优先级专项ASan/UBSan、1978组固定minimatch函数对照、最终Runtime回归与产品构建通过；Assembly及隔离核心G00通过。
+- 真实DeepSeek通过配置筛选/强制恢复、项目同名技能与模板优先、显式技能当前正文和实际工具执行。忽略规则、POSIX类/少见brace边界与其余K11范围继续推进。
 
 ## 当前接口边界
 

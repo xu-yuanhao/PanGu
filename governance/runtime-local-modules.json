@@ -1931,9 +1931,10 @@
         "libyaml",
         "libutf8proc",
         "system libc",
-        "client.contract.v0"
+        "client.contract.v0",
+        "resources.selection.local.v0"
       ],
-      "role": "Assembly skills discovery, user-first collision handling, canonical file/directory deduplication, YAML metadata validation and escaped model-visible prompt; C bridges POSIX/libyaml layouts",
+      "role": "Assembly skills discovery, ordered collision handling, canonical file/directory deduplication, YAML metadata validation and escaped model-visible prompt; C bridges POSIX/libyaml layouts",
       "exports": [
         "pg_skills_load",
         "pg_skills_prompt",
@@ -1973,7 +1974,8 @@
         "resources.skills.local.v0",
         "json-c",
         "libutf8proc",
-        "libpcre2-8"
+        "libpcre2-8",
+        "resources.selection.local.v0"
       ],
       "role": "Assembly user/project prompt-template catalogs, quoted args and exact single-pass placeholder substitution; explicit skill expansion reads current body; product foreground submit consumer",
       "exports": [
@@ -2011,11 +2013,12 @@
         "json-c",
         "system libc"
       ],
-      "role": "Assembly settings JSON layers, soft file diagnostics, detached recursive object merge and owning-scope plain resource path resolution; product loads configured skill/template files and directories with existing default consumers",
+      "role": "Assembly settings JSON layers, detached recursive object merge and scoped source descriptors; explicit resources before automatic defaults and project before user in each layer; actual skill/template consumers",
       "exports": [
         "pg_settings_merge",
         "pg_settings_load",
-        "pg_settings_resource_paths"
+        "pg_settings_resource_paths",
+        "pg_settings_resource_sources"
       ],
       "reference_basis": [
         {
@@ -2070,6 +2073,53 @@
             "packages/coding-agent/test/resource-loader.test.ts",
             "packages/coding-agent/test/skills.test.ts",
             "packages/coding-agent/test/prompt-templates.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resources.selection.local.v0",
+      "sources": [
+        "src/runtime/resource_select.S",
+        "src/runtime/resource_select.h",
+        "src/runtime/resource_match_posix.c"
+      ],
+      "dependencies": [
+        "json-c",
+        "system libc",
+        "tools.path.local.v0",
+        "libutf8proc"
+      ],
+      "role": "Assembly owning-scope resource filters, file and SKILL parent variants, default overrides versus explicit positive includes, !/+/- precedence; native globstar/brace dispatch over scoped libc fnmatch",
+      "exports": [
+        "pg_resource_selected",
+        "pg_resource_glob",
+        "pg_resource_fnmatch"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/core/package-manager.ts",
+            "packages/coding-agent/src/core/resource-loader.ts"
+          ],
+          "semantics": "splitPatterns, isEnabledByOverrides, applyPatterns, matchesAnyPattern and matchesAnyExactPattern before selected skills are deduplicated; DefaultPackageManager.resolve ordering and DefaultResourceLoader project-resource collision preference, filtering before name adoption",
+          "tests_to_read": [
+            "packages/coding-agent/test/package-manager.test.ts",
+            "packages/coding-agent/test/resource-loader.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/package.json",
+            "package-lock.json"
+          ],
+          "semantics": "pinned minimatch 10.2.6 and brace-expansion 5.0.12 matching behavior; numeric/alphabetic sequence expansion, padding/step/count rules; adapted range algorithm retains MIT copyright notices",
+          "tests_to_read": [
+            "packages/coding-agent/test/package-manager.test.ts"
           ]
         }
       ]

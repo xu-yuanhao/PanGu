@@ -8,7 +8,8 @@ struct json_object;
    roots and all output storage are disjoint. Failure leaves *out NULL.
    Symlink identities are deduplicated; traversal is bounded at 64 levels. */
 int pg_skills_load(const char *,const char *,struct json_object **out);
-/* Extra absolute file/directory paths follow defaults and share deduplication. */
+/* Extra absolute file/directory strings or resource source descriptors follow
+   defaults and share deduplication; filters run before metadata/name adoption. */
 int pg_skills_load_config(const char *,const char *,const struct json_object *,struct json_object **);
 /* reader 0=read, 1=bash, 2=indirect, 3=unavailable. XML escapes all resource data.
    Caller owns disjoint output; failure clears output and size. */

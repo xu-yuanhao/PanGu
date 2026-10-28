@@ -12,5 +12,8 @@ int pg_settings_load(const char *,const char *,struct json_object **);
 /* Resolve plain resource paths in each owning scope. Caller owns JSON array;
    root and inputs borrowed. Relative paths use the corresponding base directory.
    Native configuration paths are bounded to 4095 bytes. */
+/* Application source descriptors: explicit before auto-discovered,
+   project before user within each layer, with owning-scope filters. */
+int pg_settings_resource_sources(const struct json_object *,const char *,const char *,const char *,struct json_object **);
 int pg_settings_resource_paths(const struct json_object *,const char *,const char *,const char *,struct json_object **);
 #endif

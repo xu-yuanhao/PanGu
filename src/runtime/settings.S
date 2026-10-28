@@ -27,6 +27,9 @@ SOFTWARE.*/
 .Lsettings: .asciz "settings"
 .Ldiagnostics: .asciz "diagnostics"
 .Lbody: .asciz "body"
+.Lpatterns: .asciz "patterns"
+.Lbase: .asciz "base"
+.Ldefaults: .asciz "defaults"
 .Ltype: .asciz "type"
 .Lwarning: .asciz "warning"
 .Lmessage: .asciz "message"
@@ -408,7 +411,16 @@ pg_settings_load:
 .globl pg_settings_resource_paths
 .type pg_settings_resource_paths,@function
 pg_settings_resource_paths:
+ xor r9d,r9d
+ jmp .Lpaths
+.size pg_settings_resource_paths,.-pg_settings_resource_paths
+.globl pg_settings_resource_sources
+.type pg_settings_resource_sources,@function
+pg_settings_resource_sources:
+ mov r9d,1
+.Lpaths:
  enter 8320
+ mov [rsp+8256],r9d
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -423,6 +435,59 @@ pg_settings_resource_paths:
  mov [rsp+8192],rax
  test rax,rax
  jz .Lpaths_fail
+ mov qword ptr [rsp+8272],0
+ mov qword ptr [rsp+8264],0
+ cmp dword ptr [rsp+8256],0
+ je .Lpaths_scope
+ mov qword ptr [rsp+8200],1
+ jmp .Lpaths_scope
+.Lpaths_default_scope:
+ lea rsi,[rip+.Lglobal]
+ mov rax,r13
+ cmp qword ptr [rsp+8200],0
+ je 1f
+ lea rsi,[rip+.Lproject]
+ mov rax,r14
+1: mov [rsp+8208],rax
+ test rax,rax
+ jz .Lpaths_default_next
+ mov rdi,rbx
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call json_object_object_get@PLT
+ mov [rsp+8216],rax
+ test rax,rax
+ jz 2f
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lpaths_fail
+2: lea rdi,[rsp+4096]
+ mov esi,4096
+ lea rdx,[rip+.Ljoin]
+ mov rcx,[rsp+8208]
+ mov r8,r12
+ xor eax,eax
+ call snprintf@PLT
+ test eax,eax
+ js .Lpaths_fail
+ cmp eax,4096
+ jae .Lpaths_fail
+ lea rdi,[rsp+4096]
+ movsxd rsi,eax
+ mov rdx,rsp
+ mov ecx,4096
+ call pg_tool_path_resolve
+ test eax,eax
+ jnz .Lpaths_fail
+ jmp .Lpaths_resolved
+.Lpaths_default_next:
+ cmp qword ptr [rsp+8200],1
+ jne .Lpaths_done
+ mov qword ptr [rsp+8200],0
+ jmp .Lpaths_default_scope
 .Lpaths_scope:
  lea rsi,[rip+.Lglobal]
  mov rax,r13
@@ -466,8 +531,25 @@ pg_settings_resource_paths:
  mov [rsp+8240],rax
  mov rdi,[rsp+8232]
  call json_object_get_string@PLT
- mov rsi,[rsp+8240]
+ mov [rsp+8280],rax
+ cmp byte ptr [rax],'!'
+ je .Lpaths_skip
+ cmp byte ptr [rax],'+'
+ je .Lpaths_skip
+ cmp byte ptr [rax],'-'
+ je .Lpaths_skip
  mov rdi,rax
+ mov esi,'*'
+ call strchr@PLT
+ test rax,rax
+ jnz .Lpaths_skip
+ mov rdi,[rsp+8280]
+ mov esi,'?'
+ call strchr@PLT
+ test rax,rax
+ jnz .Lpaths_skip
+ mov rsi,[rsp+8240]
+ mov rdi,[rsp+8280]
  call pg_resource_trim
  mov rdi,rax
  mov rsi,rdx
@@ -497,6 +579,18 @@ pg_settings_resource_paths:
  test eax,eax
  jnz .Lpaths_fail
 .Lpaths_resolved:
+ cmp dword ptr [rsp+8256],0
+ je .Lpaths_string
+ mov rdi,[rsp+8192]
+ mov rsi,rsp
+ mov rdx,[rsp+8208]
+ mov rcx,[rsp+8216]
+ mov r8d,[rsp+8264]
+ call .Lpaths_descriptor
+ test eax,eax
+ jnz .Lpaths_fail
+ jmp .Lpaths_emitted
+.Lpaths_string:
  mov rdi,rsp
  call json_object_new_string@PLT
  test rax,rax
@@ -510,12 +604,30 @@ pg_settings_resource_paths:
  mov rdi,[rsp+8248]
  call json_object_put@PLT
  jmp .Lpaths_fail
-2: inc qword ptr [rsp+8224]
+2:
+.Lpaths_emitted:
+ cmp qword ptr [rsp+8272],0
+ jne .Lpaths_default_next
+.Lpaths_skip:
+ inc qword ptr [rsp+8224]
  jmp .Lpaths_loop
 .Lpaths_next_scope:
+ cmp dword ptr [rsp+8256],0
+ je .Lpaths_plain_next
+ cmp qword ptr [rsp+8200],1
+ jne .Lpaths_start_defaults
+ mov qword ptr [rsp+8200],0
+ jmp .Lpaths_scope
+.Lpaths_start_defaults:
+ mov qword ptr [rsp+8200],1
+ mov qword ptr [rsp+8272],1
+ mov qword ptr [rsp+8264],1
+ jmp .Lpaths_default_scope
+.Lpaths_plain_next:
  inc qword ptr [rsp+8200]
  cmp qword ptr [rsp+8200],2
  jb .Lpaths_scope
+.Lpaths_done:
  mov rax,[rsp+8192]
  mov [r15],rax
  xor eax,eax
@@ -528,5 +640,65 @@ pg_settings_resource_paths:
 .Lpaths_invalid:
  mov eax,4
  exit 8320
-.size pg_settings_resource_paths,.-pg_settings_resource_paths
+.size pg_settings_resource_sources,.-pg_settings_resource_sources
+/* path + owning base/patterns and source kind, retained for synchronous loading. */
+.Lpaths_descriptor:
+ enter 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15d,r8d
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldescriptor_fail
+ mov rdi,rax
+ lea rsi,[rip+.Lpath]
+ mov rdx,r12
+ call .Lset_string
+ test eax,eax
+ jnz .Ldescriptor_drop
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lbase]
+ mov rdx,r13
+ call .Lset_string
+ test eax,eax
+ jnz .Ldescriptor_drop
+ test r14,r14
+ jz 1f
+ mov rdi,r14
+ call json_object_get@PLT
+ jmp 2f
+1: call json_object_new_array@PLT
+2: test rax,rax
+ jz .Ldescriptor_drop
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lpatterns]
+ mov rdx,rax
+ call .Lset_owned
+ test eax,eax
+ jnz .Ldescriptor_drop
+ mov edi,r15d
+ call json_object_new_boolean@PLT
+ test rax,rax
+ jz .Ldescriptor_drop
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldefaults]
+ mov rdx,rax
+ call .Lset_owned
+ test eax,eax
+ jnz .Ldescriptor_drop
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Ldescriptor_end
+.Ldescriptor_drop:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ldescriptor_fail:
+ mov eax,5
+.Ldescriptor_end:
+ exit 16
 .section .note.GNU-stack,"",@progbits

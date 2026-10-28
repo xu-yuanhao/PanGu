@@ -257,6 +257,15 @@
     "src/runtime/resources.S": {
       "role": "assembly-core",
       "reason": "手写资源服务候选构建/采纳、空闲刷新、失败保留、版本/独立快照和前台展开；借用配置与明确所有权"
+    },
+    "src/runtime/resource_select.S": {
+      "role": "assembly-core",
+      "reason": "手写所属作用域资源选择、globstar/brace调度、相对路径与文件/技能目录匹配、包含/排除/强制优先级"
+    },
+    "src/runtime/resource_match_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "external-library",
+      "reason": "仅libc fnmatch及scoped UTF-8 locale的外部ABI桥接；选择/路径/globstar逻辑在Assembly"
     }
   }
 }

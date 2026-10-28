@@ -356,12 +356,18 @@ def configured_resource_workflow(binary, root, environment):
     (extras / 'guide.md').write_text('---\nname: config-recipe\ndescription: Read the configured private payload and create configured.txt.\n---\nUse read to inspect payload.txt relative to this skill directory. Write configured.txt in the workspace with that exact content followed by _CONFIG. Reply with that final content.\n')
     (extras / 'payload.txt').write_text(marker)
     (prompts / 'user-recipe.md').write_text('Use write to create user-result.txt containing exactly "$1" without the quotes. Reply with its exact content.\n')
-    (agent / 'settings.json').write_text(json.dumps({'skills':['extras/guide.md'],'prompts':['templates']}))
+    blocked_skill = agent / 'skills' / 'blocked'
+    blocked_skill.mkdir(parents=True)
+    (blocked_skill / 'SKILL.md').write_text('---\nname: config-recipe\ndescription: WRONG_BLOCKED_USER_SKILL\n---\nWrite WRONG to configured.txt.\n')
+    blocked_prompts = agent / 'prompts'
+    blocked_prompts.mkdir()
+    (blocked_prompts / 'user-recipe.md').write_text('Write WRONG to user-result.txt.\n')
+    (agent / 'settings.json').write_text(json.dumps({'skills':['extras/guide.md','!**','+extras/guide.md'],'prompts':['templates','!*.md','+templates/user-recipe.md']}))
     team = workspace / 'team'
     team.mkdir()
     (team / 'SKILL.md').write_text('---\nname: project-team\ndescription: Project-configured team instructions.\n---\nProject team body.\n')
     (workspace / 'project-recipe.md').write_text('Use write to create project-result.txt containing exactly "$1" without the quotes. Reply with its exact content.\n')
-    (private / 'settings.json').write_text(json.dumps({'skills':['../team'],'prompts':['../project-recipe.md']}))
+    (private / 'settings.json').write_text(json.dumps({'skills':['../team'],'prompts':['../project-recipe.md','!*.md','+../project-recipe.md']}))
     env = dict(environment, PANGU_AGENT_DIR=str(agent))
     env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
     terminal = Terminal(binary, workspace, env)
@@ -379,7 +385,7 @@ def configured_resource_workflow(binary, root, environment):
         terminal.finish()
     finally:
         terminal.close()
-    print('PASS: actual user/project settings load, configured skill discovery/read, user template directory and project relative template file', flush=True)
+    print('PASS: actual scoped selection, blocked same-name defaults, forced skill/template includes and user/project model workflows', flush=True)
 
 def template_workflow(binary, root, environment):
     workspace = root / 'template-workflow'
@@ -390,7 +396,8 @@ def template_workflow(binary, root, environment):
     (prompts / 'recipe.md').write_text('---\ndescription: Write and verify a supplied value\nargument-hint: "[value]"\n---\nUse write to create template.txt containing exactly "$1" without the surrounding quotes, then bash to read template.txt. Reply with its exact contents.\n')
     project = workspace / '.pangu' / 'prompts'
     project.mkdir(parents=True)
-    (project / 'recipe.md').write_text('Write WRONG_PROJECT_TEMPLATE to template.txt.')
+    (project / 'recipe.md').write_text((prompts / 'recipe.md').read_text())
+    (prompts / 'recipe.md').write_text('Write WRONG_USER_TEMPLATE to template.txt.')
     skill = agent / 'skills' / 'manual'
     skill.mkdir(parents=True)
     header = '---\nname: manual\ndescription: Disabled automatic recipe\ndisable-model-invocation: true\n---\n'
@@ -433,7 +440,7 @@ def template_workflow(binary, root, environment):
     contents = [value.get('model', [{}])[0].get('content', '') for value in saved]
     assert any(isinstance(text, str) and marker in text and not text.startswith('/recipe') for text in contents)
     assert any(isinstance(text, str) and text.startswith('<skill name="manual"') and manual in text and 'Also use bash' in text for text in contents)
-    print('PASS: actual template command, user-first recipe, literal placeholder arguments and fresh explicit disabled skill body committed through Durable', flush=True)
+    print('PASS: actual template command, project-first recipe, literal placeholder arguments and fresh explicit disabled skill body committed through Durable', flush=True)
 
 def skill_workflow(binary, root, environment):
     workspace = root / 'skill-workflow'
@@ -446,7 +453,10 @@ def skill_workflow(binary, root, environment):
     (skill / 'payload.txt').write_text(marker)
     project = workspace / '.pangu' / 'skills' / 'verification-recipe'
     project.mkdir(parents=True)
-    (project / 'SKILL.md').write_text('---\nname: verification-recipe\ndescription: WRONG_PROJECT_SKILL\n---\nWrong duplicate.\n')
+    (project / 'SKILL.md').write_text((skill / 'SKILL.md').read_text())
+    (skill / 'payload.txt').rename(project / 'payload.txt')
+    (skill / 'SKILL.md').write_text('---\nname: verification-recipe\ndescription: WRONG_USER_SKILL\n---\nWrong duplicate.\n')
+    skill = project
     hidden = project.parent / 'hidden'
     hidden.mkdir()
     (hidden / 'SKILL.md').write_text('---\nname: hidden\ndescription: DISABLED_SKILL_DESCRIPTION\ndisable-model-invocation: true\n---\nHidden.\n')
@@ -487,7 +497,7 @@ def skill_workflow(binary, root, environment):
         assert (workspace / 'result.txt').read_text().strip() == marker + '_SKILL'
         assert (marker + '_SKILL').encode() in output
         assert saved and any(str(skill / 'SKILL.md') in prompt for prompt in saved)
-        assert all('WRONG_PROJECT_SKILL' not in prompt and 'DISABLED_SKILL_DESCRIPTION' not in prompt and marker not in prompt for prompt in saved)
+        assert all('WRONG_USER_SKILL' not in prompt and 'DISABLED_SKILL_DESCRIPTION' not in prompt and marker not in prompt for prompt in saved)
         terminal.send(b'\x04')
         terminal.finish()
     finally:
@@ -511,7 +521,7 @@ def skill_workflow(binary, root, environment):
                     pass
     for path in [skill / 'SKILL.md', skill / 'payload.txt']:
         assert any(result.get('model', [{}])[0].get('toolName') == 'read' and result.get('data', {}).get('arguments', {}).get('path') == str(path) for result in results), 'skill-relative read missing'
-    print('PASS: actual model skill discovery, user-first collision, disabled visibility, on-demand skill/payload reads and workspace write', flush=True)
+    print('PASS: actual model skill discovery, project-first collision, disabled visibility, on-demand skill/payload reads and workspace write', flush=True)
 
 def thinking_workflow(binary, root, environment):
     root = root / 'thinking-workflow'

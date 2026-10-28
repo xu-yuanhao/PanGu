@@ -617,6 +617,11 @@
     "src/runtime/resources.h": "native-source",
     "tests/runtime/test_resources.c": "native-test",
     "tests/runtime/test_product_resources.c": "native-test",
-    "tools/runtime/test_product_resources.py": "gate"
+    "tools/runtime/test_product_resources.py": "gate",
+    "src/runtime/resource_select.S": "native-source",
+    "src/runtime/resource_select.h": "native-source",
+    "src/runtime/resource_match_posix.c": "native-source",
+    "tests/runtime/test_resource_select.c": "native-test",
+    "tools/runtime/test_resource_select.py": "gate"
   }
 }
