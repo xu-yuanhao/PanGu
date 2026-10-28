@@ -11,20 +11,23 @@
 static int add_owned(struct json_object *object,const char *key,struct json_object *value){
  if(!value)return 5;if(!json_object_object_add(object,key,value))return 0;json_object_put(value);return 5;
 }
+int pg_resource_entry(const char *path,struct json_object **out){
+ *out=0;struct stat metadata;char canonical[4096];
+ if(stat(path,&metadata)||!realpath(path,canonical))return errno==ENOENT||errno==ENOTDIR||errno==ELOOP?0:1;
+ const char *name=strrchr(path,'/');name=name?name+1:path;
+ struct json_object *entry=json_object_new_object();if(!entry)return 5;
+ if(add_owned(entry,"name",json_object_new_string(name))||add_owned(entry,"path",json_object_new_string(path))||add_owned(entry,"canonical",json_object_new_string(canonical))||add_owned(entry,"kind",json_object_new_int(S_ISREG(metadata.st_mode)?1:S_ISDIR(metadata.st_mode)?2:0))){json_object_put(entry);return 5;}
+ *out=entry;return 0;
+}
 /* Directory entries expose host layouts; selection and traversal live in ASM. */
 int pg_skills_directory(const char *path,struct json_object **out){
  *out=0;struct dirent **entries=0;int count=scandir(path,&entries,0,alphasort);
  if(count<0)return errno==ENOENT||errno==ENOTDIR?0:1;
  struct json_object *array=json_object_new_array();int result=array?0:5;
  for(int i=0;i<count;i++){
-  if(!result){char full[4096],canonical[4096];struct stat metadata;int n=snprintf(full,sizeof(full),"%s/%s",path,entries[i]->d_name);
+  if(!result){char full[4096];int n=snprintf(full,sizeof(full),"%s/%s",path,entries[i]->d_name);
    if(n<0||n>=(int)sizeof(full))result=1;
-   else if(!stat(full,&metadata)&&realpath(full,canonical)){
-    struct json_object *entry=json_object_new_object();
-    if(!entry)result=5;
-    else if(add_owned(entry,"name",json_object_new_string(entries[i]->d_name))||add_owned(entry,"path",json_object_new_string(full))||add_owned(entry,"canonical",json_object_new_string(canonical))||add_owned(entry,"kind",json_object_new_int(S_ISREG(metadata.st_mode)?1:S_ISDIR(metadata.st_mode)?2:0))){json_object_put(entry);result=5;}
-    else if(json_object_array_add(array,entry)){json_object_put(entry);result=5;}
-   }
+   else {struct json_object *entry=0;int status=pg_resource_entry(full,&entry);if(status==5)result=5;else if(entry&&json_object_array_add(array,entry)){json_object_put(entry);result=5;}}
   }
   free(entries[i]);
  }

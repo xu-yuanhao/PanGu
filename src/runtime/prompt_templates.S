@@ -105,7 +105,16 @@ SOFTWARE.*/
 .globl pg_prompt_templates_load
 .type pg_prompt_templates_load,@function
 pg_prompt_templates_load:
+ mov rcx,rdx
+ xor edx,edx
+ jmp pg_prompt_templates_load_config
+.size pg_prompt_templates_load,.-pg_prompt_templates_load
+.globl pg_prompt_templates_load_config
+.type pg_prompt_templates_load_config,@function
+pg_prompt_templates_load_config:
  enter 64
+ mov [rsp+32],rdx
+ mov rdx,rcx
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -153,7 +162,33 @@ pg_prompt_templates_load:
  call .Lload_dir
  test eax,eax
  jnz .Lload_fail
-2: mov rax,[rsp]
+2: cmp qword ptr [rsp+32],0
+ je .Lload_result
+ mov rdi,[rsp+32]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lload_fail
+ mov qword ptr [rsp+40],0
+.Lload_extra_loop:
+ mov rdi,[rsp+32]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lload_result
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[rsp]
+ call .Lload_path
+ test eax,eax
+ jnz .Lload_fail
+ inc qword ptr [rsp+40]
+ jmp .Lload_extra_loop
+.Lload_result:
+ mov rax,[rsp]
  mov [r13],rax
  mov qword ptr [rsp],0
  mov dword ptr [rsp+24],0
@@ -172,19 +207,16 @@ pg_prompt_templates_load:
 .Lload_invalid:
  mov eax,4
  exit 64
-.size pg_prompt_templates_load,.-pg_prompt_templates_load
+.size pg_prompt_templates_load_config,.-pg_prompt_templates_load_config
 .Lload_dir:
- enter 48
+ enter 16
  mov rbx,rdi
  mov rdi,rsi
  mov rsi,rsp
  mov qword ptr [rsp],0
- mov qword ptr [rsp+8],0
  call pg_skills_directory
  cmp eax,5
  je .Ldir_done
- test eax,eax
- jnz .Ldir_ok
  cmp qword ptr [rsp],0
  je .Ldir_ok
  xor r12d,r12d
@@ -196,14 +228,33 @@ pg_prompt_templates_load:
  mov rdi,[rsp]
  mov rsi,r12
  call json_object_array_get_idx@PLT
- mov r13,rax
- mov rdi,rax
+ mov rsi,rax
+ mov rdi,rbx
+ call .Lload_file
+ test eax,eax
+ jnz .Ldir_done
+ inc r12
+ jmp .Ldir_loop
+.Ldir_ok:
+ xor eax,eax
+.Ldir_done:
+ mov ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+ exit 16
+.Lload_file:
+ enter 48
+ mov rbx,rdi
+ mov r13,rsi
+ mov qword ptr [rsp+8],0
+ mov rdi,r13
  lea rsi,[rip+.Lkind]
  call json_object_object_get@PLT
  mov rdi,rax
  call json_object_get_int@PLT
  cmp eax,1
- jne .Ldir_next
+ jne .Lfile_ok
  mov rdi,r13
  lea rsi,[rip+.Lname]
  call .Lfield
@@ -211,13 +262,13 @@ pg_prompt_templates_load:
  mov rdi,rax
  call strlen@PLT
  cmp rax,3
- jb .Ldir_next
+ jb .Lfile_ok
  lea r15,[rax-3]
  lea rdi,[r14+r15]
  lea rsi,[rip+.Lsuffix]
  call strcmp@PLT
  test eax,eax
- jnz .Ldir_next
+ jnz .Lfile_ok
  mov rdi,r13
  lea rsi,[rip+.Lpath]
  call .Lfield
@@ -228,19 +279,19 @@ pg_prompt_templates_load:
  test eax,eax
  jz .Ldir_metadata
  cmp eax,5
- je .Ldir_done
+ je .Lfile_done
  mov rdi,rbx
  mov rsi,[rsp+16]
  call .Ldiagnostic
  test eax,eax
- jnz .Ldir_done
- jmp .Ldir_next
+ jnz .Lfile_done
+ jmp .Lfile_ok
 .Ldir_metadata:
  mov rdi,r14
  mov esi,r15d
  call json_object_new_string_len@PLT
  test rax,rax
- jz .Ldir_fail
+ jz .Lfile_fail
  mov [rsp+24],rax
  mov rdi,[rsp+8]
  lea rsi,[rip+.Lname]
@@ -250,11 +301,11 @@ pg_prompt_templates_load:
  jz 1f
  mov rdi,[rsp+24]
  call json_object_put@PLT
- jmp .Ldir_fail
+ jmp .Lfile_fail
 1: mov rdi,[rsp+16]
  call json_object_new_string@PLT
  test rax,rax
- jz .Ldir_fail
+ jz .Lfile_fail
  mov [rsp+24],rax
  mov rdi,[rsp+8]
  lea rsi,[rip+.Lfile]
@@ -264,7 +315,7 @@ pg_prompt_templates_load:
  jz 2f
  mov rdi,[rsp+24]
  call json_object_put@PLT
- jmp .Ldir_fail
+ jmp .Lfile_fail
 2: mov rdi,[rsp+8]
  lea rsi,[rip+.Ldescription]
  call .Lfield
@@ -279,7 +330,7 @@ pg_prompt_templates_load:
  mov rdi,rax
  call .Lfallback_description
  test rax,rax
- jz .Ldir_fail
+ jz .Lfile_fail
  mov [rsp+24],rax
  mov rdi,[rsp+8]
  lea rsi,[rip+.Ldescription]
@@ -289,7 +340,7 @@ pg_prompt_templates_load:
  jz .Ldir_hint
  mov rdi,[rsp+24]
  call json_object_put@PLT
- jmp .Ldir_fail
+ jmp .Lfile_fail
 .Ldir_hint:
  mov rdi,[rsp+8]
  lea rsi,[rip+.Larg_hint]
@@ -306,7 +357,7 @@ pg_prompt_templates_load:
  lea rsi,[rip+.Lhint]
  call .Lset_ref
  test eax,eax
- jnz .Ldir_fail
+ jnz .Lfile_fail
 .Ldir_attach:
  mov rdi,rbx
  lea rsi,[rip+.Ltemplates]
@@ -315,24 +366,55 @@ pg_prompt_templates_load:
  mov rsi,[rsp+8]
  call json_object_array_add@PLT
  test eax,eax
- jnz .Ldir_fail
+ jnz .Lfile_fail
  mov qword ptr [rsp+8],0
-.Ldir_next:
- inc r12
- jmp .Ldir_loop
-.Ldir_ok:
+.Lfile_ok:
  xor eax,eax
- jmp .Ldir_done
-.Ldir_fail:
+ jmp .Lfile_done
+.Lfile_fail:
  mov eax,5
-.Ldir_done:
+.Lfile_done:
  mov ebx,eax
- mov rdi,[rsp]
- call json_object_put@PLT
  mov rdi,[rsp+8]
  call json_object_put@PLT
  mov eax,ebx
  exit 48
+.Lload_path:
+ enter 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rdi,rsi
+ mov rsi,rsp
+ call pg_resource_entry
+ cmp eax,5
+ je .Lpath_done
+ cmp qword ptr [rsp],0
+ je .Lpath_ok
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lkind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int@PLT
+ cmp eax,2
+ je .Lpath_dir
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lload_file
+ jmp .Lpath_done
+.Lpath_dir:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lload_dir
+ jmp .Lpath_done
+.Lpath_ok:
+ xor eax,eax
+.Lpath_done:
+ mov ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+ exit 16
 .Ldiagnostic:
  enter 0
  mov rbx,rdi

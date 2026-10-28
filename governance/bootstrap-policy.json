@@ -609,6 +609,9 @@
     "src/runtime/prompt_templates.S": "native-source",
     "src/runtime/prompt_templates.h": "native-source",
     "tests/runtime/test_prompt_templates.c": "native-test",
-    "tools/runtime/test_prompt_templates.py": "gate"
+    "tools/runtime/test_prompt_templates.py": "gate",
+    "src/runtime/settings.S": "native-source",
+    "src/runtime/settings.h": "native-source",
+    "tests/runtime/test_settings.c": "native-test"
   }
 }

@@ -249,6 +249,10 @@
     "src/runtime/prompt_templates.S": {
       "role": "assembly-core",
       "reason": "手写提示模板加载、参数分组/单次替换和显式技能命令，接入实际用户提交"
+    },
+    "src/runtime/settings.S": {
+      "role": "assembly-core",
+      "reason": "手写用户/项目JSON设置读取、诊断、递归合并和所属作用域资源路径解析；配置技能/模板接入实际产品"
     }
   }
 }

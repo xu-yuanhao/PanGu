@@ -342,6 +342,45 @@ def path_workflow(binary, root, environment):
         assert any(result.get('model', [{}])[0].get('toolName') == name and result.get('data', {}).get('arguments', {}).get('path') == path for result in saved), (name, 'canonical persisted arguments missing')
     print('PASS: real model file URL read, home/lexical write without extra mkdir, pasted-path symlink edit, bash and unchanged committed arguments', flush=True)
 
+def configured_resource_workflow(binary, root, environment):
+    workspace = root / 'configured-workflow'
+    workspace.mkdir()
+    private = workspace / '.pangu'
+    private.mkdir()
+    agent = root / 'configured-agent'
+    extras = agent / 'extras'
+    extras.mkdir(parents=True)
+    prompts = agent / 'templates'
+    prompts.mkdir()
+    marker = 'PANGUCONFIG' + os.urandom(5).hex()
+    (extras / 'guide.md').write_text('---\nname: config-recipe\ndescription: Read the configured private payload and create configured.txt.\n---\nUse read to inspect payload.txt relative to this skill directory. Write configured.txt in the workspace with that exact content followed by _CONFIG. Reply with that final content.\n')
+    (extras / 'payload.txt').write_text(marker)
+    (prompts / 'user-recipe.md').write_text('Use write to create user-result.txt containing exactly "$1" without the quotes. Reply with its exact content.\n')
+    (agent / 'settings.json').write_text(json.dumps({'skills':['extras/guide.md'],'prompts':['templates']}))
+    team = workspace / 'team'
+    team.mkdir()
+    (team / 'SKILL.md').write_text('---\nname: project-team\ndescription: Project-configured team instructions.\n---\nProject team body.\n')
+    (workspace / 'project-recipe.md').write_text('Use write to create project-result.txt containing exactly "$1" without the quotes. Reply with its exact content.\n')
+    (private / 'settings.json').write_text(json.dumps({'skills':['../team'],'prompts':['../project-recipe.md']}))
+    env = dict(environment, PANGU_AGENT_DIR=str(agent))
+    env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
+    terminal = Terminal(binary, workspace, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, 'Use the config-recipe skill to create configured.txt and report the result.')
+        assert (workspace / 'configured.txt').read_text().strip() == marker + '_CONFIG'
+        assert (marker + '_CONFIG').encode() in output
+        for command, filename, suffix in [('user-recipe','user-result.txt','_USER'),('project-recipe','project-result.txt','_PROJECT')]:
+            value = marker + suffix
+            output = run_input(terminal, '/' + command + ' ' + value)
+            assert (workspace / filename).read_text().strip() == value
+            assert value.encode() in output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    print('PASS: actual user/project settings load, configured skill discovery/read, user template directory and project relative template file', flush=True)
+
 def template_workflow(binary, root, environment):
     workspace = root / 'template-workflow'
     workspace.mkdir()
@@ -669,6 +708,7 @@ def main():
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
     parser.add_argument('--live-plugin',action='store_true',help='native service substitution and ordered shutdown')
     parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
+    parser.add_argument('--live-settings',action='store_true',help='actual scoped settings and configured skills/templates')
     parser.add_argument('--live-templates',action='store_true',help='actual prompt command and explicit skill invocation')
     parser.add_argument('--live-skills',action='store_true',help='actual skill discovery, on-demand read and coding workflow')
     parser.add_argument('--live-paths',action='store_true',help='actual model absolute paths and symlink editing')
@@ -682,9 +722,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills or args.live_templates:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills or args.live_templates or args.live_settings:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_settings:
+                configured_resource_workflow(binary,root,env)
             if args.live_templates:
                 template_workflow(binary,root,env)
             if args.live_skills:

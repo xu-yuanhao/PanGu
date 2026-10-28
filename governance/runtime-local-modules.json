@@ -1939,7 +1939,10 @@
         "pg_skills_yaml",
         "pg_resource_document",
         "pg_resource_space",
-        "pg_resource_trim"
+        "pg_resource_trim",
+        "pg_resource_entry",
+        "pg_skills_load_config",
+        "pg_resource_text"
       ],
       "reference_basis": [
         {
@@ -1975,7 +1978,8 @@
         "pg_prompt_templates_load",
         "pg_prompt_args",
         "pg_prompt_substitute",
-        "pg_resource_expand"
+        "pg_resource_expand",
+        "pg_prompt_templates_load_config"
       ],
       "reference_basis": [
         {
@@ -1988,6 +1992,42 @@
           ],
           "semantics": "user/project direct Markdown templates; quote/whitespace args; positional/all/default/slice substitutions without recursively replacing values; explicit /skill:name uses fresh body including disabled automatic skills",
           "tests_to_read": [
+            "packages/coding-agent/test/prompt-templates.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resources.settings.local.v0",
+      "sources": [
+        "src/runtime/settings.S",
+        "src/runtime/settings.h"
+      ],
+      "dependencies": [
+        "resources.skills.local.v0",
+        "tools.path.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "Assembly settings JSON layers, soft file diagnostics, detached recursive object merge and owning-scope plain resource path resolution; product loads configured skill/template files and directories with existing default consumers",
+      "exports": [
+        "pg_settings_merge",
+        "pg_settings_load",
+        "pg_settings_resource_paths"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/core/settings-manager.ts",
+            "packages/coding-agent/src/core/package-manager.ts",
+            "packages/coding-agent/src/utils/paths.ts"
+          ],
+          "semantics": "global/project settings layers and deepMergeObjects; resource paths remain attached to global/project base directories; BOM/invalid JSON diagnostics and explicit local files/directories",
+          "tests_to_read": [
+            "packages/coding-agent/test/settings-manager.test.ts",
+            "packages/coding-agent/test/skills.test.ts",
             "packages/coding-agent/test/prompt-templates.test.ts"
           ]
         }

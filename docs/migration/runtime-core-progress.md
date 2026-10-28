@@ -18,15 +18,16 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
+| 设置与资源路径 | `settings.S`：用户/项目JSON层、递归覆盖与错误诊断、独立所有权；配置skills/prompts的普通文件/目录进入技能发现与模板命令，路径相对所属配置目录解析 |
 | 提示模板/显式技能 | `prompt_templates.S`：用户/项目Markdown模板、引号参数、位置/全部/默认/切片参数单次替换；前台/模板和/skill:name展开后进入持久Submission，显式技能读取当前正文 |
 | 技能资源 | `skills.S`、`skills_posix.c`：用户/项目默认发现、根技能优先、名称/规范路径去重、YAML元数据、校验诊断与转义XML；提示列表→模型read技能/相对资源→write真实闭环 |
 | 编码工具 | `read_tool.S`、`write_tool.S`、`edit_text.S`、`edit_tool.S`、`bash_tool.S`、`process.S`：真实读改写运行、分页/快照、Unicode匹配、异步进程/取消、原始输出文件 |
 
 ## 本批验证与集成状态
 
-- 用户agent目录/prompts与项目.pangu/prompts提供前台/模板命令；引号参数、默认值、参数切片及字面placeholder单次替换采用Pi语义。/skill:name可显式调用禁用自动技能，调用时重新读取正文，展开后的输入保存到PanGu User Entry。
-- 模板/技能命令专项ASan/UBSan、250组实际Pi原函数对照、Runtime整批回归、G00/Assembly及产品构建通过；缺失目录分支修复后追加专项、最终产品和真实模型验证通过。
-- 真实DeepSeek完成模板→write/bash和更新后的显式技能→write/bash；既有自动技能发现/读取工作流继续通过。配置、忽略规则、显式路径、刷新与诊断交互继续随K11推进。
+- 用户agent目录/settings.json与项目.pangu/settings.json读取独立层和递归覆盖结果；skills/prompts普通文件/目录按各层所属目录解析，接通既有发现/命令。错误配置层产生诊断并保持另一层可用。
+- 设置/路径/实际消费者专项ASan/UBSan、Runtime整批回归与最终产品构建通过；原始JSON模式补充拒绝Markdown frontmatter。Assembly与隔离核心候选G00通过；共享树另有TUI生成缓存的登记提示，保持其工作原位。
+- 真实DeepSeek完成配置技能发现/read/write，以及用户配置模板目录和项目相对模板文件的实际提交。资源选择模式、忽略规则、刷新和完整设置消费者继续随K11推进。
 
 ## 当前接口边界
 
@@ -49,6 +50,7 @@ python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
 python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/test_pangu_pty.py --live
+python3 -B tools/runtime/test_pangu_pty.py --live-settings
 python3 -B tools/runtime/test_pangu_pty.py --live-templates
 python3 -B tools/runtime/test_pangu_pty.py --live-skills
 python3 -B tools/runtime/test_pangu_pty.py --live-paths

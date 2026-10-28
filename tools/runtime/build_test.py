@@ -155,6 +155,13 @@ def main():
                             str(ROOT / 'tests/runtime/test_prompt_templates.c'), *templates_flags, '-o', templates_test], check=True)
             subprocess.run([templates_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_prompt_templates.py'), '--binary', templates_test], check=True, timeout=30)
+            settings_test = str(Path(directory) / 'test-settings')
+            settings_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl'], text=True).split()
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in ('settings', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix')],
+                            str(ROOT / 'tests/runtime/test_settings.c'), *settings_flags, '-o', settings_test], check=True)
+            subprocess.run([settings_test], check=True, timeout=15)
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             for name, sources, wraps in [
                 ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),

@@ -178,7 +178,16 @@ SOFTWARE.*/
 .globl pg_skills_load
 .type pg_skills_load,@function
 pg_skills_load:
+ mov rcx,rdx
+ xor edx,edx
+ jmp pg_skills_load_config
+.size pg_skills_load,.-pg_skills_load
+.globl pg_skills_load_config
+.type pg_skills_load_config,@function
+pg_skills_load_config:
  enter 80
+ mov [rsp+56],rdx
+ mov rdx,rcx
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -218,7 +227,7 @@ pg_skills_load:
  jnz .Lload_fail
 .Lload_project:
  test r12,r12
- jz .Lload_result
+ jz .Lload_extras
  mov rdi,rsp
  mov rsi,r12
  mov edx,1
@@ -226,6 +235,32 @@ pg_skills_load:
  call .Lwalk
  test eax,eax
  jnz .Lload_fail
+.Lload_extras:
+ cmp qword ptr [rsp+56],0
+ je .Lload_result
+ mov rdi,[rsp+56]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lload_fail
+ mov qword ptr [rsp+64],0
+.Lload_extra_loop:
+ mov rdi,[rsp+56]
+ call json_object_array_length@PLT
+ cmp [rsp+64],rax
+ jae .Lload_result
+ mov rdi,[rsp+56]
+ mov rsi,[rsp+64]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,rsp
+ call .Lload_path
+ test eax,eax
+ jnz .Lload_fail
+ inc qword ptr [rsp+64]
+ jmp .Lload_extra_loop
 .Lload_result:
  call json_object_new_object@PLT
  mov [rsp+40],rax
@@ -261,7 +296,72 @@ pg_skills_load:
 .Lload_invalid:
  mov eax,4
  exit 80
-.size pg_skills_load,.-pg_skills_load
+.size pg_skills_load_config,.-pg_skills_load_config
+/* An explicit path is a directory or a Markdown file. */
+.Lload_path:
+ enter 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rdi,rsi
+ mov rsi,rsp
+ call pg_resource_entry
+ test eax,eax
+ jnz .Lpath_error
+ cmp qword ptr [rsp],0
+ je .Lpath_warning
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lkind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int@PLT
+ cmp eax,2
+ je .Lpath_directory
+ cmp eax,1
+ jne .Lpath_warning
+ mov rdi,r12
+ call strlen@PLT
+ cmp rax,3
+ jb .Lpath_warning
+ lea rdi,[r12+rax-3]
+ lea rsi,[rip+.Lsuffix]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lpath_warning
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lname]
+ call .Lfield
+ mov rdi,rax
+ lea rsi,[rip+.Lskillmd]
+ call strcmp@PLT
+ xor edx,edx
+ test eax,eax
+ sete dl
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lload_file
+ jmp .Lpath_end
+.Lpath_directory:
+ mov rdi,rbx
+ mov rsi,r12
+ mov edx,1
+ xor ecx,ecx
+ call .Lwalk
+ jmp .Lpath_end
+.Lpath_error:
+ cmp eax,5
+ je .Lpath_end
+.Lpath_warning:
+ mov rdi,rbx
+ mov rsi,r12
+ lea rdx,[rip+.Lread_error]
+ call .Ldiag
+.Lpath_end:
+ mov ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+ exit 16
 /* Directory snapshot -> root SKILL preference -> children. */
 .Lwalk:
  enter 32
@@ -418,8 +518,18 @@ pg_skills_load:
 .globl pg_resource_document
 .type pg_resource_document,@function
 pg_resource_document:
+ xor edx,edx
+ jmp .Lfrontmatter
+.size pg_resource_document,.-pg_resource_document
+.globl pg_resource_text
+.type pg_resource_text,@function
+pg_resource_text:
+ mov edx,1
+ jmp .Lfrontmatter
+.size pg_resource_text,.-pg_resource_text
 .Lfrontmatter:
  enter 32
+ mov [rsp+32],edx
  mov rbx,rdi
  mov r12,rsi
  mov qword ptr [r12],0
@@ -493,6 +603,8 @@ pg_resource_document:
 4: mov byte ptr [r14+rdx],0
  mov [rsp],r14
  mov [rsp+8],rdx
+ cmp dword ptr [rsp+32],0
+ jne .Lfront_empty
  cmp rdx,4
  jb .Lfront_empty
  cmp word ptr [r14],0x2d2d
@@ -567,7 +679,6 @@ pg_resource_document:
  call close@PLT
 1: mov eax,ebx
  exit 32
-.size pg_resource_document,.-pg_resource_document
 /* ECMAScript whitespace width; zero for a nonspace or invalid scalar. */
 .globl pg_resource_space
 .type pg_resource_space,@function
@@ -719,7 +830,7 @@ pg_resource_trim:
  jnz .Lfile_ok
  mov rdi,r13
  mov rsi,rsp
- call .Lfrontmatter
+ call pg_resource_document
  test eax,eax
  jz .Lfile_description
  cmp eax,5
