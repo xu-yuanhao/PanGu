@@ -310,6 +310,10 @@
     "src/runtime/view_watch.S": {
       "role": "assembly-core",
       "reason": "Shared native Watch lifecycle used by task graph and conversation view consumers"
+    },
+    "src/runtime/task_provider.S": {
+      "role": "assembly-core",
+      "reason": "Pi registry custom Task definition validation, duplicate refusal and lookup"
     }
   }
 }

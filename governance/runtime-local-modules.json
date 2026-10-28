@@ -452,7 +452,8 @@
         "models.catalog.local.v0",
         "usage.local.v0",
         "task.graph.local.v0",
-        "conversation.view.local.v0"
+        "conversation.view.local.v0",
+        "task.provider.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2301,6 +2302,22 @@
         "pg_view_watch_next",
         "pg_view_watch_close",
         "pg_view_binding_close"
+      ]
+    },
+    {
+      "id": "task.provider.local.v0",
+      "sources": [
+        "src/runtime/task_provider.S",
+        "src/runtime/task_provider.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "system libc"
+      ],
+      "role": "Optional native Host task.definitions registry for extension tasks; built-in/custom name conflict refusal",
+      "exports": [
+        "pg_task_provider_validate",
+        "pg_task_provider_find"
       ]
     }
   ],

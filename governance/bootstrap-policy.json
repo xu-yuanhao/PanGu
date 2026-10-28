@@ -644,6 +644,8 @@
     "src/runtime/conversation_view.S": "native-source",
     "src/runtime/conversation_view.h": "native-source",
     "src/runtime/view_watch.S": "native-source",
-    "src/runtime/view_watch.h": "native-source"
+    "src/runtime/view_watch.h": "native-source",
+    "src/runtime/task_provider.S": "native-source",
+    "src/runtime/task_provider.h": "native-source"
   }
 }
