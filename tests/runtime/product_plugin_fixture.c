@@ -1,5 +1,9 @@
 #ifdef PG_TASK_FIXTURE
 #include "../../src/runtime/task_provider.h"
+#include "../../src/runtime/extensions.h"
+#include <stdio.h>
+#include <assert.h>
+#include <string.h>
 #include "../../src/runtime/native_plugin.h"
 #include <json-c/json.h>
 static int initial(void *context,const struct json_object *input,struct json_object **out){(void)context;(void)input;*out=json_tokener_parse("{\"phase\":\"work\",\"step\":0}");return *out?0:5;}
@@ -17,10 +21,28 @@ static const pg_task_phase phases[]={{{"work",4},0,poll_task,cleanup}};
 static const pg_task_definition definition={.name={"example.work",12},.version=1,.initial=initial,.phases=phases,.phase_count=1};
 static const pg_task_definition *definitions[]={&definition};
 static const pg_task_provider provider={PG_TASK_PROVIDER_ABI,sizeof(pg_task_provider),definitions,1};
-static int start(void *context,pg_host *host,size_t owner){(void)context;return pg_host_provide(host,owner,"task.definitions",(void *)&provider);}
-static int stop(void *context){(void)context;return active_tasks?-1:0;}
-static const char *const exports[]={"task.definitions"};
-static const pg_plugin plugin={"product.tasks",0,0,0,exports,1,start,stop};
+static int allow(void *context,pg_slice arguments){(void)context;(void)arguments;return 1;}
+static int echo(void *context,pg_slice arguments,char *out,size_t capacity,size_t *size){(void)context;(void)arguments;const char *text="EXTENSION_TOOL_RESULT";*size=strlen(text);if(*size>=capacity){*size=0;return PG_TOOL_ERROR;}memcpy(out,text,*size+1);return PG_TOOL_OK;}
+static const pg_tool_definition echo_tool={"native_echo","Native extension echo","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,allow,allow,echo,1,0};
+static int render(void *context,const struct json_object *configuration,struct json_object **out){(void)configuration;*out=json_object_new_string(context);return *out?0:5;}
+static int tool_wrap(void *context,const pg_tool_definition *inner,pg_tool_definition *out){*out=*inner;out->description=context;return 0;}
+static int section_wrap(void *context,const pg_extension_section *inner,pg_extension_section *out){*out=*inner;out->context=context;return 0;}
+static int failed_render(void *context,const struct json_object *configuration,struct json_object **out){(void)context;(void)configuration;*out=0;return -7;}
+static const pg_extension_section broken_sections[]={{"failure",0,failed_render,0,0}};
+static int broken_wrap(void *context,const pg_tool_definition *inner,pg_tool_definition *out){(void)context;*out=*inner;out->name="renamed";return 0;}
+static const pg_extension_section reviewer_sections[]={{"preamble","EXTENSION_REVIEW_TOKEN",render,0,0},{"shared","FIRST_SHARED",render,1,0}};
+static const pg_extension_section timing_sections[]={{"shared","EXTENSION_SHARED_TOKEN",render,1,0}};
+static const pg_extension_wrap timing_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo","Wrapped native echo",{.tool=tool_wrap}},{PG_EXTENSION_WRAP_SECTION,0,"shared","EXTENSION_WRAPPED_TOKEN",{.section=section_wrap}}};
+static const pg_extension_wrap broken_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo",0,{.tool=broken_wrap}}};
+static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2},broken={"broken",0,0,broken_sections,1,broken_wraps,1};
+static const pg_extension *extensions[]={&reviewer,&timing,&broken};
+static unsigned wrapper_errors;
+static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&!strcmp(extension,"broken"));if(error)(*(unsigned *)context)++;}
+static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,3,0,&wrapper_errors,report};
+static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"task.definitions",(void *)&provider)||pg_host_provide(host,owner,"extensions.registry",&registry);}
+static int stop(void *context){(void)context;if(active_tasks)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}
+static const char *const exports[]={"task.definitions","extensions.registry"};
+static const pg_plugin plugin={"product.tasks",0,0,0,exports,2,start,stop};
 const pg_native_manifest pangu_plugin_v1={PG_NATIVE_ABI,sizeof(pg_native_manifest),sizeof(pg_plugin),0,&plugin,1};
 #else
 #include "../../src/runtime/native_plugin.h"

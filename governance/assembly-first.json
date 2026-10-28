@@ -318,6 +318,10 @@
     "src/runtime/agent_state.S": {
       "role": "assembly-core",
       "reason": "Pi Durable AgentDoc配置事务、稳定名称工具选择与原生请求准备"
+    },
+    "src/runtime/extensions.S": {
+      "role": "assembly-core",
+      "reason": "Pi Extension名称选择、工具/提示段组合、wrapper与提示渲染"
     }
   }
 }

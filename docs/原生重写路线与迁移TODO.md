@@ -151,6 +151,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 自定义Task接入Host task.definitions：汇编校验/查找、内置与扩展重名拒绝、真实Scheduler执行/暂停重开；动态库经公开任务提交ABI保存checkpoint与终态，消费者清理后卸载。
 - [x] Agent配置服务接入pangu.agent文档：字段保留/替换/null清除、无变化不写入、回滚/重开；instructions进入真实请求且保留资源提示，tools/modelTools控制有序模型声明与实际执行入口。
+- [x] 扩展快照接通实际请求/工具链：稳定名称默认/显式/add/remove选择、工具和提示段同名覆盖保序、同步wrapTool/wrapSection、改名/错误移除并报告、标签渲染及请求内固定选择；未改动的基础工具仍走注入提供者。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -261,8 +262,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/agent.ts` AgentDoc/configure/filterTools/offeredTools、`harness-registry.test.ts`选择顺序及instructions末尾行为、`prompt.ts`资源段渲染；宿主仍沿Harness/Cordis服务作用域。沿上一批已核对的上游快照推进。
-- 实际调用链：Host agent.state.configure → Session事务 → agent_state.S更新rewindable/asOf的pangu.agent → 已采纳缓存 → Generation prepare保存独立请求配置 → instructions追加到资源提示之后 → tools/modelTools形成模型声明；实际Tool取得lease时重新读当前Agent配置，汇编gate拒绝禁用名字，再调用原提供者。服务read返回独立JSON，重复配置不新增提交；启动先加载配置，再恢复Scheduler。
-- 验证：产品Host专项与ASan/UBSan覆盖字段更新/null清除、独立快照、重复配置无提交、工具数组排序/去重/缺失名字、remove筛选及执行拒绝；两后端Durable专项覆盖配置提交/回滚/关闭重开。DeepSeek真实产品完成提示词marker查询、切换到write-only后创建文件并继续回答；最终集成结果见当前实现记录。
-- 接口与自审：新增agent_state.S/.h及agent.state函数表，既有Client/Task/TUI布局保持。原工具提供者的上下文、异步清理和元数据仍随原lease，筛选和执行gate均为汇编；产品组合只连接配置、Session、模型与工具服务。源/模块/依赖登记已同步，复用既有产品和存储用例。
-- 剩余与下一交付物：K09完整extension选择、section/wrapper及generation/tool hooks继续按覆盖表实现；AgentDoc中的model/thinking/cwd及extension字段的完整消费者、deferred工具选择与TUI配置入口仍待接通。下一批把已安装扩展按Agent配置组合为实际提示段/工具集合，连同相邻wrap和错误顺序用例推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/{registry,agent,prompt}.ts`及`harness-registry.test.ts`选择/覆盖/wrapper/section用例；Harness/Cordis作用域保持代码lease。批次已fetch核对：Pi origin/main `6eb99ad`在相关Agent入口新增maxTurns，registry/prompt未变；Harness `f3803c9`的Cordis入口未变，本批采用固定快照。
+- 实际调用链：原生DSO提供extensions.registry → Agent启动/配置候选校验 → 按AgentState/defaults解析名称 → 同名工具/提示段保序组合 → 按扩展顺序应用wrapper → section渲染追加资源提示 → Agent instructions末尾应用 → 固定实际选择到请求配置。模型声明与工具执行分别持有组合lease；工具gate继续应用tools/modelTools，未修改基础定义走原注入提供者，新/替换定义走现有注册表。消费者释放后卸载DSO。
+- 验证：产品`--native-tasks --sanitize`通过默认/显式/add/remove/去重/未知名称、覆盖/标签/wrapper、改名移除、render错误归属、保留基础提供者分派、组合工具执行、配置固定及DSO释放。`--live-extensions`实际DeepSeek完成资源刷新/Agent配置、基础写文件及native_echo调用返回；Runtime整批退出0，产品构建与登记/Assembly检查结果见实现记录。
+- 接口与自审：新增extensions.S/.h及可选Host extensions.registry ABI1；section/wrap32字节、extension56字节、provider48字节，组合与工具分派均为手写汇编。描述符/代码借用插件作用域，组合数组与模型/工具lease同寿命；异步工具close pending期间保留组合。既有Client/Task/TUI布局保持；复用既有产品动态库夹具与专项。
+- 剩余与下一交付物：K09继续完成注册表安装/替换/撤销的运行中发布、异步section和已有显示值的失败回退、SystemEntry变更计划、generation/tool hooks及扩展结果元数据；deferred工具和model/thinking/cwd消费者保留在覆盖表。下一批沿Generation/Tool实际阶段把hooks与生命周期发布一起接通，保持完整行为组推进。

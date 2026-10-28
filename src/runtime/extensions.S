@@ -1,0 +1,1153 @@
+/* Pi Durable harness/{registry,agent,prompt}.ts; d5b3de22d0e24a3e9c38a9410d3329b099717283.
+   MIT, docs/licenses/pi.md. */
+.intel_syntax noprefix
+.macro XF n
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,\n
+.endm
+.macro XE n
+ add rsp,\n
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.endm
+.text
+.globl pg_extensions_close
+.type pg_extensions_close,@function
+pg_extensions_close:
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rbx+1184]
+ call free@PLT
+ mov rdi,[rbx+1200]
+ call free@PLT
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,154
+ rep stosq
+ pop rbx
+ ret
+/* Search structs whose first field is a C-string key; return count if absent. */
+.Lx_find:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ xor ebp,ebp
+.Lx_find_each:
+ cmp rbp,r12
+ jae .Lx_find_end
+ mov rax,rbp
+ imul rax,r13
+ mov rdi,[rbx+rax]
+ mov rsi,r14
+ call strcmp@PLT
+ test eax,eax
+ jz .Lx_find_end
+ inc rbp
+ jmp .Lx_find_each
+.Lx_find_end:
+ mov rax,rbp
+ XE 16
+/* Exact byte membership in an optional stable-name array. */
+.Lx_contains:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ test rbx,rbx
+ jz .Lx_contains_no
+.Lx_contains_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lx_contains_no
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ cmp rax,r13
+ jne .Lx_contains_next
+ mov rdi,[rsp]
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lx_contains_next
+ mov rdi,rax
+ mov rsi,r12
+ mov rdx,r13
+ call memcmp@PLT
+ test eax,eax
+ jz .Lx_contains_yes
+.Lx_contains_next:
+ inc r14
+ jmp .Lx_contains_each
+.Lx_contains_no:
+ xor eax,eax
+ jmp .Lx_contains_end
+.Lx_contains_yes:
+ mov eax,1
+.Lx_contains_end:
+ XE 16
+/* Select a stable name once; missing installed names are skipped. */
+.Lx_choose:
+ XF 32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rcx
+ mov rsi,r12
+ mov rdx,r13
+ call .Lx_contains
+ test eax,eax
+ jnz .Lx_choose_ok
+ lea r14,[rip+.Lx_coding]
+ cmp r13,6
+ jne .Lx_choose_installed
+ mov rdi,r12
+ lea rsi,[rip+.Lx_coding_name]
+ mov edx,6
+ call memcmp@PLT
+ test eax,eax
+ jz .Lx_choose_found
+.Lx_choose_installed:
+ mov rax,[rbx+1216]
+ test rax,rax
+ jz .Lx_choose_ok
+ mov [rsp],rax
+ xor ebp,ebp
+.Lx_choose_each:
+ mov rax,[rsp]
+ cmp rbp,[rax+16]
+ jae .Lx_choose_ok
+ mov rax,[rax+8]
+ mov r14,[rax+rbp*8]
+ mov rdi,[r14]
+ call strlen@PLT
+ cmp rax,r13
+ jne .Lx_choose_next
+ mov rdi,[r14]
+ mov rsi,r12
+ mov rdx,r13
+ call memcmp@PLT
+ test eax,eax
+ jz .Lx_choose_found
+.Lx_choose_next:
+ inc rbp
+ jmp .Lx_choose_each
+.Lx_choose_found:
+ xor ebp,ebp
+.Lx_choose_duplicate:
+ cmp rbp,[rbx+1208]
+ jae .Lx_choose_append
+ mov rax,[rbx+1200]
+ cmp r14,[rax+rbp*8]
+ je .Lx_choose_ok
+ inc rbp
+ jmp .Lx_choose_duplicate
+.Lx_choose_append:
+ mov rax,[rbx+1200]
+ mov rcx,[rbx+1208]
+ mov [rax+rcx*8],r14
+ inc qword ptr [rbx+1208]
+.Lx_choose_ok:
+ xor eax,eax
+ XE 32
+/* Select every name of a validated array, with an optional remove list. */
+.Lx_select_array:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ test r12,r12
+ jz .Lx_array_ok
+ mov rdi,r12
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_array_bad
+.Lx_array_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lx_array_ok
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_array_bad
+ mov rdi,[rsp]
+ call json_object_get_string@PLT
+ mov rbp,rax
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ mov rdi,rbx
+ mov rsi,rbp
+ mov edx,eax
+ mov rcx,r13
+ call .Lx_choose
+ inc r14
+ jmp .Lx_array_each
+.Lx_array_bad:
+ mov eax,5
+ jmp .Lx_array_end
+.Lx_array_ok:
+ xor eax,eax
+.Lx_array_end:
+ XE 16
+/* Install or replace in place, retaining first insertion order. */
+.Lx_tool:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov rsi,[rbx+1152]
+ mov edx,72
+ mov rcx,[r12]
+ call .Lx_find
+ cmp rax,16
+ jae .Lx_tool_bad
+ cmp rax,[rbx+1152]
+ jb .Lx_tool_copy
+ inc qword ptr [rbx+1152]
+.Lx_tool_copy:
+ imul rax,rax,72
+ lea rdi,[rbx+rax]
+ mov rsi,r12
+ mov ecx,9
+ rep movsq
+ xor eax,eax
+ jmp .Lx_tool_end
+.Lx_tool_bad:
+ mov eax,5
+.Lx_tool_end:
+ XE 16
+.Lx_section:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[rbx+1184]
+ mov rsi,[rbx+1192]
+ mov edx,32
+ mov rcx,[r12]
+ call .Lx_find
+ mov r13,rax
+ cmp rax,[rbx+1192]
+ jb .Lx_section_copy
+ cmp rax,2147483647
+ jae .Lx_section_bad
+ lea rsi,[rax+1]
+ shl rsi,5
+ mov rdi,[rbx+1184]
+ call realloc@PLT
+ test rax,rax
+ jz .Lx_section_bad
+ mov [rbx+1184],rax
+ inc qword ptr [rbx+1192]
+.Lx_section_copy:
+ mov rdi,r13
+ shl rdi,5
+ add rdi,[rbx+1184]
+ mov rsi,r12
+ mov ecx,4
+ rep movsq
+ xor eax,eax
+ jmp .Lx_section_end
+.Lx_section_bad:
+ mov eax,5
+.Lx_section_end:
+ XE 16
+/* key syntax from registry.ts; instructions belongs to AgentState. */
+.Lx_key:
+ test rdi,rdi
+ jz .Lx_key_bad
+ mov al,[rdi]
+ cmp al,'a'
+ jb .Lx_key_bad
+ cmp al,'z'
+ ja .Lx_key_bad
+ xor ecx,ecx
+.Lx_key_each:
+ mov al,[rdi+rcx]
+ test al,al
+ jz .Lx_key_reserved
+ cmp al,'a'
+ jb .Lx_key_other
+ cmp al,'z'
+ jbe .Lx_key_next
+.Lx_key_other:
+ cmp al,'0'
+ jb .Lx_key_symbol
+ cmp al,'9'
+ jbe .Lx_key_next
+.Lx_key_symbol:
+ cmp al,'_'
+ je .Lx_key_next
+ cmp al,'-'
+ jne .Lx_key_bad
+.Lx_key_next:
+ inc rcx
+ jmp .Lx_key_each
+.Lx_key_reserved:
+ sub rsp,8
+ lea rsi,[rip+.Lx_instructions]
+ call strcmp@PLT
+ test eax,eax
+ setnz al
+ movzx eax,al
+ add rsp,8
+ ret
+.Lx_key_bad:
+ xor eax,eax
+ ret
+/* Provider is trusted native code; descriptor shape and intra-extension names
+   are validated before any renderer/wrapper executes. */
+.Lx_validate:
+ XF 32
+ mov rbx,rdi
+ test rbx,rbx
+ jz .Lx_validate_ok
+ cmp dword ptr [rbx],1
+ jne .Lx_validate_bad
+ cmp dword ptr [rbx+4],48
+ jne .Lx_validate_bad
+ cmp qword ptr [rbx+16],2147483646
+ ja .Lx_validate_bad
+ cmp qword ptr [rbx+16],0
+ je .Lx_validate_ok
+ cmp qword ptr [rbx+8],0
+ je .Lx_validate_bad
+ xor r12d,r12d
+.Lx_validate_extension:
+ cmp r12,[rbx+16]
+ jae .Lx_validate_ok
+ mov rax,[rbx+8]
+ mov r13,[rax+r12*8]
+ test r13,r13
+ jz .Lx_validate_bad
+ cmp qword ptr [r13],0
+ je .Lx_validate_bad
+ mov rdi,[r13]
+ cmp byte ptr [rdi],0
+ je .Lx_validate_bad
+ lea rsi,[rip+.Lx_coding_name]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lx_validate_bad
+ xor r14d,r14d
+.Lx_validate_previous:
+ cmp r14,r12
+ jae .Lx_validate_tools
+ mov rax,[rbx+8]
+ mov rax,[rax+r14*8]
+ mov rdi,[r13]
+ mov rsi,[rax]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lx_validate_bad
+ inc r14
+ jmp .Lx_validate_previous
+.Lx_validate_tools:
+ cmp qword ptr [r13+16],16
+ ja .Lx_validate_bad
+ cmp qword ptr [r13+16],0
+ je .Lx_validate_sections_start
+ cmp qword ptr [r13+8],0
+ je .Lx_validate_bad
+ xor r14d,r14d
+.Lx_validate_tool_each:
+ cmp r14,[r13+16]
+ jae .Lx_validate_sections_start
+ imul rax,r14,72
+ mov rdx,[r13+8]
+ mov rcx,[rdx+rax]
+ test rcx,rcx
+ jz .Lx_validate_bad
+ mov rdi,rdx
+ mov rsi,r14
+ mov edx,72
+ call .Lx_find
+ cmp rax,r14
+ jne .Lx_validate_bad
+ inc r14
+ jmp .Lx_validate_tool_each
+.Lx_validate_sections_start:
+ cmp qword ptr [r13+32],2147483647
+ ja .Lx_validate_bad
+ cmp qword ptr [r13+32],0
+ je .Lx_validate_wraps
+ cmp qword ptr [r13+24],0
+ je .Lx_validate_bad
+ xor r14d,r14d
+.Lx_validate_section_each:
+ cmp r14,[r13+32]
+ jae .Lx_validate_wraps
+ mov rax,r14
+ shl rax,5
+ add rax,[r13+24]
+ mov [rsp],rax
+ cmp qword ptr [rax+16],0
+ je .Lx_validate_bad
+ mov rdi,[rax]
+ call .Lx_key
+ test eax,eax
+ jz .Lx_validate_bad
+ mov rax,[rsp]
+ mov rcx,[rax]
+ mov rdi,[r13+24]
+ mov rsi,r14
+ mov edx,32
+ call .Lx_find
+ cmp rax,r14
+ jne .Lx_validate_bad
+ inc r14
+ jmp .Lx_validate_section_each
+.Lx_validate_wraps:
+ cmp qword ptr [r13+48],2147483647
+ ja .Lx_validate_bad
+ cmp qword ptr [r13+48],0
+ je .Lx_validate_next
+ cmp qword ptr [r13+40],0
+ je .Lx_validate_bad
+ xor r14d,r14d
+.Lx_validate_wrap_each:
+ cmp r14,[r13+48]
+ jae .Lx_validate_next
+ mov rax,r14
+ shl rax,5
+ add rax,[r13+40]
+ cmp dword ptr [rax],1
+ jb .Lx_validate_bad
+ cmp dword ptr [rax],2
+ ja .Lx_validate_bad
+ cmp qword ptr [rax+8],0
+ je .Lx_validate_bad
+ cmp qword ptr [rax+24],0
+ je .Lx_validate_bad
+ inc r14
+ jmp .Lx_validate_wrap_each
+.Lx_validate_next:
+ inc r12
+ jmp .Lx_validate_extension
+.Lx_validate_bad:
+ mov eax,5
+ jmp .Lx_validate_end
+.Lx_validate_ok:
+ xor eax,eax
+.Lx_validate_end:
+ XE 32
+.globl pg_extensions_resolve
+.type pg_extensions_resolve,@function
+pg_extensions_resolve:
+ XF 1280
+ mov rbx,rcx
+ mov r12,rdi
+ mov r13,rdx
+ mov [rsp+1184],rsi
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,154
+ rep stosq
+ mov [rbx+1216],r12
+ mov rdi,r12
+ call .Lx_validate
+ test eax,eax
+ jnz .Lx_resolve_bad
+ mov esi,1
+ test r12,r12
+ jz .Lx_resolve_allocate
+ add rsi,[r12+16]
+.Lx_resolve_allocate:
+ mov rdi,rsi
+ mov esi,8
+ call calloc@PLT
+ mov [rbx+1200],rax
+ test rax,rax
+ jz .Lx_resolve_bad
+ mov rdi,[rsp+1184]
+ lea rsi,[rip+.Lx_extensions]
+ call json_object_object_get@PLT
+ mov [rsp+1192],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_resolve_edits
+ mov rdi,rbx
+ mov rsi,[rsp+1192]
+ xor edx,edx
+ call .Lx_select_array
+ test eax,eax
+ jnz .Lx_resolve_bad
+ jmp .Lx_resolve_compose
+.Lx_resolve_edits:
+ mov qword ptr [rsp+1200],0
+ mov qword ptr [rsp+1208],0
+ cmp qword ptr [rsp+1192],0
+ je .Lx_resolve_defaults
+ mov rdi,[rsp+1192]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_resolve_bad
+ mov rdi,[rsp+1192]
+ lea rsi,[rip+.Lx_remove]
+ call json_object_object_get@PLT
+ mov [rsp+1200],rax
+ test rax,rax
+ jz .Lx_resolve_add
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_resolve_bad
+.Lx_resolve_add:
+ mov rdi,[rsp+1192]
+ lea rsi,[rip+.Lx_add]
+ call json_object_object_get@PLT
+ mov [rsp+1208],rax
+.Lx_resolve_defaults:
+ test r12,r12
+ jz .Lx_resolve_all
+ cmp qword ptr [r12+24],0
+ je .Lx_resolve_all
+ mov rdi,rbx
+ mov rsi,[r12+24]
+ mov rdx,[rsp+1200]
+ call .Lx_select_array
+ test eax,eax
+ jnz .Lx_resolve_bad
+ jmp .Lx_resolve_added
+.Lx_resolve_all:
+ mov rdi,rbx
+ lea rsi,[rip+.Lx_coding_name]
+ mov edx,6
+ mov rcx,[rsp+1200]
+ call .Lx_choose
+ test r12,r12
+ jz .Lx_resolve_added
+ xor r14d,r14d
+.Lx_resolve_all_each:
+ cmp r14,[r12+16]
+ jae .Lx_resolve_added
+ mov rax,[r12+8]
+ mov rax,[rax+r14*8]
+ mov rbp,[rax]
+ mov rdi,rbp
+ call strlen@PLT
+ mov rdi,rbx
+ mov rsi,rbp
+ mov rdx,rax
+ mov rcx,[rsp+1200]
+ call .Lx_choose
+ inc r14
+ jmp .Lx_resolve_all_each
+.Lx_resolve_added:
+ mov rdi,rbx
+ mov rsi,[rsp+1208]
+ mov rdx,[rsp+1200]
+ call .Lx_select_array
+ test eax,eax
+ jnz .Lx_resolve_bad
+.Lx_resolve_compose:
+ xor r14d,r14d
+.Lx_compose_each:
+ cmp r14,[rbx+1208]
+ jae .Lx_resolve_wraps
+ mov rax,[rbx+1200]
+ mov rbp,[rax+r14*8]
+ lea rax,[rip+.Lx_coding]
+ cmp rbp,rax
+ jne .Lx_compose_extension
+ mov [rsp+1216],r13
+ mov rax,[r13+1152]
+ mov [rsp+1224],rax
+ jmp .Lx_compose_tools_start
+.Lx_compose_extension:
+ mov rax,[rbp+8]
+ mov [rsp+1216],rax
+ mov rax,[rbp+16]
+ mov [rsp+1224],rax
+.Lx_compose_tools_start:
+ mov qword ptr [rsp+1232],0
+.Lx_compose_tools:
+ mov rax,[rsp+1232]
+ cmp rax,[rsp+1224]
+ jae .Lx_compose_sections_start
+ imul rsi,rax,72
+ add rsi,[rsp+1216]
+ mov rdi,rbx
+ call .Lx_tool
+ test eax,eax
+ jnz .Lx_resolve_bad
+ inc qword ptr [rsp+1232]
+ jmp .Lx_compose_tools
+.Lx_compose_sections_start:
+ mov qword ptr [rsp+1232],0
+.Lx_compose_sections:
+ mov rax,[rsp+1232]
+ cmp rax,[rbp+32]
+ jae .Lx_compose_next
+ mov rsi,rax
+ shl rsi,5
+ add rsi,[rbp+24]
+ mov rdi,rbx
+ call .Lx_section
+ test eax,eax
+ jnz .Lx_resolve_bad
+ inc qword ptr [rsp+1232]
+ jmp .Lx_compose_sections
+.Lx_compose_next:
+ inc r14
+ jmp .Lx_compose_each
+.Lx_resolve_wraps:
+ mov rdi,rbx
+ call .Lx_wraps
+ test eax,eax
+ jnz .Lx_resolve_bad
+ /* Validate final tool descriptors into independent fresh registry storage. */
+ mov rdi,rsp
+ mov rsi,rbx
+ mov rdx,[rbx+1152]
+ call pg_tool_registry_init@PLT
+ test eax,eax
+ jnz .Lx_resolve_bad
+ mov rdi,rbx
+ mov rsi,rsp
+ mov ecx,148
+ rep movsq
+ mov dword ptr [rbx+1224],1
+ mov rdx,[rbx+1152]
+ cmp rdx,[r13+1152]
+ jne .Lx_resolve_ok
+ imul rdx,rdx,72
+ mov rdi,rbx
+ mov rsi,r13
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lx_resolve_ok
+ mov dword ptr [rbx+1224],0
+.Lx_resolve_ok:
+ xor eax,eax
+ jmp .Lx_resolve_end
+.Lx_resolve_bad:
+ mov rdi,rbx
+ call pg_extensions_close
+ mov eax,5
+.Lx_resolve_end:
+ XE 1280
+.section .rodata
+.Lx_coding_name: .asciz "coding"
+.Lx_extensions: .asciz "extensions"
+.Lx_instructions: .asciz "instructions"
+.Lx_remove: .asciz "remove"
+.Lx_add: .asciz "add"
+.Lx_system: .asciz "systemPrompt"
+.Lx_open_tag: .asciz "<%s>\n"
+.Lx_close_tag: .asciz "\n</%s>"
+.section .data.rel.ro
+.balign 8
+.Lx_coding: .quad .Lx_coding_name,0,0,0,0,0,0
+.section .note.GNU-stack,"",@progbits
+.text
+/* Report is observational; native callbacks return errors instead of throwing. */
+.Lx_report:
+ mov rax,[rdi+1216]
+ test rax,rax
+ jz .Lx_report_end
+ cmp qword ptr [rax+40],0
+ je .Lx_report_end
+ mov rdi,[rax+32]
+ jmp qword ptr [rax+40]
+.Lx_report_end:
+ ret
+.Lx_wraps:
+ XF 144
+ mov rbx,rdi
+ xor r12d,r12d
+.Lx_wrap_extension:
+ cmp r12,[rbx+1208]
+ jae .Lx_wrap_ok
+ mov rax,[rbx+1200]
+ mov r13,[rax+r12*8]
+ xor r14d,r14d
+.Lx_wrap_each:
+ cmp r14,[r13+48]
+ jae .Lx_wrap_next_extension
+ mov rbp,r14
+ shl rbp,5
+ add rbp,[r13+40]
+ mov [rsp+104],rbp
+ mov qword ptr [rsp+112],72
+ mov rdi,rbx
+ mov rsi,[rbx+1152]
+ cmp dword ptr [rbp],1
+ je .Lx_wrap_find
+ mov qword ptr [rsp+112],32
+ mov rdi,[rbx+1184]
+ mov rsi,[rbx+1192]
+.Lx_wrap_find:
+ mov [rsp+120],rdi
+ mov [rsp+128],rsi
+ mov edx,[rsp+112]
+ mov rcx,[rbp+8]
+ call .Lx_find
+ cmp rax,[rsp+128]
+ jae .Lx_wrap_next
+ mov [rsp+96],rax
+ imul rax,[rsp+112]
+ add rax,[rsp+120]
+ mov [rsp+88],rax
+ mov rdi,[rbp+16]
+ mov rsi,rax
+ mov rdx,rsp
+ call [rbp+24]
+ mov [rsp+136],eax
+ test eax,eax
+ jnz .Lx_wrap_drop
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Lx_wrap_renamed
+ mov rsi,[rbp+8]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lx_wrap_renamed
+ cmp qword ptr [rsp+112],32
+ jne .Lx_wrap_copy
+ cmp qword ptr [rsp+16],0
+ je .Lx_wrap_renamed
+.Lx_wrap_copy:
+ mov rdi,[rsp+88]
+ mov rsi,rsp
+ mov ecx,[rsp+112]
+ rep movsb
+ jmp .Lx_wrap_next
+.Lx_wrap_renamed:
+ mov dword ptr [rsp+136],5
+.Lx_wrap_drop:
+ mov rdi,[rsp+88]
+ mov rsi,rdi
+ add rsi,[rsp+112]
+ mov rdx,[rsp+128]
+ sub rdx,[rsp+96]
+ dec rdx
+ imul rdx,[rsp+112]
+ call memmove@PLT
+ cmp dword ptr [rbp],1
+ jne .Lx_wrap_drop_section
+ dec qword ptr [rbx+1152]
+ jmp .Lx_wrap_report
+.Lx_wrap_drop_section:
+ dec qword ptr [rbx+1192]
+.Lx_wrap_report:
+ mov rdi,rbx
+ mov rsi,[r13]
+ mov rdx,[rbp+8]
+ mov ecx,[rsp+136]
+ call .Lx_report
+.Lx_wrap_next:
+ inc r14
+ jmp .Lx_wrap_each
+.Lx_wrap_next_extension:
+ inc r12
+ jmp .Lx_wrap_extension
+.Lx_wrap_ok:
+ xor eax,eax
+ XE 144
+/* Render sections into the saved request, preserving byte lengths through the
+   existing owned JSON string appender. */
+.globl pg_extensions_prepare
+.type pg_extensions_prepare,@function
+pg_extensions_prepare:
+ XF 80
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov qword ptr [r13],0
+ mov rdi,r12
+ mov rsi,r13
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lx_prepare_bad
+ xor r14d,r14d
+.Lx_prepare_name:
+ cmp r14,[rbx+1208]
+ jae .Lx_prepare_names_done
+ mov rax,[rbx+1200]
+ mov rax,[rax+r14*8]
+ mov rdi,[rax]
+ call json_object_new_string@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lx_prepare_bad
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ mov qword ptr [rsp+8],0
+ inc r14
+ jmp .Lx_prepare_name
+.Lx_prepare_names_done:
+ mov rdi,[r13]
+ lea rsi,[rip+.Lx_extensions]
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ mov qword ptr [rsp],0
+ mov rdi,[r13]
+ lea rsi,[rip+.Lx_system]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ xor r14d,r14d
+.Lx_prepare_section:
+ cmp r14,[rbx+1192]
+ jae .Lx_prepare_prompt_done
+ mov rbp,r14
+ shl rbp,5
+ add rbp,[rbx+1184]
+ mov qword ptr [rsp+24],0
+ mov rdi,[rbp+8]
+ mov rsi,r12
+ lea rdx,[rsp+24]
+ call [rbp+16]
+ test eax,eax
+ jnz .Lx_render_report
+ cmp qword ptr [rsp+24],0
+ je .Lx_render_next
+ mov rdi,[rsp+24]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lx_render_invalid
+ cmp dword ptr [rbp+24],0
+ je .Lx_render_append
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lx_open_tag]
+ mov rdx,[rbp]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lx_prepare_bad
+ mov rdi,[rsp+32]
+ call json_object_new_string@PLT
+ mov [rsp+40],rax
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov qword ptr [rsp+32],0
+ cmp qword ptr [rsp+40],0
+ je .Lx_prepare_bad
+ lea rdi,[rsp+40]
+ mov rsi,[rsp+24]
+ xor edx,edx
+ call pg_context_append@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lx_close_tag]
+ mov rdx,[rbp]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lx_prepare_bad
+ mov rdi,[rsp+32]
+ call json_object_new_string@PLT
+ mov [rsp+48],rax
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov qword ptr [rsp+32],0
+ cmp qword ptr [rsp+48],0
+ je .Lx_prepare_bad
+ lea rdi,[rsp+40]
+ mov rsi,[rsp+48]
+ xor edx,edx
+ call pg_context_append@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov qword ptr [rsp+48],0
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rax,[rsp+40]
+ mov [rsp+24],rax
+ mov qword ptr [rsp+40],0
+.Lx_render_append:
+ lea rdi,[rsp+16]
+ mov rsi,[rsp+24]
+ mov edx,2
+ call pg_context_append@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ jmp .Lx_render_next
+.Lx_render_invalid:
+ mov eax,5
+.Lx_render_report:
+ mov [rsp+64],eax
+ mov rdi,rbx
+ mov rsi,[rbp]
+ call .Lx_section_owner
+ mov rsi,rax
+ mov rdi,rbx
+ mov rdx,[rbp]
+ mov ecx,[rsp+64]
+ call .Lx_report
+.Lx_render_next:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov qword ptr [rsp+24],0
+ inc r14
+ jmp .Lx_prepare_section
+.Lx_prepare_prompt_done:
+ mov rdi,[r13]
+ lea rsi,[rip+.Lx_system]
+ mov rdx,[rsp+16]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+ jmp .Lx_prepare_end
+.Lx_prepare_bad:
+ mov rdi,[r13]
+ call json_object_put@PLT
+ mov qword ptr [r13],0
+ mov ebp,5
+.Lx_prepare_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov eax,ebp
+ XE 80
+.section .rodata
+.Lx_render_name: .asciz "section"
+
+.text
+/* Same owner rule as agent.ts sectionExtension: the last selected extension
+   providing or wrapping this key supplies its report identity. */
+.Lx_section_owner:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ lea rbp,[rip+.Lx_render_name]
+ xor r13d,r13d
+.Lx_owner_extension:
+ cmp r13,[rbx+1208]
+ jae .Lx_owner_end
+ mov rax,[rbx+1200]
+ mov r14,[rax+r13*8]
+ mov rdi,[r14+24]
+ mov rsi,[r14+32]
+ mov edx,32
+ mov rcx,r12
+ call .Lx_find
+ cmp rax,[r14+32]
+ jae .Lx_owner_wraps
+ mov rbp,[r14]
+.Lx_owner_wraps:
+ mov qword ptr [rsp],0
+.Lx_owner_wrap:
+ mov rax,[rsp]
+ cmp rax,[r14+48]
+ jae .Lx_owner_next
+ shl rax,5
+ add rax,[r14+40]
+ cmp dword ptr [rax],2
+ jne .Lx_owner_wrap_next
+ mov rdi,[rax+8]
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lx_owner_wrap_next
+ mov rbp,[r14]
+.Lx_owner_wrap_next:
+ inc qword ptr [rsp]
+ jmp .Lx_owner_wrap
+.Lx_owner_next:
+ inc r13
+ jmp .Lx_owner_extension
+.Lx_owner_end:
+ mov rax,rbp
+ XE 16
+
+.text
+/* Resolve explicit byte names to a descriptor without assuming NUL termination. */
+.Lx_descriptor:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+.Lx_descriptor_each:
+ cmp r14,[rbx+1152]
+ jae .Lx_descriptor_missing
+ imul rbp,r14,72
+ add rbp,rbx
+ mov rdi,[rbp]
+ call strlen@PLT
+ cmp rax,r13
+ jne .Lx_descriptor_next
+ mov rdi,[rbp]
+ mov rsi,r12
+ mov rdx,r13
+ call memcmp@PLT
+ test eax,eax
+ jz .Lx_descriptor_end
+.Lx_descriptor_next:
+ inc r14
+ jmp .Lx_descriptor_each
+.Lx_descriptor_missing:
+ xor ebp,ebp
+.Lx_descriptor_end:
+ mov rax,rbp
+ XE 16
+/* Restore native service arguments, returning the selected descriptor in rax. */
+.Lx_dispatch_route:
+ sub rsp,72
+ mov [rsp],rdi
+ mov [rsp+8],rsi
+ mov [rsp+16],rdx
+ mov [rsp+24],rcx
+ mov [rsp+32],r8
+ mov [rsp+40],r9
+ mov rdi,[rdi+112]
+ call .Lx_descriptor
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lx_dispatch_composed
+ mov rdi,[rsp]
+ mov rdi,[rdi+120]
+ mov rsi,[rsp+8]
+ mov rdx,[rsp+16]
+ call .Lx_descriptor
+ test rax,rax
+ jz .Lx_dispatch_composed
+ mov rdi,rax
+ mov rsi,[rsp+48]
+ mov edx,72
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lx_dispatch_composed
+ mov rax,[rsp]
+ jmp .Lx_dispatch_restore
+.Lx_dispatch_composed:
+ mov rax,[rsp]
+ add rax,56
+.Lx_dispatch_restore:
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ mov rdx,[rsp+16]
+ mov rcx,[rsp+24]
+ mov r8,[rsp+32]
+ mov r9,[rsp+40]
+ add rsp,72
+ ret
+.globl pg_extension_tools_service
+.type pg_extension_tools_service,@function
+pg_extension_tools_service:
+ mov [rdi],rsi
+ lea rax,[rip+.Lx_dispatch_authorize]
+ mov [rdi+8],rax
+ lea rax,[rip+.Lx_dispatch_execute]
+ mov [rdi+16],rax
+ lea rax,[rip+.Lx_dispatch_replay]
+ mov [rdi+24],rax
+ lea rax,[rip+.Lx_dispatch_next]
+ mov [rdi+32],rax
+ lea rax,[rip+.Lx_dispatch_cancel]
+ mov [rdi+40],rax
+ lea rax,[rip+.Lx_dispatch_close]
+ mov [rdi+48],rax
+ mov rax,rdi
+ ret
+.Lx_dispatch_authorize:
+ sub rsp,8
+ call .Lx_dispatch_route
+ add rsp,8
+ mov rdi,[rax]
+ jmp qword ptr [rax+8]
+.Lx_dispatch_execute:
+ sub rsp,8
+ call .Lx_dispatch_route
+ add rsp,8
+ mov [rdi+128],rax
+ mov rdi,[rax]
+ jmp qword ptr [rax+16]
+.Lx_dispatch_replay:
+ sub rsp,8
+ call .Lx_dispatch_route
+ add rsp,8
+ mov rdi,[rax]
+ mov rax,[rax+24]
+ test rax,rax
+ jz .Lx_dispatch_return
+ jmp rax
+.Lx_dispatch_next:
+ mov rax,[rdi+128]
+ test rax,rax
+ jz .Lx_dispatch_no_next
+ mov rdi,[rax]
+ mov rax,[rax+32]
+ test rax,rax
+ jz .Lx_dispatch_no_next
+ jmp rax
+.Lx_dispatch_no_next:
+ mov eax,1
+ ret
+.Lx_dispatch_cancel:
+ mov rax,[rdi+128]
+ test rax,rax
+ jz .Lx_dispatch_return
+ mov rdi,[rax]
+ mov rax,[rax+40]
+ test rax,rax
+ jz .Lx_dispatch_return
+ jmp rax
+.Lx_dispatch_close:
+ mov rax,[rdi+128]
+ test rax,rax
+ jz .Lx_dispatch_return
+ mov rdi,[rax]
+ mov rax,[rax+48]
+ test rax,rax
+ jz .Lx_dispatch_return
+ jmp rax
+.Lx_dispatch_return:
+ ret

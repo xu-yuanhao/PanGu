@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
+| 扩展选择与组合 | `extensions.S`：extensions.registry的稳定名称选择、同名工具/section保序覆盖、同步wrapper与失败报告、标签渲染和请求固定选择；工具分派保留未改动的注入提供者，扩展实现进入同一Durable Tool链 |
 | Agent配置 | `agent_state.S`：Host agent.state事务写pangu.agent，稳定名称配置、字段清除/去重提交、独立读取；instructions在资源提示后进入Generation请求，tools/modelTools筛选模型声明，执行gate保持原提供者lease并拒绝禁用名字 |
 | 扩展任务 | `task_provider.S`：可选Host task.definitions校验/查找，保留内置任务、拒绝重名/无效定义；原生DSO通过公开commit/commit_with执行checkpoint与终态，Scheduler重开后继续，消费者清理先于库卸载 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
@@ -36,9 +37,9 @@
 
 ## 本批验证与集成状态
 
-- pangu.agent文档与Host配置服务接入Generation请求、模型声明与实际工具执行；配置改变后下一请求采纳，工具执行读取当前配置，模型恢复继续使用保存的请求配置。
-- 产品`--native-tasks --sanitize`覆盖配置更新/null清除/相同配置不提交、数组去重/排序/未知名字、remove筛选与禁用工具执行拒绝；SQLite/JSONL Durable专项验证提交、回滚及重开后配置保持。
-- `--live-agent`通过实际DeepSeek验证配置提示词、缩小模型声明、write-only原生写入及继续回答。Runtime整批退出0；最终产品构建、G00/Assembly及针对错误配置/工具执行限制的产品ASan/UBSan追加专项通过。
+- 原生DSO中的扩展快照进入真实Generation提示词/工具声明和Durable工具执行，选择固定在请求配置，运行中工具重新解析当前Agent配置；组合和插件代码保留至模型/工具及pending close释放。
+- 产品`--native-tasks --sanitize`通过选择/覆盖/wrapper/标签、错误移除与归属报告、基础提供者保留分派、组合工具执行、配置固定及库卸载。
+- `--live-extensions`实际DeepSeek通过基础写入及扩展native_echo声明/执行/返回；Runtime整批退出0，最终产品构建通过。G00/Assembly随最终登记核对。
 
 ## 当前接口边界
 
@@ -66,6 +67,7 @@ python3 -B tools/runtime/build_test.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
 python3 -B tools/runtime/test_product_resources.py --live-agent
+python3 -B tools/runtime/test_product_resources.py --live-extensions
 python3 -B tools/runtime/test_product_resources.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live-settings
 python3 -B tools/runtime/test_pangu_pty.py --live-templates

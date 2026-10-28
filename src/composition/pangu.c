@@ -8,6 +8,7 @@
 #include "../runtime/task_graph.h"
 #include "../runtime/task_provider.h"
 #include "../runtime/agent_state.h"
+#include "../runtime/extensions.h"
 #include "../runtime/conversation_view.h"
 #include "../runtime/request_context.h"
 #include "../runtime/tool_provider.h"
@@ -77,7 +78,8 @@ static struct {
  const pg_model_metadata *model_metadata;
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
- pg_tools selected_tools;
+ pg_tools selected_tools,leased_tools;
+ const pg_extensions *extensions;pg_extension_result model_extensions,tool_extensions;pg_extension_tools extension_tools;
  pg_tool_registry offered_tools,allowed_tools;
  pg_agent_tools_gate tool_gate;
  struct json_object *configuration;
@@ -140,7 +142,7 @@ static int timer_enqueue(void *ctx,pg_timer_job job,void *argument){(void)ctx;if
 static void foreground(void){
  if(durable.armed&&durable.fire&&monotonic(0)>=durable.deadline){pg_timer_job fire=durable.fire;durable.fire=0;fire(durable.fire_context);}
  if(durable.queued&&(!durable.session_ready||pg_durable_session_idle(&durable.session))){pg_timer_job job=durable.queued;void *argument=durable.queued_context;durable.queued=0;job(argument);}
- if(durable.tools_draining){int result=durable.selected_tools.close(durable.selected_tools.context);if(result!=1){durable.tools_draining=0;durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
+ if(durable.tools_draining){int result=durable.leased_tools.close?durable.leased_tools.close(durable.leased_tools.context):0;if(result!=1){pg_extensions_close(&durable.tool_extensions);durable.tools_draining=0;durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
 }
 static int backend_close(void *ctx){(void)ctx;int result=pg_record_jsonl_close(&durable.backend);if(!result)durable.storage_ready=0;return result?-1:0;}
 static int record_read(void *ctx,unsigned table,uint64_t id,struct json_object **out){(void)ctx;return pg_record_memory_read(&durable.backend.memory,(pg_record_table)table,id,out);}
@@ -169,7 +171,7 @@ static int storage_stop(void *ctx){
  if(durable.timer_ready)pg_hold_timer_stop(&durable.timer);if(durable.holds_ready)pg_document_holds_finish(&durable.holds,&durable.records);if(durable.cache_ready)pg_document_cache_close(&durable.cache);if(durable.storage_ready)return backend_close(0);return 0;
 }
 static int prepare(void *ctx,uint64_t conversation,struct json_object **out){
- (void)ctx;*out=0;struct json_object *state=0;if(pg_agent_state_peek(&durable.session,conversation,&state))return 1;int prepared=pg_agent_state_prepare(durable.configuration,state,out);json_object_put(state);if(prepared)return 1;
+ (void)ctx;*out=0;struct json_object *state=0;if(pg_agent_state_peek(&durable.session,conversation,&state))return 1;pg_extension_result composed={0};json_object *configuration=0;int prepared=pg_extensions_resolve(durable.extensions,state,durable.declared_tools,&composed);if(!prepared)prepared=pg_extensions_prepare(&composed,durable.configuration,&configuration);if(!prepared)prepared=pg_agent_state_prepare(configuration,state,out);pg_extensions_close(&composed);json_object_put(configuration);json_object_put(state);if(prepared)return 1;
  struct json_object *settings=json_object_object_get(durable.resources.current.settings,"settings"),*policy=json_object_object_get(settings,"compaction"),*copy=0;
  if(policy){if(json_object_deep_copy(policy,&copy,0)||json_object_object_add(*out,"compaction",copy))goto failed;copy=0;}
  if(durable.model_metadata){if(durable.model_metadata->describe(durable.model_metadata->context,*out,&copy)||!copy||!json_object_is_type(copy,json_type_object)||!pg_document_value_valid(copy))goto failed;if(json_object_object_add(*out,"modelInfo",copy))goto failed;copy=0;}
@@ -191,9 +193,11 @@ static int acquire_model(const struct json_object *configuration,const pg_tool_r
  if(selected->configure(selected->model.context,configuration,tools)){if(selected->model.close)selected->model.close(selected->model.context);return 2;}
  *out=selected->model;durable.model_leased=1;return 0;
 }
-static int model_acquire(void *ctx,const struct json_object *configuration,pg_model *out){(void)ctx;if(durable.model_leased)return 1;if(pg_agent_tools_select(durable.declared_tools,configuration,1,&durable.offered_tools))return 2;return acquire_model(configuration,&durable.offered_tools,out);}
+static int model_acquire(void *ctx,const struct json_object *configuration,pg_model *out){
+ (void)ctx;if(durable.model_leased)return 1;int result=pg_extensions_resolve(durable.extensions,configuration,durable.declared_tools,&durable.model_extensions);if(!result)result=pg_agent_tools_select(&durable.model_extensions.tools,configuration,1,&durable.offered_tools);if(!result)result=acquire_model(configuration,&durable.offered_tools,out);if(result)pg_extensions_close(&durable.model_extensions);return result?2:0;
+}
 static int compaction_acquire(void *ctx,const struct json_object *configuration,pg_model *out){(void)ctx;return acquire_model(configuration,0,out);}
-static void model_release(void *ctx,const pg_model *model){(void)ctx;if(model->close)model->close(model->context);durable.model_leased=0;}
+static void model_release(void *ctx,const pg_model *model){(void)ctx;if(model->close)model->close(model->context);durable.model_leased=0;pg_extensions_close(&durable.model_extensions);}
 static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out){
  (void)ctx;if(durable.model_provider->failure)durable.model_provider->failure(model->context,out);
  else *out=(pg_model_failure){.message={"Model request failed",20}};
@@ -204,15 +208,15 @@ static int model_cancel_deferred(void *ctx,const pg_model *model,const struct js
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
 static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
  (void)ctx;if(durable.tools_leased)return 1;json_object *task=0,*state=0;if(record_read(0,PG_TABLE_TASK,id,&task))return 2;uint64_t conversation=json_object_get_uint64(json_object_object_get(task,"conversationId"));json_object_put(task);
- int result=pg_agent_state_read(&durable.session,conversation,&state);if(!result)result=pg_agent_tools_select(durable.declared_tools,state,1,&durable.allowed_tools);json_object_put(state);if(result)return 2;
- durable.tools_leased=1;pg_edit_tool_clear(&editor);durable.tool_gate=(pg_agent_tools_gate){durable.selected_tools,&durable.allowed_tools};*out=pg_agent_tools_service(&durable.tool_gate);pg_durable_client_tool(&durable.client,id,0);return 0;
+ int result=pg_agent_state_read(&durable.session,conversation,&state);if(!result)result=pg_extensions_resolve(durable.extensions,state,durable.declared_tools,&durable.tool_extensions);if(!result)result=pg_agent_tools_select(&durable.tool_extensions.tools,state,1,&durable.allowed_tools);json_object_put(state);if(result){pg_extensions_close(&durable.tool_extensions);return 2;}
+ durable.tools_leased=1;pg_edit_tool_clear(&editor);durable.extension_tools=(pg_extension_tools){durable.selected_tools,pg_tool_registry_service(&durable.tool_extensions.tools),durable.declared_tools,&durable.tool_extensions.tools,0};durable.leased_tools=durable.tool_extensions.tools_changed?pg_extension_tools_service(&durable.extension_tools):durable.selected_tools;durable.tool_gate=(pg_agent_tools_gate){durable.leased_tools,&durable.allowed_tools};*out=pg_agent_tools_service(&durable.tool_gate);pg_durable_client_tool(&durable.client,id,0);return 0;
 }
 static int agent_state_read(void *ctx,uint64_t conversation,json_object **out){(void)ctx;return pg_agent_state_read(&durable.session,conversation,out);}
 static int agent_state_configure(void *ctx,uint64_t conversation,const json_object *change){
- (void)ctx;pg_tool_registry checked={0};if(pg_agent_tools_select(durable.declared_tools,change,1,&checked))return 5;pg_record_tx tx={0};pg_document_tx docs={0};if(pg_durable_session_begin(&durable.session,&tx,&docs,0,record_read))return 3;
+ (void)ctx;pg_tool_registry checked={0};pg_extension_result candidate={0};int invalid=pg_extensions_resolve(durable.extensions,change,durable.declared_tools,&candidate);if(!invalid)invalid=pg_agent_tools_select(&candidate.tools,change,1,&checked);pg_extensions_close(&candidate);if(invalid)return 5;pg_record_tx tx={0};pg_document_tx docs={0};if(pg_durable_session_begin(&durable.session,&tx,&docs,0,record_read))return 3;
  if(pg_agent_state_stage(&docs,conversation,change,mint)){pg_durable_session_abort(&durable.session);return 5;}return pg_durable_session_settle(&durable.session,0,0,0);
 }
-static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
+static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {pg_extensions_close(&durable.tool_extensions);durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
 static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
  const char *name=json_object_get_string(json_object_object_get(call,"name"));
@@ -224,7 +228,7 @@ static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *
  *out=value;return 0;
 }
 static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
- (void)ctx;const pg_tool_provider *selected=durable.tool_provider;*out=0;
+ (void)ctx;const pg_tool_provider *selected=durable.tool_provider;*out=0;if(durable.tool_extensions.tools_changed&&durable.extension_tools.active==&durable.extension_tools.composed)return 0;
  return selected->snapshot?selected->snapshot(selected->context,id,call,out):0;
 }
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}
@@ -286,7 +290,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
  if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
  durable.model_metadata=pg_host_find(scope->parent,"model.metadata");if(durable.model_metadata&&(durable.model_metadata->abi!=PG_MODEL_METADATA_ABI||durable.model_metadata->size!=sizeof(pg_model_metadata)||!durable.model_metadata->describe))return 1;
- durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;
+ durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;durable.extensions=pg_host_find(scope->parent,"extensions.registry");
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
@@ -311,7 +315,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.compaction_binding=(pg_compaction_binding){&durable.compaction,&durable.session,&durable.tasks,&durable.scheduler};pg_durable_compaction_service(&durable.compaction_binding,&durable.compaction_ops);foreground_compaction=durable.compaction_ops;
  pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  extension_tasks=pg_host_find(scope->parent,"task.definitions");const pg_task_definition *builtins[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};if(pg_task_provider_validate(extension_tasks,builtins,3))return 1;
- json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;json_object_put(agent_state);
+ json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;pg_extension_result initial_extensions={0};int invalid_extensions=pg_extensions_resolve(durable.extensions,agent_state,durable.declared_tools,&initial_extensions);pg_extensions_close(&initial_extensions);json_object_put(agent_state);if(invalid_extensions)return 1;
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
@@ -324,7 +328,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;pg_conversation_view_close(&conversation_view_binding);pg_view_binding_close(&task_graph_binding);foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
- if(durable.tools_draining)return 1;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
+ if(durable.tools_draining)return 1;pg_extensions_close(&durable.model_extensions);pg_extensions_close(&durable.tool_extensions);durable.extensions=0;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};

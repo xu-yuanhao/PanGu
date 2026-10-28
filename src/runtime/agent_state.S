@@ -511,7 +511,7 @@ pg_agent_tools_select:
 .section .data.rel.ro
 .balign 8
 .La_fields: .quad .La_model,.La_thinking,.La_extensions,.La_tools,.La_model_tools,.La_instructions,.La_cwd,0
-.La_request_fields: .quad .La_instructions,.La_tools,.La_model_tools,.La_extensions,0
+.La_request_fields: .quad .La_instructions,.La_tools,.La_model_tools,0
 .La_definition:
  .quad .La_kind,11,1
  .long 1,2,3,0
