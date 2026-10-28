@@ -2448,6 +2448,17 @@ pg_durable_context_order:
  test eax,eax
  jnz .Lgg_stage_end
 .Lgg_stage_output:
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+216]
+ mov rdx,[rsp+64]
+ GGET "qword ptr [rbx+24]",error_message
+ mov rcx,rax
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+216]
+ mov rdx,[rsp+64]
+ call .Lgg_status_apply
+ test eax,eax
+ jnz .Lgg_stage_end
  GGET "qword ptr [rsp+64]",status
  mov rdi,rax
  call json_object_get_string@PLT
@@ -3120,7 +3131,7 @@ pg_durable_context_order:
 .Lgg_retry_commit:
  mov rdi,rbx
  mov rsi,[rsp]
- call pg_task_runner_commit@PLT
+ call .Lgg_status_commit
  jmp .Lgg_retry_error
 .Lgg_retry_alloc:
  mov eax,5
@@ -3947,7 +3958,7 @@ pg_durable_context_read:
  jnz .Lgg_defer_end
  mov rdi,r12
  mov rsi,[rsp]
- call pg_task_runner_commit@PLT
+ call .Lgg_status_commit
  jmp .Lgg_defer_end
 .Lgg_defer_alloc:
  mov eax,5
@@ -4857,3 +4868,240 @@ pg_durable_request_read:
  ret
 .section .rodata
 .Lgg_empty_string: .asciz ""
+
+.text
+/* runner, document Tx, next state, optional retry error. */
+.Lgg_status_apply:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,176
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,22
+ rep stosq
+ lea rax,[rip+.Lgg_live_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],10
+ GGET "qword ptr [rbx+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+32],rax
+ mov dword ptr [rsp+40],1
+ lea rax,[rip+.Lgg_live_definition]
+ mov [rsp+48],rax
+ lea rax,[rsp]
+ mov [rsp+56],rax
+ lea rax,[rip+.Lgg_live_initializer]
+ mov [rsp+72],rax
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov rax,[rax+32]
+ mov [rsp+80],rax
+ mov rdi,r12
+ lea rsi,[rsp+48]
+ lea rdx,[rsp+112]
+ call pg_document_tx_doc@PLT
+ test eax,eax
+ jnz .Lgg_status_bad
+ GGET r13,checkpoint
+ mov [rsp+144],rax
+ GGET rax,phase
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lgg_status_clear
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_retry_name]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_status_retry
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_poll_name]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_status_clear
+ mov dword ptr [rsp+168],1
+ jmp .Lgg_status_build
+.Lgg_status_retry:
+ test r14,r14
+ jnz .Lgg_status_retry_error_saved
+ mov rdi,[rsp+112]
+ lea rsi,[rsp+152]
+ call pg_document_change_snapshot@PLT
+ test eax,eax
+ jnz .Lgg_status_bad
+ GGET "qword ptr [rsp+152]",generation
+ GGET rax,retry_key
+ GGET rax,error_key
+ mov r14,rax
+.Lgg_status_retry_error_saved:
+ mov dword ptr [rsp+168],0
+.Lgg_status_build:
+ lea rdi,[rip+.Lgg_status_json]
+ call json_tokener_parse@PLT
+ mov [rsp+120],rax
+ test rax,rax
+ jz .Lgg_status_bad
+ mov rdi,[rbx+16]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_task_id]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_status_bad
+ GGET "qword ptr [rsp+144]",attempt
+ test rax,rax
+ jz .Lgg_status_default_attempt
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_attempt]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_status_bad
+.Lgg_status_default_attempt:
+ cmp dword ptr [rsp+168],0
+ jne .Lgg_status_poll
+ lea rdi,[rip+.Lgg_status_retry_json]
+ call json_tokener_parse@PLT
+ mov [rsp+136],rax
+ test rax,rax
+ jz .Lgg_status_bad
+ GGET "qword ptr [rsp+144]",until
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Lgg_at_key]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_status_bad
+ test r14,r14
+ jz .Lgg_status_retry_error_ready
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Lgg_error_key]
+ mov rdx,r14
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_status_bad
+.Lgg_status_retry_error_ready:
+ lea rbp,[rip+.Lgg_retry_key]
+ jmp .Lgg_status_member
+.Lgg_status_poll:
+ lea rdi,[rip+.Lgg_status_poll_json]
+ call json_tokener_parse@PLT
+ mov [rsp+136],rax
+ test rax,rax
+ jz .Lgg_status_bad
+ GGET "qword ptr [rsp+144]",poll_at
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Lgg_poll_at]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_status_bad
+ lea rbp,[rip+.Lgg_deferred]
+.Lgg_status_member:
+ mov rdi,[rsp+120]
+ mov rsi,rbp
+ mov rdx,[rsp+136]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_status_bad
+ lea rdi,[rip+.Lgg_status_patch_json]
+ call json_tokener_parse@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_status_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,[rsp+120]
+ call json_object_get@PLT
+ mov rdi,rbp
+ mov esi,2
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lgg_status_bad
+ jmp .Lgg_status_append
+.Lgg_status_clear:
+ lea rdi,[rip+.Lgg_live_clear_json]
+ call json_tokener_parse@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_status_bad
+.Lgg_status_append:
+ mov rdi,[rsp+112]
+ mov rsi,[rsp+128]
+ call pg_document_change_append@PLT
+ test eax,eax
+ jnz .Lgg_status_bad
+ xor ebp,ebp
+ jmp .Lgg_status_end
+.Lgg_status_bad:
+ mov ebp,5
+.Lgg_status_end:
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov rdi,[rsp+128]
+ call json_object_put@PLT
+ mov rdi,[rsp+136]
+ call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,176
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lgg_status_commit:
+ push rbx
+ sub rsp,32
+ mov [rsp],rdi
+ mov [rsp+8],rsi
+ mov rsi,rsp
+ lea rdx,[rip+.Lgg_status_stage]
+ call pg_task_runner_commit_with@PLT
+ add rsp,32
+ pop rbx
+ ret
+.Lgg_status_stage:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rcx
+ mov rsi,rdx
+ mov rdi,[rbx]
+ mov rdx,[rbx+8]
+ xor ecx,ecx
+ call .Lgg_status_apply
+ test eax,eax
+ jnz .Lgg_status_stage_end
+ mov rdi,[rbx+8]
+ call json_object_get@PLT
+ mov [r12],rax
+ xor eax,eax
+.Lgg_status_stage_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lgg_status_json: .asciz "{\"taskId\":0,\"attempt\":1}"
+.Lgg_status_retry_json: .asciz "{\"at\":0,\"error\":\"\"}"
+.Lgg_status_poll_json: .asciz "{\"pollAt\":0}"
+.Lgg_status_patch_json: .asciz "[[\"s\",[\"generation\"],null]]"
+.Lgg_at_key: .asciz "at"

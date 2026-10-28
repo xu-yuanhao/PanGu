@@ -4,13 +4,15 @@
 #include <stdint.h>
 /* Internal source contract v0: borrowed event bytes expire at next poll. */
 typedef struct { const char *data; size_t size; } pg_slice;
-typedef enum { PG_RUN_STARTED, PG_TEXT_DELTA, PG_TOOL_STARTED, PG_TOOL_FINISHED, PG_RUN_FINISHED, PG_TOOL_OUTPUT_DELTA, PG_USAGE_CHANGED, PG_COMPACTION_STARTED, PG_COMPACTION_FINISHED } pg_event_kind;
+typedef enum { PG_RUN_STARTED, PG_TEXT_DELTA, PG_TOOL_STARTED, PG_TOOL_FINISHED, PG_RUN_FINISHED, PG_TOOL_OUTPUT_DELTA, PG_USAGE_CHANGED, PG_COMPACTION_STARTED, PG_COMPACTION_FINISHED, PG_RETRY_STARTED, PG_RETRY_FINISHED, PG_DEFERRED_POLL, PG_TASK_FAILED } pg_event_kind;
 typedef enum { PG_SUCCESS, PG_ERROR, PG_CANCELLED } pg_outcome;
 typedef struct {
     pg_event_kind kind;
     pg_outcome outcome;
     /* COMPACTION_STARTED/FINISHED text contains JSON taskId/reason/blocking;
        a failed finish includes error. USAGE_CHANGED text is a JSON ledger.
+       RETRY_STARTED: {attempt,at,errorMessage}; RETRY_FINISHED: {attempt};
+       DEFERRED_POLL: {pollAt}; TASK_FAILED: {taskId,kind,message}.
        Payloads are copied into the queue and borrowed until next poll.
        TOOL_STARTED text is the canonical JSON arguments; TOOL_FINISHED text
        is output. Slices borrow the event until next poll. */

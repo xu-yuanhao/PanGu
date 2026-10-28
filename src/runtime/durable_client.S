@@ -836,7 +836,7 @@ pg_durable_client_publish:
  call pg_durable_client_tool@PLT
  CGET "qword ptr [rsp]",value
  mov r14,rax
- CGET rax,kind
+ CGET r14,kind
  mov rdi,rax
  call json_object_get_string@PLT
  test rax,rax
@@ -864,6 +864,7 @@ pg_durable_client_publish:
  jmp .Ldc_publish_each
 .Ldc_publish_usage:
  mov rdi,rbx
+ mov rsi,r12
  call .Ldc_live_publish
 .Ldc_publish_end:
  add rsp,8
@@ -1499,6 +1500,7 @@ pg_durable_client_fault_task:
  push r13
  sub rsp,16
  mov rbx,rdi
+ mov [rsp+8],rsi
  mov qword ptr [rsp],0
  mov rdi,[rbx]
  mov rsi,[rbx+24]
@@ -1513,11 +1515,18 @@ pg_durable_client_fault_task:
  CGET "qword ptr [rsp]",compactions
  mov r13,rax
  mov rdi,rbx
+ mov rsi,[rbx+112]
+ mov rdx,[rsp]
+ call .Ldc_generation_delta
+ mov rdi,rbx
  mov rsi,r12
  mov rdx,r13
  mov ecx,8
  mov r8,[rsp]
  call .Ldc_compaction_delta
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Ldc_task_failures
  mov rdi,rbx
  call .Ldc_usage_publish
  mov rdi,rbx
@@ -1535,6 +1544,9 @@ pg_durable_client_fault_task:
  mov dword ptr [rbx+72],1
 .Ldc_live_only_usage:
  mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Ldc_task_failures
+ mov rdi,rbx
  call .Ldc_usage_publish
 .Ldc_live_done:
  add rsp,16
@@ -1546,3 +1558,325 @@ pg_durable_client_fault_task:
 .Ldc_task_id: .asciz "taskId"
 .Ldc_compactions: .asciz "compactions"
 .Ldc_compaction_failure: .asciz "compactionFailure"
+
+.text
+/* Serialize a temporary JSON payload into the owning event queue. */
+.Ldc_json_event:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,64
+ mov rbx,rdi
+ mov ebp,esi
+ mov rdi,rdx
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Ldc_json_event_bad
+ mov r12,rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [rsp+56],rax
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov [rsp],ebp
+ mov [rsp+8],r12
+ mov rax,[rsp+56]
+ mov [rsp+16],rax
+ mov rdi,rbx
+ mov rsi,rsp
+ call pg_durable_client_emit
+ jmp .Ldc_json_event_end
+.Ldc_json_event_bad:
+ mov dword ptr [rbx+72],1
+ mov eax,1
+.Ldc_json_event_end:
+ add rsp,64
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* target/key/source-value, borrowed values retained by target. */
+.Ldc_event_field:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rdx
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call .Ldc_set_owned
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ldc_generation_delta:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp+32],0
+ CGET r12,generation_key
+ mov r12,rax
+ CGET r13,generation_key
+ mov r13,rax
+ CGET r12,retry_key
+ mov [rsp],rax
+ CGET r13,retry_key
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ldc_generation_retry_end
+ cmp qword ptr [rsp],0
+ jne .Ldc_generation_deferred
+ lea rdi,[rip+.Ldc_retry_start_json]
+ call json_tokener_parse@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Ldc_generation_bad
+ CGET r13,attempt_key
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ldc_attempt_key]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_generation_bad
+ CGET "qword ptr [rsp+8]",at_key
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ldc_at_key]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_generation_bad
+ CGET "qword ptr [rsp+8]",error
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ldc_error_message_key]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_generation_bad
+ mov esi,9
+ jmp .Ldc_generation_retry_emit
+.Ldc_generation_retry_end:
+ cmp qword ptr [rsp],0
+ je .Ldc_generation_deferred
+ lea rdi,[rip+.Ldc_retry_end_json]
+ call json_tokener_parse@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Ldc_generation_bad
+ CGET r12,attempt_key
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Ldc_attempt_key]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_generation_bad
+ mov esi,10
+.Ldc_generation_retry_emit:
+ mov rdi,rbx
+ mov rdx,[rsp+32]
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_generation_bad
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov qword ptr [rsp+32],0
+.Ldc_generation_deferred:
+ CGET r13,deferred_key
+ test rax,rax
+ jz .Ldc_generation_done
+ CGET rax,poll_at
+ mov [rsp+16],rax
+ CGET r12,deferred_key
+ CGET rax,poll_at
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldc_generation_done
+ lea rdi,[rip+.Ldc_deferred_event_json]
+ call json_tokener_parse@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Ldc_generation_bad
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_poll_at]
+ mov rdx,[rsp+16]
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_generation_bad
+ mov rdi,rbx
+ mov esi,11
+ mov rdx,[rsp+32]
+ call .Ldc_json_event
+ test eax,eax
+ jz .Ldc_generation_done
+.Ldc_generation_bad:
+ mov dword ptr [rbx+72],1
+.Ldc_generation_done:
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_generation_key: .asciz "generation"
+.Ldc_retry_key: .asciz "retry"
+.Ldc_attempt_key: .asciz "attempt"
+.Ldc_at_key: .asciz "at"
+.Ldc_error_message_key: .asciz "errorMessage"
+.Ldc_deferred_key: .asciz "deferred"
+.Ldc_poll_at: .asciz "pollAt"
+.Ldc_retry_start_json: .asciz "{\"attempt\":0,\"at\":0,\"errorMessage\":\"\"}"
+.Ldc_retry_end_json: .asciz "{\"attempt\":0}"
+.Ldc_deferred_event_json: .asciz "{\"pollAt\":0}"
+
+.text
+.Ldc_task_failure:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ CGET r12,conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Ldc_task_failure_end
+ CGET r12,state
+ CGET rax,outcome
+ mov [rsp+8],rax
+ CGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_task_failure_end
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_faulted_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldc_task_failure_faulted
+ mov rdi,rbp
+ lea rsi,[rip+.Ldc_orphaned_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_task_failure_end
+ CGET "qword ptr [rsp+8]",reason_key
+ jmp .Ldc_task_failure_message
+.Ldc_task_failure_faulted:
+ CGET "qword ptr [rsp+8]",error
+ CGET rax,message
+.Ldc_task_failure_message:
+ mov rbp,rax
+ lea rdi,[rip+.Ldc_task_failure_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldc_task_failure_bad
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_message]
+ mov rdx,rbp
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_task_failure_bad
+ CGET r12,id
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldc_task_id]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_task_failure_bad
+ CGET r12,kind
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldc_kind]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_task_failure_bad
+ mov rdi,rbx
+ mov esi,12
+ mov rdx,[rsp]
+ call .Ldc_json_event
+ test eax,eax
+ jz .Ldc_task_failure_end
+.Ldc_task_failure_bad:
+ mov dword ptr [rbx+72],1
+.Ldc_task_failure_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_faulted_word: .asciz "faulted"
+.Ldc_orphaned_word: .asciz "orphaned"
+.Ldc_reason_key: .asciz "reason"
+.Ldc_task_failure_json: .asciz "{\"taskId\":0,\"kind\":\"\",\"message\":\"\"}"
+
+.section .rodata
+.Ldc_status: .asciz "status"
+
+.text
+.Ldc_task_failures:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+.Ldc_task_failures_next:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_task_failures_end
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ CGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_task_failures_skip
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_task]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_task_failures_skip
+ CGET rbp,value
+ test rax,rax
+ jz .Ldc_task_failures_skip
+ mov rdi,rbx
+ mov rsi,rax
+ call .Ldc_task_failure
+.Ldc_task_failures_skip:
+ inc r13
+ jmp .Ldc_task_failures_next
+.Ldc_task_failures_end:
+ add rsp,8
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret

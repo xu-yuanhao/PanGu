@@ -32,9 +32,9 @@
 
 ## 本批验证与集成状态
 
-- Client按采纳Live的压缩taskId差异发布开始/结束，结束事件取对应失败信息，顺序为结束→用量→开始；暂停释放快照基线。
-- 实际Host正常摘要、空范围、真实连接拒绝和主动取消通过，阶段更新不重复事件；Runtime整批回归、G00/Assembly通过。
-- DeepSeek SQLite/JSONL自动owned压缩、等待父任务与保存摘要重开、后续真实回答通过；产品构建通过。
+- Generation retry/deferred checkpoint与Live状态同批提交，Client产生重试开始/结束、deferred时间变化和当前会话task_failed通知；终态清理状态。
+- 两后端ASan/UBSan通过；DeepSeek真实retry/read/回答与deferred重开/fetch/工具/后续对话通过，断言事件字段。
+- 产品task_failed发布夹具与跨会话过滤通过，既有压缩正常/失败/取消保持；Runtime整批回归、产品构建、G00/Assembly通过。
 
 ## 当前接口边界
 
