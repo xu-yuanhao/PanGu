@@ -178,6 +178,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 模型可见上下文按调用顺序整理工具结果：下一assistant前的首个同ID结果、跨用户消息匹配、排除错误/取消/deferred assistant、孤立/重复结果过滤及缺失结果临时回执；实际请求编码与两后端重开通过。
 - [x] 当前OpenAI请求路径按pi-ai折叠system正文和命名section：内容顺序追加、覆盖保序、null删除、重新加入移到末尾；接入Generation/历史/实际编码，容量边界与两后端重开通过。
 - [x] 核心手动压缩服务接通动态Entry/贡献视图、UTF-16估算与合法保留边界、固定配置/范围的摘要请求、持久select/summarize/place及原子Submission/任务终态；真实模型验证70条消息、两次阶段重开、原记录保留和摘要后继续对话，提供独立TUI操作表。
+- [x] 摘要输入移除4096字节复制边界：任务持有完整JSON文本，通过model.provider ABI3的显式长度借用行进入同一模型编码器；1 MiB/NUL/页尾编码及19,301字节真实请求、两后端恢复与产品Host继续对话通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -226,8 +227,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable harness/{context,compaction}.ts deriveRange/orderToolResults/selectCut/isCandidate/serializeConversation/CompactionTask，以及pi-ai utils/estimate.ts；摘要提示词与MIT来源保留。固定快照沿本批使用，缓存上游restartLimit修复通过原生Task cutoff接入。
-- 实际调用链：Host compaction服务/可选TUI表 → 手写Assembly创建conversation-owned Task → 动态Entry/贡献视图和UTF-16估算选择保留边界 → 固定tail/firstKept/模型配置 → 空工具目录摘要请求 → 持久保存摘要 → 同一事务admit write Submission并完成Task → 最新head上下文 → 后继模型对话。Generation/历史共用同一动态视图，原始Entry继续保留。
-- 验证：保留边界、工具配对、摘要格式/焦点、2000 UTF-16工具结果截断、跨surrogate替换、容量与ABI专项ASan/UBSan通过；真实DeepSeek在SQLite/JSONL各完成70条消息摘要、select后重开、保存摘要后重开、原记录cutoff回读及继续回答旧标记。发送入口核对摘要system、空tools和512输出token预算，发布回调验证摘要Entry/Submission/Task终态同批。Runtime整批回归、核心产品构建、实际Host服务/可选TUI表绑定与资源集成通过；隔离核心G00和Assembly通过。
-- 接口与自审：新增task.compaction.local.v0、pg_durable_context_read/order和同一admission实现的外层事务入口；模型/客户端既有布局保持。产品注入同一选定Model提供者的空工具目录请求，提供pg_compaction_ops及pg_tui_runtime_compaction；TUI可弱链接获取后start/poll/release。原生将摘要保存和最终放置分为持久阶段，最终admission与终态原子提交。登记/依赖/许可证自审通过，并行TUI、assets与其规划文档保持原位。
-- 剩余与下一交付物：继续K12自动阈值/overflow/background、generation-owned阻塞压缩、重试/取消与Live/hook、完整大文本摘要请求及system基线；当前请求/摘要仍受模型ABI容量约束。TUI的/compact交互消费已提供的独立表，完整K12与最终TUI验收继续按原覆盖表。其他K项范围保持。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable compaction.ts summaryPrompt和pi-ai OpenAI provider完整user字符串编码。已核对缓存上游差异：OpenAI模块无新增差异，compaction仅restartLimit修复，本批仍沿固定快照；Harness保持22ddee3792402c3e70ec5f86a63c3e3e895a2f60。
+- 实际调用链：已提交Entry/贡献 → 完整摘要正文JSON owner → PG_USER_VIEW显式长度借用 → 同一OpenAI编码器 → 已有持久摘要/放置/后续生成。模型关闭和租约释放后再释放正文；请求重开按固定tail/配置重建，持久协议保持PanGu自身格式。
+- 验证：1 MiB原文完整编码、嵌入NUL、无终止符页尾视图、空指针/超出json-c长度拒绝及Durable ASan/UBSan专项通过；MIMO四种模式矩阵和Runtime整批回归通过。真实DeepSeek在SQLite/JSONL各完整发送19,301字节摘要正文，经历两次阶段重开并回忆旧标记；实际产品Host通过独立compaction服务完成大上下文摘要与后续对话。核心产品构建、插件Fixture编译、隔离核心G00与Assembly通过。
+- 接口与自审：model.provider ABI3声明PG_USER_VIEW支持，函数表96字节及消息/Session布局保持；旧短消息使用同一编码器。pg_durable_compaction_request增加owned正文输出，任务持有至模型关闭；新类型限请求态，记录和历史布局保持。删除构建器中的有界正文复制，来源/语言职责保持原登记，控制变化自审通过；并行TUI、assets和规划文档保持原位。
+- 剩余与下一交付物：继续K12自动阈值/overflow/background与generation-owned阻塞压缩、重试/取消/Live/hook及system基线。常规Generation/历史仍为64行、单文本4096字节，摘要输出沿4096字节边界；完整动态请求与大摘要输出继续随实际调用链完成。TUI消费既有/compact操作表，其他K项保持原覆盖范围。

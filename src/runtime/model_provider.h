@@ -6,7 +6,9 @@ struct json_object;
 /* Service model.provider; borrowed through all requests and pending cleanup.
    configure honors the committed public configuration and current tool catalog.
    The host serializes one lease; close ends a request before provider stop.
-   identity is a stable nonempty versioned name, saved with each request. */
+   identity is a stable nonempty versioned name, saved with each request.
+   ABI3 accepts PG_USER_VIEW request rows and borrows their explicit-length text
+   until close; the producing request owner retains storage through release. */
 typedef struct {
  uint32_t abi,size;
  pg_model model;
@@ -21,5 +23,5 @@ typedef struct {
  int (*fetch_deferred)(void *,const struct json_object *handle);
  int (*cancel_deferred)(void *,const struct json_object *handle);
 } pg_model_provider;
-#define PG_MODEL_PROVIDER_ABI 2u
+#define PG_MODEL_PROVIDER_ABI 3u
 #endif

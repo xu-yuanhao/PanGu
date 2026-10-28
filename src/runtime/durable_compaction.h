@@ -5,10 +5,11 @@
    first_kept=0 means there is no nonempty old prefix to summarize. */
 int pg_durable_compaction_select(const struct json_object *,uint64_t keep_recent_tokens,uint64_t *first_kept);
 /* Build the pinned summary request from contributions before first_kept;
-   instructions is an optional UTF-8 C string. Refuses a request beyond the
-   current model ABI capacity. */
+   instructions is an optional UTF-8 C string. Success owns text_owner; the
+   request borrows its immutable UTF-8 through model close. The output owner
+   must be fresh; release it once with json_object_put. */
 int pg_durable_compaction_request(const struct json_object *,uint64_t first_kept,
-                                  const char *instructions,pg_session *);
+                                  const char *instructions,pg_session *,struct json_object **text_owner);
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;

@@ -7,12 +7,13 @@
 #define PG_ID_LIMIT 64
 #define PG_TOOL_BATCH_LIMIT 8
 #define PG_SESSION_BATCH_LIMIT (PG_TOOL_BATCH_LIMIT+1)
-/* THINKING is a model-projection row; committed history exposes visible roles. */
-typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT, PG_THINKING } pg_role;
+/* THINKING and USER_VIEW are request-only rows. USER_VIEW borrows size bytes
+   from text_view through model close; it is not a committed Session message. */
+typedef enum { PG_USER, PG_ASSISTANT, PG_TOOL_CALL, PG_TOOL_RESULT, PG_THINKING, PG_USER_VIEW } pg_role;
 typedef struct {
     pg_role role;
     size_t size;
-    char text[PG_TEXT_LIMIT];
+    union { char text[PG_TEXT_LIMIT]; const char *text_view; };
     char call_id[PG_ID_LIMIT], tool_name[PG_ID_LIMIT];
     int is_error;
 } pg_message;

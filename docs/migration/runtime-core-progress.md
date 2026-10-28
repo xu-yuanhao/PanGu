@@ -14,7 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
-| 手动压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；Host服务和可选TUI表 |
+| 手动压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
@@ -30,13 +30,13 @@
 
 ## 本批验证与集成状态
 
-- 手动压缩核心链已接通：动态上下文保留Entry/贡献对应；Task固定范围与模型配置，真实摘要保存后通过原子write admission成为新head，后继对话使用摘要与保留历史。
-- 真实DeepSeek两后端验证70条消息、两次阶段重开、原始cutoff回读、空工具/输出预算与摘要后继续回答；发布回调核对Entry/Submission/Task终态原子同批。Runtime回归、核心产品构建、实际Host/可选TUI绑定与资源集成、专项ASan/UBSan及相关G00/Assembly检查通过。
-- 自动触发、阻塞/后台组合、重试/取消/Live/hook和完整大文本摘要继续K12；完整压缩与TUI交互验收保持原清单。
+- 摘要输入使用任务持有的完整JSON文本和PG_USER_VIEW显式长度借用，经同一OpenAI编码器发送；model.provider ABI3定义该请求能力，现有结构尺寸保持。
+- 1 MiB/NUL/页尾与生命周期专项、MIMO矩阵和Runtime回归通过；真实DeepSeek两后端各发送19,301字节摘要正文，两次阶段恢复后继续回忆旧标记；实际产品Host的大上下文压缩/继续对话、产品构建及相关检查通过。
+- 后续集中接通自动阈值/overflow/background与阻塞压缩，再完成完整动态请求、摘要大输出及其余K12范围。
 
 ## 当前接口边界
 
-模型投影为64条消息、单条4096字节；完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
+摘要输入已支持显式长度借用文本，验证至1 MiB；常规Generation与历史投影仍为64条消息、单条4096字节，摘要输出沿4096字节边界。完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
 
 ## 复验入口
 
@@ -58,6 +58,7 @@ python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/build_test.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
+python3 -B tools/runtime/test_product_resources.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live-settings
 python3 -B tools/runtime/test_pangu_pty.py --live-templates
 python3 -B tools/runtime/test_pangu_pty.py --live-skills

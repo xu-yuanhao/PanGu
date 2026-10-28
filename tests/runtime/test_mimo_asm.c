@@ -363,7 +363,12 @@ static void test_thinking_roundtrip(void){
  session.count=2;assert(!pg_mimo_encode_request(&provider,&session));body=root_of(provider.request);assert(!strcmp(json_object_get_string(get(json_object_array_get_idx(get(body,"messages"),1),"reasoning_content")),"Inspect the file."));json_object_put(body);free(provider.request);
 }
 
+static void test_borrowed_user_text(void){
+ size_t bytes=1u<<20,page=(size_t)sysconf(_SC_PAGESIZE);char *text=mmap(0,bytes+page,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(text!=MAP_FAILED&&!mprotect(text+bytes,page,PROT_NONE));memset(text,'x',bytes);text[37]=0;session=(pg_session){0};session.count=1;session.messages[0]=(pg_message){.role=PG_USER_VIEW,.size=bytes,.text_view=text};pg_mimo provider={0};assert(!pg_mimo_encode_request(&provider,&session));json_object *body=root_of(provider.request),*content=get(json_object_array_get_idx(get(body,"messages"),0),"content");assert((size_t)json_object_get_string_len(content)==bytes&&!memcmp(json_object_get_string(content),text,bytes));json_object_put(body);free(provider.request);provider.request=0;session.messages[0].text_view=0;assert(pg_mimo_encode_request(&provider,&session));session.messages[0].text_view=(const char *)1;session.messages[0].size=(size_t)INT32_MAX+1;assert(pg_mimo_encode_request(&provider,&session));assert(!munmap(text,bytes+page));
+}
+
 int main(void) {
+    test_borrowed_user_text();
     test_model_init();
     test_projection_model_env();
     test_empty_tool_text();

@@ -259,6 +259,8 @@ pg_mimo_encode_request:
  imul rax, rax, PG_MM_MSG_BYTES
  lea r13, [r12 + rax]                  /* p = &messages[i] */
  mov r14, r13                          /* text = p */
+ cmp dword ptr [r13+PG_MM_MSG_ROLE],PG_MM_ROLE_USER_VIEW
+ je .Luser_view
  mov rax, qword ptr [r13 + PG_MM_MSG_SIZE]
  cmp rax, PG_MM_TEXT_LIMIT
  jae .Linvalid
@@ -289,6 +291,13 @@ pg_mimo_encode_request:
  jmp .Lthinking_dispatch_done
 .Lthinking_standalone:
  jmp .Lplain_build
+.Luser_view:
+ cmp qword ptr [r13+PG_MM_MSG_SIZE],2147483647
+ ja .Linvalid
+ cmp qword ptr [r13+PG_MM_MSG_TEXT],0
+ je .Linvalid
+ mov eax,PG_MM_ROLE_USER_VIEW
+ jmp .Lthinking_dispatch_done
 .Lthinking_dispatch_done:
  cmp eax, PG_MM_ROLE_ASSISTANT
  jne .Lrole_dispatch
@@ -554,6 +563,8 @@ pg_mimo_encode_request:
  mov eax, dword ptr [r13 + PG_MM_MSG_ROLE]
  test eax, eax
  jz .Lbuild_user
+ cmp eax,PG_MM_ROLE_USER_VIEW
+ je .Lbuild_user
  cmp eax, PG_MM_ROLE_TOOL_RESULT
  je .Lbuild_tool
  mov rdi, r15
@@ -611,6 +622,10 @@ pg_mimo_encode_request:
  jmp .Lmsg_append
 .Lbuild_content:
  lea rdi, [r13 + PG_MM_MSG_TEXT]
+ cmp dword ptr [r13+PG_MM_MSG_ROLE],PG_MM_ROLE_USER_VIEW
+ jne .Lcontent_pointer_ready
+ mov rdi,[r13+PG_MM_MSG_TEXT]
+.Lcontent_pointer_ready:
  mov rsi, qword ptr [r13 + PG_MM_MSG_SIZE]
  call json_object_new_string_len@PLT
  test rax,rax

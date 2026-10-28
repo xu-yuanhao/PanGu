@@ -994,15 +994,20 @@ pg_durable_compaction_request:
  push r12
  push r13
  push r14
- sub rsp,64
+ sub rsp,80
  mov rbx,rdi
  mov r12,rsi
  mov [rsp+24],rdx
  mov r14,rcx
+ mov [rsp+64],r8
+ mov qword ptr [rsp+72],0
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  mov qword ptr [rsp+16],0
  mov qword ptr [rsp+56],0
+ test r8,r8
+ jz .Lcc_request_bad
+ mov qword ptr [r8],0
  test rbx,rbx
  jz .Lcc_request_bad
  test r14,r14
@@ -1122,20 +1127,27 @@ pg_durable_compaction_request:
  test eax,eax
  js .Lcc_request_bad
 .Lcc_request_copy:
+ mov rax,[rsp+56]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lcc_request_bad
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+48],rax
  mov rdi,r14
  xor esi,esi
  mov edx,PG_S_BYTES
  call memset@PLT
  mov rax,[rsp+56]
  mov edx,[rax+8]
- cmp edx,4096
- jae .Lcc_request_bad
  mov [r14+PG_MSG_SIZE],rdx
  mov qword ptr [r14+PG_S_COUNT],1
- mov dword ptr [r14],0
- mov rsi,[rax]
- lea rdi,[r14+PG_MSG_TEXT]
- call memcpy@PLT
+ mov dword ptr [r14],5
+ mov rax,[rsp+48]
+ mov [r14+PG_MSG_TEXT],rax
 .Lcc_request_system:
  lea rdi,[r14+PG_S_SYSTEM]
  lea rsi,[rip+.Lcc_summary_system]
@@ -1143,11 +1155,17 @@ pg_durable_compaction_request:
  mov rdi,rax
  call strlen@PLT
  mov [r14+PG_S_SYSTEM_SIZE],rax
+ mov rax,[rsp+64]
+ mov rdx,[rsp+72]
+ mov [rax],rdx
+ mov qword ptr [rsp+72],0
  xor ebp,ebp
  jmp .Lcc_request_end
 .Lcc_request_bad:
  mov ebp,4
 .Lcc_request_end:
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov rdi,[rsp+8]
@@ -1163,7 +1181,7 @@ pg_durable_compaction_request:
  call printbuf_free@PLT
 .Lcc_request_return:
  mov eax,ebp
- add rsp,64
+ add rsp,80
  pop r14
  pop r13
  pop r12
@@ -1361,6 +1379,8 @@ pg_durable_compaction_init:
  mov rdi,[r12+16]
  call json_object_put@PLT
  mov rdi,[r12+88]
+ call json_object_put@PLT
+ mov rdi,[r12+160]
  call json_object_put@PLT
  mov rdi,[r12+24]
  call free@PLT
@@ -1594,6 +1614,7 @@ pg_durable_compaction_init:
  mov rsi,rax
  mov rdx,[rsp+32]
  mov rcx,[r14+24]
+ lea r8,[r14+160]
  call pg_durable_compaction_request@PLT
  test eax,eax
  jnz .Lcc_summarize_fail
