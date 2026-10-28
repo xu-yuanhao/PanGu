@@ -42,6 +42,9 @@ typedef struct {
    the existing bounded pg_session protocol; unsupported content rejects rather
    than silently losing model context. */
 int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generation_host *);
-/* Read-only committed startup history through the same model projection. */
+/* Read-only committed startup history through the same model projection.
+   The latest head leads retained entries; last edits win. Results are ordered
+   after their calls, first matching ID before the next assistant. Missing
+   results are ephemeral error receipts; unmatched results are omitted. */
 int pg_durable_generation_history(const pg_task_runner_host *,uint64_t,const struct json_object *,pg_session *);
 #endif

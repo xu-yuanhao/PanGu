@@ -175,6 +175,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `harness/{context,compaction}.ts`、`harness-compaction.test.ts`；Coding Agent `core/compaction/` 的分叉摘要。
 
 - [x] Generation与历史恢复共用最新head优先投影；保留范围内包含旧head的编辑，omit/replace按最后一项生效；分页读取超过256条持久记录，SQLite/JSONL重开保持结果。
+- [x] 模型可见上下文按调用顺序整理工具结果：下一assistant前的首个同ID结果、跨用户消息匹配、排除错误/取消/deferred assistant、孤立/重复结果过滤及缺失结果临时回执；实际请求编码与两后端重开通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -223,8 +224,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable harness/context.ts deriveRange/selectActive/contribute/scanRange，以及对应上下文用例。已核对缓存上游差异：context删除未使用的activeEntries导出，compaction新增restartLimit；当前批次保持固定快照，后续摘要任务采用中断预算语义。
-- 实际调用链：Durable Generation请求与启动历史 → 同一个Assembly投影 → 按cutoff分页扫描 → 最新head贡献在前、保留范围非head记录在后 → 范围内最新编辑决定omit/replace → 现有模型协议投影。旧head自身不再重复贡献，但其编辑继续生效。
-- 验证：Durable专项ASan/UBSan通过，覆盖多head、旧head编辑、同目标最后编辑、omit/replace、超过300条记录和SQLite/JSONL重开；真实DeepSeek Inputs/工具/follow-up/重开流程通过；Assembly检查通过。Runtime整批回归与隔离核心产品构建通过。
-- 接口与自审：原地修改durable_generation.S与现有存储专项，无新服务或ABI变化；分页数组独立持有引用，失败统一清理。并行TUI和规划文档改动保持原位。
-- 剩余与下一交付物：继续K12的模型消息工具结果整理、system基线、token估算/保留边界，再把摘要任务接入Scheduler/Storage及手动/自动触发；模型ABI仍为64条消息与单条4096字节，完整长会话与压缩尚未完成。K11其余覆盖范围保留原清单。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable harness/context.ts contribute/orderToolResults/missingResult及对应上下文用例；沿用本批固定快照。
+- 实际调用链：Generation/历史共用head与编辑贡献 → 先过滤error/aborted/deferred assistant → Assembly按assistant调用顺序配对下一assistant前的首个同ID结果 → 现有模型协议编码。用户消息保留原相对顺序，结果紧随所属assistant；孤立与重复结果过滤，缺失结果生成临时错误回执，不改写存储。
+- 验证：Durable专项ASan/UBSan通过，覆盖倒序结果、重复/孤立结果、跨用户消息及被排除assistant的匹配、下一assistant边界、临时缺失回执、实际请求编码和SQLite/JSONL重开。最终Runtime回归、隔离核心产品构建及真实DeepSeek两后端Inputs/工具/follow-up/重开通过；Assembly检查通过。
+- 接口与自审：原地维护durable_generation.S及已有测试，过滤统一到贡献汇总阶段，删除旧重复过滤逻辑；现有公开布局、服务、登记不变。临时消息/数组所有权统一释放，并行TUI和规划文档保持原位。
+- 剩余与下一交付物：继续K12的system基线/section语义、token估算与保留边界，把摘要任务接入Scheduler/Storage和手动/自动触发；现有模型ABI仍为64条消息与单条4096字节，完整压缩和长会话尚未完成。其他K项继续按覆盖表推进。

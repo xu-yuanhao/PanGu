@@ -459,36 +459,13 @@ pg_durable_generation_init:
  lea rsi,[rip+.Lgg_assistant]
  call strcmp@PLT
  test eax,eax
- jz .Lgg_project_assistant
+ jz .Lgg_project_role
  mov dword ptr [rsp+24],3
  mov rdi,r13
  lea rsi,[rip+.Lgg_tool_result]
  call strcmp@PLT
  test eax,eax
  jnz .Lgg_project_bad
-jmp .Lgg_project_role
-.Lgg_project_assistant:
- GGET r12,stop_reason
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lgg_project_role
- mov r13,rax
- mov rdi,rax
- lea rsi,[rip+.Lgg_error_word]
- call strcmp@PLT
- test eax,eax
- jz .Lgg_project_ok
- mov rdi,r13
- lea rsi,[rip+.Lgg_aborted_word]
- call strcmp@PLT
- test eax,eax
- jz .Lgg_project_ok
- mov rdi,r13
- lea rsi,[rip+.Lgg_deferred_word]
- call strcmp@PLT
- test eax,eax
- jz .Lgg_project_ok
 .Lgg_project_role:
  GGET r12,content
  mov r13,rax
@@ -659,6 +636,209 @@ jmp .Lgg_project_role
  mov eax,4
 .Lgg_project_end:
  add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Filter before pairing so excluded assistants cannot split a result window. */
+.Lgg_visible_message:
+ push rbx
+ mov rbx,rdi
+ GGET rbx,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_visible_yes
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_visible_yes
+ GGET rbx,stop_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_visible_yes
+ mov rbx,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_error_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_visible_no
+ mov rdi,rbx
+ lea rsi,[rip+.Lgg_aborted_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_visible_no
+ mov rdi,rbx
+ lea rsi,[rip+.Lgg_deferred_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_visible_no
+.Lgg_visible_yes:
+ mov eax,1
+ pop rbx
+ ret
+.Lgg_visible_no:
+ xor eax,eax
+ pop rbx
+ ret
+/* Context.orderToolResults: retain non-results; match the first result by ID
+   before the next assistant, in call order. Synthetic receipts stay ephemeral. */
+.Lgg_order_project:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+.Lgg_order_message:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lgg_order_ok
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ GGET r14,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_order_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_tool_result]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_order_next
+ mov rdi,rbx
+ mov rsi,r14
+ call .Lgg_project_message
+ test eax,eax
+ jnz .Lgg_order_bad
+ GGET r14,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_order_next
+ GGET r14,content
+ mov rbp,rax
+ mov qword ptr [rsp],0
+.Lgg_order_block:
+ mov rdi,rbp
+ call json_object_array_length@PLT
+ cmp [rsp],rax
+ jae .Lgg_order_next
+ mov rdi,rbp
+ mov rsi,[rsp]
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ GGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_order_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_tool_call]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_order_block_next
+ GGET "qword ptr [rsp+16]",id
+ mov [rsp+24],rax
+ lea rax,[r13+1]
+ mov [rsp+8],rax
+.Lgg_order_find:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp [rsp+8],rax
+ jae .Lgg_order_missing
+ mov rdi,r12
+ mov rsi,[rsp+8]
+ call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
+ GGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_order_bad
+ mov [rsp+40],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_order_missing
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lgg_tool_result]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_order_find_next
+ GGET "qword ptr [rsp+32]",tool_call_id
+ mov rdi,rax
+ mov rsi,[rsp+24]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lgg_order_found
+.Lgg_order_find_next:
+ inc qword ptr [rsp+8]
+ jmp .Lgg_order_find
+.Lgg_order_found:
+ mov rdi,rbx
+ mov rsi,[rsp+32]
+ call .Lgg_project_message
+ test eax,eax
+ jnz .Lgg_order_bad
+ jmp .Lgg_order_block_next
+.Lgg_order_missing:
+ lea rdi,[rip+.Lgg_missing_result_json]
+ call json_tokener_parse@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lgg_order_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_tool_call_id]
+ mov rdx,[rsp+24]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_order_missing_bad
+ GGET "qword ptr [rsp+16]",name_key
+ mov rdx,rax
+ mov rdi,[rsp+48]
+ lea rsi,[rip+.Lgg_tool_name]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_order_missing_bad
+ mov rdi,rbx
+ mov rsi,[rsp+48]
+ call .Lgg_project_message
+ mov [rsp+40],eax
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ cmp dword ptr [rsp+40],0
+ jne .Lgg_order_bad
+.Lgg_order_block_next:
+ inc qword ptr [rsp]
+ jmp .Lgg_order_block
+.Lgg_order_next:
+ inc r13
+ jmp .Lgg_order_message
+.Lgg_order_missing_bad:
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+.Lgg_order_bad:
+ mov eax,4
+ jmp .Lgg_order_end
+.Lgg_order_ok:
+ xor eax,eax
+.Lgg_order_end:
+ add rsp,64
  pop r14
  pop r13
  pop r12
@@ -838,11 +1018,12 @@ jmp .Lgg_project_role
  push r12
  push r13
  push r14
- sub rsp,64
+ sub rsp,80
  mov rbx,rdi
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+64],0
  mov edi,1
  mov esi,PG_S_BYTES
  call calloc@PLT
@@ -916,6 +1097,10 @@ jmp .Lgg_project_role
  inc r12
  jmp .Lgg_context_head
 .Lgg_context_head_done:
+ call json_object_new_array@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lgg_context_alloc
  xor r12d,r12d
  mov rax,[rsp+48]
  test rax,rax
@@ -927,7 +1112,7 @@ jmp .Lgg_project_role
  mov rdi,[rsp]
  call json_object_array_length@PLT
  cmp r12,rax
- jae .Lgg_context_ok
+ jae .Lgg_context_order
  mov rdi,[rsp]
  mov rsi,r12
  call json_object_array_get_idx@PLT
@@ -964,11 +1149,23 @@ jmp .Lgg_project_role
  mov rdi,r13
  mov rsi,r14
  call json_object_array_get_idx@PLT
- mov rsi,rax
- mov rdi,[rbx+72]
- call .Lgg_project_message
+ mov [rsp+72],rax
+ mov rdi,rax
+ call .Lgg_visible_message
  test eax,eax
- jnz .Lgg_context_bad
+ jz .Lgg_context_message_next
+ mov rdi,[rsp+72]
+ call json_object_get@PLT
+ mov [rsp+72],rax
+ mov rdi,[rsp+64]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lgg_context_message_next
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ jmp .Lgg_context_alloc
+.Lgg_context_message_next:
  inc r14
  jmp .Lgg_context_message
 .Lgg_context_next:
@@ -979,6 +1176,12 @@ jmp .Lgg_project_role
 .Lgg_context_advance:
  inc r12
  jmp .Lgg_context_entry
+.Lgg_context_order:
+ mov rdi,[rbx+72]
+ mov rsi,[rsp+64]
+ call .Lgg_order_project
+ test eax,eax
+ jnz .Lgg_context_bad
 .Lgg_context_ok:
  xor ebp,ebp
  jmp .Lgg_context_end
@@ -988,10 +1191,12 @@ jmp .Lgg_project_role
 .Lgg_context_bad:
  mov ebp,4
 .Lgg_context_end:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,64
+ add rsp,80
  pop r14
  pop r13
  pop r12
@@ -3473,3 +3678,5 @@ pg_durable_generation_history:
 .Lgg_action: .asciz "action"
 .Lgg_replace: .asciz "replace"
 .Lgg_messages: .asciz "messages"
+
+.Lgg_missing_result_json: .asciz "{\"role\":\"toolResult\",\"isError\":true,\"details\":{\"reason\":\"missing_result\"},\"content\":[{\"type\":\"text\",\"text\":\"Tool result unavailable: history ends before this call completed.\"}]}"
