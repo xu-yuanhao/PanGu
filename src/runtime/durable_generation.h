@@ -39,9 +39,9 @@ typedef struct {
    Text progress appends to conversation pangu.live using throttled deferred
    document commits; request recovery/abort converts saved progress into an
    aborted assistant, and terminal classification clears it atomically.
-   Caller holds host/model/definition leases until cleanup. Model service uses
-   the existing bounded pg_session protocol; unsupported content rejects rather
-   than silently losing model context. */
+   Caller holds host/model/definition leases until cleanup. Model service borrows a PG_CONTEXT_VIEW canonical request through close;
+   the operation retains its complete JSON owner. Unsupported content rejects
+   rather than silently losing model context. */
 int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generation_host *);
 /* Optional definition borrowed for the Generation module lifetime. */
 void pg_durable_generation_bind_compaction(pg_durable_generation *,const pg_task_definition *);
@@ -57,6 +57,8 @@ int pg_durable_generation_history(const pg_task_runner_host *,uint64_t,const str
    row limit. cutoff is inclusive (UINT64_MAX for current). Ordered messages
    include ephemeral repaired tool results; contribution arrays retain entry
    alignment and original committed objects. Release with json_object_put. */
+/* Owned canonical request with dynamic rendered systemPrompt and messages. */
+int pg_durable_request_read(const pg_task_runner_host *,uint64_t,uint64_t,const struct json_object *,struct json_object **);
 int pg_durable_context_read(const pg_task_runner_host *,uint64_t conversation,
                             uint64_t cutoff,struct json_object **);
 int pg_durable_context_order(const struct json_object *messages,struct json_object **);

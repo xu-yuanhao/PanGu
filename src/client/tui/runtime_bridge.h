@@ -17,6 +17,8 @@ typedef struct {
 int pg_tui_bridge_init(pg_tui_bridge *, pg_client);
 /* Bind a stable committed view before startup attach/poll. No storage ownership. */
 int pg_tui_bridge_set_history(pg_tui_bridge *, const pg_session *);
+/* Borrow immutable dynamic display rows through detach/stop. */
+int pg_tui_bridge_set_history_rows(pg_tui_bridge *,const struct json_object *);
 /* Optional owner lifecycle binding: stop observing without requesting abort. */
 int pg_tui_bridge_set_detach(pg_tui_bridge *, int (*detach)(void *), void *context);
 int pg_tui_bridge_set_tool_observer(pg_tui_bridge *,const tui_tool_observer *);

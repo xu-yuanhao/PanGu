@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CC = '/usr/bin/clang-23'
 SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/mimo_projection.S'),
-       str(ROOT / 'src/runtime/mimo_stream.S')]
+       str(ROOT / 'src/runtime/mimo_stream.S'),
+       str(ROOT / 'src/runtime/request_context.S')]
 ABI_WRAPS = ['-Wl,--wrap=' + n for n in (
     'strlen', 'strcmp', 'strncmp', 'memchr', 'memcpy', 'strchr', 'free',
     'getenv', 'strdup', 'json_object_object_add', 'json_object_array_add',

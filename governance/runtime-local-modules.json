@@ -136,7 +136,9 @@
         "src/runtime/mimo_stream.S",
         "src/runtime/mimo.h",
         "src/runtime/mimo_layout.h",
-        "src/runtime/model_provider.h"
+        "src/runtime/model_provider.h",
+        "src/runtime/request_context.S",
+        "src/runtime/request_context.h"
       ],
       "dependencies": [
         "agent.runtime.v0",
@@ -152,7 +154,12 @@
         "pg_mimo_bind_tools",
         "pg_mimo_encode_request (internal projection test seam)",
         "pg_mimo_configure",
-        "pg_mimo_complete"
+        "pg_mimo_complete",
+        "pg_context_append",
+        "pg_context_text",
+        "pg_context_project",
+        "pg_context_messages",
+        "pg_context_blank"
       ],
       "reference_basis": [
         {
@@ -362,6 +369,7 @@
         "tui_state_attach",
         "pg_tui_bridge_set_detach",
         "pg_tui_bridge_set_history",
+        "pg_tui_bridge_set_history_rows",
         "tui_state_history",
         "tui_view_history",
         "tui_input_remember",
@@ -1820,7 +1828,8 @@
         "pg_durable_compaction_service",
         "pg_durable_compaction_create",
         "pg_durable_compaction_threshold",
-        "pg_durable_generation_bind_compaction"
+        "pg_durable_generation_bind_compaction",
+        "pg_durable_request_read"
       ],
       "reference_basis": [
         {

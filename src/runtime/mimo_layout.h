@@ -20,6 +20,7 @@
 /* pg_role（session.h） */
 #define PG_MM_ROLE_USER 0
 #define PG_MM_ROLE_USER_VIEW 5
+#define PG_MM_ROLE_CONTEXT_VIEW 6
 #define PG_MM_ROLE_ASSISTANT 1
 #define PG_MM_ROLE_TOOL_CALL 2
 #define PG_MM_ROLE_TOOL_RESULT 3
@@ -162,6 +163,7 @@ PG_MM_ASSERT_OFF(pg_message, role, PG_MM_MSG_ROLE);
 PG_MM_ASSERT_OFF(pg_message, size, PG_MM_MSG_SIZE);
 PG_MM_ASSERT_OFF(pg_message, text, PG_MM_MSG_TEXT);
 PG_MM_ASSERT_OFF(pg_message, text_view, PG_MM_MSG_TEXT);
+_Static_assert(PG_CONTEXT_VIEW==PG_MM_ROLE_CONTEXT_VIEW,"borrowed context role drifted");
 _Static_assert(PG_USER_VIEW==PG_MM_ROLE_USER_VIEW,"borrowed user role drifted");
 PG_MM_ASSERT_OFF(pg_message, call_id, PG_MM_MSG_CALL_ID);
 PG_MM_ASSERT_OFF(pg_message, tool_name, PG_MM_MSG_TOOL_NAME);

@@ -31,14 +31,13 @@
 
 ## 本批验证与集成状态
 
-- 默认Host提供model.metadata：内置聊天目录由固定Pi生成器产出，Assembly读取用户agent目录models.json并选择公开模型容量；prepare按canonical provider/model逐字段应用compaction.modelOverrides。
-- metadata与策略为独立所有权，只公开provider/id/api及容量；配置刷新沿已有资源整体采纳。默认模型桥接将私有HTTP响应体的已检查overflow分类传入Generation，公开失败结构尺寸保持32字节。
-- ASan/UBSan模型专项、Runtime整批回归、隔离核心G00/Assembly、产品构建和离线资源刷新通过；真实DeepSeek经默认目录、用户models.json及per-model设置通过自动与后台压缩。
-- 下一交付集中接通动态Generation/历史请求与大摘要输出，继续K12完整范围及K05其余协议/认证/配置行为。
+- Generation持有完整canonical context，按固定cutoff投影system/section和工具配对，经model.provider ABI4的PG_CONTEXT_VIEW借用进入同一OpenAI编码器；模型输入解除64行及单文本4096字节复制边界。
+- 产品启动共用投影生成动态display rows，runtime_bridge提供pg_tui_bridge_set_history_rows，保持既有函数表与结构尺寸；旧有有界Session消费者仍使用原公开历史接口。
+- SQLite/JSONL ASan/UBSan覆盖长文本/系统提示、超过64条和重开；实际产品70条未压缩历史真实回忆通过，真实模型工具/重试和deferred两后端恢复通过。MiMo矩阵、Runtime回归及核心隔离检查/构建见核心TODO当前交接。
 
 ## 当前接口边界
 
-摘要输入已支持显式长度借用文本，验证至1 MiB；常规Generation与历史投影仍为64条消息、单条4096字节，摘要输出沿4096字节边界。完整上下文/压缩按K12完成。前台Client按本会话非后台任务空闲输出运行终态，空闲时继续推进后台调度；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
+动态模型输入与启动历史服务已接通；TUI消费端仍有64行/4095字节校验与显示预算，按TUI线完成。生成/摘要输出仍为4096字节，K12继续动态输出、Live/hook与stale/阻塞竞争。K05其余协议、认证和配置能力及全部其他差异保留在核心TODO。
 
 ## 复验入口
 

@@ -213,6 +213,35 @@ pg_mimo_encode_request:
  call pg_mimo_apply_options
  test eax,eax
  jnz .Linvalid
+ cmp qword ptr [r12+PG_MM_SES_COUNT],1
+ jne .Lfixed_system
+ cmp dword ptr [r12+PG_MM_MSG_ROLE],PG_MM_ROLE_CONTEXT_VIEW
+ jne .Lfixed_system
+ cmp qword ptr [r12+PG_MM_MSG_TEXT],0
+ je .Linvalid
+ mov rdi,[r12+PG_MM_MSG_TEXT]
+ lea rsi,[rsp+136]
+ mov qword ptr [rsp+136],0
+ call pg_context_messages@PLT
+ test eax,eax
+ jnz .Linvalid
+ mov rdi,[rsp+136]
+ lea rsi,[rip+.Lstr_messages]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lstr_messages]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ mov r14d,eax
+ mov rdi,[rsp+136]
+ call json_object_put@PLT
+ test r14d,r14d
+ jnz .Linvalid
+ jmp .Lmsg_done
+.Lfixed_system:
  /* 可选 system 前置消息 */
  cmp qword ptr [r12 + PG_MM_SES_SYSTEM_SIZE], 0
  je .Lno_system
@@ -869,67 +898,8 @@ pg_mimo_encode_request:
 .section .note.GNU-stack,"",@progbits
 
 .text
-/* ECMAScript trim's WhiteSpace and LineTerminator set, on UTF-8 bytes. */
 .Ltool_blank:
- test rsi,rsi
- jz .Ltool_blank_yes
- movzx eax,byte ptr [rdi]
- cmp eax,32
- je .Ltool_blank_one
- cmp eax,9
- jb .Ltool_blank_no
- cmp eax,13
- jbe .Ltool_blank_one
- cmp rsi,2
- jb .Ltool_blank_no
- cmp word ptr [rdi],0xa0c2
- je .Ltool_blank_two
- cmp rsi,3
- jb .Ltool_blank_no
- movzx eax,word ptr [rdi]
- movzx edx,byte ptr [rdi+2]
- cmp eax,0x80e2
- jne .Ltool_blank_other
- cmp edx,0x80
- jb .Ltool_blank_no
- cmp edx,0x8a
- jbe .Ltool_blank_three
- cmp edx,0xa8
- je .Ltool_blank_three
- cmp edx,0xa9
- je .Ltool_blank_three
- cmp edx,0xaf
- je .Ltool_blank_three
- jmp .Ltool_blank_no
-.Ltool_blank_other:
- shl edx,16
- or eax,edx
- cmp eax,0x809ae1
- je .Ltool_blank_three
- cmp eax,0x9f81e2
- je .Ltool_blank_three
- cmp eax,0x8080e3
- je .Ltool_blank_three
- cmp eax,0xbfbbef
- jne .Ltool_blank_no
-.Ltool_blank_three:
- add rdi,3
- sub rsi,3
- jmp .Ltool_blank
-.Ltool_blank_two:
- add rdi,2
- sub rsi,2
- jmp .Ltool_blank
-.Ltool_blank_one:
- inc rdi
- dec rsi
- jmp .Ltool_blank
-.Ltool_blank_yes:
- mov eax,1
- ret
-.Ltool_blank_no:
- xor eax,eax
- ret
+ jmp pg_context_blank@PLT
 .section .rodata
 .Ltool_no_output: .asciz "(no tool output)"
 

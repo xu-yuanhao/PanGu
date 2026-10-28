@@ -278,6 +278,10 @@
     "src/runtime/models_data.S": {
       "role": "assembly-core",
       "reason": "Read-only public chat metadata emitted by the fixed Pi catalog generator; no executable logic"
+    },
+    "src/runtime/request_context.S": {
+      "role": "assembly-core",
+      "reason": "Dynamic canonical context projection and owned OpenAI request/history strings"
     }
   }
 }

@@ -143,7 +143,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,4440
+ mov esi,4448
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -190,6 +190,8 @@ pg_durable_generation_init:
  lea rsi,[r12+32]
  call [rax+24]
 .Lgg_cleanup_json:
+ mov rdi,[r12+4440]
+ call json_object_put@PLT
  mov rdi,[r12+4352]
  call json_object_put@PLT
  mov rdi,[r12+4360]
@@ -797,59 +799,13 @@ pg_durable_generation_init:
  pop rbx
  pop rbp
  ret
-/* Append one nonempty prompt part with the provider's double-LF separator. */
-.Lgg_append_system:
- push rbx
- push r12
- push r13
- mov rbx,rdi
- mov r12,rsi
- mov rdi,rsi
- mov esi,6
- call json_object_is_type@PLT
- test eax,eax
- jz .Lgg_append_system_bad
- mov rdi,r12
- call json_object_get_string_len@PLT
- mov r13,rax
- test eax,eax
- jz .Lgg_append_system_ok
- mov rax,[rbx+PG_S_SYSTEM_SIZE]
- xor edx,edx
- test rax,rax
- setnz dl
- lea rcx,[rax+rdx*2]
- add rcx,r13
- cmp rcx,4096
- jae .Lgg_append_system_bad
- test rax,rax
- jz .Lgg_append_system_copy
- mov word ptr [rbx+rax+PG_S_SYSTEM],0x0a0a
- add qword ptr [rbx+PG_S_SYSTEM_SIZE],2
-.Lgg_append_system_copy:
- mov rdi,r12
- call json_object_get_string@PLT
- mov rsi,rax
- mov rax,[rbx+PG_S_SYSTEM_SIZE]
- lea rdi,[rbx+rax+PG_S_SYSTEM]
- mov rdx,r13
- call memcpy@PLT
- add [rbx+PG_S_SYSTEM_SIZE],r13
- mov rax,[rbx+PG_S_SYSTEM_SIZE]
- mov byte ptr [rbx+rax+PG_S_SYSTEM],0
-.Lgg_append_system_ok:
- xor eax,eax
- jmp .Lgg_append_system_end
-.Lgg_append_system_bad:
- mov eax,4
-.Lgg_append_system_end:
- pop r13
- pop r12
- pop rbx
- ret
+/* Prompt parts use the provider's double-LF separator. */
+.Lgg_append_dynamic:
+ mov edx,2
+ jmp pg_context_append@PLT
 /* The current OpenAI transport collapses system messages (pi-ai transcript.ts).
    Section replacement retains position; deletion followed by addition appends. */
-.Lgg_collapse_system:
+.Lgg_collapse_dynamic:
  push rbp
  push rbx
  push r12
@@ -914,7 +870,7 @@ pg_durable_generation_init:
 .Lgg_collapse_content:
  mov rdi,rbx
  mov rsi,[rsp+24]
- call .Lgg_append_system
+ call .Lgg_append_dynamic
  mov [rsp+40],eax
  mov rdi,[rsp+32]
  call json_object_put@PLT
@@ -992,7 +948,7 @@ pg_durable_generation_init:
  call json_object_iter_peek_value@PLT
  mov rsi,rax
  mov rdi,rbx
- call .Lgg_append_system
+ call .Lgg_append_dynamic
  test eax,eax
  jnz .Lgg_collapse_bad
  lea rdi,[rsp]
@@ -1015,6 +971,49 @@ pg_durable_generation_init:
  pop r12
  pop rbx
  pop rbp
+ ret
+.Lgg_collapse_system:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ lea rdi,[rbx+PG_S_SYSTEM]
+ mov esi,[rbx+PG_S_SYSTEM_SIZE]
+ call json_object_new_string_len@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_collapse_legacy_bad
+ mov rdi,rsp
+ mov rsi,r12
+ call .Lgg_collapse_dynamic
+ test eax,eax
+ jnz .Lgg_collapse_legacy_release
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ cmp eax,4096
+ jae .Lgg_collapse_legacy_bad
+ mov [rbx+PG_S_SYSTEM_SIZE],rax
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_object_get_string@PLT
+ mov rsi,rax
+ lea rdi,[rbx+PG_S_SYSTEM]
+ mov rdx,[rsp+8]
+ inc rdx
+ call memcpy@PLT
+ xor eax,eax
+ jmp .Lgg_collapse_legacy_release
+.Lgg_collapse_legacy_bad:
+ mov eax,4
+.Lgg_collapse_legacy_release:
+ mov r12d,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r12d
+ add rsp,24
+ pop r12
+ pop rbx
  ret
 /* Tool changes require the matching execution registry, not just prompt text. */
 .Lgg_empty_tool_changes:
@@ -1899,8 +1898,7 @@ pg_durable_context_order:
  test rax,rax
  jz .Lgg_request_invalid
  mov rdi,r14
- xor esi,esi
- call .Lgg_project
+ call .Lgg_request_view
  test eax,eax
  jnz .Lgg_request_error
  lea rdi,[rip+.Lgg_assistant_json]
@@ -3382,91 +3380,7 @@ pg_durable_context_read:
 .text
 /* OpenAI-completions joins a tool result's text blocks with LF. */
 .Lgg_join_tool_text:
- push rbp
- push rbx
- push r12
- push r13
- push r14
- sub rsp,32
- mov rbx,rdi
- xor r12d,r12d
- xor r13d,r13d
- mov qword ptr [rsp],0
- mov qword ptr [rsp+8],0
- mov edi,1
- mov esi,4096
- call calloc@PLT
- mov [rsp],rax
- test rax,rax
- jz .Lgj_end
-.Lgj_loop:
- mov rdi,rbx
- call json_object_array_length@PLT
- cmp r12,rax
- jae .Lgj_finish
- mov rdi,rbx
- mov rsi,r12
- call json_object_array_get_idx@PLT
- mov r14,rax
- GGET r14,type
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lgj_end
- mov rdi,rax
- lea rsi,[rip+.Lgg_text]
- call strcmp@PLT
- test eax,eax
- jnz .Lgj_end
- GGET r14,text
- mov rbp,rax
- mov rdi,rax
- mov esi,6
- call json_object_is_type@PLT
- test eax,eax
- jz .Lgj_end
- mov rdi,rbp
- call json_object_get_string_len@PLT
- mov [rsp+16],rax
- lea rcx,[r13+rax]
- test r12,r12
- jz .Lgj_size
- inc rcx
-.Lgj_size:
- cmp rcx,4096
- jae .Lgj_end
- test r12,r12
- jz .Lgj_copy
- mov rax,[rsp]
- mov byte ptr [rax+r13],10
- inc r13
-.Lgj_copy:
- mov rdi,rbp
- call json_object_get_string@PLT
- mov rsi,rax
- mov rdi,[rsp]
- add rdi,r13
- mov rdx,[rsp+16]
- call memcpy@PLT
- add r13,[rsp+16]
- inc r12
- jmp .Lgj_loop
-.Lgj_finish:
- mov rdi,[rsp]
- mov esi,r13d
- call json_object_new_string_len@PLT
- mov [rsp+8],rax
-.Lgj_end:
- mov rdi,[rsp]
- call free@PLT
- mov rax,[rsp+8]
- add rsp,32
- pop r14
- pop r13
- pop r12
- pop rbx
- pop rbp
- ret
+ jmp pg_context_text@PLT
 
 .section .rodata
 .Lgg_thinking: .asciz "thinking"
@@ -4793,3 +4707,122 @@ pg_durable_generation_bind_compaction:
  ret
 .section .rodata
 .Lgg_compaction_task_name: .asciz "pangu.compaction"
+
+.text
+.globl pg_durable_request_read
+.type pg_durable_request_read,@function
+pg_durable_request_read:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rcx
+ mov r12,r8
+ mov qword ptr [r12],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rcx,rsp
+ call pg_durable_context_read
+ test eax,eax
+ jnz .Lgg_request_read_end
+ GGET rbx,system_prompt
+ test rax,rax
+ jz .Lgg_request_read_empty
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_request_read_invalid
+ mov rdi,r14
+ call json_object_get@PLT
+ jmp .Lgg_request_read_prompt
+.Lgg_request_read_empty:
+ lea rdi,[rip+.Lgg_empty_string]
+ call json_object_new_string@PLT
+.Lgg_request_read_prompt:
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lgg_request_read_alloc
+ GGET "qword ptr [rsp]",messages
+ mov rsi,rax
+ lea rdi,[rsp+8]
+ call .Lgg_collapse_dynamic
+ test eax,eax
+ jnz .Lgg_request_read_end
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_system_prompt]
+ mov rdx,[rsp+8]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_request_read_end
+ mov rax,[rsp]
+ mov [r12],rax
+ mov qword ptr [rsp],0
+ xor eax,eax
+ jmp .Lgg_request_read_end
+.Lgg_request_read_invalid:
+ mov eax,4
+ jmp .Lgg_request_read_end
+.Lgg_request_read_alloc:
+ mov eax,5
+.Lgg_request_read_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lgg_request_view:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",state
+ GGET rax,checkpoint
+ GGET rax,cutoff
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp],rax
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax+8]
+ mov rdx,[rsp]
+ mov rcx,[rbx+16]
+ lea r8,[rbx+4440]
+ call pg_durable_request_read
+ test eax,eax
+ jnz .Lgg_request_view_end
+ mov edi,1
+ mov esi,PG_S_BYTES
+ call calloc@PLT
+ mov [rbx+72],rax
+ test rax,rax
+ jz .Lgg_request_view_alloc
+ mov dword ptr [rax],6
+ mov qword ptr [rax+PG_S_COUNT],1
+ mov rcx,[rbx+4440]
+ mov [rax+PG_MSG_TEXT],rcx
+ xor eax,eax
+ jmp .Lgg_request_view_end
+.Lgg_request_view_alloc:
+ mov eax,5
+.Lgg_request_view_end:
+ add rsp,16
+ pop rbx
+ ret
+.section .rodata
+.Lgg_empty_string: .asciz ""

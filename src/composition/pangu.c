@@ -4,6 +4,7 @@
 #include "../runtime/native_plugin.h"
 #include "../runtime/model_provider.h"
 #include "../runtime/models.h"
+#include "../runtime/request_context.h"
 #include "../runtime/tool_provider.h"
 #include "../runtime/read_tool.h"
 #include "../runtime/write_tool.h"
@@ -55,7 +56,7 @@ static struct {
  pg_durable_generation generation;pg_durable_generation_host generation_host,compaction_host;
  pg_durable_compaction compaction;pg_compaction_binding compaction_binding;pg_compaction_ops compaction_ops;
  pg_durable_inputs inputs;pg_record_queries queries;pg_record_requests requests;
- pg_durable_client client;pg_client native_client;pg_session history;
+ pg_durable_client client;pg_client native_client;struct json_object *history;
  const pg_model_provider *model_provider;
  const pg_model_metadata *model_metadata;
  const pg_tool_registry *declared_tools;
@@ -285,14 +286,14 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
- if(pg_durable_generation_history(&durable.tasks,1,durable.configuration,&durable.history))return 1;
+ struct json_object *startup=0;if(pg_durable_request_read(&durable.tasks,1,UINT64_MAX,durable.configuration,&startup))return 1;int projected=pg_context_project(startup,&durable.history);json_object_put(startup);if(projected)return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
  return pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
- if(durable.tools_draining)return 1;durable.records.publish=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
+ if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
@@ -316,7 +317,7 @@ int main(int argc,char **argv){
  pg_host *parent=&host;const char *plugin=getenv("PANGU_PLUGIN");if(plugin){if(pg_native_open(&extension,plugin,&host)){fprintf(stderr,"Cannot activate native extension (error=%u).\n",extension.error);goto cleanup;}parent=&extension.host;}
  if(pg_host_init_child(&agent_scope,parent,&agent_plugin,1)||pg_host_start(&agent_scope)){fprintf(stderr,"Cannot activate Agent consumer (error=%u).\n",agent_scope.error);goto cleanup;}
  tui_tool_observer observer={&durable.client,pg_durable_client_tool_observe,pg_durable_tool_observation_release};
- pg_client *client=pg_host_find(&agent_scope,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history(&bridge,&durable.history)||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
+ pg_client *client=pg_host_find(&agent_scope,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history_rows(&bridge,json_object_object_get(durable.history,"history"))||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
  if(pg_durable_client_inputs_service(&durable.client,&foreground_inputs))goto cleanup;inputs_owner=&bridge.ops;
  tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};int reason=tui_app_run(&config);inputs_owner=0;bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;if(rc)fprintf(stderr,"PanGu terminal stopped (reason=%d, bridge=%u).\n",reason,bridge.stop_error);
 cleanup:

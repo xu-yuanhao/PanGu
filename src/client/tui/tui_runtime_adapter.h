@@ -67,7 +67,8 @@ typedef enum {
 
 /* Read-only startup snapshot, separate from execution events. Borrowed slices
    expire on next call. history(index): 1 entry, 0 end, <0 error; no execution.
-   At most 64 entries, text <=4095 bytes, tool fields <=63 bytes. */
+   Dynamic startup rows use explicit lengths and end at the first 0 result.
+   Consumers maintain their own display/scroll budgets. */
 typedef struct tui_history_entry {
     unsigned kind; /* 0 user, 1 assistant, 2 tool call, 3 tool result */
     const char *text;

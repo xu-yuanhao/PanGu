@@ -91,6 +91,8 @@ pg_tui_bridge_set_history:
     test r8,r8
     jz .Lhistory_end
     mov rax,[rdi+PG_B_HISTORY_COUNT]
+    test rax,rax
+    js .Lhistory_dynamic
     cmp rax,[r8+PG_S_COUNT]
     jne .Lhistory_bad
     cmp rsi,rax
@@ -484,3 +486,141 @@ pg_tui_runtime_tool_observer:
 .Lobserver_ops_end:
  ret
 .size pg_tui_runtime_tool_observer,.-pg_tui_runtime_tool_observer
+
+.text
+.globl pg_tui_bridge_set_history_rows
+.type pg_tui_bridge_set_history_rows,@function
+pg_tui_bridge_set_history_rows:
+ test rdi,rdi
+ jz .Ldetach_bad
+ test rsi,rsi
+ jz .Ldetach_bad
+ cmp dword ptr [rdi+PG_B_ACTIVE],0
+ jne .Ldetach_bad
+ cmp dword ptr [rdi+PG_B_STOPPED],0
+ jne .Ldetach_bad
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsi
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lhistory_rows_bad
+ mov rdi,r12
+ call json_object_array_length@PLT
+ test rax,rax
+ js .Lhistory_rows_bad
+ bts rax,63
+ mov [rbx+PG_B_HISTORY],r12
+ mov [rbx+PG_B_HISTORY_COUNT],rax
+ xor eax,eax
+ jmp .Lhistory_rows_return
+.Lhistory_rows_bad:
+ mov eax,1
+.Lhistory_rows_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Lhistory_dynamic:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ btr rax,63
+ cmp rsi,rax
+ jae .Lhistory_dynamic_end
+ mov rdi,r8
+ call json_object_array_length@PLT
+ mov rcx,[rbx+PG_B_HISTORY_COUNT]
+ btr rcx,63
+ cmp rax,rcx
+ jne .Lhistory_dynamic_bad
+ mov rdi,[rbx+PG_B_HISTORY]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,r13
+ xor eax,eax
+ mov ecx,TUI_LI_HISTORY_SIZE/8
+ rep stosq
+ mov rdi,r14
+ lea rsi,[rip+.Lbh_kind]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,3
+ ja .Lhistory_dynamic_bad
+ mov [r13+TUI_LI_HISTORY_KIND],eax
+ mov rdi,r14
+ lea rsi,[rip+.Lbh_text]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhistory_dynamic_bad
+ mov [r13+TUI_LI_HISTORY_TEXT],rax
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ mov [r13+TUI_LI_HISTORY_TEXT_LEN],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lbh_ok]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov [r13+TUI_LI_HISTORY_OK],eax
+ cmp dword ptr [r13+TUI_LI_HISTORY_KIND],2
+ jb .Lhistory_dynamic_ready
+ mov rdi,r14
+ lea rsi,[rip+.Lbh_id]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhistory_dynamic_bad
+ mov [r13+TUI_LI_HISTORY_ID],rax
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ mov [r13+TUI_LI_HISTORY_ID_LEN],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lbh_name]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhistory_dynamic_bad
+ mov [r13+TUI_LI_HISTORY_NAME],rax
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ mov [r13+TUI_LI_HISTORY_NAME_LEN],rax
+.Lhistory_dynamic_ready:
+ mov eax,1
+ jmp .Lhistory_dynamic_return
+.Lhistory_dynamic_bad:
+ mov eax,-1
+ jmp .Lhistory_dynamic_return
+.Lhistory_dynamic_end:
+ xor eax,eax
+.Lhistory_dynamic_return:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lbh_kind: .asciz "kind"
+.Lbh_text: .asciz "text"
+.Lbh_ok: .asciz "ok"
+.Lbh_id: .asciz "id"
+.Lbh_name: .asciz "name"
