@@ -1766,10 +1766,13 @@ pg_durable_compaction_init:
  mov rcx,[r14+120]
  test rcx,rcx
  jz .Lcc_summarize_pending
+ cmp qword ptr [r14+112],0
+ je .Lcc_summarize_fail
  mov edx,[rax+8]
  add rdx,rcx
- cmp rdx,4096
- jae .Lcc_summarize_fail
+ jc .Lcc_summarize_fail
+ cmp rdx,2147483646
+ ja .Lcc_summarize_fail
  mov rdi,rax
  mov rsi,[r14+112]
  mov edx,ecx
@@ -1927,8 +1930,8 @@ pg_durable_compaction_init:
  test eax,eax
  js .Lcc_place_bad
  mov rax,[rsp+8]
- cmp dword ptr [rax+8],4096
- jae .Lcc_place_bad
+ cmp dword ptr [rax+8],2147483646
+ ja .Lcc_place_bad
  mov rdi,[rax]
  mov esi,[rax+8]
  call json_object_new_string_len@PLT

@@ -184,6 +184,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 溢出恢复接入Generation：沿pi-ai错误分类和Durable当前策略，原子记录失败assistant/owned压缩/父等待；摘要成功后保持attempt继续请求，保留compacted防重复，失败或无摘要保留原溢出原因。真实模型摘要/恢复及两后端阶段重开通过。
 - [x] 后台阈值压缩接通Generation/Client：同事务检查已有压缩并创建conversation-owned后台任务，前台请求独立推进；前台空闲/取消隔离后台，空闲poll继续调度，摘要经Submission放置。真实模型两后端去重/Esc/两次重开及实际产品Host通过。
 - [x] Generation按固定cutoff持有动态canonical context，经model.provider ABI4的PG_CONTEXT_VIEW进入同一OpenAI编码器；模型请求解除64行/单文本4096字节复制边界，system/section、工具配对和动态启动历史共用投影。两后端长文本/重开、70条未压缩消息真实产品、模型工具与deferred恢复通过。
+- [x] Generation正文改为动态printbuf累积，Live追加和最终assistant同源；摘要流式累积、持久summary与包装后的Entry去除4096字节边界。真实产品超过12 KiB回答和超过14 KiB摘要放置通过，旧内联正文数组原地删除。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -232,8 +233,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts request/context、pi-ai api/openai-completions.ts convertMessages及既有context配对/section用例。保持固定快照；沿已有工具和模型调用链原地接入动态请求。
-- 实际调用链：Generation固定cutoff → pg_durable_request_read完整canonical context/system sections → operation持有JSON → PG_CONTEXT_VIEW借用至模型关闭 → Assembly OpenAI投影 → 同一工具声明/选项/传输。产品启动复用canonical投影生成动态display rows，runtime_bridge新入口借用该快照至detach；旧有有界Session消费者继续使用同一编码入口。
-- 验证：两后端ASan/UBSan覆盖超过64条、16 KiB消息/系统提示、工具配对及存储重开，动态bridge读取长末行；真实产品70条未压缩消息回忆通过；SQLite/JSONL真实模型工具/重试及deferred重开通过。MiMo四模式矩阵通过；Runtime整批回归、隔离核心G00/Assembly、产品构建及离线资源刷新通过。首次动态编码联调修复已交给root的messages数组被提前释放，后续受影响专项通过。
-- 接口与自审：model.provider ABI4接受PG_CONTEXT_VIEW，函数表96字节/pg_session布局保持，canonical owner随operation清理；request_context.S实现动态文本拼接、OpenAI投影和独立display rows，复用既有空白语义。pg_tui_bridge_set_history_rows使用既有指针/计数字段，不改变TUI函数表或bridge尺寸；新文件、导出、依赖与构建输入已登记自审。并行TUI和其他规划改动保留。
-- 剩余与下一交付物：摘要/生成输出仍有4096字节边界，K12继续动态输出、取消/失败Live/hook、stale/阻塞竞争及system基线。TUI消费者tui_state_history仍校验64行/4095字节、tui_view_history仍有正文预览预算，需TUI线消费新显式长度契约；核心只证明动态历史服务而非完整界面。旧pg_durable_generation_history为有界Session消费者保留；产品已迁移动态入口。K05其余协议/能力/认证和K项范围保持。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts streamResponse/convertPartial及compaction.ts summarize/place；沿已有动态请求和持久阶段路径完成正文输出适配。固定快照不变。
+- 实际调用链：provider正文增量 → operation持有动态printbuf → 同源Live追加/最终assistant → 持久Entry；摘要provider增量 → 已有printbuf → 持久checkpoint.summary → 动态包装后的compaction Entry。释放随phase cleanup，模型/事件借用关系保持；长度上限按json-c/printbuf的int容量校验。
+- 验证：实际DeepSeek产品生成12,417字节回答、14,593序列化字节摘要并完整放置；正文增量总长与持久assistant长度一致，摘要保留尾标记。Durable ASan/UBSan与Runtime整批回归通过；删除旧数组后ASan/UBSan专项通过，产品再次生成12,417字节正文并保存摘要；模型第二次主动缩短摘要，去掉实时测试强制摘要长度断言，保留尾标记与实际存储检查。核心隔离G00/Assembly及产品构建通过。首次长输出请求因测试传入reasoningEffort=off收到HTTP422，去掉该测试选项后通过。
+- 接口与自审：既有公开ABI不变；Generation内部操作从4,456缩至360字节，删除旧4096字节正文数组，用现有成熟printbuf提供动态存储。摘要沿原实现替换有界校验，无并行旧版本；C与TUI纯逻辑未新增。既有文件登记/语言职责保持，控制未扩展。并行TUI改动保留。
+- 剩余与下一交付物：继续K12取消/失败Live/hook、stale/阻塞竞争与system基线；provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成。TUI消费端仍有64行/4095字节校验与显示预算，动态历史服务已提供；其他K项完整范围保留。

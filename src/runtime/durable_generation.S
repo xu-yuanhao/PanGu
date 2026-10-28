@@ -132,8 +132,8 @@ pg_durable_generation_init:
 .Lgg_init_return:
  ret
 .size pg_durable_generation_init,.-pg_durable_generation_init
-/* operation: module,runner,configuration,assistant,model[40],session,
-   acquired/started/ready, reserved, retained text[4096],size; stage scratch. */
+/* Operation owns configuration, canonical request, assistant and streamed
+   printbuf through phase cleanup; provider events remain borrowed. */
 .Lgg_operation:
  push rbx
  push r12
@@ -143,7 +143,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,4448
+ mov esi,360
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -190,11 +190,16 @@ pg_durable_generation_init:
  lea rsi,[r12+32]
  call [rax+24]
 .Lgg_cleanup_json:
- mov rdi,[r12+4440]
+ mov rdi,[r12+352]
+ test rdi,rdi
+ jz .Lgg_cleanup_context
+ call printbuf_free@PLT
+.Lgg_cleanup_context:
+ mov rdi,[r12+344]
  call json_object_put@PLT
- mov rdi,[r12+4352]
+ mov rdi,[r12+256]
  call json_object_put@PLT
- mov rdi,[r12+4360]
+ mov rdi,[r12+264]
  call json_object_put@PLT
  mov rdi,[r12+16]
  call json_object_put@PLT
@@ -336,11 +341,11 @@ pg_durable_generation_init:
  call pg_durable_compaction_threshold@PLT
  cmp eax,2
  jne .Lgg_prepare_blocking
- mov qword ptr [r14+4432],1
+ mov qword ptr [r14+336],1
  mov rax,[rsp+56]
- mov [r14+4416],rax
+ mov [r14+320],rax
  mov rax,[rsp+64]
- mov [r14+4424],rax
+ mov [r14+328],rax
  jmp .Lgg_prepare_scan
 .Lgg_prepare_blocking:
  cmp eax,1
@@ -363,7 +368,7 @@ pg_durable_generation_init:
  jz .Lgg_prepare_alloc
  lea rdi,[rip+.Lgg_failed_json]
  call json_tokener_parse@PLT
- mov [r14+4360],rax
+ mov [r14+264],rax
  test rax,rax
  jz .Lgg_prepare_alloc
  GGET "qword ptr [rbx+32]",state
@@ -385,7 +390,7 @@ pg_durable_generation_init:
  test eax,eax
  jnz .Lgg_prepare_alloc
 .Lgg_prepare_failure_message:
- GGET "qword ptr [r14+4360]",outcome
+ GGET "qword ptr [r14+264]",outcome
  GGET rax,error_key
  mov [rsp+40],rax
  GGET "qword ptr [r14+24]",error_message
@@ -457,12 +462,12 @@ pg_durable_generation_init:
  call .Lgg_copy_compacted
  test eax,eax
  jnz .Lgg_prepare_end
- cmp qword ptr [r14+4432],0
+ cmp qword ptr [r14+336],0
  je .Lgg_prepare_commit_request
  mov [rsp+80],r14
- mov rax,[r14+4416]
+ mov rax,[r14+320]
  mov [rsp+88],rax
- mov rax,[r14+4424]
+ mov rax,[r14+328]
  mov [rsp+96],rax
  mov rax,[rsp+32]
  mov [rsp+104],rax
@@ -1876,14 +1881,14 @@ pg_durable_context_order:
  js .Lgg_request_end
  cmp eax,1
  je .Lgg_request_reslept
- cmp dword ptr [r14+4400],0
+ cmp dword ptr [r14+304],0
  jne .Lgg_request_live_ready
  mov rdi,r14
  xor esi,esi
  call .Lgg_live_write
  test eax,eax
  jnz .Lgg_request_error
- mov dword ptr [r14+4400],1
+ mov dword ptr [r14+304],1
 .Lgg_request_live_ready:
  cmp dword ptr [r14+88],0
  jne .Lgg_request_settle
@@ -1947,11 +1952,11 @@ pg_durable_context_order:
  jnz .Lgg_request_model_error
 .Lgg_request_started:
  mov rdi,[r14+32]
- lea rsi,[r14+4200]
+ lea rsi,[r14+104]
  call [r14+48]
  test eax,eax
  jnz .Lgg_request_model_error
- mov eax,[r14+4200]
+ mov eax,[r14+104]
  test eax,eax
  jz .Lgg_request_pending
  cmp eax,1
@@ -1964,8 +1969,8 @@ pg_durable_context_order:
  je .Lgg_request_model_error
  cmp eax,5
  jne .Lgg_request_invalid
- mov r13,[r14+4208]
- mov rbp,[r14+4216]
+ mov r13,[r14+112]
+ mov rbp,[r14+120]
  cmp rbp,8
  ja .Lgg_request_invalid
  test rbp,rbp
@@ -1982,26 +1987,34 @@ pg_durable_context_order:
  jmp .Lgg_request_ready
 .Lgg_request_call:
  mov rdi,r14
- lea rsi,[r14+4208]
+ lea rsi,[r14+112]
  call .Lgg_call
  test eax,eax
  jnz .Lgg_request_error
  jmp .Lgg_request_ready
 .Lgg_request_text:
- mov r13,[r14+4216]
- mov rax,[r14+4192]
+ mov r13,[r14+120]
+ cmp qword ptr [r14+112],0
+ je .Lgg_request_invalid
+ mov rax,[r14+96]
  add rax,r13
  jc .Lgg_request_invalid
- cmp rax,4096
- jae .Lgg_request_invalid
- mov rdi,[r14+4192]
- lea rdi,[r14+rdi+96]
- mov rsi,[r14+4208]
- mov rdx,r13
- test rsi,rsi
- jz .Lgg_request_invalid
- call memcpy@PLT
- add [r14+4192],r13
+ cmp rax,2147483646
+ ja .Lgg_request_invalid
+ cmp qword ptr [r14+352],0
+ jne .Lgg_request_text_append
+ call printbuf_new@PLT
+ mov [r14+352],rax
+ test rax,rax
+ jz .Lgg_request_alloc
+.Lgg_request_text_append:
+ mov rdi,[r14+352]
+ mov rsi,[r14+112]
+ mov edx,r13d
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lgg_request_alloc
+ add [r14+96],r13
  mov rdi,r14
  mov esi,1
  call .Lgg_live_write
@@ -2013,7 +2026,7 @@ pg_durable_context_order:
  jz .Lgg_request_pending
  mov rdi,[rax]
  mov rsi,[rbx+16]
- mov rdx,[r14+4208]
+ mov rdx,[r14+112]
  mov rcx,r13
  call r8
  jmp .Lgg_request_pending
@@ -2025,15 +2038,16 @@ pg_durable_context_order:
  jnz .Lgg_request_end
 .Lgg_request_ready:
  /* Place preceding streamed text before terminal tool calls. */
- cmp qword ptr [r14+4192],0
+ cmp qword ptr [r14+96],0
  je .Lgg_request_ready_close
  lea rdi,[rip+.Lgg_text_json]
  call json_tokener_parse@PLT
  mov [rsp],rax
  test rax,rax
  jz .Lgg_request_alloc
- lea rdi,[r14+96]
- mov esi,[r14+4192]
+ mov rax,[r14+352]
+ mov rdi,[rax]
+ mov esi,[r14+96]
  call json_object_new_string_len@PLT
  mov rdi,[rsp]
  lea rsi,[rip+.Lgg_text]
@@ -2212,13 +2226,13 @@ pg_durable_context_order:
  GGET "qword ptr [rsp+56]",id
  mov rdi,rax
  call json_object_get_uint64@PLT
- mov [rbx+4256],rax
- cmp qword ptr [rbx+4408],0
+ mov [rbx+160],rax
+ cmp qword ptr [rbx+312],0
  je .Lgg_stage_normal
  mov [rsp],rbx
- mov rax,[rbx+4416]
+ mov rax,[rbx+320]
  mov [rsp+8],rax
- mov rax,[rbx+4424]
+ mov rax,[rbx+328]
  mov [rsp+16],rax
  mov rdi,rsp
  mov rsi,r12
@@ -2227,9 +2241,9 @@ pg_durable_context_order:
  call .Lgg_compact_stage
  jmp .Lgg_stage_end
 .Lgg_stage_normal:
- cmp qword ptr [rbx+4360],0
+ cmp qword ptr [rbx+264],0
  je .Lgg_stage_success
- mov rdi,[rbx+4360]
+ mov rdi,[rbx+264]
  call json_object_get@PLT
  mov [rsp+64],rax
  mov dword ptr [rsp+192],2
@@ -2436,7 +2450,7 @@ pg_durable_context_order:
  mov rsi,r12
  mov rdx,[rsp+160]
  mov ecx,[rsp+192]
- mov r8,[rbx+4256]
+ mov r8,[rbx+160]
  lea r9,[rsp+168]
  call pg_durable_inputs_apply@PLT
  test eax,eax
@@ -2806,22 +2820,22 @@ pg_durable_context_order:
  mov rbx,rsi
  mov r14,[rsi+56]
  lea rax,[rip+.Lgg_default_failure]
- mov [r14+4320],rax
- mov qword ptr [r14+4328],20
+ mov [r14+224],rax
+ mov qword ptr [r14+232],20
  mov rax,[r12]
  cmp qword ptr [rax+56],0
  je .Lgg_failure_described
  mov rdi,[rax]
  lea rsi,[r14+32]
- lea rdx,[r14+4320]
+ lea rdx,[r14+224]
  call [rax+56]
 .Lgg_failure_described:
- cmp qword ptr [r14+4320],0
+ cmp qword ptr [r14+224],0
  je .Lgg_failure_invalid
- cmp qword ptr [r14+4328],4096
+ cmp qword ptr [r14+232],4096
  jae .Lgg_failure_invalid
- mov rdi,[r14+4320]
- mov esi,[r14+4328]
+ mov rdi,[r14+224]
+ mov esi,[r14+232]
  call json_object_new_string_len@PLT
  mov rdi,[r14+24]
  lea rsi,[rip+.Lgg_error_message]
@@ -2844,31 +2858,31 @@ pg_durable_context_order:
  mov rsi,rax
  mov rax,[r12]
  mov rdi,[rax]
- lea rdx,[r14+4352]
+ lea rdx,[r14+256]
  call [rax+8]
  test eax,eax
  jnz .Lgg_failure_invalid
- mov eax,[r14+4348]
+ mov eax,[r14+252]
  test eax,1
  jz .Lgg_failure_infer_overflow
  and eax,2
  jmp .Lgg_failure_overflow_classified
 .Lgg_failure_infer_overflow:
- mov rdi,[r14+4320]
- mov rsi,[r14+4328]
- mov edx,[r14+4340]
+ mov rdi,[r14+224]
+ mov rsi,[r14+232]
+ mov edx,[r14+244]
  call pg_model_context_overflow@PLT
 .Lgg_failure_overflow_classified:
  test eax,eax
  jz .Lgg_failure_retry_policy
- mov dword ptr [r14+4336],0
+ mov dword ptr [r14+240],0
  mov rdi,r14
  call .Lgg_overflow_policy
  test eax,eax
  js .Lgg_failure_overflow_error
  jnz .Lgg_failure_overflow_ready
 .Lgg_failure_retry_policy:
- GGET "qword ptr [r14+4352]",retry_key
+ GGET "qword ptr [r14+256]",retry_key
  mov r13,rax
  mov qword ptr [rsp+16],3
  mov qword ptr [rsp+24],2000
@@ -2920,7 +2934,7 @@ pg_durable_context_order:
  mov eax,1
 .Lgg_failure_attempt:
  mov [rsp+8],rax
- cmp dword ptr [r14+4336],0
+ cmp dword ptr [r14+240],0
  je .Lgg_failure_terminal
  cmp dword ptr [rsp+40],0
  je .Lgg_failure_terminal
@@ -2957,7 +2971,7 @@ pg_durable_context_order:
  movsd [rsp+56],xmm0
  lea rdi,[rip+.Lgg_retry_json]
  call json_tokener_parse@PLT
- mov [r14+4360],rax
+ mov [r14+264],rax
  test rax,rax
  jz .Lgg_failure_alloc
  GGET rax,checkpoint
@@ -2987,7 +3001,7 @@ pg_durable_context_order:
  jnz .Lgg_failure_error
  movsd xmm0,[rsp+56]
  call json_object_new_double@PLT
- mov rdi,[r14+4360]
+ mov rdi,[r14+264]
  lea rsi,[rip+.Lgg_until]
  mov rdx,rax
  call .Lgg_set
@@ -2995,7 +3009,7 @@ pg_durable_context_order:
 .Lgg_failure_terminal:
  lea rdi,[rip+.Lgg_failed_json]
  call json_tokener_parse@PLT
- mov [r14+4360],rax
+ mov [r14+264],rax
  test rax,rax
  jz .Lgg_failure_alloc
  GGET rax,outcome
@@ -3643,12 +3657,12 @@ pg_durable_context_read:
  movsd [rsp+104],xmm0
  test r12d,r12d
  jz .Lgg_live_write_begin
- mov rax,[rbx+4192]
- cmp rax,[rbx+4392]
+ mov rax,[rbx+96]
+ cmp rax,[rbx+296]
  je .Lgg_live_write_ok
- cmp qword ptr [rbx+4392],0
+ cmp qword ptr [rbx+296],0
  je .Lgg_live_write_begin
- subsd xmm0,[rbx+4384]
+ subsd xmm0,[rbx+288]
  ucomisd xmm0,[rip+.Lgg_live_interval]
  jb .Lgg_live_write_ok
 .Lgg_live_write_begin:
@@ -3666,10 +3680,15 @@ pg_durable_context_read:
  mov rsi,rsp
  lea rdx,[rsp+48]
  mov ecx,r12d
- mov rax,[rbx+4392]
- lea r8,[rbx+rax+96]
- mov r9,[rbx+4192]
- sub r9,rax
+ mov rax,[rbx+352]
+ xor r8d,r8d
+ test rax,rax
+ jz .Lgg_live_buffer_ready
+ mov r8,[rax]
+ add r8,[rbx+296]
+.Lgg_live_buffer_ready:
+ mov r9,[rbx+96]
+ sub r9,[rbx+296]
  call .Lgg_live_apply
  test eax,eax
  jnz .Lgg_live_write_abort
@@ -3681,9 +3700,9 @@ pg_durable_context_read:
  test eax,eax
  jnz .Lgg_live_write_bad
  mov rax,[rsp+104]
- mov [rbx+4384],rax
- mov rax,[rbx+4192]
- mov [rbx+4392],rax
+ mov [rbx+288],rax
+ mov rax,[rbx+96]
+ mov [rbx+296],rax
 .Lgg_live_write_ok:
  xor eax,eax
  jmp .Lgg_live_write_end
@@ -4348,7 +4367,7 @@ pg_durable_generation_bind_compaction:
  mov rcx,[rcx+32]
  mov [rsp+16],rcx
  mov rcx,[rax+16]
- cmp qword ptr [r14+4432],0
+ cmp qword ptr [r14+336],0
  je .Lgg_compact_owner_ready
  xor ecx,ecx
 .Lgg_compact_owner_ready:
@@ -4363,7 +4382,7 @@ pg_durable_generation_bind_compaction:
  test rax,rax
  jz .Lgg_compact_stage_bad
  mov [rsp+40],rax
- cmp qword ptr [r14+4408],0
+ cmp qword ptr [r14+312],0
  je .Lgg_compact_trigger_ready
  lea rdi,[rip+.Lgg_overflow]
  call json_object_new_string@PLT
@@ -4396,7 +4415,7 @@ pg_durable_generation_bind_compaction:
  call pg_durable_compaction_create@PLT
  test eax,eax
  jnz .Lgg_compact_stage_end
- cmp qword ptr [r14+4432],0
+ cmp qword ptr [r14+336],0
  je .Lgg_compact_owned_wait
  mov rdi,[rbx+24]
  call json_object_get@PLT
@@ -4411,7 +4430,7 @@ pg_durable_generation_bind_compaction:
  jz .Lgg_compact_stage_bad
  GGET rax,checkpoint
  mov rbp,rax
- cmp qword ptr [r14+4408],0
+ cmp qword ptr [r14+312],0
  je .Lgg_compact_checkpoint_ready
  mov rdi,rbp
  lea rsi,[rip+.Lgg_threshold]
@@ -4525,7 +4544,7 @@ pg_durable_generation_bind_compaction:
  GGET rax,compacted
  test rax,rax
  jnz .Lgg_overflow_none
- GGET "qword ptr [rbx+4352]",compaction
+ GGET "qword ptr [rbx+256]",compaction
  mov r13,rax
  GGET rax,enabled
  test rax,rax
@@ -4535,21 +4554,21 @@ pg_durable_generation_bind_compaction:
  test eax,eax
  jz .Lgg_overflow_none
 .Lgg_overflow_keep:
- mov qword ptr [rbx+4416],20000
- mov qword ptr [rbx+4424],16384
+ mov qword ptr [rbx+320],20000
+ mov qword ptr [rbx+328],16384
  GGET r13,keep_recent
  test rax,rax
  jz .Lgg_overflow_reserve
  mov rdi,rax
  call json_object_get_uint64@PLT
- mov [rbx+4416],rax
+ mov [rbx+320],rax
 .Lgg_overflow_reserve:
  GGET r13,reserve_tokens
  test rax,rax
  jz .Lgg_overflow_context
  mov rdi,rax
  call json_object_get_uint64@PLT
- mov [rbx+4424],rax
+ mov [rbx+328],rax
 .Lgg_overflow_context:
  GGET r12,cutoff
  mov rdi,rax
@@ -4568,14 +4587,14 @@ pg_durable_generation_bind_compaction:
  test eax,eax
  jnz .Lgg_overflow_error
  mov rdi,[rsp]
- mov rsi,[rbx+4416]
+ mov rsi,[rbx+320]
  lea rdx,[rsp+8]
  call pg_durable_compaction_select@PLT
  test eax,eax
  jnz .Lgg_overflow_error
  cmp qword ptr [rsp+8],0
  je .Lgg_overflow_none
- mov qword ptr [rbx+4408],1
+ mov qword ptr [rbx+312],1
  mov ebp,1
  jmp .Lgg_overflow_end
 .Lgg_overflow_none:
@@ -4802,7 +4821,7 @@ pg_durable_request_read:
  mov rdi,[rax+8]
  mov rdx,[rsp]
  mov rcx,[rbx+16]
- lea r8,[rbx+4440]
+ lea r8,[rbx+344]
  call pg_durable_request_read
  test eax,eax
  jnz .Lgg_request_view_end
@@ -4814,7 +4833,7 @@ pg_durable_request_read:
  jz .Lgg_request_view_alloc
  mov dword ptr [rax],6
  mov qword ptr [rax+PG_S_COUNT],1
- mov rcx,[rbx+4440]
+ mov rcx,[rbx+344]
  mov [rax+PG_MSG_TEXT],rcx
  xor eax,eax
  jmp .Lgg_request_view_end

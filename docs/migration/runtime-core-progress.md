@@ -31,13 +31,13 @@
 
 ## 本批验证与集成状态
 
-- Generation持有完整canonical context，按固定cutoff投影system/section和工具配对，经model.provider ABI4的PG_CONTEXT_VIEW借用进入同一OpenAI编码器；模型输入解除64行及单文本4096字节复制边界。
-- 产品启动共用投影生成动态display rows，runtime_bridge提供pg_tui_bridge_set_history_rows，保持既有函数表与结构尺寸；旧有有界Session消费者仍使用原公开历史接口。
-- SQLite/JSONL ASan/UBSan覆盖长文本/系统提示、超过64条和重开；实际产品70条未压缩历史真实回忆通过，真实模型工具/重试和deferred两后端恢复通过。MiMo矩阵、Runtime回归及核心隔离检查/构建见核心TODO当前交接。
+- Generation正文沿动态printbuf累积，同源进入Live追加和最终assistant；删除旧内联文本数组，内部operation缩至360字节。
+- 摘要沿已有printbuf动态累积、保存checkpoint.summary并包装成Entry，去除4096字节拒绝；公开ABI保持。
+- 真实DeepSeek产品通过12,417字节回答和14,593序列化字节摘要放置，回答持久长度与增量总长一致；Durable ASan/UBSan、Runtime回归与核心隔离构建/检查见核心交接。
 
 ## 当前接口边界
 
-动态模型输入与启动历史服务已接通；TUI消费端仍有64行/4095字节校验与显示预算，按TUI线完成。生成/摘要输出仍为4096字节，K12继续动态输出、Live/hook与stale/阻塞竞争。K05其余协议、认证和配置能力及全部其他差异保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续Live/hook与stale/阻塞竞争。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 
