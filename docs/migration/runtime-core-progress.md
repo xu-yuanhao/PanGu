@@ -21,6 +21,7 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
+| 会话用量 | `usage.S`：pangu.usage按models/tools累计，Generation/工具结果/摘要尝试同批提交；响应模型身份优先，计数及已报告cost、可选reasoning/cacheWrite1h，Host usage读取与重开 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
 | 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
 | 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
@@ -31,13 +32,13 @@
 
 ## 本批验证与集成状态
 
-- 真实后台摘要延迟期间，由Generation阈值创建owned阻塞压缩，父任务等待后恢复回答。
-- owned新摘要落库后重开旧后台摘要，沿Submission路径结算stale，保持新head与后续真实回忆。
-- SQLite/JSONL真实DeepSeek集成通过，入口为`tools/runtime/build_test.py --live-owned-compaction-race`；产品源码与ABI保持上一批已验证版本。
+- Generation、工具snapshot.usage与摘要尝试接入同一UsageDoc记录入口，Host提供当前会话usage读取服务。
+- 双后端ASan/UBSan通过累计、可选字段、特殊工具键、abort和重开；真实DeepSeek摘要账本重开一致，后续回答增加累计用量。
+- Runtime整批回归、核心隔离G00/Assembly、产品构建和实际Host服务读取通过；共享树TUI品牌资源登记由并行线收尾。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry期间queued摘要等剩余组合，K13接入用量及完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry期间queued摘要等剩余组合，K13接入客户端用量及完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 

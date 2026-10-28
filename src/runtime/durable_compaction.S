@@ -2723,6 +2723,26 @@ pg_durable_compaction_threshold:
  CF 32
  mov rbx,rdi
  mov r12,rcx
+ mov [rsp],rdx
+ mov rax,[rbx]
+ mov rax,[rax+56]
+ test rax,rax
+ jz .Lcc_state_usage_done
+ cmp qword ptr [rax+88],0
+ je .Lcc_state_usage_done
+ mov r8,[rax+88]
+ mov rcx,[rax+16]
+ mov rdi,[rbx]
+ mov rsi,[rsp]
+ mov rax,[rdi+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov rdx,[rax+32]
+ call pg_usage_model@PLT
+ test eax,eax
+ jnz .Lcc_state_stage_end
+.Lcc_state_usage_done:
+ mov rdx,[rsp]
  mov rsi,rdx
  mov rdi,[rbx]
  mov rdx,[rbx+8]

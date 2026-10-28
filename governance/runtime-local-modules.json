@@ -446,7 +446,8 @@
         "storage.jsonl.local.v1",
         "session.durable.lifecycle.local.v0",
         "resources.lifecycle.local.v0",
-        "models.catalog.local.v0"
+        "models.catalog.local.v0",
+        "usage.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -1747,7 +1748,8 @@
       "dependencies": [
         "task.runner.local.v0",
         "json-c",
-        "tools.registry.local.v0"
+        "tools.registry.local.v0",
+        "usage.local.v0"
       ],
       "role": "Model-issued pangu.tool durable call/execute consumer: service operation leases, intent before effects, stored/current safe replay conjunction, cooperative async output/cleanup, atomic toolResult Entry and terminal Task receipt; native host owns returned operation drainage",
       "exports": [
@@ -1793,7 +1795,8 @@
         "task.tool.local.v0",
         "json-c",
         "libutf8proc",
-        "system libc POSIX regex"
+        "system libc POSIX regex",
+        "usage.local.v0"
       ],
       "role": "Native Generation/Tool/Client, Compaction and Submission/Inbox behavior: owned threshold compaction with atomic summary placement, durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions. Coordinated built-in Harness Generation/Inputs/Compaction: measured context threshold, owned blocking child/wait, direct summary Entry and resumed preparation.",
       "exports": [
@@ -2201,6 +2204,29 @@
           ],
           "semantics": "public chat contextWindow/maxTokens, custom-model metadata defaults and model overrides; Durable compactionPolicy field-wise per-model resolution. Builtin metadata generated in an isolated copy using the fixed upstream script, with input digest recorded in models_data.S."
         }
+      ]
+    },
+    {
+      "id": "usage.local.v0",
+      "sources": [
+        "src/runtime/usage.S",
+        "src/runtime/usage.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "session.documents.transaction.local.v0",
+        "json-c",
+        "session.documents.reader.local.v0"
+      ],
+      "role": "Pi Durable UsageDoc: atomic model/tool spend ledger and current conversation read",
+      "exports": [
+        "pg_usage_record",
+        "pg_usage_model",
+        "pg_usage_read",
+        "pg_usage_service"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/usage.ts"
       ]
     }
   ],

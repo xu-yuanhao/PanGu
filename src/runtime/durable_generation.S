@@ -2187,6 +2187,16 @@ pg_durable_context_order:
  call .Lgg_live_apply
  test eax,eax
  jnz .Lgg_stage_end
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+216]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rdx,[rax+32]
+ mov rcx,[rbx+16]
+ mov r8,[rbx+24]
+ call pg_usage_model@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
  lea rdi,[rip+.Lgg_entry_json]
  call json_tokener_parse@PLT
  mov [rsp+48],rax

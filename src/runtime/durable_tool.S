@@ -362,7 +362,7 @@ pg_durable_tool_init:
  push r12
  push r13
  push r14
- sub rsp,48
+ sub rsp,64
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
@@ -370,6 +370,23 @@ pg_durable_tool_init:
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
+ mov [rsp+48],rdx
+ DGET "qword ptr [rbx+4272]",usage
+ mov [rsp+56],rax
+ DGET "qword ptr [rbx+16]",name
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r8,rax
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+48]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rdx,[rax+24]
+ lea rcx,[rip+.Ldt_tools_bucket]
+ mov r9,[rsp+56]
+ call pg_usage_record@PLT
+ test eax,eax
+ jnz .Ldt_stage_end
  lea rdi,[rip+.Ldt_entry_json]
  call json_tokener_parse@PLT
  mov [rsp],rax
@@ -484,6 +501,10 @@ pg_durable_tool_init:
  jz .Ldt_metadata_done
  DREF rbp,diagnostics,rax
 .Ldt_metadata_done:
+ cmp qword ptr [rsp+56],0
+ je .Ldt_usage_done
+ DREF r14,usage,"qword ptr [rsp+56]"
+.Ldt_usage_done:
  DGET rbp,diagnostics
  mov rbp,rax
  mov rdi,rax
@@ -619,7 +640,7 @@ pg_durable_tool_init:
  mov rdi,[rsp+40]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,48
+ add rsp,64
  pop r14
  pop r13
  pop r12
@@ -1387,3 +1408,7 @@ pg_durable_tool_observation_release:
 
 .section .rodata
 .Ldt_cutoff_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"restart_limit\",\"message\":\"Tool reached the consecutive restart limit; it is not run again\"}]}"
+
+.section .rodata
+.Ldt_usage: .asciz "usage"
+.Ldt_tools_bucket: .asciz "tools"

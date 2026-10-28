@@ -286,6 +286,10 @@
     "src/runtime/compaction_hooks.S": {
       "role": "assembly-core",
       "reason": "Durable beforeCompact ordered native callback continuation, cancellation and pinned request ownership"
+    },
+    "src/runtime/usage.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable UsageDoc accumulation and atomic response accounting"
     }
   }
 }

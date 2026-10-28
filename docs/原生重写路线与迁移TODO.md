@@ -199,6 +199,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `harness/{view,events,task-graph,usage,telemetry}.ts`、`session/`；`harness-view`、`harness-events`、`harness-task-graph`、`session-watches`、`spec-usage` 测试。
 
+- [x] UsageDoc接入Generation响应、工具结果可选usage和摘要尝试的同批事务；按模型/工具累计计数及已报告cost，可选reasoning/cacheWrite1h保留，Host usage服务读取PanGu会话账本；两后端累计/回滚/重开与真实摘要/生成用量通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -239,8 +240,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness-compaction.test.ts后台/阻塞压缩竞争、generation.ts thresholdCompaction、compaction.ts place及Submission stale admission。上游跟踪分支相关新增提交已核对，本批保持固定行为快照。
-- 实际调用链：后台真实摘要保存place并延迟 → 新Entry/较低阈值触发Generation-owned阻塞压缩 → 父任务waiting，owned摘要直接Entry放置 → 父任务恢复真实回答 → 重开旧后台place → Submission结算unanswered/stale → 新head保持与真实回忆。复用现有Assembly实现和竞争场景，无第二套任务/摘要路径。
-- 验证：`python3 -B tools/runtime/build_test.py --live-owned-compaction-race`使用DeepSeek在SQLite/JSONL通过；核对owned引用、父任务完成、模型请求次数、旧摘要原子终态无Entry、stale receipt和新head不变。该场景延迟旧place；上游同一Generation retry期间queued Submission组合仍属后续覆盖。
-- 接口与自审：仅扩展现有集成场景及其显式执行参数，产品源码/ABI/登记不变；Git diff检查通过。沿用上一批已通过的产品源码Runtime回归。并行TUI/规划修改保留。
-- 剩余与下一交付物：下一批接入K13模型/工具/摘要尝试的UsageDoc原子用量记录和读取消费者；K09通用扩展与其他hook、K12剩余上游组合、provider/工具边界保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/usage.ts recordUsage/addUsage、generation.ts commitAssistant、tool.ts结果用量与compaction.ts summarize提交。固定Harness/Cordis组合边界保持。
+- 实际调用链：模型响应/工具snapshot.usage/摘要尝试 → 当前Task的Document Tx → pangu.usage同批记录 → 当前会话按models/tools累计 → Host usage服务读取。纯逻辑为usage.S，C组合仅绑定Session和发布服务；模型身份优先采用响应provider/model，缺省沿已固定配置。工具usage同时进入其ToolResult。
+- 验证：两后端ASan/UBSan覆盖工具真实执行及usage元数据、重复累计、可选reasoning/cost、__proto__工具键、事务abort不计费和重开读取，响应真实模型身份优先于别名；DeepSeek两后端摘要账本在checkpoint重开后相等，后续真实Generation增加用量。Runtime整批回归、最终专项、隔离G00/Assembly、产品构建和实际Host usage读取通过。
+- 接口与自审：usage.h公开事务记录/模型适配/读取/服务绑定契约；新增源及模块依赖/导出随实际调用链登记。工具snapshot增加可选usage，既有Host/TUI函数表尺寸保持；控制变更由实施Agent核对。共享树G00另有TUI线assets未登记，核心隔离通过，保留并行修改。
+- 剩余与下一交付物：K13继续客户端用量/完整Live事件与观察、任务图；K09通用扩展及其他hook，K12 retry期间queued摘要等剩余组合、provider完整usage/cost协议和工具边界保持所属K项范围。

@@ -631,6 +631,8 @@
     "src/runtime/request_context.S": "native-source",
     "src/runtime/request_context.h": "native-source",
     "src/runtime/compaction_hooks.S": "native-source",
-    "src/runtime/compaction_hooks.h": "native-source"
+    "src/runtime/compaction_hooks.h": "native-source",
+    "src/runtime/usage.S": "native-source",
+    "src/runtime/usage.h": "native-source"
   }
 }
