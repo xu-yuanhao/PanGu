@@ -31,13 +31,13 @@
 
 ## 本批验证与集成状态
 
-- 压缩创建、阶段和终态与pangu.live状态共用事务：有序compactions列表记录taskId/reason/blocking/attempt；取消/完成移除，失败保留compactionFailure，摘要成功放置清除旧失败。
-- 手动、Generation-owned与background创建共用状态路径；generation草稿字段保持。阶段更新保留已有列表位置。
-- SQLite/JSONL ASan/UBSan验证创建同提交序列、字段、重开、取消和失败；真实自动/后台压缩重开、清理、前台隔离及回忆通过。Runtime回归、核心隔离检查/构建见当前交接。
+- 压缩失败按当前retry设置保存retry/until和Live.retry，复用固定范围/configuration；到期attempt递增并恢复summarize，提前唤醒重睡，预算耗尽进入失败生命周期。
+- 新retry phase使内部compaction模块增至256字节，模型与Host函数表保持；阶段清理释放旧模型/请求资源。
+- 两后端ASan/UBSan覆盖预算、Live与提前唤醒；真实DeepSeek通过一次503、退避重开、真实摘要/放置及后续回忆。Runtime回归和隔离检查/构建见核心交接。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry/hook与stale/阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续hook与stale/阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 

@@ -1291,7 +1291,7 @@ pg_durable_compaction_init:
  mov [rdi+40],rax
  lea rax,[rdi+96]
  mov [rdi+48],rax
- mov qword ptr [rdi+56],3
+ mov qword ptr [rdi+56],4
  lea rax,[rip+.Lcc_abort]
  mov [rdi+64],rax
  lea rax,[rip+.Lcc_cleanup]
@@ -1323,6 +1323,13 @@ pg_durable_compaction_init:
  mov [rdi+200],rax
  lea rax,[rip+.Lcc_cleanup]
  mov [rdi+208],rax
+ lea rax,[rip+.Lcc_retry_name]
+ mov [rdi+216],rax
+ mov qword ptr [rdi+224],5
+ mov [rdi+232],rdi
+ lea rax,[rip+.Lcc_retry_phase]
+ mov [rdi+240],rax
+ mov qword ptr [rdi+248],0
  xor eax,eax
 .Lcc_init_return:
  ret
@@ -1783,9 +1790,9 @@ pg_durable_compaction_init:
  mov eax,1
  jmp .Lcc_summarize_end
 .Lcc_summarize_fail:
- mov rdi,r12
- lea rsi,[rip+.Lcc_failed_json]
- call .Lcc_commit_json
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcc_summary_failure
  jmp .Lcc_summarize_end
 .Lcc_summarize_bad:
  mov eax,-4
@@ -2762,6 +2769,11 @@ pg_durable_compaction_threshold:
  je .Lcc_live_remove_terminal
  mov qword ptr [rsp+224],1
  mov rdi,rbp
+ mov rsi,r13
+ call .Lcc_live_retry_fields
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov rdi,rbp
  call json_object_get@PLT
  mov rdi,[rsp+128]
  mov rsi,rax
@@ -2813,6 +2825,11 @@ pg_durable_compaction_threshold:
  lea rsi,[rip+.Lcc_blocking]
  mov rdx,rax
  call .Lcc_set
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov rdi,[rsp+144]
+ mov rsi,r13
+ call .Lcc_live_retry_fields
  test eax,eax
  jnz .Lcc_live_bad
  mov rdi,[rsp+128]
@@ -3047,3 +3064,380 @@ pg_durable_compaction_threshold:
  call json_object_put@PLT
  mov eax,ebp
  CE 112
+
+.text
+/* Pin the summary range/configuration across retries; policy is read now. */
+.Lcc_summary_failure:
+ CF 128
+ mov rbx,rdi
+ mov r12,rsi
+ mov r14,[rsi+56]
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,16
+ rep stosq
+ mov qword ptr [rsp+80],3
+ mov qword ptr [rsp+88],2000
+ mov qword ptr [rsp+96],60000
+ lea rdi,[rip+.Lcc_failed_json]
+ call json_tokener_parse@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lcc_retry_bad
+ cmp dword ptr [r14+72],0
+ je .Lcc_retry_terminal
+ mov rax,[rbx]
+ cmp qword ptr [rax+56],0
+ je .Lcc_retry_terminal
+ mov rdi,[rax]
+ lea rsi,[r14+32]
+ mov rdx,rsp
+ call [rax+56]
+ cmp qword ptr [rsp],0
+ je .Lcc_retry_terminal
+ cmp qword ptr [rsp+8],2147483647
+ ja .Lcc_retry_terminal
+ mov rdi,[rsp]
+ mov esi,[rsp+8]
+ call json_object_new_string_len@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lcc_retry_bad
+ CGET "qword ptr [rsp+48]",outcome
+ CGET rax,error
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_message]
+ mov rdx,[rsp+40]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_retry_bad
+ cmp dword ptr [rsp+16],0
+ je .Lcc_retry_terminal
+ CGET "qword ptr [r12+32]",conversationId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[rbx]
+ mov rdi,[rax]
+ lea rdx,[rsp+32]
+ call [rax+8]
+ test eax,eax
+ jnz .Lcc_retry_bad
+ CGET "qword ptr [rsp+32]",retry_key
+ mov r13,rax
+ CGET r13,enabled
+ test rax,rax
+ jz .Lcc_retry_policy_values
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lcc_retry_terminal
+.Lcc_retry_policy_values:
+ mov rdi,r13
+ lea rsi,[rip+.Lcc_max_retries]
+ mov edx,3
+ call .Lcc_policy_value
+ mov [rsp+80],rax
+ mov rdi,r13
+ lea rsi,[rip+.Lcc_base_delay]
+ mov edx,2000
+ call .Lcc_policy_value
+ mov [rsp+88],rax
+ mov rdi,r13
+ lea rsi,[rip+.Lcc_max_delay]
+ mov edx,60000
+ call .Lcc_policy_value
+ mov [rsp+96],rax
+ CGET "qword ptr [r12+32]",state
+ CGET rax,checkpoint
+ mov r13,rax
+ CGET rax,attempt
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jnz .Lcc_retry_attempt
+ mov eax,1
+.Lcc_retry_attempt:
+ mov [rsp+104],rax
+ cmp rax,[rsp+80]
+ ja .Lcc_retry_terminal
+ mov rcx,rax
+ dec rcx
+ mov rax,[rsp+88]
+ mov rdx,[rsp+96]
+ cmp rax,rdx
+ cmova rax,rdx
+.Lcc_retry_double:
+ test rcx,rcx
+ jz .Lcc_retry_delay
+ test rax,rax
+ jz .Lcc_retry_delay
+ cmp rax,rdx
+ jae .Lcc_retry_delay
+ shl rax,1
+ jc .Lcc_retry_cap
+ cmp rax,rdx
+ cmova rax,rdx
+ dec rcx
+ jmp .Lcc_retry_double
+.Lcc_retry_cap:
+ mov rax,rdx
+.Lcc_retry_delay:
+ mov [rsp+88],rax
+ mov rax,[r12+8]
+ mov rdi,[rax]
+ call [rax+40]
+ cvtsi2sd xmm1,qword ptr [rsp+88]
+ addsd xmm0,xmm1
+ movsd [rsp+112],xmm0
+ mov rdi,r13
+ lea rsi,[rsp+56]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcc_retry_bad
+ lea rdi,[rip+.Lcc_retry_name]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lcc_phase]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_bad
+ mov rdi,[rsp+104]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lcc_attempt]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_bad
+ movsd xmm0,[rsp+112]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lcc_until]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_bad
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lcc_retry_error]
+ mov rdx,[rsp+40]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_retry_bad
+ lea rdi,[rip+.Lcc_sleeping_json]
+ call json_tokener_parse@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lcc_retry_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_checkpoint]
+ mov rdx,[rsp+56]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_retry_bad
+ movsd xmm0,[rsp+112]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lcc_until]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_bad
+ mov rdi,r12
+ mov rsi,[rsp+64]
+ call .Lcc_commit_state
+ neg eax
+ mov ebp,eax
+ jmp .Lcc_retry_failure_end
+.Lcc_retry_terminal:
+ mov rdi,r12
+ mov rsi,[rsp+48]
+ call .Lcc_commit_state
+ neg eax
+ mov ebp,eax
+ jmp .Lcc_retry_failure_end
+.Lcc_retry_bad:
+ mov ebp,-5
+.Lcc_retry_failure_end:
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 128
+.Lcc_retry_phase:
+ CF 48
+ mov rbx,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ CGET rdx,state
+ CGET rax,checkpoint
+ mov r12,rax
+ CGET rax,until
+ mov rdi,rax
+ call json_object_get_double@PLT
+ movsd [rsp+8],xmm0
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ ucomisd xmm0,[rsp+8]
+ jb .Lcc_retry_early
+ mov rdi,r12
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+ CGET "qword ptr [rsp]",attempt
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ inc rax
+ mov rdi,rax
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcc_attempt]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+ lea rdi,[rip+.Lcc_summarize_name]
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcc_phase]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcc_retry_error]
+ call json_object_object_del@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcc_until]
+ call json_object_object_del@PLT
+ lea rdi,[rip+.Lcc_running_json]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lcc_retry_phase_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_checkpoint]
+ mov rdx,[rsp]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+ jmp .Lcc_retry_phase_commit
+.Lcc_retry_early:
+ lea rdi,[rip+.Lcc_sleeping_json]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lcc_retry_phase_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_checkpoint]
+ mov rdx,r12
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+ movsd xmm0,[rsp+8]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lcc_until]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_retry_phase_bad
+.Lcc_retry_phase_commit:
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ call .Lcc_commit_state
+ neg eax
+ mov ebp,eax
+ jmp .Lcc_retry_phase_end
+.Lcc_retry_phase_bad:
+ mov ebp,-5
+.Lcc_retry_phase_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 48
+.section .rodata
+.Lcc_retry_name: .asciz "retry"
+.Lcc_retry_key: .asciz "retry"
+.Lcc_attempt: .asciz "attempt"
+.Lcc_until: .asciz "until"
+.Lcc_retry_error: .asciz "retryError"
+.Lcc_max_retries: .asciz "maxRetries"
+.Lcc_base_delay: .asciz "baseDelayMs"
+.Lcc_max_delay: .asciz "maxAgentDelayMs"
+.Lcc_sleeping_json: .asciz "{\"status\":\"sleeping\"}"
+
+.text
+.Lcc_live_retry_fields:
+ CF 32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ CGET r12,checkpoint
+ mov r13,rax
+ CGET rax,attempt
+ test rax,rax
+ jz .Lcc_live_retry_check
+ mov rdi,rbx
+ lea rsi,[rip+.Lcc_attempt]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_retry_end
+.Lcc_live_retry_check:
+ CGET r13,retry_error
+ test rax,rax
+ jz .Lcc_live_retry_clear
+ mov r14,rax
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lcc_live_retry_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_error]
+ mov rdx,r14
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_retry_end
+ CGET r13,until
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcc_retry_at]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_retry_end
+ mov rdi,rbx
+ lea rsi,[rip+.Lcc_retry_key]
+ mov rdx,[rsp]
+ call .Lcc_copy
+ jmp .Lcc_live_retry_end
+.Lcc_live_retry_clear:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcc_retry_key]
+ call json_object_object_del@PLT
+ xor eax,eax
+ jmp .Lcc_live_retry_end
+.Lcc_live_retry_bad:
+ mov eax,5
+.Lcc_live_retry_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 32
+.section .rodata
+.Lcc_retry_at: .asciz "at"

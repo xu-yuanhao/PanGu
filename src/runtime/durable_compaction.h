@@ -13,7 +13,7 @@ int pg_durable_compaction_request(const struct json_object *,uint64_t first_kept
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
- pg_task_phase phases[3];
+ pg_task_phase phases[4];
 } pg_durable_compaction;
 /* Host uses the selected model with an empty executable tool catalog. Borrow
    it through scheduler cleanup. Start commits one conversation-owned Task;

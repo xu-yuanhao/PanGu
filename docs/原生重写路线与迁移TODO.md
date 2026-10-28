@@ -186,6 +186,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Generation按固定cutoff持有动态canonical context，经model.provider ABI4的PG_CONTEXT_VIEW进入同一OpenAI编码器；模型请求解除64行/单文本4096字节复制边界，system/section、工具配对和动态启动历史共用投影。两后端长文本/重开、70条未压缩消息真实产品、模型工具与deferred恢复通过。
 - [x] Generation正文改为动态printbuf累积，Live追加和最终assistant同源；摘要流式累积、持久summary与包装后的Entry去除4096字节边界。真实产品超过12 KiB回答和超过14 KiB摘要放置通过，旧内联正文数组原地删除。
 - [x] 压缩Live生命周期接入创建/阶段/终态事务：taskId/reason/blocking/attempt列表、取消/完成移除、失败保留compactionFailure，成功放置清除旧失败；同任务阶段更新保持列表顺序。两后端创建同序列、重开/取消/失败与真实自动/后台压缩通过。
+- [x] 压缩失败按当前retry策略进入持久retry/sleep：保留范围和请求配置、指数退避/上限/预算、提前唤醒重睡、attempt递增及Live.retry更新/清除。两后端预算耗尽专项及一次503→退避重开→真实摘要/放置/回忆通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -234,8 +235,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts createCompaction/abort/complete/place、live.ts add/remove/failCompactionStatus及harness-compaction background/cancellation用例。沿固定快照的列表与失败生命周期语义实现。
-- 实际调用链：手动/owned/background创建任务与pangu.live.compactions同事务登记 → select/summarize/place持久阶段沿同一Doc Tx更新 → 取消/无摘要完成移除当前状态，失败保存taskId/reason/error → 成功放置摘要/终态并移除状态、清除compactionFailure。已有generation字段保留，阶段更新维持列表位置。
-- 验证：SQLite/JSONL ASan/UBSan覆盖创建Task与Live同提交序列、状态字段、阶段重开、取消移除和模型启动失败发布；真实DeepSeek自动owned压缩的两阶段重开/状态清理及后台前台隔离、Esc/去重/重开/回忆通过。Runtime整批回归、更新后Durable专项、核心隔离G00/Assembly与产品构建通过。
-- 接口与自审：pg_durable_compaction_create增加所属同一Session的pg_document_tx参数，核心调用者和恢复场景同步；模块/Host函数表布局保持。状态处理为既有Assembly模块内的共享事务路径，手动构造、自动创建和各阶段共用，新增文件/依赖/登记均无变化。控制未扩展；并行TUI和规划改动保留。
-- 剩余与下一交付物：K12继续retry/hook、后台摘要与阻塞摘要竞争/stale完整用例及system基线；K13接入Live对客户端的完整事件/观察投影。provider单次事件、reasoning、工具参数/结果边界按K05/K08完成；TUI动态历史消费校验和其他K项范围保持。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts summarize/retry、live.ts的attempt/retry状态及既有retry设置语义。沿固定摘要tail/firstKept/configuration恢复，不重新选择范围。
+- 实际调用链：summary模型错误 → provider failure事实/当前retry设置 → 固定请求checkpoint的retry/until与Live.retry同事务提交 → Scheduler sleep/重开 → 提前唤醒重睡或到期attempt+1 → 同范围真实摘要 → place/后续对话。阶段恢复清除retryError/until和Live.retry，预算耗尽后转既有失败终态。
+- 验证：SQLite/JSONL ASan/UBSan覆盖最多两次retry后的三次失败/终态、Live.retry与睡眠时间一致、提前唤醒不增加模型请求；真实DeepSeek一次503→持久退避重开→19,301字节原摘要请求→两阶段恢复→放置与回忆通过。Runtime整批回归、更新后Durable专项、核心隔离G00/Assembly与产品构建通过。
+- 接口与自审：pg_durable_compaction新增retry phase，内部模块从216增至256字节，静态布局断言/组合实例同步；模型/Host函数表不变。状态机、退避及Live字段更新为手写Assembly，复用现有提交与清理路径；未新增文件/依赖/登记。并行TUI及规划修改保留。
+- 剩余与下一交付物：K12继续后台摘要与新阻塞摘要竞争/stale完整用例、hook及system基线；K13接入usage与完整Live客户端事件/观察。provider单次事件、reasoning、工具参数/结果边界按K05/K08完成；TUI动态历史消费与其他K项范围保持。
