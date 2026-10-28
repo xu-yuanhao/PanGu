@@ -294,6 +294,9 @@ pg_tui_bridge_set_history:
     test eax,eax
     jle .Lpoll_return
     mov eax,[rsp]
+    /* Committed usage is available through the optional observation binding. */
+    cmp eax,6
+    je .Lpoll_zero
     cmp eax,5
     ja .Lpoll_bad
     lea ecx,[rax+1]

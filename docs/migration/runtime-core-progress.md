@@ -32,9 +32,9 @@
 
 ## 本批验证与集成状态
 
-- observation服务追加watch/next/close：首次快照、Live/usage变化合并、无变化跳过、独立返回值和幂等释放，纯逻辑手写Assembly。
-- 双后端用量事务、实际Host压缩开始/结束、返回值隔离、退订通过；Runtime整批回归、G00/Assembly通过。
-- 该入口为状态拉取，完整逐提交事件与顺序按K13继续接入。
+- Durable Client提交发布缓存账本的实际变化为PG_USAGE_CHANGED，复用现有poll队列；暂停释放基线，完整Live事件继续K13。
+- DeepSeek双后端真实摘要/重开/回答的事件累计与账本核对通过；产品16 KiB事件复制/借用、Host场景通过。
+- 产品构建、G00/Assembly与Runtime整批回归通过。
 
 ## 当前接口边界
 

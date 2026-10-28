@@ -35,14 +35,14 @@ pg_durable_client_emit:
  jz .Ldc_emit_end
  cmp dword ptr [rdi+68],0
  jne .Ldc_emit_end
- cmp qword ptr [rsi+16],4096
- jae .Ldc_emit_fail
- cmp qword ptr [rsi+32],64
- jae .Ldc_emit_fail
- cmp qword ptr [rsi+48],64
- jae .Ldc_emit_fail
+ mov rsi,[r12+16]
+ add rsi,[r12+32]
+ jc .Ldc_emit_fail
+ add rsi,[r12+48]
+ jc .Ldc_emit_fail
+ add rsi,67
+ jc .Ldc_emit_fail
  mov edi,1
- mov esi,4288
  call calloc@PLT
  test rax,rax
  jz .Ldc_emit_fail
@@ -52,6 +52,7 @@ pg_durable_client_emit:
  mov edx,56
  call memcpy@PLT
  xor r14d,r14d
+ lea rbp,[r13+64]
 .Ldc_emit_slice:
  mov rax,r14
  shl rax,4
@@ -61,19 +62,16 @@ pg_durable_client_emit:
  mov rsi,[r12+rax+8]
  test rsi,rsi
  jz .Ldc_emit_free
- lea rbp,[r13+64]
- test r14,r14
- jz .Ldc_emit_copy
- lea rbp,[r13+4160]
- cmp r14,1
- je .Ldc_emit_copy
- lea rbp,[r13+4224]
 .Ldc_emit_copy:
  mov rdi,rbp
  call memcpy@PLT
  mov rax,r14
  shl rax,4
  mov [r13+rax+16],rbp
+ mov rax,r14
+ shl rax,4
+ add rbp,[r12+rax+16]
+ inc rbp
 .Ldc_emit_next:
  inc r14
  cmp r14,3
@@ -177,6 +175,7 @@ pg_durable_client_open:
  movdqu [rbx+64],xmm0
  mov qword ptr [rbx+80],0
  mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+104],0
  call json_object_new_object@PLT
  mov [rbx+88],rax
  test rax,rax
@@ -548,6 +547,9 @@ pg_durable_client_suspend:
  mov rdi,[rbx+96]
  call json_object_put@PLT
  mov qword ptr [rbx+96],0
+ mov rdi,[rbx+104]
+ call json_object_put@PLT
+ mov qword ptr [rbx+104],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -805,7 +807,7 @@ pg_durable_client_publish:
  mov rdi,r12
  call json_object_array_length@PLT
  cmp r13,rax
- jae .Ldc_publish_end
+ jae .Ldc_publish_usage
  mov rdi,r12
  mov rsi,r13
  call json_object_array_get_idx@PLT
@@ -856,6 +858,9 @@ pg_durable_client_publish:
 .Ldc_publish_next:
  inc r13
  jmp .Ldc_publish_each
+.Ldc_publish_usage:
+ mov rdi,rbx
+ call .Ldc_usage_publish
 .Ldc_publish_end:
  add rsp,8
  pop r14
@@ -1287,3 +1292,81 @@ pg_durable_client_fault_task:
 .size pg_durable_client_fault_task,.-pg_durable_client_fault_task
 .section .rodata
 .Ldc_owner: .asciz "owner"
+
+.text
+.Ldc_usage_publish:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,80
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov rdi,[rbx]
+ mov rsi,[rbx+24]
+ mov rdx,rsp
+ call pg_usage_peek@PLT
+ cmp eax,8
+ je .Ldc_usage_end
+ test eax,eax
+ jnz .Ldc_usage_failed
+ mov rdi,[rbx+104]
+ test rdi,rdi
+ jz .Ldc_usage_initial
+ mov rsi,[rsp]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldc_usage_end
+.Ldc_usage_initial:
+ CGET "qword ptr [rsp]",models
+ mov rdi,rax
+ call json_object_object_length@PLT
+ test eax,eax
+ jnz .Ldc_usage_new
+ CGET "qword ptr [rsp]",tools_bucket
+ mov rdi,rax
+ call json_object_object_length@PLT
+ test eax,eax
+ jz .Ldc_usage_adopt
+.Ldc_usage_new:
+ mov rdi,[rsp]
+ mov esi,0
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Ldc_usage_failed
+ mov r12,rax
+ mov rdi,rax
+ call strlen@PLT
+ mov rbp,rax
+ lea rdi,[rsp+8]
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov dword ptr [rsp+8],6
+ mov [rsp+16],r12
+ mov [rsp+24],rbp
+ mov rdi,rbx
+ lea rsi,[rsp+8]
+ call pg_durable_client_emit
+ test eax,eax
+ jnz .Ldc_usage_failed
+.Ldc_usage_adopt:
+ mov rdi,[rbx+104]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+104],rax
+ mov qword ptr [rsp],0
+ jmp .Ldc_usage_end
+.Ldc_usage_failed:
+ mov dword ptr [rbx+72],1
+.Ldc_usage_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,80
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Ldc_models: .asciz "models"
+.Ldc_tools_bucket: .asciz "tools"

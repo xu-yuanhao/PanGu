@@ -588,3 +588,36 @@ pg_agent_watch_close:
 .Lu_watch_close_end:
  pop rbx
  ret
+.text
+/* Publication reads adopted cache only: no storage access on the mutation line. */
+.globl pg_usage_peek
+.type pg_usage_peek,@function
+pg_usage_peek:
+ UF 64
+ mov rbx,rdi
+ mov r12,rdx
+ mov qword ptr [r12],0
+ mov rdi,rsp
+ mov r8,rsi
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ lea rax,[rip+.Lu_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],11
+ mov [rsp+32],r8
+ mov dword ptr [rsp+40],1
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lu_definition]
+ mov rdx,rsp
+ lea rcx,[rsp+48]
+ call pg_document_cache_peek@PLT
+ test eax,eax
+ jnz .Lu_peek_end
+ mov rax,[rsp+48]
+ mov rdi,[rax+8]
+ mov rsi,r12
+ xor edx,edx
+ call json_object_deep_copy@PLT
+.Lu_peek_end:
+ UE 64

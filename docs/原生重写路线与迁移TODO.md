@@ -207,6 +207,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] UsageDoc接入Generation响应、工具结果可选usage和摘要尝试的同批事务；按模型/工具累计计数及已报告cost，可选reasoning/cacheWrite1h保留，Host usage服务读取PanGu会话账本；两后端累计/回滚/重开与真实摘要/生成用量通过。
 - [x] Live/usage只读快照提供Host observation服务与可选TUI绑定：无调度/写入、缺省空状态、压缩终态、存储重开累计用量及解绑边界通过。
 - [x] Host/TUI observation提供拉取式状态观察：初始快照、已提交Live/usage变化合并、无变化跳过、返回值隔离及幂等退订；两后端用量事务与实际压缩开始/结束通过。
+- [x] Durable Client在提交发布后按账本实际变化排队PG_USAGE_CHANGED；缓存读取不访问Storage，动态事件节点保留完整JSON，退订/暂停释放基线。真实摘要/生成用量事件及16 KiB队列所有权通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -248,8 +249,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi Durable events.ts的Live/Usage快照及usage_changed，现有原生Document snapshot；本批提供状态视图的原生拉取适配，完整逐条事件仍按K13覆盖。
-- 实际调用链：Host/TUI observation.watch → next初始快照 → 当前Session Live/usage深比较 → 返回独立owned变化快照；无变化不分配保留帧，close释放基线，调用者在Session关闭前退订。两次next之间变化合并，不宣称逐提交事件无损投递。
-- 验证：Runtime整批回归通过，两后端用量累计/abort后观察变化及无变化跳过；实际Host压缩开始/结束、调用者修改返回值不污染基线、重复close及close后next拒绝通过。G00/Assembly通过，测试复用现有产品与存储场景。
-- 接口与自审：pg_observation_ops追加watch/next/close，pg_agent_watch为调用者持有32字节状态；实现为usage.S，新增导出已登记，旧执行事件接口保持。实际TUI显示消费继续由TUI线接入。
-- 剩余与下一交付物：K13继续逐提交事件及顺序、任务图/report与客户端状态显示；下一批沿实际发布入口接入观察事件，K09扩展、K12剩余组合及provider/工具边界保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts usage_changed与view.ts publication；原生沿已提交Record publication和既有Client队列接入。
+- 实际调用链：UsageDoc事务采纳 → Client publish处理既有工具/任务通知 → 仅peek当前缓存账本 → 深比较已发布基线 → PG_USAGE_CHANGED队列 → poll返回完整JSON；随后沿原路径发布run终态。暂停释放账本与排队事件。TUI旧执行适配跳过新事件，用量显示可从observation绑定读取。
+- 验证：DeepSeek SQLite/JSONL真实摘要重开及后续Generation新增用量事件通过，事件累计与持久账本核对；实际产品验证16 KiB事件复制所有权，不受旧4 KiB节点限制；产品构建、G00/Assembly通过，Runtime整批回归见当前实现记录。
+- 接口与自审：pg_event枚举尾部增加PG_USAGE_CHANGED，事件结构不变；内部Client112字节，追加usage基线。事件节点按实际slice总长度分配并逐段终止，溢出/分配失败沿现有失败路径；公开缓存读取与模块导出同步登记。
+- 剩余与下一交付物：完整逐提交Live事件、独立多观察者投递与关闭仍待K13；下一批集中接压缩/重试状态和任务观察，避免把快照当作完整事件。K09扩展、K12剩余组合及provider/工具边界保持原范围。
