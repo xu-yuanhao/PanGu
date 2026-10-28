@@ -12,7 +12,7 @@ typedef struct {
  void *head,*tail,*delivered;
  unsigned busy,active,cancelled,stopping,failed,fault;
  uint64_t root;
- struct json_object *tool_events,*error_message,*usage;
+ struct json_object *tool_events,*error_message,*usage,*live;
 } pg_durable_client;
 /* Single foreground client on its scheduler, borrowed providers/configuration.
    Submit delegates atomic Submission/Entry/Generation admission to inputs. Poll pumps

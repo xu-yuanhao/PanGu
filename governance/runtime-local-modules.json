@@ -2233,7 +2233,8 @@
         "pg_agent_watch_open",
         "pg_agent_watch_next",
         "pg_agent_watch_close",
-        "pg_usage_peek"
+        "pg_usage_peek",
+        "pg_live_peek"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/usage.ts"

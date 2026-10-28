@@ -621,3 +621,36 @@ pg_usage_peek:
  call json_object_deep_copy@PLT
 .Lu_peek_end:
  UE 64
+
+.text
+.globl pg_live_peek
+.type pg_live_peek,@function
+pg_live_peek:
+ UF 64
+ mov rbx,rdi
+ mov r12,rdx
+ mov qword ptr [r12],0
+ mov rdi,rsp
+ mov r8,rsi
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ lea rax,[rip+.Lu_live_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],10
+ mov [rsp+32],r8
+ mov dword ptr [rsp+40],1
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lu_live_definition]
+ mov rdx,rsp
+ lea rcx,[rsp+48]
+ call pg_document_cache_peek@PLT
+ test eax,eax
+ jnz .Lu_live_peek_end
+ mov rax,[rsp+48]
+ mov rdi,[rax+8]
+ mov rsi,r12
+ xor edx,edx
+ call json_object_deep_copy@PLT
+.Lu_live_peek_end:
+ UE 64

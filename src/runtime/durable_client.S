@@ -176,6 +176,7 @@ pg_durable_client_open:
  mov qword ptr [rbx+80],0
  mov qword ptr [rbx+96],0
  mov qword ptr [rbx+104],0
+ mov qword ptr [rbx+112],0
  call json_object_new_object@PLT
  mov [rbx+88],rax
  test rax,rax
@@ -550,6 +551,9 @@ pg_durable_client_suspend:
  mov rdi,[rbx+104]
  call json_object_put@PLT
  mov qword ptr [rbx+104],0
+ mov rdi,[rbx+112]
+ call json_object_put@PLT
+ mov qword ptr [rbx+112],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -860,7 +864,7 @@ pg_durable_client_publish:
  jmp .Ldc_publish_each
 .Ldc_publish_usage:
  mov rdi,rbx
- call .Ldc_usage_publish
+ call .Ldc_live_publish
 .Ldc_publish_end:
  add rsp,8
  pop r14
@@ -1370,3 +1374,175 @@ pg_durable_client_fault_task:
 .section .rodata
 .Ldc_models: .asciz "models"
 .Ldc_tools_bucket: .asciz "tools"
+
+.text
+/* from entries missing in to: end first, usage, then starts, as Pi events.ts. */
+.Ldc_compaction_delta:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov [rsp+96],ecx
+ mov [rsp+104],r8
+ mov qword ptr [rsp+80],0
+ xor r14d,r14d
+.Ldc_compaction_each:
+ test r12,r12
+ jz .Ldc_compaction_done
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldc_compaction_done
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ CGET rax,task_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+72],rax
+ xor ebp,ebp
+.Ldc_compaction_find:
+ test r13,r13
+ jz .Ldc_compaction_emit
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Ldc_compaction_emit
+ mov rdi,r13
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ CGET rax,task_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+72]
+ je .Ldc_compaction_next
+ inc rbp
+ jmp .Ldc_compaction_find
+.Ldc_compaction_emit:
+ mov rdi,[rsp+64]
+ lea rsi,[rsp+80]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldc_compaction_failed
+ cmp dword ptr [rsp+96],8
+ jne .Ldc_compaction_serialize
+ CGET "qword ptr [rsp+104]",compaction_failure
+ mov [rsp+88],rax
+ CGET rax,task_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+72]
+ jne .Ldc_compaction_serialize
+ CGET "qword ptr [rsp+88]",error
+ test rax,rax
+ jz .Ldc_compaction_serialize
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Ldc_error]
+ mov rdx,rax
+ call .Ldc_set_owned
+ test eax,eax
+ jnz .Ldc_compaction_failed
+.Ldc_compaction_serialize:
+ mov rdi,[rsp+80]
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Ldc_compaction_failed
+ mov rbp,rax
+ mov rdi,rax
+ call strlen@PLT
+ lea rdi,[rsp]
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov eax,[rsp+96]
+ mov [rsp],eax
+ mov [rsp+8],rbp
+ mov rdi,rbp
+ call strlen@PLT
+ mov [rsp+16],rax
+ mov rdi,rbx
+ mov rsi,rsp
+ call pg_durable_client_emit
+ test eax,eax
+ jnz .Ldc_compaction_failed
+ mov rdi,[rsp+80]
+ call json_object_put@PLT
+ mov qword ptr [rsp+80],0
+.Ldc_compaction_next:
+ inc r14
+ jmp .Ldc_compaction_each
+.Ldc_compaction_failed:
+ mov dword ptr [rbx+72],1
+.Ldc_compaction_done:
+ mov rdi,[rsp+80]
+ call json_object_put@PLT
+ add rsp,112
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldc_live_publish:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov rdi,[rbx]
+ mov rsi,[rbx+24]
+ mov rdx,rsp
+ call pg_live_peek@PLT
+ cmp eax,8
+ je .Ldc_live_only_usage
+ test eax,eax
+ jnz .Ldc_live_failure
+ CGET "qword ptr [rbx+112]",compactions
+ mov r12,rax
+ CGET "qword ptr [rsp]",compactions
+ mov r13,rax
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov ecx,8
+ mov r8,[rsp]
+ call .Ldc_compaction_delta
+ mov rdi,rbx
+ call .Ldc_usage_publish
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,r12
+ mov ecx,7
+ mov r8,[rsp]
+ call .Ldc_compaction_delta
+ mov rdi,[rbx+112]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+112],rax
+ jmp .Ldc_live_done
+.Ldc_live_failure:
+ mov dword ptr [rbx+72],1
+.Ldc_live_only_usage:
+ mov rdi,rbx
+ call .Ldc_usage_publish
+.Ldc_live_done:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Ldc_task_id: .asciz "taskId"
+.Ldc_compactions: .asciz "compactions"
+.Ldc_compaction_failure: .asciz "compactionFailure"

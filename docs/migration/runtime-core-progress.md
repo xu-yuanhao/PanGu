@@ -32,9 +32,9 @@
 
 ## 本批验证与集成状态
 
-- Durable Client提交发布缓存账本的实际变化为PG_USAGE_CHANGED，复用现有poll队列；暂停释放基线，完整Live事件继续K13。
-- DeepSeek双后端真实摘要/重开/回答的事件累计与账本核对通过；产品16 KiB事件复制/借用、Host场景通过。
-- 产品构建、G00/Assembly与Runtime整批回归通过。
+- Client按采纳Live的压缩taskId差异发布开始/结束，结束事件取对应失败信息，顺序为结束→用量→开始；暂停释放快照基线。
+- 实际Host正常摘要、空范围、真实连接拒绝和主动取消通过，阶段更新不重复事件；Runtime整批回归、G00/Assembly通过。
+- DeepSeek SQLite/JSONL自动owned压缩、等待父任务与保存摘要重开、后续真实回答通过；产品构建通过。
 
 ## 当前接口边界
 

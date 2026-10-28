@@ -208,6 +208,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Live/usage只读快照提供Host observation服务与可选TUI绑定：无调度/写入、缺省空状态、压缩终态、存储重开累计用量及解绑边界通过。
 - [x] Host/TUI observation提供拉取式状态观察：初始快照、已提交Live/usage变化合并、无变化跳过、返回值隔离及幂等退订；两后端用量事务与实际压缩开始/结束通过。
 - [x] Durable Client在提交发布后按账本实际变化排队PG_USAGE_CHANGED；缓存读取不访问Storage，动态事件节点保留完整JSON，退订/暂停释放基线。真实摘要/生成用量事件及16 KiB队列所有权通过。
+- [x] Client按已采纳Live中taskId差异发布压缩开始/结束：结束→用量→开始，失败匹配对应error；正常/空范围/连接失败/取消均一对通知，TUI执行适配保持兼容。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -249,8 +250,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts usage_changed与view.ts publication；原生沿已提交Record publication和既有Client队列接入。
-- 实际调用链：UsageDoc事务采纳 → Client publish处理既有工具/任务通知 → 仅peek当前缓存账本 → 深比较已发布基线 → PG_USAGE_CHANGED队列 → poll返回完整JSON；随后沿原路径发布run终态。暂停释放账本与排队事件。TUI旧执行适配跳过新事件，用量显示可从observation绑定读取。
-- 验证：DeepSeek SQLite/JSONL真实摘要重开及后续Generation新增用量事件通过，事件累计与持久账本核对；实际产品验证16 KiB事件复制所有权，不受旧4 KiB节点限制；产品构建、G00/Assembly通过，Runtime整批回归见当前实现记录。
-- 接口与自审：pg_event枚举尾部增加PG_USAGE_CHANGED，事件结构不变；内部Client112字节，追加usage基线。事件节点按实际slice总长度分配并逐段终止，溢出/分配失败沿现有失败路径；公开缓存读取与模块导出同步登记。
-- 剩余与下一交付物：完整逐提交Live事件、独立多观察者投递与关闭仍待K13；下一批集中接压缩/重试状态和任务观察，避免把快照当作完整事件。K09扩展、K12剩余组合及provider/工具边界保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts compactionsBefore/compactions差异与compactionFailure、usage_changed顺序；沿现有Client publish和缓存读取实现。
+- 实际调用链：压缩创建/阶段/终态事务采纳Live → Client publish读取缓存副本 → 消失taskId发PG_COMPACTION_FINISHED、账本变化发PG_USAGE_CHANGED、新增taskId发PG_COMPACTION_STARTED → 既有动态事件队列。失败按taskId取error，取消不携带另一任务旧失败。阶段更新不重复发开始；暂停释放Live基线。
+- 验证：实际产品Host覆盖正常hook摘要、空范围、真实本地连接拒绝、主动取消；均恰好一对开始/结束，错误归属和顺序通过。Runtime整批回归、G00/Assembly通过；真实自动owned压缩与重开/回答结果见当前实现记录。
+- 接口与自审：pg_event追加两个压缩事件，结构保持；内部Client120字节，追加Live基线。pg_live_peek只读当前采纳缓存、不访问Storage；模块导出登记同步。TUI旧执行事件适配跳过状态通知，状态显示通过observation读取，完整显示由TUI线接入。
+- 剩余与下一交付物：K13继续generation重试/deferred事件、多观察者投递、任务图与report；下一批以任务观察实际消费者为交付，K09扩展及其他hook、K12剩余组合、provider/工具边界保持原范围。

@@ -381,7 +381,7 @@ static void generation_bind(generation_case *g){durable_tool_case *tools=&g->too
 static int generation_flow(unsigned mode){
  unsigned live=mode==1||mode==8||mode==15||mode==16||mode==20||mode==21;
  _Static_assert(sizeof(pg_durable_generation_host)==96&&sizeof(pg_durable_generation)==304,"Generation retry ABI");
- _Static_assert(sizeof(pg_durable_client_config)==32&&sizeof(pg_durable_client)==112&&offsetof(pg_durable_client,tool_events)==88,"Durable Client ABI");
+ _Static_assert(sizeof(pg_durable_client_config)==32&&sizeof(pg_durable_client)==120&&offsetof(pg_durable_client,tool_events)==88,"Durable Client ABI");
  if(live&&!getenv("MIMO_API_KEY")&&!getenv("PANGU_MODEL_API_KEY")){fputs("Model API key required for real Durable model/tool flow\n",stderr);return 2;}
  assert(!curl_global_init(CURL_GLOBAL_DEFAULT));
  for(unsigned kind=0;kind<2;kind++){

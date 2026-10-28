@@ -8,6 +8,7 @@ int pg_usage_record(pg_task_runner *,pg_document_tx *,int (*mint)(void *,uint64_
 int pg_usage_model(pg_task_runner *,pg_document_tx *,int (*mint)(void *,uint64_t *),const struct json_object *configuration,const struct json_object *assistant);
 /* Detached current conversation ledger; caller releases with json_object_put. */
 /* Publication-only cache read: PG_DOC_MISSING without loading Storage. */
+int pg_live_peek(pg_durable_session *,uint64_t,struct json_object **);
 int pg_usage_peek(pg_durable_session *,uint64_t,struct json_object **);
 int pg_usage_read(pg_durable_session *,uint64_t conversation,struct json_object **);
 typedef struct {void *context;int (*read)(void *,uint64_t,struct json_object **);} pg_usage_ops;
