@@ -638,6 +638,8 @@
     "src/client/tui/tui_logo.h": "client-source",
     "tests/client/tui/test_tui_logo.c": "client-test",
     "assets/branding/pangu-logo.svg": "client-asset",
-    "assets/branding/pangu-logo-geometry.json": "control"
+    "assets/branding/pangu-logo-geometry.json": "control",
+    "src/runtime/task_graph.S": "native-source",
+    "src/runtime/task_graph.h": "native-source"
   }
 }

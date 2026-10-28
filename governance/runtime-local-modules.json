@@ -450,7 +450,8 @@
         "session.durable.lifecycle.local.v0",
         "resources.lifecycle.local.v0",
         "models.catalog.local.v0",
-        "usage.local.v0"
+        "usage.local.v0",
+        "task.graph.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -458,7 +459,8 @@
         "pg_tui_runtime_inputs",
         "pg_tui_runtime_resources",
         "pg_tui_runtime_compaction",
-        "pg_tui_runtime_observation"
+        "pg_tui_runtime_observation",
+        "pg_tui_runtime_task_graph"
       ],
       "reference_basis": [
         {
@@ -2238,6 +2240,22 @@
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/usage.ts"
+      ]
+    },
+    {
+      "id": "task.graph.local.v0",
+      "sources": [
+        "src/runtime/task_graph.S",
+        "src/runtime/task_graph.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "json-c"
+      ],
+      "role": "Pi Durable task-graph live nodes, state/ownership projection and registry metadata inspection",
+      "exports": [
+        "pg_task_graph_read",
+        "pg_task_graph_service"
       ]
     }
   ],

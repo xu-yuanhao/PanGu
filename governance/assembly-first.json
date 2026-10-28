@@ -298,6 +298,10 @@
     "src/client/tui/tui_logo.S": {
       "role": "assembly-core",
       "reason": "Native TUI rendering and branding used by the integrated view"
+    },
+    "src/runtime/task_graph.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable task graph node/state projection and paginated read-only ownership query"
     }
   }
 }

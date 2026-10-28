@@ -7,6 +7,7 @@
 #include "../../src/runtime/durable_client.h"
 #include "../../src/runtime/durable_compaction.h"
 #include "../../src/runtime/usage.h"
+#include "../../src/runtime/task_graph.h"
 #include "../../src/client/tui/runtime_bridge.h"
 #include "../../src/runtime/mimo.h"
 #include "../../src/runtime/request_context.h"
@@ -91,7 +92,8 @@ static int task_read(void *p,unsigned table,uint64_t id,struct json_object **v){
 static int task_scan(void *p,const pg_memory_query *q,pg_memory_page *page){return pg_record_memory_scan(((task_case *)p)->f.memory,q,page);}
 static int task_documents(void *p,const pg_document_query *q,pg_memory_page *page){return pg_record_memory_scan_documents(((task_case *)p)->f.memory,q,page);}
 static double task_now(void *p){return (double)((task_case *)p)->f.now;}
-static int task_resolve(void *p,pg_slice kind,const pg_task_definition **out){task_case *t=p;*out=0;if(!t->available)return 1;assert(kind.size==7&&!memcmp(kind.data,"counter",7));*out=&t->definition;return 0;}
+static unsigned graph_read_probe;
+static int task_resolve(void *p,pg_slice kind,const pg_task_definition **out){task_case *t=p;if(graph_read_probe==1){pg_record_tx probe_tx={0};pg_document_tx probe_docs={0};assert(pg_durable_session_begin(&t->f.session,&probe_tx,&probe_docs,t,task_read)!=0);graph_read_probe=2;}*out=0;if(!t->available)return 1;assert(kind.size==7&&!memcmp(kind.data,"counter",7));*out=&t->definition;return 0;}
 static int task_initial(void *p,const struct json_object *input,struct json_object **out){(void)p;(void)input;*out=json_tokener_parse("{\"phase\":\"count\",\"n\":0}");return *out?0:1;}
 static int task_mint(void *p,uint64_t *id){return pg_record_memory_mint(((task_case *)p)->f.memory,id);}
 static void task_cleanup(void *p,pg_task_runner *runner){task_case *t=p;t->cleanups++;runner->operation=0;}
@@ -183,10 +185,11 @@ static void scheduler_tests(void){
   }
   if(scenario==1){t.mode=4;t.available=0;}
   assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3)&&scheduler.count==count&&!t.calls);
+  struct json_object *graph=0;uint64_t graph_sequence=t.f.records.sequence;assert(!pg_task_graph_read(&scheduler,&graph)&&json_object_object_length(json_object_object_get(graph,"tasks"))==(int)count&&t.f.records.sequence==graph_sequence&&!t.calls);char graph_key[32];snprintf(graph_key,sizeof(graph_key),"%llu",(unsigned long long)ids[0]);struct json_object *node=json_object_object_get(json_object_object_get(graph,"tasks"),graph_key);assert(node&&!json_object_object_get(node,"input")&&!json_object_object_get(json_object_object_get(node,"state"),"checkpoint"));if(scenario==1)assert(!strcmp(json_object_get_string(json_object_object_get(node,"blocked")),"missing_task"));json_object_put(graph);
   if(scenario==2)for(unsigned i=0;i<count;i++){struct json_object *row=task_row(&t,ids[i]);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(row,"state"),"status")),"pending")&&json_object_get_int(json_object_object_get(row,"restarts"))==1);json_object_put(row);}
   if(scenario==1){
-   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_BLOCKED&&!t.calls);t.available=1;
-   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count&&scheduler.next_wake==150);
+   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_BLOCKED&&!t.calls);t.available=1;assert(!pg_task_graph_read(&scheduler,&graph));node=json_object_object_get(json_object_object_get(graph,"tasks"),graph_key);assert(!json_object_object_get(node,"blocked"));json_object_put(graph);
+   assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count&&scheduler.next_wake==150);assert(!pg_task_graph_read(&scheduler,&graph));node=json_object_object_get(json_object_object_get(graph,"tasks"),graph_key);assert(json_object_get_uint64(json_object_object_get(json_object_object_get(node,"state"),"until"))==150);json_object_put(graph);
    assert(!pg_task_scheduler_close(&scheduler)&&!pg_task_scheduler_close(&scheduler));
    assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3));assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PENDING&&t.calls==count);
    ids[count++]=task_create(&t,0,1);assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_PROGRESS&&t.calls==count);
@@ -194,12 +197,25 @@ static void scheduler_tests(void){
   }
   if(scenario==4){assert(pg_task_scheduler_poll(&scheduler)==PG_TASK_CLOSED&&t.calls==1&&scheduler.count==2);assert(!pg_task_scheduler_close(&scheduler)&&!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));cleanup(&t.f,parent);continue;}
   int result=PG_TASK_PENDING;for(unsigned i=0;i<10&&result!=PG_TASK_DONE;i++){result=pg_task_scheduler_poll(&scheduler);assert(result<=PG_TASK_BLOCKED);}
-  assert(result==PG_TASK_DONE&&!scheduler.count);
+  assert(result==PG_TASK_DONE&&!scheduler.count);assert(!pg_task_graph_read(&scheduler,&graph)&&!json_object_object_length(json_object_object_get(graph,"tasks")));json_object_put(graph);
   if(scenario==0){assert(t.seen_count==9);for(unsigned i=0;i<9;i++)assert(t.seen[i]==i/3);}
   for(unsigned i=0;i<count;i++){struct json_object *row=task_row(&t,ids[i]);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(row,"state"),"status")),"terminal"));json_object_put(row);}
   assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));cleanup(&t.f,parent);
  }
  puts("PASS: Durable Scheduler stable phase fairness, live discovery/pagination, registry unblock, sleep deadline and all-task crash recovery on SQLite/JSONL");
+}
+static void task_graph_cases(void){
+ for(unsigned backend=0;backend<2;backend++){
+  char parent[]="/tmp/pangu-task-graph-XXXXXX";assert(mkdtemp(parent));task_case t={.f={.kind=backend,.now=100}};snprintf(t.f.path,sizeof(t.f.path),"%s/%s",parent,backend?".pangu":"pangu.sqlite");backend_open(&t.f);seed(&t.f);open_session(&t.f);task_bind(&t);uint64_t root=task_create(&t,0,3),child=task_create(&t,root,3);pg_task_scheduler scheduler={0};assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3));
+  pg_record_tx tx={0};pg_document_tx docs={0};assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read));for(unsigned i=0;i<257;i++){struct json_object *conversation=0;assert(!pg_record_tx_create_conversation(&tx,root,0,task_mint,&conversation));json_object_put(conversation);}assert(!pg_durable_session_settle(&t.f.session,0,0,0));
+  struct json_object *row=task_row(&t,root),*state=json_tokener_parse("{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"count\",\"private\":\"not visible\"},\"on\":[],\"policy\":\"allSettled\"}");json_object_array_add(json_object_object_get(state,"on"),json_object_new_uint64(child));json_object_object_add(row,"state",state);assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,&t,task_now)&&!pg_durable_session_settle(&t.f.session,0,0,0));json_object_put(row);row=task_row(&t,child);json_object_object_add(row,"state",json_tokener_parse("{\"status\":\"sleeping\",\"checkpoint\":{\"phase\":\"count\"},\"until\":150}"));assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,&t,task_now)&&!pg_durable_session_settle(&t.f.session,0,0,0));json_object_put(row);
+  struct json_object *graph=0;graph_read_probe=1;assert(!pg_task_graph_read(&scheduler,&graph)&&graph_read_probe==2);graph_read_probe=0;char root_key[32],child_key[32];snprintf(root_key,sizeof(root_key),"%llu",(unsigned long long)root);snprintf(child_key,sizeof(child_key),"%llu",(unsigned long long)child);struct json_object *tasks=json_object_object_get(graph,"tasks"),*node=json_object_object_get(tasks,root_key),*child_node=json_object_object_get(tasks,child_key);assert(json_object_array_length(json_object_object_get(node,"conversations"))==257&&json_object_get_uint64(json_object_object_get(child_node,"owner"))==root);assert(json_object_get_uint64(json_object_array_get_idx(json_object_object_get(json_object_object_get(node,"state"),"on"),0))==child&&!json_object_object_get(json_object_object_get(node,"state"),"checkpoint"));assert(json_object_get_uint64(json_object_object_get(json_object_object_get(child_node,"state"),"until"))==150);
+  assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));backend_open(&t.f);open_session(&t.f);assert(!pg_task_scheduler_open(&scheduler,&t.f.session,&t.host,3));struct json_object *reopened=0;assert(!pg_task_graph_read(&scheduler,&reopened)&&json_object_equal(graph,reopened));json_object_put(reopened);json_object_put(graph);
+  t.definition.version=2;assert(!pg_task_graph_read(&scheduler,&graph));node=json_object_object_get(json_object_object_get(graph,"tasks"),child_key);assert(!strcmp(json_object_get_string(json_object_object_get(node,"blocked")),"migration_failed"));json_object_put(graph);t.definition.version=0;assert(!pg_task_graph_read(&scheduler,&graph));node=json_object_object_get(json_object_object_get(graph,"tasks"),child_key);assert(!strcmp(json_object_get_string(json_object_object_get(node,"blocked")),"task_too_old"));json_object_put(graph);t.definition.version=1;
+  row=task_row(&t,root);json_object_object_add(row,"state",json_tokener_parse("{\"status\":\"completing\",\"outcome\":{\"status\":\"completed\",\"result\":\"private result payload\"}}"));assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,&t,task_now)&&!pg_durable_session_settle(&t.f.session,0,0,0));json_object_put(row);row=task_row(&t,child);json_object_object_add(row,"restarts",json_object_new_int(3));assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read)&&!pg_record_tx_set_task(&tx,row,&t,task_now)&&!pg_durable_session_settle(&t.f.session,0,0,0));json_object_put(row);assert(!pg_task_graph_read(&scheduler,&graph));tasks=json_object_object_get(graph,"tasks");node=json_object_object_get(tasks,root_key);state=json_object_object_get(node,"state");assert(!strcmp(json_object_get_string(json_object_object_get(state,"outcome")),"completed")&&!json_object_object_get(state,"result"));child_node=json_object_object_get(tasks,child_key);assert(!strcmp(json_object_get_string(json_object_object_get(child_node,"blocked")),"restart_limit"));json_object_put(graph);
+  assert(!pg_durable_session_begin(&t.f.session,&tx,&docs,&t,task_read));assert(pg_task_graph_read(&scheduler,&graph)==3&&!graph);assert(!pg_durable_session_abort(&t.f.session));assert(!pg_task_scheduler_close(&scheduler)&&!pg_durable_session_close(&t.f.session));cleanup(&t.f,parent);
+ }
+ puts("PASS: task graph paged owned conversations, waiting/owner/sleeping projection, registry metadata, read-line refusal and SQLite/JSONL reopen");
 }
 typedef struct {
  task_case base;uint64_t ids[8];unsigned count,behavior[8],policy[8],calls[8],resumes[8],gate,aborted[8],abort_count,check_marks;
@@ -660,6 +676,7 @@ int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--live-deferred"))return generation_flow(16);
  if(argc==2&&!strcmp(argv[1],"--live-sequential"))return generation_flow(20);
  if(argc==2&&!strcmp(argv[1],"--live-inputs"))return generation_flow(21);
+ task_graph_cases();
  compaction_lifecycle_cases();
  compaction_selection_cases();
  context_edit_cases();

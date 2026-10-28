@@ -24,6 +24,7 @@
 #include "../../contracts/client.h"
 
 #include "../../runtime/usage.h"
+#include "../../runtime/task_graph.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -130,6 +131,7 @@ const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *);
 /* Optional committed Live/usage snapshot; ownership follows pg_observation_ops.
    The binding expires when the bridge detaches. */
 const pg_observation_ops *pg_tui_runtime_observation(const tui_runtime_ops *);
+const pg_task_graph_ops *pg_tui_runtime_task_graph(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

@@ -13,6 +13,7 @@
 | 插件组合 | `host.S`、`native_plugin.S`：依赖排序、父子作用域、局部替换、协作释放、本地库入口 |
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
+| 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
@@ -32,9 +33,9 @@
 
 ## 本批验证与集成状态
 
-- Generation retry/deferred checkpoint与Live状态同批提交，Client产生重试开始/结束、deferred时间变化和当前会话task_failed通知；终态清理状态。
-- 两后端ASan/UBSan通过；DeepSeek真实retry/read/回答与deferred重开/fetch/工具/后续对话通过，断言事件字段。
-- 产品task_failed发布夹具与跨会话过滤通过，既有压缩正常/失败/取消保持；Runtime整批回归、产品构建、G00/Assembly通过。
+- 原生task.graph服务接通Scheduler、存储扫描与TUI可选绑定，返回已提交live任务的状态/等待/所有权/所属会话。
+- 双后端ASan/UBSan通过260任务、257会话分页、completing裁剪、注册分类、重开与只读回调写入拒绝；实际Host活动压缩图查询通过。
+- Runtime整批回归、产品构建、G00/Assembly通过；任务图订阅与已执行迁移失败缓存继续K13，完整移植验收保持原范围。
 
 ## 当前接口边界
 
