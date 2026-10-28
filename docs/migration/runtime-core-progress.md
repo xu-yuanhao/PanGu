@@ -31,13 +31,13 @@
 
 ## 本批验证与集成状态
 
-- beforeCompact通过可替换compaction.hooks Host服务接入select；固定上下文/配置，按序首决定，错误报告后继续，支持decline/summary与原生pending/cancel。
-- 插件提供的摘要保存place并复用既有Live/Submission/Entry事务；无需另起模型或摘要路径。
-- 两后端ASan/UBSan覆盖错误、顺序、拒绝、摘要、pending和取消；实际产品Host服务替换摘要通过。Runtime回归与隔离检查/构建见核心交接。
+- 压缩沿固定Durable使用当前Agent模型，select固定范围/配置；输出预算只取reserveTokens策略与模型上限。
+- 无usage时按上下文消息估算，不额外加入配置systemPrompt；已有usage继续作为后续估算基线。
+- 双后端ASan/UBSan及DeepSeek真实压缩、checkpoint重开、原子放置、后续回忆通过；Runtime整批回归与Assembly检查通过。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续摘要模型/system基线与owned阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续owned阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 

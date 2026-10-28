@@ -1571,17 +1571,6 @@ pg_durable_compaction_init:
  mov ecx,5
  div rcx
  mov [rsp+64],rax
- CGET "qword ptr [rsp+56]",maxTokens
- test rax,rax
- jz .Lcc_select_maximum
- mov rdi,rax
- call json_object_get_uint64@PLT
- test rax,rax
- jz .Lcc_select_maximum
- cmp rax,[rsp+64]
- jae .Lcc_select_maximum
- mov [rsp+64],rax
-.Lcc_select_maximum:
  CGET "qword ptr [rsp+16]",modelInfo
  CGET rax,maxTokens
  mov rdi,rax
@@ -2603,14 +2592,7 @@ pg_durable_compaction_create:
  jne .Lcc_estimate_find
  jmp .Lcc_estimate_sum
 .Lcc_estimate_system:
- CGET "qword ptr [rsp+48]",systemPrompt
- mov rdi,rax
- call .Lcc_chars
- lea rax,[rax+rax+6]
- xor edx,edx
- mov ecx,7
- div rcx
- mov [rsp+8],rax
+ mov qword ptr [rsp+8],0
 .Lcc_estimate_sum:
  mov rdi,r12
  call json_object_array_length@PLT
@@ -2703,7 +2685,6 @@ pg_durable_compaction_threshold:
 .Lcc_compaction: .asciz "compaction"
 .Lcc_enabled: .asciz "enabled"
 .Lcc_backgroundTokens: .asciz "backgroundTokens"
-.Lcc_systemPrompt: .asciz "systemPrompt"
 .Lcc_messages: .asciz "messages"
 .Lcc_usage: .asciz "usage"
 .Lcc_totalTokens: .asciz "totalTokens"
