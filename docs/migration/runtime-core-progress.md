@@ -34,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- Generation回合边界进入实际提交事件流，completing/terminal去重，顺序为结束→Submission/用量→开始；暂停释放身份表。
-- 流式消息以Entry.byTaskId配对，交错提交不误清前台消息；产品发布场景通过去重、身份表清理及交错任务检查。
-- DeepSeek双后端retry/工具/follow-up/重开中的回合ID与消息配对通过；最终Durable ASan/UBSan、批次Runtime回归、产品构建、Assembly通过。
+- Client从现有Submission存储分页初始化队列基线，提交后按实际变化发布PG_INBOX_UPDATED，顺序为Submission→队列→用量；暂停释放。
+- 双后端ASan/UBSan验证重开恢复256项队列；实际Host覆盖入队/撤回/重复通知去重和所有权。
+- DeepSeek SQLite/JSONL真实retry/工具/follow-up的队列ID/status顺序与清空通过；Runtime整批回归、产品构建、G00/Assembly通过。
 
 ## 当前接口边界
 

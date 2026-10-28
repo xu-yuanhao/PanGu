@@ -217,6 +217,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Client接通message_start/message_end/entry_appended原生事件：首文本前开始、流式assistant提交不重复开始、普通消息与无模型Entry边界、同批ID顺序和会话过滤；真实重试/工具/后续回答配对通过。
 - [x] Submission提交记录接入Client事件：按ID排序、会话过滤、排队/放置/撤回/结算字段直接取PanGu记录，位于任务结束之后、用量之前；产品排序夹具与真实follow-up流程验证。
 - [x] Generation回合开始/结束接入提交事件，completing提前结束后terminal去重，按结束→Submission/用量→开始排列；流式消息以Entry.byTaskId关联，其他任务提交不结束当前消息。
+- [x] Client队列刷新接通启动分页基线与Submission实际提交：入队/撤回/结算后发布完整ID有序队列，内容不变跳过，暂停释放；重开恢复大队列与真实follow-up事件通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -258,8 +259,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts held/turnEnded/turn_start与message_start/message_end。沿现有Generation Task提交和原生Client顺序接线，固定快照保持。
-- 实际调用链：本会话Generation提交 → 任务身份表判断首次开始/completing或terminal结束 → PG_TURN_STARTED/FINISHED {taskId}；结束位于Submission/用量之前，开始位于之后。completing保留结束标记到terminal，终态清理表项；暂停释放整表。流式assistant的Entry.byTaskId必须等于当前message_task才省略重复开始并结束该消息。
-- 验证：实际Host发布场景覆盖回合开始去重、completing→terminal只结束一次且身份表清空；交错的其他任务assistant仍正常成对通知且不清流式标记，匹配任务提交仅结束。DeepSeek SQLite/JSONL真实retry→工具→follow-up→重开流程通过回合ID/计数与消息配对检查；产品构建、Assembly及受影响专项结果见当前实现记录。
-- 接口与自审：pg_event追加TURN_STARTED/FINISHED，事件仅携带taskId；内部Client136字节追加turns身份表，头、初始化、释放和ABI断言同步。纯Assembly复用既有发布队列，无新增模块或产品能力范围。
-- 剩余与下一交付物：inbox_update、结构化message_update、report和Agent/Provider文档继续K05/K09/K13。下一批成组接队列变化与客户端状态消费者，完整范围保持。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts Submission→inbox_update→usage_changed顺序、inbox.ts queued视图；复用PanGu自身Submission存储，不引入另一种队列协议。
+- 实际调用链：Client打开时readOnLine分页读取当前queued记录 → 已提交Submission替换更新观察基线 → 深比较/ID排序 → PG_INBOX_UPDATED完整队列 → 既有动态事件队列；先发对应Submission事件，再发一次队列刷新。正常阶段或重复结算未改变队列时不刷新；暂停释放基线。会话视图与Client共享原有队列扫描入口。
+- 验证：双后端Durable ASan/UBSan覆盖重开Client恢复256项队列、只读初始化、暂停释放及原有队列撤回/边界场景；实际Host发布夹具覆盖入队、撤回、重复终态只发Submission不重复队列刷新、排序/会话隔离。DeepSeek双后端真实retry/工具/follow-up检查队列事件JSON、ID顺序和queued状态，整批结果见当前实现记录。
+- 接口与自审：pg_event尾部追加PG_INBOX_UPDATED，内部Client144字节增加仅用于事件比较的inbox引用，布局断言/初始化/清理同步；旧TUI执行适配跳过结构事件，状态消费仍由公开查询/观察入口接入。导出共享队列读取与模块依赖更新，无新增源码/存储实现。
+- 剩余与下一交付物：结构化message_update、完整report与Agent/Provider文档及最终TUI消费仍按K05/K09/K13覆盖。下一批转向实际扩展/Agent配置消费者，避免只继续增加事件辅助层；完整TODO范围保持。

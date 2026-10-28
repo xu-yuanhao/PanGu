@@ -48,7 +48,9 @@
  pop r12
  pop rbx
  ret
-.Lv_inbox:
+.globl pg_conversation_queue_read
+.type pg_conversation_queue_read,@function
+pg_conversation_queue_read:
  VF 176
  mov rbx,rdi
  mov r12,rsi
@@ -222,7 +224,7 @@ pg_conversation_view_read:
  mov rdi,[rbx+8]
  mov rsi,r12
  lea rdx,[rsp+40]
- call .Lv_inbox
+ call pg_conversation_queue_read
  test eax,eax
  jnz .Lv_view_bad
  mov rdi,[rsp+32]

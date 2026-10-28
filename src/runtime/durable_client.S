@@ -189,10 +189,15 @@ pg_durable_client_open:
  mov qword ptr [rbx+112],0
  mov qword ptr [rbx+120],0
  mov qword ptr [rbx+128],0
+ mov qword ptr [rbx+136],0
  call json_object_new_object@PLT
  mov [rbx+88],rax
  test rax,rax
  jz .Ldc_open_bad
+ mov rdi,rbx
+ call .Ldc_inbox_initialize
+ test eax,eax
+ jnz .Ldc_open_queue_bad
  mov rax,[rbx+8]
  cmp qword ptr [rax+24],0
  je .Ldc_open_ok
@@ -210,6 +215,10 @@ pg_durable_client_open:
 .Ldc_open_ok:
  xor eax,eax
  jmp .Ldc_open_end
+.Ldc_open_queue_bad:
+ mov rdi,[rbx+88]
+ call json_object_put@PLT
+ mov qword ptr [rbx+88],0
 .Ldc_open_bad:
  mov eax,1
 .Ldc_open_end:
@@ -570,6 +579,9 @@ pg_durable_client_suspend:
  mov rdi,[rbx+128]
  call json_object_put@PLT
  mov qword ptr [rbx+128],0
+ mov rdi,[rbx+136]
+ call json_object_put@PLT
+ mov qword ptr [rbx+136],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -2205,7 +2217,7 @@ pg_durable_client_fault_task:
  mov rdi,[rsp]
  call json_object_array_length@PLT
  cmp r13,rax
- jae .Ldc_submissions_end
+ jae .Ldc_submissions_inbox
  mov rdi,[rsp]
  mov rsi,r13
  call json_object_array_get_idx@PLT
@@ -2217,6 +2229,12 @@ pg_durable_client_fault_task:
  jnz .Ldc_submissions_failed
  inc r13
  jmp .Ldc_submissions_each
+.Ldc_submissions_inbox:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Ldc_inbox_apply
+ test eax,eax
+ jz .Ldc_submissions_end
 .Ldc_submissions_failed:
  mov dword ptr [rbx+72],1
 .Ldc_submissions_end:
@@ -2395,3 +2413,165 @@ pg_durable_client_fault_task:
 .Ldc_turn_id_format: .asciz "%llu"
 .Ldc_completing_word: .asciz "completing"
 .Ldc_terminal_word: .asciz "terminal"
+
+.text
+/* Derive the queue view from committed Submission replacements. */
+.Ldc_inbox_apply:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,rsi
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldc_inbox_ok
+ mov rdi,[rbx+136]
+ call json_object_get@PLT
+ mov [rsp],rax
+ xor r13d,r13d
+.Ldc_inbox_record:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_inbox_compare
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ CGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+16],rax
+ CGET r14,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_queued_word]
+ call strcmp@PLT
+ mov [rsp+32],eax
+ call json_object_new_array@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ldc_inbox_bad
+ xor ebp,ebp
+.Ldc_inbox_copy:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Ldc_inbox_append
+ mov rdi,[rsp]
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ CGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+16]
+ je .Ldc_inbox_copy_next
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov [rsp+40],rax
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldc_inbox_add_failed
+.Ldc_inbox_copy_next:
+ inc rbp
+ jmp .Ldc_inbox_copy
+.Ldc_inbox_append:
+ cmp dword ptr [rsp+32],0
+ jne .Ldc_inbox_swap
+ mov rdi,r14
+ call json_object_get@PLT
+ mov [rsp+40],rax
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldc_inbox_add_failed
+.Ldc_inbox_swap:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],0
+ inc r13
+ jmp .Ldc_inbox_record
+.Ldc_inbox_compare:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldc_message_compare]
+ call json_object_array_sort@PLT
+ mov rdi,[rsp]
+ mov rsi,[rbx+136]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldc_inbox_ok
+ mov rdi,rbx
+ mov esi,19
+ mov rdx,[rsp]
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_inbox_bad
+ mov rdi,[rbx+136]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+136],rax
+ mov qword ptr [rsp],0
+.Ldc_inbox_ok:
+ xor ebp,ebp
+ jmp .Ldc_inbox_end
+.Ldc_inbox_add_failed:
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+.Ldc_inbox_bad:
+ mov ebp,5
+.Ldc_inbox_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_queued_word: .asciz "queued"
+
+.text
+.Ldc_inbox_initialize:
+ push rbp
+ push rbx
+ sub rsp,24
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,rsp
+ mov rsi,[rbx]
+ call pg_durable_read_on_line_begin@PLT
+ test eax,eax
+ jnz .Ldc_inbox_initialize_end
+ mov rax,[rbx+8]
+ mov rdi,[rax+8]
+ mov rsi,[rbx+24]
+ lea rdx,[rbx+136]
+ call pg_conversation_queue_read@PLT
+ mov ebp,eax
+ mov rdi,rsp
+ call pg_durable_read_on_line_end@PLT
+ mov eax,ebp
+.Ldc_inbox_initialize_end:
+ add rsp,24
+ pop rbx
+ pop rbp
+ ret

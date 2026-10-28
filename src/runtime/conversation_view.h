@@ -10,6 +10,8 @@ struct pg_conversation_watch {pg_view_binding source;pg_view_watch observer;pg_c
    Submission records in ID order. Serialized readOnLine, no Task work/writes.
    Binding/providers are borrowed through Host lifetime.
    0 success, 2 missing conversation, 3 busy, other error. */
+/* Detached ascending queued Submission records; caller already owns readOnLine. */
+int pg_conversation_queue_read(const pg_task_runner_host *,uint64_t,struct json_object **);
 int pg_conversation_view_read(pg_conversation_view_binding *,uint64_t,struct json_object **);
 /* Zeroed/released watch storage lives until close or owning Host shutdown.
    next follows pg_view_watch_next: initial frame, then merged state changes. */
