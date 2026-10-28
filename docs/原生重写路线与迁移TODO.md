@@ -214,6 +214,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 任务图多观察者支持attach初始帧、独立读取/合并变化、注册元数据刷新、幂等退订与Host统一关闭；迁移失败按定义身份缓存，替换后恢复，图读取不执行迁移。
 - [x] conversation.view接通会话记录、原始有效Entry范围、已实现Live/Usage文档与排队Submission视图；Host/TUI公开只读入口同一readOnLine读取，分页、撤回、压缩head及重开通过。
 - [x] conversation.view多观察者接通初始历史、后续Entry/文档/队列变化、合并读取与Host关闭释放；任务图/会话视图共用一份原生Watch生命周期，真实摘要/回答观察通过。
+- [x] Client接通message_start/message_end/entry_appended原生事件：首文本前开始、流式assistant提交不重复开始、普通消息与无模型Entry边界、同批ID顺序和会话过滤；真实重试/工具/后续回答配对通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -255,8 +256,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/view.ts attach/watch/advance/close与task-graph.ts的Watch语义。初始帧固定attach视图，慢消费读取合并后的状态，观察者分别持有交付基线。
-- 实际调用链：Host/TUI conversation.view.watch → 同一只读会话快照 → 共享view_watch.S初始/变化交付 → 真实Entry、Live/Usage、队列变化 → caller-owned JSON；个别退订解除注册，Host停止先统一关闭会话观察者再关闭任务图/Client/Scheduler。任务图原观察实现移入共享模块，旧实现及旧导出同步移除，两个实际消费者共用生命周期。
-- 验证：SQLite/JSONL ASan/UBSan覆盖257项队列撤回观察、独立/迟读初始帧、返回值隔离、重复退订、统一关闭与attach中关闭无残留；任务图既有多观察者/注册变化/迁移恢复场景保持。实际Host覆盖两个会话观察者、压缩后head、持有帧跨Host关闭及未退订自动清理；DeepSeek两后端真实摘要/重开/回答后订阅得到新head/历史与用量，再次读取无变化。整批验证见当前实现记录。
-- 接口与自审：view_watch.h公开40字节binding/32字节watch；会话binding32字节、watch104字节，头/Assembly偏移与ABI断言同步。conversation.view服务追加watch/next/close，C仅组合和关闭；新共享源码、模块依赖、导出及构建登记更新并自审。
-- 剩余与下一交付物：当前观察为显式拉取的合并视图；完整逐提交消息事件/Op与report、Agent/Provider内置文档继续K09/K13。下一批接实际Client的完整消息边界与会话事件，其他覆盖项保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts partial首次message_start、已提交Entry的message_start/message_end/entry_appended及ID顺序。流式起点沿原生Generation先采纳Live再调用progress的既有顺序。
+- 实际调用链：首个text delta → 读取已采纳Live.message → PG_MESSAGE_STARTED → 原文本事件；Entry提交发布 → 按ID整理本会话Entry → 非流式首消息开始、PG_MESSAGE_FINISHED或PG_ENTRY_APPENDED → 压缩/用量/终态。已开始的assistant提交仅结束；run结束/暂停清理流式任务标记，旧TUI执行适配跳过结构事件，保留原文本/工具显示。
+- 验证：两后端原生ASan/UBSan与Runtime整批回归通过。DeepSeek SQLite/JSONL真实瞬态失败→retry→工具→后续回答中，文本前已有assistant开始、每个assistant开始/结束配对，结束Entry ID和会话核对通过。实际产品发布夹具验证同批乱序Entry按ID排序、普通消息成对、无模型Entry追加、跨会话过滤；既有压缩/失败/取消和16 KiB所有权场景通过。整批构建/检查见当前实现记录。
+- 接口与自审：pg_event追加三种消息边界枚举，结构保持；内部Client128字节新增流式任务标记，头/初始化/暂停/断言同步。纯Assembly，队列复用已有动态字节所有权，无新文件/依赖。记录源与实际消费者一并接线。
+- 剩余与下一交付物：完整message_update的结构变化/usage、partial思考/工具参数、turn/Submission/Agent等事件与report仍按K05/K09/K13覆盖；下一批沿同一发布路径接会话队列/回合事件，保持完整范围。

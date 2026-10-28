@@ -34,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- 会话视图多观察者提供attach初始帧、后续历史/文档/队列合并变化、独立退订与Host统一关闭。
-- 任务图与会话视图复用view_watch.S；移除任务图内旧生命周期实现并迁移实际调用者。
-- 双后端ASan/UBSan、队列/迟读/attach中关闭、实际Host多观察者与持有帧关闭后有效通过；DeepSeek真实摘要/回答的head、历史和用量变化观察通过。Runtime整批回归、产品构建、G00/Assembly通过。
+- Client消息边界接通首个流式文本前开始、提交Entry结束、普通消息成对和无模型Entry追加；同批按ID排序并过滤其他会话。
+- SQLite/JSONL真实DeepSeek retry/工具/后续回答通过开始→文本→结束配对检查；原生ASan/UBSan、Runtime整批回归和实际产品发布场景通过。
+- 产品构建、G00/Assembly通过；完整结构化message_update等剩余事件继续所属覆盖项。
 
 ## 当前接口边界
 

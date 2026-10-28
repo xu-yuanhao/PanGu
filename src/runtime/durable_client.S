@@ -35,6 +35,15 @@ pg_durable_client_emit:
  jz .Ldc_emit_end
  cmp dword ptr [rdi+68],0
  jne .Ldc_emit_end
+ cmp dword ptr [r12],1
+ jne .Ldc_emit_allocate
+ cmp qword ptr [rbx+120],0
+ jne .Ldc_emit_allocate
+ mov rdi,rbx
+ call .Ldc_message_progress
+ test eax,eax
+ jnz .Ldc_emit_fail
+.Ldc_emit_allocate:
  mov rsi,[r12+16]
  add rsi,[r12+32]
  jc .Ldc_emit_fail
@@ -114,6 +123,7 @@ pg_durable_client_emit:
  mov [rsp+4],edx
  cmp esi,4
  jne .Ldc_boundary_emit
+ mov qword ptr [rbx+120],0
  cmp edx,1
  jne .Ldc_boundary_emit
  mov rdi,[rbx+96]
@@ -177,6 +187,7 @@ pg_durable_client_open:
  mov qword ptr [rbx+96],0
  mov qword ptr [rbx+104],0
  mov qword ptr [rbx+112],0
+ mov qword ptr [rbx+120],0
  call json_object_new_object@PLT
  mov [rbx+88],rax
  test rax,rax
@@ -554,6 +565,7 @@ pg_durable_client_suspend:
  mov rdi,[rbx+112]
  call json_object_put@PLT
  mov qword ptr [rbx+112],0
+ mov qword ptr [rbx+120],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -863,6 +875,9 @@ pg_durable_client_publish:
  inc r13
  jmp .Ldc_publish_each
 .Ldc_publish_usage:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Ldc_messages_publish
  mov rdi,rbx
  mov rsi,r12
  call .Ldc_live_publish
@@ -1879,4 +1894,216 @@ pg_durable_client_fault_task:
  pop r12
  pop rbx
  pop rbp
+ ret
+
+.text
+/* First streamed partial is already adopted before the provider text callback. */
+.Ldc_message_progress:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov rdi,[rbx]
+ mov rsi,[rbx+24]
+ mov rdx,rsp
+ call pg_live_peek@PLT
+ cmp eax,8
+ je .Ldc_message_progress_ok
+ test eax,eax
+ jnz .Ldc_message_progress_bad
+ CGET "qword ptr [rsp]",generation_key
+ mov r12,rax
+ CGET rax,message
+ test rax,rax
+ jz .Ldc_message_progress_ok
+ mov rdi,rbx
+ mov esi,13
+ mov rdx,rax
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_message_progress_bad
+ CGET r12,task_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rbx+120],rax
+.Ldc_message_progress_ok:
+ xor ebp,ebp
+ jmp .Ldc_message_progress_end
+.Ldc_message_progress_bad:
+ mov ebp,1
+.Ldc_message_progress_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldc_messages_publish:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov qword ptr [rsp],0
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldc_messages_failed
+.Ldc_messages_collect:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_messages_sort
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ CGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_messages_collect_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_entry_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_messages_collect_next
+ CGET r14,value
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldc_messages_collect_bad
+.Ldc_messages_collect_next:
+ inc r13
+ jmp .Ldc_messages_collect
+.Ldc_messages_collect_bad:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ jmp .Ldc_messages_failed
+.Ldc_messages_sort:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldc_message_compare]
+ call json_object_array_sort@PLT
+ mov r12,[rsp]
+ xor r13d,r13d
+.Ldc_messages_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_messages_end
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ CGET rax,conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Ldc_messages_next
+ CGET r14,model
+ test rax,rax
+ jz .Ldc_messages_raw
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldc_messages_raw
+ CGET r14,model
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ CGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_messages_begin
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_assistant_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_messages_begin
+ cmp qword ptr [rbx+120],0
+ je .Ldc_messages_begin
+ mov qword ptr [rbx+120],0
+ jmp .Ldc_messages_finish
+.Ldc_messages_begin:
+ mov rdi,rbx
+ mov esi,13
+ mov rdx,rbp
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_messages_failed
+.Ldc_messages_finish:
+ mov rdi,rbx
+ mov esi,14
+ mov rdx,r14
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_messages_failed
+ jmp .Ldc_messages_next
+.Ldc_messages_raw:
+ mov rdi,rbx
+ mov esi,15
+ mov rdx,r14
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_messages_failed
+.Ldc_messages_next:
+ inc r13
+ jmp .Ldc_messages_each
+.Ldc_messages_failed:
+ mov dword ptr [rbx+72],1
+.Ldc_messages_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_entry_word: .asciz "entry"
+.Ldc_role: .asciz "role"
+.Ldc_assistant_word: .asciz "assistant"
+
+.text
+.Ldc_message_compare:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,[rsi]
+ mov rdi,[rdi]
+ lea rsi,[rip+.Ldc_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r12,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Ldc_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp r12,rax
+ seta al
+ setb dl
+ movzx eax,al
+ movzx edx,dl
+ sub eax,edx
+ add rsp,8
+ pop r12
+ pop rbx
  ret
