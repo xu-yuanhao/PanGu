@@ -30,9 +30,9 @@
 
 ## 本批验证与集成状态
 
-- Generation按模型容量、有效usage与尾部估算触发阻塞压缩；owned子任务与父任务等待原子提交，摘要Entry和子任务终态同批提交，重开后恢复生成。
-- SQLite/JSONL真实DeepSeek验证自动压缩、等待父任务重开、已保存摘要重开、503后持久重试且不重复压缩及继续回忆；实际产品Host通过合并设置和注入模型元数据完成同一闭环。Runtime整批回归、Durable ASan/UBSan专项、隔离核心G00/Assembly与产品构建通过。
-- `model.metadata`为独立可选服务，返回公开contextWindow/maxTokens；默认模型目录接入按K05完成。K12继续overflow/background、取消/失败/Live/hook与完整动态请求。
+- 模型错误/HTTP识别context overflow后，按当前压缩策略与固定cutoff创建owned压缩；失败assistant、子任务和父等待同批提交。摘要成功后保持原attempt继续请求，失败/无摘要保留原溢出原因；同一Generation的compacted标记约束再次溢出。
+- SQLite/JSONL注入overflow后经真实DeepSeek摘要、阶段重开及继续回忆通过；Durable ASan/UBSan覆盖关闭压缩、无切点、恢复failed/no-entry子任务的原错误。Runtime整批回归、更新后的Durable专项、隔离核心G00/Assembly与产品构建通过。
+- K12继续background、取消/Live/hook与完整动态请求；可选model.metadata提供容量，默认目录和模型覆盖策略按K05接入。
 
 ## 当前接口边界
 

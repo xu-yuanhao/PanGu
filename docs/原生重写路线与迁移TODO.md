@@ -180,6 +180,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 核心手动压缩服务接通动态Entry/贡献视图、UTF-16估算与合法保留边界、固定配置/范围的摘要请求、持久select/summarize/place及原子Submission/任务终态；真实模型验证70条消息、两次阶段重开、原记录保留和摘要后继续对话，提供独立TUI操作表。
 - [x] 摘要输入移除4096字节复制边界：任务持有完整JSON文本，通过model.provider ABI3的显式长度借用行进入同一模型编码器；1 MiB/NUL/页尾编码及19,301字节真实请求、两后端恢复与产品Host继续对话通过。
 - [x] 自动阻塞压缩接入Generation：按模型容量、最近有效usage与尾部估算选择切点，原子创建owned子任务并等待；摘要Entry与子任务终态同批提交，父任务重开后继续生成。产品读取合并compaction设置和可选model.metadata；真实模型两后端阶段重开与产品Host闭环通过。
+- [x] 溢出恢复接入Generation：沿pi-ai错误分类和Durable当前策略，原子记录失败assistant/owned压缩/父等待；摘要成功后保持attempt继续请求，保留compacted防重复，失败或无摘要保留原溢出原因。真实模型摘要/恢复及两后端阶段重开通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -228,8 +229,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts的thresholdCompaction/prepare、compaction.ts的createCompaction/place、agent.ts默认策略及harness-compaction测试；沿固定快照完成本批。已fetch核对Pi origin/main `ad702637fdf6fbd3f965c5dba0b14bae100b74eb`与Harness origin/master `f3803c9697`，后续批次评估新增Generation行为和compaction restartLimit修复。
-- 实际调用链：产品prepare读取合并compaction设置/可选模型元数据 → Assembly估算与合法切点 → 同一事务创建Generation-owned压缩及父任务waiting → 持久select/summarize/place → 同批提交摘要Entry/子任务终态 → 唤醒父任务继续请求。父任务状态沿request/retry保留compacted标记。
-- 验证：SQLite/JSONL真实模型自动压缩、等待父任务和已保存摘要两次阶段重开、原子直接Entry放置、注入一次503后保留compacted标记并恢复真实请求/回忆通过；实际产品Host以注入模型容量和真实DeepSeek传输通过自动触发。Runtime整批回归、Durable ASan/UBSan专项、隔离核心G00/Assembly和产品构建通过。首次产品联调修复了启动中scope无法查询元数据的问题，查询改用已激活父scope。
-- 接口与自审：新增独立model.metadata ABI1描述contextWindow/maxTokens，model.provider ABI3函数表不变；Generation结构304字节，增加compaction绑定，调用者与布局断言同步更新。Generation/Inputs/Compaction静态登记合为同一Harness实现模块，服务入口仍各自独立；状态机/估算/原子放置均为手写Assembly。控制变化自审通过；并行TUI、assets与规划文档的其他改动保持原位。
-- 剩余与下一交付物：K12继续overflow/background、取消/失败/Live/hook及system基线；K05接入默认模型目录元数据与模型覆盖策略。当前自动阈值通过可选model.metadata生效，默认provider尚未发布目录容量。常规Generation/历史仍为64行、单文本4096字节，摘要输出4096字节；随完整动态请求调用链完成。TUI消费既有/compact操作表，其他K项保持原覆盖范围。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts的finish/prepare、compaction.ts createCompaction/place、harness-compaction.test.ts overflow compaction及pi-ai utils/overflow.ts。沿固定快照采用error-based overflow语义；已核对缓存Pi/Harness上游变化，后续批次评估新增Generation行为与restartLimit修复。
+- 实际调用链：模型失败 → 当前策略与错误/HTTP分类 → 固定请求cutoff选择可压缩范围 → 同批追加失败assistant、创建owned压缩及父waiting/overflow → 两阶段重开 → 摘要Entry与子任务终态原子放置 → 原attempt恢复模型请求。已有compacted时溢出直接结算，关闭压缩/无切点也直接结算；child失败或completed但无entryId使用原始overflow文本。
+- 验证：SQLite/JSONL注入context overflow后，真实DeepSeek摘要与恢复回忆通过，两次阶段重开、直接Entry放置和旧范围读取保持；Durable ASan/UBSan覆盖关闭压缩/无切点时即使provider标为可重试也不普通重试，以及持久failed/no-entry子任务的原错误恢复。Runtime整批回归及更新后的Durable专项、隔离核心G00/Assembly与产品构建通过。
+- 接口与自审：新增pg_model_context_overflow显式长度/HTTP分类导出，复用现有POSIX正则桥接和错误模式，throttling优先；Generation内部操作持有本次overflow策略，沿用现有压缩构造与原子assistant提交路径。公开函数表及Generation布局保持；新增导出已登记，控制变化自审通过；并行TUI与其他规划修改保留。
+- 剩余与下一交付物：K12继续background压缩、取消/Live/hook及system基线；K05接入默认模型目录元数据与模型覆盖策略。当前阈值依赖可选model.metadata，默认provider尚未发布目录容量。常规Generation/历史为64行、单文本4096字节，摘要输出4096字节；随完整动态请求链完成。TUI使用既有/compact操作表，其他K项保留原覆盖范围。

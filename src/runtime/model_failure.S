@@ -76,6 +76,39 @@ pg_model_retryable:
  pop rbp
  ret
 .size pg_model_retryable,.-pg_model_retryable
+.text
+.globl pg_model_context_overflow
+.type pg_model_context_overflow,@function
+pg_model_context_overflow:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ lea rdx,[rip+.Lmf_overflow_exempt]
+ call pg_model_regex@PLT
+ test eax,eax
+ jnz .Lmf_context_no
+ cmp r13,413
+ je .Lmf_context_yes
+ mov rdi,rbx
+ mov rsi,r12
+ lea rdx,[rip+.Lmf_overflow]
+ call pg_model_regex@PLT
+ test eax,eax
+ jg .Lmf_context_yes
+.Lmf_context_no:
+ xor eax,eax
+ jmp .Lmf_context_end
+.Lmf_context_yes:
+ mov eax,1
+.Lmf_context_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_model_context_overflow,.-pg_model_context_overflow
 .section .rodata
 .Lmf_overflow_exempt: .asciz "^(Throttling error|Service unavailable):|rate limit|too many requests"
 .Lmf_overflow: .asciz "prompt (is )?too long|prompt exceeds max length|request_too_large|input is too long for requested model|exceeds the context window|exceeds (the )?(model.?s )?maximum context length|input token count.*exceeds the maximum|maximum prompt length is [0-9]+|reduce the length of the messages|maximum context length is [0-9]+ tokens|exceeds (the )?maximum allowed input length|input \\([0-9]+ tokens\\) is longer than the model.?s context length|exceeds the limit of [0-9]+|exceeds the available context size|greater than the context length|context window exceeds limit|request exceeded model token limit|configured context size is|too large for model with|Range of input length should be|context[_ ]length[_ ]exceeded|too many tokens|token limit exceeded"
