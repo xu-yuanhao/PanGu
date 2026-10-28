@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
+| 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
@@ -28,9 +29,9 @@
 
 ## 本批验证与集成状态
 
-- K12实际请求/历史投影已统一工具结果整理：先排除失败/取消/deferred assistant，再按调用顺序匹配首个结果；孤立/重复结果过滤，缺失回执仅用于模型上下文。
-- Durable专项ASan/UBSan和实际编码检查覆盖倒序、跨用户/被排除assistant、下一assistant边界和SQLite/JSONL重开。最终Runtime回归、隔离核心产品构建及真实DeepSeek两后端Inputs/工具/follow-up/重开通过；Assembly通过。
-- 后续接通system基线/section、保留边界和持久摘要任务；完整压缩尚未完成。
+- 当前OpenAI路径按pi-ai默认策略折叠system内容与section，复用Generation/历史投影；配置提示与正文按顺序组合，section有序覆盖/删除/重加。
+- Durable专项ASan/UBSan、容量拒绝、实际请求编码及两后端重开通过；Runtime回归、隔离核心产品构建和Assembly通过。真实DeepSeek持久section/发送请求/工具/后续输入/重开场景在两后端通过。
+- 继续保留完整system基线/工具声明、token边界和持久摘要任务范围，完整压缩尚未完成。
 
 ## 当前接口边界
 

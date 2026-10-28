@@ -45,6 +45,9 @@ int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generati
 /* Read-only committed startup history through the same model projection.
    The latest head leads retained entries; last edits win. Results are ordered
    after their calls, first matching ID before the next assistant. Missing
-   results are ephemeral error receipts; unmatched results are omitted. */
+   results are ephemeral error receipts; unmatched results are omitted.
+   The current OpenAI transport collapses system content and ordered section
+   patches into system_prompt. Tool deltas need an execution-registry binding
+   and currently reject during projection. */
 int pg_durable_generation_history(const pg_task_runner_host *,uint64_t,const struct json_object *,pg_session *);
 #endif

@@ -642,6 +642,249 @@ pg_durable_generation_init:
  pop rbx
  pop rbp
  ret
+/* Append one nonempty prompt part with the provider's double-LF separator. */
+.Lgg_append_system:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_append_system_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov r13,rax
+ test eax,eax
+ jz .Lgg_append_system_ok
+ mov rax,[rbx+PG_S_SYSTEM_SIZE]
+ xor edx,edx
+ test rax,rax
+ setnz dl
+ lea rcx,[rax+rdx*2]
+ add rcx,r13
+ cmp rcx,4096
+ jae .Lgg_append_system_bad
+ test rax,rax
+ jz .Lgg_append_system_copy
+ mov word ptr [rbx+rax+PG_S_SYSTEM],0x0a0a
+ add qword ptr [rbx+PG_S_SYSTEM_SIZE],2
+.Lgg_append_system_copy:
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rax,[rbx+PG_S_SYSTEM_SIZE]
+ lea rdi,[rbx+rax+PG_S_SYSTEM]
+ mov rdx,r13
+ call memcpy@PLT
+ add [rbx+PG_S_SYSTEM_SIZE],r13
+ mov rax,[rbx+PG_S_SYSTEM_SIZE]
+ mov byte ptr [rbx+rax+PG_S_SYSTEM],0
+.Lgg_append_system_ok:
+ xor eax,eax
+ jmp .Lgg_append_system_end
+.Lgg_append_system_bad:
+ mov eax,4
+.Lgg_append_system_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* The current OpenAI transport collapses system messages (pi-ai transcript.ts).
+   Section replacement retains position; deletion followed by addition appends. */
+.Lgg_collapse_system:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp+32],0
+ call json_object_new_object@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lgg_collapse_bad
+ xor r13d,r13d
+.Lgg_collapse_message:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lgg_collapse_sections
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ GGET rbp,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_collapse_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_system_role]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_collapse_next
+ GGET rbp,tools_added
+ mov rdi,rax
+ call .Lgg_empty_tool_changes
+ test eax,eax
+ jnz .Lgg_collapse_bad
+ GGET rbp,tools_removed
+ mov rdi,rax
+ call .Lgg_empty_tool_changes
+ test eax,eax
+ jnz .Lgg_collapse_bad
+ GGET rbp,content
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lgg_collapse_content
+ mov rdi,[rsp+24]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_collapse_bad
+ mov rdi,[rsp+24]
+ call .Lgg_join_tool_text
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lgg_collapse_bad
+ mov [rsp+24],rax
+.Lgg_collapse_content:
+ mov rdi,rbx
+ mov rsi,[rsp+24]
+ call .Lgg_append_system
+ mov [rsp+40],eax
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov qword ptr [rsp+32],0
+ cmp dword ptr [rsp+40],0
+ jne .Lgg_collapse_bad
+ GGET rbp,sections
+ test rax,rax
+ jz .Lgg_collapse_next
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_collapse_bad
+ mov rdi,rbp
+ call json_object_iter_begin@PLT
+ mov [rsp],rax
+ mov rdi,rbp
+ call json_object_iter_end@PLT
+ mov [rsp+8],rax
+.Lgg_collapse_patch:
+ lea rdi,[rsp]
+ lea rsi,[rsp+8]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lgg_collapse_next
+ lea rdi,[rsp]
+ call json_object_iter_peek_name@PLT
+ mov [rsp+16],rax
+ lea rdi,[rsp]
+ call json_object_iter_peek_value@PLT
+ test rax,rax
+ jz .Lgg_collapse_delete
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_collapse_bad
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdi,r14
+ mov rsi,[rsp+16]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_collapse_bad
+ jmp .Lgg_collapse_patch_next
+.Lgg_collapse_delete:
+ mov rdi,r14
+ mov rsi,[rsp+16]
+ call json_object_object_del@PLT
+.Lgg_collapse_patch_next:
+ lea rdi,[rsp]
+ call json_object_iter_next@PLT
+ jmp .Lgg_collapse_patch
+.Lgg_collapse_next:
+ inc r13
+ jmp .Lgg_collapse_message
+.Lgg_collapse_sections:
+ mov rdi,r14
+ call json_object_iter_begin@PLT
+ mov [rsp],rax
+ mov rdi,r14
+ call json_object_iter_end@PLT
+ mov [rsp+8],rax
+.Lgg_collapse_render:
+ lea rdi,[rsp]
+ lea rsi,[rsp+8]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lgg_collapse_ok
+ lea rdi,[rsp]
+ call json_object_iter_peek_value@PLT
+ mov rsi,rax
+ mov rdi,rbx
+ call .Lgg_append_system
+ test eax,eax
+ jnz .Lgg_collapse_bad
+ lea rdi,[rsp]
+ call json_object_iter_next@PLT
+ jmp .Lgg_collapse_render
+.Lgg_collapse_ok:
+ xor ebp,ebp
+ jmp .Lgg_collapse_end
+.Lgg_collapse_bad:
+ mov ebp,4
+.Lgg_collapse_end:
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,r14
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Tool changes require the matching execution registry, not just prompt text. */
+.Lgg_empty_tool_changes:
+ test rdi,rdi
+ jz .Lgg_empty_changes_ok
+ push rbx
+ mov rbx,rdi
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_empty_changes_bad
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ test rax,rax
+ setnz al
+ movzx eax,al
+ pop rbx
+ ret
+.Lgg_empty_changes_bad:
+ mov eax,1
+ pop rbx
+ ret
+.Lgg_empty_changes_ok:
+ xor eax,eax
+ ret
 /* Filter before pairing so excluded assistants cannot split a result window. */
 .Lgg_visible_message:
  push rbx
@@ -711,7 +954,13 @@ pg_durable_generation_init:
  call json_object_get_string@PLT
  test rax,rax
  jz .Lgg_order_bad
+ mov [rsp+56],rax
  mov rdi,rax
+ lea rsi,[rip+.Lgg_system_role]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_order_next
+ mov rdi,[rsp+56]
  lea rsi,[rip+.Lgg_tool_result]
  call strcmp@PLT
  test eax,eax
@@ -1177,6 +1426,11 @@ pg_durable_generation_init:
  inc r12
  jmp .Lgg_context_entry
 .Lgg_context_order:
+ mov rdi,[rbx+72]
+ mov rsi,[rsp+64]
+ call .Lgg_collapse_system
+ test eax,eax
+ jnz .Lgg_context_bad
  mov rdi,[rbx+72]
  mov rsi,[rsp+64]
  call .Lgg_order_project
@@ -3680,3 +3934,8 @@ pg_durable_generation_history:
 .Lgg_messages: .asciz "messages"
 
 .Lgg_missing_result_json: .asciz "{\"role\":\"toolResult\",\"isError\":true,\"details\":{\"reason\":\"missing_result\"},\"content\":[{\"type\":\"text\",\"text\":\"Tool result unavailable: history ends before this call completed.\"}]}"
+
+.Lgg_system_role: .asciz "system"
+.Lgg_sections: .asciz "sections"
+.Lgg_tools_added: .asciz "toolsAdded"
+.Lgg_tools_removed: .asciz "toolsRemoved"

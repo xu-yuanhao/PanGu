@@ -176,6 +176,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] Generation与历史恢复共用最新head优先投影；保留范围内包含旧head的编辑，omit/replace按最后一项生效；分页读取超过256条持久记录，SQLite/JSONL重开保持结果。
 - [x] 模型可见上下文按调用顺序整理工具结果：下一assistant前的首个同ID结果、跨用户消息匹配、排除错误/取消/deferred assistant、孤立/重复结果过滤及缺失结果临时回执；实际请求编码与两后端重开通过。
+- [x] 当前OpenAI请求路径按pi-ai折叠system正文和命名section：内容顺序追加、覆盖保序、null删除、重新加入移到末尾；接入Generation/历史/实际编码，容量边界与两后端重开通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -224,8 +225,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable harness/context.ts contribute/orderToolResults/missingResult及对应上下文用例；沿用本批固定快照。
-- 实际调用链：Generation/历史共用head与编辑贡献 → 先过滤error/aborted/deferred assistant → Assembly按assistant调用顺序配对下一assistant前的首个同ID结果 → 现有模型协议编码。用户消息保留原相对顺序，结果紧随所属assistant；孤立与重复结果过滤，缺失结果生成临时错误回执，不改写存储。
-- 验证：Durable专项ASan/UBSan通过，覆盖倒序结果、重复/孤立结果、跨用户消息及被排除assistant的匹配、下一assistant边界、临时缺失回执、实际请求编码和SQLite/JSONL重开。最终Runtime回归、隔离核心产品构建及真实DeepSeek两后端Inputs/工具/follow-up/重开通过；Assembly检查通过。
-- 接口与自审：原地维护durable_generation.S及已有测试，过滤统一到贡献汇总阶段，删除旧重复过滤逻辑；现有公开布局、服务、登记不变。临时消息/数组所有权统一释放，并行TUI和规划文档保持原位。
-- 剩余与下一交付物：继续K12的system基线/section语义、token估算与保留边界，把摘要任务接入Scheduler/Storage和手动/自动触发；现有模型ABI仍为64条消息与单条4096字节，完整压缩和长会话尚未完成。其他K项继续按覆盖表推进。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 pi-ai utils/transcript.ts getCurrentSystemMessage/collapseSystemMessages、utils/text.ts contentText/getSystemMessageText、OpenAI provider resolveTranscript默认路径，以及Durable harness/prompt.ts replaySections和Generation的系统上下文调用者。
+- 实际调用链：已提交head/编辑贡献 → Assembly折叠system内容及section → 现有pg_session.system_prompt → OpenAI编码；同一投影供Generation和历史恢复。配置提示作为初始内容，系统正文按双换行追加；section以命名有序映射重放，覆盖保序、null删除、重加追加，最终内容统一受现有容量约束。
+- 验证：Durable专项ASan/UBSan覆盖字符串/文本块、section覆盖/删除/重加、空section、实际请求文本、容量拒绝与SQLite/JSONL重开；Runtime整批回归、隔离核心产品构建及Assembly通过。真实DeepSeek两后端验证持久section经过发送入口与HTTP请求，并完成工具/follow-up/重开。
+- 接口与自审：原地扩展durable_generation.S，复用json-c有序对象和既有文本块读取；公开布局/服务/登记保持不变。动态工具声明需要同步执行注册表，当前明确拒绝该输入，随K09成组实现；中间system位置/基线与其他provider策略继续保留在完整范围。并行TUI与规划文档保持原位。
+- 剩余与下一交付物：继续K12 token估算、保留边界、Scheduler/Storage摘要任务及手动/自动触发，随后补齐完整system计划/动态工具与provider策略。模型ABI仍为64条消息、单条4096字节，完整压缩与长会话尚未完成；其他K项按覆盖表推进。
