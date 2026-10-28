@@ -31,13 +31,13 @@
 
 ## 本批验证与集成状态
 
-- 压缩沿固定Durable使用当前Agent模型，select固定范围/配置；输出预算只取reserveTokens策略与模型上限。
-- 无usage时按上下文消息估算，不额外加入配置systemPrompt；已有usage继续作为后续估算基线。
-- 双后端ASan/UBSan及DeepSeek真实压缩、checkpoint重开、原子放置、后续回忆通过；Runtime整批回归与Assembly检查通过。
+- 真实后台摘要延迟期间，由Generation阈值创建owned阻塞压缩，父任务等待后恢复回答。
+- owned新摘要落库后重开旧后台摘要，沿Submission路径结算stale，保持新head与后续真实回忆。
+- SQLite/JSONL真实DeepSeek集成通过，入口为`tools/runtime/build_test.py --live-owned-compaction-race`；产品源码与ABI保持上一批已验证版本。
 
 ## 当前接口边界
 
-正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续owned阻塞竞争，K13接入完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
+正文输入、Generation正文累积和摘要保存/放置已动态化。provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成；K12继续retry期间queued摘要等剩余组合，K13接入用量及完整Live事件/观察。TUI消费端的旧历史校验与显示预算由TUI线接入动态入口。其他差异仍保留在核心TODO。
 
 ## 复验入口
 

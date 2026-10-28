@@ -190,6 +190,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 后台摘要延迟放置与新摘要竞争：真实摘要保存后挂起，后续范围的新摘要先提交；旧摘要重开后经同一Submission路径结算stale、不追加Entry且保持新head。SQLite/JSONL真实摘要/回忆及原子写入检查通过；手动与自动任务共用一个构造函数。
 - [x] beforeCompact接入原生Host可替换compaction.hooks服务：按序回调、首个决定、错误报告后跳过、decline/summary、协作挂起/续接与取消；固定旧范围/配置的hook摘要进入同一place/Submission链。两后端专项与产品Host插件替换通过。
 - [x] 压缩模型与预算对齐Durable：固定当前Agent模型/配置，摘要预算独立于普通对话maxTokens；无usage阈值基线沿上游消息估算。双后端真实摘要、重开、放置及回忆通过。
+- [x] Generation-owned阻塞压缩与后台摘要竞争：阈值创建owned任务、父Generation等待/恢复，较新摘要落库后旧后台摘要重开结算stale，保持新head与真实回忆；SQLite/JSONL通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -238,8 +239,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts select/summarize/estimateContext与generation.ts thresholdCompaction。摘要使用当前Agent模型，select固定配置；预算为floor(0.8×reserveTokens)与模型maxTokens的较小值，阈值按已测usage及后续消息估算。
-- 实际调用链：Generation阈值估算 → select保存当前模型/范围/配置 → 独立摘要输出预算 → 真实模型摘要 → checkpoint重开 → place/Submission原子提交 → 后续Generation回忆。Assembly移除普通对话maxTokens对摘要预算的额外限制，并将无usage的估算基线对齐上游。
-- 验证：双后端Durable ASan/UBSan通过，包含对话maxTokens=1而压缩预算=512及systemPrompt不改变阈值分类；DeepSeek真实SQLite/JSONL完成超过64条消息的摘要、select重开、摘要保存重开、原子放置和后续回忆。Runtime整批回归与Assembly检查通过。
-- 接口与自审：公开ABI、模块与登记保持；直接沿现有Assembly实现修正公式，测试复用现有压缩场景。并行TUI与其规划修改保留。
-- 剩余与下一交付物：K12继续Generation-owned阻塞摘要与后台摘要竞争；K09继续通用扩展注册/撤销及Generation/Tool hook，K13继续usage与完整Live事件/观察。provider/工具边界和TUI动态历史消费保持所属K/U项范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness-compaction.test.ts后台/阻塞压缩竞争、generation.ts thresholdCompaction、compaction.ts place及Submission stale admission。上游跟踪分支相关新增提交已核对，本批保持固定行为快照。
+- 实际调用链：后台真实摘要保存place并延迟 → 新Entry/较低阈值触发Generation-owned阻塞压缩 → 父任务waiting，owned摘要直接Entry放置 → 父任务恢复真实回答 → 重开旧后台place → Submission结算unanswered/stale → 新head保持与真实回忆。复用现有Assembly实现和竞争场景，无第二套任务/摘要路径。
+- 验证：`python3 -B tools/runtime/build_test.py --live-owned-compaction-race`使用DeepSeek在SQLite/JSONL通过；核对owned引用、父任务完成、模型请求次数、旧摘要原子终态无Entry、stale receipt和新head不变。该场景延迟旧place；上游同一Generation retry期间queued Submission组合仍属后续覆盖。
+- 接口与自审：仅扩展现有集成场景及其显式执行参数，产品源码/ABI/登记不变；Git diff检查通过。沿用上一批已通过的产品源码Runtime回归。并行TUI/规划修改保留。
+- 剩余与下一交付物：下一批接入K13模型/工具/摘要尝试的UsageDoc原子用量记录和读取消费者；K09通用扩展与其他hook、K12剩余上游组合、provider/工具边界保持原范围。
