@@ -7,6 +7,7 @@
 #include "../runtime/usage.h"
 #include "../runtime/task_graph.h"
 #include "../runtime/task_provider.h"
+#include "../runtime/agent_state.h"
 #include "../runtime/conversation_view.h"
 #include "../runtime/request_context.h"
 #include "../runtime/tool_provider.h"
@@ -44,6 +45,7 @@ static pg_usage_ops foreground_usage;
 static pg_observation_ops foreground_observation;
 static pg_task_graph_ops foreground_task_graph;
 static const pg_task_provider *extension_tasks;
+static pg_agent_state_ops foreground_agent_state;
 static pg_view_binding task_graph_binding;
 static pg_conversation_view_binding conversation_view_binding;
 static pg_conversation_view_ops foreground_conversation_view;
@@ -76,6 +78,8 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools;
+ pg_tool_registry offered_tools,allowed_tools;
+ pg_agent_tools_gate tool_gate;
  struct json_object *configuration;
  pg_resources resources;pg_resource_host resource_host;
  pg_timer_job fire,queued;void *fire_context,*queued_context;uint64_t deadline;
@@ -165,7 +169,7 @@ static int storage_stop(void *ctx){
  if(durable.timer_ready)pg_hold_timer_stop(&durable.timer);if(durable.holds_ready)pg_document_holds_finish(&durable.holds,&durable.records);if(durable.cache_ready)pg_document_cache_close(&durable.cache);if(durable.storage_ready)return backend_close(0);return 0;
 }
 static int prepare(void *ctx,uint64_t conversation,struct json_object **out){
- (void)ctx;(void)conversation;*out=0;if(json_object_deep_copy(durable.configuration,out,0))return 1;
+ (void)ctx;*out=0;struct json_object *state=0;if(pg_agent_state_peek(&durable.session,conversation,&state))return 1;int prepared=pg_agent_state_prepare(durable.configuration,state,out);json_object_put(state);if(prepared)return 1;
  struct json_object *settings=json_object_object_get(durable.resources.current.settings,"settings"),*policy=json_object_object_get(settings,"compaction"),*copy=0;
  if(policy){if(json_object_deep_copy(policy,&copy,0)||json_object_object_add(*out,"compaction",copy))goto failed;copy=0;}
  if(durable.model_metadata){if(durable.model_metadata->describe(durable.model_metadata->context,*out,&copy)||!copy||!json_object_is_type(copy,json_type_object)||!pg_document_value_valid(copy))goto failed;if(json_object_object_add(*out,"modelInfo",copy))goto failed;copy=0;}
@@ -187,7 +191,7 @@ static int acquire_model(const struct json_object *configuration,const pg_tool_r
  if(selected->configure(selected->model.context,configuration,tools)){if(selected->model.close)selected->model.close(selected->model.context);return 2;}
  *out=selected->model;durable.model_leased=1;return 0;
 }
-static int model_acquire(void *ctx,const struct json_object *configuration,pg_model *out){(void)ctx;return acquire_model(configuration,durable.declared_tools,out);}
+static int model_acquire(void *ctx,const struct json_object *configuration,pg_model *out){(void)ctx;if(durable.model_leased)return 1;if(pg_agent_tools_select(durable.declared_tools,configuration,1,&durable.offered_tools))return 2;return acquire_model(configuration,&durable.offered_tools,out);}
 static int compaction_acquire(void *ctx,const struct json_object *configuration,pg_model *out){(void)ctx;return acquire_model(configuration,0,out);}
 static void model_release(void *ctx,const pg_model *model){(void)ctx;if(model->close)model->close(model->context);durable.model_leased=0;}
 static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out){
@@ -198,7 +202,16 @@ static int model_complete(void *ctx,const pg_model *model,struct json_object *as
 static int model_fetch_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->fetch_deferred?durable.model_provider->fetch_deferred(model->context,handle):-1;}
 static int model_cancel_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->cancel_deferred?durable.model_provider->cancel_deferred(model->context,handle):0;}
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
-static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){(void)ctx;if(durable.tools_leased)return 1;durable.tools_leased=1;pg_edit_tool_clear(&editor);*out=durable.selected_tools;pg_durable_client_tool(&durable.client,id,0);return 0;}
+static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
+ (void)ctx;if(durable.tools_leased)return 1;json_object *task=0,*state=0;if(record_read(0,PG_TABLE_TASK,id,&task))return 2;uint64_t conversation=json_object_get_uint64(json_object_object_get(task,"conversationId"));json_object_put(task);
+ int result=pg_agent_state_read(&durable.session,conversation,&state);if(!result)result=pg_agent_tools_select(durable.declared_tools,state,1,&durable.allowed_tools);json_object_put(state);if(result)return 2;
+ durable.tools_leased=1;pg_edit_tool_clear(&editor);durable.tool_gate=(pg_agent_tools_gate){durable.selected_tools,&durable.allowed_tools};*out=pg_agent_tools_service(&durable.tool_gate);pg_durable_client_tool(&durable.client,id,0);return 0;
+}
+static int agent_state_read(void *ctx,uint64_t conversation,json_object **out){(void)ctx;return pg_agent_state_read(&durable.session,conversation,out);}
+static int agent_state_configure(void *ctx,uint64_t conversation,const json_object *change){
+ (void)ctx;pg_tool_registry checked={0};if(pg_agent_tools_select(durable.declared_tools,change,1,&checked))return 5;pg_record_tx tx={0};pg_document_tx docs={0};if(pg_durable_session_begin(&durable.session,&tx,&docs,0,record_read))return 3;
+ if(pg_agent_state_stage(&docs,conversation,change,mint)){pg_durable_session_abort(&durable.session);return 5;}return pg_durable_session_settle(&durable.session,0,0,0);
+}
 static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){(void)ctx;(void)id;int result=tools->close?tools->close(tools->context):0;if(result==1)durable.tools_draining=1;else {durable.tools_leased=0;if(result)pg_durable_client_fault(&durable.client);}}
 static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
@@ -298,22 +311,24 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.compaction_binding=(pg_compaction_binding){&durable.compaction,&durable.session,&durable.tasks,&durable.scheduler};pg_durable_compaction_service(&durable.compaction_binding,&durable.compaction_ops);foreground_compaction=durable.compaction_ops;
  pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  extension_tasks=pg_host_find(scope->parent,"task.definitions");const pg_task_definition *builtins[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};if(pg_task_provider_validate(extension_tasks,builtins,3))return 1;
+ json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;json_object_put(agent_state);
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  struct json_object *startup=0;if(pg_durable_request_read(&durable.tasks,1,UINT64_MAX,durable.configuration,&startup))return 1;int projected=pg_context_project(startup,&durable.history);json_object_put(startup);if(projected)return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
+ foreground_agent_state=(pg_agent_state_ops){0,agent_state_read,agent_state_configure};
  conversation_view_binding=(pg_conversation_view_binding){&durable.session,&durable.tasks,0,0,0};pg_conversation_view_service(&conversation_view_binding,&foreground_conversation_view);pg_task_graph_service(&task_graph_binding,&durable.scheduler,&foreground_task_graph);pg_usage_service(&durable.session,&foreground_usage);pg_observation_service(&durable.session,&foreground_observation);
- return pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
+ return pg_host_provide(scope,owner,"agent.state",&foreground_agent_state)||pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;pg_conversation_view_close(&conversation_view_binding);pg_view_binding_close(&task_graph_binding);foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
  if(durable.tools_draining)return 1;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
-static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,8,agent_start,agent_stop};
+static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,9,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},

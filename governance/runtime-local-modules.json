@@ -453,7 +453,8 @@
         "usage.local.v0",
         "task.graph.local.v0",
         "conversation.view.local.v0",
-        "task.provider.local.v0"
+        "task.provider.local.v0",
+        "agent.state.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2318,6 +2319,33 @@
       "exports": [
         "pg_task_provider_validate",
         "pg_task_provider_find"
+      ]
+    },
+    {
+      "id": "agent.state.local.v0",
+      "sources": [
+        "src/runtime/agent_state.S",
+        "src/runtime/agent_state.h"
+      ],
+      "dependencies": [
+        "session.documents.transaction.local.v0",
+        "session.documents.reader.local.v0",
+        "tools.registry.local.v0",
+        "json-c",
+        "model.mimo.local.v0"
+      ],
+      "role": "Pi AgentDoc mutation/read, request instructions and stable-name model/execution tool selection",
+      "exports": [
+        "pg_agent_state_stage",
+        "pg_agent_state_read",
+        "pg_agent_state_prepare",
+        "pg_agent_tools_select",
+        "pg_agent_tool_allowed",
+        "pg_agent_state_peek",
+        "pg_agent_tools_service"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/agent.ts"
       ]
     }
   ],

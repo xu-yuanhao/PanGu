@@ -8,6 +8,7 @@ from build_pangu import ROOT, SOURCES, PLUGIN_EXPORTS
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live',action='store_true')
+    parser.add_argument('--live-agent',action='store_true')
     parser.add_argument('--compaction-hooks',action='store_true')
     parser.add_argument('--native-tasks',action='store_true')
     parser.add_argument('--sanitize',action='store_true')
@@ -25,6 +26,6 @@ def main():
         library=Path(directory)/'tasks.so'
         if args.native_tasks:
             subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-fPIC','-shared',*sanitize,'-DPG_TASK_FIXTURE',str(ROOT/'tests/runtime/product_plugin_fixture.c'),*flags,'-o',str(library)],check=True)
-        subprocess.run([str(output),*(['--native-tasks',str(library)] if args.native_tasks else ['--compaction-hooks'] if args.compaction_hooks else ['--live-dynamic-context'] if args.live_dynamic_context else ['--live-background-compaction'] if args.live_background_compaction else ['--live-auto-compaction'] if args.live_auto_compaction else ['--live-compaction'] if args.live_compaction else ['--live'] if args.live else [])],check=True,timeout=330)
+        subprocess.run([str(output),*(['--live-agent'] if args.live_agent else ['--native-tasks',str(library)] if args.native_tasks else ['--compaction-hooks'] if args.compaction_hooks else ['--live-dynamic-context'] if args.live_dynamic_context else ['--live-background-compaction'] if args.live_background_compaction else ['--live-auto-compaction'] if args.live_auto_compaction else ['--live-compaction'] if args.live_compaction else ['--live'] if args.live else [])],check=True,timeout=330)
 if __name__=='__main__':
     main()

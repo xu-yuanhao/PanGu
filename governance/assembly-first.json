@@ -314,6 +314,10 @@
     "src/runtime/task_provider.S": {
       "role": "assembly-core",
       "reason": "Pi registry custom Task definition validation, duplicate refusal and lookup"
+    },
+    "src/runtime/agent_state.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable AgentDoc配置事务、稳定名称工具选择与原生请求准备"
     }
   }
 }

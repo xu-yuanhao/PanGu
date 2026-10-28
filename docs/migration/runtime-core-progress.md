@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
+| Agent配置 | `agent_state.S`：Host agent.state事务写pangu.agent，稳定名称配置、字段清除/去重提交、独立读取；instructions在资源提示后进入Generation请求，tools/modelTools筛选模型声明，执行gate保持原提供者lease并拒绝禁用名字 |
 | 扩展任务 | `task_provider.S`：可选Host task.definitions校验/查找，保留内置任务、拒绝重名/无效定义；原生DSO通过公开commit/commit_with执行checkpoint与终态，Scheduler重开后继续，消费者清理先于库卸载 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
@@ -35,9 +36,9 @@
 
 ## 本批验证与集成状态
 
-- 自定义Task服务通过task_provider.S接入实际Agent/Scheduler；校验ABI、必要定义字段、内置及扩展重名，定义与代码借用父插件作用域。
-- `python3 -B tools/runtime/test_product_resources.py --native-tasks`与追加`--sanitize`通过：真实动态库phase分别调用commit_with/commit，保存checkpoint后暂停/重开Scheduler，终态结果入库；operation cleanup完成后释放消费者与动态库。复用产品资源与compaction hook场景，无模型请求。
-- 产品构建、G00、Assembly职责检查通过；`python3 -B tools/runtime/build_test.py`整批退出0，包含两后端Durable/Task恢复、Host/DSO生命周期、Runtime/TUI桥接及独立Pi/PanGu存储行为对照。
+- pangu.agent文档与Host配置服务接入Generation请求、模型声明与实际工具执行；配置改变后下一请求采纳，工具执行读取当前配置，模型恢复继续使用保存的请求配置。
+- 产品`--native-tasks --sanitize`覆盖配置更新/null清除/相同配置不提交、数组去重/排序/未知名字、remove筛选与禁用工具执行拒绝；SQLite/JSONL Durable专项验证提交、回滚及重开后配置保持。
+- `--live-agent`通过实际DeepSeek验证配置提示词、缩小模型声明、write-only原生写入及继续回答。Runtime整批退出0；最终产品构建、G00/Assembly及针对错误配置/工具执行限制的产品ASan/UBSan追加专项通过。
 
 ## 当前接口边界
 
@@ -64,6 +65,7 @@ python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/build_test.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
+python3 -B tools/runtime/test_product_resources.py --live-agent
 python3 -B tools/runtime/test_product_resources.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live-settings
 python3 -B tools/runtime/test_pangu_pty.py --live-templates
