@@ -36,8 +36,9 @@ typedef struct {
  const struct json_object *input;
 } pg_compaction_creation;
 /* Stage a conversation-owned or Generation-owned compaction on the caller's
-   transaction. Definition/host/input are borrowed only through this call. */
-int pg_durable_compaction_create(const pg_compaction_creation *,pg_record_tx *,uint64_t *);
+   transaction with its Live status. Definition/host/input are borrowed only
+   through this call; documents belongs to the same active Session mutation. */
+int pg_durable_compaction_create(const pg_compaction_creation *,pg_record_tx *,uint64_t *,pg_document_tx *);
 typedef struct {uint64_t keep_recent_tokens,reserve_tokens,background_tokens;} pg_compaction_policy;
 /* 0 no cut, 1 blocking threshold, 2 background threshold. */
 int pg_durable_compaction_threshold(const struct json_object *view,

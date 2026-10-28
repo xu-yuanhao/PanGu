@@ -1336,7 +1336,7 @@ pg_durable_compaction_init:
  jz .Lcc_commit_json_bad
  mov rdi,rbx
  mov rsi,rax
- call pg_task_runner_commit@PLT
+ call .Lcc_commit_state
  mov ebx,eax
  mov rdi,r12
  call json_object_put@PLT
@@ -1550,7 +1550,7 @@ pg_durable_compaction_init:
  jnz .Lcc_select_phase_bad
  mov rdi,r12
  mov rsi,[rsp+24]
- call pg_task_runner_commit@PLT
+ call .Lcc_commit_state
  neg eax
  mov ebp,eax
  jmp .Lcc_select_phase_end
@@ -1754,7 +1754,7 @@ pg_durable_compaction_init:
  jnz .Lcc_summarize_bad
  mov rdi,r12
  mov rsi,[rsp+16]
- call pg_task_runner_commit@PLT
+ call .Lcc_commit_state
  mov ebp,eax
  mov rdi,[rsp+16]
  call json_object_put@PLT
@@ -1804,6 +1804,7 @@ pg_durable_compaction_init:
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
+ mov [rsp+40],rdx
  mov rax,[rbx+8]
  CGET "qword ptr [rax+24]",conversationId
  mov rdi,rax
@@ -1866,6 +1867,13 @@ pg_durable_compaction_init:
  mov rsi,r14
  mov rdx,rax
  call .Lcc_set
+ test eax,eax
+ jnz .Lcc_place_stage_end
+ mov rdi,[rbx+8]
+ mov rsi,[rsp+40]
+ mov rdx,[r13]
+ mov ecx,1
+ call .Lcc_live_update
 .Lcc_place_stage_end:
  CE 48
 .Lcc_place_stage_bad:
@@ -1995,7 +2003,7 @@ pg_durable_compaction_init:
 .globl pg_durable_compaction_start
 .type pg_durable_compaction_start,@function
 pg_durable_compaction_start:
- CF 208
+ CF 272
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -2094,6 +2102,23 @@ pg_durable_compaction_start:
  call pg_record_tx_create_task@PLT
  test eax,eax
  jnz .Lcc_start_abort
+ lea rax,[rbx+8]
+ mov [rsp+208],rax
+ mov [rsp+216],r13
+ mov rax,[rbx]
+ mov rax,[rax+32]
+ mov [rsp+224],rax
+ mov rax,[r14]
+ mov [rsp+232],rax
+ mov qword ptr [rsp+240],0
+ mov rax,[rsp+144]
+ mov [rsp+248],rax
+ lea rdi,[rsp+208]
+ mov rsi,[rsp+160]
+ lea rdx,[rsp+48]
+ call .Lcc_live_created
+ test eax,eax
+ jnz .Lcc_start_abort
  mov rdi,r12
  xor esi,esi
  xor edx,edx
@@ -2118,7 +2143,7 @@ pg_durable_compaction_start:
  mov rdi,[rsp+152]
  call json_object_put@PLT
  mov eax,[rsp+184]
- CE 208
+ CE 272
 .section .rodata
 .Lcc_task_name: .asciz "pangu.compaction"
 .Lcc_select_name: .asciz "select"
@@ -2258,8 +2283,9 @@ pg_durable_compaction_service:
 .globl pg_durable_compaction_create
 .type pg_durable_compaction_create,@function
 pg_durable_compaction_create:
- CF 96
+ CF 112
  mov rbx,rdi
+ mov [rsp+96],rcx
  mov r12,rsi
  mov r13,rdx
  mov qword ptr [rsp+40],0
@@ -2345,6 +2371,13 @@ pg_durable_compaction_create:
  mov r8,rsp
  mov r9,r13
  call pg_record_tx_create_task@PLT
+ test eax,eax
+ jnz .Lcc_create_result
+ mov rdi,rbx
+ mov rsi,[r13]
+ mov rdx,[rsp+96]
+ call .Lcc_live_created
+.Lcc_create_result:
  mov ebp,eax
  jmp .Lcc_create_end
 .Lcc_create_bad:
@@ -2355,7 +2388,7 @@ pg_durable_compaction_create:
  mov rdi,[rsp+48]
  call json_object_put@PLT
  mov eax,ebp
- CE 96
+ CE 112
 .section .rodata
 .Lcc_version: .asciz "version"
 .Lcc_ownership: .asciz "ownership"
@@ -2601,3 +2634,416 @@ pg_durable_compaction_threshold:
 .section .rodata
 .Lcc_background: .asciz "background"
 .Lcc_manual_word: .asciz "manual"
+
+.text
+/* runner + next state: update Live and Task on the same mutation line. */
+.Lcc_commit_state:
+ push rbx
+ sub rsp,32
+ mov rbx,rdi
+ mov [rsp],rdi
+ mov [rsp+8],rsi
+ mov rdi,rbx
+ mov rsi,rsp
+ lea rdx,[rip+.Lcc_state_stage]
+ call pg_task_runner_commit_with@PLT
+ add rsp,32
+ pop rbx
+ ret
+.Lcc_state_stage:
+ CF 32
+ mov rbx,rdi
+ mov r12,rcx
+ mov rsi,rdx
+ mov rdi,[rbx]
+ mov rdx,[rbx+8]
+ xor ecx,ecx
+ call .Lcc_live_update
+ test eax,eax
+ jnz .Lcc_state_stage_end
+ mov rdi,[rbx+8]
+ call json_object_get@PLT
+ mov [r12],rax
+ xor eax,eax
+.Lcc_state_stage_end:
+ CE 32
+.Lcc_live_initial:
+ push rbx
+ mov rbx,rdx
+ call json_object_new_object@PLT
+ mov [rbx],rax
+ test rax,rax
+ setz al
+ movzx eax,al
+ pop rbx
+ ret
+/* runner, document Tx, next Task state, successful placement. */
+.Lcc_live_update:
+ CF 272
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14d,ecx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,34
+ rep stosq
+ mov [rsp+208],r14d
+ lea rax,[rip+.Lcc_live_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],10
+ CGET "qword ptr [rbx+32]",conversationId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+32],rax
+ mov dword ptr [rsp+40],1
+ lea rax,[rip+.Lcc_live_definition]
+ mov [rsp+48],rax
+ lea rax,[rsp]
+ mov [rsp+56],rax
+ lea rax,[rip+.Lcc_live_initializer]
+ mov [rsp+72],rax
+ mov rax,[rbx+40]
+ mov rax,[rax+24]
+ mov rax,[rax]
+ mov rax,[rax+32]
+ mov [rsp+80],rax
+ mov rdi,r12
+ lea rsi,[rsp+48]
+ lea rdx,[rsp+112]
+ call pg_document_tx_doc@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov rdi,[rsp+112]
+ lea rsi,[rsp+120]
+ call pg_document_change_snapshot@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ CGET r13,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_terminal_word]
+ call strcmp@PLT
+ mov [rsp+212],eax
+ call json_object_new_array@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lcc_live_bad
+ CGET "qword ptr [rsp+120]",compactions
+ mov r14,rax
+ mov qword ptr [rsp+216],0
+ test rax,rax
+ jz .Lcc_live_list_done
+.Lcc_live_each:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp [rsp+216],rax
+ jae .Lcc_live_list_done
+ mov rdi,r14
+ mov rsi,[rsp+216]
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ CGET rax,taskId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+16]
+ je .Lcc_live_remove
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[rsp+128]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ jmp .Lcc_live_next
+.Lcc_live_remove:
+ cmp dword ptr [rsp+212],0
+ je .Lcc_live_remove_terminal
+ mov qword ptr [rsp+224],1
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[rsp+128]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ jmp .Lcc_live_next
+.Lcc_live_remove_terminal:
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov [rsp+136],rax
+.Lcc_live_next:
+ inc qword ptr [rsp+216]
+ jmp .Lcc_live_each
+.Lcc_live_list_done:
+ cmp dword ptr [rsp+212],0
+ je .Lcc_live_terminal
+ cmp qword ptr [rsp+224],0
+ jne .Lcc_live_patch
+ lea rdi,[rip+.Lcc_live_status_json]
+ call json_tokener_parse@PLT
+ mov [rsp+144],rax
+ test rax,rax
+ jz .Lcc_live_bad
+ mov rdi,[rbx+16]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+144]
+ lea rsi,[rip+.Lcc_taskId]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_live_bad
+ CGET "qword ptr [rbx+32]",input
+ CGET rax,reason
+ mov rdi,[rsp+144]
+ lea rsi,[rip+.Lcc_reason]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_bad
+ CGET "qword ptr [rbx+32]",owner
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ setnz dil
+ movzx edi,dil
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+144]
+ lea rsi,[rip+.Lcc_blocking]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov rdi,[rsp+128]
+ mov rsi,[rsp+144]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov qword ptr [rsp+144],0
+ jmp .Lcc_live_patch
+.Lcc_live_terminal:
+ CGET r13,outcome
+ CGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_failed_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcc_live_patch
+ cmp qword ptr [rsp+136],0
+ je .Lcc_live_patch
+ lea rdi,[rip+.Lcc_live_failure_json]
+ call json_tokener_parse@PLT
+ mov [rsp+152],rax
+ test rax,rax
+ jz .Lcc_live_bad
+ CGET "qword ptr [rsp+136]",taskId
+ mov rdi,[rsp+152]
+ lea rsi,[rip+.Lcc_taskId]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_bad
+ CGET "qword ptr [rsp+136]",reason
+ mov rdi,[rsp+152]
+ lea rsi,[rip+.Lcc_reason]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_bad
+ CGET r13,outcome
+ CGET rax,error
+ CGET rax,message
+ mov rdi,[rsp+152]
+ lea rsi,[rip+.Lcc_error]
+ mov rdx,rax
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_live_bad
+.Lcc_live_patch:
+ lea rdi,[rip+.Lcc_live_patch_json]
+ call json_tokener_parse@PLT
+ mov [rsp+160],rax
+ test rax,rax
+ jz .Lcc_live_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,[rsp+128]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lcc_live_delete_list
+ mov rdi,[rsp+128]
+ call json_object_get@PLT
+ mov rdi,rbp
+ mov esi,2
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ jmp .Lcc_live_failure_patch
+.Lcc_live_delete_list:
+ lea rdi,[rip+.Lcc_delete_word]
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ xor esi,esi
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov rdi,rbp
+ mov esi,2
+ mov edx,1
+ call json_object_array_del_idx@PLT
+.Lcc_live_failure_patch:
+ cmp qword ptr [rsp+152],0
+ jne .Lcc_live_set_failure
+ cmp dword ptr [rsp+208],0
+ je .Lcc_live_append_patch
+ lea rdi,[rip+.Lcc_live_clear_failure_json]
+ call json_tokener_parse@PLT
+ mov [rsp+168],rax
+ jmp .Lcc_live_add_patch
+.Lcc_live_set_failure:
+ lea rdi,[rip+.Lcc_live_set_failure_json]
+ call json_tokener_parse@PLT
+ mov [rsp+168],rax
+ test rax,rax
+ jz .Lcc_live_bad
+ mov rdi,[rsp+152]
+ call json_object_get@PLT
+ mov rdi,[rsp+168]
+ mov esi,2
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+.Lcc_live_add_patch:
+ cmp qword ptr [rsp+168],0
+ je .Lcc_live_bad
+ mov rdi,[rsp+160]
+ mov rsi,[rsp+168]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ mov qword ptr [rsp+168],0
+.Lcc_live_append_patch:
+ mov rdi,[rsp+112]
+ mov rsi,[rsp+160]
+ call pg_document_change_append@PLT
+ test eax,eax
+ jnz .Lcc_live_bad
+ xor ebp,ebp
+ jmp .Lcc_live_end
+.Lcc_live_bad:
+ mov ebp,5
+.Lcc_live_end:
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov rdi,[rsp+128]
+ call json_object_put@PLT
+ mov rdi,[rsp+136]
+ call json_object_put@PLT
+ mov rdi,[rsp+144]
+ call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov rdi,[rsp+160]
+ call json_object_put@PLT
+ mov rdi,[rsp+168]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 272
+.section .rodata
+.Lcc_live_kind: .asciz "pangu.live"
+.Lcc_compactions: .asciz "compactions"
+.Lcc_status: .asciz "status"
+.Lcc_terminal_word: .asciz "terminal"
+.Lcc_failed_word: .asciz "failed"
+.Lcc_error: .asciz "error"
+.Lcc_message: .asciz "message"
+.Lcc_blocking: .asciz "blocking"
+.Lcc_delete_word: .asciz "d"
+.Lcc_live_status_json: .asciz "{\"attempt\":1}"
+.Lcc_live_failure_json: .asciz "{}"
+.Lcc_live_patch_json: .asciz "[[\"s\",[\"compactions\"],null]]"
+.Lcc_live_clear_failure_json: .asciz "[\"d\",[\"compactionFailure\"]]"
+.Lcc_live_set_failure_json: .asciz "[\"s\",[\"compactionFailure\"],null]"
+.section .data.rel.ro
+.balign 8
+.Lcc_live_definition:
+ .quad .Lcc_live_kind,10,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lcc_live_initializer:
+ .quad 0,.Lcc_live_initial
+
+.text
+/* Build a borrowed runner view for the shared creation/phase status writer. */
+.Lcc_live_created:
+ CF 112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov rax,[rbx+8]
+ mov [rsp+8],rax
+ mov [rsp+16],r12
+ mov rax,[rbx]
+ mov [rsp+40],rax
+ call json_object_new_object@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lcc_created_live_bad
+ mov rdi,[rbx+24]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcc_conversationId]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_created_live_bad
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcc_input]
+ mov rdx,[rbx+40]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_created_live_bad
+ cmp qword ptr [rbx+32],0
+ je .Lcc_created_live_state
+ mov rdi,[rbx+32]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcc_owner]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_created_live_bad
+.Lcc_created_live_state:
+ lea rdi,[rip+.Lcc_running_json]
+ call json_tokener_parse@PLT
+ mov [rsp+96],rax
+ test rax,rax
+ jz .Lcc_created_live_bad
+ mov rdi,rsp
+ mov rsi,r13
+ mov rdx,rax
+ xor ecx,ecx
+ call .Lcc_live_update
+ mov ebp,eax
+ jmp .Lcc_created_live_end
+.Lcc_created_live_bad:
+ mov ebp,5
+.Lcc_created_live_end:
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 112

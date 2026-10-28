@@ -4351,6 +4351,7 @@ pg_durable_generation_bind_compaction:
  push r14
  sub rsp,96
  mov rbx,rdi
+ mov [rsp+72],rdx
  mov r12,rsi
  mov r13,rcx
  mov qword ptr [rsp+48],0
@@ -4412,6 +4413,7 @@ pg_durable_generation_bind_compaction:
  mov rdi,rsp
  mov rsi,r12
  lea rdx,[rsp+56]
+ mov rcx,[rsp+72]
  call pg_durable_compaction_create@PLT
  test eax,eax
  jnz .Lgg_compact_stage_end

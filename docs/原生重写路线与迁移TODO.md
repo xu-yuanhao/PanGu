@@ -185,6 +185,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 后台阈值压缩接通Generation/Client：同事务检查已有压缩并创建conversation-owned后台任务，前台请求独立推进；前台空闲/取消隔离后台，空闲poll继续调度，摘要经Submission放置。真实模型两后端去重/Esc/两次重开及实际产品Host通过。
 - [x] Generation按固定cutoff持有动态canonical context，经model.provider ABI4的PG_CONTEXT_VIEW进入同一OpenAI编码器；模型请求解除64行/单文本4096字节复制边界，system/section、工具配对和动态启动历史共用投影。两后端长文本/重开、70条未压缩消息真实产品、模型工具与deferred恢复通过。
 - [x] Generation正文改为动态printbuf累积，Live追加和最终assistant同源；摘要流式累积、持久summary与包装后的Entry去除4096字节边界。真实产品超过12 KiB回答和超过14 KiB摘要放置通过，旧内联正文数组原地删除。
+- [x] 压缩Live生命周期接入创建/阶段/终态事务：taskId/reason/blocking/attempt列表、取消/完成移除、失败保留compactionFailure，成功放置清除旧失败；同任务阶段更新保持列表顺序。两后端创建同序列、重开/取消/失败与真实自动/后台压缩通过。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -233,8 +234,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable generation.ts streamResponse/convertPartial及compaction.ts summarize/place；沿已有动态请求和持久阶段路径完成正文输出适配。固定快照不变。
-- 实际调用链：provider正文增量 → operation持有动态printbuf → 同源Live追加/最终assistant → 持久Entry；摘要provider增量 → 已有printbuf → 持久checkpoint.summary → 动态包装后的compaction Entry。释放随phase cleanup，模型/事件借用关系保持；长度上限按json-c/printbuf的int容量校验。
-- 验证：实际DeepSeek产品生成12,417字节回答、14,593序列化字节摘要并完整放置；正文增量总长与持久assistant长度一致，摘要保留尾标记。Durable ASan/UBSan与Runtime整批回归通过；删除旧数组后ASan/UBSan专项通过，产品再次生成12,417字节正文并保存摘要；模型第二次主动缩短摘要，去掉实时测试强制摘要长度断言，保留尾标记与实际存储检查。核心隔离G00/Assembly及产品构建通过。首次长输出请求因测试传入reasoningEffort=off收到HTTP422，去掉该测试选项后通过。
-- 接口与自审：既有公开ABI不变；Generation内部操作从4,456缩至360字节，删除旧4096字节正文数组，用现有成熟printbuf提供动态存储。摘要沿原实现替换有界校验，无并行旧版本；C与TUI纯逻辑未新增。既有文件登记/语言职责保持，控制未扩展。并行TUI改动保留。
-- 剩余与下一交付物：继续K12取消/失败Live/hook、stale/阻塞竞争与system基线；provider单次事件、reasoning、工具参数/结果仍有现有边界，按K05/K08完成。TUI消费端仍有64行/4095字节校验与显示预算，动态历史服务已提供；其他K项完整范围保留。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts createCompaction/abort/complete/place、live.ts add/remove/failCompactionStatus及harness-compaction background/cancellation用例。沿固定快照的列表与失败生命周期语义实现。
+- 实际调用链：手动/owned/background创建任务与pangu.live.compactions同事务登记 → select/summarize/place持久阶段沿同一Doc Tx更新 → 取消/无摘要完成移除当前状态，失败保存taskId/reason/error → 成功放置摘要/终态并移除状态、清除compactionFailure。已有generation字段保留，阶段更新维持列表位置。
+- 验证：SQLite/JSONL ASan/UBSan覆盖创建Task与Live同提交序列、状态字段、阶段重开、取消移除和模型启动失败发布；真实DeepSeek自动owned压缩的两阶段重开/状态清理及后台前台隔离、Esc/去重/重开/回忆通过。Runtime整批回归、更新后Durable专项、核心隔离G00/Assembly与产品构建通过。
+- 接口与自审：pg_durable_compaction_create增加所属同一Session的pg_document_tx参数，核心调用者和恢复场景同步；模块/Host函数表布局保持。状态处理为既有Assembly模块内的共享事务路径，手动构造、自动创建和各阶段共用，新增文件/依赖/登记均无变化。控制未扩展；并行TUI和规划改动保留。
+- 剩余与下一交付物：K12继续retry/hook、后台摘要与阻塞摘要竞争/stale完整用例及system基线；K13接入Live对客户端的完整事件/观察投影。provider单次事件、reasoning、工具参数/结果边界按K05/K08完成；TUI动态历史消费校验和其他K项范围保持。
