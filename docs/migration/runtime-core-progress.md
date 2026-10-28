@@ -32,9 +32,9 @@
 
 ## 本批验证与集成状态
 
-- Generation、工具snapshot.usage与摘要尝试接入同一UsageDoc记录入口，Host提供当前会话usage读取服务。
-- 双后端ASan/UBSan通过累计、可选字段、特殊工具键、abort和重开；真实DeepSeek摘要账本重开一致，后续回答增加累计用量。
-- Runtime整批回归、核心隔离G00/Assembly、产品构建和实际Host服务读取通过；共享树TUI品牌资源登记由并行线收尾。
+- Host observation服务和可选TUI绑定提供已提交{live,usage}快照，读取不推进Scheduler、不写记录；返回JSON由调用者释放。
+- SQLite/JSONL重开后的累计用量及只读序列检查、实际Host初始/压缩终态快照、TUI绑定/解绑边界通过。
+- Runtime整批回归和实际产品compaction-hooks场景通过；完整增量事件继续按K13接入。
 
 ## 当前接口边界
 

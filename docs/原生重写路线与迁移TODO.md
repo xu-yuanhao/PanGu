@@ -205,6 +205,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `harness/{view,events,task-graph,usage,telemetry}.ts`、`session/`；`harness-view`、`harness-events`、`harness-task-graph`、`session-watches`、`spec-usage` 测试。
 
 - [x] UsageDoc接入Generation响应、工具结果可选usage和摘要尝试的同批事务；按模型/工具累计计数及已报告cost，可选reasoning/cacheWrite1h保留，Host usage服务读取PanGu会话账本；两后端累计/回滚/重开与真实摘要/生成用量通过。
+- [x] Live/usage只读快照提供Host observation服务与可选TUI绑定：无调度/写入、缺省空状态、压缩终态、存储重开累计用量及解绑边界通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -246,8 +247,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/usage.ts recordUsage/addUsage、generation.ts commitAssistant、tool.ts结果用量与compaction.ts summarize提交。固定Harness/Cordis组合边界保持。
-- 实际调用链：模型响应/工具snapshot.usage/摘要尝试 → 当前Task的Document Tx → pangu.usage同批记录 → 当前会话按models/tools累计 → Host usage服务读取。纯逻辑为usage.S，C组合仅绑定Session和发布服务；模型身份优先采用响应provider/model，缺省沿已固定配置。工具usage同时进入其ToolResult。
-- 验证：两后端ASan/UBSan覆盖工具真实执行及usage元数据、重复累计、可选reasoning/cost、__proto__工具键、事务abort不计费和重开读取，响应真实模型身份优先于别名；DeepSeek两后端摘要账本在checkpoint重开后相等，后续真实Generation增加用量。Runtime整批回归、最终专项、隔离G00/Assembly、产品构建和实际Host usage读取通过。
-- 接口与自审：usage.h公开事务记录/模型适配/读取/服务绑定契约；新增源及模块依赖/导出随实际调用链登记。工具snapshot增加可选usage，既有Host/TUI函数表尺寸保持；控制变更由实施Agent核对。共享树G00另有TUI线assets未登记，核心隔离通过，保留并行修改。
-- 剩余与下一交付物：K13继续客户端用量/完整Live事件与观察、任务图；K09通用扩展及其他hook，K12 retry期间queued摘要等剩余组合、provider完整usage/cost协议和工具边界保持所属K项范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts snapshot中的Live与UsageDoc，现有Document snapshot读取和客户端绑定。
+- 实际调用链：Host observation.snapshot或pg_tui_runtime_observation → pg_agent_snapshot → 当前Session的pangu.live/pangu.usage → detached JSON {live,usage}；调用者release，解绑后TUI入口返回空。实现已随5bdf1cb整合，本批完成消费者验证。
+- 验证：Runtime整批回归通过；SQLite/JSONL重开后的快照保留工具累计用量且records.sequence不变；实际产品Host覆盖初始缺省快照、hook摘要终态无活动compactions/模型用量、TUI绑定身份和解绑后不可访问。使用tools/runtime/test_product_resources.py --compaction-hooks通过。
+- 接口与自审：既有执行事件函数表保持；本批沿现有测试补齐快照消费者，未新增辅助模块。工作区仅本批明确文件变更。
+- 剩余与下一交付物：K13下一批把已提交Live/usage变化接入客户端观察事件，并覆盖初始快照到增量的衔接；任务图/report、K09扩展及其他hook、K12剩余组合与provider/工具边界保持原范围。
