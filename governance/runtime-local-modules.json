@@ -451,7 +451,8 @@
         "resources.lifecycle.local.v0",
         "models.catalog.local.v0",
         "usage.local.v0",
-        "task.graph.local.v0"
+        "task.graph.local.v0",
+        "conversation.view.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -460,7 +461,8 @@
         "pg_tui_runtime_resources",
         "pg_tui_runtime_compaction",
         "pg_tui_runtime_observation",
-        "pg_tui_runtime_task_graph"
+        "pg_tui_runtime_task_graph",
+        "pg_tui_runtime_conversation_view"
       ],
       "reference_basis": [
         {
@@ -2260,6 +2262,23 @@
         "pg_task_graph_watch_next",
         "pg_task_graph_watch_close",
         "pg_task_graph_binding_close"
+      ]
+    },
+    {
+      "id": "conversation.view.local.v0",
+      "sources": [
+        "src/runtime/conversation_view.S",
+        "src/runtime/conversation_view.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "session.documents.reader.local.v0",
+        "json-c"
+      ],
+      "role": "Pi Durable ConversationView on a native readOnLine: active entries, existing documents and queued native Submissions",
+      "exports": [
+        "pg_conversation_view_read",
+        "pg_conversation_view_service"
       ]
     }
   ],

@@ -302,6 +302,10 @@
     "src/runtime/task_graph.S": {
       "role": "assembly-core",
       "reason": "Pi Durable task graph node/state projection and paginated read-only ownership query"
+    },
+    "src/runtime/conversation_view.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable ConversationView atomic active transcript and built-in document/queue read"
     }
   }
 }

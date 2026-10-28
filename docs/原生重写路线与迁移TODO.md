@@ -212,6 +212,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Generation重试/deferred状态与Task checkpoint同事务写Live，事件覆盖retry开始/结束、pollAt变化与faulted/orphaned任务失败；两后端ASan/UBSan、真实重试/工具/回答及deferred重开通过。
 - [x] Host task.graph与TUI可选绑定提供只读活任务图：五种live状态分页、父子owner/等待/睡眠/completing投影、所属会话分页、注册元数据阻塞分类、终态移除与重开查询；读取占用Session只读事务。
 - [x] 任务图多观察者支持attach初始帧、独立读取/合并变化、注册元数据刷新、幂等退订与Host统一关闭；迁移失败按定义身份缓存，替换后恢复，图读取不执行迁移。
+- [x] conversation.view接通会话记录、原始有效Entry范围、已实现Live/Usage文档与排队Submission视图；Host/TUI公开只读入口同一readOnLine读取，分页、撤回、压缩head及重开通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -253,8 +254,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/task-graph.ts watch/attach/refreshBlocked/close及scheduler.ts failedMigrations/fit。采用初始视图、独立观察者、慢消费合并和定义替换后重试语义。远端跟踪已更新至Pi a87b742/Harness f3803c9697；Pi的Watch/report与restart语义调整留在下一批统一评估，采用快照保持。
-- 实际调用链：Host/TUI task.graph.watch → attach时捕获图 → next交付初始owned帧 → 后续只读refresh/深比较并交付变化；每观察者保留独立基线，binding共享最新图，close解除链表注册。Host停止先统一清理观察者，再关闭Client/Scheduler。Task runner迁移失败保存借用的定义身份，重复poll不重跑，替换定义后重新迁移；任务图读取该已执行结果。
-- 验证：SQLite/JSONL ASan/UBSan通过多观察者快/慢消费、返回值隔离、attach后变化仍先交付初始帧、无提交注册刷新、退订/统一关闭及attach中关闭无残留。迁移实际失败一次、多poll保持一次、图显示migration_failed、新定义解除阻塞并完成任务通过。实际Host覆盖活压缩任务出现/结束及Host关闭释放未退订观察者。整批验证见当前实现记录。
-- 接口与自审：task.graph服务表追加watch/next/close并以binding持有生命周期；watch/binding各32字节。内部Task runner128字节，追加失败定义指针；Scheduler分配与头/ABI断言同步。Assembly实现行为，C仅绑定与停止清理；新增导出登记更新。next为原生显式拉取/合并刷新，不伪称后台逐提交推送。
-- 剩余与下一交付物：K13继续完整会话视图/消息事件与report上下文，任务图推送通知/差量Op等完整Watch表面继续覆盖；下一批按同一实际客户端调用链接完整会话视图。K09扩展、K12剩余组合及provider/工具边界保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/view.ts build/MOUNTED、context.ts activeEntries/selectActive与inbox.ts队列视图。采用原始有效Entry范围和同一Session只读事务读取。
+- 实际调用链：Host conversation.view或pg_tui_runtime_conversation_view → readOnLine → 会话记录/最新head与原始保留Entry/已有pangu.live与pangu.usage → 同会话queued Submission分页 → owned {conversation,entries,docs,inbox}。inbox直接暴露PanGu自身已提交队列记录，保持独立存储协议；只读历史不经过模型请求投影，不推进Task。
+- 验证：SQLite/JSONL ASan/UBSan覆盖超过300条有效历史与head优先、257条队列分页/ID顺序、撤回后重开、返回值隔离、事务占用拒绝及序列不变。实际Host初始/不存在会话、队列加入/撤回和TUI绑定通过；DeepSeek双后端真实摘要重开、视图UsageDoc与账本相等、Live可见、head历史与后续回答通过。整批检查见当前实现记录。
+- 接口与自审：conversation_view.h公开16字节借用binding与owned读取服务；新增纯Assembly实现，C仅组合与绑定。源码、模块依赖、导出和构建清单同步登记，G00/Assembly自审通过。
+- 剩余与下一交付物：会话视图多观察者/逐提交消息事件，以及Agent/Provider等尚未落地的内置文档继续K09/K13；下一批沿conversation.view接订阅、关闭和真实消息变化。任务图完整Op推送、report与其他覆盖项保持原范围。

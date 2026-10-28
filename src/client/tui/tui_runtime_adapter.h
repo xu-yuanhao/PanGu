@@ -25,6 +25,7 @@
 
 #include "../../runtime/usage.h"
 #include "../../runtime/task_graph.h"
+#include "../../runtime/conversation_view.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,6 +133,7 @@ const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *);
    The binding expires when the bridge detaches. */
 const pg_observation_ops *pg_tui_runtime_observation(const tui_runtime_ops *);
 const pg_task_graph_ops *pg_tui_runtime_task_graph(const tui_runtime_ops *);
+const pg_conversation_view_ops *pg_tui_runtime_conversation_view(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

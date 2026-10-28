@@ -640,6 +640,8 @@
     "assets/branding/pangu-logo.svg": "client-asset",
     "assets/branding/pangu-logo-geometry.json": "control",
     "src/runtime/task_graph.S": "native-source",
-    "src/runtime/task_graph.h": "native-source"
+    "src/runtime/task_graph.h": "native-source",
+    "src/runtime/conversation_view.S": "native-source",
+    "src/runtime/conversation_view.h": "native-source"
   }
 }

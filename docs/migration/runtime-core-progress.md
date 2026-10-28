@@ -22,6 +22,7 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
+| 会话视图 | `conversation_view.S`：conversation.view Host/TUI只读入口，统一会话/原始有效Entry/已有Live与UsageDoc/queued Submission，readOnLine保护与分页、重开 |
 | 会话用量 | `usage.S`：pangu.usage按models/tools累计，Generation/工具结果/摘要尝试同批提交；响应模型身份优先，计数及已报告cost、可选reasoning/cacheWrite1h，Host usage读取与重开 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
 | 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
@@ -33,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- task.graph追加多观察者watch/next/close，共享最新图、独立交付基线，保留attach初始帧并合并慢消费变化；Host关闭统一释放。
-- 任务迁移失败按定义身份缓存；图显示已执行失败，新定义解除阻塞，读取不执行迁移。
-- 双后端ASan/UBSan、多观察者/注册变化/attach中关闭与实际Host压缩任务/统一关闭通过；Runtime整批回归、产品构建、G00/Assembly通过。原生接口采用显式拉取。
+- conversation.view接通原始有效历史、已有Live/Usage文档与PanGu队列记录；所有读取在同一readOnLine内，返回值独立持有。
+- 双后端ASan/UBSan通过超过300条Entry与257条队列分页、撤回/重开/只读保护；实际Host/TUI查询通过。
+- DeepSeek真实摘要/重开/后续回答中，视图用量与账本相等、Live存在、压缩后head历史正确；Runtime整批回归、G00/Assembly与产品构建通过。
 
 ## 当前接口边界
 
