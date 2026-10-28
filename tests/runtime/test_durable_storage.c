@@ -478,12 +478,37 @@ static void model_failure_cases(void){
  puts("PASS: Pi provider retry patterns/status boundaries, quota/overflow priority and native CURL classification");
 }
 
+static void context_edit_cases(void){
+ for(unsigned backend=0;backend<2;backend++){
+  char parent[]="/tmp/pangu-context-XXXXXX";assert(mkdtemp(parent));task_case *base=calloc(1,sizeof(*base));assert(base);base->f.kind=backend;snprintf(base->f.path,sizeof(base->f.path),"%s/%s",parent,backend?".pangu":"pangu.sqlite");backend_open(&base->f);seed(&base->f);open_session(&base->f);task_bind(base);
+  const char *entries[]={
+   "{\"id\":3,\"conversationId\":1,\"kind\":\"chat\",\"model\":[{\"role\":\"user\",\"content\":\"discard\"}]}",
+   "{\"id\":4,\"conversationId\":1,\"kind\":\"chat\",\"model\":[{\"role\":\"user\",\"content\":\"original\"}]}",
+   "{\"id\":5,\"conversationId\":1,\"kind\":\"old-summary\",\"head\":4,\"model\":[{\"role\":\"user\",\"content\":\"old summary\"}],\"edits\":[{\"target\":4,\"action\":\"replace\",\"messages\":[{\"role\":\"user\",\"content\":\"replacement\"}]}]}",
+   "{\"id\":6,\"conversationId\":1,\"kind\":\"chat\",\"model\":[{\"role\":\"user\",\"content\":\"omit me\"}]}",
+   "{\"id\":7,\"conversationId\":1,\"kind\":\"pangu.compaction\",\"head\":4,\"model\":[{\"role\":\"user\",\"content\":\"latest summary\"}],\"edits\":[{\"target\":6,\"action\":\"omit\"}]}",
+   "{\"id\":8,\"conversationId\":1,\"kind\":\"edit\",\"edits\":[{\"target\":4,\"action\":\"omit\"},{\"target\":4,\"action\":\"replace\",\"messages\":[{\"role\":\"user\",\"content\":\"newest replacement\"}]}]}"
+  };
+  struct json_object *config=json_tokener_parse("{\"systemPrompt\":\"PanGu\"}");pg_session *view=calloc(1,sizeof(*view));assert(config&&view);
+  for(size_t i=0;i<sizeof(entries)/sizeof(*entries);i++){
+   struct json_object *batch=json_object_new_array(),*write=json_object_new_object();assert(batch&&write);json_object_object_add(write,"type",json_object_new_string("entry"));json_object_object_add(write,"value",json_tokener_parse(entries[i]));json_object_array_add(batch,write);assert(!pg_records_commit(&base->f.records,batch));json_object_put(batch);
+   if(i==4){assert(!pg_durable_generation_history(&base->host,1,config,view));assert(view->count==2&&!strcmp(view->messages[0].text,"latest summary")&&!strcmp(view->messages[1].text,"replacement"));}
+  }
+  struct json_object *batch=json_object_new_array();assert(batch);
+  for(unsigned id=9;id<310;id++){char record[200];snprintf(record,sizeof(record),"{\"type\":\"entry\",\"value\":{\"id\":%u,\"conversationId\":1,\"kind\":\"notice\"}}",id);assert(!json_object_array_add(batch,json_tokener_parse(record)));}
+  assert(!pg_records_commit(&base->f.records,batch));json_object_put(batch);
+  assert(!pg_durable_session_close(&base->f.session));backend_open(&base->f);open_session(&base->f);task_bind(base);assert(!pg_durable_generation_history(&base->host,1,config,view));assert(view->count==2&&!strcmp(view->messages[0].text,"latest summary")&&!strcmp(view->messages[1].text,"newest replacement"));free(view);json_object_put(config);assert(!pg_durable_session_close(&base->f.session));cleanup(&base->f,parent);free(base);
+ }
+ puts("PASS: context latest head first, retained old-head edits, omit/replace last-wins, paged history and SQLite/JSONL reopen");
+}
+
 int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--live-generation"))return generation_flow(8);
  if(argc==2&&!strcmp(argv[1],"--live-partial"))return generation_flow(15);
  if(argc==2&&!strcmp(argv[1],"--live-deferred"))return generation_flow(16);
  if(argc==2&&!strcmp(argv[1],"--live-sequential"))return generation_flow(20);
  if(argc==2&&!strcmp(argv[1],"--live-inputs"))return generation_flow(21);
+ context_edit_cases();
  input_cases();
  model_failure_cases();
  assert(!generation_flow(0));

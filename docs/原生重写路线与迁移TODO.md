@@ -174,6 +174,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `harness/{context,compaction}.ts`、`harness-compaction.test.ts`；Coding Agent `core/compaction/` 的分叉摘要。
 
+- [x] Generation与历史恢复共用最新head优先投影；保留范围内包含旧head的编辑，omit/replace按最后一项生效；分页读取超过256条持久记录，SQLite/JSONL重开保持结果。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -222,8 +223,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 package-manager.ts resolve/splitPatterns/isEnabledByOverrides/applyPatterns/路径变体匹配，resource-loader.ts dedupePrompts与项目资源碰撞用例；依赖锁定minimatch10.2.6、brace-expansion5.0.12，范围算法保留MIT来源。固定快照继续采用，已获取上游package-manager差异仅npm安装参数。
-- 实际调用链：作用域设置 → Assembly来源描述符（显式路径先于自动目录、各层项目先于用户）→ 技能/模板发现 → !/+/-选择 → 已选名称/规范文件去重 → 原有资源候选/系统提示/前台命令。默认目录只应用覆盖规则，显式路径再应用正向glob；SKILL.md同时匹配父目录变体，强制选择使用精确路径。被排除的同一路径记录发现状态，自动目录不重新启用；不同路径同名可由后继已选资源接替。
-- 验证：选择、目录碰撞、显式优先与排除后不重新加入的真实文件树专项ASan/UBSan通过；1978组常见glob/brace/范围/UTF-16匹配与固定minimatch原函数对照通过。发现应用级优先级与旧底层便捷加载顺序不同后按上游碰撞用例修正，最终Runtime整批回归、产品构建、Assembly及隔离核心G00通过。真实DeepSeek验证屏蔽同名默认资源、强制恢复配置技能/模板及项目同名技能/模板优先，完成实际read/write/bash。
-- 接口与自审：新增resources.selection.local.v0；Assembly处理来源顺序、相对路径、优先级、globstar/brace/range与JS UTF-16单元匹配适配，C仅桥接libc fnmatch/scoped locale。pg_settings_resource_sources输出owned来源描述符，现有加载入口共用同一实现接收字符串或描述符，应用模板增加名称去重与碰撞诊断。删除组合层重复的默认目录构造，新增源/依赖/构建登记自审通过；并行TUI与规划文档保持原位。
-- 剩余与下一交付物：K11继续忽略文件、Minimatch的POSIX类/少见嵌套brace等剩余边界、来源/诊断交互、完整设置字段消费者及MCP/代码工具；原生匹配继续保留显式长度/容量与展开限制。TUI资源表及其他K项保持原覆盖表范围。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 Durable harness/context.ts deriveRange/selectActive/contribute/scanRange，以及对应上下文用例。已核对缓存上游差异：context删除未使用的activeEntries导出，compaction新增restartLimit；当前批次保持固定快照，后续摘要任务采用中断预算语义。
+- 实际调用链：Durable Generation请求与启动历史 → 同一个Assembly投影 → 按cutoff分页扫描 → 最新head贡献在前、保留范围非head记录在后 → 范围内最新编辑决定omit/replace → 现有模型协议投影。旧head自身不再重复贡献，但其编辑继续生效。
+- 验证：Durable专项ASan/UBSan通过，覆盖多head、旧head编辑、同目标最后编辑、omit/replace、超过300条记录和SQLite/JSONL重开；真实DeepSeek Inputs/工具/follow-up/重开流程通过；Assembly检查通过。Runtime整批回归与隔离核心产品构建通过。
+- 接口与自审：原地修改durable_generation.S与现有存储专项，无新服务或ABI变化；分页数组独立持有引用，失败统一清理。并行TUI和规划文档改动保持原位。
+- 剩余与下一交付物：继续K12的模型消息工具结果整理、system基线、token估算/保留边界，再把摘要任务接入Scheduler/Storage及手动/自动触发；模型ABI仍为64条消息与单条4096字节，完整长会话与压缩尚未完成。K11其余覆盖范围保留原清单。

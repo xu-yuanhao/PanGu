@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
+| 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
@@ -27,9 +28,9 @@
 
 ## 本批验证与集成状态
 
-- 配置与默认资源共用带作用域的来源描述符：显式资源优先、同层项目优先；`!`/`+`/`-`优先级在名称采纳前应用，自动发现不会重新加入已排除路径。应用模板按名称去重并报告碰撞。
-- 原生选择/目录/优先级专项ASan/UBSan、1978组固定minimatch函数对照、最终Runtime回归与产品构建通过；Assembly及隔离核心G00通过。
-- 真实DeepSeek通过配置筛选/强制恢复、项目同名技能与模板优先、显式技能当前正文和实际工具执行。忽略规则、POSIX类/少见brace边界与其余K11范围继续推进。
+- K12上下文投影已接入实际Generation和历史恢复：最新head在前，旧head的编辑仍计入保留范围，最后omit/replace决定贡献；扫描按固定cutoff分页。
+- Durable专项ASan/UBSan覆盖多head、编辑、300多条记录和SQLite/JSONL重开；真实DeepSeek Inputs/工具/follow-up/重开通过，Assembly检查通过。Runtime整批回归与隔离核心产品构建通过。
+- 后续接通工具结果整理、system基线和持久摘要任务；完整压缩尚未完成。
 
 ## 当前接口边界
 

@@ -665,13 +665,180 @@ jmp .Lgg_project_role
  pop rbx
  pop rbp
  ret
+/* Scan the immutable cutoff in ascending pages; output owns one joined array. */
+.Lgg_context_scan:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rcx
+ mov r13,rsi
+ mov r14,rdx
+ mov rdi,rsp
+ xor esi,esi
+ mov edx,144
+ call memset@PLT
+ mov qword ptr [r12],0
+ mov dword ptr [rsp],1
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+ mov qword ptr [rsp+32],17
+ cmp r14,-1
+ jne .Lgg_context_scan_bound
+ mov qword ptr [rsp+32],1
+.Lgg_context_scan_bound:
+ mov [rsp+40],r13
+ mov [rsp+72],r14
+ call json_object_new_array@PLT
+ mov [r12],rax
+ test rax,rax
+ jz .Lgg_context_scan_bad
+.Lgg_context_scan_page:
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rax+16]
+ test eax,eax
+ jnz .Lgg_context_scan_bad
+ xor ebp,ebp
+.Lgg_context_scan_item:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Lgg_context_scan_next
+ mov rdi,[rsp+112]
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[r12]
+ mov rsi,rax
+ mov [rsp+136],rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_context_scan_add_bad
+ inc rbp
+ jmp .Lgg_context_scan_item
+.Lgg_context_scan_next:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ cmp dword ptr [rsp+132],0
+ je .Lgg_context_scan_ok
+ mov rax,[rsp+120]
+ cmp rax,[rsp+16]
+ jbe .Lgg_context_scan_bad
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov eax,[rsp+128]
+ mov [rsp+12],eax
+ jmp .Lgg_context_scan_page
+.Lgg_context_scan_add_bad:
+ mov rdi,[rsp+136]
+ call json_object_put@PLT
+.Lgg_context_scan_bad:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,4
+ jmp .Lgg_context_scan_end
+.Lgg_context_scan_ok:
+ xor eax,eax
+.Lgg_context_scan_end:
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Borrow the newest replacement in the captured range, including edits on
+   superseded head markers. The page owns both the entry and its edits. */
+.Lgg_contribution:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp],rdx
+ GGET rbx,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+8],rax
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov r13,rax
+.Lgg_edit_entry:
+ test r13,r13
+ jz .Lgg_edit_original
+ dec r13
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ GGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp]
+ jb .Lgg_edit_original
+ GGET "qword ptr [rsp+16]",edits
+ mov r14,rax
+ test rax,rax
+ jz .Lgg_edit_entry
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov rbp,rax
+.Lgg_edit_one:
+ test rbp,rbp
+ jz .Lgg_edit_entry
+ dec rbp
+ mov rdi,r14
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ GGET rax,target
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+8]
+ jne .Lgg_edit_one
+ GGET "qword ptr [rsp+24]",action
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_edit_empty
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_replace]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_edit_empty
+ GGET "qword ptr [rsp+24]",messages
+ jmp .Lgg_edit_end
+.Lgg_edit_original:
+ GGET rbx,model
+ jmp .Lgg_edit_end
+.Lgg_edit_empty:
+ xor eax,eax
+.Lgg_edit_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
 .Lgg_project:
  push rbp
  push rbx
  push r12
  push r13
  push r14
- sub rsp,48
+ sub rsp,64
  mov rbx,rdi
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
@@ -718,16 +885,15 @@ jmp .Lgg_project_role
  call json_object_get_uint64@PLT
  mov rcx,rax
  mov rdi,r12
- mov esi,1
- mov edx,256
- mov r8,r14
- mov r9,rsp
- call .Lgg_scan
+ mov rsi,rcx
+ mov rdx,r14
+ mov rcx,rsp
+ call .Lgg_context_scan
  test eax,eax
  jnz .Lgg_context_bad
- cmp dword ptr [rsp+20],0
- jne .Lgg_context_bad
  mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+56],0
  xor r12d,r12d
 .Lgg_context_head:
  mov rdi,[rsp]
@@ -737,17 +903,26 @@ jmp .Lgg_project_role
  mov rdi,[rsp]
  mov rsi,r12
  call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
  GGET rax,head
  test rax,rax
  jz .Lgg_context_head_next
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov [rsp+24],rax
+ mov rax,[rsp+32]
+ mov [rsp+48],rax
 .Lgg_context_head_next:
  inc r12
  jmp .Lgg_context_head
 .Lgg_context_head_done:
  xor r12d,r12d
+ mov rax,[rsp+48]
+ test rax,rax
+ jz .Lgg_context_entry
+ mov [rsp+32],rax
+ mov qword ptr [rsp+56],1
+ jmp .Lgg_context_contribute
 .Lgg_context_entry:
  mov rdi,[rsp]
  call json_object_array_length@PLT
@@ -762,7 +937,16 @@ jmp .Lgg_project_role
  call json_object_get_uint64@PLT
  cmp rax,[rsp+24]
  jb .Lgg_context_next
- GGET "qword ptr [rsp+32]",model
+ cmp qword ptr [rsp+48],0
+ je .Lgg_context_contribute
+ GGET "qword ptr [rsp+32]",head
+ test rax,rax
+ jnz .Lgg_context_next
+.Lgg_context_contribute:
+ mov rdi,[rsp+32]
+ mov rsi,[rsp]
+ mov rdx,[rsp+24]
+ call .Lgg_contribution
  mov r13,rax
  test rax,rax
  jz .Lgg_context_next
@@ -788,6 +972,11 @@ jmp .Lgg_project_role
  inc r14
  jmp .Lgg_context_message
 .Lgg_context_next:
+ cmp qword ptr [rsp+56],0
+ je .Lgg_context_advance
+ mov qword ptr [rsp+56],0
+ jmp .Lgg_context_entry
+.Lgg_context_advance:
  inc r12
  jmp .Lgg_context_entry
 .Lgg_context_ok:
@@ -802,7 +991,7 @@ jmp .Lgg_project_role
  mov rdi,[rsp]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,48
+ add rsp,64
  pop r14
  pop r13
  pop r12
@@ -3277,3 +3466,10 @@ pg_durable_generation_history:
 
 .section .rodata
 .Lgg_data: .asciz "data"
+
+.section .rodata
+.Lgg_edits: .asciz "edits"
+.Lgg_target: .asciz "target"
+.Lgg_action: .asciz "action"
+.Lgg_replace: .asciz "replace"
+.Lgg_messages: .asciz "messages"
