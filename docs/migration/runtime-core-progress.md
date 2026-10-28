@@ -32,9 +32,9 @@
 
 ## 本批验证与集成状态
 
-- Host observation服务和可选TUI绑定提供已提交{live,usage}快照，读取不推进Scheduler、不写记录；返回JSON由调用者释放。
-- SQLite/JSONL重开后的累计用量及只读序列检查、实际Host初始/压缩终态快照、TUI绑定/解绑边界通过。
-- Runtime整批回归和实际产品compaction-hooks场景通过；完整增量事件继续按K13接入。
+- observation服务追加watch/next/close：首次快照、Live/usage变化合并、无变化跳过、独立返回值和幂等释放，纯逻辑手写Assembly。
+- 双后端用量事务、实际Host压缩开始/结束、返回值隔离、退订通过；Runtime整批回归、G00/Assembly通过。
+- 该入口为状态拉取，完整逐提交事件与顺序按K13继续接入。
 
 ## 当前接口边界
 

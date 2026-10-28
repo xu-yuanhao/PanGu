@@ -448,6 +448,12 @@ pg_observation_service:
  mov [rsi+8],rax
  mov rax,qword ptr [rip+json_object_put@GOTPCREL]
  mov [rsi+16],rax
+ lea rax,[rip+pg_agent_watch_open]
+ mov [rsi+24],rax
+ lea rax,[rip+pg_agent_watch_next]
+ mov [rsi+32],rax
+ lea rax,[rip+pg_agent_watch_close]
+ mov [rsi+40],rax
  ret
 .section .rodata
 .Lu_kind: .asciz "pangu.usage"
@@ -489,3 +495,96 @@ pg_observation_service:
  .quad .Lu_live_kind,10,1
  .long 1,1,2,0
  .quad 0,0
+
+.text
+.globl pg_agent_watch_open
+.type pg_agent_watch_open,@function
+pg_agent_watch_open:
+ test rdi,rdi
+ jz .Lu_watch_invalid
+ test rsi,rsi
+ jz .Lu_watch_invalid
+ test rdx,rdx
+ jz .Lu_watch_invalid
+ cmp dword ptr [rdx+24],0
+ jne .Lu_watch_invalid
+ mov [rdx],rdi
+ mov [rdx+8],rsi
+ mov qword ptr [rdx+16],0
+ mov dword ptr [rdx+24],1
+ xor eax,eax
+ ret
+.Lu_watch_invalid:
+ mov eax,1
+ ret
+.globl pg_agent_watch_next
+.type pg_agent_watch_next,@function
+pg_agent_watch_next:
+ UF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [r12],0
+ mov qword ptr [rsp],0
+ cmp dword ptr [rbx+24],1
+ jne .Lu_watch_next_closed
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ mov rdx,rsp
+ call pg_agent_snapshot
+ test eax,eax
+ jnz .Lu_watch_next_error
+ mov rdi,[rbx+16]
+ test rdi,rdi
+ jz .Lu_watch_changed
+ mov rsi,[rsp]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lu_watch_same
+.Lu_watch_changed:
+ mov qword ptr [rsp+8],0
+ mov rdi,[rsp]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lu_watch_copy_failed
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [rbx+16],rax
+ mov rax,[rsp]
+ mov [r12],rax
+ mov eax,1
+ jmp .Lu_watch_next_end
+.Lu_watch_copy_failed:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,-5
+ jmp .Lu_watch_next_end
+.Lu_watch_same:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ xor eax,eax
+ jmp .Lu_watch_next_end
+.Lu_watch_next_error:
+ neg eax
+ jmp .Lu_watch_next_end
+.Lu_watch_next_closed:
+ mov eax,-1
+.Lu_watch_next_end:
+ UE 16
+.globl pg_agent_watch_close
+.type pg_agent_watch_close,@function
+pg_agent_watch_close:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lu_watch_close_end
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ pxor xmm0,xmm0
+ movdqu [rbx],xmm0
+ movdqu [rbx+16],xmm0
+.Lu_watch_close_end:
+ pop rbx
+ ret

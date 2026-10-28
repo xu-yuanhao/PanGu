@@ -2229,7 +2229,10 @@
         "pg_usage_read",
         "pg_usage_service",
         "pg_agent_snapshot",
-        "pg_observation_service"
+        "pg_observation_service",
+        "pg_agent_watch_open",
+        "pg_agent_watch_next",
+        "pg_agent_watch_close"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/usage.ts"
