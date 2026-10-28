@@ -56,6 +56,7 @@ static struct {
  pg_durable_inputs inputs;pg_record_queries queries;pg_record_requests requests;
  pg_durable_client client;pg_client native_client;pg_session history;
  const pg_model_provider *model_provider;
+ const pg_model_metadata *model_metadata;
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools;
@@ -145,7 +146,14 @@ static int storage_stop(void *ctx){
  (void)ctx;foreground();if(durable.session_ready){int result=pg_durable_session_close(&durable.session);if(result==1)return 1;durable.session_ready=0;return result;}
  if(durable.timer_ready)pg_hold_timer_stop(&durable.timer);if(durable.holds_ready)pg_document_holds_finish(&durable.holds,&durable.records);if(durable.cache_ready)pg_document_cache_close(&durable.cache);if(durable.storage_ready)return backend_close(0);return 0;
 }
-static int prepare(void *ctx,uint64_t conversation,struct json_object **out){(void)ctx;(void)conversation;*out=0;return json_object_deep_copy(durable.configuration,out,0);}
+static int prepare(void *ctx,uint64_t conversation,struct json_object **out){
+ (void)ctx;(void)conversation;*out=0;if(json_object_deep_copy(durable.configuration,out,0))return 1;
+ struct json_object *settings=json_object_object_get(durable.resources.current.settings,"settings"),*policy=json_object_object_get(settings,"compaction"),*copy=0;
+ if(policy){if(json_object_deep_copy(policy,&copy,0)||json_object_object_add(*out,"compaction",copy))goto failed;copy=0;}
+ if(durable.model_metadata){if(durable.model_metadata->describe(durable.model_metadata->context,*out,&copy)||!copy||!json_object_is_type(copy,json_type_object)||!pg_document_value_valid(copy))goto failed;if(json_object_object_add(*out,"modelInfo",copy))goto failed;copy=0;}
+ return 0;
+failed:json_object_put(copy);json_object_put(*out);*out=0;return 1;
+}
 static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);return pg_mimo_configure(ctx,configuration);}
 static void native_model_failure(void *ctx,pg_model_failure *out){
  pg_mimo *source=ctx;static char message[128];int n=snprintf(message,sizeof(message),"Model request failed (HTTP %ld, transport %u)",source->http,source->transport_error);
@@ -242,6 +250,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(!toolset||toolset->abi!=PG_TOOL_PROVIDER_ABI||toolset->size!=sizeof(*toolset)||!toolset->catalog||!toolset->identity||!*toolset->identity||strlen(toolset->identity)>63)return 1;
  if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
  if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
+ durable.model_metadata=pg_host_find(scope->parent,"model.metadata");if(durable.model_metadata&&(durable.model_metadata->abi!=PG_MODEL_METADATA_ABI||durable.model_metadata->size!=sizeof(pg_model_metadata)||!durable.model_metadata->describe))return 1;
  durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
@@ -263,7 +272,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
  durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete,model_fetch_deferred,model_cancel_deferred};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
- durable.compaction_host=durable.generation_host;durable.compaction_host.acquire=compaction_acquire;durable.compaction_host.progress=0;if(pg_durable_compaction_init(&durable.compaction,&durable.compaction_host))return 1;
+ durable.compaction_host=durable.generation_host;durable.compaction_host.acquire=compaction_acquire;durable.compaction_host.progress=0;if(pg_durable_compaction_init(&durable.compaction,&durable.compaction_host))return 1;pg_durable_generation_bind_compaction(&durable.generation,&durable.compaction.definition);
  durable.compaction_binding=(pg_compaction_binding){&durable.compaction,&durable.session,&durable.tasks,&durable.scheduler};pg_durable_compaction_service(&durable.compaction_binding,&durable.compaction_ops);foreground_compaction=durable.compaction_ops;
  pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;

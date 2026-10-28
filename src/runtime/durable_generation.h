@@ -28,6 +28,7 @@ typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
  pg_task_phase phases[5];
+ const pg_task_definition *compaction;
 } pg_durable_generation;
 /* Resolve pangu.generation alongside pangu.tool. prepare saves configuration
    and context cutoff; request streams through the native model service, then
@@ -42,6 +43,8 @@ typedef struct {
    the existing bounded pg_session protocol; unsupported content rejects rather
    than silently losing model context. */
 int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generation_host *);
+/* Optional definition borrowed for the Generation module lifetime. */
+void pg_durable_generation_bind_compaction(pg_durable_generation *,const pg_task_definition *);
 /* Read-only committed startup history through the same model projection.
    The latest head leads retained entries; last edits win. Results are ordered
    after their calls, first matching ID before the next assistant. Missing

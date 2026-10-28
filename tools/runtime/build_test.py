@@ -21,14 +21,14 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
-        if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction')):
+        if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction','--live-auto-compaction')):
             if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
                 raise SystemExit('Model API key required in the environment')
             output = str(Path(directory) / 'live-durable-generation')
             flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             *DURABLE_SOURCES, str(ROOT / 'tests/runtime/test_durable_storage.c'), *flags, '-o', output], check=True)
-            subprocess.run([output, '--live-compaction' if '--live-compaction' in sys.argv else '--live-inputs' if '--live-inputs' in sys.argv else '--live-sequential' if '--live-sequential' in sys.argv else '--live-deferred' if '--live-deferred' in sys.argv else '--live-partial' if '--live-partial' in sys.argv else '--live-generation'], check=True, timeout=350)
+            subprocess.run([output, '--live-auto-compaction' if '--live-auto-compaction' in sys.argv else '--live-compaction' if '--live-compaction' in sys.argv else '--live-inputs' if '--live-inputs' in sys.argv else '--live-sequential' if '--live-sequential' in sys.argv else '--live-deferred' if '--live-deferred' in sys.argv else '--live-partial' if '--live-partial' in sys.argv else '--live-generation'], check=True, timeout=350)
             return 0
         if any(flag in sys.argv for flag in ('--live-batch', '--live-batch-execute', '--live-snapshot-edit', '--live-capacity')):
             if not os.environ.get('MIMO_API_KEY'):

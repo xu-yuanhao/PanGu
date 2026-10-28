@@ -24,4 +24,12 @@ typedef struct {
  int (*cancel_deferred)(void *,const struct json_object *handle);
 } pg_model_provider;
 #define PG_MODEL_PROVIDER_ABI 3u
+/* Optional model.metadata service: detached public model description for the
+   selected configuration (contextWindow/maxTokens). Borrow through scope close. */
+typedef struct {
+ uint32_t abi,size;
+ void *context;
+ int (*describe)(void *,const struct json_object *,struct json_object **);
+} pg_model_metadata;
+#define PG_MODEL_METADATA_ABI 1u
 #endif

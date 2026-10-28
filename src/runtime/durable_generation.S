@@ -127,6 +127,7 @@ pg_durable_generation_init:
  mov [rdi+280],rax
  lea rax,[rip+.Lgg_cleanup]
  mov [rdi+288],rax
+ mov qword ptr [rdi+296],0
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -244,13 +245,15 @@ pg_durable_generation_init:
  push r12
  push r13
  push r14
- sub rsp,48
+ sub rsp,128
  mov r12,rdi
  mov rbx,rsi
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+104],0
  call .Lgg_operation
  test eax,eax
  jnz .Lgg_prepare_end
@@ -270,6 +273,106 @@ pg_durable_generation_init:
  call pg_document_value_valid@PLT
  test eax,eax
  jz .Lgg_prepare_invalid
+ cmp qword ptr [r12+296],0
+ je .Lgg_prepare_scan
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ GGET rax,compacted
+ test rax,rax
+ jz .Lgg_prepare_threshold
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov esi,2
+ lea rcx,[rsp+104]
+ call [rax+8]
+ test eax,eax
+ jnz .Lgg_prepare_invalid
+ GGET "qword ptr [rsp+104]",state
+ GGET rax,outcome
+ GGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_prepare_compaction_failed
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_completed_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_prepare_compaction_failed
+ jmp .Lgg_prepare_scan
+.Lgg_prepare_threshold:
+ GGET "qword ptr [r14+16]",model_info
+ GGET rax,context_window
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Lgg_prepare_scan
+ mov rdi,[rbx+8]
+ mov rsi,r13
+ mov rdx,-1
+ lea rcx,[rsp+48]
+ call pg_durable_context_read
+ test eax,eax
+ jnz .Lgg_prepare_invalid
+ mov rdi,[rsp+48]
+ mov rsi,[r14+16]
+ lea rdx,[rsp+56]
+ call pg_durable_compaction_threshold@PLT
+ cmp eax,1
+ jne .Lgg_prepare_scan
+ mov [rsp+80],r14
+ mov rax,[rsp+56]
+ mov [rsp+88],rax
+ mov rax,[rsp+64]
+ mov [rsp+96],rax
+ mov rdi,rbx
+ lea rsi,[rsp+80]
+ lea rdx,[rip+.Lgg_compact_stage]
+ call pg_task_runner_commit_with@PLT
+ jmp .Lgg_prepare_end
+.Lgg_prepare_compaction_failed:
+ lea rdi,[rip+.Lgg_compaction_error_assistant]
+ call json_tokener_parse@PLT
+ mov [r14+24],rax
+ test rax,rax
+ jz .Lgg_prepare_alloc
+ lea rdi,[rip+.Lgg_failed_json]
+ call json_tokener_parse@PLT
+ mov [r14+4360],rax
+ test rax,rax
+ jz .Lgg_prepare_alloc
+ GGET "qword ptr [rsp+104]",state
+ GGET rax,outcome
+ GGET rax,error_key
+ GGET rax,message_key
+ test rax,rax
+ jz .Lgg_prepare_failure_message
+ mov rdi,[r14+24]
+ lea rsi,[rip+.Lgg_error_message]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_prepare_alloc
+.Lgg_prepare_failure_message:
+ GGET "qword ptr [r14+4360]",outcome
+ GGET rax,error_key
+ mov [rsp+40],rax
+ GGET "qword ptr [r14+24]",error_message
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lgg_message_key]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_prepare_alloc
+ mov rdi,rbx
+ mov rsi,r14
+ lea rdx,[rip+.Lgg_stage]
+ call pg_task_runner_commit_with@PLT
+ jmp .Lgg_prepare_end
+.Lgg_prepare_scan:
  mov rdi,rbx
  mov esi,2
  mov edx,1
@@ -319,6 +422,13 @@ pg_durable_generation_init:
  test eax,eax
  jnz .Lgg_prepare_end
 .Lgg_prepare_attempt_ready:
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ mov rdi,rax
+ mov rsi,rbp
+ call .Lgg_copy_compacted
+ test eax,eax
+ jnz .Lgg_prepare_end
  mov rdi,rbx
  mov rsi,[rsp+32]
  call pg_task_runner_commit@PLT
@@ -330,6 +440,10 @@ pg_durable_generation_init:
  mov eax,4
 .Lgg_prepare_end:
  mov ebp,eax
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov rdi,[rsp+24]
@@ -338,7 +452,7 @@ pg_durable_generation_init:
  call json_object_put@PLT
  mov eax,ebp
  neg eax
- add rsp,48
+ add rsp,128
  pop r14
  pop r13
  pop r12
@@ -2775,6 +2889,13 @@ pg_durable_context_order:
  jz .Lgg_failure_alloc
  GGET rax,checkpoint
  mov rbp,rax
+ GGET "qword ptr [rbx+32]",state
+ GGET rax,checkpoint
+ mov rdi,rax
+ mov rsi,rbp
+ call .Lgg_copy_compacted
+ test eax,eax
+ jnz .Lgg_failure_error
  mov rdi,[rsp+8]
  call json_object_new_int64@PLT
  mov rdi,rbp
@@ -2855,6 +2976,11 @@ pg_durable_context_order:
  jz .Lgg_retry_alloc
  GGET rax,checkpoint
  mov r13,rax
+ mov rdi,r12
+ mov rsi,r13
+ call .Lgg_copy_compacted
+ test eax,eax
+ jnz .Lgg_retry_error
  GGET r12,attempt
  mov rdi,rax
  call json_object_get_uint64@PLT
@@ -4196,3 +4322,152 @@ pg_durable_context_read:
 .Lgg_contributions: .asciz "contributions"
 
 .Lgg_timestamp: .asciz "timestamp"
+
+.text
+.globl pg_durable_generation_bind_compaction
+.type pg_durable_generation_bind_compaction,@function
+pg_durable_generation_bind_compaction:
+ mov [rdi+296],rsi
+ ret
+.Lgg_compact_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rcx
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+64],0
+ mov r14,[rbx]
+ mov rax,[r14]
+ mov rax,[rax+296]
+ mov [rsp],rax
+ mov rax,[r14+8]
+ mov rcx,[rax+8]
+ mov [rsp+8],rcx
+ mov rcx,[r14]
+ mov rcx,[rcx]
+ mov rcx,[rcx+32]
+ mov [rsp+16],rcx
+ mov rcx,[rax+16]
+ mov [rsp+32],rcx
+ GGET "qword ptr [rax+24]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+24],rax
+ lea rdi,[rip+.Lgg_compaction_input]
+ call json_tokener_parse@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lgg_compact_stage_bad
+ mov [rsp+40],rax
+ mov rdi,[rbx+8]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+48]
+ lea rsi,[rip+.Lgg_keep_recent]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_compact_stage_bad
+ mov rdi,[rbx+16]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+48]
+ lea rsi,[rip+.Lgg_reserve_tokens]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_compact_stage_bad
+ mov rdi,rsp
+ mov rsi,r12
+ lea rdx,[rsp+56]
+ call pg_durable_compaction_create@PLT
+ test eax,eax
+ jnz .Lgg_compact_stage_end
+ lea rdi,[rip+.Lgg_compaction_wait]
+ call json_tokener_parse@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lgg_compact_stage_bad
+ GGET rax,checkpoint
+ mov rbp,rax
+ mov rdi,[rsp+56]
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_compacted]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_compact_stage_bad
+ mov rax,[r14+8]
+ GGET "qword ptr [rax+32]",state
+ GGET rax,checkpoint
+ GGET rax,attempt
+ test rax,rax
+ jz .Lgg_compact_stage_wait
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_attempt]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_compact_stage_bad
+.Lgg_compact_stage_wait:
+ GGET "qword ptr [rsp+64]",on
+ mov rbp,rax
+ mov rdi,[rsp+56]
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_compact_stage_bad
+ mov rax,[rsp+64]
+ mov [r13],rax
+ mov qword ptr [rsp+64],0
+ xor eax,eax
+ jmp .Lgg_compact_stage_end
+.Lgg_compact_stage_bad:
+ mov eax,4
+.Lgg_compact_stage_end:
+ mov ebp,eax
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_compacted: .asciz "compacted"
+.Lgg_completed_word: .asciz "completed"
+.Lgg_model_info: .asciz "modelInfo"
+.Lgg_context_window: .asciz "contextWindow"
+.Lgg_keep_recent: .asciz "keepRecentTokens"
+.Lgg_reserve_tokens: .asciz "reserveTokens"
+.Lgg_compaction_input: .asciz "{\"reason\":\"threshold\"}"
+.Lgg_compaction_wait: .asciz "{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"prepare\",\"attempt\":1,\"threshold\":true},\"on\":[],\"policy\":\"allSettled\"}"
+
+.section .rodata
+.Lgg_compaction_error_assistant: .asciz "{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"Blocking compaction did not complete\",\"content\":[]}"
+
+.text
+.Lgg_copy_compacted:
+ push rbx
+ mov rbx,rsi
+ GGET rdi,compacted
+ test rax,rax
+ jz .Lgg_copy_compacted_end
+ mov rdi,rbx
+ lea rsi,[rip+.Lgg_compacted]
+ mov rdx,rax
+ call .Lgg_copy_field
+.Lgg_copy_compacted_end:
+ pop rbx
+ ret

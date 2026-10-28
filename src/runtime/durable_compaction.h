@@ -28,4 +28,18 @@ typedef struct {
  pg_task_scheduler *scheduler;
 } pg_compaction_binding;
 void pg_durable_compaction_service(pg_compaction_binding *,pg_compaction_ops *);
+typedef struct {
+ const pg_task_definition *definition;
+ const pg_task_runner_host *host;
+ int (*mint)(void *,uint64_t *);
+ uint64_t conversation,owner;
+ const struct json_object *input;
+} pg_compaction_creation;
+/* Stage a conversation-owned or Generation-owned compaction on the caller's
+   transaction. Definition/host/input are borrowed only through this call. */
+int pg_durable_compaction_create(const pg_compaction_creation *,pg_record_tx *,uint64_t *);
+typedef struct {uint64_t keep_recent_tokens,reserve_tokens,background_tokens;} pg_compaction_policy;
+/* 0 no cut, 1 blocking threshold, 2 background threshold. */
+int pg_durable_compaction_threshold(const struct json_object *view,
+ const struct json_object *configuration,pg_compaction_policy *);
 #endif

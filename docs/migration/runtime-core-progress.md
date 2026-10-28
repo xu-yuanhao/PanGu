@@ -14,7 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
-| 手动压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表 |
+| 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
@@ -30,9 +30,9 @@
 
 ## 本批验证与集成状态
 
-- 摘要输入使用任务持有的完整JSON文本和PG_USER_VIEW显式长度借用，经同一OpenAI编码器发送；model.provider ABI3定义该请求能力，现有结构尺寸保持。
-- 1 MiB/NUL/页尾与生命周期专项、MIMO矩阵和Runtime回归通过；真实DeepSeek两后端各发送19,301字节摘要正文，两次阶段恢复后继续回忆旧标记；实际产品Host的大上下文压缩/继续对话、产品构建及相关检查通过。
-- 后续集中接通自动阈值/overflow/background与阻塞压缩，再完成完整动态请求、摘要大输出及其余K12范围。
+- Generation按模型容量、有效usage与尾部估算触发阻塞压缩；owned子任务与父任务等待原子提交，摘要Entry和子任务终态同批提交，重开后恢复生成。
+- SQLite/JSONL真实DeepSeek验证自动压缩、等待父任务重开、已保存摘要重开、503后持久重试且不重复压缩及继续回忆；实际产品Host通过合并设置和注入模型元数据完成同一闭环。Runtime整批回归、Durable ASan/UBSan专项、隔离核心G00/Assembly与产品构建通过。
+- `model.metadata`为独立可选服务，返回公开contextWindow/maxTokens；默认模型目录接入按K05完成。K12继续overflow/background、取消/失败/Live/hook与完整动态请求。
 
 ## 当前接口边界
 

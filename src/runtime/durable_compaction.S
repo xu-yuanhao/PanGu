@@ -1479,6 +1479,16 @@ pg_durable_compaction_init:
  jae .Lcc_select_maximum
  mov [rsp+64],rax
 .Lcc_select_maximum:
+ CGET "qword ptr [rsp+16]",modelInfo
+ CGET rax,maxTokens
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Lcc_select_maximum_ready
+ cmp rax,[rsp+64]
+ jae .Lcc_select_maximum_ready
+ mov [rsp+64],rax
+.Lcc_select_maximum_ready:
  mov rdi,[rsp+64]
  call json_object_new_uint64@PLT
  mov rdi,[rsp+56]
@@ -1787,7 +1797,7 @@ pg_durable_compaction_init:
 .text
 /* Summary placement and terminal receipt share the existing Submission line. */
 .Lcc_place_stage:
- CF 32
+ CF 48
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
@@ -1795,7 +1805,12 @@ pg_durable_compaction_init:
  CGET "qword ptr [rax+24]",conversationId
  mov rdi,rax
  call json_object_get_uint64@PLT
- mov rdx,rax
+ mov [rsp+32],rax
+ mov rax,[rbx+8]
+ CGET "qword ptr [rax+24]",owner
+ test rax,rax
+ jnz .Lcc_place_owned
+ mov rdx,[rsp+32]
  mov rax,[rbx]
  mov rax,[rax]
  mov rdi,[rax+64]
@@ -1805,6 +1820,35 @@ pg_durable_compaction_init:
  call pg_durable_inputs_admit@PLT
  test eax,eax
  jnz .Lcc_place_stage_end
+ lea r14,[rip+.Lcc_submissionId]
+ jmp .Lcc_place_receipt
+.Lcc_place_owned:
+ mov rax,[rbx+8]
+ mov rcx,[rax+16]
+ CGET "qword ptr [rbx+16]",entry
+ mov rdx,rax
+ mov rdi,r12
+ mov rsi,[rsp+32]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ lea r9,[rsp]
+ mov rax,[rbx+8]
+ mov rcx,[rax+16]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lcc_place_stage_end
+ mov r14,[rsp]
+ CGET r14,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+32],rax
+ mov rdi,r14
+ call json_object_put@PLT
+ mov rax,[rsp+32]
+ mov [rsp],rax
+ lea r14,[rip+.Lcc_entryId]
+.Lcc_place_receipt:
  lea rdi,[rip+.Lcc_completed_json]
  call json_tokener_parse@PLT
  mov [r13],rax
@@ -1816,14 +1860,14 @@ pg_durable_compaction_init:
  mov rdi,[rsp]
  call json_object_new_uint64@PLT
  mov rdi,r12
- lea rsi,[rip+.Lcc_submissionId]
+ mov rsi,r14
  mov rdx,rax
  call .Lcc_set
 .Lcc_place_stage_end:
- CE 32
+ CE 48
 .Lcc_place_stage_bad:
  mov eax,5
- CE 32
+ CE 48
 .Lcc_place_phase:
  CF 160
  mov rbx,rdi
@@ -1842,6 +1886,19 @@ pg_durable_compaction_init:
  jz .Lcc_place_bad
  CGET rax,entry
  mov [rsp+24],rax
+ CGET rax,data
+ mov [rsp+64],rax
+ CGET r13,input
+ CGET rax,reason
+ test rax,rax
+ jz .Lcc_place_reason_ready
+ mov rdx,rax
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lcc_reason]
+ call .Lcc_copy
+ test eax,eax
+ jnz .Lcc_place_bad
+.Lcc_place_reason_ready:
  CGET r14,firstKept
  mov rdx,rax
  mov rdi,[rsp+24]
@@ -2181,3 +2238,339 @@ pg_durable_compaction_service:
 .text
 .Lcc_service_release:
  jmp json_object_put@PLT
+
+.section .rodata
+.Lcc_owner: .asciz "owner"
+.Lcc_entryId: .asciz "entryId"
+.text
+.Lcc_created_initial:
+ mov rax,[rdi]
+ mov rdi,[rax+24]
+ jmp [rax+32]
+.Lcc_created_mint:
+ mov rax,[rdi+16]
+ mov rcx,[rdi+8]
+ mov rdi,[rcx]
+ jmp rax
+.globl pg_durable_compaction_create
+.type pg_durable_compaction_create,@function
+pg_durable_compaction_create:
+ CF 96
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [r13],0
+ call json_object_new_object@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lcc_create_bad
+ mov rax,[rbx]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lcc_name]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_create_bad
+ mov rax,[rbx]
+ mov rdi,[rax+16]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lcc_version]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_create_bad
+ lea rdi,[rip+.Lcc_options_json]
+ cmp qword ptr [rbx+32],0
+ je .Lcc_create_options
+ lea rdi,[rip+.Lcc_owned_options_json]
+.Lcc_create_options:
+ call json_tokener_parse@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lcc_create_bad
+ cmp qword ptr [rbx+32],0
+ je .Lcc_create_stage
+ CGET rax,ownership
+ mov r14,rax
+ mov rdi,[rbx+32]
+ call json_object_new_uint64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_taskId]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_create_bad
+.Lcc_create_stage:
+ mov [rsp],rbx
+ lea rax,[rip+.Lcc_created_initial]
+ mov [rsp+8],rax
+ lea rax,[rip+.Lcc_created_mint]
+ mov [rsp+16],rax
+ mov qword ptr [rsp+24],0
+ mov rax,[rbx+24]
+ mov [rsp+32],rax
+ mov rdi,r12
+ mov rsi,[rsp+40]
+ mov rdx,[rbx+40]
+ mov rcx,[rsp+48]
+ mov r8,rsp
+ mov r9,r13
+ call pg_record_tx_create_task@PLT
+ mov ebp,eax
+ jmp .Lcc_create_end
+.Lcc_create_bad:
+ mov ebp,4
+.Lcc_create_end:
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov eax,ebp
+ CE 96
+.section .rodata
+.Lcc_version: .asciz "version"
+.Lcc_ownership: .asciz "ownership"
+.Lcc_taskId: .asciz "taskId"
+.Lcc_owned_options_json: .asciz "{\"ownership\":{\"kind\":\"task\",\"taskId\":0}}"
+.text
+.Lcc_policy_value:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lcc_policy_default
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ pop rbx
+ ret
+.Lcc_policy_default:
+ mov rax,rbx
+ pop rbx
+ ret
+.Lcc_usage_tokens:
+ CF 16
+ mov rbx,rdi
+ CGET rbx,totalTokens
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jnz .Lcc_usage_end
+ xor r12d,r12d
+ xor ebp,ebp
+.Lcc_usage_component:
+ lea rax,[rip+.Lcc_usage_fields]
+ movsxd rsi,dword ptr [rax+r12*4]
+ add rsi,rax
+ mov rdi,rbx
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ add rbp,rax
+ inc r12
+ cmp r12,4
+ jb .Lcc_usage_component
+ mov rax,rbp
+.Lcc_usage_end:
+ CE 16
+/* estimateContext: newest applicable assistant usage plus trailing estimates. */
+.Lcc_estimate_context:
+ CF 64
+ mov rbx,rdi
+ mov [rsp+48],rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ CGET rbx,head
+ CGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+16],rax
+ CGET rbx,contributions
+ mov r12,rax
+ CGET rbx,entries
+ mov [rsp+24],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov r13,rax
+.Lcc_estimate_entry:
+ test r13,r13
+ jz .Lcc_estimate_messages
+ dec r13
+ mov rdi,[rsp+24]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ CGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rsp+16]
+ jbe .Lcc_estimate_entry
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov rbp,rax
+.Lcc_estimate_assistant:
+ test rbp,rbp
+ jz .Lcc_estimate_entry
+ dec rbp
+ mov rdi,r14
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
+ CGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcc_estimate_assistant
+ CGET "qword ptr [rsp+32]",usage
+ mov rdi,rax
+ call .Lcc_usage_tokens
+ test rax,rax
+ jz .Lcc_estimate_assistant
+ mov [rsp+8],rax
+ mov rax,[rsp+32]
+ mov [rsp],rax
+.Lcc_estimate_messages:
+ CGET rbx,messages
+ mov r12,rax
+ xor r13d,r13d
+ cmp qword ptr [rsp],0
+ je .Lcc_estimate_system
+.Lcc_estimate_find:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lcc_estimate_sum
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ inc r13
+ cmp rax,[rsp]
+ jne .Lcc_estimate_find
+ jmp .Lcc_estimate_sum
+.Lcc_estimate_system:
+ CGET "qword ptr [rsp+48]",systemPrompt
+ mov rdi,rax
+ call .Lcc_chars
+ lea rax,[rax+rax+6]
+ xor edx,edx
+ mov ecx,7
+ div rcx
+ mov [rsp+8],rax
+.Lcc_estimate_sum:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lcc_estimate_done
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call .Lcc_tokens
+ add [rsp+8],rax
+ inc r13
+ jmp .Lcc_estimate_sum
+.Lcc_estimate_done:
+ mov rax,[rsp+8]
+ CE 64
+.globl pg_durable_compaction_threshold
+.type pg_durable_compaction_threshold,@function
+pg_durable_compaction_threshold:
+ CF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ CGET r12,modelInfo
+ CGET rax,contextWindow
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lcc_threshold_none
+ CGET r12,compaction
+ mov r14,rax
+ test rax,rax
+ jz .Lcc_threshold_policy
+ CGET r14,enabled
+ test rax,rax
+ jz .Lcc_threshold_policy
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lcc_threshold_none
+.Lcc_threshold_policy:
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_keepRecentTokens]
+ mov edx,20000
+ call .Lcc_policy_value
+ mov [r13],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_reserveTokens]
+ mov edx,16384
+ call .Lcc_policy_value
+ mov [r13+8],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lcc_backgroundTokens]
+ mov edx,32768
+ call .Lcc_policy_value
+ mov [r13+16],rax
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcc_estimate_context
+ mov rcx,[rsp]
+ sub rcx,[r13+8]
+ mov dword ptr [rsp+16],1
+ cmp rax,rcx
+ jg .Lcc_threshold_cut
+ cmp qword ptr [r13+16],0
+ je .Lcc_threshold_none
+ sub rcx,[r13+16]
+ cmp rax,rcx
+ jle .Lcc_threshold_none
+ mov dword ptr [rsp+16],2
+.Lcc_threshold_cut:
+ mov rdi,rbx
+ mov rsi,[r13]
+ lea rdx,[rsp+8]
+ call pg_durable_compaction_select@PLT
+ test eax,eax
+ jnz .Lcc_threshold_none
+ cmp qword ptr [rsp+8],0
+ je .Lcc_threshold_none
+ mov eax,[rsp+16]
+ jmp .Lcc_threshold_end
+.Lcc_threshold_none:
+ xor eax,eax
+.Lcc_threshold_end:
+ CE 48
+.section .rodata
+.Lcc_modelInfo: .asciz "modelInfo"
+.Lcc_contextWindow: .asciz "contextWindow"
+.Lcc_compaction: .asciz "compaction"
+.Lcc_enabled: .asciz "enabled"
+.Lcc_backgroundTokens: .asciz "backgroundTokens"
+.Lcc_systemPrompt: .asciz "systemPrompt"
+.Lcc_messages: .asciz "messages"
+.Lcc_usage: .asciz "usage"
+.Lcc_totalTokens: .asciz "totalTokens"
+.Lcc_usage_fields:
+ .long .Lcc_usage_input-.Lcc_usage_fields,.Lcc_usage_output-.Lcc_usage_fields
+ .long .Lcc_usage_read-.Lcc_usage_fields,.Lcc_usage_write-.Lcc_usage_fields
+.Lcc_usage_input: .asciz "input"
+.Lcc_usage_output: .asciz "output"
+.Lcc_usage_read: .asciz "cacheRead"
+.Lcc_usage_write: .asciz "cacheWrite"
+
+.section .rodata
+.Lcc_data: .asciz "data"
+.Lcc_reason: .asciz "reason"

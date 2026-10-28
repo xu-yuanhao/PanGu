@@ -437,8 +437,7 @@
         "task.generation.local.v0",
         "storage.jsonl.local.v1",
         "session.durable.lifecycle.local.v0",
-        "resources.lifecycle.local.v0",
-        "task.compaction.local.v0"
+        "resources.lifecycle.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -1773,7 +1772,9 @@
         "src/runtime/model_failure.S",
         "src/runtime/model_regex_posix.c",
         "src/runtime/durable_inputs.h",
-        "src/runtime/durable_inputs.S"
+        "src/runtime/durable_inputs.S",
+        "src/runtime/durable_compaction.h",
+        "src/runtime/durable_compaction.S"
       ],
       "dependencies": [
         "task.runner.local.v0",
@@ -1783,7 +1784,7 @@
         "libutf8proc",
         "system libc POSIX regex"
       ],
-      "role": "Native Generation/Tool/Client and Submission/Inbox behavior: durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions.",
+      "role": "Native Generation/Tool/Client, Compaction and Submission/Inbox behavior: owned threshold compaction with atomic summary placement, durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions. Coordinated built-in Harness Generation/Inputs/Compaction: measured context threshold, owned blocking child/wait, direct summary Entry and resumed preparation.",
       "exports": [
         "pg_durable_generation_init",
         "pg_durable_generation_history",
@@ -1808,7 +1809,15 @@
         "pg_durable_inputs_start",
         "pg_durable_client_tool_observe",
         "pg_durable_context_order",
-        "pg_durable_inputs_admit"
+        "pg_durable_inputs_admit",
+        "pg_durable_compaction_select",
+        "pg_durable_compaction_request",
+        "pg_durable_compaction_init",
+        "pg_durable_compaction_start",
+        "pg_durable_compaction_service",
+        "pg_durable_compaction_create",
+        "pg_durable_compaction_threshold",
+        "pg_durable_generation_bind_compaction"
       ],
       "reference_basis": [
         {
@@ -1833,6 +1842,19 @@
             "packages/durable/test/harness-host-inputs.test.ts",
             "packages/durable/test/harness-submissions.test.ts",
             "packages/durable/test/harness-inbox.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/compaction.ts",
+            "packages/ai/src/utils/estimate.ts"
+          ],
+          "semantics": "selectCut/isCandidate, UTF-16 token estimate, summarizedMessages/serializeConversation, structured summary prompts; pinned select/summarize/place with write admission and atomic task receipt.",
+          "tests_to_read": [
+            "packages/durable/test/harness-compaction.test.ts",
+            "packages/durable/test/harness-context.test.ts"
           ]
         }
       ]
@@ -2125,42 +2147,6 @@
           "semantics": "pinned minimatch 10.2.6 and brace-expansion 5.0.12 matching behavior; numeric/alphabetic sequence expansion, padding/step/count rules; adapted range algorithm retains MIT copyright notices",
           "tests_to_read": [
             "packages/coding-agent/test/package-manager.test.ts"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "task.compaction.local.v0",
-      "sources": [
-        "src/runtime/durable_compaction.h",
-        "src/runtime/durable_compaction.S"
-      ],
-      "dependencies": [
-        "task.generation.local.v0",
-        "task.runner.local.v0",
-        "json-c",
-        "system libc"
-      ],
-      "role": "Pi Durable manual compaction: retained-entry selection, structured summary request, pinned context/configuration, resumable select/summarize/place phases and atomic write Submission/terminal receipt. Summary request owns its complete JSON string through provider close and uses a borrowed text row in the same native encoder.",
-      "exports": [
-        "pg_durable_compaction_select",
-        "pg_durable_compaction_request",
-        "pg_durable_compaction_init",
-        "pg_durable_compaction_start",
-        "pg_durable_compaction_service"
-      ],
-      "reference_basis": [
-        {
-          "repository": "pi",
-          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
-          "paths": [
-            "packages/durable/src/harness/compaction.ts",
-            "packages/ai/src/utils/estimate.ts"
-          ],
-          "semantics": "selectCut/isCandidate, UTF-16 token estimate, summarizedMessages/serializeConversation, structured summary prompts; pinned select/summarize/place with write admission and atomic task receipt.",
-          "tests_to_read": [
-            "packages/durable/test/harness-compaction.test.ts",
-            "packages/durable/test/harness-context.test.ts"
           ]
         }
       ]
