@@ -1543,6 +1543,9 @@ pg_durable_client_fault_task:
  mov rsi,[rsp+8]
  call .Ldc_task_failures
  mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Ldc_submissions_publish
+ mov rdi,rbx
  call .Ldc_usage_publish
  mov rdi,rbx
  mov rsi,r13
@@ -1561,6 +1564,9 @@ pg_durable_client_fault_task:
  mov rdi,rbx
  mov rsi,[rsp+8]
  call .Ldc_task_failures
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Ldc_submissions_publish
  mov rdi,rbx
  call .Ldc_usage_publish
 .Ldc_live_done:
@@ -2107,3 +2113,98 @@ pg_durable_client_fault_task:
  pop r12
  pop rbx
  ret
+
+.text
+/* Submission records are delivered in numeric ID order, independently of
+   the commit's write order, following Pi events.ts. */
+.Ldc_submissions_publish:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldc_submissions_failed
+ xor r13d,r13d
+.Ldc_submissions_collect:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_submissions_sort
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ CGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_submissions_collect_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_submission_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_submissions_collect_next
+ CGET r14,value
+ mov r14,rax
+ CGET rax,conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Ldc_submissions_collect_next
+ mov rdi,r14
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldc_submissions_failed
+ mov qword ptr [rsp+8],0
+.Ldc_submissions_collect_next:
+ inc r13
+ jmp .Ldc_submissions_collect
+.Ldc_submissions_sort:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldc_message_compare]
+ call json_object_array_sort@PLT
+ xor r13d,r13d
+.Ldc_submissions_each:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_submissions_end
+ mov rdi,[rsp]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rbx
+ mov esi,16
+ mov rdx,rax
+ call .Ldc_json_event
+ test eax,eax
+ jnz .Ldc_submissions_failed
+ inc r13
+ jmp .Ldc_submissions_each
+.Ldc_submissions_failed:
+ mov dword ptr [rbx+72],1
+.Ldc_submissions_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_submission_word: .asciz "submission"

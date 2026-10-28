@@ -34,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- Client消息边界接通首个流式文本前开始、提交Entry结束、普通消息成对和无模型Entry追加；同批按ID排序并过滤其他会话。
-- SQLite/JSONL真实DeepSeek retry/工具/后续回答通过开始→文本→结束配对检查；原生ASan/UBSan、Runtime整批回归和实际产品发布场景通过。
-- 产品构建、G00/Assembly通过；完整结构化message_update等剩余事件继续所属覆盖项。
+- Submission实际提交记录按ID顺序进入Client结构事件，过滤其他会话，顺序位于任务结束之后、用量变化之前。
+- 沿用现有Inputs与动态事件队列，未增加存储副本；TUI旧执行适配保持原显示路径。
+- 受影响Durable ASan/UBSan、产品Host排序/会话隔离专项通过；DeepSeek SQLite/JSONL真实retry/工具/follow-up的Submission ID/status/draft清理通过，产品构建与Assembly检查通过。
 
 ## 当前接口边界
 

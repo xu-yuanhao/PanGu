@@ -215,6 +215,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] conversation.view接通会话记录、原始有效Entry范围、已实现Live/Usage文档与排队Submission视图；Host/TUI公开只读入口同一readOnLine读取，分页、撤回、压缩head及重开通过。
 - [x] conversation.view多观察者接通初始历史、后续Entry/文档/队列变化、合并读取与Host关闭释放；任务图/会话视图共用一份原生Watch生命周期，真实摘要/回答观察通过。
 - [x] Client接通message_start/message_end/entry_appended原生事件：首文本前开始、流式assistant提交不重复开始、普通消息与无模型Entry边界、同批ID顺序和会话过滤；真实重试/工具/后续回答配对通过。
+- [x] Submission提交记录接入Client事件：按ID排序、会话过滤、排队/放置/撤回/结算字段直接取PanGu记录，位于任务结束之后、用量之前；产品排序夹具与真实follow-up流程验证。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -256,8 +257,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts partial首次message_start、已提交Entry的message_start/message_end/entry_appended及ID顺序。流式起点沿原生Generation先采纳Live再调用progress的既有顺序。
-- 实际调用链：首个text delta → 读取已采纳Live.message → PG_MESSAGE_STARTED → 原文本事件；Entry提交发布 → 按ID整理本会话Entry → 非流式首消息开始、PG_MESSAGE_FINISHED或PG_ENTRY_APPENDED → 压缩/用量/终态。已开始的assistant提交仅结束；run结束/暂停清理流式任务标记，旧TUI执行适配跳过结构事件，保留原文本/工具显示。
-- 验证：两后端原生ASan/UBSan与Runtime整批回归通过。DeepSeek SQLite/JSONL真实瞬态失败→retry→工具→后续回答中，文本前已有assistant开始、每个assistant开始/结束配对，结束Entry ID和会话核对通过。实际产品发布夹具验证同批乱序Entry按ID排序、普通消息成对、无模型Entry追加、跨会话过滤；既有压缩/失败/取消和16 KiB所有权场景通过。整批构建/检查见当前实现记录。
-- 接口与自审：pg_event追加三种消息边界枚举，结构保持；内部Client128字节新增流式任务标记，头/初始化/暂停/断言同步。纯Assembly，队列复用已有动态字节所有权，无新文件/依赖。记录源与实际消费者一并接线。
-- 剩余与下一交付物：完整message_update的结构变化/usage、partial思考/工具参数、turn/Submission/Agent等事件与report仍按K05/K09/K13覆盖；下一批沿同一发布路径接会话队列/回合事件，保持完整范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/events.ts submissions收集/ID排序及任务结束→Submission→usage_changed顺序，沿现有Durable Inputs提交记录移植。
+- 实际调用链：Inputs接收/排队/边界放置/撤回/结算 → Record publication → 过滤当前conversation的Submission并按ID排序 → PG_SUBMISSION_CHANGED → 既有动态Client队列；不增加队列存储或状态副本。TUI旧执行适配跳过结构事件，完整队列仍可从conversation.view和inputs查询。
+- 验证：受影响Durable ASan/UBSan与产品Host专项通过，发布夹具覆盖乱序记录排序、独立JSON所有权和外会话过滤，实际压缩/取消等现有事件场景保持。真实模型follow-up的Submission ID/status、非queued记录draft清理和结算事件验证结果见当前实现记录。
+- 接口与自审：pg_event尾部追加PG_SUBMISSION_CHANGED，结构和Client布局保持。Assembly复用现有排序比较、JSON事件序列化及动态队列；无新文件、模块、存储协议或依赖，产品构建和Assembly检查随本批验证。
+- 剩余与下一交付物：完整inbox_update/turn事件、结构化message_update、report与Agent/Provider文档仍按K05/K09/K13覆盖；下一批成组接回合边界与队列刷新，不以本批事件子集判定K13完成。

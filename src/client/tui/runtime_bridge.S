@@ -297,7 +297,7 @@ pg_tui_bridge_set_history:
     /* Committed usage is available through the optional observation binding. */
     cmp eax,6
     jb .Lpoll_execution_event
-    cmp eax,15
+    cmp eax,16
     jbe .Lpoll_zero
 .Lpoll_execution_event:
     cmp eax,5
