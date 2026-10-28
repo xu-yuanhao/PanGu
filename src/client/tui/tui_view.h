@@ -1,12 +1,11 @@
 /* tui_view.h — 展示渲染（输出 sink 可注入：交互终端或测试内存缓冲）。
  *
- * 设计：主屏滚动回显；PageUp 的源文本阅读使用临时 alt-screen，返回时恢复主屏。
- * 编辑行与事件输出互斥使用当前行：
- *  - 事件输出前先挂起编辑行（写 "\r\n" 结束该行）；
- *  - 编辑内容变化后清除其视觉行并完整重绘，最后把真实光标移到字节编辑位置；
- *    多行草稿与窄终端自动换行不改变提交字节。
- *  - text_delta 经 tui_md 流式渲染为 Markdown；工具事件经 tui_tool 状态机
- *    展示（头行/输出预览/完成状态/Ctrl-O 展开），原文内容经安全转义输出。
+ * 设计：默认交互启动使用会话滚动区和底部独立输入区；banner 启用。
+ * shell_active 为 0=未启用、1=idle、2=running，shell_body_end 为会话底行。
+ * 非交互/独立组件测试继续使用注入 sink；小于八行暂保留旧降级路径。
+ * PageUp 使用临时阅读屏，返回恢复会话滚动范围。长草稿在输入滚动范围内
+ * 绘制并定位光标。完整消息树/原位工具块与字素簇尚未完成。
+ * Markdown/tool/diff 复用同一输出和状态机，不另建演示专用视图。
  * 有界展示：工具 detail 按 code point 边界截断并带明确标记；输入上限由
  * tui_input 保证；系统级上限协调由主 Agent 负责。
  */
@@ -14,6 +13,7 @@
 #define PANGU_TUI_VIEW_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "tui_input.h"
 #include "tui_md.h"
@@ -45,11 +45,22 @@ typedef struct tui_view {
  size_t read_anchor; /* source byte offset << 5 | printable expansion offset */
  size_t read_start; /* raw byte boundary for output received while reading */
  unsigned page_rows, transcript_dropped;
+ const tui_tool_observer *tool_observer; /* borrowed for app lifetime */
+ unsigned shell_active, shell_body_end; /* stable default interactive regions */
  char transcript[65536]; /* owned raw source bytes; replay always escapes controls */
+ uint64_t logo_start_ms, logo_last_ms;
+ unsigned logo_aspect, logo_flags, logo_fg, logo_bg, logo_phase;
+ unsigned logo_width, logo_height, logo_top, logo_left, logo_dirty;
+ unsigned char logo_cells[1600], logo_previous[1600];
+
 } tui_view;
 
 void tui_view_init(tui_view *v, tui_out_sink sink, int ansi, tui_input *editor);
 void tui_view_set_size(tui_view *v, unsigned cols);
+/* Recompute screen regions after app updates terminal_rows. */
+void tui_view_relayout(tui_view *v);
+/* Advance welcome animation; returns next deadline in ms, -1 when idle. */
+int tui_view_logo_tick(tui_view *v, uint64_t now_ms);
 
 /* 编辑区：多行/窄终端按 code point 宽度重绘并定位真实光标；降级模式无操作。 */
 void tui_view_redraw_editor(tui_view *v);

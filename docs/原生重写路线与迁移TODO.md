@@ -8,6 +8,11 @@
 
 当前任务是完整移植Pi，必须对照Pi Durable、Pi Coding Agent及deepseek-harness/Cordis的对应实现开发。每组功能沿现有算法、调用链和用例移植，原生重组服务于内存、ABI、平台与插件组合需要。下面每一步都完成、覆盖表全部有实现与验证、TUI 最终工作流通过，才勾选 K15。每项实现从已有代码继续，复用已验证的部分。
 
+产品交互优先级按 2026-10-28 用户澄清执行：Pi 式简洁交互 TUI 为主，Grok Build 布局/输入/历史体验为参考，Codex/Claude Code 兜底。TUI U02 原完成判定撤回，下一交付先替换滚动调试壳为完整主界面，具体调研和验收见 [TUI TODO](TUI移植TODO.md)。核心保持真实服务接线，不用可运行 REPL 或 headless 替代 TUI 验收。
+
+K14 的命令行范围仅取固定 Pi `cli/args.ts` 与 main 分派：install/remove（uninstall）/update/list/config/auth/mcp，以及帮助/版本、模型和会话启动参数、资源/工具开关、export/list-models、print、text/json/rpc 等已有入口；逐项沿对应模块移植并适配 PanGu 身份。默认 `pangu` 进入交互式 TUI，不建设独立 CLI 产品或另一套会话；`config` 的交互选择也接同一 TUI。命令清单和实际支持状态须分别记录。
+
+
 ## 并行职责
 
 你维护 `src/runtime/`、`src/contracts/`、`src/composition/`、原生基础/宿主模块、`tests/runtime/`、`tools/runtime/`、`tools/migration/`、`tools/gates/`、`governance/`，以及 `src/client/tui/runtime_bridge*` 和 `tui_runtime_adapter.h`。你更新本文与当前实现记录。
@@ -217,6 +222,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [ ] 逐行核对覆盖表和对应入口中的public行为，检查实现、原生差异和实际验证；把发现的缺口补回所属K步骤并完成。
 - [ ] 运行受影响全部模块检查及产品构建，配合TUI的U08执行最终用户工作流。
+- [ ] 与 U02/U08 核对实际终端截图/录屏和可见帧回放：独立输入/会话/状态、流输出、原位工具展开/收起、阅读焦点和面板、resize，无提示符堆积；完整主界面通过后再验收以下真实服务流程。
 - [ ] 从真实TUI执行：配置模型→加载项目资源→连续对话→读改写运行→steer/follow-up→压缩→新会话/分叉→扩展/MCP/代码工具→任务中断恢复→查看历史/用量→正常退出。每个结果以实际状态、存储和副作用核对。
 - [ ] 本文K01–K15与TUI U01–U08均满足验收，在主文档记录当前参考提交、构建命令和完整移植结论。
 

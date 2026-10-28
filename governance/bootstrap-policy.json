@@ -633,6 +633,11 @@
     "src/runtime/compaction_hooks.S": "native-source",
     "src/runtime/compaction_hooks.h": "native-source",
     "src/runtime/usage.S": "native-source",
-    "src/runtime/usage.h": "native-source"
+    "src/runtime/usage.h": "native-source",
+    "src/client/tui/tui_logo.S": "client-source",
+    "src/client/tui/tui_logo.h": "client-source",
+    "tests/client/tui/test_tui_logo.c": "client-test",
+    "assets/branding/pangu-logo.svg": "client-asset",
+    "assets/branding/pangu-logo-geometry.json": "control"
   }
 }

@@ -1,5 +1,6 @@
 #include "fake_runtime.h"
 
+#include <json-c/json.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -20,10 +21,25 @@ static const tui_demo_step steps_no_tool[] = {
 static const tui_demo_step steps_tool[] = {
 	{ 0, TUI_EV_RUN_STARTED, NULL, NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
 	{ 2, TUI_EV_TEXT_DELTA, "我来读取示例文件。\n", NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
-	{ 1, TUI_EV_TOOL_STARTED, NULL, "call-1", "read_file", 0, NULL, TUI_RUN_SUCCESS },
+	{ 1, TUI_EV_TOOL_STARTED, NULL, "call-1", "read_file", 0, "{\"path\":\"example.txt\"}", TUI_RUN_SUCCESS },
 	{ 6, TUI_EV_TOOL_FINISHED, NULL, "call-1", "read_file", 1, "示例文件内容：盘古演示数据 20 字节", TUI_RUN_SUCCESS },
 	{ 2, TUI_EV_TEXT_DELTA, "读取完成，一次工具往返结束。", NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
 	{ 2, TUI_EV_RUN_FINISHED, NULL, NULL, NULL, 0, NULL, TUI_RUN_SUCCESS },
+};
+
+static const tui_demo_step steps_committed_edit[] = {
+ {0,TUI_EV_RUN_STARTED,NULL,NULL,NULL,0,NULL,TUI_RUN_SUCCESS},
+ {1,TUI_EV_TOOL_STARTED,NULL,"call-1","edit",0,"{\"path\":\"example.txt\"}",TUI_RUN_SUCCESS},
+ {2,TUI_EV_TOOL_FINISHED,NULL,"call-1","edit",1,"committed edit fixture",TUI_RUN_SUCCESS},
+ {2,TUI_EV_RUN_FINISHED,NULL,NULL,NULL,0,NULL,TUI_RUN_SUCCESS},
+};
+
+static const tui_demo_step steps_many_lines[] = {
+ {0,TUI_EV_RUN_STARTED,NULL,NULL,NULL,0,NULL,TUI_RUN_SUCCESS},
+ {1,TUI_EV_TOOL_STARTED,NULL,"many","bash",0,"{}",TUI_RUN_SUCCESS},
+ {2,TUI_EV_TOOL_OUTPUT,"0\n1\n2\n3\n4\n5\n6\n7\n8\n9\nEXPANDED_TAIL\n","many","bash",0,NULL,TUI_RUN_SUCCESS},
+ {1,TUI_EV_TOOL_FINISHED,NULL,"many","bash",1,NULL,TUI_RUN_SUCCESS},
+ {1,TUI_EV_RUN_FINISHED,NULL,NULL,NULL,0,NULL,TUI_RUN_SUCCESS},
 };
 
 static const tui_demo_step steps_error[] = {
@@ -54,6 +70,9 @@ static const tui_demo_step steps_poll_error[] = {
 static const tui_demo_scenario scenarios[] = {
 	{ "no_tool", 0, 0, 6, steps_no_tool },
 	{ "tool_roundtrip", 0, 0, 6, steps_tool },
+ { "committed_edit", 0, 0, 4, steps_committed_edit },
+ { "committed_history", 0, 0, 4, steps_committed_edit },
+ { "tool_many_lines", 0, 0, 5, steps_many_lines },
 	{ "model_error", 0, 0, 3, steps_error },
 	{ "user_cancel", 1, 0, 5, steps_cancel },
 	{ "busy_reject", 0, 0, 3, steps_busy },
@@ -197,8 +216,40 @@ static tui_runtime_ops fake_ops = {
     NULL,
 };
 
+static int fake_committed_history(void *ctx,size_t index,tui_history_entry *out)
+{
+ (void)ctx;
+ if(index) return 0;
+ *out=(tui_history_entry){.kind=3,.text="saved edit",.text_len=10,
+  .tool_name="edit",.tool_name_len=4,.call_id="call-1",.call_id_len=6,.tool_ok=1};
+ return 1;
+}
+
 const tui_runtime_ops *tui_fake_runtime_ops(tui_fake_runtime *fr)
 {
 	fake_ops.ctx = fr;
+ fake_ops.history=!strcmp(fr->sc->name,"committed_history")?fake_committed_history:NULL;
 	return &fake_ops;
+}
+
+/* Optional observer exists only for this explicit injected committed-result
+ * fixture. Other adapters/scenarios still exercise the absent extension path. */
+static int fake_observe_tool(void *ctx,const char *id,size_t len,struct json_object **out)
+{
+ tui_fake_runtime *fr=ctx;
+ *out=NULL;
+ if(len!=6 || memcmp(id,"call-1",6)) return 1;
+ if(fr->step<3 && strcmp(fr->sc->name,"committed_history")) return 1;
+ *out=json_tokener_parse("{\"entry\":{\"data\":{\"status\":\"completed\"},\"model\":[{\"isError\":false,\"content\":[{\"type\":\"text\",\"text\":\"committed result full text 中🙂\\n0\\n1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\nCANONICAL_TAIL\"}],\"details\":{\"firstChangedLine\":7,\"diff\":\"-7 123 old\\n+7 456 new\\n\"}}]}}");
+ return *out?0:-1;
+}
+static void fake_release_tool(struct json_object *value) {json_object_put(value);}
+const tui_tool_observer *pg_tui_runtime_tool_observer(const tui_runtime_ops *ops)
+{
+ static tui_tool_observer observer={NULL,fake_observe_tool,fake_release_tool};
+ if(ops!=&fake_ops || !ops->ctx) return NULL;
+ tui_fake_runtime *fr=ops->ctx;
+ if(strcmp(fr->sc->name,"committed_edit") && strcmp(fr->sc->name,"committed_history")) return NULL;
+ observer.context=fr;
+ return &observer;
 }

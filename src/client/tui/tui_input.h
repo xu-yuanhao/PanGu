@@ -34,7 +34,8 @@ typedef enum {
 	TUI_KEY_HELP,     /* F1: show implemented keyboard help without changing draft */
 	TUI_KEY_COMPLETIONS, /* more than one supported local command */
 	TUI_KEY_SEARCH,    /* reverse search preview changed */
- TUI_KEY_PAGE_UP, TUI_KEY_PAGE_DOWN
+ TUI_KEY_PAGE_UP, TUI_KEY_PAGE_DOWN,
+ TUI_KEY_WHEEL_UP, TUI_KEY_WHEEL_DOWN
 } tui_key_kind;
 
 typedef struct tui_input {

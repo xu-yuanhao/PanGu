@@ -290,6 +290,14 @@
     "src/runtime/usage.S": {
       "role": "assembly-core",
       "reason": "Pi Durable UsageDoc accumulation and atomic response accounting"
+    },
+    "src/client/tui/tui_diff.S": {
+      "role": "assembly-core",
+      "reason": "Native TUI rendering and branding used by the integrated view"
+    },
+    "src/client/tui/tui_logo.S": {
+      "role": "assembly-core",
+      "reason": "Native TUI rendering and branding used by the integrated view"
     }
   }
 }

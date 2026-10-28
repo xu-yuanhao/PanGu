@@ -275,6 +275,14 @@ tui_app_run:
  xor r8d, r8d
 .Lview_init:
  call tui_view_init@PLT
+ /* Optional independent tool observation; fake/other adapters may omit lookup. */
+ mov rax, qword ptr pg_tui_runtime_tool_observer@GOTPCREL[rip]
+ test rax, rax
+ jz .Lobserver_unavailable
+ mov rdi, [rbx + TUI_LI_APP_OPS]
+ call rax
+ mov [r14 + TUI_LI_VIEW_OBSERVER], rax
+.Lobserver_unavailable:
  /* 初始编辑区宽度取实际终端列（term_init 已探测） */
  mov rdi, r14
  movzx esi, word ptr [r12 + TUI_LI_TERM_COLS]
@@ -393,6 +401,8 @@ tui_app_run:
  call tui_view_page@PLT
 .Lread_resize_done:
  mov rdi, r14
+ call tui_view_relayout@PLT
+ mov rdi, r14
  call tui_view_redraw_editor@PLT
 .Ldo_poll:
  mov eax, dword ptr [rbx + TUI_LI_APP_IN_FD]
@@ -409,6 +419,21 @@ tui_app_run:
  je .Ltimeout_ok
  mov edx, dword ptr [rsp + OFF_TICK]
 .Ltimeout_ok:
+ mov [rsp+OFF_ESC_POLL], edx
+ call tui_li_milliseconds
+ mov rsi, rax
+ mov rdi, r14
+ call tui_view_logo_tick@PLT
+ mov edx, [rsp+OFF_ESC_POLL]
+ test eax, eax
+ js .Llogo_timeout_done
+ test edx, edx
+ js .Llogo_timeout_use
+ cmp eax, edx
+ jae .Llogo_timeout_done
+.Llogo_timeout_use:
+ mov edx, eax
+.Llogo_timeout_done:
  mov [rsp + OFF_ESC_POLL], edx
  cmp dword ptr [r13 + TUI_LI_INPUT_PASTE], 0
  jne .Lescape_timer_off
@@ -508,6 +533,10 @@ tui_app_run:
 .Lread_feed_byte:
  mov rdi, r13
  call tui_input_feed@PLT
+ cmp eax, TUI_LI_KEY_WHEEL_UP
+ je .Lkey_wheel_up
+ cmp eax, TUI_LI_KEY_WHEEL_DOWN
+ je .Lkey_wheel_down
  cmp eax, TUI_LI_KEY_PAGE_UP
  je .Lkey_page_up
  cmp eax, TUI_LI_KEY_PAGE_DOWN
@@ -555,6 +584,14 @@ tui_app_run:
  cmp eax, TUI_LI_KEY_PASTE
  je .Lkey_redraw
  jmp .Lkey_next
+.Lkey_wheel_up:
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lkey_next
+ jmp .Lkey_page_up
+.Lkey_wheel_down:
+ cmp dword ptr [r14 + TUI_LI_VIEW_READING], 0
+ je .Lkey_next
+ jmp .Lkey_page_down
 .Lkey_page_up:
  mov esi, -1
  jmp .Lkey_page
@@ -876,3 +913,5 @@ tui_exit_reason_name:
 .size tui_exit_reason_name, .-tui_exit_reason_name
 
 .section .note.GNU-stack,"",@progbits
+
+.weak pg_tui_runtime_tool_observer

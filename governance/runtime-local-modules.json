@@ -353,7 +353,10 @@
         "src/client/tui/tui_safe.h",
         "src/client/tui/tui_safe.S",
         "src/client/tui/tui_tool.h",
-        "src/client/tui/tui_tool.S"
+        "src/client/tui/tui_tool.S",
+        "src/client/tui/tui_diff.S",
+        "src/client/tui/tui_logo.S",
+        "src/client/tui/tui_logo.h"
       ],
       "dependencies": [
         "client.contract.v0",
@@ -454,7 +457,8 @@
         "main",
         "pg_tui_runtime_inputs",
         "pg_tui_runtime_resources",
-        "pg_tui_runtime_compaction"
+        "pg_tui_runtime_compaction",
+        "pg_tui_runtime_observation"
       ],
       "reference_basis": [
         {
@@ -2223,7 +2227,9 @@
         "pg_usage_record",
         "pg_usage_model",
         "pg_usage_read",
-        "pg_usage_service"
+        "pg_usage_service",
+        "pg_agent_snapshot",
+        "pg_observation_service"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/usage.ts"

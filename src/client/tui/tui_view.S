@@ -16,7 +16,7 @@
 .Lhistory_search: .asciz "[history search] 输入查询；Ctrl-R/Up: 较早；Ctrl-S/Down: 较新；Enter: 采用；Esc/Ctrl-C: 恢复草稿\n"
 .Lcompletions: .asciz "[commands] /hotkeys  /quit\n> /hotkeys\n  /quit\nUp/Down: 选择；Enter: 填入；Esc/Ctrl-C: 关闭\n"
 .Lcompletions_quit: .asciz "[commands] /hotkeys  /quit\n  /hotkeys\n> /quit\nUp/Down: 选择；Enter: 填入；Esc/Ctrl-C: 关闭\n"
-.Lhelp: .asciz "[help] PanGu 快捷键\nEnter: 提交；Alt+Enter: 换行；括号粘贴: 安全多行输入\nLeft/Right: 按码点移动；Home/End: 行首/行尾\nUp/Down: 视觉行移动；顶部/底部: 输入历史与草稿\nBackspace/Delete: 删除；Ctrl-U: 清空草稿\nCtrl-O: 展开所有保留工具的隐藏输出（运行中也可展开）；Ctrl-R: 搜索输入历史；Tab: 补全本地命令；PageUp/PageDown: 阅读历史/回到最新；F1 或 /hotkeys: 快捷键帮助\nCtrl-C: 运行时请求取消，闲置时退出；Ctrl-D: 空草稿退出，非空退格\n/quit: 通过 Runtime shutdown 退出并恢复终端\n[help] 可直接继续编辑当前草稿\n"
+.Lhelp: .asciz "[help] PanGu 快捷键\nEnter: 提交；Alt+Enter: 换行；括号粘贴: 安全多行输入\nLeft/Right: 按码点移动；Home/End: 行首/行尾\nUp/Down: 视觉行移动；顶部/底部: 输入历史与草稿\nBackspace/Delete: 删除；Ctrl-U: 清空草稿\nCtrl-O: 展开所有保留工具并保持新调用展开（运行中也可展开）；Ctrl-R: 搜索输入历史；Tab: 补全本地命令；PageUp/PageDown: 阅读历史/回到最新；F1 或 /hotkeys: 快捷键帮助\nCtrl-C: 运行时请求取消，闲置时退出；Ctrl-D: 空草稿退出，非空退格\n/quit: 通过 Runtime shutdown 退出并恢复终端\n[help] 可直接继续编辑当前草稿\n"
 .Linput_hint:       .asciz "[tui] 输入：Enter 提交，Alt+Enter 插入换行，Ctrl-U 清空草稿，F1 帮助；行首 Up 浏览输入历史，行尾 Down 返回草稿\n"
 .Lqmark:            .asciz "?"
 .Lhash_paren:       .asciz " (#"
@@ -121,6 +121,8 @@ li_event_suspend:
  * 事件输出、提交定稿、resize 换行均经此收束；文本留在滚动回显。 */
 .type li_editor_break,@function
 li_editor_break:
+ cmp dword ptr [rdi+TUI_LI_VIEW_SHELL], 0
+ jne li_shell_suspend
  cmp dword ptr [rdi + TUI_LI_VIEW_ANSI], 0
  je .Lbrk_ret
  cmp dword ptr [rdi + TUI_LI_VIEW_EDITOR_ON_LINE], 0
@@ -167,6 +169,8 @@ li_editor_break:
 /* ---- 内部：event_resume_editor(v)：编辑缓冲非空则重绘编辑行 ---- */
 .type li_event_resume,@function
 li_event_resume:
+ cmp dword ptr [rdi+TUI_LI_VIEW_SHELL], 0
+ jne tui_view_redraw_editor
  mov rax, qword ptr [rdi + TUI_LI_VIEW_EDITOR]
  test rax, rax
  jz .Lres_ret
@@ -274,6 +278,12 @@ tui_view_init:
  mov qword ptr [rdi + TUI_LI_VIEW_READ_START], 0
  mov dword ptr [rdi + TUI_LI_VIEW_PAGE_ROWS], 10
  mov dword ptr [rdi + TUI_LI_VIEW_DROPPED], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_LOGO_START], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_LOGO_LAST], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_LOGO_PHASE], 0
+ mov dword ptr [rdi + TUI_LI_VIEW_LOGO_DIRTY], 1
+ mov qword ptr [rdi + TUI_LI_VIEW_SHELL], 0
+ mov qword ptr [rdi + TUI_LI_VIEW_OBSERVER], 0
  mov dword ptr [rdi + TUI_LI_VIEW_ANSI], ecx
  mov qword ptr [rdi + TUI_LI_VIEW_EDITOR], r8
  test r8, r8
@@ -304,6 +314,15 @@ tui_view_init:
  lea rcx, [rip + tui_view_raw_put]
  mov r8d, r12d
  call tui_tool_init@PLT
+ lea rdi, [rbx+TUI_LI_VIEW_LOGO_ASPECT]
+ lea rsi, [rbx+TUI_LI_VIEW_LOGO_FLAGS]
+ lea rdx, [rbx+TUI_LI_VIEW_LOGO_FG]
+ lea rcx, [rbx+TUI_LI_VIEW_LOGO_BG]
+ call tui_logo_environment@PLT
+ test dword ptr [rbx+TUI_LI_VIEW_LOGO_FLAGS], 4
+ jz .Linit_logo_motion
+ mov dword ptr [rbx+TUI_LI_VIEW_LOGO_PHASE], 65536
+.Linit_logo_motion:
  pop rax
  pop r12
  pop rbx
@@ -370,6 +389,12 @@ tui_view_redraw_editor:
  sub rsp, 80
  mov rbx, rdi
  mov r12, rax /* editor（buf 偏移 0） */
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lred_legacy
+ mov rdi, rbx
+ call li_shell_editor
+ jmp .Lred_prompt
+.Lred_legacy:
  /* 擦除旧编辑区：先上移到编辑区首行，再清到屏幕尾 */
  cmp dword ptr [rbx + TUI_LI_VIEW_EDITOR_ON_LINE], 0
  je .Lred_clear
@@ -391,6 +416,7 @@ tui_view_redraw_editor:
  mov rdi, rbx
  lea rsi, [rip + .Lcleartail]
  call li_vputs
+.Lred_prompt:
  mov rdi, rbx
  lea rsi, [rip + .Lprompt]
  call li_vputs
@@ -400,6 +426,17 @@ tui_view_redraw_editor:
  mov r15d, 2 /* 当前列（提示符后） */
  xor r13d, r13d /* 字节偏移 i */
 .Lred_loop:
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lred_space_ok
+ cmp r13, [r12+TUI_LI_INPUT_CURSOR]
+ jbe .Lred_space_ok
+ mov eax, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]
+ sub eax, [rbx+TUI_LI_VIEW_BODY_END]
+ sub eax, 3
+ add eax, dword ptr [rsp]
+ cmp r14d, eax
+ jae .Lred_end
+.Lred_space_ok:
  mov rax, qword ptr [r12 + TUI_LI_INPUT_LEN]
  cmp r13, rax
  jae .Lred_end
@@ -498,6 +535,51 @@ tui_view_redraw_editor:
  mov [rsp], r14
  mov [rsp + 8], r15
 .Lred_have_cur:
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lred_relative_cursor
+ mov eax, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]
+ sub eax, [rbx+TUI_LI_VIEW_BODY_END]
+ sub eax, 3 /* input rows */
+ mov ecx, r14d
+ inc ecx
+ sub ecx, eax
+ jns .Lred_shell_scrolled
+ xor ecx, ecx
+.Lred_shell_scrolled:
+ mov eax, [rsp]
+ sub eax, ecx
+ jns .Lred_shell_cursor_valid
+ xor eax, eax
+.Lred_shell_cursor_valid:
+ mov [rsp], eax
+ add eax, [rbx+TUI_LI_VIEW_BODY_END]
+ add eax, 2
+ mov ecx, eax
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 48
+ lea rdx, [rip+.Lshell_cursor_fmt]
+ mov r8d, [rsp+8]
+ inc r8d
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ call li_vputs
+ /* Keep horizontal positioning explicit for terminals and existing consumers. */
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 48
+ lea rdx, [rip+.Lfmt_cha]
+ mov ecx, [rsp+8]
+ inc ecx
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ call li_vputs
+ jmp .Lred_store
+.Lred_relative_cursor:
  /* 真实光标从文本末尾移回编辑位置 */
  mov rax, [rsp]
  cmp r14, rax
@@ -571,6 +653,17 @@ tui_view_banner:
  sub rsp, 128 /* char line[128] */
  mov rbx, rdi
  mov r12, rsi
+ cmp dword ptr [rbx+TUI_LI_VIEW_ANSI], 0
+ je .Lbanner_legacy
+ cmp qword ptr [rbx+TUI_LI_VIEW_EDITOR], 0
+ je .Lbanner_legacy
+ cmp dword ptr [rbx+TUI_LI_VIEW_TERMINAL_ROWS], 8
+ jb .Lbanner_legacy
+ mov dword ptr [rbx+TUI_LI_VIEW_SHELL], 1
+ mov rdi, rbx
+ call li_shell_start
+ jmp .Lbanner_skip
+.Lbanner_legacy:
  mov rdi, rsp
  mov esi, 128
  lea rdx, [rip + .Lfmt_banner]
@@ -639,6 +732,13 @@ tui_view_exit_note:
  mov rsi, rsp
  call li_vput
 .Lexit_done:
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lexit_frame_done
+ mov rdi, rbx
+ lea rsi, [rip+.Lshell_reset]
+ call li_vputs
+ mov dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+.Lexit_frame_done:
  add rsp, 160
  pop r13
  pop r12
@@ -828,6 +928,10 @@ tui_view_event:
  jmp .Lev_out
 
 .Lev_started:
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lev_started_mode
+ mov dword ptr [rbx+TUI_LI_VIEW_SHELL], 2
+.Lev_started_mode:
  mov rdi, rbx
  call li_event_suspend
  lea rsi, [rip + .Lrun_started]
@@ -878,8 +982,22 @@ tui_view_event:
  mov rsi, qword ptr [r12 + TUI_LI_EVENT_TOOL_NAME]
  mov rdx, qword ptr [r12 + TUI_LI_EVENT_CALL_ID]
  call tui_tool_started@PLT
- test eax, eax
- jz .Lev_out
+ cmp qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN], 0
+ je .Lev_arguments_done
+ cmp qword ptr [r12 + TUI_LI_EVENT_DETAIL], 0
+ je .Lev_arguments_done
+ mov rdi, rbx
+ lea rsi, [rip + .Ltool_arguments]
+ call li_vputs
+ mov rdi, rbx
+ mov rsi, [r12 + TUI_LI_EVENT_DETAIL]
+ mov rdx, [r12 + TUI_LI_EVENT_DETAIL_LEN]
+ mov ecx, TUI_LI_VIEW_TOOL_SNIPPET
+ call li_put_bounded
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ call li_vputs
+.Lev_arguments_done:
  mov rdi, rbx
  call li_event_resume
  jmp .Lev_out
@@ -896,13 +1014,18 @@ tui_view_event:
  mov rcx, qword ptr [r12 + TUI_LI_EVENT_DETAIL]
  mov r8, qword ptr [r12 + TUI_LI_EVENT_DETAIL_LEN]
  call tui_tool_finished@PLT
- test eax, eax
- jz .Lev_out
+ mov rdi, rbx
+ mov rsi, [r12 + TUI_LI_EVENT_CALL_ID]
+ call li_observe_tool
  mov rdi, rbx
  call li_event_resume
  jmp .Lev_out
 
 .Lev_finished:
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Lev_finished_mode
+ mov dword ptr [rbx+TUI_LI_VIEW_SHELL], 1
+.Lev_finished_mode:
  mov rdi, rbx
  lea rdi, [rbx + TUI_LI_VIEW_MD]
  call tui_md_flush@PLT
@@ -993,6 +1116,7 @@ tui_view_history:
  call li_transcript_append
  cmp r13d,3
  ja .Lhistory_view_done
+ mov rdi, rbx
  call li_event_suspend
  lea rsi,[rip+.Lhistory_user]
  test r13d,r13d
@@ -1043,6 +1167,52 @@ tui_view_history:
  mov rdi,rbx
  lea rsi,[rip+.Lnl]
  call li_vputs
+ cmp r13d, 3
+ jne .Lhistory_view_done
+ /* History fields are explicit borrowed slices, not necessarily NUL-terminated.
+  * Build a bounded temporary identity before the independent observer lookup. */
+ mov rax, [r12 + TUI_LI_HISTORY_ID_LEN]
+ test rax, rax
+ jz .Lhistory_view_done
+ cmp rax, 63
+ ja .Lhistory_view_done
+ cmp qword ptr [r12 + TUI_LI_HISTORY_ID], 0
+ je .Lhistory_view_done
+ sub rsp, 160
+ mov [rsp + 64], rax
+ mov rdi, rsp
+ mov rsi, [r12 + TUI_LI_HISTORY_ID]
+ mov rdx, rax
+ call memcpy@PLT
+ mov rax, [rsp + 64]
+ mov byte ptr [rsp + rax], 0
+ mov rax, [r12+TUI_LI_HISTORY_NAME_LEN]
+ test rax, rax
+ jz .Lhistory_restore_default
+ cmp rax, 63
+ ja .Lhistory_restore_default
+ cmp qword ptr [r12+TUI_LI_HISTORY_NAME], 0
+ je .Lhistory_restore_default
+ mov [rsp+144], rax
+ lea rdi, [rsp+80]
+ mov rsi, [r12+TUI_LI_HISTORY_NAME]
+ mov rdx, rax
+ call memcpy@PLT
+ mov rax, [rsp+144]
+ mov byte ptr [rsp+rax+80], 0
+ lea rsi, [rsp+80]
+ jmp .Lhistory_restore
+.Lhistory_restore_default:
+ lea rsi, [rip+.Lhistory_tool_default]
+.Lhistory_restore:
+ lea rdi, [rbx+TUI_LI_VIEW_TOOL]
+ mov rdx, rsp
+ mov ecx, [r12+TUI_LI_HISTORY_OK]
+ call tui_tool_restore@PLT
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_observe_tool
+ add rsp, 160
 .Lhistory_view_done:
  pop r13
  pop r12
@@ -1177,10 +1347,13 @@ tui_view_history_search:
 .set .Ltranscript_user_len, . - .Ltranscript_user
 .Ltranscript_history: .ascii "\n[history] "
 .set .Ltranscript_history_len, . - .Ltranscript_history
+.Ltool_arguments: .asciz "[arguments] "
 .Ltranscript_tool: .ascii "\n[tool] "
 .set .Ltranscript_tool_len, . - .Ltranscript_tool
-.Lread_enter: .ascii "\033[?1049h"
-.Lread_leave: .ascii "\033[?1049l"
+.Lread_enter: .ascii "\033[?1049h\033[r\033[?1000h\033[?1006h"
+.set .Lread_enter_len, . - .Lread_enter
+.Lread_leave: .ascii "\033[?1006l\033[?1000l\033[?1049l"
+.set .Lread_leave_len, . - .Lread_leave
 .Lread_clear: .ascii "\033[H\033[2J"
 .Lread_header: .asciz "[history] PgUp/PgDn"
 .Lread_dropped: .asciz "[history] older buffered text was evicted"
@@ -1329,7 +1502,12 @@ li_transcript_event:
  mov rdx, rax
  mov rdi, rbx
  call li_transcript_append
- jmp .Lrecord_done
+ cmp dword ptr [r12 + TUI_LI_EVENT_KIND], TUI_LI_EV_TOOL_STARTED
+ jne .Lrecord_done
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_transcript_append
 .Lrecord_detail:
  mov rsi, [r12 + TUI_LI_EVENT_DETAIL]
  mov rdx, [r12 + TUI_LI_EVENT_DETAIL_LEN]
@@ -1356,6 +1534,30 @@ tui_view_user:
  mov rbx, rdi
  mov r12, rsi
  mov r13, rdx
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Luser_record
+ mov rdi, rbx
+ call li_shell_suspend
+ cmp qword ptr [rbx+TUI_LI_VIEW_TRANSCRIPT_LEN], 0
+ jne .Luser_brand_cleared
+ mov rdi, rbx
+ lea rsi, [rip+.Lbrand_clear]
+ call li_vputs
+.Luser_brand_cleared:
+ mov rdi, rbx
+ lea rsi, [rip+.Ltranscript_user]
+ mov edx, OFFSET .Ltranscript_user_len
+ call li_safe_vput
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r13
+ call li_safe_vput
+ mov rdi, rbx
+ lea rsi, [rip+.Lnl]
+ mov edx, 1
+ call li_safe_vput
+.Luser_record:
+ mov rdi, rbx
  lea rsi, [rip + .Ltranscript_user]
  mov edx, OFFSET .Ltranscript_user_len
  call li_transcript_append
@@ -1574,7 +1776,7 @@ tui_view_page:
  mov [rbx + TUI_LI_VIEW_READ_ANCHOR], rax
  mov dword ptr [rbx + TUI_LI_VIEW_READING], 1
  lea rsi, [rip + .Lread_enter]
- mov edx, 8
+ mov edx, OFFSET .Lread_enter_len
  call li_read_raw
 .Lpage_count_init:
  mov eax, [rbx + TUI_LI_VIEW_TERMINAL_ROWS]
@@ -1820,8 +2022,13 @@ tui_view_return_latest:
  call tui_tool_flush@PLT
  mov dword ptr [rbx + TUI_LI_VIEW_READING], 0
  lea rsi, [rip + .Lread_leave]
- mov edx, 8
+ mov edx, OFFSET .Lread_leave_len
  call li_read_raw
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 0
+ je .Llatest_body_ready
+ mov rdi, rbx
+ call li_shell_region_restore
+.Llatest_body_ready:
  mov rax, [rbx + TUI_LI_VIEW_TRANSCRIPT_LEN]
  cmp rax, [rbx + TUI_LI_VIEW_READ_START]
  jbe .Llatest_editor
@@ -1841,3 +2048,1126 @@ tui_view_return_latest:
 .Llatest_ret:
  ret
 .size tui_view_return_latest,.-tui_view_return_latest
+
+.section .rodata
+.Lobs_entry: .asciz "entry"
+.Lobs_model: .asciz "model"
+.Lobs_details: .asciz "details"
+.Lobs_diff_key: .asciz "diff"
+.Lobs_patch_key: .asciz "patch"
+.Lobs_first: .asciz "firstChangedLine"
+.Lobs_is_error: .asciz "isError"
+.Lobs_line_fmt: .asciz "[edit] first changed line: %lld\n"
+.Lobs_failed: .asciz "[tool] committed details unavailable\n"
+.section .text
+/* Read owned committed observation, render while JSON alive, then release on
+ * every path. Execution is never advanced by this read-only optional service. */
+.type li_observe_tool,@function
+li_observe_tool:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp, 96
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13, [rbx + TUI_LI_VIEW_OBSERVER]
+ test r13, r13
+ jz .Lobs_done
+ cmp qword ptr [r13 + 8], 0
+ je .Lobs_done
+ cmp qword ptr [r13 + 16], 0
+ je .Lobs_done
+ test r12, r12
+ jz .Lobs_done
+ mov rdi, r12
+ call strlen@PLT
+ mov rdx, rax
+ mov rsi, r12
+ mov rdi, [r13]
+ mov qword ptr [rsp], 0
+ mov rcx, rsp
+ call [r13 + 8]
+ test eax, eax
+ jnz .Lobs_status
+ mov r14, [rsp]
+ test r14, r14
+ jz .Lobs_error
+ mov rdi, r14
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, r14
+ lea rsi, [rip + .Lobs_entry]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lobs_release
+ mov r14, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, rbx
+ mov rsi, r14
+ call li_observe_tool_status
+ mov rdi, r14
+ lea rsi, [rip + .Lobs_model]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lobs_release
+ mov r14, rax
+ mov rdi, rax
+ mov esi, 5
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, r14
+ xor esi, esi
+ call json_object_array_get_idx@PLT
+ test rax, rax
+ jz .Lobs_release
+ mov r14, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, rbx
+ mov rsi, r14
+ call li_observe_images
+ /* Like Pi formatEditResult(isError), failed results do not describe an
+  * applied edit. Only the committed boolean controls this branch. */
+ mov rdi, r14
+ lea rsi, [rip + .Lobs_is_error]
+ call json_object_object_get@PLT
+ mov r15, rax
+ mov rdi, rax
+ mov esi, 1 /* json_type_boolean */
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_text_success
+ mov rdi, r15
+ call json_object_get_boolean@PLT
+ test eax, eax
+ jz .Lobs_text_success
+ mov dword ptr [rsp+8], 1
+ jmp .Lobs_text
+.Lobs_text_success:
+ mov dword ptr [rsp+8], 0
+.Lobs_text:
+ mov rdi, rbx
+ mov rsi, r14
+ mov edx, [rsp+8]
+ mov rcx, r12
+ call li_observe_result_text
+ cmp dword ptr [rsp+8], 0
+ jne .Lobs_release
+.Lobs_result_details:
+ mov rdi, r14
+ lea rsi, [rip + .Lobs_details]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lobs_release
+ mov r15, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, r15
+ lea rsi, [rip + .Lobs_first]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lobs_diff
+ mov r14, rax
+ mov rdi, rax
+ mov esi, 3
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_diff
+ mov rdi, r14
+ call json_object_get_int64@PLT
+ test rax, rax
+ jle .Lobs_diff
+ mov rcx, rax
+ lea rdi, [rsp + 16]
+ mov esi, 80
+ lea rdx, [rip + .Lobs_line_fmt]
+ xor eax, eax
+ call snprintf@PLT
+ cmp eax, 0
+ jle .Lobs_diff
+ cmp eax, 80
+ jge .Lobs_diff
+ mov edx, eax
+ lea rsi, [rsp + 16]
+ mov rdi, rbx
+ call li_vput
+ mov rdi, rbx
+ lea rsi, [rsp + 16]
+ call strlen@PLT
+ mov rdx, rax
+ mov rdi, rbx
+ lea rsi, [rsp + 16]
+ call li_transcript_append
+.Lobs_diff:
+ mov rdi, r15
+ lea rsi, [rip + .Lobs_diff_key]
+ call json_object_object_get@PLT
+ test rax, rax
+ jnz .Lobs_diff_value
+ mov rdi, r15
+ lea rsi, [rip + .Lobs_patch_key]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lobs_release
+.Lobs_diff_value:
+ mov r12, rax
+ mov rdi, rax
+ mov esi, 6 /* json_type_string */
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lobs_release
+ mov rdi, r12
+ call json_object_get_string_len@PLT
+ mov r15d, eax
+ mov rdi, r12
+ call json_object_get_string@PLT
+ mov r12, rax
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r15
+ call li_transcript_append
+ lea rdi, [rbx + TUI_LI_VIEW_SINK_CTX]
+ mov esi, [rbx + TUI_LI_VIEW_ANSI]
+ mov rdx, r12
+ mov rcx, r15
+ call tui_diff_render@PLT
+.Lobs_release:
+ mov rdi, [rsp]
+ call [r13 + 16]
+ jmp .Lobs_done
+.Lobs_status:
+ cmp eax, 1
+ je .Lobs_release_if_any
+.Lobs_error:
+ mov rdi, rbx
+ lea rsi, [rip + .Lobs_failed]
+ call li_vputs
+.Lobs_release_if_any:
+ cmp qword ptr [rsp], 0
+ jne .Lobs_release
+.Lobs_done:
+ add rsp, 96
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_observe_tool,.-li_observe_tool
+
+.section .rodata
+.Limage_content: .asciz "content"
+.Limage_type: .asciz "type"
+.Limage_value: .asciz "image"
+.Limage_mime: .asciz "mimeType"
+.Limage_data: .asciz "data"
+.Limage_prefix: .asciz "[image] "
+.Limage_unknown: .asciz "image/unknown"
+.Limage_size: .asciz " (%d base64 bytes; retained in committed tool result)\n"
+.section .text
+/* Pi tool result image blocks: metadata fallback only; base64 is never emitted.
+ * Traversal borrows from the observation and finishes before owner release. */
+.type li_observe_images,@function
+li_observe_images:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp, 128
+ mov rbx, rdi
+ mov rdi, rsi
+ lea rsi, [rip + .Limage_content]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Limgobs_done
+ mov r12, rax
+ mov rdi, rax
+ mov esi, 5
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Limgobs_done
+ mov rdi, r12
+ call json_object_array_length@PLT
+ mov r13, rax
+ xor r14d, r14d
+.Limgobs_loop:
+ cmp r14, r13
+ jae .Limgobs_done
+ mov rdi, r12
+ mov rsi, r14
+ inc r14
+ call json_object_array_get_idx@PLT
+ test rax, rax
+ jz .Limgobs_loop
+ mov r15, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Limgobs_loop
+ mov rdi, r15
+ lea rsi, [rip + .Limage_type]
+ call json_object_object_get@PLT
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Limgobs_loop
+ mov rdi, r15
+ lea rsi, [rip + .Limage_type]
+ call json_object_object_get@PLT
+ mov rdi, rax
+ call json_object_get_string@PLT
+ mov rdi, rax
+ lea rsi, [rip + .Limage_value]
+ call strcmp@PLT
+ test eax, eax
+ jnz .Limgobs_loop
+ mov rdi, rbx
+ lea rsi, [rip + .Limage_prefix]
+ call li_vputs
+ mov rdi, r15
+ lea rsi, [rip + .Limage_mime]
+ call json_object_object_get@PLT
+ mov [rsp], rax
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Limgobs_unknown
+ mov rdi, [rsp]
+ call json_object_get_string_len@PLT
+ mov [rsp + 8], eax
+ mov rdi, [rsp]
+ call json_object_get_string@PLT
+ mov rdi, rbx
+ mov rsi, rax
+ mov edx, [rsp + 8]
+ mov ecx, 80
+ call li_put_bounded
+ jmp .Limgobs_bytes
+.Limgobs_unknown:
+ mov rdi, rbx
+ lea rsi, [rip + .Limage_unknown]
+ call li_vputs
+.Limgobs_bytes:
+ mov rdi, r15
+ lea rsi, [rip + .Limage_data]
+ call json_object_object_get@PLT
+ mov [rsp], rax
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Limgobs_zero
+ mov rdi, [rsp]
+ call json_object_get_string_len@PLT
+ jmp .Limgobs_size
+.Limgobs_zero:
+ xor eax, eax
+.Limgobs_size:
+ mov ecx, eax
+ lea rdi, [rsp + 16]
+ mov esi, 112
+ lea rdx, [rip + .Limage_size]
+ xor eax, eax
+ call snprintf@PLT
+ test eax, eax
+ jle .Limgobs_loop
+ cmp eax, 112
+ jge .Limgobs_loop
+ mov edx, eax
+ lea rsi, [rsp + 16]
+ mov rdi, rbx
+ call li_vput
+ jmp .Limgobs_loop
+.Limgobs_done:
+ add rsp, 128
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_observe_images,.-li_observe_images
+
+.section .rodata
+.Lstatus_data: .asciz "data"
+.Lstatus_key: .asciz "status"
+.Lstatus_prefix: .asciz "[tool committed status] "
+.section .text
+/* The receipt status is authoritative, including aborted/interrupted. Preserve
+ * unknown future strings as safe metadata rather than guessing an outcome. */
+.type li_observe_tool_status,@function
+li_observe_tool_status:
+ push rbx
+ push r12
+ push r13
+ mov rbx, rdi
+ mov rdi, rsi
+ lea rsi, [rip + .Lstatus_data]
+ call json_object_object_get@PLT
+ test rax, rax
+ jz .Lstatus_done
+ mov r12, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lstatus_done
+ mov rdi, r12
+ lea rsi, [rip + .Lstatus_key]
+ call json_object_object_get@PLT
+ mov r12, rax
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lstatus_done
+ mov rdi, r12
+ call json_object_get_string_len@PLT
+ mov r13d, eax
+ test eax, eax
+ jz .Lstatus_done
+ mov rdi, rbx
+ lea rsi, [rip + .Lstatus_prefix]
+ call li_vputs
+ mov rdi, r12
+ call json_object_get_string@PLT
+ mov r12, rax
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r13
+ mov ecx, 80
+ call li_put_bounded
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ call li_vputs
+ lea rdi, [rip + .Lstatus_prefix]
+ call strlen@PLT
+ mov rdx, rax
+ mov rdi, rbx
+ lea rsi, [rip + .Lstatus_prefix]
+ call li_transcript_append
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, r13
+ call li_transcript_append
+ mov rdi, rbx
+ lea rsi, [rip + .Lnl]
+ mov edx, 1
+ call li_transcript_append
+.Lstatus_done:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_observe_tool_status,.-li_observe_tool_status
+
+.section .rodata
+.Lerror_text_key: .asciz "text"
+.Lerror_text_value: .asciz "text"
+.Lerror_text_prefix: .ascii "[tool committed error] "
+.set .Lerror_text_prefix_len, .-.Lerror_text_prefix
+.Lresult_text_prefix: .ascii "[tool committed output] "
+.set .Lresult_text_prefix_len, .-.Lresult_text_prefix
+.section .text
+/* Pi result content.filter(text).map(text).join(newline); edx marks error.
+ * Borrow complete
+ * strings while the observation is alive; safely display and copy source into
+ * the reader before release. Non-text blocks never become error text. */
+.type li_observe_result_text,@function
+li_observe_result_text:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp, 64
+ mov rbx, rdi
+ mov [rsp+48], edx
+ mov [rsp+32], rcx
+ mov qword ptr [rsp+40], 0
+ mov qword ptr [rsp+16], 0
+ mov rdi, rsi
+ lea rsi, [rip+.Limage_content]
+ call json_object_object_get@PLT
+ mov r12, rax
+ mov rdi, rax
+ mov esi, 5
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lerrtext_done
+ mov rdi, r12
+ call json_object_array_length@PLT
+ mov r13, rax
+ xor r14d, r14d
+.Lerrtext_loop:
+ cmp r14, r13
+ jae .Lerrtext_end
+ mov rdi, r12
+ mov rsi, r14
+ inc r14
+ call json_object_array_get_idx@PLT
+ mov r15, rax
+ mov rdi, rax
+ mov esi, 4
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lerrtext_loop
+ mov rdi, r15
+ lea rsi, [rip+.Limage_type]
+ call json_object_object_get@PLT
+ mov [rsp], rax
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lerrtext_loop
+ mov rdi, [rsp]
+ call json_object_get_string_len@PLT
+ cmp eax, 4
+ jne .Lerrtext_loop
+ mov rdi, [rsp]
+ call json_object_get_string@PLT
+ mov rdi, rax
+ lea rsi, [rip+.Lerror_text_value]
+ call strcmp@PLT
+ test eax, eax
+ jnz .Lerrtext_loop
+ mov rdi, r15
+ lea rsi, [rip+.Lerror_text_key]
+ call json_object_object_get@PLT
+ mov r15, rax
+ mov rdi, rax
+ mov esi, 6
+ call json_object_is_type@PLT
+ test eax, eax
+ jz .Lerrtext_loop
+ mov rdi, r15
+ call json_object_get_string_len@PLT
+ mov [rsp+8], rax
+ mov rdi, r15
+ call json_object_get_string@PLT
+ mov [rsp], rax
+ cmp qword ptr [rsp+16], 0
+ jne .Lerrtext_separator
+ cmp dword ptr [rsp+48], 0
+ je .Lresult_text_header
+ lea rsi, [rip+.Lerror_text_prefix]
+ mov edx, OFFSET .Lerror_text_prefix_len
+ jmp .Lerrtext_framing
+.Lresult_text_header:
+ lea rdi, [rbx+TUI_LI_VIEW_TOOL]
+ mov rsi, [rsp+32]
+ call tui_tool_result_begin@PLT
+ mov [rsp+40], eax
+ lea rsi, [rip+.Lresult_text_prefix]
+ mov edx, OFFSET .Lresult_text_prefix_len
+ jmp .Lerrtext_framing
+.Lerrtext_separator:
+ lea rsi, [rip+.Lnl]
+ mov edx, 1
+.Lerrtext_framing:
+ mov [rsp+24], rdx
+ mov r15, rsi
+ cmp qword ptr [rsp+16], 0
+ je .Lresult_frame_direct
+ cmp dword ptr [rsp+40], 0
+ je .Lresult_frame_direct
+ mov rcx, rdx
+ mov rdx, rsi
+ mov rsi, [rsp+32]
+ lea rdi, [rbx+TUI_LI_VIEW_TOOL]
+ call tui_tool_output@PLT
+ jmp .Lresult_frame_saved
+.Lresult_frame_direct:
+ mov rdi, rbx
+ call li_safe_vput
+.Lresult_frame_saved:
+ mov rdi, rbx
+ mov rsi, r15
+ mov rdx, [rsp+24]
+ call li_transcript_append
+ mov qword ptr [rsp+16], 1
+ cmp dword ptr [rsp+40], 0
+ je .Lresult_content_direct
+ lea rdi, [rbx+TUI_LI_VIEW_TOOL]
+ mov rsi, [rsp+32]
+ mov rdx, [rsp]
+ mov rcx, [rsp+8]
+ call tui_tool_output@PLT
+ jmp .Lresult_content_saved
+.Lresult_content_direct:
+ mov rdi, rbx
+ mov rsi, [rsp]
+ mov rdx, [rsp+8]
+ call li_safe_vput
+.Lresult_content_saved:
+ mov rdi, rbx
+ mov rsi, [rsp]
+ mov rdx, [rsp+8]
+ call li_transcript_append
+ jmp .Lerrtext_loop
+.Lerrtext_end:
+ cmp qword ptr [rsp+16], 0
+ je .Lerrtext_done
+ cmp dword ptr [rsp+40], 0
+ je .Lresult_end_direct
+ lea rdi, [rbx+TUI_LI_VIEW_TOOL]
+ mov rsi, [rsp+32]
+ call tui_tool_result_end@PLT
+ jmp .Lresult_end_saved
+.Lresult_end_direct:
+ mov rdi, rbx
+ lea rsi, [rip+.Lnl]
+ mov edx, 1
+ call li_safe_vput
+.Lresult_end_saved:
+ mov rdi, rbx
+ lea rsi, [rip+.Lnl]
+ mov edx, 1
+ call li_transcript_append
+.Lerrtext_done:
+ add rsp, 64
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_observe_result_text,.-li_observe_result_text
+
+.section .rodata
+.Lhistory_tool_default: .asciz "tool"
+
+.section .rodata
+.Lshell_start: .asciz "\033[r\033[2J\033[H\033[1mPanGu\033[0m  ·  Agent\r\n"
+.Lshell_region: .asciz "\033[2;%ur\033[2;1H\0337"
+.Lshell_restore: .asciz "\0338"
+.Lshell_editor_fmt: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter send · Alt+Enter newline · F1 help\033[0m\033[%u;1H────\r\n"
+.Lshell_reset: .asciz "\033[r\033[999;1H\r\n"
+.section .text
+/* One saved output cursor belongs exclusively to the conversation region.
+ * Editor redraws restore/save that cursor and use absolute bottom coordinates. */
+.type li_shell_start,@function
+li_shell_start:
+ push rbx
+ sub rsp, 64
+ mov rbx, rdi
+ mov eax, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]
+ sub eax, 6
+ cmp eax, 2
+ jae .Lshell_body_valid
+ mov eax, 2
+.Lshell_body_valid:
+ mov [rbx+TUI_LI_VIEW_BODY_END], eax
+ lea rdi, [rbx+TUI_LI_VIEW_LOGO_ASPECT]
+ lea rsi, [rbx+TUI_LI_VIEW_LOGO_FLAGS]
+ lea rdx, [rbx+TUI_LI_VIEW_LOGO_FG]
+ lea rcx, [rbx+TUI_LI_VIEW_LOGO_BG]
+ call tui_logo_environment@PLT
+ test dword ptr [rbx+TUI_LI_VIEW_LOGO_FLAGS], 4
+ jz .Lshell_logo_policy_ready
+ mov dword ptr [rbx+TUI_LI_VIEW_LOGO_PHASE], 65536
+.Lshell_logo_policy_ready:
+ mov rdi, rbx
+ lea rsi, [rip+.Lshell_start]
+ call li_vputs
+.Lshell_welcome_done:
+ mov rdi, rsp
+ mov esi, 64
+ lea rdx, [rip+.Lshell_region]
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vputs
+ mov dword ptr [rbx+TUI_LI_VIEW_LOGO_DIRTY], 1
+ /* Defer welcome until startup history/attach have established eligibility. */
+ add rsp, 64
+ pop rbx
+ ret
+.size li_shell_start,.-li_shell_start
+.type li_shell_suspend,@function
+li_shell_suspend:
+ cmp dword ptr [rdi+TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ je .Lshell_suspend_done
+ mov dword ptr [rdi+TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ jmp li_shell_region_restore
+.Lshell_suspend_done:
+ ret
+.size li_shell_suspend,.-li_shell_suspend
+.type li_shell_editor,@function
+li_shell_editor:
+ push rbx
+ sub rsp, 160
+ mov rbx, rdi
+ /* If an event has advanced output, save its current position first. */
+ cmp dword ptr [rbx+TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ jne .Lshell_editor_saved
+ lea rsi, [rip+.Lshell_save]
+ call li_vputs
+.Lshell_editor_saved:
+ mov rdi, rbx
+ lea rsi, [rip+.Lshell_ready_header]
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 2
+ jne .Lshell_header_write
+ lea rsi, [rip+.Lshell_running_header]
+.Lshell_header_write:
+ call li_vputs
+ mov rdi, rsp
+ mov esi, 160
+ lea rdx, [rip+.Lshell_editor_fmt]
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ inc ecx
+ mov r8d, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]
+ mov r9d, ecx
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vputs
+ mov rdi, rsp
+ mov esi, 160
+ lea rdx, [rip+.Lshell_input_region]
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ add ecx, 2
+ mov r8d, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]
+ dec r8d
+ mov r9d, ecx
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vputs
+ mov dword ptr [rbx+TUI_LI_VIEW_EDITOR_ROWS], 0
+ mov dword ptr [rbx+TUI_LI_VIEW_CURSOR_ROW], 0
+ add rsp, 160
+ pop rbx
+ ret
+.size li_shell_editor,.-li_shell_editor
+.section .rodata
+.Lshell_save: .asciz "\0337"
+
+.section .rodata
+.Lshell_region_resume: .asciz "\033[2;%ur\0338"
+.section .text
+.type li_shell_region_restore,@function
+li_shell_region_restore:
+ push rbx
+ sub rsp, 64
+ mov rbx, rdi
+ mov rdi, rsp
+ mov esi, 64
+ lea rdx, [rip+.Lshell_region_resume]
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ mov rsi, rsp
+ call li_vputs
+ mov dword ptr [rbx+TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ add rsp, 64
+ pop rbx
+ ret
+.size li_shell_region_restore,.-li_shell_region_restore
+.globl tui_view_relayout
+.type tui_view_relayout,@function
+tui_view_relayout:
+ cmp dword ptr [rdi+TUI_LI_VIEW_SHELL], 0
+ je .Lrelayout_ret
+ cmp dword ptr [rdi+TUI_LI_VIEW_READING], 0
+ jne .Lrelayout_ret
+ push rbx
+ mov rbx, rdi
+ call li_shell_start
+ mov dword ptr [rbx+TUI_LI_VIEW_EDITOR_ON_LINE], 0
+ mov rdi, rbx
+ lea rsi, [rbx+TUI_LI_VIEW_TRANSCRIPT]
+ mov rdx, [rbx+TUI_LI_VIEW_TRANSCRIPT_LEN]
+ call li_safe_vput
+ pop rbx
+.Lrelayout_ret:
+ ret
+.size tui_view_relayout,.-tui_view_relayout
+
+.section .rodata
+.Lshell_input_region: .asciz "\033[%u;%ur\033[%u;1H"
+.Lshell_cursor_fmt: .asciz "\033[%u;%uH"
+
+.section .rodata
+.Lshell_ready_header: .asciz "\033[1;1H\033[K\033[1mPanGu\033[0m  ·  ready"
+.Lshell_running_header: .asciz "\033[1;1H\033[K\033[1mPanGu\033[0m  ·  running"
+
+.section .rodata
+.Lbrand_clear: .asciz "\033[2;1H\033[J"
+
+.section .rodata
+.Llogo_rgb: .asciz "\033[38;2;%u;%u;%um"
+.Llogo_position: .asciz "\033[%u;%uH"
+.Llogo_fallback: .asciz "PanGu"
+.Llogo_hide: .asciz "\033[?25l"
+.Llogo_show: .asciz "\033[0m\0338\033[?25h"
+.Llogo_dim: .asciz "\033[2m"
+.section .text
+/* Bounded cell shadow: only changed mask/color is emitted; no screen clear.
+ * 1600-byte current/previous arrays are view-owned, no per-frame allocation. */
+.type li_logo_draw,@function
+li_logo_draw:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp, 40128
+ mov rbx, rdi
+ cmp qword ptr [rbx+TUI_LI_VIEW_TRANSCRIPT_LEN], 0
+ jne .Llogo_draw_done
+ cmp dword ptr [rbx+TUI_LI_VIEW_READING], 0
+ jne .Llogo_draw_done
+ mov eax, [rbx+TUI_LI_VIEW_COLS]
+ sub eax, 4
+ cmp eax, 8
+ jl .Llogo_draw_done
+ cmp eax, 40
+ jbe .Llogo_w
+ mov eax, 40
+.Llogo_w:
+ mov [rbx+TUI_LI_VIEW_LOGO_WIDTH], eax
+ mov eax, [rbx+TUI_LI_VIEW_BODY_END]
+ sub eax, 3
+ cmp eax, 3
+ jl .Llogo_draw_done
+ cmp eax, 20
+ jbe .Llogo_h
+ mov eax, 20
+.Llogo_h:
+ mov [rbx+TUI_LI_VIEW_LOGO_HEIGHT], eax
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ dec ecx
+ sub ecx, eax
+ shr ecx, 1
+ add ecx, 2
+ mov [rbx+TUI_LI_VIEW_LOGO_TOP], ecx
+ mov ecx, [rbx+TUI_LI_VIEW_COLS]
+ sub ecx, [rbx+TUI_LI_VIEW_LOGO_WIDTH]
+ shr ecx, 1
+ inc ecx
+ mov [rbx+TUI_LI_VIEW_LOGO_LEFT], ecx
+ cmp dword ptr [rbx+TUI_LI_VIEW_LOGO_DIRTY], 0
+ je .Llogo_shadow_ready
+ lea rdi, [rbx+TUI_LI_VIEW_LOGO_PREV]
+ mov esi, 255
+ mov edx, 1600
+ call memset@PLT
+ mov dword ptr [rbx+TUI_LI_VIEW_LOGO_DIRTY], 0
+.Llogo_shadow_ready:
+ mov rdi, rbx
+ call li_shell_suspend
+ /* Capture logo writes and issue one physical write per changed frame. */
+ mov rax, [rbx+TUI_LI_VIEW_TERMINAL]
+ mov [rsp+112], rax
+ mov rax, [rbx+TUI_LI_VIEW_TERMINAL+8]
+ mov [rsp+120], rax
+ lea rax, [rsp+128]
+ mov [rsp+96], rax
+ mov qword ptr [rsp+104], 0
+ lea rax, [rsp+96]
+ mov [rbx+TUI_LI_VIEW_TERMINAL], rax
+ lea rax, [rip+li_logo_buffer_write]
+ mov [rbx+TUI_LI_VIEW_TERMINAL+8], rax
+ mov rdi, rbx
+ lea rsi, [rip+.Llogo_hide]
+ call li_vputs
+ test dword ptr [rbx+TUI_LI_VIEW_LOGO_FLAGS], 1
+ jz .Llogo_wordmark
+ lea rdi, [rbx+TUI_LI_VIEW_LOGO_CELLS]
+ mov esi, [rbx+TUI_LI_VIEW_LOGO_WIDTH]
+ mov edx, [rbx+TUI_LI_VIEW_LOGO_HEIGHT]
+ mov ecx, [rbx+TUI_LI_VIEW_LOGO_ASPECT]
+ mov r8d, [rbx+TUI_LI_VIEW_LOGO_PHASE]
+ mov r9d, 1600
+ call tui_logo_raster@PLT
+ mov r15, rax
+ xor r12d, r12d
+.Llogo_cells:
+ cmp r12, r15
+ jae .Llogo_draw_restore
+ movzx r13d, byte ptr [rbx+r12*2+TUI_LI_VIEW_LOGO_CELLS]
+ movzx eax, byte ptr [rbx+r12*2+TUI_LI_VIEW_LOGO_CELLS+1]
+ /* Edge coverage scales opacity; 0.44 while closed -> 0.25 at rest. */
+ mov ecx, [rbx+TUI_LI_VIEW_LOGO_PHASE]
+ imul ecx, ecx, 48
+ shr ecx, 16
+ mov edx, 112
+ sub edx, ecx
+ imul eax, edx
+ shr eax, 8
+ and eax, 248 /* eight-level stable color quantization, no dithering */
+ mov [rsp+8], eax
+ shl eax, 8
+ or eax, r13d
+ cmp ax, word ptr [rbx+r12*2+TUI_LI_VIEW_LOGO_PREV]
+ je .Llogo_cell_next
+ mov word ptr [rbx+r12*2+TUI_LI_VIEW_LOGO_PREV], ax
+ mov rax, r12
+ xor edx, edx
+ mov ecx, [rbx+TUI_LI_VIEW_LOGO_WIDTH]
+ div rcx
+ add eax, [rbx+TUI_LI_VIEW_LOGO_TOP]
+ add edx, [rbx+TUI_LI_VIEW_LOGO_LEFT]
+ mov ecx, eax
+ mov r8d, edx
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 64
+ lea rdx, [rip+.Llogo_position]
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ call li_vputs
+ test r13d, r13d
+ jz .Llogo_cell_blank
+ test dword ptr [rbx+TUI_LI_VIEW_LOGO_FLAGS], 2
+ jz .Llogo_cell_dim
+ xor r14d, r14d
+.Llogo_channel:
+ mov ecx, r14d
+ shl ecx, 3
+ mov eax, [rbx+TUI_LI_VIEW_LOGO_FG]
+ shr eax, cl
+ and eax, 255
+ mov edx, [rbx+TUI_LI_VIEW_LOGO_BG]
+ shr edx, cl
+ and edx, 255
+ sub eax, edx
+ imul eax, [rsp+8]
+ sar eax, 8
+ add eax, edx
+ mov [rsp+16+r14*4], eax
+ inc r14d
+ cmp r14d, 3
+ jb .Llogo_channel
+ mov rdi, rsp
+ add rdi, 32
+ mov esi, 64
+ lea rdx, [rip+.Llogo_rgb]
+ mov ecx, [rsp+24]
+ mov r8d, [rsp+20]
+ mov r9d, [rsp+16]
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ call li_vputs
+ jmp .Llogo_cell_utf8
+.Llogo_cell_dim:
+ mov rdi, rbx
+ lea rsi, [rip+.Llogo_dim]
+ call li_vputs
+.Llogo_cell_utf8:
+ /* U+2800+mask, exactly one terminal column in supported terminals. */
+ mov byte ptr [rsp+32], 0xe2
+ mov eax, r13d
+ shr eax, 6
+ or eax, 0xa0
+ mov [rsp+33], al
+ mov eax, r13d
+ and eax, 63
+ or eax, 0x80
+ mov [rsp+34], al
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ mov edx, 3
+ call li_vput
+ jmp .Llogo_cell_next
+.Llogo_cell_blank:
+ mov rdi, rbx
+ lea rsi, [rip+.Ld_logo_space]
+ mov edx, 1
+ call li_vput
+.Llogo_cell_next:
+ inc r12
+ jmp .Llogo_cells
+.Llogo_wordmark:
+ mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
+ shr ecx, 1
+ inc ecx
+ mov r8d, [rbx+TUI_LI_VIEW_COLS]
+ sub r8d, 5
+ shr r8d, 1
+ inc r8d
+ lea rdi, [rsp+32]
+ mov esi, 64
+ lea rdx, [rip+.Llogo_position]
+ xor eax, eax
+ call snprintf@PLT
+ mov rdi, rbx
+ lea rsi, [rsp+32]
+ call li_vputs
+ mov rdi, rbx
+ lea rsi, [rip+.Llogo_fallback]
+ call li_vputs
+.Llogo_draw_restore:
+ mov rdi, rbx
+ lea rsi, [rip+.Llogo_show]
+ call li_vputs
+ mov rax, [rsp+112]
+ mov [rbx+TUI_LI_VIEW_TERMINAL], rax
+ mov rax, [rsp+120]
+ mov [rbx+TUI_LI_VIEW_TERMINAL+8], rax
+ mov rdi, [rsp+112]
+ lea rsi, [rsp+128]
+ mov rdx, [rsp+104]
+ call rax
+.Llogo_draw_done:
+ add rsp, 40128
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size li_logo_draw,.-li_logo_draw
+.section .rodata
+.Ld_logo_space: .ascii " "
+.section .text
+/* Deadline-based one-shot opening: 2 seconds, smoothstep interpolation.
+ * Input/history/hidden or unsupported marks settle once, then return -1.
+ * Caller uses returned timeout to bound poll; finished logos never wake it. */
+.globl tui_view_logo_tick
+.type tui_view_logo_tick,@function
+tui_view_logo_tick:
+ push rbx
+ push r12
+ push r13
+ mov rbx, rdi
+ mov r12, rsi
+ cmp dword ptr [rbx+TUI_LI_VIEW_SHELL], 1
+ jne .Llogo_tick_idle
+ cmp qword ptr [rbx+TUI_LI_VIEW_TRANSCRIPT_LEN], 0
+ jne .Llogo_tick_idle
+ cmp dword ptr [rbx+TUI_LI_VIEW_READING], 0
+ jne .Llogo_tick_idle
+ cmp dword ptr [rbx+TUI_LI_VIEW_COLS], 12
+ jb .Llogo_tick_idle
+ cmp dword ptr [rbx+TUI_LI_VIEW_BODY_END], 6
+ jb .Llogo_tick_idle
+ cmp dword ptr [rbx+TUI_LI_VIEW_LOGO_DIRTY], 0
+ je .Llogo_tick_policy
+ mov rdi, rbx
+ call li_logo_draw
+ mov rdi, rbx
+ call tui_view_redraw_editor
+.Llogo_tick_policy:
+ mov eax, [rbx+TUI_LI_VIEW_LOGO_FLAGS]
+ and eax, 5
+ cmp eax, 1
+ jne .Llogo_tick_idle
+ cmp dword ptr [rbx+TUI_LI_VIEW_LOGO_PHASE], 65536
+ jae .Llogo_tick_idle
+ mov rax, [rbx+TUI_LI_VIEW_EDITOR]
+ cmp qword ptr [rax+TUI_LI_INPUT_LEN], 0
+ jne .Llogo_tick_settle
+ cmp qword ptr [rbx+TUI_LI_VIEW_LOGO_START], 0
+ jne .Llogo_tick_started
+ mov [rbx+TUI_LI_VIEW_LOGO_START], r12
+ mov [rbx+TUI_LI_VIEW_LOGO_LAST], r12
+ mov eax, 50
+ jmp .Llogo_tick_out
+.Llogo_tick_started:
+ mov rax, r12
+ sub rax, [rbx+TUI_LI_VIEW_LOGO_LAST]
+ cmp rax, 50
+ jb .Llogo_tick_wait
+ mov rax, r12
+ sub rax, [rbx+TUI_LI_VIEW_LOGO_START]
+ cmp rax, 2000
+ jae .Llogo_tick_settle
+ shl rax, 16
+ xor edx, edx
+ mov ecx, 2000
+ div rcx
+ mov rcx, rax
+ imul rax, rax
+ shr rax, 16
+ mov edx, 196608
+ lea rcx, [rcx+rcx]
+ sub rdx, rcx
+ imul rax, rdx
+ shr rax, 16
+ mov [rbx+TUI_LI_VIEW_LOGO_PHASE], eax
+ jmp .Llogo_tick_draw
+.Llogo_tick_settle:
+ mov dword ptr [rbx+TUI_LI_VIEW_LOGO_PHASE], 65536
+.Llogo_tick_draw:
+ mov [rbx+TUI_LI_VIEW_LOGO_LAST], r12
+ mov rdi, rbx
+ call li_logo_draw
+ mov rdi, rbx
+ call tui_view_redraw_editor
+ cmp dword ptr [rbx+TUI_LI_VIEW_LOGO_PHASE], 65536
+ jae .Llogo_tick_idle
+ mov eax, 50
+ jmp .Llogo_tick_out
+.Llogo_tick_wait:
+ mov ecx, 50
+ sub ecx, eax
+ mov eax, ecx
+ jmp .Llogo_tick_out
+.Llogo_tick_idle:
+ mov eax, -1
+.Llogo_tick_out:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_view_logo_tick,.-tui_view_logo_tick
+
+.section .text
+/* Physical frame staging (40000-byte static bound, only trusted logo output).
+ * At most 800 cells * (cursor + RGB + 3 UTF8 bytes) plus framing. */
+.type li_logo_buffer_write,@function
+li_logo_buffer_write:
+ push rbx
+ push r12
+ sub rsp, 8
+ mov rbx, rdi
+ mov r12, rdx
+ mov rax, [rbx+8]
+ add rax, rdx
+ cmp rax, 40000
+ ja .Llogo_buffer_full
+ mov rdi, [rbx]
+ add rdi, [rbx+8]
+ call memcpy@PLT
+ add [rbx+8], r12
+ xor eax, eax
+ jmp .Llogo_buffer_done
+.Llogo_buffer_full:
+ mov eax, -1
+.Llogo_buffer_done:
+ add rsp, 8
+ pop r12
+ pop rbx
+ ret
+.size li_logo_buffer_write,.-li_logo_buffer_write

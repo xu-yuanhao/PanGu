@@ -377,6 +377,8 @@ tui_tool_started:
  mov rsi, r12
  mov rdx, r13
  call tt_reset
+ mov eax, [rbx+TUI_LI_TOOL_EXPAND_PREF]
+ mov [rbp+TUI_LI_REC_EXPANDED], eax
  lea rsi, [rip + .Ltool_pfx]
  mov edx, OFFSET .Ltool_pfx_l
  call tt_raw
@@ -728,6 +730,7 @@ tui_tool_expand:
  push r12
  push r13
  mov rbx, rdi
+ mov dword ptr [rbx+TUI_LI_TOOL_EXPAND_PREF], 1
  xor r12d, r12d
  xor r13d, r13d
 .Lexpand_all:
@@ -890,3 +893,119 @@ tui_tool_flush:
  pop rbx
  ret
 .size tui_tool_flush,.-tui_tool_flush
+
+/* Canonical result lifecycle: replace the retained preview contents, preserving
+ * identity, authoritative outcome and expansion. Chunks use tui_tool_output.
+ * Only the addressed record is flushed; no other pending tool is disturbed. */
+.globl tui_tool_result_begin
+.type tui_tool_result_begin,@function
+tui_tool_result_begin:
+ xor edx, edx
+ jmp tt_result_boundary
+.size tui_tool_result_begin,.-tui_tool_result_begin
+.globl tui_tool_result_end
+.type tui_tool_result_end,@function
+tui_tool_result_end:
+ mov edx, 1
+ jmp tt_result_boundary
+.size tui_tool_result_end,.-tui_tool_result_end
+.type tt_result_boundary,@function
+tt_result_boundary:
+ push rbx
+ push r12
+ push r13
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13d, edx
+ test rsi, rsi
+ jz .Lresult_missing
+ mov rdi, rsi
+ call strlen@PLT
+ mov rdi, rbx
+ mov rsi, r12
+ mov rdx, rax
+ call tt_find
+ cmp eax, TUI_LI_TOOL_SLOTS
+ je .Lresult_missing
+ call tt_slot
+ mov r12, rax
+ test r13d, r13d
+ jnz .Lresult_end
+ mov dword ptr [r12+TUI_LI_REC_OUTLINES], 0
+ mov dword ptr [r12+TUI_LI_REC_SHOWN], 0
+ mov dword ptr [r12+TUI_LI_REC_HINTED], 0
+ mov dword ptr [r12+TUI_LI_REC_TAIL_LEN], 0
+ mov dword ptr [r12+TUI_LI_REC_LOSSY], 0
+ mov dword ptr [r12+TUI_LI_REC_LINE_LEN], 0
+ jmp .Lresult_ok
+.Lresult_end:
+ call tt_line_flush
+ mov eax, [r12+TUI_LI_REC_OUTLINES]
+ cmp eax, [r12+TUI_LI_REC_SHOWN]
+ jbe .Lresult_ok
+ cmp dword ptr [r12+TUI_LI_REC_HINTED], 0
+ jne .Lresult_ok
+ mov dword ptr [r12+TUI_LI_REC_HINTED], 1
+ lea rsi, [rip+.Lpending_expand]
+ mov edx, OFFSET .Lpending_expand_l
+ call tt_raw
+.Lresult_ok:
+ mov eax, 1
+ jmp .Lresult_exit
+.Lresult_missing:
+ xor eax, eax
+.Lresult_exit:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tt_result_boundary,.-tt_result_boundary
+
+/* Restore a committed history component without rendering a start event or
+ * advancing execution. Identity strings are NUL-terminated borrowed inputs. */
+.globl tui_tool_restore
+.type tui_tool_restore,@function
+tui_tool_restore:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx, rdi
+ mov r12, rsi
+ mov r13, rdx
+ mov r15d, ecx
+ mov rdi, r13
+ call strlen@PLT
+ mov rdi, rbx
+ mov rsi, r13
+ mov rdx, rax
+ call tt_find
+ cmp eax, TUI_LI_TOOL_SLOTS
+ jne .Lrestore_slot
+ mov rdi, rbx
+ call tt_new
+.Lrestore_slot:
+ mov [rbx+TUI_LI_TOOL_ACTIVE], eax
+ mov [rbx+TUI_LI_TOOL_LAST_FIN], eax
+ call tt_slot
+ mov r14, rax
+ mov rdi, rax
+ mov rsi, r12
+ mov rdx, r13
+ call tt_reset
+ mov eax, [rbx+TUI_LI_TOOL_EXPAND_PREF]
+ mov [r14+TUI_LI_REC_EXPANDED], eax
+ mov eax, 2
+ test r15d, r15d
+ jz .Lrestore_state
+ mov eax, 1
+.Lrestore_state:
+ mov [r14+TUI_LI_REC_STATE], eax
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size tui_tool_restore,.-tui_tool_restore

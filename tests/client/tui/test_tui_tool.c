@@ -335,7 +335,7 @@ static void test_expand_running_tool(void)
  tui_tool_finished(&t,"live",1,NULL,0);
  T_CHECK(!tstr_contains(&out,"more lines"));
  tui_tool_started(&t,"bash","early");
- T_CHECK(tui_tool_expand(&t)==1);
+ T_CHECK(tui_tool_expand(&t)==0);
  tstr_clear(&out);
  tui_tool_output(&t,"early",text,strlen(text));
  T_CHECK(!strcmp(out.buf,text));
@@ -389,8 +389,61 @@ static void test_expand_all_retained_tools(void)
  T_RUN("expand_all_retained_tools");
 }
 
+static void test_expand_preference_inherited_by_new_calls(void)
+{
+ tstr out;tui_tool_emit emit;tui_tool t;
+ tstr_clear(&out);emit_setup(&emit,&out);
+ tui_tool_init(&t,emit.ctx,emit.put,emit.raw,0);
+ T_CHECK(t.expanded_preference==0);
+ T_CHECK(tui_tool_expand(&t)==0); /* preference before any call */
+ T_CHECK(t.expanded_preference==1);
+ const char *text="0\n1\n2\n3\n4\n5\n6\n7\n8\n9\nTAIL\n";
+ for(unsigned i=0;i<TUI_TOOL_SLOTS+2;i++) {
+  char id[32];snprintf(id,sizeof(id),"new-%u",i);
+  tui_tool_started(&t,"bash",id);
+  T_CHECK(t.slot[t.active].expanded==1);
+  tstr_clear(&out);tui_tool_output(&t,id,text,strlen(text));
+  T_CHECK(!strcmp(out.buf,text));
+  tui_tool_finished(&t,id,1,NULL,0);
+  T_CHECK(!tstr_contains(&out,"more lines"));
+ }
+ tui_tool_init(&t,emit.ctx,emit.put,emit.raw,0);
+ T_CHECK(t.expanded_preference==0);
+ tui_tool_started(&t,"bash","reset");tstr_clear(&out);
+ tui_tool_output(&t,"reset",text,strlen(text));
+ T_CHECK(!tstr_contains(&out,"TAIL"));
+ T_RUN("expand_preference_new_calls_slot_replacement_and_reinit");
+}
+
+static void test_canonical_result_preview_lifecycle(void)
+{
+ tstr out;tui_tool_emit emit;tui_tool t;
+ tstr_clear(&out);emit_setup(&emit,&out);tui_tool_init(&t,emit.ctx,emit.put,emit.raw,0);
+ T_CHECK(!tui_tool_result_begin(&t,"missing"));
+ tui_tool_started(&t,"read","canonical");tui_tool_output(&t,"canonical","old stream\n",11);
+ tui_tool_finished(&t,"canonical",1,NULL,0);
+ unsigned state=t.slot[t.active].state;
+ T_CHECK(tui_tool_result_begin(&t,"canonical"));
+ T_CHECK(t.slot[t.active].state==state && !t.slot[t.active].out_lines);
+ const char *text="0\n1\n2\n3\n4\n5\n6\n7\n8\n9\nTAIL";
+ tstr_clear(&out);tui_tool_output(&t,"canonical",text,strlen(text));
+ T_CHECK(tui_tool_result_end(&t,"canonical"));
+ T_CHECK(!tstr_contains(&out,"TAIL"));
+ T_CHECK(tstr_contains(&out,"Ctrl-O to expand"));
+ T_CHECK(!tstr_contains(&out,"old stream"));
+ tstr_clear(&out);T_CHECK(tui_tool_expand(&t));T_CHECK(tstr_contains(&out,"TAIL"));
+ T_CHECK(tui_tool_result_begin(&t,"canonical"));
+ tstr_clear(&out);tui_tool_output(&t,"canonical",text,strlen(text));
+ tui_tool_result_end(&t,"canonical");
+ T_CHECK(tstr_contains(&out,"TAIL"));T_CHECK(!tstr_contains(&out,"Ctrl-O to expand"));
+ tstr_clear(&out);tui_tool_result_end(&t,"canonical");T_CHECK(!out.len);
+ T_RUN("canonical_result_replaces_retained_preview_preserves_outcome_and_expansion");
+}
+
 int main(void)
 {
+ test_canonical_result_preview_lifecycle();
+ test_expand_preference_inherited_by_new_calls();
  test_expand_all_retained_tools();
  test_bridge_maximum_identity();
  test_expand_running_tool();

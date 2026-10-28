@@ -10,10 +10,10 @@ from pathlib import Path, PurePosixPath
 
 
 POLICY = "governance/bootstrap-policy.json"
-KINDS = {"instructions", "document", "control", "gate", "gate-test", "native-source", "native-test", "development-tool", "legacy-source", "client-source", "client-test", "client-build", "client-tool", "repository-config"}
+KINDS = {"client-asset", "instructions", "document", "control", "gate", "gate-test", "native-source", "native-test", "development-tool", "legacy-source", "client-source", "client-test", "client-build", "client-tool", "repository-config"}
 # The T09 oracle runner must stay JavaScript: it imports the frozen Pi sources.
 # Only "gate" may use .mjs; documents/controls/tests stay .md/.json/.py.
-SUFFIXES = {"instructions": ".md", "document": ".md", "control": ".json",
+SUFFIXES = {"client-asset": ".svg", "instructions": ".md", "document": ".md", "control": ".json",
             "gate": (".py", ".mjs"), "gate-test": ".py",
             "native-source": (".c", ".h", ".S"), "native-test": (".c", ".S"),
             "development-tool": ".py", "legacy-source": (".c", ".h", ".cpp", ".S"),
@@ -43,7 +43,7 @@ def inspect(root, policy):
                 or kind not in KINDS):
             errors.append(f"policy: invalid file registration {name!r}")
             continue
-        roots = {"native-source": ("src/runtime/", "src/contracts/", "src/composition/"),
+        roots = {"client-asset": ("assets/branding/",), "native-source": ("src/runtime/", "src/contracts/", "src/composition/"),
                  "native-test": ("tests/runtime/",),
                  "development-tool": ("tools/runtime/",),
                  "client-source": ("src/client/tui/",),

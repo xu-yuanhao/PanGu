@@ -2,6 +2,7 @@
 #include "test_util.h"
 
 #include "tui_view.h"
+#include <json-c/json.h>
 
 static void test_editor_redraw_ansi(void)
 {
@@ -499,8 +500,201 @@ static void test_reader_tiny_height_does_not_scroll_last_row(void)
  T_RUN("reader_one_to_three_rows_keeps_last_cell_visible");
 }
 
+static void test_started_real_arguments_preview_and_reader(void)
+{
+ tui_input in; tui_input_init(&in); tui_view view; tstr out; tstr_clear(&out);
+ tui_view_init(&view,tstr_sink(&out),1,&in);
+ char args[260]; memset(args,'a',sizeof(args));
+ memcpy(args,"{\"path\":\"",9); memcpy(args+250,"TAIL\"}",6);
+ tui_event ev={.kind=TUI_EV_TOOL_STARTED,.tool_name="read",.tool_call_id="args",
+ .detail=args,.detail_len=256};
+ tui_view_event(&view,&ev);
+ T_CHECK(tstr_contains(&out,"[arguments] {\"path\":\""));
+ T_CHECK(tstr_contains(&out,"截断"));
+ T_CHECK(!tstr_contains(&out,"TAIL"));
+ T_CHECK(find_bytes(view.transcript,view.transcript_len,"TAIL",4));
+ tstr_clear(&out);
+ ev.detail="{\"x\":\"\x1b]52;bad\a\"}"; ev.detail_len=strlen(ev.detail);
+ tui_view_event(&view,&ev);
+ T_CHECK(tstr_contains(&out,"\\x1b]52;bad\\x07"));
+ T_CHECK(!tstr_contains(&out,"\x1b]52;bad"));
+ T_RUN("real_tool_arguments_bounded_preview_full_reader_and_safety");
+}
+
+static unsigned observation_reads, observation_releases;
+static int read_tool_observation(void *ctx,const char *id,size_t len,struct json_object **out)
+{
+ (void)ctx; T_CHECK(len==4 && !memcmp(id,"edit",4)); observation_reads++;
+ *out=json_tokener_parse("{\"entry\":{\"model\":[{\"details\":{\"firstChangedLine\":7,\"diff\":\"-7 old\\n+7 new\\n\"}}]}}");
+ return 0;
+}
+static void release_tool_observation(struct json_object *value)
+{ observation_releases++; json_object_put(value); }
+static void test_committed_tool_observer_diff(void)
+{
+ tui_input in; tui_input_init(&in); tstr out; tstr_clear(&out); tui_view view;
+ tui_view_init(&view,tstr_sink(&out),1,&in);
+ tui_tool_observer observer={NULL,read_tool_observation,release_tool_observation};
+ view.tool_observer=&observer;
+ tui_event ev={.kind=TUI_EV_TOOL_STARTED,.tool_name="edit",.tool_call_id="edit"};
+ tui_view_event(&view,&ev); tstr_clear(&out);
+ ev.kind=TUI_EV_TOOL_FINISHED; ev.tool_ok=1;
+ tui_view_event(&view,&ev);
+ T_CHECK(observation_reads==1 && observation_releases==1);
+ T_CHECK(tstr_contains(&out,"[edit] first changed line: 7"));
+ T_CHECK(tstr_contains(&out,"-7 ") && tstr_contains(&out,"+7 "));
+ T_CHECK(find_bytes(view.transcript,view.transcript_len,"-7 old\n+7 new\n",14));
+ /* Reopened history uses a length-delimited ID without a trailing NUL. */
+ tstr_clear(&out);
+ const char id[4]={'e','d','i','t'};
+ tui_history_entry history={.kind=3,.text="saved result",.text_len=12,
+ .tool_name="edit",.tool_name_len=4,.call_id=id,.call_id_len=4,.tool_ok=1};
+ tui_view_history(&view,&history);
+ T_CHECK(observation_reads==2 && observation_releases==2);
+ T_CHECK(tstr_contains(&out,"[history] result edit (#edit) ok: saved result"));
+ T_CHECK(tstr_contains(&out,"[edit] first changed line: 7"));
+ T_CHECK(!tstr_contains(&out,"[run] started"));
+ T_RUN("committed_tool_observer_diff_and_owned_release");
+}
+
+typedef struct {const char *json; int status; unsigned reads,releases;} observer_case;
+static observer_case *release_case;
+static int read_observer_case(void *ctx,const char *id,size_t len,struct json_object **out)
+{
+ observer_case *c=ctx; (void)id;(void)len; c->reads++;
+ *out=c->json?json_tokener_parse(c->json):NULL;
+ return c->status;
+}
+static void release_observer_case(struct json_object *value)
+{release_case->releases++;json_object_put(value);}
+static void test_observer_failure_ownership_and_types(void)
+{
+ observer_case cases[]={
+ {NULL,1,0,0},{NULL,2,0,0},{NULL,0,0,0},
+ {"{}",2,0,0},{"{}",1,0,0},{"[]",0,0,0},
+ {"{\"entry\":[]}",0,0,0},
+ {"{\"entry\":{\"model\":{}}}",0,0,0},
+ {"{\"entry\":{\"model\":[3]}}",0,0,0},
+ {"{\"entry\":{\"model\":[{\"details\":[]}]}}",0,0,0},
+ {"{\"entry\":{\"model\":[{\"details\":{\"firstChangedLine\":\"7\",\"diff\":42}}]}}",0,0,0}};
+ for(size_t i=0;i<sizeof(cases)/sizeof(cases[0]);i++) {
+  tui_view view; tstr out; tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);
+  release_case=&cases[i];
+  tui_tool_observer observer={&cases[i],read_observer_case,release_observer_case};
+  view.tool_observer=&observer;
+  tui_event ev={.kind=TUI_EV_TOOL_FINISHED,.tool_name="edit",.tool_call_id="edit",.tool_ok=1};
+  tui_view_event(&view,&ev);
+  T_CHECK(cases[i].reads==1 && cases[i].releases==(cases[i].json?1u:0u));
+  T_CHECK(!tstr_contains(&out,"first changed line"));
+  if(cases[i].status==2 || (!cases[i].json && !cases[i].status))
+   T_CHECK(tstr_contains(&out,"committed details unavailable"));
+ }
+ /* Committed tool isError must suppress edit-success details, independent
+  * of the legacy event summary; false and non-boolean values are not errors. */
+ const char *flags[]={"true","false","\"true\"","1"};
+ for(size_t i=0;i<4;i++) {
+  char json[400];snprintf(json,sizeof(json),"{\"entry\":{\"model\":[{\"isError\":%s,\"details\":{\"firstChangedLine\":7,\"diff\":\"-7 before\\n+7 after\\n\"}}]}}",flags[i]);
+  observer_case failed={json,0,0,0};release_case=&failed;
+  tui_tool_observer source={&failed,read_observer_case,release_observer_case};
+  tui_view v;tstr o;tstr_clear(&o);tui_view_init(&v,tstr_sink(&o),0,NULL);
+  v.tool_observer=&source;
+  tui_event e={.kind=TUI_EV_TOOL_FINISHED,.tool_call_id="error-edit",.tool_ok=0,
+   .detail="edit failed",.detail_len=11};
+  tui_view_event(&v,&e);
+  T_CHECK(failed.reads==1 && failed.releases==1);
+  T_CHECK(tstr_contains(&o,"edit failed"));
+  T_CHECK(tstr_contains(&o,"first changed line")== (i!=0));
+  T_CHECK(tstr_contains(&o,"+7 after")== (i!=0));
+  T_CHECK((find_bytes(v.transcript,v.transcript_len,"+7 after",8)!=NULL)== (i!=0));
+ }
+ {
+  char payload[1800],json[2300];memset(payload,'x',1500);strcpy(payload+1500,"TAIL中🙂");
+  snprintf(json,sizeof(json),"{\"entry\":{\"model\":[{\"isError\":true,\"content\":[{\"type\":\"image\",\"data\":\"HIDDENBASE64\"},{\"type\":\"text\",\"text\":\"%s\"},{\"type\":\"text\",\"text\":\"next\\u0000after\\u001b[2J\"},{\"type\":\"text\",\"text\":42}]}]}}",payload);
+  observer_case receipt={json,0,0,0};release_case=&receipt;
+  tui_tool_observer source={&receipt,read_observer_case,release_observer_case};
+  tui_view v;tstr o;tstr_clear(&o);tui_view_init(&v,tstr_sink(&o),0,NULL);v.tool_observer=&source;
+  tui_event e={.kind=TUI_EV_TOOL_FINISHED,.tool_call_id="long-error",.tool_ok=0};
+  tui_view_event(&v,&e);
+  T_CHECK(receipt.reads==1 && receipt.releases==1);
+  T_CHECK(tstr_contains(&o,"[tool committed error] "));
+  T_CHECK(tstr_contains(&o,"TAIL中🙂\nnext\\x00after\\x1b[2J"));
+  T_CHECK(!tstr_contains(&o,"HIDDENBASE64"));
+  T_CHECK(!memchr(o.buf,27,o.len));
+  T_CHECK(find_bytes(v.transcript,v.transcript_len,payload,strlen(payload)));
+  const char raw[]="next\0after\x1b[2J";
+  T_CHECK(find_bytes(v.transcript,v.transcript_len,raw,sizeof(raw)-1));
+  char *flag=strstr(json,"true");T_CHECK(flag!=NULL);
+  memmove(flag+5,flag+4,strlen(flag+4)+1);memcpy(flag,"false",5);
+  receipt.reads=receipt.releases=0;
+  tstr_clear(&o);tui_view_init(&v,tstr_sink(&o),0,NULL);v.tool_observer=&source;
+  e.tool_ok=1;tui_view_event(&v,&e);
+  T_CHECK(receipt.reads==1 && receipt.releases==1);
+  T_CHECK(tstr_contains(&o,"[tool committed output] "));
+  T_CHECK(!tstr_contains(&o,"[tool committed error]"));
+  T_CHECK(tstr_contains(&o,"TAIL中🙂\nnext\\x00after\\x1b[2J"));
+  T_CHECK(find_bytes(v.transcript,v.transcript_len,payload,strlen(payload)));
+  T_CHECK(find_bytes(v.transcript,v.transcript_len,raw,sizeof(raw)-1));
+ }
+ {
+  observer_case saved={"{\"entry\":{\"model\":[{\"isError\":false,\"content\":[{\"type\":\"text\",\"text\":\"0\\n1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\nSAVED_TAIL\"}]}]}}",0,0,0};
+  release_case=&saved;tui_tool_observer source={&saved,read_observer_case,release_observer_case};
+  tui_view v;tstr o;tstr_clear(&o);tui_view_init(&v,tstr_sink(&o),0,NULL);v.tool_observer=&source;
+  const char id[4]={'h','i','s','t'},name[4]={'r','e','a','d'};
+  tui_history_entry h={.kind=3,.text="summary",.text_len=7,.call_id=id,.call_id_len=4,
+   .tool_name=name,.tool_name_len=4,.tool_ok=1};
+  tui_view_history(&v,&h);
+  T_CHECK(saved.reads==1 && saved.releases==1);
+  T_CHECK(!tstr_contains(&o,"SAVED_TAIL"));
+  T_CHECK(tstr_contains(&o,"Ctrl-O to expand"));
+  T_CHECK(!tstr_contains(&o,"[run] started"));
+  T_CHECK(!tstr_contains(&o,"[tool] read (#hist)"));
+  T_CHECK(find_bytes(v.transcript,v.transcript_len,"SAVED_TAIL",10));
+  T_CHECK(v.tool.slot[v.tool.active].state==1);
+  tstr_clear(&o);tui_view_tool_expand(&v);T_CHECK(tstr_contains(&o,"SAVED_TAIL"));
+  T_CHECK(!tstr_contains(&o,"[run] started"));
+  tstr_clear(&o);h.tool_ok=0;tui_view_history(&v,&h);
+  T_CHECK(v.tool.slot[v.tool.active].state==2);
+  T_CHECK(tstr_contains(&o,"SAVED_TAIL")); /* restored expanded preference */
+ }
+ const char *statuses[]={"completed","error","aborted","interrupted","future\\u001b[2J"};
+ for(size_t i=0;i<sizeof(statuses)/sizeof(statuses[0]);i++) {
+  char json[256];snprintf(json,sizeof(json),"{\"entry\":{\"data\":{\"status\":\"%s\"}}}",statuses[i]);
+  observer_case receipt={json,0,0,0};release_case=&receipt;
+  tui_tool_observer source={&receipt,read_observer_case,release_observer_case};
+  tui_view status_view;tstr status_out;tstr_clear(&status_out);tui_view_init(&status_view,tstr_sink(&status_out),0,NULL);
+  status_view.tool_observer=&source;
+  tui_event status_event={.kind=TUI_EV_TOOL_FINISHED,.tool_call_id="receipt",.tool_ok=0};
+  tui_view_event(&status_view,&status_event);
+  T_CHECK(receipt.releases==1 && tstr_contains(&status_out,"[tool committed status] "));
+  T_CHECK(!memchr(status_out.buf,27,status_out.len));
+  T_CHECK(find_bytes(status_view.transcript,status_view.transcript_len,"[tool committed status]",strlen("[tool committed status]")));
+ }
+ observer_case image={"{\"entry\":{\"model\":[{\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"SECRETBASE64\"}]}]}}",0,0,0};
+ release_case=&image;
+ tui_tool_observer images={&image,read_observer_case,release_observer_case};
+ tui_view image_view;tstr image_out;tstr_clear(&image_out);tui_view_init(&image_view,tstr_sink(&image_out),0,NULL);
+ image_view.tool_observer=&images;
+ tui_event image_event={.kind=TUI_EV_TOOL_FINISHED,.tool_call_id="image",.tool_ok=1};
+ tui_view_event(&image_view,&image_event);
+ T_CHECK(image.releases==1 && tstr_contains(&image_out,"[image] image/png (12 base64 bytes"));
+ T_CHECK(!tstr_contains(&image_out,"SECRETBASE64"));
+ observer_case patch={"{\"entry\":{\"model\":[{\"details\":{\"patch\":\"@@ -7 +7 @@\\n-7 before\\n+7 after\\n\"}}]}}",0,0,0};
+ release_case=&patch;
+ tui_tool_observer observer={&patch,read_observer_case,release_observer_case};
+ tui_view view;tstr out;tstr_clear(&out);tui_view_init(&view,tstr_sink(&out),0,NULL);
+ view.tool_observer=&observer;
+ tui_event ev={.kind=TUI_EV_TOOL_FINISHED,.tool_call_id="patch",.tool_ok=1};
+ tui_view_event(&view,&ev);
+ T_CHECK(patch.reads==1 && patch.releases==1);
+ T_CHECK(tstr_contains(&out,"@@ -7 +7 @@") && tstr_contains(&out,"+7 after"));
+ T_RUN("observer_failure_owned_release_and_json_type_validation");
+}
+
 int main(void)
 {
+ test_observer_failure_ownership_and_types();
+ test_committed_tool_observer_diff();
+ test_started_real_arguments_preview_and_reader();
  test_reader_tiny_height_does_not_scroll_last_row();
  test_one_column_reader_continues_escaped_wide_character();
  test_read_visual_rows_do_not_skip_long_lines();

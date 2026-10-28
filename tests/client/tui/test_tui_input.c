@@ -759,8 +759,25 @@ static void test_invalid_utf8_recovery(void)
  T_RUN("utf8_scalar_rejection_and_partial_recovery");
 }
 
+static void test_sgr_wheel_preserves_draft(void)
+{
+ tui_input in; tui_input_init(&in); feed_str(&in,"中draft");
+ size_t cursor=in.cursor;
+ T_CHECK(feed_last(&in,"\x1b[<64;1;2M")==TUI_KEY_WHEEL_UP);
+ T_CHECK(feed_last(&in,"\x1b[<65;65535;2M")==TUI_KEY_WHEEL_DOWN);
+ T_CHECK(feed_last(&in,"\x1b[<80;2;2M")==TUI_KEY_WHEEL_UP);
+ T_CHECK(feed_last(&in,"\x1b[<0;2;2M")==TUI_KEY_IGNORED);
+ T_CHECK(feed_last(&in,"\x1b[<65;2;2m")==TUI_KEY_IGNORED);
+ T_CHECK(feed_last(&in,"\x1b[<64;0;2M")==TUI_KEY_IGNORED);
+ T_CHECK(in.cursor==cursor && in.len==strlen("中draft"));
+ T_CHECK(in.esc_state==0);
+ feed_str(&in,"x"); T_CHECK(in.len==strlen("中draftx"));
+ T_RUN("sgr_wheel_reports_preserve_draft");
+}
+
 int main(void)
 {
+ test_sgr_wheel_preserves_draft();
  test_invalid_utf8_recovery();
  test_scoped_escape_timeout();
  test_unicode_lowercase_search();

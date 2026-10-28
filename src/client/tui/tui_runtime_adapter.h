@@ -23,6 +23,8 @@
 #include <stddef.h>
 #include "../../contracts/client.h"
 
+#include "../../runtime/usage.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -124,6 +126,10 @@ const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *);
 const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *);
 /* Optional manual compaction; poll owns a persistent Task snapshot. */
 const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *);
+
+/* Optional committed Live/usage snapshot; ownership follows pg_observation_ops.
+   The binding expires when the bridge detaches. */
+const pg_observation_ops *pg_tui_runtime_observation(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

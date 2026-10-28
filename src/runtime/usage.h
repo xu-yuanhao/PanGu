@@ -11,4 +11,9 @@ int pg_usage_read(pg_durable_session *,uint64_t conversation,struct json_object 
 typedef struct {void *context;int (*read)(void *,uint64_t,struct json_object **);} pg_usage_ops;
 /* Binding borrows Session until the Host scope finishes. */
 void pg_usage_service(pg_durable_session *,pg_usage_ops *);
+/* Detached committed {live,usage} from one synchronous foreground read.
+   This does not pump Scheduler or advance tasks. */
+int pg_agent_snapshot(pg_durable_session *,uint64_t,struct json_object **);
+typedef struct {void *context;int (*snapshot)(void *,uint64_t,struct json_object **);void (*release)(struct json_object *);} pg_observation_ops;
+void pg_observation_service(pg_durable_session *,pg_observation_ops *);
 #endif

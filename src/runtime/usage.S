@@ -367,6 +367,88 @@ pg_usage_service:
  lea rax,[rip+pg_usage_read]
  mov [rsi+8],rax
  ret
+.globl pg_agent_snapshot
+.type pg_agent_snapshot,@function
+pg_agent_snapshot:
+ UF 80
+ mov rbx,rdi
+ mov r13,rsi
+ mov r12,rdx
+ mov qword ptr [r12],0
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ lea rax,[rip+.Lu_live_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],10
+ mov [rsp+32],r13
+ mov dword ptr [rsp+40],1
+ mov rdi,rbx
+ lea rsi,[rip+.Lu_live_definition]
+ mov rdx,rsp
+ lea rcx,[rsp+48]
+ call pg_durable_snapshot@PLT
+ cmp eax,8
+ jne .Lu_snapshot_live
+ call json_object_new_object@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lu_snapshot_bad
+ xor eax,eax
+.Lu_snapshot_live:
+ test eax,eax
+ jnz .Lu_snapshot_result
+ mov rdi,rbx
+ mov rsi,r13
+ lea rdx,[rsp+56]
+ call pg_usage_read
+ test eax,eax
+ jnz .Lu_snapshot_result
+ call json_object_new_object@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lu_snapshot_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lu_live]
+ mov rdx,[rsp+48]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lu_snapshot_bad
+ mov qword ptr [rsp+48],0
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lu_usage]
+ mov rdx,[rsp+56]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lu_snapshot_bad
+ mov qword ptr [rsp+56],0
+ mov rax,[rsp+64]
+ mov [r12],rax
+ mov qword ptr [rsp+64],0
+ xor eax,eax
+ jmp .Lu_snapshot_result
+.Lu_snapshot_bad:
+ mov eax,5
+.Lu_snapshot_result:
+ mov ebp,eax
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov eax,ebp
+ UE 80
+.globl pg_observation_service
+.type pg_observation_service,@function
+pg_observation_service:
+ mov [rsi],rdi
+ lea rax,[rip+pg_agent_snapshot]
+ mov [rsi+8],rax
+ mov rax,qword ptr [rip+json_object_put@GOTPCREL]
+ mov [rsi+16],rax
+ ret
 .section .rodata
 .Lu_kind: .asciz "pangu.usage"
 .Lu_empty: .asciz "{\"models\":{},\"tools\":{}}"
@@ -397,3 +479,13 @@ pg_usage_service:
  .quad 0,0
 .Lu_initializer: .quad 0,.Lu_initial
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lu_live_kind: .asciz "pangu.live"
+.Lu_live: .asciz "live"
+.section .data.rel.ro
+.balign 8
+.Lu_live_definition:
+ .quad .Lu_live_kind,10,1
+ .long 1,1,2,0
+ .quad 0,0

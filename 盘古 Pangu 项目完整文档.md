@@ -16,6 +16,12 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。
 
+## 产品交互与命令行边界
+
+默认产品入口是交互式 Agent TUI：保持 Pi 的简洁性，以对话、独立多行输入和少量真实状态为中心；Grok Build 作为布局、输入、历史浏览及终端稳定性的体验参考，Codex/Claude Code 作为具体控件和反馈的兜底参考。完整调研依据、优先级和可见帧验收见 [TUI TODO](docs/TUI移植TODO.md)。不以日志滚动加 `>` 的调试壳代替交互界面，也不以底层测试通过宣称布局完成。U02 原完成判定已撤回，下一交付优先形成同一产品渲染路径上的完整主界面。
+
+不建设独立 CLI 产品。仅移植固定 Pi 已有基础子命令、启动参数、一次性操作及非交互集成入口，共用 PanGu Runtime/配置/会话。子命令包括 install/remove/uninstall/update/list/config/auth/mcp；帮助、版本、模型和会话启动参数、export/list-models、print 与 text/json/rpc 模式按 Pi 实际解析核对，详见 TUI TODO 的边界清单。基础命令不能替代默认 TUI，也不另造一套 CLI 会话。
+
 ## 开发入口
 
 1. [核心移植 TODO](docs/原生重写路线与迁移TODO.md)：Runtime、模型、工具、存储、插件宿主与产品组合；交给核心 Agent。

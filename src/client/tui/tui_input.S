@@ -1209,7 +1209,104 @@ tui_input_feed:
  je .Lesc_string
  cmp eax, 5
  je .Lesc_st
+ cmp eax, 6
+ jae .Lesc_mouse
  mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 0
+ jmp .Lfeed_ignored
+/* SGR mouse: bounded button; positive bounded X/Y; press reports only.
+ * Coordinates are consumed without affecting draft; only wheel emits a key. */
+.Lesc_mouse:
+ cmp eax, 9
+ je .Lmouse_discard
+ cmp eax, 8
+ ja .Lmouse_invalid
+ cmp r12b, 3
+ je .Lesc_abort_ctrl_c
+ cmp r12b, 27
+ je .Lesc_restart
+ cmp r12b, ';'
+ je .Lmouse_separator
+ cmp r12b, 'M'
+ je .Lmouse_end
+ cmp r12b, 'm'
+ je .Lmouse_invalid
+ cmp r12b, '0'
+ jb .Lmouse_invalid
+ cmp r12b, '9'
+ ja .Lmouse_invalid
+ mov edx, [rbx + TUI_LI_INPUT_ESC_PARAM]
+ cmp eax, 6
+ jne .Lmouse_coord
+ cmp edx, 25
+ ja .Lmouse_invalid
+ imul edx, edx, 10
+ movzx ecx, r12b
+ sub ecx, '0'
+ add edx, ecx
+ cmp edx, 255
+ ja .Lmouse_invalid
+ jmp .Lmouse_store
+.Lmouse_coord:
+ mov ecx, edx
+ shr ecx, 8
+ imul ecx, ecx, 10
+ movzx esi, r12b
+ sub esi, '0'
+ add ecx, esi
+ cmp ecx, 65535
+ ja .Lmouse_invalid
+ shl ecx, 8
+ and edx, 255
+ or edx, ecx
+.Lmouse_store:
+ mov [rbx + TUI_LI_INPUT_ESC_PARAM], edx
+ jmp .Lfeed_ignored
+.Lmouse_separator:
+ cmp eax, 8
+ je .Lmouse_invalid
+ cmp eax, 6
+ je .Lmouse_separator_ok
+ cmp dword ptr [rbx + TUI_LI_INPUT_ESC_PARAM], 256
+ jb .Lmouse_invalid
+.Lmouse_separator_ok:
+ inc dword ptr [rbx + TUI_LI_INPUT_ESC_STATE]
+ and dword ptr [rbx + TUI_LI_INPUT_ESC_PARAM], 255
+ jmp .Lfeed_ignored
+.Lmouse_end:
+ cmp eax, 8
+ jne .Lesc_abort
+ mov edx, [rbx + TUI_LI_INPUT_ESC_PARAM]
+ cmp edx, 256
+ jb .Lmouse_invalid
+ mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 0
+ mov dword ptr [rbx + TUI_LI_INPUT_ESC_PARAM], 0
+ and edx, 255
+ and edx, -29 /* ignore Shift/Alt/Ctrl modifiers */
+ cmp edx, 64
+ je .Lmouse_up
+ cmp edx, 65
+ jne .Lfeed_ignored
+ mov eax, TUI_LI_KEY_WHEEL_DOWN
+ jmp .Lfeed_out
+.Lmouse_up:
+ mov eax, TUI_LI_KEY_WHEEL_UP
+ jmp .Lfeed_out
+.Lmouse_invalid:
+ cmp r12b, 'M'
+ je .Lesc_abort
+ cmp r12b, 'm'
+ je .Lesc_abort
+ mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 9
+ jmp .Lfeed_ignored
+.Lmouse_discard:
+ cmp r12b, 3
+ je .Lesc_abort_ctrl_c
+ cmp r12b, 27
+ je .Lesc_restart
+ cmp r12b, 'M'
+ je .Lesc_abort
+ cmp r12b, 'm'
+ je .Lesc_abort
  jmp .Lfeed_ignored
 .Lesc_abort_ctrl_c:
  mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 0
@@ -1310,6 +1407,13 @@ tui_input_feed:
  mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 1
  jmp .Lfeed_ignored
 .Lesc_csi:
+ cmp r12b, '<'
+ jne .Lcsi_not_mouse
+ cmp dword ptr [rbx + TUI_LI_INPUT_ESC_PARAM], 0
+ jne .Lesc_abort
+ mov dword ptr [rbx + TUI_LI_INPUT_ESC_STATE], 6
+ jmp .Lfeed_ignored
+.Lcsi_not_mouse:
  cmp r12b, 0x03
  je .Lesc_abort_ctrl_c
  cmp r12b, 0x18

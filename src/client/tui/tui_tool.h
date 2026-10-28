@@ -11,7 +11,7 @@
  *  - Pi 预览按视觉行（折行后）计；本实现按源行计，超 512 字节的源行按
  *    码点边界拆分为多行（与 tui_md 同语义）。
  *  - Pi 展开是全局双向切换；本实现 Ctrl-O 展开当前四个保留槽的所有调用，
- *    不重写滚动回显中的已显示内容，暂不收起。
+ *    新调用继承展开偏好，不重写滚动回显中的已显示内容，暂不收起。
  * 有界性：尾部保留最近 4096 字节（按整行丢弃最旧行，单行超限整行丢弃并
  * 记 lossy）；行缓冲 512 字节；name/id 保留桥接契约内的最多 63 字节。slot 4 个按调用 ID
  * 匹配（并行工具调用），满后轮转置换。
@@ -63,6 +63,7 @@ typedef struct tui_tool {
 	unsigned active;        /* 最近使用的 slot 下标 */
 	unsigned last_finished; /* 最近完成的 slot；TUI_TOOL_SLOTS=无 */
 	tui_tool_rec slot[TUI_TOOL_SLOTS];
+ unsigned expanded_preference; /* inherited by every subsequent tool call */
 } tui_tool;
 
 void tui_tool_init(tui_tool *t, void *ctx,
@@ -82,8 +83,18 @@ int tui_tool_finished(tui_tool *t, const char *call_id, int ok,
 
 /* Ctrl-O expands every retained call. Pending calls may be enabled before
  * output arrives; future lines bypass preview. Returns 1 if any call changed.
- * This does not enable future new calls or collapse prior terminal scrollback. */
+ * Enables future new calls too; does not collapse prior terminal scrollback. */
 int tui_tool_expand(tui_tool *t);
+
+/* Restore a saved result component without output or execution. name/id are
+ * borrowed NUL-terminated strings; ok is the saved authoritative outcome. */
+void tui_tool_restore(tui_tool *t, const char *name, const char *call_id, int ok);
+
+/* Replace retained canonical-result preview for a known call, then feed chunks
+ * through output and end. Preserves outcome/expansion; 0 if ID not retained.
+ * End flushes only this call and emits an expansion hint when needed. */
+int tui_tool_result_begin(tui_tool *t, const char *call_id);
+int tui_tool_result_end(tui_tool *t, const char *call_id);
 
 /* Flush buffered output at an authoritative run terminal. This does not
  * fabricate tool outcomes; only tool_finished carries success/failure.

@@ -92,3 +92,46 @@ size_t tui_unicode_lower(const char *text, size_t len, char *out, size_t cap)
  dlclose(handle);
  return size;
 }
+
+/* Host capability/config discovery only; render/easing/state remain Assembly.
+ * Pixel winsize is optional. Unknown terminals use a documented 2:1 cell.
+ * Terminals have no portable alpha channel: renderer blends known RGB colors.
+ */
+#include "tui_logo.h"
+void tui_logo_environment(unsigned *aspect,unsigned *flags,unsigned *fg,unsigned *bg)
+{
+ struct winsize ws={0};
+ *aspect=131072; *flags=0; *fg=0xd4d9df; *bg=0x171b22;
+ if(!ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws) && ws.ws_xpixel && ws.ws_ypixel && ws.ws_col && ws.ws_row){
+  uint64_t ratio=(uint64_t)ws.ws_ypixel*ws.ws_col*65536/((uint64_t)ws.ws_xpixel*ws.ws_row);
+  if(ratio>=65536 && ratio<=262144) *aspect=(unsigned)ratio;
+ }
+ const char *term=getenv("TERM"),*locale=getenv("LC_ALL");
+ if(!locale||!*locale)locale=getenv("LC_CTYPE");
+ if(!locale||!*locale)locale=getenv("LANG");
+ if(locale&&(strstr(locale,"UTF-8")||strstr(locale,"utf8")||strstr(locale,"utf-8"))) *flags|=1;
+ const char *braille=getenv("PANGU_TUI_BRAILLE");
+ if(braille&&!strcmp(braille,"0")) *flags&=~1u;
+ const char *cell=getenv("PANGU_TUI_CELL_ASPECT");
+ if(cell){char *end=NULL;double ratio=strtod(cell,&end);if(end&&!*end&&ratio>=1&&ratio<=4)*aspect=(unsigned)(ratio*65536+.5);}
+ const char *ct=getenv("COLORTERM");
+ if(ct&&(!strcmp(ct,"truecolor")||!strcmp(ct,"24bit"))) *flags|=2;
+ if(term&&(!strcmp(term,"dumb")||strstr(term,"linux"))) *flags&=~3u;
+ if(getenv("NO_COLOR")) *flags&=~2u;
+ const char *reduce=getenv("PANGU_REDUCE_MOTION");
+ if(!reduce)reduce=getenv("REDUCE_MOTION");
+ if(reduce&&strcmp(reduce,"0")&&strcmp(reduce,"false")) *flags|=4;
+ const char *gtk=getenv("GTK_ENABLE_ANIMATIONS");
+ if(gtk&&!strcmp(gtk,"0")) *flags|=4;
+ const char *theme=getenv("PANGU_TUI_THEME"),*color=getenv("COLORFGBG");
+ if((theme&&!strcmp(theme,"light")) || (!theme&&color&&strrchr(color,';')&&atoi(strrchr(color,';')+1)>=7)){
+  *fg=0x343a40;*bg=0xf4f3ee;
+ }
+ /* Explicit terminal RGB overrides avoid assuming a palette from theme names. */
+ const char *values[2]={getenv("PANGU_TUI_FOREGROUND"),getenv("PANGU_TUI_BACKGROUND")};
+ unsigned *outputs[2]={fg,bg};
+ for(unsigned i=0;i<2;i++) if(values[i]&&strlen(values[i])==6){
+  char *end=NULL;unsigned long value=strtoul(values[i],&end,16);
+  if(end&&!*end&&value<=0xffffff)*outputs[i]=(unsigned)value;
+ }
+}

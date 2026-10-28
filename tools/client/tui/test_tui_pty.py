@@ -63,7 +63,7 @@ class Demo:
         if not data:
             return False
         self.output += data
-        assert len(self.output) <= 262144, 'PTY transcript limit exceeded'
+        assert len(self.output) <= 1048576, 'PTY transcript limit exceeded'  # full-frame editor repaint budget
         return True
 
     def until(self, marker, timeout=15):
@@ -105,7 +105,10 @@ class Demo:
 def wait_idle(demo):
     """等假 Runtime 就绪（banner + 粘贴模式 + 首个提示符）。"""
     demo.until(PASTE_ON, 5)
-    demo.until(b'[tui] ', 5)
+    deadline = time.monotonic() + 5
+    while b'PanGu' not in demo.output and b'[tui] ' not in demo.output:
+        assert time.monotonic() < deadline, 'startup banner missing'
+        demo.pump(.05)
     demo.until(b'> ', 5)
     time.sleep(0.1)
     demo.pump(0.1)
@@ -524,6 +527,35 @@ def case_reader_one_cell_resize():
     print('ok: reader_one_cell_resize_no_scroll')
 
 
+def case_reading_mouse_wheel():
+    d = Demo('no_tool', cols=8, rows=6)
+    try:
+        wait_idle(d)
+        d.send(b'0123456789abcdefghijklmnop\r')
+        d.until(RUN_FINISHED_OK, 15)
+        d.send(b'draft\x1b[5~')
+        d.until(b'\x1b[?1006h', 5)
+        d.send(b'\x1b[<64;2;2M' * 20)
+        d.until(b'[user] 0', 5)
+        deadline=time.monotonic()+0.1
+        while time.monotonic()<deadline:
+            d.pump(0.01)
+        d.output=b''
+        for byte in b'\x1b[<65;2;2M':
+            d.send(bytes([byte]))
+        d.until(b'9abcdefg\r\nhijklmno\r\np\r\n', 5)
+        d.send(b'\x03')
+        d.until(b'\x1b[?1006l\x1b[?1000l\x1b[?1049l', 5)
+        d.send(b'!')
+        d.until(b'> draft!', 5)
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: reading_sgr_wheel_and_mode_cleanup')
+
+
 def case_multiline_edit_submit():
     d = Demo('no_tool')
     try:
@@ -672,6 +704,7 @@ def case_streaming_keeps_draft():
         d.send(b'draft')                    # 流式期间输入新草稿
         d.until(b'draft', 5)
         d.until(b'[tool] \x1b[1mread_file\x1b[22m (#call-1)', 5)
+        d.until(b'[arguments] {"path":"example.txt"}', 5)
         d.until(RUN_FINISHED_OK, 15)
         # 流式/工具输出结束后草稿仍在输入区（事件挂起/恢复不丢草稿）
         d.until(b'> draft', 5)
@@ -682,6 +715,75 @@ def case_streaming_keeps_draft():
     finally:
         d.close()
     print('ok: streaming_keeps_draft')
+
+
+def case_committed_edit_observer():
+    d = Demo('committed_edit')
+    try:
+        wait_idle(d)
+        d.send(b'edit\r')
+        d.until(RUN_STARTED, 5)
+        d.send(b'draft')
+        d.until(b'[tool committed status] completed', 15)
+        d.until('[tool committed output] committed result full text 中🙂'.encode(), 5)
+        d.until(b'[edit] first changed line: 7', 5)
+        d.until(b'\x1b[31m-7 \x1b[7m123 old\x1b[27m', 5)
+        d.until(b'\x1b[32m+7 \x1b[7m456 new\x1b[27m', 5)
+        d.until(RUN_FINISHED_OK, 10)
+        d.until(b'> draft', 5)
+        assert b'CANONICAL_TAIL' not in d.output
+        d.send(b'\x0f')
+        d.until(b'CANONICAL_TAIL', 5)
+        d.send(b'\x1b[5~')
+        d.until(b'-7 123 old', 5)
+        d.until(b'+7 456 new', 5)
+        d.send(b'\r\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: committed_edit_observer_app_diff_reader_and_draft')
+
+
+def case_new_tools_inherit_expansion():
+    d = Demo('tool_many_lines')
+    try:
+        wait_idle(d)
+        d.send(b'\x0f')  # Expand preference before any tool exists.
+        d.send(b'first\r')
+        d.until(RUN_FINISHED_OK, 10)
+        assert b'EXPANDED_TAIL' in d.output
+        assert b'more lines' not in d.output
+        d.output = b''
+        d.send(b'second\r')
+        d.until(RUN_FINISHED_OK, 10)
+        assert b'EXPANDED_TAIL' in d.output
+        assert b'more lines' not in d.output
+        d.send(b'/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: new_tool_calls_inherit_expand_preference_across_runs')
+
+
+def case_committed_history_preview():
+    d = Demo('committed_history')
+    try:
+        wait_idle(d)
+        d.until(b'[history] result edit (#call-1)', 5)
+        d.until(b'[edit] first changed line: 7', 5)
+        assert b'CANONICAL_TAIL' not in d.output
+        assert RUN_STARTED not in d.output
+        d.send(b'\x0f')
+        d.until(b'CANONICAL_TAIL', 5)
+        assert RUN_STARTED not in d.output
+        d.send(b'/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: committed_history_preview_expand_without_execution')
 
 
 def case_narrow_autowrap():
@@ -771,6 +873,138 @@ def case_product_prompt_history(binary):
     print('ok: product_failed_run_reopen_prompt_history_no_execution')
 
 
+def case_logo_welcome_tiers():
+    import pyte
+    keys = ['TERM', 'COLORTERM', 'LANG', 'NO_COLOR', 'PANGU_REDUCE_MOTION',
+            'REDUCE_MOTION', 'GTK_ENABLE_ANIMATIONS', 'PANGU_TUI_BRAILLE', 'PANGU_TUI_THEME']
+    saved = {key: os.environ.get(key) for key in keys}
+    try:
+        for key in keys:
+            os.environ.pop(key, None)
+        os.environ.update(TERM='xterm-256color', COLORTERM='truecolor', LANG='C.UTF-8')
+        for cols, rows in [(90, 36), (80, 24), (40, 18)]:
+            d = Demo('no_tool', cols=cols, rows=rows)
+            try:
+                wait_idle(d)
+                deadline = time.monotonic() + 2.35
+                while time.monotonic() < deadline:
+                    d.pump(.03)
+                screen = pyte.Screen(cols, rows)
+                stream = pyte.Stream(screen)
+                stream.feed(d.output.decode('utf-8', 'replace'))
+                points = [(x, y) for y in range(rows) for x, c in enumerate(screen.display[y]) if '\u2800' <= c <= '\u28ff']
+                assert points, 'geometric Braille logo missing'
+                assert abs((min(x for x,y in points)+max(x for x,y in points))/2-(cols-1)/2) <= 1
+                assert max(y for x,y in points) < rows-6, 'logo overlapped input'
+                assert b'38;2;' in d.output
+                assert d.output.count(b'\x1b[2J') == 1, 'animation cleared the whole screen'
+                assert len(d.output)<256000, 'welcome animation exceeded 256KB output budget'
+                if rows == 36:
+                    # Resize an already settled welcome, including cell pixel
+                    # metadata: recompute layout/aspect without restarting time.
+                    fcntl.ioctl(d.master, termios.TIOCSWINSZ, struct.pack('HHHH',30,70,700,750))
+                    d.process.send_signal(signal.SIGWINCH)
+                    deadline=time.monotonic()+.2
+                    while time.monotonic()<deadline:d.pump(.02)
+                    resized=pyte.Screen(70,30);pyte.Stream(resized).feed(d.output.decode('utf-8','replace'))
+                    pts=[(x,y) for y in range(30) for x,c in enumerate(resized.display[y]) if '\u2800'<=c<='\u28ff']
+                    assert pts and max(y for x,y in pts)<24
+                    assert abs((min(x for x,y in pts)+max(x for x,y in pts))/2-34.5)<=1
+                    screen=resized;stream=pyte.Stream(screen)
+                before=len(d.output)
+                stat=Path(f'/proc/{d.process.pid}/stat')
+                cpu_before=sum(map(int,stat.read_text().split()[13:15])) if stat.exists() else None
+                deadline=time.monotonic()+.25
+                while time.monotonic()<deadline:d.pump(.03)
+                assert len(d.output)==before, 'completed animation still repaints'
+                if cpu_before is not None:
+                    assert sum(map(int,stat.read_text().split()[13:15]))<=cpu_before+1, 'settled logo still consumes CPU ticks'
+                d.output=b''
+                d.send(b'hello\r');d.until(RUN_FINISHED_OK,10)
+                stream.feed(d.output.decode('utf-8','replace'))
+                assert not any('\u2800' <= c <= '\u28ff' for line in screen.display for c in line)
+                d.send(b'/quit\r');d.until(PASTE_OFF,5);d.finish(0)
+            finally:d.close()
+        # Reduced motion is fully open at startup and schedules no animation.
+        os.environ['PANGU_REDUCE_MOTION']='1'
+        for theme in ['light','dark']:
+            os.environ['PANGU_TUI_THEME']=theme
+            d=Demo('no_tool',cols=80,rows=30)
+            try:
+                wait_idle(d)
+                deadline=time.monotonic()+.2
+                while time.monotonic()<deadline:d.pump(.02)
+                before=len(d.output)
+                deadline=time.monotonic()+.2
+                while time.monotonic()<deadline:d.pump(.02)
+                assert len(d.output)==before
+                sc=pyte.Screen(80,30);pyte.Stream(sc).feed(d.output.decode('utf-8','replace'))
+                colors={cell.fg for row in sc.buffer.values() for cell in row.values() if '\u2800'<=cell.data<='\u28ff'}
+                assert colors and all(len(c)==6 for c in colors)
+                channels=[int(color[i:i+2],16) for color in colors for i in (0,2,4)]
+                assert min(channels)>150 if theme=='light' else max(channels)<128
+                d.send(b'/quit\r');d.until(PASTE_OFF,5);d.finish(0)
+            finally:d.close()
+        os.environ['PANGU_TUI_BRAILLE']='1'
+        os.environ['PANGU_REDUCE_MOTION']='0'
+        d=Demo('committed_history')
+        try:
+            wait_idle(d);d.until(b'[history]',5);d.pump(.1)
+            assert not any('\u2800'<=c<='\u28ff' for c in d.output.decode('utf-8','replace')), 'logo drawn before history eligibility known'
+            d.send(b'/quit\r');d.until(PASTE_OFF,5);d.finish(0)
+        finally:d.close()
+        os.environ['PANGU_TUI_BRAILLE']='0'
+        d=Demo('no_tool')
+        try:
+            wait_idle(d);d.pump(.1)
+            assert not any('\u2800'<=c<='\u28ff' for c in d.output.decode('utf-8','replace'))
+            d.send(b'/quit\r');d.until(PASTE_OFF,5);d.finish(0)
+        finally:d.close()
+    finally:
+        for key,value in saved.items():
+            if value is None:os.environ.pop(key,None)
+            else:os.environ[key]=value
+    print('ok: geometric_logo_center_animation_idle_themes_reduce_and_fallback')
+
+
+def case_visible_shell_frames():
+    # Optional terminal emulator verification, enabled explicitly by the layout
+    # batch. Existing byte-level cases remain available without this dependency.
+    import pyte
+    d = Demo('tool_roundtrip', cols=90, rows=26)
+    try:
+        wait_idle(d)
+        d.send(b'layout-check\r')
+        d.until(RUN_FINISHED_OK, 10)
+        d.send(b'draft for next turn')
+        deadline = time.monotonic() + .3
+        while time.monotonic() < deadline:
+            d.pump(.02)
+        screen = pyte.Screen(90, 26)
+        stream = pyte.Stream(screen)
+        stream.feed(d.output.decode('utf-8', 'replace'))
+        assert screen.display[0].startswith('PanGu')
+        assert screen.display[21].startswith('> draft for next turn')
+        assert screen.display[25].startswith('Enter send')
+        assert sum('> draft' in line for line in screen.display) == 1
+        assert any('layout-check' in line for line in screen.display[1:20])
+        d.output = b''
+        d.send(b'\x15\x1b[200~' + b'x' * 800 + b'\x1b[201~')
+        deadline = time.monotonic() + .4
+        while time.monotonic() < deadline:
+            d.pump(.02)
+        stream.feed(d.output.decode('utf-8', 'replace'))
+        assert screen.display[0].startswith('PanGu')
+        assert screen.display[25].startswith('Enter send')
+        assert 21 <= screen.cursor.y <= 24
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: visible_shell_header_editor_footer_user_and_long_draft')
+
+
 def main():
     if not DEMO.exists():
         subprocess.run(['bash', str(ROOT / 'tools/client/tui/build.sh')], check=True)
@@ -789,15 +1023,22 @@ def main():
     case_reading_keeps_anchor_and_draft()
     case_read_long_line_visual_pages()
     case_reader_one_cell_resize()
+    case_reading_mouse_wheel()
     case_multiline_edit_submit()
     case_paste_safety()
     case_unfinished_paste_recovery()
     case_capacity_limit()
     case_signal_exit_restores_terminal()
     case_streaming_keeps_draft()
+    case_committed_edit_observer()
+    case_new_tools_inherit_expansion()
+    case_committed_history_preview()
     case_resize_keeps_draft()
     case_narrow_autowrap()
     case_poll_error_failure_path()
+    if os.environ.get('PANGU_TUI_VISUAL'):
+        case_visible_shell_frames()
+        case_logo_welcome_tiers()
     if os.environ.get('PANGU_TUI_PRODUCT'):
         case_product_prompt_history(os.environ['PANGU_TUI_PRODUCT'])
     print('test_tui_pty: all passed')

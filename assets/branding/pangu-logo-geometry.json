@@ -1,0 +1,120 @@
+{
+  "name": "PanGu / 开界",
+  "revision": "2.0",
+  "coordinate_system": {
+    "viewBox": [
+      0,
+      0,
+      64,
+      64
+    ],
+    "unit": "SVG user unit"
+  },
+  "mark": {
+    "bounds": {
+      "left": 8,
+      "top": 8,
+      "right": 56,
+      "bottom": 56
+    },
+    "width": 48,
+    "height": 48,
+    "margin": 8
+  },
+  "cut": {
+    "angle_degrees": 18,
+    "center": [
+      32,
+      32
+    ],
+    "perpendicular_gap": 9,
+    "slope": 0.324919696233,
+    "vertical_difference": 9.463160018144,
+    "cut_segment_length": 50.470186763437
+  },
+  "corners": {
+    "outer_degrees": 90,
+    "inner_degrees": [
+      72,
+      108
+    ]
+  },
+  "symmetry": {
+    "rotation_degrees": 180,
+    "center": [
+      32,
+      32
+    ]
+  },
+  "polygon_vertices": {
+    "sky": [
+      [
+        8,
+        8
+      ],
+      [
+        56,
+        8
+      ],
+      [
+        56,
+        19.470347
+      ],
+      [
+        8,
+        35.066493
+      ]
+    ],
+    "earth": [
+      [
+        8,
+        44.529653
+      ],
+      [
+        56,
+        28.933507
+      ],
+      [
+        56,
+        56
+      ],
+      [
+        8,
+        56
+      ]
+    ]
+  },
+  "paths": {
+    "sky": "M8 8 H56 V19.470347 L8 35.066493 Z",
+    "earth": "M8 44.529653 L56 28.933507 V56 H8 Z"
+  },
+  "reproducibility": {
+    "formula": "center_y(x)=32-(x-32)*tan(18deg); upper_y(x)=center_y(x)-9/(2*cos(18deg)); lower_y(x)=center_y(x)+9/(2*cos(18deg))",
+    "note": "Coordinates are rounded to 6 decimal places for SVG; angles and perpendicular distance are parameters."
+  },
+  "terminal_renderer": {
+    "implementation": "src/client/tui/tui_logo.S",
+    "coordinates": "SVG viewBox, 16.16 fixed point; convex polygon half-plane membership",
+    "braille_dot_bits": [
+      1,
+      8,
+      2,
+      16,
+      4,
+      32,
+      64,
+      128
+    ],
+    "dot_coverage": "four deterministic quarter-offset samples per dot; enabled at >=50%; enabled-dot coverage scales cell brightness",
+    "region_max_cells": [
+      40,
+      20
+    ],
+    "cell_aspect": "measured terminal winsize pixel height/width per cell; fallback 2.0; PANGU_TUI_CELL_ASPECT override 1.0..4.0",
+    "animation": "two rigid plates translate along opposite crack normals from closed to original geometry; 2 seconds smoothstep; <=20fps; settles then no scheduled frames",
+    "geometry_guard": "tests/client/tui/test_tui_logo.c loads these vertices and checks exact SVG path strings; independent double-precision ray crossing compares all raster masks at three aspects and phases",
+    "theme": "foreground/background RGB blend; unknown palette uses terminal dim foreground; no native terminal alpha channel",
+    "reduced_motion": "PANGU_REDUCE_MOTION=1 / REDUCE_MOTION=1 / GTK_ENABLE_ANIMATIONS=0; native host may feed policy through environment",
+    "fallback": "PANGU_TUI_BRAILLE=0, non-UTF8 locale, dumb/linux console -> centered PanGu text; no unsupported glyph assumption"
+  }
+}
