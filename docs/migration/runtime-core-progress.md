@@ -34,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- Submission实际提交记录按ID顺序进入Client结构事件，过滤其他会话，顺序位于任务结束之后、用量变化之前。
-- 沿用现有Inputs与动态事件队列，未增加存储副本；TUI旧执行适配保持原显示路径。
-- 受影响Durable ASan/UBSan、产品Host排序/会话隔离专项通过；DeepSeek SQLite/JSONL真实retry/工具/follow-up的Submission ID/status/draft清理通过，产品构建与Assembly检查通过。
+- Generation回合边界进入实际提交事件流，completing/terminal去重，顺序为结束→Submission/用量→开始；暂停释放身份表。
+- 流式消息以Entry.byTaskId配对，交错提交不误清前台消息；产品发布场景通过去重、身份表清理及交错任务检查。
+- DeepSeek双后端retry/工具/follow-up/重开中的回合ID与消息配对通过；最终Durable ASan/UBSan、批次Runtime回归、产品构建、Assembly通过。
 
 ## 当前接口边界
 

@@ -188,6 +188,7 @@ pg_durable_client_open:
  mov qword ptr [rbx+104],0
  mov qword ptr [rbx+112],0
  mov qword ptr [rbx+120],0
+ mov qword ptr [rbx+128],0
  call json_object_new_object@PLT
  mov [rbx+88],rax
  test rax,rax
@@ -566,6 +567,9 @@ pg_durable_client_suspend:
  call json_object_put@PLT
  mov qword ptr [rbx+112],0
  mov qword ptr [rbx+120],0
+ mov rdi,[rbx+128]
+ call json_object_put@PLT
+ mov qword ptr [rbx+128],0
  xor eax,eax
 .Ldc_suspend_end:
  add rsp,16
@@ -1544,6 +1548,10 @@ pg_durable_client_fault_task:
  call .Ldc_task_failures
  mov rdi,rbx
  mov rsi,[rsp+8]
+ xor edx,edx
+ call .Ldc_turns_publish
+ mov rdi,rbx
+ mov rsi,[rsp+8]
  call .Ldc_submissions_publish
  mov rdi,rbx
  call .Ldc_usage_publish
@@ -1553,6 +1561,10 @@ pg_durable_client_fault_task:
  mov ecx,7
  mov r8,[rsp]
  call .Ldc_compaction_delta
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov edx,1
+ call .Ldc_turns_publish
  mov rdi,[rbx+112]
  call json_object_put@PLT
  mov rax,[rsp]
@@ -1566,9 +1578,17 @@ pg_durable_client_fault_task:
  call .Ldc_task_failures
  mov rdi,rbx
  mov rsi,[rsp+8]
+ xor edx,edx
+ call .Ldc_turns_publish
+ mov rdi,rbx
+ mov rsi,[rsp+8]
  call .Ldc_submissions_publish
  mov rdi,rbx
  call .Ldc_usage_publish
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov edx,1
+ call .Ldc_turns_publish
 .Ldc_live_done:
  add rsp,16
  pop r13
@@ -2040,8 +2060,13 @@ pg_durable_client_fault_task:
  call strcmp@PLT
  test eax,eax
  jnz .Ldc_messages_begin
- cmp qword ptr [rbx+120],0
- je .Ldc_messages_begin
+ CGET r14,by_task
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ test rax,rax
+ jz .Ldc_messages_begin
+ cmp rax,[rbx+120]
+ jne .Ldc_messages_begin
  mov qword ptr [rbx+120],0
  jmp .Ldc_messages_finish
 .Ldc_messages_begin:
@@ -2208,3 +2233,165 @@ pg_durable_client_fault_task:
  ret
 .section .rodata
 .Ldc_submission_word: .asciz "submission"
+
+.section .rodata
+.Ldc_by_task: .asciz "byTaskId"
+
+.text
+.Ldc_turns_publish:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp+80],edx
+ cmp qword ptr [rbx+128],0
+ jne .Ldc_turns_ready
+ call json_object_new_object@PLT
+ mov [rbx+128],rax
+ test rax,rax
+ jz .Ldc_turns_bad
+.Ldc_turns_ready:
+ xor r13d,r13d
+.Ldc_turns_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Ldc_turns_end
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ CGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_turns_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_task]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_turns_next
+ CGET r14,value
+ mov r14,rax
+ CGET rax,conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Ldc_turns_next
+ CGET r14,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_generation]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_turns_next
+ CGET r14,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+64],rax
+ mov rcx,rax
+ mov rdi,rsp
+ mov esi,64
+ lea rdx,[rip+.Ldc_turn_id_format]
+ xor eax,eax
+ call snprintf@PLT
+ mov rdi,[rbx+128]
+ mov rsi,rsp
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int@PLT
+ mov ebp,eax
+ CGET r14,state
+ CGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+72],rax
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_completing_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldc_turns_finish
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Ldc_terminal_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldc_turns_finish
+ cmp dword ptr [rsp+80],1
+ jne .Ldc_turns_next
+ test ebp,ebp
+ jnz .Ldc_turns_next
+ mov ebp,1
+ mov esi,17
+ jmp .Ldc_turns_emit
+.Ldc_turns_finish:
+ cmp dword ptr [rsp+80],0
+ jne .Ldc_turns_next
+ cmp ebp,2
+ je .Ldc_turns_terminal_cleanup
+ mov ebp,2
+ mov esi,18
+.Ldc_turns_emit:
+ mov [rsp+84],esi
+ call json_object_new_object@PLT
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Ldc_turns_bad
+ CGET r14,id
+ mov rdi,[rsp+88]
+ lea rsi,[rip+.Ldc_task_id]
+ mov rdx,rax
+ call .Ldc_event_field
+ test eax,eax
+ jnz .Ldc_turns_payload_bad
+ mov rdi,rbx
+ mov esi,[rsp+84]
+ mov rdx,[rsp+88]
+ call .Ldc_json_event
+ mov [rsp+84],eax
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
+ mov eax,[rsp+84]
+ test eax,eax
+ jnz .Ldc_turns_bad
+ mov edi,ebp
+ call json_object_new_int@PLT
+ mov rdi,[rbx+128]
+ mov rsi,rsp
+ mov rdx,rax
+ call .Ldc_set_owned
+ test eax,eax
+ jnz .Ldc_turns_bad
+.Ldc_turns_terminal_cleanup:
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Ldc_terminal_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_turns_next
+ mov rdi,[rbx+128]
+ mov rsi,rsp
+ call json_object_object_del@PLT
+.Ldc_turns_next:
+ inc r13
+ jmp .Ldc_turns_each
+.Ldc_turns_payload_bad:
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
+.Ldc_turns_bad:
+ mov dword ptr [rbx+72],1
+.Ldc_turns_end:
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldc_turn_id_format: .asciz "%llu"
+.Ldc_completing_word: .asciz "completing"
+.Ldc_terminal_word: .asciz "terminal"
