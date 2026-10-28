@@ -100,6 +100,7 @@ typedef struct {
    withdraw result: 0 withdrawn, 1 placed, 2 settled, 3 missing. Owned values
    survive later calls and are released exactly once with release. */
 typedef pg_inputs_ops tui_inputs_ops;
+typedef pg_resource_ops tui_resource_ops;
 
 typedef struct tui_runtime_ops {
 	const char *name; /* 适配来源标识，如 "fake-runtime" */
@@ -115,6 +116,9 @@ const tui_tool_observer *pg_tui_runtime_tool_observer(const tui_runtime_ops *);
 /* Optional product binding; clients weak-link this lookup. An absent symbol
    or NULL means this adapter has no durable input operations. */
 const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *);
+/* Optional product resource service; same binding lifetime as input ops.
+   Clients may weak-link this lookup. */
+const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

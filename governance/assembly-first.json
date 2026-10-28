@@ -253,6 +253,10 @@
     "src/runtime/settings.S": {
       "role": "assembly-core",
       "reason": "手写用户/项目JSON设置读取、诊断、递归合并和所属作用域资源路径解析；配置技能/模板接入实际产品"
+    },
+    "src/runtime/resources.S": {
+      "role": "assembly-core",
+      "reason": "手写资源服务候选构建/采纳、空闲刷新、失败保留、版本/独立快照和前台展开；借用配置与明确所有权"
     }
   }
 }

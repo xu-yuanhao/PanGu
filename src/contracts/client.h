@@ -34,4 +34,15 @@ typedef struct {
     int (*list)(void *,uint64_t after,size_t limit,struct json_object **);
     void (*release)(struct json_object *);
 } pg_inputs_ops;
+/* Optional serialized resource service. reload: 0 adopted, 3 busy, 5 failed,
+   7 closed. snapshot returns detached owned catalogs/diagnostics and revision;
+   settings values and credentials are omitted. release once. expand processes
+   foreground template/skill text; buffers are caller-owned and disjoint. */
+typedef struct {
+    void *context;
+    int (*reload)(void *);
+    int (*snapshot)(void *,struct json_object **);
+    void (*release)(struct json_object *);
+    int (*expand)(void *,pg_slice,char *,size_t,size_t *);
+} pg_resource_ops;
 #endif

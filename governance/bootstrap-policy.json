@@ -612,6 +612,11 @@
     "tools/runtime/test_prompt_templates.py": "gate",
     "src/runtime/settings.S": "native-source",
     "src/runtime/settings.h": "native-source",
-    "tests/runtime/test_settings.c": "native-test"
+    "tests/runtime/test_settings.c": "native-test",
+    "src/runtime/resources.S": "native-source",
+    "src/runtime/resources.h": "native-source",
+    "tests/runtime/test_resources.c": "native-test",
+    "tests/runtime/test_product_resources.c": "native-test",
+    "tools/runtime/test_product_resources.py": "gate"
   }
 }

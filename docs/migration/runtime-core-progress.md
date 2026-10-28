@@ -18,6 +18,7 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
+| 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
 | 设置与资源路径 | `settings.S`：用户/项目JSON层、递归覆盖与错误诊断、独立所有权；配置skills/prompts的普通文件/目录进入技能发现与模板命令，路径相对所属配置目录解析 |
 | 提示模板/显式技能 | `prompt_templates.S`：用户/项目Markdown模板、引号参数、位置/全部/默认/切片参数单次替换；前台/模板和/skill:name展开后进入持久Submission，显式技能读取当前正文 |
 | 技能资源 | `skills.S`、`skills_posix.c`：用户/项目默认发现、根技能优先、名称/规范路径去重、YAML元数据、校验诊断与转义XML；提示列表→模型read技能/相对资源→write真实闭环 |
@@ -25,9 +26,9 @@
 
 ## 本批验证与集成状态
 
-- 用户agent目录/settings.json与项目.pangu/settings.json读取独立层和递归覆盖结果；skills/prompts普通文件/目录按各层所属目录解析，接通既有发现/命令。错误配置层产生诊断并保持另一层可用。
-- 设置/路径/实际消费者专项ASan/UBSan、Runtime整批回归与最终产品构建通过；原始JSON模式补充拒绝Markdown frontmatter。Assembly与隔离核心候选G00通过；共享树另有TUI生成缓存的登记提示，保持其工作原位。
-- 真实DeepSeek完成配置技能发现/read/write，以及用户配置模板目录和项目相对模板文件的实际提交。资源选择模式、忽略规则、刷新和完整设置消费者继续随K11推进。
+- resources服务统一持有配置层、技能、模板和系统提示，刷新仅在当前run空闲时执行；完整候选成功后更新模型提示并统一采纳，失败继续使用原版本。前台展开和Host/TUI查询共用该服务。
+- 资源专项ASan/UBSan、Runtime整批回归、实际产品组合/可选TUI绑定、最终产品构建与现有离线PTY通过；Assembly及隔离核心G00通过。提交后首poll前也按活动run拒绝刷新。
+- 真实DeepSeek验证刷新前后模板/提示改变，失败刷新后原模板仍完成真实工具执行；新增技能通过实际快照与系统提示核对。TUI刷新控件、资源选择模式与忽略规则继续随K11推进。
 
 ## 当前接口边界
 
@@ -39,6 +40,7 @@
 python3 -B tools/runtime/build_test.py
 python3 -B tools/runtime/build_pangu.py --output /tmp/pangu-native/pangu
 python3 -B tools/runtime/test_pangu_pty.py
+python3 -B tools/runtime/test_product_resources.py
 ```
 
 真实模型通过`PANGU_MODEL_ENDPOINT`、`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`注入，默认MiMo连接接受`MIMO_API_KEY`。
@@ -50,6 +52,7 @@ python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
 python3 -B tools/runtime/build_test.py --live-inputs
 python3 -B tools/runtime/test_pangu_pty.py --live
+python3 -B tools/runtime/test_product_resources.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-settings
 python3 -B tools/runtime/test_pangu_pty.py --live-templates
 python3 -B tools/runtime/test_pangu_pty.py --live-skills

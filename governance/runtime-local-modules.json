@@ -436,12 +436,14 @@
         "host.services.local.v0",
         "task.generation.local.v0",
         "storage.jsonl.local.v1",
-        "session.durable.lifecycle.local.v0"
+        "session.durable.lifecycle.local.v0",
+        "resources.lifecycle.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
         "main",
-        "pg_tui_runtime_inputs"
+        "pg_tui_runtime_inputs",
+        "pg_tui_runtime_resources"
       ],
       "reference_basis": [
         {
@@ -2027,6 +2029,45 @@
           "semantics": "global/project settings layers and deepMergeObjects; resource paths remain attached to global/project base directories; BOM/invalid JSON diagnostics and explicit local files/directories",
           "tests_to_read": [
             "packages/coding-agent/test/settings-manager.test.ts",
+            "packages/coding-agent/test/skills.test.ts",
+            "packages/coding-agent/test/prompt-templates.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resources.lifecycle.local.v0",
+      "sources": [
+        "src/runtime/resources.S",
+        "src/runtime/resources.h"
+      ],
+      "dependencies": [
+        "resources.templates.local.v0",
+        "resources.settings.local.v0",
+        "context.prompt.local.v0",
+        "client.contract.v0",
+        "json-c"
+      ],
+      "role": "Assembly owned resource lifecycle, coherent candidate adoption and configured prompt update, idle-only reload, detached metadata/diagnostic snapshots and foreground expansion through exported product resource service",
+      "exports": [
+        "pg_resources_open",
+        "pg_resources_reload",
+        "pg_resources_snapshot",
+        "pg_resources_expand",
+        "pg_resources_close"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/core/resource-loader.ts",
+            "packages/coding-agent/src/core/agent-session.ts",
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ],
+          "semantics": "reload settings/resources and rebuild system prompt; interactive reload waits for streaming/compaction to finish; catalogs and diagnostics queried through resource loader; native candidate ownership retains working resources on failed rebuild",
+          "tests_to_read": [
+            "packages/coding-agent/test/resource-loader.test.ts",
             "packages/coding-agent/test/skills.test.ts",
             "packages/coding-agent/test/prompt-templates.test.ts"
           ]

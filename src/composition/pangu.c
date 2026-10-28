@@ -13,6 +13,7 @@
 #include "../runtime/skills.h"
 #include "../runtime/prompt_templates.h"
 #include "../runtime/settings.h"
+#include "../runtime/resources.h"
 #include "../runtime/durable_client.h"
 #include "../runtime/record_jsonl.h"
 #include <json-c/json.h>
@@ -30,7 +31,9 @@
 
 static const tui_runtime_ops *inputs_owner;
 static tui_inputs_ops foreground_inputs;
+static tui_resource_ops foreground_resources;
 const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_inputs:0;}
+const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_resources:0;}
 static pg_host host,agent_scope;
 static pg_native_plugin extension;
 static pg_model_provider default_model_provider;
@@ -52,7 +55,8 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools;
- struct json_object *configuration,*skills,*templates;
+ struct json_object *configuration;
+ pg_resources resources;pg_resource_host resource_host;
  pg_timer_job fire,queued;void *fire_context,*queued_context;uint64_t deadline;
  unsigned armed,storage_ready,cache_ready,holds_ready,timer_ready,session_ready,client_ready,model_leased,tools_leased,tools_draining;
 } durable;
@@ -179,7 +183,7 @@ static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,st
 }
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}
 static int client_submit(void *ctx,pg_slice text){
- (void)ctx;char expanded[4096];size_t size=0;if(pg_resource_expand(durable.templates,durable.skills,text,expanded,sizeof(expanded),&size))return 1;
+ (void)ctx;char expanded[4096];size_t size=0;if(foreground_resources.expand(foreground_resources.context,text,expanded,sizeof(expanded),&size))return 1;
  return durable.native_client.submit(durable.native_client.context,(pg_slice){expanded,size});
 }
 static void client_cancel(void *ctx){(void)ctx;durable.native_client.cancel(durable.native_client.context);}
@@ -189,18 +193,11 @@ static int prompt_probe(void *context,const char *path){
  if(fstatat(root->directory,path,&metadata,AT_SYMLINK_NOFOLLOW))return errno==ENOENT||errno==ENOTDIR?0:-1;
  return S_ISREG(metadata.st_mode)?1:0;
 }
-static int agent_start(void *ctx,pg_host *scope,size_t owner){
- (void)ctx;const pg_model_provider *selected=pg_host_get(scope,owner,"model.provider");const pg_tool_provider *toolset=pg_host_get(scope,owner,"tools.provider");
- pg_tools *executor=toolset?(pg_tools *)&toolset->tools:0;
- if(!toolset||toolset->abi!=PG_TOOL_PROVIDER_ABI||toolset->size!=sizeof(*toolset)||!toolset->catalog||!toolset->identity||!*toolset->identity||strlen(toolset->identity)>63)return 1;
- if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
- if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
- durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;
- pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
- pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
- const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
+static struct {pg_tools *files;pg_read_tool *root;const pg_tool_registry *declared;} resource_sources;
+static int resource_build(void *context,pg_resource_candidate *out){
+ (void)context;pg_tools *files=resource_sources.files;pg_read_tool *root=resource_sources.root;const pg_tool_registry *declared=resource_sources.declared;
  pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0,{0,0},{0,0},0,{0,0}};
- size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
+ size_t prompt_size=0;const char *file=getenv("PANGU_SYSTEM_PROMPT_FILE");
  {
   char user_path[4096],user_canonical[4096];const char *agent_dir=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");
   if(!agent_dir&&home){int n=snprintf(user_path,sizeof(user_path),"%s/.pangu/agent",home);if(n<0||(size_t)n>=sizeof(user_path))return 1;agent_dir=user_path;}
@@ -230,11 +227,26 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
   if(!result)result=pg_prompt_templates_load_config(have_user?user_prompts:0,project_prompts,prompt_paths,&templates);
   if(!result)result=pg_skills_prompt(skills,reader,skills_prompt,sizeof(skills_prompt),&skills_size);
   if(!result){source.skills_prompt=(pg_slice){skills_prompt,skills_size};result=file?pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size):pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);}
-  json_object_put(settings);json_object_put(skill_paths);json_object_put(prompt_paths);pg_read_tool_close(&resources);if(result){json_object_put(skills);json_object_put(templates);return 1;}durable.skills=skills;durable.templates=templates;
+  json_object_put(skill_paths);json_object_put(prompt_paths);pg_read_tool_close(&resources);if(result){json_object_put(settings);json_object_put(skills);json_object_put(templates);return 1;}out->skills=skills;out->templates=templates;out->settings=settings;
  }
+ out->prompt=json_object_new_string_len(configured_prompt,(int)prompt_size);return out->prompt?0:5;
+}
+static int resource_busy(void *context){(void)context;return durable.client.busy||durable.client.active||durable.scheduler.busy||durable.model_leased||durable.tools_leased||durable.tools_draining;}
+static void resource_release(struct json_object *snapshot){json_object_put(snapshot);}
+static int agent_start(void *ctx,pg_host *scope,size_t owner){
+ (void)ctx;const pg_model_provider *selected=pg_host_get(scope,owner,"model.provider");const pg_tool_provider *toolset=pg_host_get(scope,owner,"tools.provider");
+ pg_tools *executor=toolset?(pg_tools *)&toolset->tools:0;
+ if(!toolset||toolset->abi!=PG_TOOL_PROVIDER_ABI||toolset->size!=sizeof(*toolset)||!toolset->catalog||!toolset->identity||!*toolset->identity||strlen(toolset->identity)>63)return 1;
+ if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
+ if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
+ durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;
+ pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
+ pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
+ const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
+ resource_sources.files=files;resource_sources.root=root;resource_sources.declared=declared;
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
- if(json_object_object_add(durable.configuration,"systemPrompt",json_object_new_string_len(prompt,(int)prompt_size))||json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
+ if(json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
  const char *execution=getenv("PANGU_TOOL_EXECUTION");if(execution){if(strcmp(execution,"parallel")&&strcmp(execution,"sequential"))return 1;if(json_object_object_add(durable.configuration,"toolExecution",json_object_new_string(execution)))return 1;}
  const char *options=getenv("PANGU_MODEL_OPTIONS");if(options){
   size_t size=strlen(options);if(size>=4096)return 1;struct json_tokener *parser=json_tokener_new();if(!parser)return 1;
@@ -243,6 +255,8 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
   if(invalid){json_object_put(value);return 1;}if(json_object_object_add(durable.configuration,"options",value)){json_object_put(value);return 1;}
  }
  if(json_object_object_add(durable.configuration,"provider",json_object_new_string(selected->identity)))return 1;
+ durable.resource_host=(pg_resource_host){0,resource_build,resource_busy};if(pg_resources_open(&durable.resources,&durable.resource_host,durable.configuration))return 1;
+ foreground_resources=(pg_resource_ops){&durable.resources,pg_resources_reload,pg_resources_snapshot,resource_release,pg_resources_expand};
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;
  durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete,model_fetch_deferred,model_cancel_deferred};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;
@@ -252,16 +266,16 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  if(pg_durable_generation_history(&durable.tasks,1,durable.configuration,&durable.history))return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
- return pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs);
+ return pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
- if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;json_object_put(durable.skills);durable.skills=0;json_object_put(durable.templates);durable.templates=0;return 0;
+ if(durable.tools_draining)return 1;durable.records.publish=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs","resources"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
-static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,2,agent_start,agent_stop};
+static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,3,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"model",0,model_imports,1,model_exports,3,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},

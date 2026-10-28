@@ -162,6 +162,12 @@ def main():
                             *[implementation('src/runtime/' + name) for name in ('settings', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix')],
                             str(ROOT / 'tests/runtime/test_settings.c'), *settings_flags, '-o', settings_test], check=True)
             subprocess.run([settings_test], check=True, timeout=15)
+            resources_test = str(Path(directory) / 'test-resources')
+            subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
+                            '-fsanitize=undefined', '-fno-sanitize-recover=all',
+                            *[implementation('src/runtime/' + name) for name in ('resources', 'skills', 'skills_posix', 'prompt_templates')],
+                            str(ROOT / 'tests/runtime/test_resources.c'), '-Wl,--wrap=json_object_object_add', *templates_flags, '-o', resources_test], check=True)
+            subprocess.run([resources_test], check=True, timeout=15)
             model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'json-c', 'libutf8proc'], text=True).split()
             for name, sources, wraps in [
                 ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),

@@ -163,6 +163,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 用户与项目默认skills接入模型请求：目录SKILL.md优先、根目录Markdown与嵌套发现、名称/描述校验、同名先加载优先、规范路径去重、禁用自动调用过滤和XML描述；真实模型按需读取技能/相对资源并完成写入。
 - [x] 用户/项目默认prompt templates与显式技能命令接入前台提交：引号参数、位置/全部参数、默认值和切片单次展开；/skill:name读取当前正文（含禁用自动调用的技能），展开后的实际输入进入Durable持久执行。
 - [x] 用户/项目settings.json接入资源调用链：保留两层及递归覆盖结果，BOM/缺失/错误诊断，skills/prompts中的普通文件与目录路径按所属作用域解析，复用实际技能发现和模板提交。
+- [x] 核心resources服务接通配置/技能/模板/系统提示的空闲整体刷新、失败保留、独立快照与前台展开；提供Host服务和可选TUI资源操作表，真实模型验证刷新前后及失败后的继续执行。
 - [ ] 完成项目/用户配置优先级、AGENTS上下文、system/append/section、skills、prompt templates和资源刷新；配置解析与资源加载成为服务；内置提示词保留参考机制并适配PanGu自称、`.pangu`目录、配置与实际入口。
 - [ ] 完成 MCP stdio/HTTP客户端的发现、调用、取消、认证与清理，并转成现有Tools接口。
 - [ ] 对照 Pi codemode 的工具能力隔离、声明生成和持久嵌套调用，通过QuickJS的C接口完成原生桥接；完成tool search后动态工具声明与实际执行同步。
@@ -220,8 +221,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 settings-manager.ts deepMergeObjects/loadFromStorage、package-manager.ts collectAdditionalResources/resolvePathFromBase及skills/prompt-templates显式路径；对应设置、技能与模板测试。已获取origin/main中package-manager差异仅npm安装参数，与本批资源路径无关，沿固定快照实现。
-- 实际调用链：用户agent目录/settings.json与项目.pangu/settings.json → Assembly独立作用域/递归覆盖与诊断 → skills/prompts普通路径分别相对用户agent目录/项目.pangu解析 → 配置文件或目录接入原有技能/模板加载 → 实际systemPrompt/read及/模板提交 → Durable。数组/标量/null覆盖，嵌套对象合并，合并结果与输入内存分离；错误层按空设置处理，保留另一层。
-- 验证：设置/合并/配置路径及实际技能/模板消费者专项ASan/UBSan通过；Runtime整批回归通过。复用读取时保持设置为原始JSON，补充验证Markdown frontmatter不能被设置解析接受，最终专项与产品重建通过。真实DeepSeek从用户设置发现外置技能并读取payload写入结果，分别执行用户配置模板目录与项目相对模板文件。Assembly通过；隔离核心候选G00通过，共享树G00另有TUI生成的__pycache__登记提示，未修改其工作。
-- 接口与自审：resources.settings.local.v0提供owned层快照、递归合并与作用域路径数组；skills/templates新增配置路径入口并共用单一加载实现，原两根目录入口为同一实现的便捷调用。POSIX C只复用stat/realpath布局快照，选择/递归/解析规则均Assembly；json-c iterator布局在头文件断言。新增源/模块/构建登记同步，控制差异自审通过；TUI未提交源与产物保持原位。
-- 剩余与下一交付物：K11继续资源选择模式（glob/排除/强制选择）、忽略文件、刷新、完整设置字段消费者、诊断/选择交互及MCP/代码工具。当前已接通普通本地文件/目录；读取与展开的现有容量保持。其余K项按完整覆盖表推进。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 resource-loader.ts reload/getSkills/getPromptTemplates、agent-session.ts reload和interactive-mode.ts handleReloadCommand（流/压缩运行时等待）；与已获取origin/main比较相关源码无差异，Harness仍固定22ddee3792402c3e70ec5f86a63c3e3e895a2f60。
+- 实际调用链：Agent组合注入resource_build/busy → Assembly pg_resources_open/reload → 配置/技能/模板/系统提示完整候选 → 更新当前model configuration的systemPrompt并整体采纳 → resources.expand → 原有Durable提交。前台使用同一资源服务；实际产品Host导出resources。刷新成功递增revision，失败保持原目录和提示；配置值从公开快照省略，快照完全独立。
+- 验证：资源服务专项ASan/UBSan覆盖候选失败、畸形目录、配置采纳失败、忙/重入、快照修改隔离和关闭；Runtime整批回归通过。实际产品组合/可选TUI绑定、配置路径/新增技能/模板与系统提示刷新、失败保留的离线验证通过，并覆盖提交后首poll前的busy窗口。真实DeepSeek刷新前后使用不同模板和系统token，超长提示刷新失败后仍完成原模板工具调用。最终产品构建、PTY目录/恢复/终端验证、Assembly和隔离核心G00通过。
+- 接口与自审：新增resources.lifecycle.local.v0，pg_resources为64字节、候选32字节；public pg_resource_ops为40字节（context/reload/snapshot/release/expand）。TUI可弱查询pg_tui_runtime_resources(&ops)，仅匹配当前有效产品绑定；借用表至关闭，snapshot返回owned JSON须release。旧TUI/Client布局、枚举保持。候选生命周期/采纳/快照/展开为Assembly，C仅组合现有资源与平台桥接。新增源/模块/实际构建登记自审通过；并行TUI与规划文档修改保持未提交。
+- 剩余与下一交付物：TUI线消费新资源表完成刷新交互；K11继续资源选择模式、忽略文件、完整设置字段消费者、诊断/选择控件、MCP/代码工具。K09扩展模块刷新按其生命周期条目完成；其余K项保持完整覆盖表范围。
