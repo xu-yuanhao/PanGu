@@ -31,9 +31,9 @@
 
 ## 本批验证与集成状态
 
-- 压缩失败按当前retry设置保存retry/until和Live.retry，复用固定范围/configuration；到期attempt递增并恢复summarize，提前唤醒重睡，预算耗尽进入失败生命周期。
-- 新retry phase使内部compaction模块增至256字节，模型与Host函数表保持；阶段清理释放旧模型/请求资源。
-- 两后端ASan/UBSan覆盖预算、Live与提前唤醒；真实DeepSeek通过一次503、退避重开、真实摘要/放置及后续回忆。Runtime回归和隔离检查/构建见核心交接。
+- 后台旧摘要保存后延迟放置，新摘要先提交；旧place重开后经既有Submission/head判定结算stale，不追加Entry，不覆盖新head。
+- 手动start与自动/后台任务共用pg_durable_compaction_create，删除重复定义/选项及mint路径，内部帧缩至208字节。
+- 两后端真实模型摘要竞争和后续回忆、Durable ASan/UBSan及当前回归/构建结果见核心交接。owned阻塞竞争和hook仍保留在K12。
 
 ## 当前接口边界
 

@@ -2010,7 +2010,7 @@ pg_durable_compaction_init:
 .globl pg_durable_compaction_start
 .type pg_durable_compaction_start,@function
 pg_durable_compaction_start:
- CF 272
+ CF 208
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -2039,21 +2039,11 @@ pg_durable_compaction_start:
  jb .Lcc_start_end
  cmp qword ptr [r14+16],1000000
  ja .Lcc_start_end
- lea rdi,[rip+.Lcc_definition_json]
- call json_tokener_parse@PLT
- mov [rsp+136],rax
  lea rdi,[rip+.Lcc_input_json]
  call json_tokener_parse@PLT
  mov [rsp+144],rax
- lea rdi,[rip+.Lcc_options_json]
- call json_tokener_parse@PLT
- mov [rsp+152],rax
  test rax,rax
  jz .Lcc_start_end
- cmp qword ptr [rsp+136],0
- je .Lcc_start_end
- cmp qword ptr [rsp+144],0
- je .Lcc_start_end
  mov rdi,[r14+8]
  call json_object_new_uint64@PLT
  mov rdi,[rsp+144]
@@ -2090,40 +2080,22 @@ pg_durable_compaction_start:
  test eax,eax
  jnz .Lcc_start_end
  mov dword ptr [rsp+188],1
- mov [rsp+168],rbx
- mov [rsp+176],r13
- lea rax,[rsp+168]
- mov [rsp+96],rax
- lea rax,[rip+.Lcc_initial]
- mov [rsp+104],rax
- lea rax,[rip+.Lcc_creation_mint]
- mov [rsp+112],rax
- mov rax,[r14]
- mov [rsp+128],rax
- mov rdi,rsp
- mov rsi,[rsp+136]
- mov rdx,[rsp+144]
- mov rcx,[rsp+152]
- lea r8,[rsp+96]
- lea r9,[rsp+160]
- call pg_record_tx_create_task@PLT
- test eax,eax
- jnz .Lcc_start_abort
  lea rax,[rbx+8]
- mov [rsp+208],rax
- mov [rsp+216],r13
+ mov [rsp+96],rax
+ mov [rsp+104],r13
  mov rax,[rbx]
  mov rax,[rax+32]
- mov [rsp+224],rax
+ mov [rsp+112],rax
  mov rax,[r14]
- mov [rsp+232],rax
- mov qword ptr [rsp+240],0
+ mov [rsp+120],rax
+ mov qword ptr [rsp+128],0
  mov rax,[rsp+144]
- mov [rsp+248],rax
- lea rdi,[rsp+208]
- mov rsi,[rsp+160]
- lea rdx,[rsp+48]
- call .Lcc_live_created
+ mov [rsp+136],rax
+ lea rdi,[rsp+96]
+ mov rsi,rsp
+ lea rdx,[rsp+160]
+ lea rcx,[rsp+48]
+ call pg_durable_compaction_create
  test eax,eax
  jnz .Lcc_start_abort
  mov rdi,r12
@@ -2143,14 +2115,10 @@ pg_durable_compaction_start:
  call pg_durable_session_abort@PLT
  mov dword ptr [rsp+188],0
 .Lcc_start_end:
- mov rdi,[rsp+136]
- call json_object_put@PLT
  mov rdi,[rsp+144]
  call json_object_put@PLT
- mov rdi,[rsp+152]
- call json_object_put@PLT
  mov eax,[rsp+184]
- CE 272
+ CE 208
 .section .rodata
 .Lcc_task_name: .asciz "pangu.compaction"
 .Lcc_select_name: .asciz "select"
@@ -2187,7 +2155,6 @@ pg_durable_compaction_start:
 .Lcc_cutoff_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"failed\",\"error\":{\"message\":\"Compaction reached the consecutive restart limit\",\"detail\":{\"reason\":\"restart_limit\"}}}}"
 .Lcc_failed_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"failed\",\"error\":{\"message\":\"Summarization failed to produce a complete text summary\",\"detail\":{\"reason\":\"model_error\"}}}}"
 .Lcc_assistant_json: .asciz "{\"role\":\"assistant\",\"content\":[]}"
-.Lcc_definition_json: .asciz "{\"name\":\"pangu.compaction\",\"version\":1}"
 .Lcc_options_json: .asciz "{\"ownership\":{\"kind\":\"conversation\"}}"
 .Lcc_input_json: .asciz "{\"reason\":\"manual\"}"
 .Lcc_write_json: .asciz "{\"type\":\"write\",\"entry\":{\"kind\":\"pangu.compaction\",\"model\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"\"}]}],\"data\":{\"reason\":\"manual\"}}}"
@@ -2263,12 +2230,6 @@ pg_durable_compaction_service:
 .Lcc_kind: .asciz "kind"
 
 .text
-.Lcc_creation_mint:
- mov rax,[rdi]
- mov rax,[rax]
- mov rcx,[rdi+8]
- mov rdi,[rcx]
- jmp [rax+32]
 
 .text
 .Lcc_service_release:

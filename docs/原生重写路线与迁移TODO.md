@@ -187,6 +187,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Generation正文改为动态printbuf累积，Live追加和最终assistant同源；摘要流式累积、持久summary与包装后的Entry去除4096字节边界。真实产品超过12 KiB回答和超过14 KiB摘要放置通过，旧内联正文数组原地删除。
 - [x] 压缩Live生命周期接入创建/阶段/终态事务：taskId/reason/blocking/attempt列表、取消/完成移除、失败保留compactionFailure，成功放置清除旧失败；同任务阶段更新保持列表顺序。两后端创建同序列、重开/取消/失败与真实自动/后台压缩通过。
 - [x] 压缩失败按当前retry策略进入持久retry/sleep：保留范围和请求配置、指数退避/上限/预算、提前唤醒重睡、attempt递增及Live.retry更新/清除。两后端预算耗尽专项及一次503→退避重开→真实摘要/放置/回忆通过。
+- [x] 后台摘要延迟放置与新摘要竞争：真实摘要保存后挂起，后续范围的新摘要先提交；旧摘要重开后经同一Submission路径结算stale、不追加Entry且保持新head。SQLite/JSONL真实摘要/回忆及原子写入检查通过；手动与自动任务共用一个构造函数。
 - [ ] 完成 reset/compaction/fork后的上下文投影、token估算、保留边界、自动/手动压缩、后台压缩、摘要模型与hook。
 - [ ] 压缩任务接入Scheduler/Storage，运行中的取消、失败、工具调用配对与重开保持一致。
 - [ ] 验收：超过当前有界会话规模的长工作流可通过压缩持续运行；原始记录、摘要与模型可见上下文能从存储重构；压缩中断后恢复。
@@ -235,8 +236,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts summarize/retry、live.ts的attempt/retry状态及既有retry设置语义。沿固定摘要tail/firstKept/configuration恢复，不重新选择范围。
-- 实际调用链：summary模型错误 → provider failure事实/当前retry设置 → 固定请求checkpoint的retry/until与Live.retry同事务提交 → Scheduler sleep/重开 → 提前唤醒重睡或到期attempt+1 → 同范围真实摘要 → place/后续对话。阶段恢复清除retryError/until和Live.retry，预算耗尽后转既有失败终态。
-- 验证：SQLite/JSONL ASan/UBSan覆盖最多两次retry后的三次失败/终态、Live.retry与睡眠时间一致、提前唤醒不增加模型请求；真实DeepSeek一次503→持久退避重开→19,301字节原摘要请求→两阶段恢复→放置与回忆通过。Runtime整批回归、更新后Durable专项、核心隔离G00/Assembly与产品构建通过。
-- 接口与自审：pg_durable_compaction新增retry phase，内部模块从216增至256字节，静态布局断言/组合实例同步；模型/Host函数表不变。状态机、退避及Live字段更新为手写Assembly，复用现有提交与清理路径；未新增文件/依赖/登记。并行TUI及规划修改保留。
-- 剩余与下一交付物：K12继续后台摘要与新阻塞摘要竞争/stale完整用例、hook及system基线；K13接入usage与完整Live客户端事件/观察。provider单次事件、reasoning、工具参数/结果边界按K05/K08完成；TUI动态历史消费与其他K项范围保持。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable compaction.ts placeSummary、submissions.ts admitSubmission/isStale及harness-compaction.test.ts后台旧摘要竞争用例。沿现有head比较和Submission admission实现，固定快照不变。
+- 实际调用链：后台真实summary保存place → 持久sleep延迟旧摘要 → 新工作Entry及新真实摘要先放置 → 唤醒/重开旧place → 同一Inputs admission结算旧Submission为unanswered/stale → 不追加旧Entry，新head保持 → 后续真实模型读取有效摘要。手动start改用已有pg_durable_compaction_create，共用任务/Live事务，删除重复定义/选项构造与mint回调。
+- 验证：SQLite/JSONL真实模型完成两份摘要，旧摘要重开后stale receipt、无Entry的原子终态、winner head不变及后续回忆通过；共用构造后的Durable ASan/UBSan、创建Live/取消/重试等专项通过。Runtime整批回归、核心隔离G00/Assembly、产品构建与离线资源服务验证通过。
+- 接口与自审：公开接口、布局、模块依赖及文件登记保持；手动构造帧从272缩至208字节，沿一个底层任务/Live构造入口。当前竞争用例的新摘要为conversation-owned手动摘要；Generation-owned阻塞摘要与后台摘要的完整组合仍需K12覆盖。并行TUI和规划改动保留。
+- 剩余与下一交付物：K12继续beforeCompact/afterCompact等hook、摘要模型选择/system基线以及owned阻塞竞争；K13完成usage与Live客户端事件/观察。下一批以实际扩展消费者和压缩调用链接通hook，provider/工具边界及其他K项保持原范围。
