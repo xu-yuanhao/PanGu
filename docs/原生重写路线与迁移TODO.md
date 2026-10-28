@@ -213,6 +213,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Host task.graph与TUI可选绑定提供只读活任务图：五种live状态分页、父子owner/等待/睡眠/completing投影、所属会话分页、注册元数据阻塞分类、终态移除与重开查询；读取占用Session只读事务。
 - [x] 任务图多观察者支持attach初始帧、独立读取/合并变化、注册元数据刷新、幂等退订与Host统一关闭；迁移失败按定义身份缓存，替换后恢复，图读取不执行迁移。
 - [x] conversation.view接通会话记录、原始有效Entry范围、已实现Live/Usage文档与排队Submission视图；Host/TUI公开只读入口同一readOnLine读取，分页、撤回、压缩head及重开通过。
+- [x] conversation.view多观察者接通初始历史、后续Entry/文档/队列变化、合并读取与Host关闭释放；任务图/会话视图共用一份原生Watch生命周期，真实摘要/回答观察通过。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -254,8 +255,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/view.ts build/MOUNTED、context.ts activeEntries/selectActive与inbox.ts队列视图。采用原始有效Entry范围和同一Session只读事务读取。
-- 实际调用链：Host conversation.view或pg_tui_runtime_conversation_view → readOnLine → 会话记录/最新head与原始保留Entry/已有pangu.live与pangu.usage → 同会话queued Submission分页 → owned {conversation,entries,docs,inbox}。inbox直接暴露PanGu自身已提交队列记录，保持独立存储协议；只读历史不经过模型请求投影，不推进Task。
-- 验证：SQLite/JSONL ASan/UBSan覆盖超过300条有效历史与head优先、257条队列分页/ID顺序、撤回后重开、返回值隔离、事务占用拒绝及序列不变。实际Host初始/不存在会话、队列加入/撤回和TUI绑定通过；DeepSeek双后端真实摘要重开、视图UsageDoc与账本相等、Live可见、head历史与后续回答通过。整批检查见当前实现记录。
-- 接口与自审：conversation_view.h公开16字节借用binding与owned读取服务；新增纯Assembly实现，C仅组合与绑定。源码、模块依赖、导出和构建清单同步登记，G00/Assembly自审通过。
-- 剩余与下一交付物：会话视图多观察者/逐提交消息事件，以及Agent/Provider等尚未落地的内置文档继续K09/K13；下一批沿conversation.view接订阅、关闭和真实消息变化。任务图完整Op推送、report与其他覆盖项保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/view.ts attach/watch/advance/close与task-graph.ts的Watch语义。初始帧固定attach视图，慢消费读取合并后的状态，观察者分别持有交付基线。
+- 实际调用链：Host/TUI conversation.view.watch → 同一只读会话快照 → 共享view_watch.S初始/变化交付 → 真实Entry、Live/Usage、队列变化 → caller-owned JSON；个别退订解除注册，Host停止先统一关闭会话观察者再关闭任务图/Client/Scheduler。任务图原观察实现移入共享模块，旧实现及旧导出同步移除，两个实际消费者共用生命周期。
+- 验证：SQLite/JSONL ASan/UBSan覆盖257项队列撤回观察、独立/迟读初始帧、返回值隔离、重复退订、统一关闭与attach中关闭无残留；任务图既有多观察者/注册变化/迁移恢复场景保持。实际Host覆盖两个会话观察者、压缩后head、持有帧跨Host关闭及未退订自动清理；DeepSeek两后端真实摘要/重开/回答后订阅得到新head/历史与用量，再次读取无变化。整批验证见当前实现记录。
+- 接口与自审：view_watch.h公开40字节binding/32字节watch；会话binding32字节、watch104字节，头/Assembly偏移与ABI断言同步。conversation.view服务追加watch/next/close，C仅组合和关闭；新共享源码、模块依赖、导出及构建登记更新并自审。
+- 剩余与下一交付物：当前观察为显式拉取的合并视图；完整逐提交消息事件/Op与report、Agent/Provider内置文档继续K09/K13。下一批接实际Client的完整消息边界与会话事件，其他覆盖项保持原范围。

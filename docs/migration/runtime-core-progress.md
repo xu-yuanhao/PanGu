@@ -34,9 +34,9 @@
 
 ## 本批验证与集成状态
 
-- conversation.view接通原始有效历史、已有Live/Usage文档与PanGu队列记录；所有读取在同一readOnLine内，返回值独立持有。
-- 双后端ASan/UBSan通过超过300条Entry与257条队列分页、撤回/重开/只读保护；实际Host/TUI查询通过。
-- DeepSeek真实摘要/重开/后续回答中，视图用量与账本相等、Live存在、压缩后head历史正确；Runtime整批回归、G00/Assembly与产品构建通过。
+- 会话视图多观察者提供attach初始帧、后续历史/文档/队列合并变化、独立退订与Host统一关闭。
+- 任务图与会话视图复用view_watch.S；移除任务图内旧生命周期实现并迁移实际调用者。
+- 双后端ASan/UBSan、队列/迟读/attach中关闭、实际Host多观察者与持有帧关闭后有效通过；DeepSeek真实摘要/回答的head、历史和用量变化观察通过。Runtime整批回归、产品构建、G00/Assembly通过。
 
 ## 当前接口边界
 

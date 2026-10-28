@@ -137,6 +137,8 @@ pg_conversation_view_read:
  xor eax,eax
  mov ecx,24
  rep stosq
+ cmp dword ptr [rbx+24],0
+ jne .Lv_view_closed
  mov rdi,rsp
  mov rsi,[rbx]
  call pg_durable_read_on_line_begin@PLT
@@ -237,6 +239,9 @@ pg_conversation_view_read:
 .Lv_view_missing:
  mov ebp,2
  jmp .Lv_view_end
+.Lv_view_closed:
+ mov ebp,7
+ jmp .Lv_view_end
 .Lv_view_busy:
  mov ebp,3
  jmp .Lv_view_end
@@ -270,6 +275,12 @@ pg_conversation_view_service:
  mov [rsi+8],rax
  mov rax,qword ptr [rip+json_object_put@GOTPCREL]
  mov [rsi+16],rax
+ lea rax,[rip+pg_conversation_watch_open]
+ mov [rsi+24],rax
+ lea rax,[rip+pg_conversation_watch_next]
+ mov [rsi+32],rax
+ lea rax,[rip+pg_conversation_watch_close]
+ mov [rsi+40],rax
  ret
 .section .rodata
 .Lv_conversation: .asciz "conversation"
@@ -421,3 +432,115 @@ pg_conversation_view_service:
  VE 192
 .section .rodata
 .Lv_head: .asciz "head"
+
+.text
+.Lv_watch_snapshot:
+ mov rdx,rsi
+ mov rsi,[rdi+80]
+ mov rdi,[rdi+72]
+ jmp pg_conversation_view_read
+.globl pg_conversation_watch_open
+.type pg_conversation_watch_open,@function
+pg_conversation_watch_open:
+ VF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ cmp dword ptr [rdx+96],0
+ jne .Lv_watch_open_invalid
+ cmp dword ptr [rbx+24],0
+ jne .Lv_watch_open_closed
+ mov [r13+72],rbx
+ mov [r13+80],r12
+ mov rdi,r13
+ mov rsi,r13
+ lea rdx,[rip+.Lv_watch_snapshot]
+ call pg_view_binding_init@PLT
+ mov rdi,r13
+ lea rsi,[r13+40]
+ call pg_view_watch_open@PLT
+ test eax,eax
+ jnz .Lv_watch_open_error
+ cmp dword ptr [rbx+24],0
+ jne .Lv_watch_open_late_close
+ mov rax,[rbx+16]
+ mov [r13+88],rax
+ mov [rbx+16],r13
+ mov dword ptr [r13+96],1
+ xor eax,eax
+ jmp .Lv_watch_open_end
+.Lv_watch_open_late_close:
+ mov eax,7
+.Lv_watch_open_error:
+ mov [rsp],eax
+ mov rdi,r13
+ call pg_view_binding_close@PLT
+ mov rdi,r13
+ xor eax,eax
+ mov ecx,13
+ rep stosq
+ mov eax,[rsp]
+ jmp .Lv_watch_open_end
+.Lv_watch_open_closed:
+ mov eax,7
+ jmp .Lv_watch_open_end
+.Lv_watch_open_invalid:
+ mov eax,1
+.Lv_watch_open_end:
+ VE 16
+.globl pg_conversation_watch_next
+.type pg_conversation_watch_next,@function
+pg_conversation_watch_next:
+ mov qword ptr [rsi],0
+ cmp dword ptr [rdi+96],1
+ jne .Lv_watch_next_closed
+ add rdi,40
+ jmp pg_view_watch_next@PLT
+.Lv_watch_next_closed:
+ mov eax,-7
+ ret
+.globl pg_conversation_watch_close
+.type pg_conversation_watch_close,@function
+pg_conversation_watch_close:
+ push rbx
+ mov rbx,rdi
+ cmp dword ptr [rbx+96],0
+ je .Lv_watch_close_end
+ mov rax,[rbx+72]
+ lea rcx,[rax+16]
+.Lv_watch_close_find:
+ mov rax,[rcx]
+ test rax,rax
+ jz .Lv_watch_close_release
+ cmp rax,rbx
+ je .Lv_watch_close_unlink
+ lea rcx,[rax+88]
+ jmp .Lv_watch_close_find
+.Lv_watch_close_unlink:
+ mov rax,[rbx+88]
+ mov [rcx],rax
+.Lv_watch_close_release:
+ mov rdi,rbx
+ call pg_view_binding_close@PLT
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,13
+ rep stosq
+.Lv_watch_close_end:
+ pop rbx
+ ret
+.globl pg_conversation_view_close
+.type pg_conversation_view_close,@function
+pg_conversation_view_close:
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+24],1
+.Lv_watch_close_all:
+ mov rdi,[rbx+16]
+ test rdi,rdi
+ jz .Lv_watch_close_all_end
+ call pg_conversation_watch_close
+ jmp .Lv_watch_close_all
+.Lv_watch_close_all_end:
+ pop rbx
+ ret

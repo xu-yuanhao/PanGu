@@ -2252,16 +2252,13 @@
       ],
       "dependencies": [
         "task.runner.local.v0",
-        "json-c"
+        "json-c",
+        "view.watch.local.v0"
       ],
       "role": "Pi Durable task-graph live nodes, state/ownership projection and registry metadata inspection",
       "exports": [
         "pg_task_graph_read",
-        "pg_task_graph_service",
-        "pg_task_graph_watch_open",
-        "pg_task_graph_watch_next",
-        "pg_task_graph_watch_close",
-        "pg_task_graph_binding_close"
+        "pg_task_graph_service"
       ]
     },
     {
@@ -2273,12 +2270,35 @@
       "dependencies": [
         "task.runner.local.v0",
         "session.documents.reader.local.v0",
-        "json-c"
+        "json-c",
+        "view.watch.local.v0"
       ],
       "role": "Pi Durable ConversationView on a native readOnLine: active entries, existing documents and queued native Submissions",
       "exports": [
         "pg_conversation_view_read",
-        "pg_conversation_view_service"
+        "pg_conversation_view_service",
+        "pg_conversation_watch_open",
+        "pg_conversation_watch_next",
+        "pg_conversation_watch_close",
+        "pg_conversation_view_close"
+      ]
+    },
+    {
+      "id": "view.watch.local.v0",
+      "sources": [
+        "src/runtime/view_watch.S",
+        "src/runtime/view_watch.h"
+      ],
+      "dependencies": [
+        "json-c"
+      ],
+      "role": "Shared owned initial/change frames and serialized observer teardown for native task graph and conversation view",
+      "exports": [
+        "pg_view_binding_init",
+        "pg_view_watch_open",
+        "pg_view_watch_next",
+        "pg_view_watch_close",
+        "pg_view_binding_close"
       ]
     }
   ],

@@ -306,6 +306,10 @@
     "src/runtime/conversation_view.S": {
       "role": "assembly-core",
       "reason": "Pi Durable ConversationView atomic active transcript and built-in document/queue read"
+    },
+    "src/runtime/view_watch.S": {
+      "role": "assembly-core",
+      "reason": "Shared native Watch lifecycle used by task graph and conversation view consumers"
     }
   }
 }
