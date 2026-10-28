@@ -2295,13 +2295,33 @@ pg_durable_compaction_create:
  test rax,rax
  jz .Lcc_create_bad
  cmp qword ptr [rbx+32],0
- je .Lcc_create_stage
+ je .Lcc_create_background
  CGET rax,ownership
  mov r14,rax
  mov rdi,[rbx+32]
  call json_object_new_uint64@PLT
  mov rdi,r14
  lea rsi,[rip+.Lcc_taskId]
+ mov rdx,rax
+ call .Lcc_set
+ test eax,eax
+ jnz .Lcc_create_bad
+ jmp .Lcc_create_stage
+.Lcc_create_background:
+ CGET "qword ptr [rbx+40]",reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcc_create_stage
+ mov rdi,rax
+ lea rsi,[rip+.Lcc_manual_word]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcc_create_stage
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+48]
+ lea rsi,[rip+.Lcc_background]
  mov rdx,rax
  call .Lcc_set
  test eax,eax
@@ -2574,3 +2594,7 @@ pg_durable_compaction_threshold:
 .section .rodata
 .Lcc_data: .asciz "data"
 .Lcc_reason: .asciz "reason"
+
+.section .rodata
+.Lcc_background: .asciz "background"
+.Lcc_manual_word: .asciz "manual"

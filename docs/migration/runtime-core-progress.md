@@ -14,7 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
-| 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成 |
+| 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
@@ -30,13 +30,14 @@
 
 ## 本批验证与集成状态
 
-- 模型错误/HTTP识别context overflow后，按当前压缩策略与固定cutoff创建owned压缩；失败assistant、子任务和父等待同批提交。摘要成功后保持原attempt继续请求，失败/无摘要保留原溢出原因；同一Generation的compacted标记约束再次溢出。
-- SQLite/JSONL注入overflow后经真实DeepSeek摘要、阶段重开及继续回忆通过；Durable ASan/UBSan覆盖关闭压缩、无切点、恢复failed/no-entry子任务的原错误。Runtime整批回归、更新后的Durable专项、隔离核心G00/Assembly与产品构建通过。
-- K12继续background、取消/Live/hook与完整动态请求；可选model.metadata提供容量，默认目录和模型覆盖策略按K05接入。
+- 后台容量阈值在prepare事务中检查已有压缩，创建conversation-owned/background Task并保留正常request；摘要经现有Submission路径放置。
+- Client以前台活跃任务判定运行结束，空闲poll继续调度后台，Esc仅取消前台；Task故障按owner链隔离后台分支。查询优先最新running任务并限制1条结果。
+- SQLite/JSONL真实DeepSeek验证前台结束、重复触发去重、Esc隔离、两次阶段重开、摘要放置与后续回忆；实际产品Host同一后台闭环通过。Runtime整批回归、Durable ASan/UBSan及后台真实专项、隔离核心G00/Assembly与产品构建通过。
+- K05接入默认模型目录与modelOverrides，K12继续取消/失败Live/hook、stale/阻塞竞争及完整动态请求。
 
 ## 当前接口边界
 
-摘要输入已支持显式长度借用文本，验证至1 MiB；常规Generation与历史投影仍为64条消息、单条4096字节，摘要输出沿4096字节边界。完整上下文/压缩按K12完成。前台Client当前按调度空闲输出运行终态；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
+摘要输入已支持显式长度借用文本，验证至1 MiB；常规Generation与历史投影仍为64条消息、单条4096字节，摘要输出沿4096字节边界。完整上下文/压缩按K12完成。前台Client按本会话非后台任务空闲输出运行终态，空闲时继续推进后台调度；独立Inputs服务和可选TUI操作表已提供队列/Submission；TUI交互、多会话及完整查询按K10/K13接入。K05/K07继续补齐模型协议、分类错误/重试、deferred/partial、顺序工具与hooks；项目配置和提示资源恢复按K11完成。全部剩余行为保留在核心TODO。
 
 ## 复验入口
 

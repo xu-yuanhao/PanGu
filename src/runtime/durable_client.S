@@ -184,6 +184,11 @@ pg_durable_client_open:
  mov rax,[rbx+8]
  cmp qword ptr [rax+24],0
  je .Ldc_open_ok
+ mov rdi,rbx
+ call .Ldc_foreground_busy
+ test eax,eax
+ js .Ldc_open_bad
+ jz .Ldc_open_ok
  mov dword ptr [rbx+60],1
  mov rdi,rbx
  xor esi,esi
@@ -445,15 +450,24 @@ pg_durable_client_open:
  mov qword ptr [rbx+48],0
  cmp qword ptr [rbx+32],0
  jne .Ldc_poll_take
- cmp dword ptr [rbx+60],1
- jne .Ldc_poll_empty
  mov rdi,[rbx+8]
  call pg_task_scheduler_poll@PLT
+ cmp eax,4
+ jae .Ldc_poll_scheduler_error
+ cmp dword ptr [rbx+60],1
+ jne .Ldc_poll_take
  cmp eax,2
  je .Ldc_poll_finish
- cmp eax,4
- jb .Ldc_poll_take
+ mov rdi,rbx
+ call .Ldc_foreground_busy
+ test eax,eax
+ js .Ldc_poll_scheduler_error
+ jnz .Ldc_poll_take
+ jmp .Ldc_poll_finish
+.Ldc_poll_scheduler_error:
  mov dword ptr [rbx+72],1
+ cmp dword ptr [rbx+60],1
+ jne .Ldc_poll_take
 .Ldc_poll_finish:
  mov dword ptr [rbx+60],0
  mov rdi,rbx
@@ -1150,3 +1164,126 @@ pg_durable_client_inputs_service:
 .text
 .Ldi_release:
  jmp json_object_put@PLT
+
+.text
+/* Conversation idle excludes background Task branches, like Durable waitForIdle. */
+.Ldc_foreground_busy:
+ push rbx
+ push r12
+ push r13
+ sub rsp,144
+ mov rbx,rdi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,18
+ rep stosq
+ mov rax,[rbx+8]
+ mov r12,[rax+8]
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],2
+ mov qword ptr [rsp+24],1
+ mov qword ptr [rsp+32],321
+ mov dword ptr [rsp+96],1
+ mov rax,[rbx+24]
+ mov [rsp+40],rax
+.Ldc_foreground_scan:
+ mov rdi,[r12]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [r12+16]
+ test eax,eax
+ jnz .Ldc_foreground_error
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .Ldc_foreground_found
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ mov eax,[rsp+96]
+ cmp eax,1
+ je .Ldc_foreground_pending
+ test eax,eax
+ jnz .Ldc_foreground_next
+ mov eax,1
+.Ldc_foreground_next:
+ inc eax
+ cmp eax,5
+ jae .Ldc_foreground_idle
+ mov [rsp+96],eax
+ jmp .Ldc_foreground_scan
+.Ldc_foreground_pending:
+ mov dword ptr [rsp+96],0
+ jmp .Ldc_foreground_scan
+.Ldc_foreground_found:
+ mov r13d,1
+ jmp .Ldc_foreground_end
+.Ldc_foreground_error:
+ mov r13d,-1
+ jmp .Ldc_foreground_end
+.Ldc_foreground_idle:
+ xor r13d,r13d
+.Ldc_foreground_end:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,r13d
+ add rsp,144
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.section .rodata
+
+.text
+.globl pg_durable_client_fault_task
+.type pg_durable_client_fault_task,@function
+pg_durable_client_fault_task:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+.Ldc_fault_task_read:
+ mov rax,[rbx+8]
+ test rax,rax
+ jz .Ldc_fault_task_foreground
+ mov rax,[rax+8]
+ test rax,rax
+ jz .Ldc_fault_task_foreground
+ mov rdi,[rax]
+ mov esi,2
+ mov rdx,r12
+ mov rcx,rsp
+ call [rax+8]
+ test eax,eax
+ jnz .Ldc_fault_task_foreground
+ CGET "qword ptr [rsp]",background
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ldc_fault_task_end
+ CGET "qword ptr [rsp]",owner
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Ldc_fault_task_foreground
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ jmp .Ldc_fault_task_read
+.Ldc_fault_task_foreground:
+ mov rdi,rbx
+ call pg_durable_client_fault
+.Ldc_fault_task_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_fault_task,.-pg_durable_client_fault_task
+.section .rodata
+.Ldc_owner: .asciz "owner"

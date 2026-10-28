@@ -1797,6 +1797,7 @@
         "pg_durable_client_tool",
         "pg_durable_client_publish",
         "pg_durable_client_fault",
+        "pg_durable_client_fault_task",
         "pg_durable_client_output",
         "pg_model_retryable",
         "pg_model_context_overflow",

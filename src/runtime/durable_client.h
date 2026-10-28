@@ -33,6 +33,8 @@ void pg_durable_client_output(pg_durable_client *,uint64_t task_id,pg_slice);
 /* Attach as Record Session publication callback with context=client. */
 void pg_durable_client_publish(void *,const struct json_object *,uint64_t);
 void pg_durable_client_fault(pg_durable_client *);
+/* Background Task branches do not fail the foreground run. */
+void pg_durable_client_fault_task(pg_durable_client *,uint64_t);
 /* tui_tool_observer read signature; owned committed snapshot, no pumping. */
 int pg_durable_client_tool_observe(void *,const char *,size_t,struct json_object **);
 #endif

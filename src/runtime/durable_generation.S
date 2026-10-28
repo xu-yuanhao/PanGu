@@ -245,7 +245,7 @@ pg_durable_generation_init:
  push r12
  push r13
  push r14
- sub rsp,128
+ sub rsp,144
  mov r12,rdi
  mov rbx,rsi
  pxor xmm0,xmm0
@@ -253,7 +253,7 @@ pg_durable_generation_init:
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
  mov qword ptr [rsp+48],0
- mov qword ptr [rsp+104],0
+ mov qword ptr [rsp+120],0
  call .Lgg_operation
  test eax,eax
  jnz .Lgg_prepare_end
@@ -286,11 +286,11 @@ pg_durable_generation_init:
  mov rax,[rbx+8]
  mov rdi,[rax]
  mov esi,2
- lea rcx,[rsp+104]
+ lea rcx,[rsp+120]
  call [rax+8]
  test eax,eax
  jnz .Lgg_prepare_invalid
- GGET "qword ptr [rsp+104]",state
+ GGET "qword ptr [rsp+120]",state
  GGET rax,outcome
  GGET rax,status
  mov rdi,rax
@@ -307,7 +307,7 @@ pg_durable_generation_init:
  GGET rax,overflow
  test rax,rax
  jz .Lgg_prepare_scan
- GGET "qword ptr [rsp+104]",state
+ GGET "qword ptr [rsp+120]",state
  GGET rax,outcome
  GGET rax,result
  GGET rax,entry_id
@@ -332,6 +332,15 @@ pg_durable_generation_init:
  mov rsi,[r14+16]
  lea rdx,[rsp+56]
  call pg_durable_compaction_threshold@PLT
+ cmp eax,2
+ jne .Lgg_prepare_blocking
+ mov qword ptr [r14+4432],1
+ mov rax,[rsp+56]
+ mov [r14+4416],rax
+ mov rax,[rsp+64]
+ mov [r14+4424],rax
+ jmp .Lgg_prepare_scan
+.Lgg_prepare_blocking:
  cmp eax,1
  jne .Lgg_prepare_scan
  mov [rsp+80],r14
@@ -360,7 +369,7 @@ pg_durable_generation_init:
  GGET rax,overflow
  test rax,rax
  jnz .Lgg_prepare_failure_copy
- GGET "qword ptr [rsp+104]",state
+ GGET "qword ptr [rsp+120]",state
  GGET rax,outcome
  GGET rax,error_key
  GGET rax,message_key
@@ -446,6 +455,21 @@ pg_durable_generation_init:
  call .Lgg_copy_compacted
  test eax,eax
  jnz .Lgg_prepare_end
+ cmp qword ptr [r14+4432],0
+ je .Lgg_prepare_commit_request
+ mov [rsp+80],r14
+ mov rax,[r14+4416]
+ mov [rsp+88],rax
+ mov rax,[r14+4424]
+ mov [rsp+96],rax
+ mov rax,[rsp+32]
+ mov [rsp+104],rax
+ mov rdi,rbx
+ lea rsi,[rsp+80]
+ lea rdx,[rip+.Lgg_prepare_background_stage]
+ call pg_task_runner_commit_with@PLT
+ jmp .Lgg_prepare_end
+.Lgg_prepare_commit_request:
  mov rdi,rbx
  mov rsi,[rsp+32]
  call pg_task_runner_commit@PLT
@@ -459,7 +483,7 @@ pg_durable_generation_init:
  mov ebp,eax
  mov rdi,[rsp+48]
  call json_object_put@PLT
- mov rdi,[rsp+104]
+ mov rdi,[rsp+120]
  call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
@@ -469,7 +493,7 @@ pg_durable_generation_init:
  call json_object_put@PLT
  mov eax,ebp
  neg eax
- add rsp,128
+ add rsp,144
  pop r14
  pop r13
  pop r12
@@ -4403,6 +4427,10 @@ pg_durable_generation_bind_compaction:
  mov rcx,[rcx+32]
  mov [rsp+16],rcx
  mov rcx,[rax+16]
+ cmp qword ptr [r14+4432],0
+ je .Lgg_compact_owner_ready
+ xor ecx,ecx
+.Lgg_compact_owner_ready:
  mov [rsp+32],rcx
  GGET "qword ptr [rax+24]",conversation_id
  mov rdi,rax
@@ -4447,6 +4475,14 @@ pg_durable_generation_bind_compaction:
  call pg_durable_compaction_create@PLT
  test eax,eax
  jnz .Lgg_compact_stage_end
+ cmp qword ptr [r14+4432],0
+ je .Lgg_compact_owned_wait
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov [r13],rax
+ xor eax,eax
+ jmp .Lgg_compact_stage_end
+.Lgg_compact_owned_wait:
  lea rdi,[rip+.Lgg_compaction_wait]
  call json_tokener_parse@PLT
  mov [rsp+64],rax
@@ -4643,3 +4679,110 @@ pg_durable_generation_bind_compaction:
 .Lgg_threshold: .asciz "threshold"
 .Lgg_reason: .asciz "reason"
 .Lgg_compaction: .asciz "compaction"
+
+.text
+/* Query the current transaction before admitting one background compaction. */
+.Lgg_prepare_background_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,184
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,23
+ rep stosq
+ mov dword ptr [rsp],2
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],64
+ mov qword ptr [rsp+32],33
+ lea rax,[rip+.Lgg_compaction_task_name]
+ mov [rsp+80],rax
+ mov qword ptr [rsp+88],16
+ mov rax,[rbx]
+ mov rax,[rax+8]
+ mov rax,[rax+8]
+ mov rcx,[rax]
+ mov [rsp+144],rcx
+ mov rcx,[rax+16]
+ mov [rsp+152],rcx
+ mov rax,[rbx]
+ mov rax,[rax+8]
+ GGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+40],rax
+.Lgg_background_scan:
+ mov rdi,r12
+ lea rsi,[rsp+144]
+ mov rdx,rsp
+ lea rcx,[rsp+112]
+ call pg_record_tx_scan@PLT
+ test eax,eax
+ jnz .Lgg_background_end
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ mov r15,rax
+ xor ebp,ebp
+.Lgg_background_task:
+ cmp rbp,r15
+ jae .Lgg_background_page
+ mov rdi,[rsp+112]
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ GGET rax,state
+ GGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_terminal_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_background_existing
+ inc rbp
+ jmp .Lgg_background_task
+.Lgg_background_page:
+ cmp dword ptr [rsp+132],0
+ je .Lgg_background_create
+ mov dword ptr [rsp+8],1
+ mov eax,[rsp+128]
+ mov [rsp+12],eax
+ mov rax,[rsp+120]
+ mov [rsp+16],rax
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Lgg_background_scan
+.Lgg_background_create:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,r14
+ call .Lgg_compact_stage
+ jmp .Lgg_background_end
+.Lgg_background_existing:
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov [r14],rax
+ xor eax,eax
+.Lgg_background_end:
+ mov ebp,eax
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,184
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_compaction_task_name: .asciz "pangu.compaction"

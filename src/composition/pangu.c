@@ -129,7 +129,7 @@ static int resolve(void *ctx,pg_slice name,const pg_task_definition **out){
  (void)ctx;const pg_task_definition *definitions[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};*out=0;
  for(size_t i=0;i<3;i++)if(name.size==definitions[i]->name.size&&!memcmp(name.data,definitions[i]->name.data,name.size)){*out=definitions[i];return 0;}return 1;
 }
-static void report(void *ctx,uint64_t id,int error){(void)ctx;fprintf(stderr,"PanGu durable task %llu failed (%d; model HTTP=%ld, transport=%d, decoder=%d).\n",(unsigned long long)id,error,provider.http,provider.transport_done,provider.failed);pg_durable_client_fault(&durable.client);}
+static void report(void *ctx,uint64_t id,int error){(void)ctx;fprintf(stderr,"PanGu durable task %llu failed (%d; model HTTP=%ld, transport=%d, decoder=%d).\n",(unsigned long long)id,error,provider.http,provider.transport_done,provider.failed);pg_durable_client_fault_task(&durable.client,id);}
 static int storage_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;if(pg_record_jsonl_open(&durable.backend,application.session_directory,1))return 1;durable.storage_ready=1;
  durable.records=(pg_record_session){.storage=pg_record_jsonl_storage(&durable.backend),.sequence=durable.backend.memory.next_sequence-1};
