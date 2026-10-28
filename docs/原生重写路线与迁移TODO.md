@@ -161,6 +161,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Coding Agent `core/{resource-loader,settings-manager,settings-schema,skills,prompt-templates,system-prompt,auth-storage}.ts`、`packages/mcp/src/`；Durable `codemode/`、`tool-search/` 及其测试。
 
 - [x] 用户与项目默认skills接入模型请求：目录SKILL.md优先、根目录Markdown与嵌套发现、名称/描述校验、同名先加载优先、规范路径去重、禁用自动调用过滤和XML描述；真实模型按需读取技能/相对资源并完成写入。
+- [x] 用户/项目默认prompt templates与显式技能命令接入前台提交：引号参数、位置/全部参数、默认值和切片单次展开；/skill:name读取当前正文（含禁用自动调用的技能），展开后的实际输入进入Durable持久执行。
 - [ ] 完成项目/用户配置优先级、AGENTS上下文、system/append/section、skills、prompt templates和资源刷新；配置解析与资源加载成为服务；内置提示词保留参考机制并适配PanGu自称、`.pangu`目录、配置与实际入口。
 - [ ] 完成 MCP stdio/HTTP客户端的发现、调用、取消、认证与清理，并转成现有Tools接口。
 - [ ] 对照 Pi codemode 的工具能力隔离、声明生成和持久嵌套调用，通过QuickJS的C接口完成原生桥接；完成tool search后动态工具声明与实际执行同步。
@@ -218,8 +219,8 @@ B01已接通持久提交与完整Session关闭重开链；当前推进B02的持�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 core/skills.ts、resource-loader.ts、system-prompt.ts、utils/frontmatter.ts及skills.test.ts/fixtures；与已获取origin/main比较本批相关源码无差异，沿固定快照实现。
-- 实际调用链：产品启动 → 用户agent目录/skills与项目.pangu/skills → Assembly发现/校验/去重 → libyaml元数据桥接 → Assembly转义XML → systemPrompt的skills节 → 真实Generation/read读取SKILL.md与相对资源 → write写入工作区。用户先加载，同名保留首项；SKILL.md截断目录递归，隐藏目录/node_modules跳过，symlink规范路径去重并限制递归深度。
-- 验证：skills与prompt专项ASan/UBSan、Pi现有skills夹具、Runtime整批回归、G00/Assembly与产品构建通过。真实DeepSeek从技能描述发现技能、按需读取正文和相对payload、生成精确结果；请求捕获核对用户优先、禁用技能过滤、正文未注入systemPrompt，持久工具回执核对实际read路径。
-- 接口与自审：新增resources.skills.local.v0，导出owned JSON技能/诊断快照与有界XML格式接口；pg_prompt_workspace_source追加借用skills_prompt，当前全部调用者同步。C仅暴露目录/stat与libyaml节点布局；遍历、选择、验证、去重和格式为Assembly。libyaml 0.2.5作为成熟解析依赖登记，源/模块/构建同步；控制差异自审通过。TUI未提交工作保持原位。
-- 剩余与下一交付物：K11继续忽略文件规则、显式技能路径/配置、诊断交互、刷新和prompt templates；当前技能正文读取上限1MiB，系统提示沿现有4095字节有界失败，不静默截断。K08其余文件/附件行为及其他K项按原覆盖表保留。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 prompt-templates.ts parseCommandArgs/substituteArgs/loadPromptTemplates/expandPromptTemplate、agent-session.ts _expandSkillCommand及对应测试；本批与已获取origin/main比较相关文件无差异，沿固定快照移植。
+- 实际调用链：用户agent目录/prompts与项目.pangu/prompts → Assembly目录加载与Markdown元数据/正文 → 前台client_submit → pg_resource_expand → 模板参数单次替换或显式技能当前正文 → 原有Durable Submission/Generation/Tools。普通文本/未知命令保持原文；同名模板按用户先加载顺序选择；技能禁用自动调用不阻止显式调用。
+- 验证：模板/参数/技能命令专项ASan/UBSan、250组与Pi原函数的参数/替换差异对照、Runtime整批回归、G00/Assembly与产品构建通过。整机发现并修复缺失模板目录的空快照分支，追加专项与最终产品重建通过。真实DeepSeek从/recipe带引号及字面$1参数写入/运行，再从/skill:manual读取启动后更新的禁用自动技能正文并写入/运行；持久User Entry保存实际展开文本，既有自动技能读取工作流继续通过。
+- 接口与自审：resources.templates.local.v0新增owned目录快照、参数解析、单次替换和统一展开函数；复用skills中的完整Markdown读取/BOM/换行/frontmatter处理及Unicode空白函数。纯逻辑为Assembly，placeholder匹配复用libpcre2-8原生API，libyaml仍只作YAML桥接；新增源/依赖/构建同步登记。资源快照由产品持有至Agent关闭；前台提交扩展，既有Inputs与TUI布局不变。控制差异自审通过，TUI工作保留原位。
+- 剩余与下一交付物：K11继续配置、忽略规则、显式资源路径、目录刷新、诊断/命令选择交互和MCP/代码工具；描述截断保持完整UTF-8标量。当前正文读取上限1MiB、前台展开和系统提示4095字节有界失败；其他K项保持原覆盖表范围。

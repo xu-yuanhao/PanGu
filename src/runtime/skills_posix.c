@@ -56,7 +56,7 @@ int pg_skills_yaml(const char *data,size_t size,struct json_object **out){
    if(key->type!=YAML_SCALAR_NODE){result=1;break;}const char *name=(const char *)key->data.scalar.value;
    if(json_object_object_get(keys,name)){result=1;break;}
    struct json_object *flag=json_object_new_boolean(1);if(!flag||json_object_object_add(keys,name,flag)){json_object_put(flag);result=5;break;}
-   if(!strcmp(name,"name")||!strcmp(name,"description")||!strcmp(name,"disable-model-invocation")){
+   if(!strcmp(name,"name")||!strcmp(name,"description")||!strcmp(name,"disable-model-invocation")||!strcmp(name,"argument-hint")){
     int error=0;struct json_object *field=scalar(value,&error);if(!field&&error)result=error;else if(field&&json_object_object_add(fields,name,field)){json_object_put(field);result=5;}
    }
   }

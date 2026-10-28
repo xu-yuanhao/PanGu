@@ -1928,14 +1928,18 @@
         "json-c",
         "libyaml",
         "libutf8proc",
-        "system libc"
+        "system libc",
+        "client.contract.v0"
       ],
       "role": "Assembly skills discovery, user-first collision handling, canonical file/directory deduplication, YAML metadata validation and escaped model-visible prompt; C bridges POSIX/libyaml layouts",
       "exports": [
         "pg_skills_load",
         "pg_skills_prompt",
         "pg_skills_directory",
-        "pg_skills_yaml"
+        "pg_skills_yaml",
+        "pg_resource_document",
+        "pg_resource_space",
+        "pg_resource_trim"
       ],
       "reference_basis": [
         {
@@ -1950,6 +1954,41 @@
           "semantics": "default user/project skill roots, directory SKILL.md preference, direct root markdown files, nested discovery, description/name validation, name/canonical deduplication, disabled model invocation, XML descriptors and on-demand read",
           "tests_to_read": [
             "packages/coding-agent/test/skills.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resources.templates.local.v0",
+      "sources": [
+        "src/runtime/prompt_templates.S",
+        "src/runtime/prompt_templates.h"
+      ],
+      "dependencies": [
+        "resources.skills.local.v0",
+        "json-c",
+        "libutf8proc",
+        "libpcre2-8"
+      ],
+      "role": "Assembly user/project prompt-template catalogs, quoted args and exact single-pass placeholder substitution; explicit skill expansion reads current body; product foreground submit consumer",
+      "exports": [
+        "pg_prompt_templates_load",
+        "pg_prompt_args",
+        "pg_prompt_substitute",
+        "pg_resource_expand"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/coding-agent/src/core/prompt-templates.ts",
+            "packages/coding-agent/src/core/agent-session.ts",
+            "packages/coding-agent/src/utils/frontmatter.ts"
+          ],
+          "semantics": "user/project direct Markdown templates; quote/whitespace args; positional/all/default/slice substitutions without recursively replacing values; explicit /skill:name uses fresh body including disabled automatic skills",
+          "tests_to_read": [
+            "packages/coding-agent/test/prompt-templates.test.ts"
           ]
         }
       ]
@@ -2020,6 +2059,14 @@
       "license": "MIT",
       "purpose": "skill frontmatter YAML parsing, multiline/quoted metadata, aliases and syntax errors",
       "impact": "resource loader external parser; traversal, validation and model prompt remain Assembly"
+    },
+    {
+      "name": "libpcre2-8",
+      "version": "10.49",
+      "source": "system pkg-config libpcre2-8; pcre2.h",
+      "license": "BSD-3-Clause",
+      "purpose": "reuse mature regex engine for Pi prompt-template placeholder pattern; matches only the original template, Assembly selects arguments and writes output",
+      "impact": "resource expansion only; regex handles and match data scoped to each invocation"
     }
   ],
   "real_model_validation": "real SSE tool/read roundtrips, multi-run context recall/reset, cancel followed by new input verified",

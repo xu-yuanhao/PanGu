@@ -342,6 +342,60 @@ def path_workflow(binary, root, environment):
         assert any(result.get('model', [{}])[0].get('toolName') == name and result.get('data', {}).get('arguments', {}).get('path') == path for result in saved), (name, 'canonical persisted arguments missing')
     print('PASS: real model file URL read, home/lexical write without extra mkdir, pasted-path symlink edit, bash and unchanged committed arguments', flush=True)
 
+def template_workflow(binary, root, environment):
+    workspace = root / 'template-workflow'
+    workspace.mkdir()
+    agent = root / 'template-user-agent'
+    prompts = agent / 'prompts'
+    prompts.mkdir(parents=True)
+    (prompts / 'recipe.md').write_text('---\ndescription: Write and verify a supplied value\nargument-hint: "[value]"\n---\nUse write to create template.txt containing exactly "$1" without the surrounding quotes, then bash to read template.txt. Reply with its exact contents.\n')
+    project = workspace / '.pangu' / 'prompts'
+    project.mkdir(parents=True)
+    (project / 'recipe.md').write_text('Write WRONG_PROJECT_TEMPLATE to template.txt.')
+    skill = agent / 'skills' / 'manual'
+    skill.mkdir(parents=True)
+    header = '---\nname: manual\ndescription: Disabled automatic recipe\ndisable-model-invocation: true\n---\n'
+    (skill / 'SKILL.md').write_text(header + 'Stale initial body.\n')
+    env = dict(environment, PANGU_AGENT_DIR=str(agent))
+    env.pop('PANGU_SYSTEM_PROMPT_FILE', None)
+    marker = 'PANGUTEMPLATE' + os.urandom(5).hex() + ' quoted $1'
+    manual = 'PANGUMANUAL' + os.urandom(5).hex()
+    terminal = Terminal(binary, workspace, env)
+    try:
+        terminal.until(b'> ', 5)
+        output = run_input(terminal, "/recipe '" + marker + "'")
+        assert (workspace / 'template.txt').read_text().strip() == marker
+        assert marker.encode() in output
+        (skill / 'SKILL.md').write_text(header + 'Use write to create manual.txt containing exactly ' + manual + '. Then report its exact contents.\n')
+        output = run_input(terminal, '/skill:manual Also use bash to read manual.txt after writing.')
+        assert (workspace / 'manual.txt').read_text().strip() == manual
+        assert manual.encode() in output
+        terminal.send(b'\x04')
+        terminal.finish()
+    finally:
+        terminal.close()
+    def users(value):
+        if isinstance(value, dict):
+            if value.get('kind') == 'pangu.user':
+                yield value
+            for child in value.values():
+                yield from users(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from users(child)
+    saved = []
+    for path in (workspace / '.pangu').iterdir():
+        if path.is_file():
+            for line in path.read_bytes().splitlines():
+                try:
+                    saved.extend(users(json.loads(line)))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+    contents = [value.get('model', [{}])[0].get('content', '') for value in saved]
+    assert any(isinstance(text, str) and marker in text and not text.startswith('/recipe') for text in contents)
+    assert any(isinstance(text, str) and text.startswith('<skill name="manual"') and manual in text and 'Also use bash' in text for text in contents)
+    print('PASS: actual template command, user-first recipe, literal placeholder arguments and fresh explicit disabled skill body committed through Durable', flush=True)
+
 def skill_workflow(binary, root, environment):
     workspace = root / 'skill-workflow'
     workspace.mkdir()
@@ -615,6 +669,7 @@ def main():
     parser.add_argument('--live-crash',action='store_true',help='process death during an unsafe tool and reopen')
     parser.add_argument('--live-plugin',action='store_true',help='native service substitution and ordered shutdown')
     parser.add_argument('--live-resources',action='store_true',help='project system/append/context instructions and reopen')
+    parser.add_argument('--live-templates',action='store_true',help='actual prompt command and explicit skill invocation')
     parser.add_argument('--live-skills',action='store_true',help='actual skill discovery, on-demand read and coding workflow')
     parser.add_argument('--live-paths',action='store_true',help='actual model absolute paths and symlink editing')
     parser.add_argument('--live-thinking',action='store_true',help='real reasoning/tool/context/reopen workflow')
@@ -627,9 +682,11 @@ def main():
         assert missing.returncode==2 and b'Model API key is required' in missing.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
-        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills:
+        if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills or args.live_templates:
             assert os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY'), 'model credential required'
             env=dict(os.environ);env.pop('PANGU_SESSION_DIR',None)
+            if args.live_templates:
+                template_workflow(binary,root,env)
             if args.live_skills:
                 skill_workflow(binary,root,env)
             if args.live_paths:

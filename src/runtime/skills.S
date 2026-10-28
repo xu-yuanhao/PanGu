@@ -29,6 +29,7 @@ SOFTWARE.*/
 .Lpath: .asciz "path"
 .Lcanonical: .asciz "canonical"
 .Lkind: .asciz "kind"
+.Lbody: .asciz "body"
 .Ldisabled: .asciz "disable-model-invocation"
 .Lfile: .asciz "filePath"
 .Lbase: .asciz "baseDir"
@@ -305,6 +306,8 @@ pg_skills_load:
  call .Ldiag
  jmp .Lwalk_exit
 .Lwalk_scan:
+ cmp qword ptr [rsp],0
+ je .Lwalk_ok
  xor r15d,r15d
 .Lwalk_prefer:
  mov rdi,[rsp]
@@ -412,6 +415,9 @@ pg_skills_load:
  mov eax,r14d
  exit 32
 /* Complete bounded read and normalized frontmatter extraction. */
+.globl pg_resource_document
+.type pg_resource_document,@function
+pg_resource_document:
 .Lfrontmatter:
  enter 32
  mov rbx,rdi
@@ -485,6 +491,8 @@ pg_skills_load:
  inc rdx
  jmp 1b
 4: mov byte ptr [r14+rdx],0
+ mov [rsp],r14
+ mov [rsp+8],rdx
  cmp rdx,4
  jb .Lfront_empty
  cmp word ptr [r14],0x2d2d
@@ -501,20 +509,49 @@ pg_skills_load:
  inc rcx
  jmp .Lfront_delimiter
 .Lfront_yaml:
+ mov [rsp+24],rcx
+ lea rdi,[r14+rcx+4]
+ lea rsi,[rcx+4]
+ sub rdx,rsi
+ mov rsi,rdx
+ call pg_resource_trim
+ mov [rsp],rax
+ mov [rsp+8],rdx
+ mov rcx,[rsp+24]
  cmp rcx,4
  jbe .Lfront_empty
  lea rdi,[r14+4]
  lea rsi,[rcx-4]
  mov rdx,r12
  call pg_skills_yaml
- jmp .Lfront_result
+ test eax,eax
+ jnz .Lfront_result
+ jmp .Lfront_body
 .Lfront_empty:
  call json_object_new_object@PLT
  test rax,rax
  jz .Lfront_memory
  mov [r12],rax
- xor eax,eax
- jmp .Lfront_result
+.Lfront_body:
+ mov rdi,[rsp]
+ mov esi,[rsp+8]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Lfront_body_fail
+ mov [rsp+16],rax
+ mov rdi,[r12]
+ lea rsi,[rip+.Lbody]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lfront_result
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+.Lfront_body_fail:
+ mov rdi,[r12]
+ call json_object_put@PLT
+ mov qword ptr [r12],0
+ jmp .Lfront_memory
 .Lfront_memory:
  mov eax,5
  jmp .Lfront_result
@@ -530,6 +567,91 @@ pg_skills_load:
  call close@PLT
 1: mov eax,ebx
  exit 32
+.size pg_resource_document,.-pg_resource_document
+/* ECMAScript whitespace width; zero for a nonspace or invalid scalar. */
+.globl pg_resource_space
+.type pg_resource_space,@function
+pg_resource_space:
+ sub rsp,24
+ lea rdx,[rsp]
+ call utf8proc_iterate@PLT
+ test rax,rax
+ jle .Lspace_no
+ mov [rsp+8],rax
+ mov edi,[rsp]
+ cmp edi,9
+ jb 1f
+ cmp edi,13
+ jbe .Lspace_yes
+1: cmp edi,0xfeff
+ je .Lspace_yes
+ call utf8proc_category@PLT
+ cmp eax,23
+ jb .Lspace_no
+ cmp eax,25
+ ja .Lspace_no
+.Lspace_yes:
+ mov rax,[rsp+8]
+ add rsp,24
+ ret
+.Lspace_no:
+ xor eax,eax
+ add rsp,24
+ ret
+.size pg_resource_space,.-pg_resource_space
+.globl pg_resource_trim
+.type pg_resource_trim,@function
+pg_resource_trim:
+ enter 16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+.Ltrim_lead:
+ cmp r13,r12
+ jae .Ltrim_empty
+ lea rdi,[rbx+r13]
+ mov rsi,r12
+ sub rsi,r13
+ call pg_resource_space
+ test rax,rax
+ jz .Ltrim_body
+ add r13,rax
+ jmp .Ltrim_lead
+.Ltrim_body:
+ mov r14,r13
+ mov r15,r13
+.Ltrim_scan:
+ cmp r13,r12
+ jae .Ltrim_end
+ lea rdi,[rbx+r13]
+ mov rsi,r12
+ sub rsi,r13
+ call pg_resource_space
+ test rax,rax
+ jz 1f
+ add r13,rax
+ jmp .Ltrim_scan
+1: lea rdi,[rbx+r13]
+ mov rsi,r12
+ sub rsi,r13
+ mov rdx,rsp
+ call utf8proc_iterate@PLT
+ test rax,rax
+ jg 2f
+ mov eax,1
+2: add r13,rax
+ mov r15,r13
+ jmp .Ltrim_scan
+.Ltrim_end:
+ lea rax,[rbx+r14]
+ mov rdx,r15
+ sub rdx,r14
+ exit 16
+.Ltrim_empty:
+ lea rax,[rbx+r12]
+ xor edx,edx
+ exit 16
+.size pg_resource_trim,.-pg_resource_trim
 /* String UTF-16 length and non-whitespace flag, matching JS validation. */
 .Ltext_measure:
  enter 16

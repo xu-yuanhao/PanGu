@@ -245,6 +245,10 @@
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "仅POSIX目录/stat布局快照和libyaml节点布局/标量桥接；遍历与技能语义在Assembly"
+    },
+    "src/runtime/prompt_templates.S": {
+      "role": "assembly-core",
+      "reason": "手写提示模板加载、参数分组/单次替换和显式技能命令，接入实际用户提交"
     }
   }
 }

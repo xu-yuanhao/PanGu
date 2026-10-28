@@ -11,6 +11,7 @@
 #include "../runtime/profile.h"
 #include "../runtime/prompt.h"
 #include "../runtime/skills.h"
+#include "../runtime/prompt_templates.h"
 #include "../runtime/durable_client.h"
 #include "../runtime/record_jsonl.h"
 #include <json-c/json.h>
@@ -50,7 +51,7 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools;
- struct json_object *configuration;
+ struct json_object *configuration,*skills,*templates;
  pg_timer_job fire,queued;void *fire_context,*queued_context;uint64_t deadline;
  unsigned armed,storage_ready,cache_ready,holds_ready,timer_ready,session_ready,client_ready,model_leased,tools_leased,tools_draining;
 } durable;
@@ -176,7 +177,10 @@ static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,st
  return selected->snapshot?selected->snapshot(selected->context,id,call,out):0;
 }
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}
-static int client_submit(void *ctx,pg_slice text){(void)ctx;return durable.native_client.submit(durable.native_client.context,text);}
+static int client_submit(void *ctx,pg_slice text){
+ (void)ctx;char expanded[4096];size_t size=0;if(pg_resource_expand(durable.templates,durable.skills,text,expanded,sizeof(expanded),&size))return 1;
+ return durable.native_client.submit(durable.native_client.context,(pg_slice){expanded,size});
+}
 static void client_cancel(void *ctx){(void)ctx;durable.native_client.cancel(durable.native_client.context);}
 static int client_poll(void *ctx,pg_event *event){(void)ctx;foreground();return durable.native_client.poll(durable.native_client.context,event);}
 static int prompt_probe(void *context,const char *path){
@@ -196,8 +200,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
  pg_prompt_workspace_source source={files,root,prompt_probe,declared,{application.path,strlen(application.path)},0,0,0,{0,0},0,0,0,{0,0},{0,0},0,{0,0}};
  size_t prompt_size=0;const char *prompt=configured_prompt,*file=getenv("PANGU_SYSTEM_PROMPT_FILE");
- if(file){if(pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size))return 1;}
- else {
+ {
   char user_path[4096],user_canonical[4096];const char *agent_dir=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");
   if(!agent_dir&&home){int n=snprintf(user_path,sizeof(user_path),"%s/.pangu/agent",home);if(n<0||(size_t)n>=sizeof(user_path))return 1;agent_dir=user_path;}
   int have_user=0;if(agent_dir){struct stat metadata;if(!stat(agent_dir,&metadata)){if(!S_ISDIR(metadata.st_mode)||!realpath(agent_dir,user_canonical))return 1;have_user=1;}else if(errno!=ENOENT&&errno!=ENOTDIR)return 1;}
@@ -208,15 +211,18 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
   if(have_user){source.user_files=&user_files;source.user_context=&user_source;source.user_probe=pg_prompt_resource_probe;source.user_directory=(pg_slice){user_canonical,strlen(user_canonical)};}
   source.ancestor_files=&ancestor_files;source.ancestor_context=&ancestor_source;source.ancestor_probe=pg_prompt_resource_probe;source.canonical=pg_prompt_path_canonical;
   char git_worktree[4096],git_common[4096];if(!pg_prompt_git_paths(application.path,git_worktree,sizeof(git_worktree),git_common,sizeof(git_common))){source.git_worktree=(pg_slice){git_worktree,strlen(git_worktree)};source.git_common_directory=(pg_slice){git_common,strlen(git_common)};}
-  char user_skills[4096],project_skills[4096],skills_prompt[4096];size_t skills_size=0;struct json_object *skills=0;
+  char user_skills[4096],project_skills[4096],user_prompts[4096],project_prompts[4096],skills_prompt[4096];size_t skills_size=0;struct json_object *skills=0,*templates=0;
   int n=snprintf(project_skills,sizeof(project_skills),"%s/.pangu/skills",application.path);if(n<0||(size_t)n>=sizeof(project_skills)){pg_read_tool_close(&resources);return 1;}
   if(have_user){n=snprintf(user_skills,sizeof(user_skills),"%s/skills",user_canonical);if(n<0||(size_t)n>=sizeof(user_skills)){pg_read_tool_close(&resources);return 1;}}
+  n=snprintf(project_prompts,sizeof(project_prompts),"%s/.pangu/prompts",application.path);if(n<0||(size_t)n>=sizeof(project_prompts)){pg_read_tool_close(&resources);return 1;}
+  if(have_user){n=snprintf(user_prompts,sizeof(user_prompts),"%s/prompts",user_canonical);if(n<0||(size_t)n>=sizeof(user_prompts)){pg_read_tool_close(&resources);return 1;}}
   unsigned reader=3;for(size_t i=0;i<declared->count;i++){if(!strcmp(declared->entries[i].name,"read")){reader=0;break;}if(!strcmp(declared->entries[i].name,"bash"))reader=1;}
   int result=pg_skills_load(have_user?user_skills:0,project_skills,&skills);
   if(!result){struct json_object *diagnostics=json_object_object_get(skills,"diagnostics");for(size_t i=0;i<json_object_array_length(diagnostics);i++){struct json_object *entry=json_object_array_get_idx(diagnostics,i);fprintf(stderr,"Skill warning: %s: %s\n",json_object_get_string(json_object_object_get(entry,"path")),json_object_get_string(json_object_object_get(entry,"message")));}}
+  if(!result)result=pg_prompt_templates_load(have_user?user_prompts:0,project_prompts,&templates);
   if(!result)result=pg_skills_prompt(skills,reader,skills_prompt,sizeof(skills_prompt),&skills_size);
-  if(!result){source.skills_prompt=(pg_slice){skills_prompt,skills_size};result=pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);}
-  json_object_put(skills);pg_read_tool_close(&resources);if(result)return 1;
+  if(!result){source.skills_prompt=(pg_slice){skills_prompt,skills_size};result=file?pg_prompt_from_file(files,(pg_slice){file,strlen(file)},configured_prompt,sizeof(configured_prompt),&prompt_size):pg_prompt_workspace(&source,configured_prompt,sizeof(configured_prompt),&prompt_size);}
+  pg_read_tool_close(&resources);if(result){json_object_put(skills);json_object_put(templates);return 1;}durable.skills=skills;durable.templates=templates;
  }
  const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
@@ -243,7 +249,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
- if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;return 0;
+ if(durable.tools_draining)return 1;durable.records.publish=0;json_object_put(durable.configuration);durable.configuration=0;json_object_put(durable.skills);durable.skills=0;json_object_put(durable.templates);durable.templates=0;return 0;
 }
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base"},*const agent_exports[]={"client","inputs"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};

@@ -605,6 +605,10 @@
     "src/runtime/skills.S": "native-source",
     "src/runtime/skills.h": "native-source",
     "src/runtime/skills_posix.c": "native-source",
-    "tests/runtime/test_skills.c": "native-test"
+    "tests/runtime/test_skills.c": "native-test",
+    "src/runtime/prompt_templates.S": "native-source",
+    "src/runtime/prompt_templates.h": "native-source",
+    "tests/runtime/test_prompt_templates.c": "native-test",
+    "tools/runtime/test_prompt_templates.py": "gate"
   }
 }
