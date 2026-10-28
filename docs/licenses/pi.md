@@ -4,6 +4,8 @@
 
 本批移植来源：packages/chord/src/delta/pending.ts、packages/durable/src/session/transaction.ts 的 storeHeld/holdable/adoptHeld、session/session.ts 的提交选择；原生实现为 src/runtime/pending.S、document_tx.S、delta.S、records.S。
 
+Durable 上下文与压缩移植来源：packages/durable/src/harness/{context,compaction}.ts、packages/ai/src/utils/{estimate,text,transcript}.ts；对应原生实现为 durable_generation.S 和 durable_compaction.S，包含摘要提示词。
+
 MIT License
 
 Copyright (c) 2025 Mario Zechner

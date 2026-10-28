@@ -20,6 +20,20 @@ typedef struct {
     int (*poll)(void *, pg_event *); /* 1 event, 0 no event; bounded work */
 } pg_client;
 struct json_object;
+/* start copies instructions; reserve_tokens is 2..1000000. Serialized binding
+   remains borrowed through poll/release and the owning runtime lifetime. */
+typedef struct {
+ uint64_t conversation,keep_recent_tokens,reserve_tokens;
+ const char *instructions;
+} pg_compaction_request;
+typedef struct {
+ void *context;
+ int (*start)(void *,const pg_compaction_request *,uint64_t *);
+ /* Pump one scheduler step; 0 owns a compaction Task snapshot, 1 missing. */
+ int (*poll)(void *,uint64_t,struct json_object **);
+ void (*release)(struct json_object *);
+} pg_compaction_ops;
+
 /* Serialized, non-pumping Submission operations. submit borrows a typed
    input/write draft and returns its stable deduplicated ID. status returns an
    owned record; list returns an owned ascending conversation-scoped array,

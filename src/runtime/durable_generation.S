@@ -928,17 +928,46 @@ pg_durable_generation_init:
  xor eax,eax
  pop rbx
  ret
+/* Append a borrowed JSON value; ownership transfers only after array adoption. */
+.Lgg_array_borrow:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov r12,rax
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lgg_array_borrow_end
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,4
+.Lgg_array_borrow_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
 /* Context.orderToolResults: retain non-results; match the first result by ID
    before the next assistant, in call order. Synthetic receipts stay ephemeral. */
-.Lgg_order_project:
+.globl pg_durable_context_order
+.type pg_durable_context_order,@function
+pg_durable_context_order:
  push rbp
  push rbx
  push r12
  push r13
  push r14
- sub rsp,64
- mov rbx,rdi
- mov r12,rsi
+ sub rsp,80
+ mov r12,rdi
+ mov [rsp+64],rsi
+ mov qword ptr [rsi],0
+ call json_object_new_array@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lgg_order_bad
  xor r13d,r13d
 .Lgg_order_message:
  mov rdi,r12
@@ -954,20 +983,14 @@ pg_durable_generation_init:
  call json_object_get_string@PLT
  test rax,rax
  jz .Lgg_order_bad
- mov [rsp+56],rax
  mov rdi,rax
- lea rsi,[rip+.Lgg_system_role]
- call strcmp@PLT
- test eax,eax
- jz .Lgg_order_next
- mov rdi,[rsp+56]
  lea rsi,[rip+.Lgg_tool_result]
  call strcmp@PLT
  test eax,eax
  jz .Lgg_order_next
  mov rdi,rbx
  mov rsi,r14
- call .Lgg_project_message
+ call .Lgg_array_borrow
  test eax,eax
  jnz .Lgg_order_bad
  GGET r14,role
@@ -1041,7 +1064,7 @@ pg_durable_generation_init:
 .Lgg_order_found:
  mov rdi,rbx
  mov rsi,[rsp+32]
- call .Lgg_project_message
+ call .Lgg_array_borrow
  test eax,eax
  jnz .Lgg_order_bad
  jmp .Lgg_order_block_next
@@ -1064,9 +1087,19 @@ pg_durable_generation_init:
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_order_missing_bad
+ GGET r14,timestamp
+ test rax,rax
+ jz .Lgg_order_missing_append
+ mov rdx,rax
+ mov rdi,[rsp+48]
+ lea rsi,[rip+.Lgg_timestamp]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_order_missing_bad
+.Lgg_order_missing_append:
  mov rdi,rbx
  mov rsi,[rsp+48]
- call .Lgg_project_message
+ call .Lgg_array_borrow
  mov [rsp+40],eax
  mov rdi,[rsp+48]
  call json_object_put@PLT
@@ -1082,12 +1115,16 @@ pg_durable_generation_init:
  mov rdi,[rsp+48]
  call json_object_put@PLT
 .Lgg_order_bad:
+ mov rdi,rbx
+ call json_object_put@PLT
  mov eax,4
  jmp .Lgg_order_end
 .Lgg_order_ok:
+ mov rax,[rsp+64]
+ mov [rax],rbx
  xor eax,eax
 .Lgg_order_end:
- add rsp,64
+ add rsp,80
  pop r14
  pop r13
  pop r12
@@ -1267,12 +1304,19 @@ pg_durable_generation_init:
  push r12
  push r13
  push r14
- sub rsp,80
+ sub rsp,128
  mov rbx,rdi
+ mov [rsp+80],rsi
+ pxor xmm0,xmm0
+ movdqu [rsp+88],xmm0
+ movdqu [rsp+104],xmm0
+ mov qword ptr [rsp+120],0
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  mov qword ptr [rsp+16],0
  mov qword ptr [rsp+64],0
+ cmp qword ptr [rsp+80],0
+ jne .Lgg_context_entries
  mov edi,1
  mov esi,PG_S_BYTES
  call calloc@PLT
@@ -1314,6 +1358,21 @@ pg_durable_generation_init:
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov rcx,rax
+ cmp qword ptr [rsp+80],0
+ jne .Lgg_context_scan_range
+ mov rdi,[r12+8]
+ mov rsi,rcx
+ mov rdx,r14
+ lea rcx,[rsp+120]
+ call pg_durable_context_read
+ test eax,eax
+ jnz .Lgg_context_bad
+ GGET "qword ptr [rsp+120]",messages
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+112],rax
+ jmp .Lgg_context_model
+.Lgg_context_scan_range:
  mov rdi,r12
  mov rsi,rcx
  mov rdx,r14
@@ -1347,6 +1406,14 @@ pg_durable_generation_init:
  jmp .Lgg_context_head
 .Lgg_context_head_done:
  call json_object_new_array@PLT
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lgg_context_alloc
+ call json_object_new_array@PLT
+ mov [rsp+96],rax
+ test rax,rax
+ jz .Lgg_context_alloc
+ call json_object_new_array@PLT
  mov [rsp+64],rax
  test rax,rax
  jz .Lgg_context_alloc
@@ -1377,6 +1444,20 @@ pg_durable_generation_init:
  test rax,rax
  jnz .Lgg_context_next
 .Lgg_context_contribute:
+ call json_object_new_array@PLT
+ mov [rsp+104],rax
+ test rax,rax
+ jz .Lgg_context_alloc
+ mov rdi,[rsp+96]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_context_contribution_fail
+ mov rdi,[rsp+88]
+ mov rsi,[rsp+32]
+ call .Lgg_array_borrow
+ test eax,eax
+ jnz .Lgg_context_bad
  mov rdi,[rsp+32]
  mov rsi,[rsp]
  mov rdx,[rsp+24]
@@ -1403,17 +1484,16 @@ pg_durable_generation_init:
  call .Lgg_visible_message
  test eax,eax
  jz .Lgg_context_message_next
- mov rdi,[rsp+72]
- call json_object_get@PLT
- mov [rsp+72],rax
  mov rdi,[rsp+64]
- mov rsi,rax
- call json_object_array_add@PLT
+ mov rsi,[rsp+72]
+ call .Lgg_array_borrow
  test eax,eax
- jz .Lgg_context_message_next
- mov rdi,[rsp+72]
- call json_object_put@PLT
- jmp .Lgg_context_alloc
+ jnz .Lgg_context_alloc
+ mov rdi,[rsp+104]
+ mov rsi,[rsp+72]
+ call .Lgg_array_borrow
+ test eax,eax
+ jnz .Lgg_context_alloc
 .Lgg_context_message_next:
  inc r14
  jmp .Lgg_context_message
@@ -1426,16 +1506,87 @@ pg_durable_generation_init:
  inc r12
  jmp .Lgg_context_entry
 .Lgg_context_order:
+ mov rdi,[rsp+64]
+ lea rsi,[rsp+112]
+ call pg_durable_context_order
+ test eax,eax
+ jnz .Lgg_context_bad
+ jmp .Lgg_context_view
+.Lgg_context_model:
  mov rdi,[rbx+72]
- mov rsi,[rsp+64]
+ mov rsi,[rsp+112]
  call .Lgg_collapse_system
  test eax,eax
  jnz .Lgg_context_bad
+ xor r12d,r12d
+.Lgg_context_encode:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lgg_context_ok
+ mov rdi,[rsp+112]
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ GGET r13,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_context_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_system_role]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_context_encode_next
  mov rdi,[rbx+72]
- mov rsi,[rsp+64]
- call .Lgg_order_project
+ mov rsi,r13
+ call .Lgg_project_message
  test eax,eax
  jnz .Lgg_context_bad
+.Lgg_context_encode_next:
+ inc r12
+ jmp .Lgg_context_encode
+.Lgg_context_view:
+ call json_object_new_object@PLT
+ mov [rsp+120],rax
+ test rax,rax
+ jz .Lgg_context_alloc
+ cmp qword ptr [rsp+48],0
+ je .Lgg_context_view_entries
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_head]
+ mov rdx,[rsp+48]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_context_bad
+.Lgg_context_view_entries:
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_entries]
+ mov rdx,[rsp+88]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_context_bad
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_contributions]
+ mov rdx,[rsp+96]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_context_bad
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_messages]
+ mov rdx,[rsp+112]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_context_bad
+ mov rax,[rsp+80]
+ mov rcx,[rsp+120]
+ mov [rax],rcx
+ mov qword ptr [rsp+120],0
+ jmp .Lgg_context_ok
+.Lgg_context_contribution_fail:
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ jmp .Lgg_context_alloc
 .Lgg_context_ok:
  xor ebp,ebp
  jmp .Lgg_context_end
@@ -1445,12 +1596,20 @@ pg_durable_generation_init:
 .Lgg_context_bad:
  mov ebp,4
 .Lgg_context_end:
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
  mov rdi,[rsp+64]
  call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,80
+ add rsp,128
  pop r14
  pop r13
  pop r12
@@ -1585,6 +1744,7 @@ pg_durable_generation_init:
  test rax,rax
  jz .Lgg_request_invalid
  mov rdi,r14
+ xor esi,esi
  call .Lgg_project
  test eax,eax
  jnz .Lgg_request_error
@@ -2853,7 +3013,7 @@ pg_durable_generation_history:
  mov rax,[rsp+120]
  mov [rsp+32],rax
  mov edi,1
- mov esi,4384
+ mov esi,80
  call calloc@PLT
  mov [rsp+128],rax
  test rax,rax
@@ -2861,6 +3021,7 @@ pg_durable_generation_history:
  mov [rax+8],rsp
  mov [rax+16],r13
  mov rdi,rax
+ xor esi,esi
  call .Lgg_project
  test eax,eax
  jnz .Lgg_history_result
@@ -2916,6 +3077,97 @@ pg_durable_generation_history:
  pop rbp
  ret
 .size pg_durable_generation_history,.-pg_durable_generation_history
+.globl pg_durable_context_read
+.type pg_durable_context_read,@function
+pg_durable_context_read:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,144
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ mov ecx,18
+ xor eax,eax
+ cld
+ rep stosq
+ test r14,r14
+ jz .Lgg_context_read_invalid
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lgg_context_read_invalid
+ cmp qword ptr [rbx+16],0
+ je .Lgg_context_read_invalid
+ test r12,r12
+ jz .Lgg_context_read_invalid
+ mov [rsp+8],rbx
+ lea rdi,[rip+.Lgg_history_json]
+ call json_tokener_parse@PLT
+ mov [rsp+120],rax
+ test rax,rax
+ jz .Lgg_context_read_alloc
+ mov rdi,r12
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lgg_conversation_id]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_context_read_result
+ mov rdi,r13
+ call json_object_new_uint64@PLT
+ mov [rsp+136],rax
+ GGET "qword ptr [rsp+120]",state
+ GGET rax,checkpoint
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_cutoff]
+ mov rdx,[rsp+136]
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_context_read_result
+ mov rax,[rsp+120]
+ mov [rsp+32],rax
+ mov edi,1
+ mov esi,80
+ call calloc@PLT
+ mov [rsp+128],rax
+ test rax,rax
+ jz .Lgg_context_read_alloc
+ mov [rax+8],rsp
+ mov rdi,rax
+ mov rsi,r14
+ call .Lgg_project
+ jmp .Lgg_context_read_result
+.Lgg_context_read_invalid:
+ mov eax,4
+ jmp .Lgg_context_read_result
+.Lgg_context_read_alloc:
+ mov eax,5
+.Lgg_context_read_result:
+ mov ebp,eax
+ mov rax,[rsp+128]
+ test rax,rax
+ jz .Lgg_context_read_release
+ mov rdi,[rax+72]
+ call free@PLT
+ mov rdi,[rsp+128]
+ call free@PLT
+.Lgg_context_read_release:
+ mov rdi,[rsp+120]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,144
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_context_read,.-pg_durable_context_read
 .section .rodata
 .Lgg_history_json: .asciz "{\"conversationId\":1,\"state\":{\"checkpoint\":{\"cutoff\":9007199254740991}}}"
 .section .note.GNU-stack,"",@progbits
@@ -3939,3 +4191,8 @@ pg_durable_generation_history:
 .Lgg_sections: .asciz "sections"
 .Lgg_tools_added: .asciz "toolsAdded"
 .Lgg_tools_removed: .asciz "toolsRemoved"
+
+.Lgg_entries: .asciz "entries"
+.Lgg_contributions: .asciz "contributions"
+
+.Lgg_timestamp: .asciz "timestamp"

@@ -1002,7 +1002,23 @@ pg_durable_inputs_apply:
 .globl pg_durable_inputs_submit
 .type pg_durable_inputs_submit,@function
 pg_durable_inputs_submit:
- BEGIN 224
+ xor r9d,r9d
+ jmp .Li_submit_shared
+.globl pg_durable_inputs_admit
+.type pg_durable_inputs_admit,@function
+pg_durable_inputs_admit:
+ mov r9,rsi
+ mov rsi,rdx
+ mov rdx,rcx
+ mov rcx,r8
+.Li_submit_shared:
+ BEGIN 240
+ mov [rsp+232],r9
+ mov [rsp+224],r9
+ test r9,r9
+ jnz .Li_submit_external_tx
+ mov [rsp+224],rsp
+.Li_submit_external_tx:
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -1065,9 +1081,17 @@ pg_durable_inputs_submit:
  jz .Li_submit_end
 .Li_submit_begin:
  mov dword ptr [rbx+40],1
+ cmp qword ptr [rsp+232],0
+ je .Li_submit_own_line
+ mov rax,[rbx]
+ mov rcx,[rsp+224]
+ cmp [rax+152],rcx
+ jne .Li_submit_unlock_flag
+ jmp .Li_submit_lookup
+.Li_submit_own_line:
  mov rax,[rbx+8]
  mov rdi,[rbx]
- mov rsi,rsp
+ mov rsi,[rsp+224]
  lea rdx,[rsp+48]
  mov rcx,[rax]
  mov r8,[rax+8]
@@ -1075,6 +1099,7 @@ pg_durable_inputs_submit:
  test eax,eax
  jnz .Li_submit_busy_unlock
  mov dword ptr [rsp+212],1
+.Li_submit_lookup:
  IGET r13,request_id
  test rax,rax
  jz .Li_submit_prepare
@@ -1086,7 +1111,7 @@ pg_durable_inputs_submit:
  mov rdi,[rsp+184]
  call json_object_get_string_len@PLT
  mov [rsp+144],rax
- mov rdi,rsp
+ mov rdi,[rsp+224]
  mov rsi,[rbx+32]
  lea rdx,[rsp+128]
  lea rcx,[rsp+112]
@@ -1151,7 +1176,7 @@ pg_durable_inputs_submit:
  jz .Li_submit_unlock
 .Li_submit_prepare_snapshot:
  mov rdi,rbx
- mov rsi,rsp
+ mov rsi,[rsp+224]
  mov rdx,r12
  lea rcx,[rsp+96]
  call pg_durable_inputs_prepare@PLT
@@ -1222,7 +1247,7 @@ pg_durable_inputs_submit:
 .Li_submit_mint:
  mov rax,[rbx+16]
  mov rax,[rax]
- mov rdi,rsp
+ mov rdi,[rsp+224]
  mov rsi,[rsp+152]
  mov rdx,[rax+32]
  lea rcx,[rsp+104]
@@ -1236,7 +1261,7 @@ pg_durable_inputs_submit:
  cmp dword ptr [rsp+216],0
  je .Li_submit_enqueue
  mov rdi,rbx
- mov rsi,rsp
+ mov rsi,[rsp+224]
  mov rdx,r12
  mov rcx,r13
  lea r8,[rsp+120]
@@ -1258,7 +1283,7 @@ pg_durable_inputs_submit:
  call .Li_copy
  test eax,eax
  jnz .Li_submit_error
- mov rdi,rsp
+ mov rdi,[rsp+224]
  mov rsi,[rsp+104]
  mov rdx,[rsp+152]
  call .Li_change
@@ -1276,7 +1301,7 @@ pg_durable_inputs_submit:
  cmp dword ptr [rsp+208],0
  jne .Li_submit_commit
  mov rdi,rbx
- mov rsi,rsp
+ mov rsi,[rsp+224]
  mov rdx,[rsp+96]
  mov ecx,1
  xor r8d,r8d
@@ -1312,7 +1337,7 @@ pg_durable_inputs_submit:
  test rax,rax
  jz .Li_submit_commit
  mov rdi,rbx
- mov rsi,rsp
+ mov rsi,[rsp+224]
  mov rdx,r12
  mov rcx,[rsp+160]
  lea r8,[r14+8]
@@ -1320,6 +1345,8 @@ pg_durable_inputs_submit:
  test eax,eax
  jnz .Li_submit_error
 .Li_submit_commit:
+ cmp qword ptr [rsp+232],0
+ jne .Li_submit_admitted
  mov rdi,[rbx]
  xor esi,esi
  xor edx,edx
@@ -1327,6 +1354,7 @@ pg_durable_inputs_submit:
  call pg_durable_session_settle@PLT
  test eax,eax
  jnz .Li_submit_storage
+.Li_submit_admitted:
  xor ebp,ebp
  mov dword ptr [rsp+212],0
  jmp .Li_submit_unlock
@@ -1374,7 +1402,7 @@ pg_durable_inputs_submit:
  mov rdi,[rsp+160]
  call json_object_put@PLT
  mov eax,ebp
- END 224
+ END 240
 .size pg_durable_inputs_submit,.-pg_durable_inputs_submit
 .globl pg_durable_inputs_status
 .type pg_durable_inputs_status,@function

@@ -437,13 +437,15 @@
         "task.generation.local.v0",
         "storage.jsonl.local.v1",
         "session.durable.lifecycle.local.v0",
-        "resources.lifecycle.local.v0"
+        "resources.lifecycle.local.v0",
+        "task.compaction.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
         "main",
         "pg_tui_runtime_inputs",
-        "pg_tui_runtime_resources"
+        "pg_tui_runtime_resources",
+        "pg_tui_runtime_compaction"
       ],
       "reference_basis": [
         {
@@ -1785,6 +1787,7 @@
       "exports": [
         "pg_durable_generation_init",
         "pg_durable_generation_history",
+        "pg_durable_context_read",
         "pg_durable_client_open",
         "pg_durable_client_inputs_service",
         "pg_durable_client_service",
@@ -1803,7 +1806,9 @@
         "pg_durable_inputs_prepare",
         "pg_durable_inputs_apply",
         "pg_durable_inputs_start",
-        "pg_durable_client_tool_observe"
+        "pg_durable_client_tool_observe",
+        "pg_durable_context_order",
+        "pg_durable_inputs_admit"
       ],
       "reference_basis": [
         {
@@ -2120,6 +2125,42 @@
           "semantics": "pinned minimatch 10.2.6 and brace-expansion 5.0.12 matching behavior; numeric/alphabetic sequence expansion, padding/step/count rules; adapted range algorithm retains MIT copyright notices",
           "tests_to_read": [
             "packages/coding-agent/test/package-manager.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task.compaction.local.v0",
+      "sources": [
+        "src/runtime/durable_compaction.h",
+        "src/runtime/durable_compaction.S"
+      ],
+      "dependencies": [
+        "task.generation.local.v0",
+        "task.runner.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "Pi Durable manual compaction: retained-entry selection, structured summary request, pinned context/configuration, resumable select/summarize/place phases and atomic write Submission/terminal receipt.",
+      "exports": [
+        "pg_durable_compaction_select",
+        "pg_durable_compaction_request",
+        "pg_durable_compaction_init",
+        "pg_durable_compaction_start",
+        "pg_durable_compaction_service"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/compaction.ts",
+            "packages/ai/src/utils/estimate.ts"
+          ],
+          "semantics": "selectCut/isCandidate, UTF-16 token estimate, summarizedMessages/serializeConversation, structured summary prompts; pinned select/summarize/place with write admission and atomic task receipt.",
+          "tests_to_read": [
+            "packages/durable/test/harness-compaction.test.ts",
+            "packages/durable/test/harness-context.test.ts"
           ]
         }
       ]

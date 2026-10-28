@@ -50,4 +50,11 @@ int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generati
    patches into system_prompt. Tool deltas need an execution-registry binding
    and currently reject during projection. */
 int pg_durable_generation_history(const pg_task_runner_host *,uint64_t,const struct json_object *,pg_session *);
+/* Detached JSON {head?,entries,contributions,messages}, beyond the model ABI's
+   row limit. cutoff is inclusive (UINT64_MAX for current). Ordered messages
+   include ephemeral repaired tool results; contribution arrays retain entry
+   alignment and original committed objects. Release with json_object_put. */
+int pg_durable_context_read(const pg_task_runner_host *,uint64_t conversation,
+                            uint64_t cutoff,struct json_object **);
+int pg_durable_context_order(const struct json_object *messages,struct json_object **);
 #endif

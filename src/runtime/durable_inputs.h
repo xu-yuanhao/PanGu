@@ -20,6 +20,11 @@ typedef struct {struct json_object *users;unsigned reset,reserved;} pg_input_bou
 int pg_durable_inputs_open(pg_durable_inputs *,pg_durable_session *,const pg_task_runner_host *,
  const pg_durable_generation *,const pg_record_queries *,const pg_record_requests *);
 int pg_durable_inputs_submit(pg_durable_inputs *,uint64_t conversation,const struct json_object *draft,pg_input_receipt *);
+/* Stage admission on the caller's active Session mutation line. The caller
+   settles or discards the entire transaction, including task state; partial
+   writes remain owned by that line on failure. Same receipt/dedup semantics. */
+int pg_durable_inputs_admit(pg_durable_inputs *,pg_record_tx *,uint64_t,
+                            const struct json_object *,pg_input_receipt *);
 /* Owned detached snapshot; poll returns PENDING for queued/placed. The caller
    drives its scheduler, and may cancel its own polling without withdrawing. */
 int pg_durable_inputs_status(pg_durable_inputs *,uint64_t id,struct json_object **);

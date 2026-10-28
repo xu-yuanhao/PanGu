@@ -14,6 +14,7 @@
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
+| 手动压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；Host服务和可选TUI表 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
@@ -29,9 +30,9 @@
 
 ## 本批验证与集成状态
 
-- 当前OpenAI路径按pi-ai默认策略折叠system内容与section，复用Generation/历史投影；配置提示与正文按顺序组合，section有序覆盖/删除/重加。
-- Durable专项ASan/UBSan、容量拒绝、实际请求编码及两后端重开通过；Runtime回归、隔离核心产品构建和Assembly通过。真实DeepSeek持久section/发送请求/工具/后续输入/重开场景在两后端通过。
-- 继续保留完整system基线/工具声明、token边界和持久摘要任务范围，完整压缩尚未完成。
+- 手动压缩核心链已接通：动态上下文保留Entry/贡献对应；Task固定范围与模型配置，真实摘要保存后通过原子write admission成为新head，后继对话使用摘要与保留历史。
+- 真实DeepSeek两后端验证70条消息、两次阶段重开、原始cutoff回读、空工具/输出预算与摘要后继续回答；发布回调核对Entry/Submission/Task终态原子同批。Runtime回归、核心产品构建、实际Host/可选TUI绑定与资源集成、专项ASan/UBSan及相关G00/Assembly检查通过。
+- 自动触发、阻塞/后台组合、重试/取消/Live/hook和完整大文本摘要继续K12；完整压缩与TUI交互验收保持原清单。
 
 ## 当前接口边界
 
@@ -54,6 +55,7 @@ python3 -B tools/runtime/build_test.py --live-partial
 python3 -B tools/runtime/build_test.py --live-deferred
 python3 -B tools/runtime/build_test.py --live-sequential
 python3 -B tools/runtime/build_test.py --live-inputs
+python3 -B tools/runtime/build_test.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
 python3 -B tools/runtime/test_pangu_pty.py --live-settings

@@ -101,6 +101,8 @@ typedef struct {
    survive later calls and are released exactly once with release. */
 typedef pg_inputs_ops tui_inputs_ops;
 typedef pg_resource_ops tui_resource_ops;
+typedef pg_compaction_ops tui_compaction_ops;
+typedef pg_compaction_request tui_compaction_request;
 
 typedef struct tui_runtime_ops {
 	const char *name; /* 适配来源标识，如 "fake-runtime" */
@@ -119,6 +121,8 @@ const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *);
 /* Optional product resource service; same binding lifetime as input ops.
    Clients may weak-link this lookup. */
 const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *);
+/* Optional manual compaction; poll owns a persistent Task snapshot. */
+const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

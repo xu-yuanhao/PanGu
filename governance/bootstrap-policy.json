@@ -622,6 +622,8 @@
     "src/runtime/resource_select.h": "native-source",
     "src/runtime/resource_match_posix.c": "native-source",
     "tests/runtime/test_resource_select.c": "native-test",
-    "tools/runtime/test_resource_select.py": "gate"
+    "tools/runtime/test_resource_select.py": "gate",
+    "src/runtime/durable_compaction.S": "native-source",
+    "src/runtime/durable_compaction.h": "native-source"
   }
 }

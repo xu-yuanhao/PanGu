@@ -9,7 +9,7 @@ from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream')]
 PATH_SOURCES = [implementation('src/runtime/' + name) for name in ('tool_path', 'tool_path_posix')]
-DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
+DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'durable_tool', 'durable_generation', 'durable_compaction', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
 PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
     'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
     'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
@@ -21,14 +21,14 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
-        if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs')):
+        if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction')):
             if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
                 raise SystemExit('Model API key required in the environment')
             output = str(Path(directory) / 'live-durable-generation')
             flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             *DURABLE_SOURCES, str(ROOT / 'tests/runtime/test_durable_storage.c'), *flags, '-o', output], check=True)
-            subprocess.run([output, '--live-inputs' if '--live-inputs' in sys.argv else '--live-sequential' if '--live-sequential' in sys.argv else '--live-deferred' if '--live-deferred' in sys.argv else '--live-partial' if '--live-partial' in sys.argv else '--live-generation'], check=True, timeout=350)
+            subprocess.run([output, '--live-compaction' if '--live-compaction' in sys.argv else '--live-inputs' if '--live-inputs' in sys.argv else '--live-sequential' if '--live-sequential' in sys.argv else '--live-deferred' if '--live-deferred' in sys.argv else '--live-partial' if '--live-partial' in sys.argv else '--live-generation'], check=True, timeout=350)
             return 0
         if any(flag in sys.argv for flag in ('--live-batch', '--live-batch-execute', '--live-snapshot-edit', '--live-capacity')):
             if not os.environ.get('MIMO_API_KEY'):
