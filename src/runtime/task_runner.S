@@ -655,6 +655,7 @@ pg_task_runner_open:
  mov qword ptr [rdi+96],0
  mov qword ptr [rdi+104],0
  mov qword ptr [rdi+112],0
+ mov qword ptr [rdi+120],0
  xor eax,eax
 .Ltr_open_return:
  ret
@@ -1203,6 +1204,8 @@ pg_task_runner_commit:
  cmp rax,[r12+16]
  ja .Ltr_resolve_cleanup
  je .Ltr_resolve_ready
+ cmp [rbx+120],r12
+ je .Ltr_resolve_cleanup
  cmp qword ptr [r12+72],0
  je .Ltr_resolve_cleanup
  mov [rsp+32],rax
@@ -1217,24 +1220,24 @@ pg_task_runner_commit:
  lea r8,[rsp+8]
  call [r12+72]
  test eax,eax
- jnz .Ltr_resolve_cleanup
+ jnz .Ltr_migration_failed
  mov rdi,[rsp+8]
  call pg_document_value_valid@PLT
  test eax,eax
- jz .Ltr_resolve_cleanup
+ jz .Ltr_migration_failed
  mov rdi,[rsp+8]
  lea rsi,[rip+.Ltr_input]
  lea rdx,[rsp+24]
  call json_object_object_get_ex@PLT
  test eax,eax
- jz .Ltr_resolve_cleanup
+ jz .Ltr_migration_failed
  TGET "qword ptr [rsp+8]",checkpoint
  mov r14,rax
  mov rdi,rax
  mov esi,4
  call json_object_is_type@PLT
  test eax,eax
- jz .Ltr_resolve_cleanup
+ jz .Ltr_migration_failed
  mov rdi,[rbx+24]
  lea rsi,[rsp+16]
  xor edx,edx
@@ -1276,7 +1279,13 @@ pg_task_runner_commit:
  mov [rbx+24],rax
  mov qword ptr [rsp+16],0
  or dword ptr [rbx+88],2
+ jmp .Ltr_resolve_ready
+.Ltr_migration_failed:
+ mov [rbx+120],r12
+ mov ebp,3
+ jmp .Ltr_resolve_cleanup
 .Ltr_resolve_ready:
+ mov qword ptr [rbx+120],0
  mov [rbx+40],r12
  xor ebp,ebp
 .Ltr_resolve_cleanup:
@@ -1906,7 +1915,7 @@ pg_task_runner_close:
  mov [rbx+32],r14
 .Lts_allocate_runner:
  mov edi,1
- mov esi,120
+ mov esi,128
  call calloc@PLT
  test rax,rax
  jz .Lts_discover_allocation

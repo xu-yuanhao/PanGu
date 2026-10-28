@@ -2255,7 +2255,11 @@
       "role": "Pi Durable task-graph live nodes, state/ownership projection and registry metadata inspection",
       "exports": [
         "pg_task_graph_read",
-        "pg_task_graph_service"
+        "pg_task_graph_service",
+        "pg_task_graph_watch_open",
+        "pg_task_graph_watch_next",
+        "pg_task_graph_watch_close",
+        "pg_task_graph_binding_close"
       ]
     }
   ],

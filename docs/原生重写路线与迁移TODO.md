@@ -211,6 +211,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Client按已采纳Live中taskId差异发布压缩开始/结束：结束→用量→开始，失败匹配对应error；正常/空范围/连接失败/取消均一对通知，TUI执行适配保持兼容。
 - [x] Generation重试/deferred状态与Task checkpoint同事务写Live，事件覆盖retry开始/结束、pollAt变化与faulted/orphaned任务失败；两后端ASan/UBSan、真实重试/工具/回答及deferred重开通过。
 - [x] Host task.graph与TUI可选绑定提供只读活任务图：五种live状态分页、父子owner/等待/睡眠/completing投影、所属会话分页、注册元数据阻塞分类、终态移除与重开查询；读取占用Session只读事务。
+- [x] 任务图多观察者支持attach初始帧、独立读取/合并变化、注册元数据刷新、幂等退订与Host统一关闭；迁移失败按定义身份缓存，替换后恢复，图读取不执行迁移。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -252,8 +253,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/task-graph.ts nodeOf/stateOf/build及scheduler.ts blockedReason/fit。采用其live状态过滤、节点裁剪、任务owner和所属会话语义。
-- 实际调用链：Host task.graph或pg_tui_runtime_task_graph → pg_task_graph_read → Session readOnLine → 按pending/running/waiting/sleeping/completing索引分页 → 节点/等待边/所属会话 → 独立owned JSON。元数据查询不执行phase或migrate，终态不入图；busy读取拒绝，不写入或推进Scheduler。
-- 验证：SQLite/JSONL ASan/UBSan通过260任务、257所属会话分页、waiting/on/policy/owner/sleeping/completing投影、重开图一致、终态移除、注册服务变化及missing_task/task_too_old/缺迁移/restart_limit分类；输入/检查点/结果业务载荷不进入图。注册回调尝试写事务被只读事务拒绝。实际产品Host/TUI绑定与活动压缩任务查询通过，整批检查见当前实现记录。
-- 接口与自审：task_graph.h公开owned只读图和服务表；纯逻辑task_graph.S，C仅绑定Scheduler/发布服务。新增源码、模块依赖、导出及构建登记同步，实施Agent自审。现有运行/事件ABI保持。
-- 剩余与下一交付物：任务图的多观察者订阅、已执行迁移失败的缓存分类/服务变化通知仍需K13；下一批沿实际任务图消费者接订阅与关闭。完整消息事件/report、K09扩展、K12剩余组合及provider/工具边界保持原范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` harness/task-graph.ts watch/attach/refreshBlocked/close及scheduler.ts failedMigrations/fit。采用初始视图、独立观察者、慢消费合并和定义替换后重试语义。远端跟踪已更新至Pi a87b742/Harness f3803c9697；Pi的Watch/report与restart语义调整留在下一批统一评估，采用快照保持。
+- 实际调用链：Host/TUI task.graph.watch → attach时捕获图 → next交付初始owned帧 → 后续只读refresh/深比较并交付变化；每观察者保留独立基线，binding共享最新图，close解除链表注册。Host停止先统一清理观察者，再关闭Client/Scheduler。Task runner迁移失败保存借用的定义身份，重复poll不重跑，替换定义后重新迁移；任务图读取该已执行结果。
+- 验证：SQLite/JSONL ASan/UBSan通过多观察者快/慢消费、返回值隔离、attach后变化仍先交付初始帧、无提交注册刷新、退订/统一关闭及attach中关闭无残留。迁移实际失败一次、多poll保持一次、图显示migration_failed、新定义解除阻塞并完成任务通过。实际Host覆盖活压缩任务出现/结束及Host关闭释放未退订观察者。整批验证见当前实现记录。
+- 接口与自审：task.graph服务表追加watch/next/close并以binding持有生命周期；watch/binding各32字节。内部Task runner128字节，追加失败定义指针；Scheduler分配与头/ABI断言同步。Assembly实现行为，C仅绑定与停止清理；新增导出登记更新。next为原生显式拉取/合并刷新，不伪称后台逐提交推送。
+- 剩余与下一交付物：K13继续完整会话视图/消息事件与report上下文，任务图推送通知/差量Op等完整Watch表面继续覆盖；下一批按同一实际客户端调用链接完整会话视图。K09扩展、K12剩余组合及provider/工具边界保持原范围。

@@ -48,6 +48,7 @@ struct pg_task_runner {
  unsigned busy,active,pending,closing,recovered,committing;
  pg_slice error;
  pg_record_tx *mutation; /* Private synchronous phase transaction, otherwise NULL. */
+ const pg_task_definition *failed_migration; /* Borrowed definition identity; retry after replacement. */
 };
 typedef enum {PG_TASK_PROGRESS,PG_TASK_PENDING,PG_TASK_DONE,PG_TASK_BLOCKED,
  PG_TASK_INVALID,PG_TASK_ALLOCATION,PG_TASK_STORAGE,PG_TASK_CLOSED} pg_task_status;

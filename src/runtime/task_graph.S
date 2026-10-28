@@ -396,9 +396,28 @@ pg_task_graph_read:
 .globl pg_task_graph_service
 .type pg_task_graph_service,@function
 pg_task_graph_service:
- mov [rsi],rdi
- lea rax,[rip+pg_task_graph_read]
- mov [rsi+8],rax
+ mov [rdi],rsi
+ mov qword ptr [rdi+8],0
+ mov qword ptr [rdi+16],0
+ mov qword ptr [rdi+24],0
+ mov [rdx],rdi
+ lea rax,[rip+.Lq_binding_read]
+ mov [rdx+8],rax
+ lea rax,[rip+pg_task_graph_watch_open]
+ mov [rdx+16],rax
+ lea rax,[rip+pg_task_graph_watch_next]
+ mov [rdx+24],rax
+ lea rax,[rip+pg_task_graph_watch_close]
+ mov [rdx+32],rax
+ ret
+.Lq_binding_read:
+ cmp dword ptr [rdi+24],0
+ jne .Lq_binding_closed
+ mov rdi,[rdi]
+ jmp pg_task_graph_read
+.Lq_binding_closed:
+ mov qword ptr [rsi],0
+ mov eax,7
  ret
 .section .rodata
 .Lq_id: .asciz "id"
@@ -490,6 +509,27 @@ pg_task_graph_service:
  cmp rax,[rcx+16]
  ja .Lq_block_old
  je .Lq_block_ready
+ mov [rsp+8],rcx
+ QG r12,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r13,rax
+ xor r14d,r14d
+.Lq_block_migration_runner:
+ cmp r14,[rbx+24]
+ jae .Lq_block_migration_available
+ mov rax,[rbx+16]
+ mov rax,[rax+r14*8]
+ cmp [rax+16],r13
+ jne .Lq_block_migration_next
+ mov rcx,[rsp+8]
+ cmp [rax+120],rcx
+ je .Lq_block_migration
+.Lq_block_migration_next:
+ inc r14
+ jmp .Lq_block_migration_runner
+.Lq_block_migration_available:
+ mov rcx,[rsp+8]
  cmp qword ptr [rcx+72],0
  je .Lq_block_migration
 .Lq_block_ready:
@@ -517,3 +557,179 @@ pg_task_graph_service:
 .Lq_old: .asciz "task_too_old"
 .Lq_migration: .asciz "migration_failed"
 .Lq_restart_limit: .asciz "restart_limit"
+
+.text
+/* Refresh the shared graph without changing observers' delivery baselines. */
+.Lq_refresh:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ cmp dword ptr [rbx+24],0
+ jne .Lq_refresh_closed
+ mov rdi,[rbx]
+ mov rsi,rsp
+ call pg_task_graph_read
+ test eax,eax
+ jnz .Lq_refresh_end
+ cmp dword ptr [rbx+24],0
+ jne .Lq_refresh_late_close
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+16],rax
+ xor eax,eax
+ jmp .Lq_refresh_end
+.Lq_refresh_late_close:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lq_refresh_closed:
+ mov eax,7
+.Lq_refresh_end:
+ add rsp,16
+ pop rbx
+ ret
+.globl pg_task_graph_watch_open
+.type pg_task_graph_watch_open,@function
+pg_task_graph_watch_open:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ cmp dword ptr [r12+24],0
+ jne .Lq_watch_invalid
+ call .Lq_refresh
+ test eax,eax
+ jnz .Lq_watch_open_end
+ mov rdi,[rbx+16]
+ call json_object_get@PLT
+ mov [r12+16],rax
+ mov [r12],rbx
+ mov rax,[rbx+8]
+ mov [r12+8],rax
+ mov [rbx+8],r12
+ mov dword ptr [r12+24],1
+ mov dword ptr [r12+28],1
+ xor eax,eax
+ jmp .Lq_watch_open_end
+.Lq_watch_invalid:
+ mov eax,1
+.Lq_watch_open_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.globl pg_task_graph_watch_next
+.type pg_task_graph_watch_next,@function
+pg_task_graph_watch_next:
+ QF 32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [r12],0
+ mov qword ptr [rsp],0
+ cmp dword ptr [rbx+24],1
+ jne .Lq_watch_next_closed
+ mov r13,[rbx]
+ cmp dword ptr [r13+24],0
+ jne .Lq_watch_next_closed
+ cmp dword ptr [rbx+28],0
+ jne .Lq_watch_initial
+ mov rdi,r13
+ call .Lq_refresh
+ test eax,eax
+ jnz .Lq_watch_next_error
+ cmp dword ptr [rbx+24],1
+ jne .Lq_watch_next_closed
+ mov rdi,[rbx+16]
+ mov rsi,[r13+16]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lq_watch_unchanged
+ mov r14,[r13+16]
+ jmp .Lq_watch_deliver
+.Lq_watch_initial:
+ mov r14,[rbx+16]
+.Lq_watch_deliver:
+ mov rdi,r14
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lq_watch_copy_failed
+ mov rdi,r14
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rax,[rsp+8]
+ mov [rbx+16],rax
+ mov dword ptr [rbx+28],0
+ mov rax,[rsp]
+ mov [r12],rax
+ mov eax,1
+ jmp .Lq_watch_next_end
+.Lq_watch_unchanged:
+ xor eax,eax
+ jmp .Lq_watch_next_end
+.Lq_watch_copy_failed:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,-5
+ jmp .Lq_watch_next_end
+.Lq_watch_next_error:
+ neg eax
+ jmp .Lq_watch_next_end
+.Lq_watch_next_closed:
+ mov eax,-7
+.Lq_watch_next_end:
+ QE 32
+.globl pg_task_graph_watch_close
+.type pg_task_graph_watch_close,@function
+pg_task_graph_watch_close:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lq_watch_close_end
+ cmp dword ptr [rbx+24],0
+ je .Lq_watch_close_end
+ mov rax,[rbx]
+ lea rcx,[rax+8]
+.Lq_watch_unlink:
+ mov rax,[rcx]
+ test rax,rax
+ jz .Lq_watch_unlinked
+ cmp rax,rbx
+ je .Lq_watch_remove
+ lea rcx,[rax+8]
+ jmp .Lq_watch_unlink
+.Lq_watch_remove:
+ mov rax,[rbx+8]
+ mov [rcx],rax
+.Lq_watch_unlinked:
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ pxor xmm0,xmm0
+ movdqu [rbx],xmm0
+ movdqu [rbx+16],xmm0
+.Lq_watch_close_end:
+ pop rbx
+ ret
+.globl pg_task_graph_binding_close
+.type pg_task_graph_binding_close,@function
+pg_task_graph_binding_close:
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rbx+24],1
+.Lq_binding_close_each:
+ mov rdi,[rbx+8]
+ test rdi,rdi
+ jz .Lq_binding_close_value
+ call pg_task_graph_watch_close
+ jmp .Lq_binding_close_each
+.Lq_binding_close_value:
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov qword ptr [rbx+16],0
+ pop rbx
+ ret
