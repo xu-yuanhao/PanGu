@@ -198,6 +198,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] conversation.catalog提供升降序游标分页、owner筛选、记录查询和名称读写；Coding Agent式元数据Entry规范CR/LF与Unicode首尾空白，名称变化进入会话观察，分叉继承/清空隔离、跨页读取与两后端重开通过。
 - [x] conversation.actions.reset接入真实Submission/队列边界，空上下文和显式handoff消息共用head重置；公开接口保留Submission ID用于状态查询，忙时reset/后续队列顺序及两后端专项通过。
 - [x] 任务能力接口通过runner受保护事务创建/分叉会话，复用Harness默认文档/配置/init；产品Host真实任务验证owner归属、分叉配置、init失败整体回滚与过期能力拒绝。
+- [x] task access通过runner受保护事务向子会话提交Submission，确认后返回receipt，复用现有requestId去重、Entry/任务准入与状态查询。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -299,8 +300,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts`创建流程、`types.ts:ConversationCreateOptions`与TaskRuntime事务语义；沿用当前Harness默认文档/分叉/owner验证实现。
-- 实际调用链：`pg_agent_conversation_stage`在已经准入的Session事务上复用创建hook、agent/init；`pg_task_access_create_conversation`校验当前phase和Session，通过`pg_task_runner_commit_with`调用它，输出只在提交确认后转交。调用者显式选择owner/new/fork；提供者绑定必须与当前Tx的read context/read一致。产品Host注册的真实任务通过该接口创建拥有的子会话及分叉。
-- 验证：产品资源/Host ASan/UBSan通过实际任务创建、owner归属、配置继承/分叉、init失败回滚和过期能力拒绝；`build_test.py --client`相关两后端回归、产品构建、Assembly检查通过。本批无模型请求；G00按Git登记文件当前快照核对，项目外`claude/`保留。
-- 接口与差异：新增stage与task access公开函数，现有结构/函数表布局不变；动态插件构建已有`pg_task_access_*`导出规则覆盖新入口。会话创建绑定由实际组合者注入，尚需将它接入完整工具会话API；本批不宣称跨会话模型执行/恢复/级联取消工作流整体验收。
-- 下一交付物：工具会话API接通上述能力与Submission/等待，在实际子会话运行Generation，验证父等待、子会话恢复和父取消的完整路径。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/submissions.ts:admitSubmission`、`harness.ts:Conversation.submit`与TaskRuntime事务；复用原生输入准入、Generation和Scheduler所有权。
+- 实际调用链：`pg_task_access_submit`校验当前phase/Session，通过runner commit_with调用既有`pg_durable_inputs_admit`，提交确认后转交Submission receipt。产品任务使用它向拥有的分叉会话提交，原输入API负责状态查询与去重；所有公共布局保持不变。
+- 验证：产品Host ASan/UBSan通过子会话展示Entry提交、持久receipt及requestId重复返回；产品构建、Assembly检查通过。真实DeepSeek `test_product_resources.py --live-conversations`通过task-owned分叉Submission→实际子Generation→父Task终态join，并完成既有新建/分叉/写文件/reset回归。G00使用Git登记文件当前快照，项目外`claude/`保留；新增导出与依赖已自审。
+- 接口与差异：Task提交同样遵守当前mutation事务，输出只在整体提交后有效；父Task本身可产生生命周期提交，去重以相同Submission ID/状态验证。完整父子恢复与取消仍需按K10场景补齐。
+- 下一交付物：推进子会话执行中重开与父取消的完整路径。

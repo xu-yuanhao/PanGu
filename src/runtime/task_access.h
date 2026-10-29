@@ -2,6 +2,7 @@
 #define PANGU_TASK_ACCESS_H
 #include "task_runner.h"
 #include "document_reader.h"
+#include "durable_inputs.h"
 /* Borrowed phase capability; valid until phase cleanup. History is optional
    for current reads/memos and required for snapshot_as_of. Outputs are detached
    and owned; status follows pg_task_status except document reads, which retain
@@ -26,5 +27,8 @@ struct pg_agent_conversation_options;
 /* Uses the active task mutation guard and preserves explicit ownership.
    Creation options, init and providers are borrowed for this synchronous call. */
 int pg_task_access_create_conversation(const pg_task_access *,struct pg_agent_conversation_binding *,const struct pg_agent_conversation_options *,struct json_object **);
+/* Admit into a conversation on this task's guarded transaction. Receipt is
+   transferred only after settlement; requestId preserves Submission dedup. */
+int pg_task_access_submit(const pg_task_access *,pg_durable_inputs *,uint64_t,const struct json_object *,pg_input_receipt *);
 pg_task_runner *pg_task_scheduler_find(pg_task_scheduler *,uint64_t);
 #endif

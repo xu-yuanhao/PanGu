@@ -594,3 +594,64 @@ pg_task_access_create_conversation:
  lea rcx,[rax+16]
  jmp pg_agent_conversation_stage@PLT
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_task_access_submit
+.type pg_task_access_submit,@function
+pg_task_access_submit:
+ AF 80
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov [rsp+64],r8
+ mov ebp,4
+ test r8,r8
+ jz .Las_end
+ mov qword ptr [r8],0
+ mov qword ptr [r8+8],0
+ mov qword ptr [r8+16],0
+ test r12,r12
+ jz .Las_end
+ test r14,r14
+ jz .Las_end
+ call .Laccess_valid
+ mov ebp,7
+ test eax,eax
+ jz .Las_end
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp [r12],rax
+ jne .Las_end
+ mov [rsp],r12
+ mov [rsp+8],r13
+ mov [rsp+16],r14
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],0
+ mov qword ptr [rsp+40],0
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rip+.Las_stage]
+ call pg_task_runner_commit_with@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Las_end
+ mov rdx,[rsp+64]
+ mov rax,[rsp+24]
+ mov [rdx],rax
+ mov rax,[rsp+32]
+ mov [rdx+8],rax
+ mov rax,[rsp+40]
+ mov [rdx+16],rax
+.Las_end:
+ mov eax,ebp
+ AE 80
+.Las_stage:
+ mov qword ptr [rcx],0
+ mov rax,rdi
+ mov rdi,[rax]
+ mov rdx,[rax+8]
+ mov rcx,[rax+16]
+ lea r8,[rax+24]
+ jmp pg_durable_inputs_admit@PLT
+.section .note.GNU-stack,"",@progbits
