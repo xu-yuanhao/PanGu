@@ -88,6 +88,9 @@ def corpus():
         text = ending.join(lines) + rng.choice(['', ending])
         edits = [(rng.choice(alphabet), rng.choice(['new', '', 'x\ny', '中'])) for _ in range(rng.randint(1, 4))]
         add(text, *edits)
+    for count in (17,32,65,128):
+        pairs=[(f'T{i:03d}',f'R{i:03d}') for i in range(count)]
+        add('\ufeff'+'\r\n'.join(a for a,b in pairs)+'\r\n',*reversed(pairs))
     return cases
 
 def tool_corpus():
@@ -104,6 +107,8 @@ def tool_corpus():
         cases.append({'content': 'alpha\nbeta\n', 'arguments': {'path': 'file.txt', **extra}})
     for case in corpus()[:22] + corpus()[-20:]:
         cases.append({'content': case['content'], 'arguments': {'path': 'file.txt', 'edits': case['edits']}})
+    for case in corpus()[-4:]:
+        cases.append({'content':case['content'],'arguments':{'path':'file.txt','edits':json.dumps(case['edits'][:-1]),**case['edits'][-1]}})
     return cases
 
 def compare(binary, tool=False):

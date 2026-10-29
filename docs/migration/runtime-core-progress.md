@@ -59,9 +59,9 @@
 
 ## 本批验证与集成状态
 
-- Read按Pi Durable的Number/slice语义接受offset/limit，保留NUL，流式替代非法UTF-8，超长首行返回码点完整前缀；续读诊断使用既有结果快照，正文不被提示挤占预算。
-- 1600组正文及拒绝条件直接对照固定Pi `referenceRead`/`truncateHead`通过；O0/O2、UBSan专项覆盖UTF-8跨块、容量与读取改写/再次变化/追加日志，最终元数据随close释放。
-- Runtime整套回归在正文/诊断接线后通过；随后稳定性/关闭释放修改由最终工具专项复验。最终产品构建、Assembly检查及产品Host的`--native-tasks --sanitize`集成通过。完整truncation details与诊断文案仍在K08中补齐。
+- Edit的schema、解析、原文件匹配和实际写入使用按数量分配的替换向量；128项单次调用经真实文件读改写通过。成功消息沿Pi采用数量/路径，首个变更行保留在details。
+- 1304组文本与95组工具/参数语料对照实际固定Pi函数，覆盖17/32/65/128项、BOM/CRLF、逆序和参数修复；文本O0/O2 UBSan、文件工具ASan/UBSan及十处扩容失败无副作用通过。
+- Read已完成的1600组正文差分、Number/slice选择、替代解码、首行前缀与读取改写重试继续作为基线；完整truncation details、NUL等Edit边界与逐文件异步并发仍按K08补齐。
 
 ## 当前接口边界
 

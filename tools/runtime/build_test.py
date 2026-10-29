@@ -251,7 +251,7 @@ def main():
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in edit_tool_sources],
                             str(ROOT / 'tests/runtime/test_edit_tool.c'),
-                            '-Wl,--wrap=json_tokener_new,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext',
+                            '-Wl,--wrap=json_tokener_new,--wrap=json_object_new_object,--wrap=json_object_new_string_len,--wrap=json_object_object_add,--wrap=json_object_to_json_string_ext,--wrap=realloc',
                             *edit_flags, '-o', edit_tool_test], check=True)
             subprocess.run([edit_tool_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_edit_text.py'),

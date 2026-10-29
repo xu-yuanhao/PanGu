@@ -468,7 +468,8 @@ pg_edit_text_apply:
  jz .Lreturn
  test r13,r13
  jz .Lreturn
- cmp r13,16
+ mov rax,0x0333333333333333 /* largest count whose 80-byte records fit */
+ cmp r13,rax
  ja .Lreturn
  test rsi,rsi
  jz .Lallocate

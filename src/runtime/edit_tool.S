@@ -6,21 +6,22 @@
 #define P_PATH_N 24
 #define P_COUNT 32
 #define P_EDITS 40
-#define P_BYTES 552
-#define FIRST_LINE 552
-#define CONTENT 560
-#define CONTENT_CAP 568
-#define RESULT 576
-#define RESULT_CAP 584
-#define IO_SIZE 592
-#define TREE 600
-#define ENCODED 608
-#define ENCODED_N 616
-#define FRAME 648
+#define P_CAP 48
+#define P_BYTES 56
+#define FIRST_LINE 56
+#define CONTENT 64
+#define CONTENT_CAP 72
+#define RESULT 80
+#define RESULT_CAP 88
+#define IO_SIZE 96
+#define TREE 104
+#define ENCODED 112
+#define ENCODED_N 120
+#define FRAME 152
 .section .rodata
 .Lname: .asciz "edit"
-.Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Paths support home expansion, file URLs and lexical dot segments. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
-.Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"edits\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":16,\"items\":{\"type\":\"object\",\"properties\":{\"oldText\":{\"type\":\"string\"},\"newText\":{\"type\":\"string\"}},\"required\":[\"oldText\",\"newText\"],\"additionalProperties\":false}}},\"required\":[\"path\",\"edits\"],\"additionalProperties\":false}"
+.Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Paths support home expansion, file URLs and lexical dot segments. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks."
+.Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"edits\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"properties\":{\"oldText\":{\"type\":\"string\"},\"newText\":{\"type\":\"string\"}},\"required\":[\"oldText\",\"newText\"],\"additionalProperties\":false}}},\"required\":[\"path\",\"edits\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Ledits: .asciz "edits"
 .Lold: .asciz "oldText"
@@ -37,7 +38,7 @@
 .Loverlap: .asciz "Edit targets overlap; merge them"
 .Lnochange: .asciz "Edit produced no changes"
 .Lmemory: .asciz "Edit memory allocation failed"
-.Lok: .asciz "Successfully replaced %zu block(s); first changed line %zu"
+.Lok: .asciz "Successfully replaced %zu block(s) in %s."
 .Lsummary_error: .asciz "Edit succeeded; could not format change summary"
 .Lread_limit: .asciz "read output limit exceeded"
 .set LREAD_LIMIT_N, 26
@@ -173,12 +174,28 @@
  push r13
  mov rbx,rdi
  mov r12,rdx
+ mov r13,rsi
  mov rax,[rbx+P_COUNT]
- cmp rax,16
- jae .Lpair_bad
+ cmp rax,[rbx+P_CAP]
+ jb .Lpair_slot
+ mov rsi,[rbx+P_CAP]
+ add rsi,rsi
+ jnz .Lpair_grow
+ mov esi,8
+.Lpair_grow:
+ mov [rbx+P_CAP],rsi
+ shl rsi,5
+ mov rdi,[rbx+P_EDITS]
+ call realloc@PLT
+ test rax,rax
+ jz .Lpair_bad
+ mov [rbx+P_EDITS],rax
+.Lpair_slot:
+ mov rdi,r13
+ mov rax,[rbx+P_COUNT]
  shl rax,5
- lea r13,[rbx+P_EDITS+rax]
- mov rdi,rsi
+ mov r13,[rbx+P_EDITS]
+ add r13,rax
  mov rsi,r13
  call .Lstring
  test eax,eax
@@ -252,7 +269,7 @@
  pop rbx
  ret
 
-/* Parsed state owns ROOT/INNER only. Slices borrow them until close. */
+/* Parsed state owns the edit vector and ROOT/INNER; slices borrow the trees. */
 .Lparsed_close:
  push rbx
  mov rbx,rdi
@@ -266,6 +283,9 @@
  jz .Lclose_done
  call json_object_put@PLT
 .Lclose_done:
+ mov rdi,[rbx+P_EDITS]
+ mov qword ptr [rbx+P_EDITS],0
+ call free@PLT
  pop rbx
  ret
 
@@ -403,8 +423,6 @@
  mov rdi,r13
  call json_object_array_length@PLT
  mov r14,rax
- cmp r14,16
- ja .Lparse_bad
  xor r15d,r15d
 .Larray_item:
  cmp r15,r14
@@ -446,7 +464,7 @@
 
 .Lvalidate:
  push rbx
- sub rsp,560
+ sub rsp,64
  mov rdi,rsi
  mov rsi,rdx
  mov rdx,rsp
@@ -456,7 +474,7 @@
  call .Lparsed_close
  mov eax,ebx
  xor eax,1
- add rsp,560
+ add rsp,64
  pop rbx
  ret
 
@@ -717,7 +735,8 @@
  jae .Lresult_measure_done
  mov rax,r11
  shl rax,5
- lea rdx,[rbp+P_EDITS+rax]
+ mov rdx,[rbp+P_EDITS]
+ add rdx,rax
  add r10,[rdx+24]
  jc .Lquota_error
  inc r11
@@ -740,7 +759,7 @@
  push rax
  mov rdi,[rbp+CONTENT]
  mov rsi,[rbp+FIRST_LINE]
- lea rdx,[rbp+P_EDITS]
+ mov rdx,[rbp+P_EDITS]
  mov rcx,[rbp+P_COUNT]
  mov r8,[rbp+RESULT]
  mov r9,[rbp+RESULT_CAP]
@@ -843,18 +862,20 @@
  jz .Lcleanup_parsed
  call json_object_put@PLT
 .Lcleanup_parsed:
- mov rdi,rbp
- call .Lparsed_close
  lea rax,[rip+.Lok]
  cmp r15,rax
- jne .Lcopy_message
+ jne .Lcleanup_failure
  mov rdi,r12
  mov rsi,r13
  mov rdx,r15
  mov rcx,[rbp+P_COUNT]
- mov r8,[rbp+FIRST_LINE]
+ mov r8,[rbp+P_PATH]
  xor eax,eax
  call snprintf@PLT
+ mov [rbp+IO_SIZE],rax
+ mov rdi,rbp
+ call .Lparsed_close
+ mov rax,[rbp+IO_SIZE]
  test eax,eax
  js .Lsummary_failed
  cmp rax,r13
@@ -862,6 +883,10 @@
  mov [r14],rax
  xor eax,eax
  jmp .Lexecute_return
+.Lcleanup_failure:
+ mov rdi,rbp
+ call .Lparsed_close
+ jmp .Lcopy_message
 .Lsummary_failed:
  mov rdi,rbx
  call pg_edit_tool_clear

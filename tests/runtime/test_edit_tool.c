@@ -30,6 +30,9 @@ static unsigned reads,writes,checks;
 static int deny_read,deny_write;
 static int partial_read,oversize_read,fail_after_write,crash_after_write;
 static unsigned api_calls,fail_api;
+static unsigned vector_realloc_calls,fail_vector_at;
+void *__real_realloc(void *,size_t);
+void *__wrap_realloc(void *p,size_t n){if(fail_vector_at&&++vector_realloc_calls==fail_vector_at)return 0;return __real_realloc(p,n);}
 static char last_output[128];
 static int fault(void){return ++api_calls==fail_api;}
 json_tokener *__real_json_tokener_new(void);
@@ -77,11 +80,13 @@ static void success_summaries(void){
   {"alpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\\n\",\"newText\":\"alpha\\nx\"}",2,1},
   {"alpha\n","{\"path\":\"file.txt\",\"oldText\":\"alpha\\n\",\"newText\":\"alpha\"}",1,1},
  };
- for(size_t i=0;i<sizeof(cases)/sizeof(*cases);++i){put(cases[i].before);assert(!invoke(cases[i].args));char expected[128];snprintf(expected,sizeof(expected),"Successfully replaced %u block(s); first changed line %u",cases[i].blocks,cases[i].line);assert(!strcmp(last_output,expected));}
- char many[2048];memset(many,'\n',2001);memcpy(many+2001,"alpha",6);put(many);assert(!invoke("{\"path\":\"file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!strcmp(last_output,"Successfully replaced 1 block(s); first changed line 2002"));
- char content[128]={0};json_object *args=json_object_new_object(),*edits=json_object_new_array();assert(args&&edits);assert(!json_object_object_add(args,"path",json_object_new_string("file.txt")));assert(!json_object_object_add(args,"edits",edits));
- for(unsigned i=0;i<16;++i){char old[8],replacement[8];snprintf(old,sizeof(old),"T%02u",i);snprintf(replacement,sizeof(replacement),"R%02u",i);strcat(content,old);strcat(content,"\n");json_object *edit=json_object_new_object();assert(edit&&!json_object_object_add(edit,"oldText",json_object_new_string(old))&&!json_object_object_add(edit,"newText",json_object_new_string(replacement))&&!json_object_array_add(edits,edit));}
- put(content);assert(!invoke(json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN)));assert(!strcmp(last_output,"Successfully replaced 16 block(s); first changed line 1"));json_object_put(args);
+ for(size_t i=0;i<sizeof(cases)/sizeof(*cases);++i){put(cases[i].before);assert(!invoke(cases[i].args));char expected[128];snprintf(expected,sizeof(expected),"Successfully replaced %u block(s) in file.txt.",cases[i].blocks);assert(!strcmp(last_output,expected)&&json_object_get_uint64(json_object_object_get(editor.details,"firstChangedLine"))==cases[i].line);}
+ char many[2048];memset(many,'\n',2001);memcpy(many+2001,"alpha",6);put(many);assert(!invoke("{\"path\":\"file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!strcmp(last_output,"Successfully replaced 1 block(s) in file.txt."));
+ char content[2048]={0};json_object *args=json_object_new_object(),*edits=json_object_new_array();assert(args&&edits);assert(!json_object_object_add(args,"path",json_object_new_string("file.txt")));assert(!json_object_object_add(args,"edits",edits));
+ for(unsigned i=0;i<128;++i){char old[8],replacement[8];snprintf(old,sizeof(old),"T%03u",i);snprintf(replacement,sizeof(replacement),"R%03u",i);strcat(content,old);strcat(content,"\n");json_object *edit=json_object_new_object();assert(edit&&!json_object_object_add(edit,"oldText",json_object_new_string(old))&&!json_object_object_add(edit,"newText",json_object_new_string(replacement))&&!json_object_array_add(edits,edit));}
+ const char *encoded=json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN);put(content);
+ for(unsigned failure=1;failure<=10;failure++){unsigned r=reads,w=writes;vector_realloc_calls=0;fail_vector_at=failure;assert(invoke(encoded));fail_vector_at=0;assert(reads==r&&writes==w);expect(content);}
+ assert(!invoke(encoded));assert(!strcmp(last_output,"Successfully replaced 128 block(s) in file.txt."));json_object_put(args);
  put("alpha\n");
 }
 
@@ -164,7 +169,7 @@ int main(int argc,char **argv){
  api_calls=0;assert(!invoke(shapes[0]));unsigned points=api_calls;assert(points>10);for(unsigned failure=1;failure<=points;++failure){put("alpha\n");api_calls=0;fail_api=failure;assert(invoke(shapes[0]));expect("alpha\n");}fail_api=0;printf("edit allocation/setup failure points: %u\n",points);put("alpha\n");
  char out[128];size_t n=999;r=reads;w=writes;assert(definition.execute(definition.context,s(shapes[0]),out,1,&n)&&!n&&reads==r&&writes==w);
  long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page,PROT_NONE));size_t len=strlen(shapes[0]);char *tail=map+page-len;memcpy(tail,shapes[0],len);assert(!definition.execute(definition.context,(pg_slice){tail,len},out,sizeof(out),&n));expect("ALPHA\n");put("alpha\n");r=reads;w=writes;n=999;assert(definition.execute(definition.context,s(shapes[0]),out,63,&n)&&!n&&reads==r&&writes==w);
- char *output_tail=map+page-64;assert(!definition.execute(definition.context,s(shapes[0]),output_tail,64,&n));assert(n==strlen("Successfully replaced 1 block(s); first changed line 1")&&!strcmp(output_tail,"Successfully replaced 1 block(s); first changed line 1"));
+ char *output_tail=map+page-64;assert(!definition.execute(definition.context,s(shapes[0]),output_tail,64,&n));assert(n==strlen("Successfully replaced 1 block(s) in file.txt.")&&!strcmp(output_tail,"Successfully replaced 1 block(s) in file.txt."));
  assert(!munmap(map,(size_t)page*2));
  assert(fds()==before);recovery(reader.directory);assert(fds()==before);assert(!unlink("file.txt"));pg_edit_tool_clear(&editor);pg_read_tool_close(&reader);assert(!fchdir(saved)&&!close(saved)&&!rmdir(root));
  puts("edit tool: canonical/repair shapes, untouched args, batch/fuzzy/BOM, policy order, no-write refusals, borrowed service, page tails and unsafe post-write crash recovery OK");return 0;
