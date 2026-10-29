@@ -477,7 +477,8 @@
         "pg_tui_runtime_task_graph",
         "pg_tui_runtime_conversation_view",
         "pg_tui_runtime_conversations",
-        "pg_tui_runtime_conversation_catalog"
+        "pg_tui_runtime_conversation_catalog",
+        "pg_tui_runtime_conversation_actions"
       ],
       "reference_basis": [
         {
@@ -1933,6 +1934,8 @@
         "pg_durable_client_create",
         "pg_durable_client_history",
         "pg_durable_client_catalog_service",
+        "pg_durable_client_actions_service",
+        "pg_durable_client_reset",
         "pg_durable_client_rename",
         "pg_durable_client_conversations_service",
         "pg_durable_client_text"

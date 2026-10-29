@@ -3256,3 +3256,155 @@ pg_durable_client_rename:
  ret
 .size pg_durable_client_rename,.-pg_durable_client_rename
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_client_actions_service
+.type pg_durable_client_actions_service,@function
+pg_durable_client_actions_service:
+ mov eax,4
+ test rdi,rdi
+ jz .Lreset_service_end
+ test rsi,rsi
+ jz .Lreset_service_end
+ mov [rsi],rdi
+ lea rax,[rip+pg_durable_client_reset]
+ mov [rsi+8],rax
+ xor eax,eax
+.Lreset_service_end:
+ ret
+.globl pg_durable_client_reset
+.type pg_durable_client_reset,@function
+pg_durable_client_reset:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov ebp,4
+ test r13,r13
+ jz .Lreset_end
+ mov qword ptr [r13],0
+ call .Ldi_check
+ mov ebp,eax
+ test eax,eax
+ jnz .Lreset_end
+ test r12,r12
+ jz .Lreset_draft
+ mov r14,[r12+8]
+ mov eax,0x7fffffff
+ cmp r14,rax
+ ja .Lreset_invalid
+ mov r12,[r12]
+ test r14,r14
+ jz .Lreset_text
+ test r12,r12
+ jz .Lreset_invalid
+ xor ebp,ebp
+.Lreset_validate:
+ cmp rbp,r14
+ jae .Lreset_text
+ lea rdi,[r12+rbp]
+ mov rsi,r14
+ sub rsi,rbp
+ lea rdx,[rsp+24]
+ call utf8proc_iterate@PLT
+ test rax,rax
+ jle .Lreset_invalid
+ add rbp,rax
+ jmp .Lreset_validate
+.Lreset_text:
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_new_string_len@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lreset_allocation
+.Lreset_draft:
+ lea rdi,[rip+.Lreset_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lreset_allocation
+ cmp qword ptr [rsp+16],0
+ je .Lreset_submit
+ lea rdi,[rip+.Lreset_message]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lreset_allocation
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lreset_content]
+ mov rdx,[rsp+16]
+ mov qword ptr [rsp+16],0
+ call .Ldc_set_owned
+ test eax,eax
+ jnz .Lreset_allocation
+ mov rax,[rbx+8]
+ mov rax,[rax+8]
+ mov rdi,[rax]
+ call [rax+40]
+ call json_object_new_double@PLT
+ test rax,rax
+ jz .Lreset_allocation
+ mov rdi,r14
+ lea rsi,[rip+.Lreset_timestamp]
+ mov rdx,rax
+ call .Ldc_set_owned
+ test eax,eax
+ jnz .Lreset_allocation
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lreset_entry]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lreset_model]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Ldc_set_owned
+ test eax,eax
+ jnz .Lreset_allocation
+.Lreset_submit:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Ldi_submit
+ mov ebp,eax
+ jmp .Lreset_end
+.Lreset_invalid:
+ mov ebp,4
+ jmp .Lreset_end
+.Lreset_allocation:
+ mov ebp,5
+.Lreset_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lreset_json: .asciz "{\"type\":\"write\",\"entry\":{\"kind\":\"pangu.reset\",\"head\":\"self\"}}"
+.Lreset_message: .asciz "[{\"role\":\"user\"}]"
+.Lreset_content: .asciz "content"
+.Lreset_timestamp: .asciz "timestamp"
+.Lreset_entry: .asciz "entry"
+.Lreset_model: .asciz "model"
+.section .note.GNU-stack,"",@progbits

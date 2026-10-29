@@ -61,6 +61,11 @@ typedef struct {
  int (*rename)(void *,uint64_t,pg_slice);
  void (*release)(struct json_object *);
 } pg_conversation_catalog_ops;
+/* Reset the selected conversation through durable Submission admission.
+   NULL handoff starts an empty context; a present slice adds that user message,
+   including an empty message. Owns no borrowed text after return. id receives
+   the durable Submission ID; inspect it through the existing inputs service. */
+typedef struct {void *context;int (*reset)(void *,const pg_slice *handoff,uint64_t *id);} pg_conversation_actions_ops;
 /* start copies instructions; reserve_tokens is 2..1000000. Serialized binding
    remains borrowed through poll/release and the owning runtime lifetime. */
 typedef struct {
