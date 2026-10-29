@@ -618,6 +618,12 @@ li_execute:
 li_operation_result:
  push r15
  mov r15d,eax
+ cmp qword ptr [r14],-1
+ jne .Lop_explicit_size
+ cmp r15d,1
+ jbe .Lop_final
+ jmp .Lop_invalid
+.Lop_explicit_size:
  cmp qword ptr [r14],r13
  jae .Lop_limit
  cmp r15d,4

@@ -2,6 +2,9 @@
 #define PG_TOOLS_H
 #include "agent.h"
 #define PG_TOOL_LIMIT 16
+/* Durable final OK/ERROR with this size selects the invocation's reported output.
+   Zero size is an explicit empty result; WAIT/OUTPUT always carry real sizes. */
+#define PG_TOOL_OUTPUT_REPORTED ((size_t)-1)
 /* Borrowed immutable strings and contexts must outlive the registry and runs.
    validate checks tool-specific schema semantics; policy is separate from visibility.
    Validators/authorization are side-effect free; callbacks return promptly. */

@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,384
+ mov esi,400
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -1081,6 +1081,12 @@ pg_durable_tool_init:
  cmp eax,4
  ja .Ldt_poll_invalid
  mov [r14+144],eax
+ cmp qword ptr [r14+136],-1
+ jne .Ldt_poll_explicit_size
+ cmp eax,1
+ ja .Ldt_poll_invalid
+ jmp .Ldt_poll_end_result
+.Ldt_poll_explicit_size:
  mov rcx,[r14+248]
  cmp [r14+136],rcx
  ja .Ldt_poll_invalid
@@ -1101,6 +1107,14 @@ pg_durable_tool_init:
  sete al
  movzx eax,al
  mov [r14+164],eax
+ call .Ldt_monotonic
+ movsd [r14+392],xmm0
+ cmp qword ptr [r14+136],-1
+ jne .Ldt_poll_close
+ mov rdi,r14
+ call .Ldt_reported_result
+ test eax,eax
+ jnz .Ldt_poll_error
 .Ldt_poll_close:
  mov rdi,r14
  mov esi,1
@@ -1157,6 +1171,10 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
  mov dword ptr [r14+228],1
 .Ldt_after_hooks_done:
+ mov rdi,r14
+ call .Ldt_reported_warning
+ test eax,eax
+ jnz .Ldt_poll_error
  mov rdi,r14
  call .Ldt_duration
  test eax,eax
@@ -1987,6 +2005,22 @@ pg_durable_tool_bind_hooks:
  mov rdi,[rsp+24]
  call json_object_get_string_len@PLT
  mov [rsp+32],rax
+ cmp dword ptr [r13+372],0
+ je .Ldt_hooks_retained_ready
+ cmp rax,[r13+136]
+ jne .Ldt_hooks_retained_replaced
+ mov rdi,[rsp+24]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,[r13+128]
+ mov rdx,[rsp+32]
+ call memcmp@PLT
+ test eax,eax
+ jz .Ldt_hooks_retained_ready
+.Ldt_hooks_retained_replaced:
+ mov dword ptr [r13+372],0
+.Ldt_hooks_retained_ready:
+ mov rax,[rsp+32]
  cmp rax,[r13+248]
  jbe .Ldt_hooks_capacity_ready
  lea rdi,[rax+1]
@@ -2109,6 +2143,8 @@ pg_durable_tool_executing:
  jne .Ldt_executing_end
  cmp dword ptr [rdx+196],0
  je .Ldt_executing_end
+ cmp qword ptr [rdx+392],0
+ jne .Ldt_executing_end
  cmp dword ptr [rdx+176],0
  jne .Ldt_executing_end
  mov eax,1
@@ -2957,7 +2993,12 @@ pg_durable_tool_output_limits:
  call .Ldt_ensure_diagnostics
  test rax,rax
  jz .Ldt_duration_bad
+ movsd xmm0,[rbx+392]
+ pxor xmm1,xmm1
+ ucomisd xmm0,xmm1
+ ja .Ldt_duration_measured
  call .Ldt_monotonic
+.Ldt_duration_measured:
  subsd xmm0,[rbx+280]
  pxor xmm1,xmm1
  maxsd xmm0,xmm1
@@ -3290,3 +3331,73 @@ pg_durable_tool_output_window:
  pop rbx
  ret
 .size pg_durable_tool_output_window,.-pg_durable_tool_output_window
+
+.text
+/* Resolve an omitted final output before afterTool sees the result. */
+.Ldt_reported_result:
+ push rbx
+ sub rsp,32
+ mov rbx,rdi
+ lea rdi,[rbx+288]
+ mov rsi,rsp
+ call pg_output_buffer_snapshot@PLT
+ test eax,eax
+ jnz .Ldt_reported_end
+ mov rax,[rsp+8]
+ cmp rax,[rbx+248]
+ ja .Ldt_reported_bad
+ mov [rbx+136],rax
+ mov rdi,[rbx+128]
+ mov rsi,[rsp]
+ mov rdx,rax
+ call memcpy@PLT
+ mov rax,[rsp+16]
+ mov [rbx+376],rax
+ mov rax,[rsp+24]
+ mov [rbx+384],rax
+ mov dword ptr [rbx+372],1
+ xor eax,eax
+ jmp .Ldt_reported_release
+.Ldt_reported_bad:
+ mov eax,4
+.Ldt_reported_release:
+ mov [rsp+8],eax
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,[rsp+8]
+.Ldt_reported_end:
+ add rsp,32
+ pop rbx
+ ret
+/* Harness truncation diagnostics follow afterTool and reported diagnostics. */
+.Ldt_reported_warning:
+ push rbx
+ mov rbx,rdi
+ cmp dword ptr [rbx+372],0
+ je .Ldt_reported_warning_ok
+ cmp qword ptr [rbx+376],0
+ je .Ldt_reported_warning_done
+ call .Ldt_ensure_diagnostics
+ test rax,rax
+ jz .Ldt_reported_warning_alloc
+ mov rdi,rax
+ mov rsi,[rbx+376]
+ mov rdx,[rbx+384]
+ lea rcx,[rip+.Ldt_head_word]
+ cmp dword ptr [rbx+272],0
+ je .Ldt_reported_warning_call
+ lea rcx,[rip+.Ldt_tail_word]
+.Ldt_reported_warning_call:
+ call .Ldt_truncated
+ test eax,eax
+ jnz .Ldt_reported_warning_end
+.Ldt_reported_warning_done:
+ mov dword ptr [rbx+372],0
+.Ldt_reported_warning_ok:
+ xor eax,eax
+ jmp .Ldt_reported_warning_end
+.Ldt_reported_warning_alloc:
+ mov eax,5
+.Ldt_reported_warning_end:
+ pop rbx
+ ret
