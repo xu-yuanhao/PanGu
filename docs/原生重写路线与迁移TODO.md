@@ -156,6 +156,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Generation四阶段hooks进入产品：beforeRequest临时消息链、afterResponse/afterTools观察、onYield首个续接；phase固定选择、挂起/取消、回答与续接/队列边界原子提交。新请求保存offeredTools并随并行/串行子任务传递，未提供的工具在效果前拒绝。
 - [x] 可变注册表接入实际消费者：同名替换保序、完整候选验证后发布、安装/撤销及独立所有者引用；运行中phase固定快照，旧快照归还后释放，Host关闭等待外借快照。
 - [x] beforeCompact接入同一扩展选择/注册表：首个decline/summary、挂起/取消、阶段快照及替换后下一任务采用新hook；摘要进入原有Task/Submission持久放置链。
+- [x] 自定义Task接入可变注册表和实际Scheduler：全安装集合按稳定名字解析、跨扩展/内置冲突拒绝、phase边界接手、撤销或不兼容候选保留旧invocation；调度器重开后缺定义等待安装，迁移失败身份缓存及替换后恢复，任务图同步blocked原因，代码引用在清理后释放。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -266,8 +267,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/registry.ts`、`compaction.ts` select/beforeCompact/place及scheduler的phase固定Agent；Pi跟踪`6eb99ad`、Harness跟踪`f3803c9`的已知差异沿本批固定快照评估。Harness/Cordis提供作用域/代码引用与释放语义。
-- 实际调用链：Host extensions.control → 注册表候选验证/发布 → prepare、模型、工具及hook消费者取得不可变快照。压缩select构建固定entries/messages/firstKept → 同一扩展beforeCompact → 首个decline或summary → 原有持久任务/Submission放置；未决定时沿注入压缩服务及模型摘要路径继续。挂起中替换/撤销保留旧phase，下一任务解析新快照；取消先释放callback资源，再归还快照。
-- 验证：`test_product_resources.py --native-tasks --sanitize`通过注册表候选失败、替换/撤销、旧快照执行、延迟所有者释放及Host关闭等待；新增实际压缩任务覆盖挂起中撤销并替换、旧摘要落库、下一任务decline、取消及引用归零。原`--compaction-hooks`服务专项通过；Runtime整批与产品构建通过。真实DeepSeek扩展闭环通过，挂起撤销/替换形成的摘要可在继续对话中准确回忆，原请求/工具/续接与取消工作流保持。
-- 接口与自审：extensions.registry ABI4提供acquire/release，扩展结果1248字节持有lease；注册表104字节，控制函数表32字节。beforeCompact为统一hook事件7；Compaction272字节尾部绑定现有hook函数表，私有压缩hook状态72字节持有scope。Client/Task/TUI布局保持。新增导出已登记；控制差异为模块入口登记，G00/Assembly通过。
-- 剩余与下一交付物：K09继续自定义Task与可变注册表/调度定义引用整合、完整HookApi、异步section/失败回退/SystemEntry计划；K07/K08继续串行未启动调用取消及内容/控制语义。下一交付物将注册表中的自定义Task与现有Scheduler解析/清理连接，完成安装、执行、替换、撤销与持久重开工作流。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/registry.ts`任务集合/重名拒绝、`scheduler.ts` Reservation/Phase/fit/resolve及 `harness-tasks-recovery.test.ts` 的缺定义等待、phase handover、撤销后继续与迁移失败恢复。Pi跟踪`6eb99ad`、Harness跟踪`f3803c9`的已知差异沿当前固定快照评估；Harness/Cordis提供代码引用与释放语义。
+- 实际调用链：原生Extension.tasks → 完整候选校验与注册表发布 → scoped Task resolver → Scheduler/Runner取得定义及epoch lease → 挂起中固定原phase → 清理后下一phase选择合适的新定义。已运行invocation在撤销/不兼容替换时沿旧定义继续；调度器关闭后归还引用，重开按当前注册表解析。迁移失败固定候选身份并阻塞，定义替换后重试；任务图通过同一scoped resolver只读查询原因。DSO专项的自定义任务已直接来自Extension.tasks。
+- 验证：`test_product_resources.py --native-tasks --sanitize`通过缺定义→安装、挂起替换/无重叠、撤销后原任务完成、关闭/重开后的缺定义等待、失败迁移只调用一次、替换迁移后版本2完成、任务图missing_task/migration_failed、重名/内置名拒绝及所有者引用归零。Runtime整批与产品构建退出0；G00/Assembly通过。既有模型请求/工具及压缩引擎未改动。
+- 接口与自审：extensions.registry ABI5，Extension88字节尾部增加tasks/count；Runner160字节保存scoped resolver、invocation和失败候选lease；Scheduler80字节尾部持有独立resolver绑定，原host函数表及Client/TUI布局保持。新增公开入口及实际依赖已登记。所有权在头文件注明；控制修改为模块导出/依赖登记，候选发布失败保留原状态。
+- 剩余与下一交付物：K09继续完整HookApi、异步section/失败回退/SystemEntry计划；K07/K08继续未启动串行调用取消及更完整内容/控制语义。下一交付物将扩展section的运行/失败保留与系统提示计划接入真实请求和持久SystemEntry，按上游完整提示渲染调用链推进。

@@ -20,7 +20,6 @@ static int poll_task(void *context,pg_task_runner *runner,const struct json_obje
 static const pg_task_phase phases[]={{{"work",4},0,poll_task,cleanup}};
 static const pg_task_definition definition={.name={"example.work",12},.version=1,.initial=initial,.phases=phases,.phase_count=1};
 static const pg_task_definition *definitions[]={&definition};
-static const pg_task_provider provider={PG_TASK_PROVIDER_ABI,sizeof(pg_task_provider),definitions,1};
 static int allow(void *context,pg_slice arguments){(void)context;(void)arguments;return 1;}
 static int echo(void *context,pg_slice arguments,char *out,size_t capacity,size_t *size){(void)context;(void)arguments;const char *text="EXTENSION_TOOL_RESULT";*size=strlen(text);if(*size>=capacity){*size=0;return PG_TOOL_ERROR;}memcpy(out,text,*size+1);return PG_TOOL_OK;}
 static const pg_tool_definition echo_tool={"native_echo","Native extension echo","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,allow,allow,echo,1,0};
@@ -55,7 +54,7 @@ static const pg_extension_hook policy_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,pol
 static int timing_before(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *args=json_object_object_get(json_object_object_get(request,"call"),"arguments");const char *path=json_object_get_string(json_object_object_get(args,"path"));if(path&&!strcmp(path,"hooked.txt"))assert(!strcmp(json_object_get_string(json_object_object_get(args,"content")),"HOOK_ARGUMENTS"));return 0;}
 static int timing_after(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *args=json_object_object_get(json_object_object_get(request,"call"),"arguments");const char *path=json_object_get_string(json_object_object_get(args,"path"));if(path&&!strcmp(path,"hooked.txt")){assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(request,"result"),"output")),"HOOK_AFTER_RESULT"));assert(!json_object_deep_copy(json_object_object_get(request,"result"),decision,0));json_object_object_add(*decision,"output",json_object_new_string("HOOK_AFTER_CHAINED"));}return 0;}
 static const pg_extension_hook timing_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,timing_before,0},{PG_EXTENSION_AFTER_TOOL,0,0,timing_after,0}};
-static const pg_extension policy={"policy",0,0,0,0,0,0,policy_hooks,2};
+static const pg_extension policy={"policy",0,0,0,0,0,0,policy_hooks,2,0,0};
 static const json_object *pending_request,*pending_response,*pending_yield;
 static int generation_before(void *context,const json_object *request,json_object **decision){
  (void)context;*decision=0;if(!pending_request){pending_request=request;hook_stats.generation_pending=1;return 1;}assert(pending_request==request);pending_request=0;hook_stats.generation_pending=0;hook_stats.requests++;json_object *messages=0;assert(!json_object_deep_copy(json_object_object_get(request,"messages"),&messages,0));json_object *message=json_tokener_parse("{\"role\":\"user\",\"content\":\"The transient request marker is BEFORE_REQUEST_MARKER. Keep following the user's task.\"}");assert(messages&&message&&!json_object_array_add(messages,message));*decision=json_object_new_object();assert(*decision&&!json_object_object_add(*decision,"messages",messages));return 0;
@@ -67,15 +66,15 @@ static int generation_yield(void *context,const json_object *request,json_object
 static int generation_tools(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *results=json_object_object_get(request,"results");assert(json_object_is_type(results,json_type_array)&&json_object_array_length(results)>0&&hook_stats.responses>hook_stats.rounds);hook_stats.rounds++;return 0;}
 static void generation_cancel(void *context,const json_object *request){(void)context;assert(request==pending_request||request==pending_response||request==pending_yield);if(request==pending_request){pending_request=0;hook_stats.generation_pending=0;}if(request==pending_response)pending_response=0;if(request==pending_yield)pending_yield=0;hook_stats.generation_cancels++;}
 static const pg_extension_hook generation_hooks[]={{PG_EXTENSION_BEFORE_REQUEST,0,0,generation_before,generation_cancel},{PG_EXTENSION_AFTER_RESPONSE,0,0,generation_after,generation_cancel},{PG_EXTENSION_ON_YIELD,0,0,generation_yield,generation_cancel},{PG_EXTENSION_AFTER_TOOLS,0,0,generation_tools,0}};
-static const pg_extension generation={"generation",0,0,0,0,0,0,generation_hooks,4};
-static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2,timing_hooks,2},broken={"broken",0,0,broken_sections,1,broken_wraps,1,0,0};
+static const pg_extension generation={"generation",0,0,0,0,0,0,generation_hooks,4,definitions,1};
+static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0,0,0,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2,timing_hooks,2,0,0},broken={"broken",0,0,broken_sections,1,broken_wraps,1,0,0,0,0};
 static const pg_extension *extensions[]={&reviewer,&timing,&broken,&policy,&generation};
 static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&(!strcmp(extension,"broken")||!strcmp(extension,"policy")||!strcmp(extension,"generation")));if(error)(*(unsigned *)context)++;}
 static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,5,0,&hook_stats,report,0,0,0};
-static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"task.definitions",(void *)&provider)||pg_host_provide(host,owner,"extensions.registry",&registry);}
+static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"extensions.registry",&registry);}
 static int stop(void *context){(void)context;if(active_tasks||pending_before||pending_after||pending_request||pending_response||pending_yield)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}
-static const char *const exports[]={"task.definitions","extensions.registry"};
-static const pg_plugin plugin={"product.tasks",0,0,0,exports,2,start,stop};
+static const char *const exports[]={"extensions.registry"};
+static const pg_plugin plugin={"product.tasks",0,0,0,exports,1,start,stop};
 const pg_native_manifest pangu_plugin_v1={PG_NATIVE_ABI,sizeof(pg_native_manifest),sizeof(pg_plugin),0,&plugin,1};
 #else
 #include "../../src/runtime/native_plugin.h"

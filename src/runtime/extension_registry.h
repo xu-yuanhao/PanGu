@@ -17,5 +17,9 @@ int pg_extension_registry_describe(void *,struct json_object **);
    Keep registry/Host storage alive while pending; releases require no polling. */
 int pg_extension_registry_close(pg_extension_registry *);
 typedef struct {void *context;int (*install)(void *,const pg_extension *,const pg_extension_owner *);int (*remove)(void *,const char *);int (*describe)(void *,struct json_object **);} pg_extension_control;
+/* Lookup all installed task definitions independently of Agent selection.
+   Success transfers an epoch lease; missing/failure return no lease. */
+void pg_extension_registry_release(void *);
+int pg_extension_registry_task(void *,pg_slice,const pg_task_definition **,void **);
 void pg_extension_registry_service(pg_extension_registry *,pg_extension_control *);
 #endif

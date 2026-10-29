@@ -200,7 +200,7 @@ pg_extension_registry_open:
  xor eax,eax
  mov ecx,13
  rep stosq
- mov dword ptr [rbx],4
+ mov dword ptr [rbx],5
  mov dword ptr [rbx+4],72
  test r12,r12
  jz .Lr_open_facade
@@ -590,3 +590,64 @@ pg_extension_registry_describe:
 .section .rodata
 .Lr_revision: .asciz "revision"
 .Lr_extensions: .asciz "extensions"
+
+.text
+.globl pg_extension_registry_task
+.type pg_extension_registry_task,@function
+pg_extension_registry_task:
+ RF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov [rsp+24],rcx
+ mov [rsp+32],r8
+ mov qword ptr [rcx],0
+ mov qword ptr [r8],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ lea rsi,[rsp]
+ lea rdx,[rsp+8]
+ call .Lr_acquire
+ mov ebp,eax
+ test eax,eax
+ jnz .Lrt_end
+ xor r14d,r14d
+.Lrt_extension:
+ mov rax,[rsp]
+ cmp r14,[rax+16]
+ jae .Lrt_missing
+ mov rax,[rax+8]
+ mov rax,[rax+r14*8]
+ mov rcx,[rax+72]
+ /* A borrowed provider is assembled in a second frame for the lookup. */
+ sub rsp,32
+ mov dword ptr [rsp],1
+ mov dword ptr [rsp+4],24
+ mov [rsp+8],rcx
+ mov rax,[rax+80]
+ mov [rsp+16],rax
+ mov rdi,rsp
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,[rsp+56]
+ call pg_task_provider_find@PLT
+ add rsp,32
+ test eax,eax
+ jz .Lrt_found
+ inc r14
+ jmp .Lrt_extension
+.Lrt_found:
+ mov rax,[rsp+8]
+ mov rdx,[rsp+32]
+ mov [rdx],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Lrt_release
+.Lrt_missing:
+ mov ebp,1
+.Lrt_release:
+ mov rdi,[rsp+8]
+ call pg_extension_registry_release
+.Lrt_end:
+ mov eax,ebp
+ RE 48

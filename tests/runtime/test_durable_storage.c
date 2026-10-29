@@ -88,7 +88,7 @@ typedef struct {
  fixture f;pg_task_runner_host host;pg_task_definition definition;pg_task_phase phase;pg_task_scheduler *scheduler;
  unsigned mode,calls,cleanups,available,reports,seen[1024],seen_count,first_restart;
 } task_case;
-_Static_assert(sizeof(pg_task_runner)==128&&offsetof(pg_task_runner,error)==96&&offsetof(pg_task_runner,mutation)==112,"Task runner ABI");
+_Static_assert(sizeof(pg_task_runner)==160&&offsetof(pg_task_runner,error)==96&&offsetof(pg_task_runner,mutation)==112,"Task runner ABI");
 _Static_assert(sizeof(pg_task_definition)==88&&offsetof(pg_task_definition,migrate)==72,"Task definition ABI");
 static pg_conversation_view_binding *view_close_probe;
 static int task_read(void *p,unsigned table,uint64_t id,struct json_object **v){task_case *t=p;if(view_close_probe){pg_conversation_view_binding *closing=view_close_probe;view_close_probe=0;pg_conversation_view_close(closing);}return pg_record_memory_read(t->f.memory,(pg_record_table)table,id,v);}
@@ -177,7 +177,7 @@ static void task_tests(void){
  puts("PASS: durable Task phases, cooperative pending, sleep/wake, migration, fault/abort and outcome reopen on SQLite/JSONL");
 }
 static void scheduler_tests(void){
- _Static_assert(sizeof(pg_task_scheduler)==72&&offsetof(pg_task_scheduler,next_wake)==48,"Scheduler ABI");
+ _Static_assert(sizeof(pg_task_scheduler)==80&&offsetof(pg_task_scheduler,next_wake)==48,"Scheduler ABI");
  for(unsigned kind=0;kind<2;kind++)for(unsigned scenario=0;scenario<5;scenario++){
   char parent[]="/tmp/pangu-scheduler-XXXXXX";assert(mkdtemp(parent));task_case t={.f={.kind=kind,.now=100}};
   snprintf(t.f.path,sizeof(t.f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&t.f);seed(&t.f);open_session(&t.f);task_bind(&t);

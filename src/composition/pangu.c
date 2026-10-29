@@ -80,7 +80,7 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools,leased_tools;
- pg_extension_registry extension_registry;pg_extension_control extension_control;
+ pg_extension_registry extension_registry;pg_extension_control extension_control;pg_task_resolver task_resolver;
  const pg_extensions *extensions;pg_extension_result model_extensions,tool_extensions;pg_extension_tools extension_tools;
  pg_tool_registry offered_tools,allowed_tools;
  pg_agent_tools_gate tool_gate;
@@ -154,6 +154,9 @@ static int mint(void *ctx,uint64_t *id){(void)ctx;return pg_record_memory_mint(&
 static int resolve(void *ctx,pg_slice name,const pg_task_definition **out){
  (void)ctx;const pg_task_definition *definitions[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};*out=0;
  for(size_t i=0;i<3;i++)if(name.size==definitions[i]->name.size&&!memcmp(name.data,definitions[i]->name.data,name.size)){*out=definitions[i];return 0;}return pg_task_provider_find(extension_tasks,name,out);
+}
+static int task_acquire(void *ctx,pg_slice name,const pg_task_definition **out,void **lease){
+ (void)ctx;*out=0;*lease=0;int result=pg_extension_registry_task(&durable.extension_registry,name,out,lease);if(result!=1)return result;return resolve(0,name,out);
 }
 static void report(void *ctx,uint64_t id,int error){(void)ctx;fprintf(stderr,"PanGu durable task %llu failed (%d; model HTTP=%ld, transport=%d, decoder=%d).\n",(unsigned long long)id,error,provider.http,provider.transport_done,provider.failed);pg_durable_client_fault_task(&durable.client,id);}
 static int storage_start(void *ctx,pg_host *scope,size_t owner){
@@ -328,7 +331,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  pg_record_memory_queries(&durable.backend.memory,&durable.queries);pg_record_memory_requests(&durable.backend.memory,&durable.requests);if(pg_durable_inputs_open(&durable.inputs,&durable.session,&durable.tasks,&durable.generation,&durable.queries,&durable.requests))return 1;
  extension_tasks=pg_host_find(scope->parent,"task.definitions");const pg_task_definition *builtins[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};if(pg_task_provider_validate(extension_tasks,builtins,3))return 1;
  json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;pg_extension_result initial_extensions={0};int invalid_extensions=pg_extensions_resolve(durable.extensions,agent_state,durable.declared_tools,&initial_extensions);pg_extensions_close(&initial_extensions);json_object_put(agent_state);if(invalid_extensions)return 1;
- if(pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
+ durable.task_resolver=(pg_task_resolver){0,task_acquire,pg_extension_registry_release};if(pg_task_scheduler_bind_definitions(&durable.scheduler,&durable.task_resolver)||pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  struct json_object *startup=0;if(pg_durable_request_read(&durable.tasks,1,UINT64_MAX,durable.configuration,&startup))return 1;int projected=pg_context_project(startup,&durable.history);json_object_put(startup);if(projected)return 1;

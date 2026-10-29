@@ -326,7 +326,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],4
+ cmp dword ptr [rbx],5
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],72
  jne .Lx_validate_bad
@@ -491,7 +491,7 @@ pg_extensions_resolve:
  rep stosq
  test r12,r12
  jz .Lx_resolve_provider
- cmp dword ptr [r12],4
+ cmp dword ptr [r12],5
  jne .Lx_resolve_bad
  cmp dword ptr [r12+4],72
  jne .Lx_resolve_bad
@@ -1748,7 +1748,8 @@ pg_extensions_validate:
  inc r12
  jmp .Lx_validate_full_each
 .Lx_validate_full_ok:
- xor eax,eax
+ mov rdi,rbx
+ call pg_task_extensions_validate@PLT
  jmp .Lx_validate_full_end
 .Lx_validate_full_bad:
  mov eax,5

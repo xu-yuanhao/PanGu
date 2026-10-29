@@ -456,6 +456,7 @@ pg_task_graph_service:
  mov rbx,rdi
  mov r12,rsi
  mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
  QG r12,state
  QG rax,status
  mov rdi,rax
@@ -484,11 +485,20 @@ pg_task_graph_service:
  mov rdi,r13
  call json_object_get_string_len@PLT
  mov edx,eax
- mov rax,[rbx+8]
- mov rdi,[rax]
  mov rsi,r14
  mov rcx,rsp
+ mov rax,[rbx+72]
+ test rax,rax
+ jz .Lq_block_borrowed
+ mov rdi,[rax]
+ lea r8,[rsp+16]
+ call [rax+8]
+ jmp .Lq_block_resolved
+.Lq_block_borrowed:
+ mov rax,[rbx+8]
+ mov rdi,[rax]
  call [rax+32]
+.Lq_block_resolved:
  cmp eax,1
  je .Lq_block_missing
  test eax,eax
@@ -549,6 +559,14 @@ pg_task_graph_service:
 .Lq_block_restarts:
  lea rax,[rip+.Lq_restart_limit]
 .Lq_block_end:
+ mov [rsp+24],rax
+ mov rdi,[rsp+16]
+ test rdi,rdi
+ jz .Lq_block_return
+ mov rax,[rbx+72]
+ call [rax+16]
+.Lq_block_return:
+ mov rax,[rsp+24]
  QE 32
 .section .rodata
 .Lq_blocked_key: .asciz "blocked"

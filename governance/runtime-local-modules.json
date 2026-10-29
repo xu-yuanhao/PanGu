@@ -1720,7 +1720,7 @@
         "session.records.local.v0",
         "json-c"
       ],
-      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline; persisted allSettled/failFast waits, native iterative wait-for graph including owned conversations/background barriers, atomic derived cancellation marks and bottom-up abort; synchronous phase transaction stages Entry/Document/child work and next state atomically, final overlay drives wait and owned-work decisions",
+      "role": "Per-task cooperative phase executor over Durable Session; borrowed definition leases, committed outcomes, restart recovery and owned-child completion; live-status scheduler admission, all-task recovery before invocation, stable per-pass fairness and borrowed-clock sleep deadline; persisted allSettled/failFast waits, native iterative wait-for graph including owned conversations/background barriers, atomic derived cancellation marks and bottom-up abort; synchronous phase transaction stages Entry/Document/child work and next state atomically, final overlay drives wait and owned-work decisions; optional scoped registry resolution pins invocation and failed-migration identity, replaces at phase boundaries and retains fitting old invocation when registration disappears",
       "exports": [
         "pg_task_runner_open",
         "pg_task_runner_poll",
@@ -1729,7 +1729,8 @@
         "pg_task_scheduler_open",
         "pg_task_scheduler_poll",
         "pg_task_scheduler_close",
-        "pg_task_runner_commit_with"
+        "pg_task_runner_commit_with",
+        "pg_task_scheduler_bind_definitions"
       ],
       "reference_basis": [
         {
@@ -2322,10 +2323,11 @@
         "task.runner.local.v0",
         "system libc"
       ],
-      "role": "Optional native Host task.definitions registry for extension tasks; built-in/custom name conflict refusal",
+      "role": "Native task definition lookup and publication validation across installed extensions; unique names and built-in reservations",
       "exports": [
         "pg_task_provider_validate",
-        "pg_task_provider_find"
+        "pg_task_provider_find",
+        "pg_task_extensions_validate"
       ]
     },
     {
@@ -2367,7 +2369,8 @@
         "tools.registry.local.v0",
         "model.mimo.local.v0",
         "json-c",
-        "system libc"
+        "system libc",
+        "task.provider.local.v0"
       ],
       "role": "Pi Registry snapshot selection, ordered tool/section composition, wraps and Generation/Tool/Compaction phase hooks with native scoped leases",
       "exports": [
@@ -2395,7 +2398,8 @@
       "dependencies": [
         "extensions.local.v0",
         "json-c",
-        "system libc"
+        "system libc",
+        "task.provider.local.v0"
       ],
       "role": "Pi Registry immutable publication and native descriptor/code lifetime through retired snapshot leases",
       "exports": [
@@ -2405,7 +2409,8 @@
         "pg_extension_registry_close",
         "pg_extension_registry_release",
         "pg_extension_registry_describe",
-        "pg_extension_registry_service"
+        "pg_extension_registry_service",
+        "pg_extension_registry_task"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/registry.ts; Harness/Cordis scoped disposal"

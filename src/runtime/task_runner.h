@@ -36,6 +36,10 @@ typedef struct {
  double (*now)(void *);
  void (*report)(void *,uint64_t,int);
 } pg_task_runner_host;
+/* Optional scoped definition resolver. Success transfers a lease protecting
+   immutable definition/data/code; release after invocation/failed-fit identity
+   no longer needs it. Missing (1) transfers no lease. Calls are serialized. */
+typedef struct {void *context;int (*acquire)(void *,pg_slice,const pg_task_definition **,void **);void (*release)(void *);} pg_task_resolver;
 struct pg_task_runner {
  pg_durable_session *session;
  const pg_task_runner_host *host;
@@ -48,7 +52,10 @@ struct pg_task_runner {
  unsigned busy,active,pending,closing,recovered,committing;
  pg_slice error;
  pg_record_tx *mutation; /* Private synchronous phase transaction, otherwise NULL. */
- const pg_task_definition *failed_migration; /* Borrowed definition identity; retry after replacement. */
+ const pg_task_definition *failed_migration; /* Identity pinned until replacement/close. */
+ const pg_task_resolver *resolver;
+ void *definition_lease,*failed_lease;
+ const pg_task_definition *invocation_definition;
 };
 typedef enum {PG_TASK_PROGRESS,PG_TASK_PENDING,PG_TASK_DONE,PG_TASK_BLOCKED,
  PG_TASK_INVALID,PG_TASK_ALLOCATION,PG_TASK_STORAGE,PG_TASK_CLOSED} pg_task_status;
@@ -93,6 +100,7 @@ typedef struct {
  uint64_t restart_limit;
  double next_wake;
  unsigned busy,active,closing,reserved;
+ const pg_task_resolver *resolver;
 } pg_task_scheduler;
 /* Zeroed caller storage, one scheduler per writable Session. Open discovers
    and recovers live tasks before any phase executes. Even failed open must be
@@ -106,6 +114,10 @@ typedef struct {
    derive ordinary descendant/sibling marks in one Session commit. Aborts drain
    children first; background task branches remain independent.
    A close requested from a callback returns PENDING; call close after unwinding. */
+/* Configure while inactive; binding survives close/open and is borrowed until
+   all runners close. Active phases retain their reservation, next phase takes
+   a fitting replacement; missing/incompatible replacements keep the invocation. */
+pg_task_status pg_task_scheduler_bind_definitions(pg_task_scheduler *,const pg_task_resolver *);
 pg_task_status pg_task_scheduler_open(pg_task_scheduler *,pg_durable_session *,
  const pg_task_runner_host *,uint64_t restart_limit);
 pg_task_status pg_task_scheduler_poll(pg_task_scheduler *);

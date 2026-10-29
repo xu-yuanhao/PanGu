@@ -23,7 +23,7 @@
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
-| 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者 |
+| 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者；自定义Task按全安装集合解析，Runner持有invocation/失败迁移定义引用并在phase边界接手 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
@@ -40,9 +40,9 @@
 
 ## 本批验证与集成状态
 
-- 可变扩展注册表已接通产品：完整候选验证、同名保序替换、撤销、不可变快照和所有者引用；当前phase使用旧快照，新解析采用新状态。关闭Host时等待外借快照后释放父DSO。
-- beforeCompact采用同一扩展注册表及事件引擎，固定请求/选择跨挂起续接，首个decline/summary决定；摘要沿既有持久任务及Submission放置，取消释放callback与代码引用。原有注入式压缩服务保持可组合。
-- 产品ASan/UBSan通过真实压缩任务中的挂起撤销/替换、旧摘要放置、新任务decline、取消与所有者引用归零；原compaction.hooks专项、Runtime整批及产品构建通过。真实DeepSeek扩展闭环通过：请求修改、工具执行、续接、运行中撤销、取消和新注册表压缩后继续对话，模型准确回忆已放置摘要中的marker。
+- Extension.tasks接入同一可变注册表，发布前校验安装集合中的任务重名及内置名；实际Scheduler通过scoped resolver取得定义和代码引用，task.definitions仍可作为注入的宿主服务提供定义。
+- 运行中phase固定定义，替换在下一phase接手；撤销或不兼容替换时已运行invocation继续原定义。关闭调度器后释放引用，重开按当前安装集合解析；缺定义任务等待安装，迁移失败身份被固定并阻塞，换定义后可恢复。任务图只读显示同源blocked原因。
+- 产品`--native-tasks --sanitize`通过安装/挂起替换/撤销后继续、调度器重开、失败迁移去重和恢复、跨扩展/内置冲突拒绝及引用归零；DSO自定义任务直接由Extension.tasks提供。Runtime整批、产品构建及G00/Assembly通过。
 
 ## 当前接口边界
 

@@ -656,6 +656,10 @@ pg_task_runner_open:
  mov qword ptr [rdi+104],0
  mov qword ptr [rdi+112],0
  mov qword ptr [rdi+120],0
+ mov qword ptr [rdi+128],0
+ mov qword ptr [rdi+136],0
+ mov qword ptr [rdi+144],0
+ mov qword ptr [rdi+152],0
  xor eax,eax
 .Ltr_open_return:
  ret
@@ -1153,12 +1157,14 @@ pg_task_runner_commit:
  push r12
  push r13
  push r14
- sub rsp,48
+ sub rsp,64
  mov rbx,rdi
  mov r12,[rbx+8]
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+56],0
  TGET "qword ptr [rbx+24]",kind
  mov r14,rax
  mov rdi,rax
@@ -1173,10 +1179,19 @@ pg_task_runner_commit:
  mov rdi,r14
  call json_object_get_string@PLT
  mov rsi,rax
- mov rdi,[r12]
  mov rdx,r13
  mov rcx,rsp
+ mov rax,[rbx+128]
+ test rax,rax
+ jz .Ltr_resolve_borrowed
+ mov rdi,[rax]
+ lea r8,[rsp+48]
+ call [rax+8]
+ jmp .Ltr_resolve_acquired
+.Ltr_resolve_borrowed:
+ mov rdi,[r12]
  call [r12+32]
+.Ltr_resolve_acquired:
  test eax,eax
  jnz .Ltr_resolve_cleanup
  mov r12,[rsp]
@@ -1205,7 +1220,10 @@ pg_task_runner_commit:
  ja .Ltr_resolve_cleanup
  je .Ltr_resolve_ready
  cmp [rbx+120],r12
- je .Ltr_resolve_cleanup
+ jne .Ltr_resolve_migrate
+ mov qword ptr [rsp+56],1
+ jmp .Ltr_resolve_cleanup
+.Ltr_resolve_migrate:
  cmp qword ptr [r12+72],0
  je .Ltr_resolve_cleanup
  mov [rsp+32],rax
@@ -1281,20 +1299,58 @@ pg_task_runner_commit:
  or dword ptr [rbx+88],2
  jmp .Ltr_resolve_ready
 .Ltr_migration_failed:
+ mov rdi,rbx
+ mov esi,144
+ call .Ltr_drop_lease
+ mov rax,[rsp+48]
+ mov [rbx+144],rax
+ mov qword ptr [rsp+48],0
+ mov rdi,rbx
+ mov esi,136
+ call .Ltr_drop_lease
+ mov qword ptr [rbx+152],0
+ mov qword ptr [rbx+40],0
+ mov qword ptr [rsp+56],1
  mov [rbx+120],r12
  mov ebp,3
  jmp .Ltr_resolve_cleanup
 .Ltr_resolve_ready:
+ mov rdi,rbx
+ mov esi,136
+ call .Ltr_drop_lease
+ mov rdi,rbx
+ mov esi,144
+ call .Ltr_drop_lease
+ mov rax,[rsp+48]
+ mov [rbx+136],rax
+ mov qword ptr [rsp+48],0
+ mov [rbx+152],r12
  mov qword ptr [rbx+120],0
  mov [rbx+40],r12
  xor ebp,ebp
 .Ltr_resolve_cleanup:
+ cmp ebp,3
+ jne .Ltr_resolve_release_candidate
+ cmp qword ptr [rsp+56],0
+ jne .Ltr_resolve_release_candidate
+ mov rax,[rbx+152]
+ test rax,rax
+ jz .Ltr_resolve_release_candidate
+ mov [rbx+40],rax
+ xor ebp,ebp
+.Ltr_resolve_release_candidate:
+ mov rdi,[rsp+48]
+ test rdi,rdi
+ jz .Ltr_resolve_values
+ mov rax,[rbx+128]
+ call [rax+16]
+.Ltr_resolve_values:
  mov rdi,[rsp+8]
  call json_object_put@PLT
  mov rdi,[rsp+16]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,48
+ add rsp,64
  pop r14
  pop r13
  pop r12
@@ -1743,6 +1799,14 @@ pg_task_runner_poll:
  call .Ltr_park
  mov r12d,eax
 .Ltr_close_release:
+ mov rdi,rbx
+ mov esi,136
+ call .Ltr_drop_lease
+ mov rdi,rbx
+ mov esi,144
+ call .Ltr_drop_lease
+ mov qword ptr [rbx+152],0
+ mov qword ptr [rbx+120],0
  mov rdi,[rbx+24]
  call json_object_put@PLT
  mov qword ptr [rbx+24],0
@@ -1915,7 +1979,7 @@ pg_task_runner_close:
  mov [rbx+32],r14
 .Lts_allocate_runner:
  mov edi,1
- mov esi,128
+ mov esi,160
  call calloc@PLT
  test rax,rax
  jz .Lts_discover_allocation
@@ -1929,6 +1993,8 @@ pg_task_runner_close:
  mov ebp,eax
  test eax,eax
  jnz .Lts_free_failed
+ mov rax,[rbx+72]
+ mov [r14+128],rax
  mov rax,[rbx+16]
  mov rcx,[rbx+24]
  mov rdx,[rsp+136]
@@ -3557,3 +3623,34 @@ pg_task_runner_commit_with:
  ret
 
 .section .note.GNU-stack,"",@progbits
+
+.text
+.Ltr_drop_lease:
+ mov rax,[rdi+rsi]
+ test rax,rax
+ jz .Ltr_drop_lease_return
+ mov qword ptr [rdi+rsi],0
+ mov rcx,[rdi+128]
+ mov rdi,rax
+ jmp [rcx+16]
+.Ltr_drop_lease_return:
+ ret
+.globl pg_task_scheduler_bind_definitions
+.type pg_task_scheduler_bind_definitions,@function
+pg_task_scheduler_bind_definitions:
+ mov eax,4
+ cmp dword ptr [rdi+60],0
+ jne .Lts_bind_end
+ cmp dword ptr [rdi+56],0
+ jne .Lts_bind_end
+ test rsi,rsi
+ jz .Lts_bind_store
+ cmp qword ptr [rsi+8],0
+ je .Lts_bind_end
+ cmp qword ptr [rsi+16],0
+ je .Lts_bind_end
+.Lts_bind_store:
+ mov [rdi+72],rsi
+ xor eax,eax
+.Lts_bind_end:
+ ret
