@@ -247,7 +247,7 @@ pg_extensions_close:
  mov r12,rsi
  mov rdi,[rbx+1184]
  mov rsi,[rbx+1192]
- mov edx,32
+ mov edx,40
  mov rcx,[r12]
  call .Lx_find
  mov r13,rax
@@ -256,7 +256,7 @@ pg_extensions_close:
  cmp rax,2147483647
  jae .Lx_section_bad
  lea rsi,[rax+1]
- shl rsi,5
+ imul rsi,rsi,40
  mov rdi,[rbx+1184]
  call realloc@PLT
  test rax,rax
@@ -265,10 +265,10 @@ pg_extensions_close:
  inc qword ptr [rbx+1192]
 .Lx_section_copy:
  mov rdi,r13
- shl rdi,5
+ imul rdi,rdi,40
  add rdi,[rbx+1184]
  mov rsi,r12
- mov ecx,4
+ mov ecx,5
  rep movsq
  xor eax,eax
  jmp .Lx_section_end
@@ -326,7 +326,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],5
+ cmp dword ptr [rbx],6
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],72
  jne .Lx_validate_bad
@@ -402,7 +402,7 @@ pg_extensions_close:
  cmp r14,[r13+32]
  jae .Lx_validate_wraps
  mov rax,r14
- shl rax,5
+ imul rax,rax,40
  add rax,[r13+24]
  mov [rsp],rax
  cmp qword ptr [rax+16],0
@@ -415,7 +415,7 @@ pg_extensions_close:
  mov rcx,[rax]
  mov rdi,[r13+24]
  mov rsi,r14
- mov edx,32
+ mov edx,40
  call .Lx_find
  cmp rax,r14
  jne .Lx_validate_bad
@@ -491,7 +491,7 @@ pg_extensions_resolve:
  rep stosq
  test r12,r12
  jz .Lx_resolve_provider
- cmp dword ptr [r12],5
+ cmp dword ptr [r12],6
  jne .Lx_resolve_bad
  cmp dword ptr [r12+4],72
  jne .Lx_resolve_bad
@@ -650,7 +650,7 @@ pg_extensions_resolve:
  cmp rax,[rbp+32]
  jae .Lx_compose_next
  mov rsi,rax
- shl rsi,5
+ imul rsi,rsi,40
  add rsi,[rbp+24]
  mov rdi,rbx
  call .Lx_section
@@ -708,7 +708,7 @@ pg_extensions_resolve:
 .Lx_close_tag: .asciz "\n</%s>"
 .section .data.rel.ro
 .balign 8
-.Lx_coding: .quad .Lx_coding_name,0,0,0,0,0,0,0,0
+.Lx_coding: .quad .Lx_coding_name,0,0,0,0,0,0,0,0,0,0
 .section .note.GNU-stack,"",@progbits
 .text
 /* Report is observational; native callbacks return errors instead of throwing. */
@@ -744,7 +744,7 @@ pg_extensions_resolve:
  mov rsi,[rbx+1152]
  cmp dword ptr [rbp],1
  je .Lx_wrap_find
- mov qword ptr [rsp+112],32
+ mov qword ptr [rsp+112],40
  mov rdi,[rbx+1184]
  mov rsi,[rbx+1192]
 .Lx_wrap_find:
@@ -773,7 +773,7 @@ pg_extensions_resolve:
  call strcmp@PLT
  test eax,eax
  jnz .Lx_wrap_renamed
- cmp qword ptr [rsp+112],32
+ cmp qword ptr [rsp+112],40
  jne .Lx_wrap_copy
  cmp qword ptr [rsp+16],0
  je .Lx_wrap_renamed
@@ -817,18 +817,36 @@ pg_extensions_resolve:
  XE 144
 /* Render sections into the saved request, preserving byte lengths through the
    existing owned JSON string appender. */
-.globl pg_extensions_prepare
-.type pg_extensions_prepare,@function
-pg_extensions_prepare:
+.globl pg_extension_prepare_poll
+.type pg_extension_prepare_poll,@function
+pg_extension_prepare_poll:
  XF 80
  mov rbx,rdi
- mov r12,rsi
- mov r13,rdx
+ mov r13,rsi
  mov rdi,rsp
  xor eax,eax
  mov ecx,10
  rep stosq
+ mov [rsp+72],rbx
+ mov [rbx+64],r13
  mov qword ptr [r13],0
+ mov r12,[rbx+8]
+ lea r13,[rbx+16]
+ mov rbx,[rbx]
+ cmp qword ptr [r13],0
+ je .Lx_prepare_initialize
+ mov rax,[rsp+72]
+ cmp dword ptr [rax+60],0
+ jne .Lx_prepare_completed
+ mov r14,[rax+24]
+ mov rcx,[rax+32]
+ mov [rsp+16],rcx
+ mov rcx,[rax+40]
+ mov [rsp+56],rcx
+ mov qword ptr [rax+32],0
+ mov qword ptr [rax+40],0
+ jmp .Lx_prepare_section
+.Lx_prepare_initialize:
  mov rdi,r12
  mov rsi,r13
  xor edx,edx
@@ -896,13 +914,18 @@ pg_extensions_prepare:
  cmp r14,[rbx+1192]
  jae .Lx_prepare_prompt_done
  mov rbp,r14
- shl rbp,5
+ imul rbp,rbp,40
  add rbp,[rbx+1184]
  mov qword ptr [rsp+24],0
  mov rdi,[rbp+8]
  mov rsi,r12
  lea rdx,[rsp+24]
  call [rbp+16]
+ cmp eax,1
+ je .Lx_render_pending
+ mov rcx,[rsp+72]
+ mov dword ptr [rcx+56],0
+ mov qword ptr [rcx+48],0
  test eax,eax
  jnz .Lx_render_report
  cmp qword ptr [rsp+24],0
@@ -1030,13 +1053,36 @@ pg_extensions_prepare:
  test eax,eax
  jnz .Lx_prepare_bad
  mov qword ptr [rsp+16],0
+ mov rax,[rsp+72]
+ mov dword ptr [rax+60],1
+.Lx_prepare_completed:
+ mov rdi,[r13]
+ call json_object_get@PLT
+ mov rcx,[rsp+72]
+ mov rcx,[rcx+64]
+ mov [rcx],rax
  xor ebp,ebp
+ jmp .Lx_prepare_end
+.Lx_render_pending:
+ cmp qword ptr [rbp+32],0
+ je .Lx_render_invalid
+ mov rax,[rsp+72]
+ mov [rax+24],r14
+ mov rcx,[rsp+16]
+ mov [rax+32],rcx
+ mov rcx,[rsp+56]
+ mov [rax+40],rcx
+ mov [rax+48],rbp
+ mov dword ptr [rax+56],1
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+56],0
+ mov ebp,1
  jmp .Lx_prepare_end
 .Lx_prepare_bad:
  mov rdi,[r13]
  call json_object_put@PLT
  mov qword ptr [r13],0
- mov ebp,5
+ mov ebp,-5
 .Lx_prepare_end:
  mov rdi,[rsp]
  call json_object_put@PLT
@@ -1078,7 +1124,7 @@ pg_extensions_prepare:
  mov r14,[rax+r13*8]
  mov rdi,[r14+24]
  mov rsi,[r14+32]
- mov edx,32
+ mov edx,40
  mov rcx,r12
  call .Lx_find
  cmp rax,[r14+32]
@@ -1811,3 +1857,95 @@ pg_extensions_validate:
  mov eax,5
 .Lx_validate_full_end:
  XE 1200
+
+.text
+/* State: composed result, input, output, index, prompt, sections, active,
+   pending/completed, transient output address. */
+.globl pg_extension_prepare_open
+.type pg_extension_prepare_open,@function
+pg_extension_prepare_open:
+ XF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r13],0
+ mov edi,1
+ mov esi,72
+ call calloc@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lxp_open_bad
+ mov [rax],rbx
+ mov rdi,r12
+ lea rsi,[rax+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lxp_open_release
+ mov [r13],r14
+ xor eax,eax
+ jmp .Lxp_open_end
+.Lxp_open_release:
+ mov rdi,r14
+ call pg_extension_prepare_close
+.Lxp_open_bad:
+ mov eax,5
+.Lxp_open_end:
+ XE 16
+.globl pg_extension_prepare_close
+.type pg_extension_prepare_close,@function
+pg_extension_prepare_close:
+ test rdi,rdi
+ jz .Lxp_close_return
+ push rbx
+ mov rbx,rdi
+ cmp dword ptr [rbx+56],0
+ je .Lxp_close_json
+ mov rax,[rbx+48]
+ mov rdi,[rax+8]
+ mov rsi,[rbx+8]
+ call [rax+32]
+.Lxp_close_json:
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rdi,[rbx+32]
+ call json_object_put@PLT
+ mov rdi,[rbx+40]
+ call json_object_put@PLT
+ mov rdi,rbx
+ call free@PLT
+ pop rbx
+.Lxp_close_return:
+ ret
+.globl pg_extensions_prepare
+.type pg_extensions_prepare,@function
+pg_extensions_prepare:
+ XF 16
+ mov rbx,rdx
+ mov qword ptr [rbx],0
+ mov qword ptr [rsp],0
+ mov rdx,rsp
+ call pg_extension_prepare_open
+ mov r12d,eax
+ test eax,eax
+ jnz .Lxp_sync_end
+ mov rdi,[rsp]
+ mov rsi,rbx
+ call pg_extension_prepare_poll
+ mov r12d,eax
+ test eax,eax
+ jns .Lxp_sync_pending
+ neg r12d
+ jmp .Lxp_sync_close
+.Lxp_sync_pending:
+ test eax,eax
+ jz .Lxp_sync_close
+ mov r12d,3
+.Lxp_sync_close:
+ mov rdi,[rsp]
+ call pg_extension_prepare_close
+.Lxp_sync_end:
+ mov eax,r12d
+ XE 16

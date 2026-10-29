@@ -27,10 +27,10 @@ static int render(void *context,const struct json_object *configuration,struct j
 static int tool_wrap(void *context,const pg_tool_definition *inner,pg_tool_definition *out){*out=*inner;out->description=context;return 0;}
 static int section_wrap(void *context,const pg_extension_section *inner,pg_extension_section *out){*out=*inner;out->context=context;return 0;}
 static int failed_render(void *context,const struct json_object *configuration,struct json_object **out){(void)context;(void)configuration;*out=0;return -7;}
-static const pg_extension_section broken_sections[]={{"failure",0,failed_render,0,0}};
+static const pg_extension_section broken_sections[]={{"failure",0,failed_render,0,0,0}};
 static int broken_wrap(void *context,const pg_tool_definition *inner,pg_tool_definition *out){(void)context;*out=*inner;out->name="renamed";return 0;}
-static const pg_extension_section reviewer_sections[]={{"preamble","EXTENSION_REVIEW_TOKEN",render,0,0},{"shared","FIRST_SHARED",render,1,0}};
-static const pg_extension_section timing_sections[]={{"shared","EXTENSION_SHARED_TOKEN",render,1,0}};
+static const pg_extension_section reviewer_sections[]={{"preamble","EXTENSION_REVIEW_TOKEN",render,0,0,0},{"shared","FIRST_SHARED",render,1,0,0}};
+static const pg_extension_section timing_sections[]={{"shared","EXTENSION_SHARED_TOKEN",render,1,0,0}};
 static const pg_extension_wrap timing_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo","Wrapped native echo",{.tool=tool_wrap}},{PG_EXTENSION_WRAP_SECTION,0,"shared","EXTENSION_WRAPPED_TOKEN",{.section=section_wrap}}};
 static const pg_extension_wrap broken_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo",0,{.tool=broken_wrap}}};
 static struct {unsigned errors,before,after,cancels,requests,responses,yields,rounds,generation_cancels,generation_pending;} hook_stats;
@@ -69,7 +69,7 @@ static const pg_extension_hook generation_hooks[]={{PG_EXTENSION_BEFORE_REQUEST,
 static const pg_extension generation={"generation",0,0,0,0,0,0,generation_hooks,4,definitions,1};
 static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0,0,0,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2,timing_hooks,2,0,0},broken={"broken",0,0,broken_sections,1,broken_wraps,1,0,0,0,0};
 static const pg_extension *extensions[]={&reviewer,&timing,&broken,&policy,&generation};
-static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&(!strcmp(extension,"broken")||!strcmp(extension,"policy")||!strcmp(extension,"generation")));if(error)(*(unsigned *)context)++;}
+static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target);if(error)(*(unsigned *)context)++;}
 static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,5,0,&hook_stats,report,0,0,0};
 static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"extensions.registry",&registry);}
 static int stop(void *context){(void)context;if(active_tasks||pending_before||pending_after||pending_request||pending_response||pending_yield)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}

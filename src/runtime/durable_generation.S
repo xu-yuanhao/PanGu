@@ -129,6 +129,7 @@ pg_durable_generation_init:
  mov [rdi+288],rax
  mov qword ptr [rdi+296],0
  mov qword ptr [rdi+304],0
+ mov qword ptr [rdi+312],0
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -144,7 +145,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,400
+ mov esi,416
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -169,6 +170,16 @@ pg_durable_generation_init:
  mov r12,[rsi+56]
  test r12,r12
  jz .Lgg_cleanup_end
+ mov rax,[r12]
+ mov rax,[rax+312]
+ test rax,rax
+ jz .Lgg_cleanup_generation_hooks
+ cmp qword ptr [r12+400],0
+ je .Lgg_cleanup_generation_hooks
+ mov rdi,[rax]
+ mov rsi,[r12+400]
+ call [rax+16]
+.Lgg_cleanup_generation_hooks:
  mov rax,[r12]
  mov rax,[rax+304]
  test rax,rax
@@ -287,6 +298,20 @@ pg_durable_generation_init:
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov r13,rax
+ mov rax,[r12+312]
+ test rax,rax
+ jz .Lgg_prepare_sync
+ mov rdi,[rax]
+ mov rsi,r13
+ lea rdx,[r14+400]
+ lea rcx,[r14+16]
+ call [rax+8]
+ cmp eax,1
+ je .Lgg_prepare_pending
+ test eax,eax
+ jnz .Lgg_prepare_invalid
+ jmp .Lgg_prepare_validate
+.Lgg_prepare_sync:
  mov rax,[r12]
  mov rdi,[rax]
  mov rsi,r13
@@ -294,6 +319,7 @@ pg_durable_generation_init:
  call [rax+8]
  test eax,eax
  jnz .Lgg_prepare_invalid
+.Lgg_prepare_validate:
  mov rdi,[r14+16]
  call pg_document_value_valid@PLT
  test eax,eax
@@ -502,6 +528,9 @@ pg_durable_generation_init:
  mov rdi,rbx
  mov rsi,[rsp+32]
  call pg_task_runner_commit@PLT
+ jmp .Lgg_prepare_end
+.Lgg_prepare_pending:
+ mov eax,-1
  jmp .Lgg_prepare_end
 .Lgg_prepare_alloc:
  mov eax,5
@@ -5684,3 +5713,10 @@ pg_durable_generation_bind_hooks:
  ret
 .section .rodata
 .Lgg_prompt_plan: .asciz "promptPlan"
+
+.text
+.globl pg_durable_generation_bind_prepare
+.type pg_durable_generation_bind_prepare,@function
+pg_durable_generation_bind_prepare:
+ mov [rdi+312],rsi
+ ret

@@ -5,8 +5,10 @@
 /* Immutable descriptors/code are protected by their snapshot/Host lease.
    Callback output descriptors borrow immutable strings, contexts and callbacks
    from that same lease. render transfers an owned JSON string or NULL (omit).
-   Callbacks are synchronous; nonzero errors are reported and skip the target. */
-typedef struct {const char *key;void *context;int (*render)(void *,const struct json_object *,struct json_object **);unsigned tag,reserved;} pg_extension_section;
+   render returns 0 complete, 1 pending, negative error. Pending render must
+   provide cancel, which releases callback resources before its snapshot closes.
+   Wrappers are synchronous; callback errors retain previously shown text. */
+typedef struct {const char *key;void *context;int (*render)(void *,const struct json_object *,struct json_object **);unsigned tag,reserved;void (*cancel)(void *,const struct json_object *);} pg_extension_section;
 typedef struct {unsigned kind,reserved;const char *target;void *context;union {int (*tool)(void *,const pg_tool_definition *,pg_tool_definition *);int (*section)(void *,const pg_extension_section *,pg_extension_section *);} wrap;} pg_extension_wrap;
 #define PG_EXTENSION_WRAP_TOOL 1u
 #define PG_EXTENSION_WRAP_SECTION 2u
@@ -29,7 +31,7 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
    pending callback resources before its extension lease closes. */
 typedef struct {unsigned event,reserved;void *context;int (*poll)(void *,const struct json_object *,struct json_object **);void (*cancel)(void *,const struct json_object *);} pg_extension_hook;
 typedef struct {const char *name;const pg_tool_definition *tools;size_t tool_count;const pg_extension_section *sections;size_t section_count;const pg_extension_wrap *wraps;size_t wrap_count;const pg_extension_hook *hooks;size_t hook_count;const pg_task_definition *const *tasks;size_t task_count;} pg_extension;
-#define PG_EXTENSIONS_ABI 5u
+#define PG_EXTENSIONS_ABI 6u
 /* Host extensions.registry. A facade acquire returns an immutable snapshot
    and lease on success (0), none on failure; release drops that lease.
    defaults is an optional stable-name JSON array;
@@ -57,5 +59,11 @@ typedef struct {pg_tools base,composed;const pg_tool_registry *base_catalog,*com
 pg_tools pg_extension_tools_service(pg_extension_tools *);
 /* Detached request config: selected stable names and ordered rendered sections
    appended to resource prompt. Agent instructions are applied afterwards. */
+/* Open borrows the composed result through close, owns a stable detached input.
+   Poll transfers owned output on 0, returns 1 pending or negative error.
+   Synchronous convenience cancels pending work and returns 3. */
+int pg_extension_prepare_open(const pg_extension_result *,const struct json_object *,void **);
+int pg_extension_prepare_poll(void *,struct json_object **);
+void pg_extension_prepare_close(void *);
 int pg_extensions_prepare(const pg_extension_result *,const struct json_object *,struct json_object **);
 #endif

@@ -5,7 +5,9 @@
 struct pg_durable_inputs;
 typedef struct {
  void *context;
- /* Owned strict JSON {systemPrompt,model,...request options}. The provider
+ /* Synchronous admission/metadata configuration; request rendering may use
+    the independent async prepare binding. Owned strict JSON
+    {systemPrompt,model,...request options}. The provider
     must honor this saved configuration on recovery; no credentials in it. */
  int (*prepare)(void *,uint64_t conversation,struct json_object **);
  int (*acquire)(void *,const struct json_object *configuration,pg_model *);
@@ -27,12 +29,16 @@ typedef struct {
 /* Poll: 0 with owned request, 1 pending, negative error. State retains the
    phase-selected extensions across events; close cancels/releases the scope. */
 typedef struct {void *context;int (*poll)(void *,uint64_t,unsigned,const struct json_object *,void **,struct json_object **);void (*close)(void *,void *);} pg_durable_generation_hooks;
+/* 0 transfers owned configuration, 1 pending, negative error. Phase owns state;
+   close cancels/releases it. Binding is borrowed until Generation cleanup. */
+typedef struct {void *context;int (*poll)(void *,uint64_t,void **,struct json_object **);void (*close)(void *,void *);} pg_durable_prepare;
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
  pg_task_phase phases[5];
  const pg_task_definition *compaction;
  const pg_durable_generation_hooks *hooks;
+ const pg_durable_prepare *prepare;
 } pg_durable_generation;
 /* Resolve pangu.generation alongside pangu.tool. prepare saves configuration
    and context cutoff; request streams through the native model service, then
@@ -47,7 +53,8 @@ typedef struct {
    the operation retains its complete JSON owner. Unsupported content rejects
    rather than silently losing model context. */
 int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generation_host *);
-/* Optional definition borrowed for the Generation module lifetime. */
+/* Optional bindings are borrowed through Generation cleanup. */
+void pg_durable_generation_bind_prepare(pg_durable_generation *,const pg_durable_prepare *);
 void pg_durable_generation_bind_hooks(pg_durable_generation *,const pg_durable_generation_hooks *);
 void pg_durable_generation_bind_compaction(pg_durable_generation *,const pg_task_definition *);
 /* Read-only committed startup history through the same model projection.
@@ -55,8 +62,8 @@ void pg_durable_generation_bind_compaction(pg_durable_generation *,const pg_task
    after their calls, first matching ID before the next assistant. Missing
    results are ephemeral error receipts; unmatched results are omitted.
    The current OpenAI transport collapses system content and ordered section
-   patches into system_prompt. Tool deltas need an execution-registry binding
-   and currently reject during projection. */
+   patches into system_prompt. Tool deltas are positional metadata; execution
+   uses the selected injected catalog. */
 int pg_durable_generation_history(const pg_task_runner_host *,uint64_t,const struct json_object *,pg_session *);
 /* Detached JSON {head?,entries,contributions,messages}, beyond the model ABI's
    row limit. cutoff is inclusive (UINT64_MAX for current). Ordered messages

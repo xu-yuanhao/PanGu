@@ -655,6 +655,7 @@
     "src/runtime/extension_registry.h": "native-source",
     "src/runtime/system_prompt.S": "native-source",
     "src/runtime/system_prompt.h": "native-source",
-    "tools/runtime/test_system_prompt.py": "gate-test"
+    "tools/runtime/test_system_prompt.py": "gate-test",
+    "src/runtime/prompt_preparer.S": "native-source"
   }
 }
