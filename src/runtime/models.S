@@ -454,6 +454,61 @@ pg_models_describe:
  inc ebp
  cmp ebp,2
  jb .Lm_describe_number
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lm_input]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lm_input_found
+ mov rdi,[rsp+16]
+ test rdi,rdi
+ jnz .Lm_input_source
+ mov rdi,[rsp+8]
+.Lm_input_source:
+ lea rsi,[rip+.Lm_input]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lm_describe_success
+.Lm_input_found:
+ mov r15,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lm_describe_error
+ xor ebp,ebp
+.Lm_input_each:
+ mov rdi,r15
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Lm_input_copy
+ mov rdi,r15
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call .Lm_string
+ test rax,rax
+ jz .Lm_describe_error
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lm_input_text]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lm_input_next
+ mov rdi,r14
+ lea rsi,[rip+.Lm_input_image]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lm_describe_error
+.Lm_input_next:
+ inc rbp
+ jmp .Lm_input_each
+.Lm_input_copy:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lm_input]
+ mov rdx,r15
+ call .Lm_copy
+ test eax,eax
+ jnz .Lm_describe_error
  jmp .Lm_describe_success
 .Lm_describe_next:
  lea rdi,[rsp+112]
@@ -622,3 +677,8 @@ pg_models_compaction_policy:
 .Lm_invalid_output:
  mov eax,5
  ret
+
+.section .rodata
+.Lm_input: .asciz "input"
+.Lm_input_text: .asciz "text"
+.Lm_input_image: .asciz "image"
