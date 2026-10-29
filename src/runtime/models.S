@@ -467,7 +467,7 @@ pg_models_describe:
  lea rsi,[rip+.Lm_input]
  call json_object_object_get@PLT
  test rax,rax
- jz .Lm_describe_success
+ jz .Lm_describe_compat
 .Lm_input_found:
  mov r15,rax
  mov rdi,rax
@@ -509,6 +509,52 @@ pg_models_describe:
  call .Lm_copy
  test eax,eax
  jnz .Lm_describe_error
+.Lm_describe_compat:
+ xor ebp,ebp
+.Lm_compat_each:
+ mov rdi,[rsp+8]
+ cmp ebp,1
+ jne .Lm_compat_custom
+ mov rdi,[rsp+64]
+.Lm_compat_custom:
+ cmp ebp,2
+ jne .Lm_compat_override
+ mov rdi,[rsp+16]
+.Lm_compat_override:
+ cmp ebp,3
+ jne .Lm_compat_get
+ mov rdi,[rsp+24]
+.Lm_compat_get:
+ lea rsi,[rip+.Lm_compat]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lm_compat_next
+ mov r15,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lm_describe_error
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lm_compat]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,r15
+ mov qword ptr [rsp+96],0
+ lea rdx,[rsp+96]
+ call pg_settings_merge@PLT
+ test eax,eax
+ jnz .Lm_describe_error
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lm_compat]
+ mov rdx,[rsp+96]
+ call .Lm_set
+ test eax,eax
+ jnz .Lm_describe_error
+.Lm_compat_next:
+ inc ebp
+ cmp ebp,4
+ jb .Lm_compat_each
  jmp .Lm_describe_success
 .Lm_describe_next:
  lea rdi,[rsp+112]
@@ -682,3 +728,5 @@ pg_models_compaction_policy:
 .Lm_input: .asciz "input"
 .Lm_input_text: .asciz "text"
 .Lm_input_image: .asciz "image"
+
+.Lm_compat: .asciz "compat"

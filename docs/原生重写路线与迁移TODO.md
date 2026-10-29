@@ -286,8 +286,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts` convertMessages用户/工具图片分支及 `openai-completions-tool-result-images.test.ts`；模型目录沿用该提交生成数据，Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：模型目录input能力经models.describe进入配置modelInfo；request_context将用户Content逐块转为OpenAI文本/image_url，过滤空文本并跳过空内容数组，清除非协议字段；mimo_projection在真实请求编码入口使用同一转换。已有连续toolResult图片分组与模型能力过滤保持。
-- 验证：产品 `--native-tasks --sanitize` 覆盖用户空文本过滤、空消息省略、混合文本/图片顺序、MIME/data URL、额外字段清理和最终pg_mimo_encode_request；已有工具图片、Schema、控制与取消场景通过。模型配置专项、产品构建和Assembly检查通过；Runtime整批回归通过。
-- 接口与自审：沿现有context公开接口实现，用户和工具图片复用同一转换函数，持久原始Content保持独立；临时JSON明确转移所有权并在失败路径释放。模型目录/描述修改见 `e42785a`，本批请求投影由实施Agent自审。
-- 剩余与下一交付物：完整图片传输保持未勾选。下一组补齐requiresAssistantAfterToolResult及模型兼容配置映射、图片资源读取；其他协议、TypeBox语料差异、异常Task自身Live最终化及异步元数据调度仍在既有覆盖范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts` convertMessages的工具后assistant衔接、工具图片分组与空assistant内容；Coding Agent `provider-composer.ts` mergeCompat及模型配置组合。Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：models.describe将内置模型、提供者、显式模型和modelOverrides的compat依次合并为独立公开元数据，沿modelInfo保存。request_context读取requiresAssistantAfterToolResult，在工具结果后接用户输入/分组图片前插入上游相同assistant文本；工具调用型assistant提供空字符串content。选项关闭沿原有请求行为。
+- 验证：产品 `--native-tasks --sanitize` 覆盖图片能力/兼容选项四种组合，衔接消息位置、图片顺序及最终请求消息数量；模型配置专项覆盖提供者继承、模型false覆盖true、其他选项保留。空assistant内容、已有工具/Schema/取消/控制场景一并核对。产品构建及Assembly检查通过；Runtime整批与最终专项通过。
+- 接口与自审：复用现有模型/context接口与settings合并服务，公开元数据深拷贝，原配置借用；合成消息仅进入请求，不改持久会话。当前compat组合为对象递归合并，后续协议分支仍按上游逐项核对其专用嵌套规则；已接入的布尔选项覆盖顺序与上游一致。
+- 剩余与下一交付物：完整图片传输保持未勾选。下一组接通图片资源读取到实际工具结果；其他提供者协议与compat选项、TypeBox语料差异、异常Task自身Live最终化及异步元数据调度仍在既有覆盖范围。

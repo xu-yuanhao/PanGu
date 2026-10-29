@@ -460,6 +460,19 @@ pg_context_messages_model:
  mov [rsp+40],rax
  test rax,rax
  jz .Lr_project_bad
+ mov rdi,[rsp+160]
+ call .Lri_requires_assistant
+ test eax,eax
+ jz .Lri_assistant_ready
+ lea rdi,[rip+.Lr_empty]
+ call json_object_new_string@PLT
+ mov rdx,rax
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lr_content]
+ call .Lr_set
+ test eax,eax
+ jnz .Lr_project_bad
+.Lri_assistant_ready:
  RG "qword ptr [rsp+24]",content
  mov [rsp+112],rax
  mov rdi,rax
@@ -680,6 +693,11 @@ pg_context_messages_model:
  inc r15
  jmp .Lr_project_call_history
 .Lr_project_user:
+ mov rdi,[rsp+160]
+ mov rsi,[rsp]
+ call .Lri_bridge_tool
+ test eax,eax
+ jnz .Lr_project_bad
  lea rdi,[rip+.Lr_user_wire]
  call json_tokener_parse@PLT
  mov [rsp+40],rax
@@ -834,6 +852,11 @@ pg_context_messages_model:
 .Lri_group_end:
  cmp qword ptr [rsp+152],0
  je .Lr_project_next
+ mov rdi,[rsp+160]
+ mov rsi,[rsp]
+ call .Lri_bridge_tool
+ test eax,eax
+ jnz .Lr_project_bad
  lea rdi,[rip+.Lri_user_json]
  call json_tokener_parse@PLT
  mov [rsp+40],rax
@@ -1338,3 +1361,66 @@ pg_context_blank:
  RE 16
 .section .rodata
 .Lriu_text_json: .asciz "{\"type\":\"text\"}"
+
+.text
+.Lri_requires_assistant:
+ RF 0
+ mov rbx,rdi
+ RG rbx,modelInfo
+ test rax,rax
+ cmovnz rbx,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lric_compat]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lric_requires]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ RE 0
+.Lri_bridge_tool:
+ RF 16
+ mov rbx,rsi
+ call .Lri_requires_assistant
+ test eax,eax
+ jz .Lric_ok
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lric_ok
+ lea rsi,[rax-1]
+ mov rdi,rbx
+ call json_object_array_get_idx@PLT
+ RG rax,role
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lric_ok
+ mov rdi,rax
+ lea rsi,[rip+.Lric_tool]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lric_ok
+ lea rdi,[rip+.Lric_bridge]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lric_bad
+ mov [rsp],rax
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lric_ok
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lric_bad:
+ mov eax,5
+ RE 16
+.Lric_ok:
+ xor eax,eax
+ RE 16
+.section .rodata
+.Lric_compat: .asciz "compat"
+.Lric_requires: .asciz "requiresAssistantAfterToolResult"
+.Lric_tool: .asciz "tool"
+.Lric_bridge: .asciz "{\"role\":\"assistant\",\"content\":\"I have processed the tool results.\"}"
