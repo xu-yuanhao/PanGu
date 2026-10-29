@@ -1098,6 +1098,10 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_poll_error
 .Ldt_poll_execute:
+ mov rdi,r14
+ call .Ldt_contract_prepare
+ test eax,eax
+ jnz .Ldt_poll_error
  call .Ldt_monotonic
  movsd [r14+280],xmm0
  cmp dword ptr [rbx+84],0
@@ -3735,23 +3739,6 @@ pg_durable_tool_progress_recorded:
  mov rdi,rax
  call json_object_get_string@PLT
  mov r12,rax
- mov rax,[rbx]
- mov rax,[rax]
- cmp qword ptr [rax+48],0
- je .Ldt_contract_value
- mov rdi,[rax]
- mov rcx,[rbx+8]
- mov rsi,[rcx+16]
- mov rdx,[rbx+16]
- call [rax+48]
- test rax,rax
- jz .Ldt_contract_value
- mov rdi,rax
- lea rsi,[rbx+400]
- mov rdx,rsp
- call pg_json_schema_compile@PLT
- test eax,eax
- jnz .Ldt_contract_end
 .Ldt_contract_value:
  mov rdi,[rbx+184]
  lea rsi,[rip+.Ldt_structured_output]
@@ -3896,3 +3883,44 @@ pg_durable_tool_progress_recorded:
 .Ldt_contract_undeclared_format: .asciz "Tool %s returned structuredOutput but declares no structuredOutputSchema"
 .Ldt_contract_missing_format: .asciz "Tool %s returned no structuredOutput"
 .Ldt_contract_invalid_format: .asciz "Tool %s returned structuredOutput that does not match its schema: %s"
+
+.text
+/* Pin the declaration before execute starts effects; settlement only validates. */
+.Ldt_contract_prepare:
+ push rbp
+ push rbx
+ sub rsp,24
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ cmp dword ptr [rbx+412],0
+ jne .Ldt_contract_prepare_ok
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp qword ptr [rax+48],0
+ je .Ldt_contract_prepare_done
+ mov rdi,[rax]
+ mov rcx,[rbx+8]
+ mov rsi,[rcx+16]
+ mov rdx,[rbx+16]
+ call [rax+48]
+ test rax,rax
+ jz .Ldt_contract_prepare_done
+ mov rdi,rax
+ lea rsi,[rbx+400]
+ mov rdx,rsp
+ call pg_json_schema_compile@PLT
+ test eax,eax
+ jnz .Ldt_contract_prepare_end
+.Ldt_contract_prepare_done:
+ mov dword ptr [rbx+412],1
+.Ldt_contract_prepare_ok:
+ xor eax,eax
+.Ldt_contract_prepare_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,24
+ pop rbx
+ pop rbp
+ ret

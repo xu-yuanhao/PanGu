@@ -286,7 +286,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tool.ts` structuredOutputError/finalResult，`tools/bash.ts` shellStructuredOutputSchema及嵌套结果消费者。原生验证桥接采用Valijson `af2383509277f8e8051acbb3e4b3060f4779aa10`、nlohmann/json `55f93686c01528224f448c19128836e7df245f72`；Harness保持固定快照。
-- 实际调用链：工具声明的output_limits携带可选structured_output_schema，组合器按调用级固定工具快照解析；Tool afterTool之后通过C ABI编译/强类型验证。嵌套调用的无声明/缺失/不匹配结果删除结构化值并追加invalid_structured_output、标记isError；模型调用保留文本结果并通过非致命报告通知宿主。schema工具错误结果可省略结构化值，缺error诊断时补充输出文本；已声明但无结构化值的嵌套返回保留内部标志，查询不会错误回退文本。bash接入自身声明。
-- 验证：产品 `--native-tasks --sanitize` 最终复验通过合法值、类型不符、缺失值、错误文本补诊断及既有恢复/控制场景；Draft-7组合/$ref/regex/数组约束、无效JSON定义拒绝、null值与模型无声明非致命报告均通过。Runtime整批日志完成且无失败；产品构建及构建缓存入口复验通过。G00登记候选镜像（排除独立安装目录claude）、Assembly、7项语言门禁自测与17项文件准入自测通过。
+- 实际调用链：工具声明的output_limits携带可选structured_output_schema，组合器按调用级固定工具快照解析；Tool在execute效果前通过C ABI编译契约，afterTool之后复用契约进行强类型验证。嵌套调用的无声明/缺失/不匹配结果删除结构化值并追加invalid_structured_output、标记isError；模型调用保留文本结果并通过非致命报告通知宿主。schema工具错误结果可省略结构化值，缺error诊断时补充输出文本；已声明但无结构化值的嵌套返回保留内部标志，查询不会错误回退文本。bash接入自身声明。
+- 验证：产品 `--native-tasks --sanitize` 最终复验通过合法值、类型不符、缺失值、错误文本补诊断及既有恢复/控制场景；Draft-7组合/$ref/regex/数组约束、无效JSON定义拒绝、null值与模型无声明非致命报告均通过。效果前无效Schema专项确认execute计数不变、faulted终态和完整实例/租约释放，合法调用按调用级编译一次。Runtime整批日志完成且无失败；产品构建及构建缓存入口复验通过。G00登记候选镜像（排除独立安装目录claude）、Assembly、7项语言门禁自测与17项文件准入自测通过。
 - 接口与自审：工具定义/注册表尺寸保持；pg_tool_output_limits扩展schema指针，Tool Host追加声明解析及非致命报告回调，Tool私有416字节保存compiled contract与一次性结算标记；provider ABI=4、extensions ABI=10同步到汇编校验/注册表与DSO夹具。C++仅桥接外部Schema库和异常/所有权，Agent结果策略仍用汇编。构建从固定URL按SHA256取得头文件到用户缓存，编译对象按源码/头/编译器/选项缓存；许可证见schema-libraries。外部Schema无网络fetcher。
-- 剩余与下一交付物：完整工具行为保持未勾选。Draft-7验证桥接与Pi TypeBox错误文字/格式规则的差异仍需对应语料核对，schema无效定义的前置准入与编译缓存生命周期待集中完成。随后补齐多内容块结果、异常Task自身Live最终化及统一异步details/diagnostic调度语义。
+- 剩余与下一交付物：完整工具行为保持未勾选。Draft-7验证桥接与Pi TypeBox错误文字/格式规则的差异仍需对应语料核对，契约已在execute前编译并随调用释放；无效定义产品专项验证没有执行效果。跨调用编译缓存及完整TypeBox语料差异继续核对。随后补齐多内容块结果、异常Task自身Live最终化及统一异步details/diagnostic调度语义。
