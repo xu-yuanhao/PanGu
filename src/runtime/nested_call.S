@@ -443,3 +443,42 @@ pg_nested_call_read:
 .section .rodata
 .Ln_name: .asciz "name"
 .Ln_arguments: .asciz "arguments"
+
+.text
+.globl pg_nested_call_peek
+.type pg_nested_call_peek,@function
+pg_nested_call_peek:
+ NF 64
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,6
+ rep stosq
+ lea rax,[rip+.Ln_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],22
+ mov [rsp+16],r13
+ mov rdi,r13
+ call strlen@PLT
+ mov [rsp+24],rax
+ mov [rsp+32],r12
+ mov dword ptr [rsp+40],2
+ mov dword ptr [rsp+44],1
+ mov qword ptr [r14],0
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Ln_definition]
+ mov rdx,rsp
+ lea rcx,[rsp+48]
+ call pg_document_cache_peek@PLT
+ test eax,eax
+ jnz .Ln_peek_end
+ mov rax,[rsp+48]
+ mov rdi,[rax+8]
+ mov rsi,r14
+ xor edx,edx
+ call json_object_deep_copy@PLT
+.Ln_peek_end:
+ NE 64

@@ -2493,7 +2493,8 @@
         "pg_nested_call_document",
         "pg_nested_call_start",
         "pg_nested_call_settle",
-        "pg_nested_call_read"
+        "pg_nested_call_read",
+        "pg_nested_call_peek"
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts NestedCallDoc/startNestedCall/settle"

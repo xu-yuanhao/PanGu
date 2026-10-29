@@ -271,6 +271,6 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts NestedCallDoc/startNestedCall/readCall/settle及nested-tools恢复/所有权用例。复用PanGu现有TaskRunner事务、任务级文档family、owned-child等待/取消与终态退休。
 - 实际调用链：扩展父Task调用pg_nested_call_start → 同事务创建pangu.tool.nested-call索引与owned pangu.tool → 父任务持久waiting → 子ToolTask从input.call读取调用并走既有schema/hooks/intent/执行/恢复 → 结果写回父任务family文档与子终态同批提交 → 父读结果完成并退休文档。同key同call返回原ID，冲突参数拒绝；调度器重开保留索引/归属，父取消先结算子任务。嵌套结果没有普通model tool-result Entry。
-- 验证：产品ASan/UBSan通过真实write效果、重复键复用、参数冲突回滚、调度器关闭重开、父读取结果、单子任务、终态文档退休及父取消后无文件效果。Runtime整批与产品构建通过，候选登记镜像G00/Assembly通过。模型协议未改动；既有正常Tool路径由同产品专项回归。
-- 接口与自审：nested_call.S手写Assembly，nested_call.h公开start/document/settle/read；ToolTask公开布局保持，新增input.kind=nested分支。源码、导出与模块依赖登记，Assembly检查通过；现有前台model Tool事件不消费nested分支，避免把无assistant Entry的子调用当普通模型调用。
-- 剩余与下一交付物：尚需把原生工具执行API的executeTool绑定到该持久调用链、Live.nestedTools进度/事件、自动sequence key和abandonOnRestart策略、取消前等待未完成嵌套admission及结构化结果/参数更新。K09/K10完整嵌套行为未勾选；下一批按执行器作用域与上述用户行为成组接入。
+- 验证：产品ASan/UBSan通过真实write效果、重复键复用、参数冲突回滚、调度器关闭重开、父读取结果、单子任务、终态文档退休及父取消后无文件效果；新增nested观察和事件专项核对成功/执行前取消各一对开始结束、ID/工具名/结果及错误状态。Runtime整批与产品构建通过，候选登记镜像G00/Assembly通过。模型协议未改动；既有正常Tool路径由同产品专项回归。
+- 接口与自审：nested_call.S手写Assembly，nested_call.h公开start/document/settle/read；ToolTask公开布局保持，新增input.kind=nested分支。源码、导出与模块依赖登记，Assembly检查通过；客户端按nested input.call读取ID/名称/参数，开始/输出复用既有事件；子终态从提交后缓存中的父文档取结果并发结束。原生观察接口可读取nested Task/call。当前开始时机是持久任务准入，完整Live.nestedTools状态投影仍待按上游running迁移。
+- 剩余与下一交付物：尚需把原生工具执行API的executeTool绑定到该持久调用链、完整Live.nestedTools状态投影与结构化增量、自动sequence key和abandonOnRestart策略、取消前等待未完成嵌套admission及结构化结果/参数更新。K09/K10完整嵌套行为未勾选；下一批按执行器作用域与上述用户行为成组接入。

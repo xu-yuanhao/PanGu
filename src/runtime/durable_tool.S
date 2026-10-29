@@ -1247,7 +1247,13 @@ pg_durable_tool_observe:
  call json_object_array_get_idx@PLT
  mov r15,rax
  DGET r15,input
+ mov [rsp+184],rax
  DGET rax,call_id
+ test rax,rax
+ jnz .Ldto_call_identity
+ DGET "qword ptr [rsp+184]",call
+ DGET rax,id
+.Ldto_call_identity:
  mov rdi,rax
  mov rsi,[rsp+168]
  call json_object_equal@PLT
@@ -1268,7 +1274,14 @@ pg_durable_tool_observe:
  jmp .Ldto_page
 .Ldto_found:
  DGET r15,input
- DGET rax,assistant
+ mov [rsp+184],rax
+ DGET rax,call
+ test rax,rax
+ jz .Ldto_model_found
+ mov r14,rax
+ jmp .Ldto_result
+.Ldto_model_found:
+ DGET "qword ptr [rsp+184]",assistant
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov rdx,rax

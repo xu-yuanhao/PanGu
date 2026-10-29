@@ -43,7 +43,7 @@
 
 - nested_call.S把Task-scoped family索引、owned ToolTask和结果结算接成持久调用链；ToolTask直接读取nested input.call，调用现有真实编码工具，结果与子终态同事务写入父文档，父终态退休文档。
 - 产品ASan/UBSan通过实际write、同键复用/参数冲突、调度器重开、结果读取、单子任务、父取消/无文件效果和文档退休。Runtime整批、产品构建和候选G00/Assembly通过。
-- 当前调用者为原生扩展Task；工具执行API内的executeTool绑定、嵌套Live进度及剩余控制语义继续K09/K10。前台普通模型Tool事件暂不展示nested子调用，完整项保持未勾选。
+- 当前调用者为原生扩展Task；工具执行API内的executeTool绑定、嵌套Live进度及剩余控制语义继续K09/K10。客户端已展示nested子调用开始/输出/结束，终态读取提交后缓存结果，native观察支持Task/call；开始时机仍为任务准入，完整Live.nestedTools/running与结构化增量保留为差异，完整项保持未勾选。
 
 ## 当前接口边界
 

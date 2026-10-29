@@ -45,7 +45,9 @@ int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned
    {task,call,entry?}, 1 missing; other values are read/argument errors. The
-   conversation and call ID select the latest matching native Tool task. */
+   conversation and call ID select the latest matching model or nested Tool task.
+   A nested observation exposes its input call and small Task receipt; its
+   caller-owned result is read through nested_call while the caller is live. */
 int pg_durable_tool_observe(const pg_task_runner_host *,uint64_t conversation,pg_slice call_id,struct json_object **);
 void pg_durable_tool_observation_release(struct json_object *);
 #endif

@@ -7,6 +7,8 @@
    and key, rejects a key naming different arguments. */
 int pg_nested_call_start(pg_task_runner *,const pg_task_definition *,const char *key,
  const struct json_object *call,int (*mint)(void *,uint64_t *),uint64_t *);
+/* Publication-only adopted cache lookup; never loads Storage. */
+int pg_nested_call_peek(pg_durable_session *,uint64_t,const char *,struct json_object **);
 int pg_nested_call_read(pg_durable_session *,uint64_t,const char *,struct json_object **);
 int pg_nested_call_document(pg_document_tx *,uint64_t,const char *,int (*mint)(void *,uint64_t *),pg_document_change **);
 /* Store result on an already indexed member during child terminal mutation. */
