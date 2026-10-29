@@ -84,8 +84,8 @@ li_parse_object:
  jz .Lpo_null
  test r12, r12
  jz .Lpo_null
- cmp r12, PG_TL_ARGUMENT_LIMIT
- jae .Lpo_null
+ cmp r12, 0x7fffffff
+ ja .Lpo_null
  mov rdi, rbx
  xor esi, esi
  mov rdx, r12
@@ -98,7 +98,7 @@ li_parse_object:
  mov r13, rax /* tok */
  mov rdi, r13
  mov rsi, rbx
- mov edx, r12d /* size < PG_TL_ARGUMENT_LIMIT，int 安全 */
+ mov edx, r12d /* json-c accepts a signed int byte count */
  call json_tokener_parse_ex@PLT
  mov r14, rax /* o */
  mov rdi, r13

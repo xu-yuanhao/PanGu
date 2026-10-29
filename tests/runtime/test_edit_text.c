@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <utf8proc.h>
-_Static_assert(PG_TEXT_LIMIT==4096 && PG_EDIT_LIMIT==16,"native quotas");
+_Static_assert(PG_EDIT_LIMIT==16,"Pi edit batch limit");
 _Static_assert(PG_EDIT_OK==0 && PG_EDIT_INVALID==1 && PG_EDIT_QUOTA==2 && PG_EDIT_NOT_FOUND==3 && PG_EDIT_AMBIGUOUS==4 && PG_EDIT_OVERLAP==5 && PG_EDIT_UNCHANGED==6 && PG_EDIT_NO_MEMORY==7,"status ABI");
 _Static_assert(sizeof(pg_text_edit)==32 && offsetof(pg_text_edit,new_text)==16,"edit input ABI");
 _Static_assert((UTF8PROC_STABLE|UTF8PROC_COMPAT|UTF8PROC_COMPOSE)==14,"NFKC flags");
@@ -61,8 +61,9 @@ static void cases(void){
  fail_calloc=1;check("a",&replace,1,PG_EDIT_NO_MEMORY,0);fail_calloc=0;
  for(int failure=1;failure<=3;++failure){fail_map=failure;map_calls=0;check("Ａ",&folded,1,PG_EDIT_NO_MEMORY,0);}fail_map=0;
  char expansion[4096];size_t used=0;for(unsigned i=0;i<200;++i){memcpy(expansion+used,"ﷺ",3);used+=3;}expansion[used]=0;
- check(expansion,&replace,1,PG_EDIT_QUOTA,0);
- char large[4096];memset(large,'x',4095);large[4095]=0;pg_text_edit grow={s("a"),s(large)};check("a",&grow,1,PG_EDIT_QUOTA,0);
+ check(expansion,&replace,1,PG_EDIT_NOT_FOUND,0);
+ char large[4096];memset(large,'x',4095);large[4095]=0;pg_text_edit grow={s("a"),s(large)};assert(!pg_edit_text_apply(s("a"),&grow,1,out,sizeof(out),&n)&&n==4095&&!memcmp(out,large,sizeof(large)));
+ size_t prefix=65536,input_n=prefix+7;char *large_input=malloc(input_n),*large_output=malloc(input_n+2);assert(large_input&&large_output);memset(large_input,'a',prefix);memcpy(large_input+prefix,"target\n",7);pg_text_edit large_edit={s("target"),s("changed")};n=0;assert(!pg_edit_text_apply((pg_slice){large_input,input_n},&large_edit,1,large_output,input_n+2,&n));assert(n==input_n+1&&!memcmp(large_output,large_input,prefix)&&!memcmp(large_output+prefix,"changed\n",8)&&large_output[n]==0);free(large_output);free(large_input);
  puts("edit text: batch/original matching, ambiguity/overlap/no-op refusal, fuzzy NFKC/unchanged lines, BOM/CRLF, alias/quota/page tails OK");
 }
 static pg_slice value(json_object *o,const char *name){json_object *v=0;assert(json_object_object_get_ex(o,name,&v)&&json_object_is_type(v,json_type_string));return (pg_slice){json_object_get_string(v),(size_t)json_object_get_string_len(v)};}

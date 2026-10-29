@@ -37,8 +37,8 @@
  jz .Lparse_bad
  test r12,r12
  jz .Lparse_bad
- cmp r12,PG_TL_ARGUMENT_LIMIT
- jae .Lparse_bad
+	cmp r12,0x7fffffff
+	ja .Lparse_bad
  mov rdi,rbx
  xor esi,esi
  mov rdx,r12
@@ -170,8 +170,6 @@
  mov r13d,eax
  test r15d,r15d
  jz .Lpath_length
- cmp r13,PG_TL_ARGUMENT_LIMIT
- jae .Lparse_bad
 .Lpath_length:
  test r15d,r15d
  jnz .Lstring_length_ready

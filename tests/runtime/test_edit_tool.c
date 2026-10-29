@@ -6,6 +6,7 @@
 #include "../../src/runtime/write_tool.h"
 #include "../../src/runtime/journal.h"
 #include <assert.h>
+#include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <json-c/json.h>
@@ -45,8 +46,10 @@ static pg_slice s(const char *p){return (pg_slice){p,strlen(p)};}
 static int forward_allow(void *p,pg_slice name,pg_slice args){(void)p;++checks;if((name.size==4&&deny_read)||(name.size==5&&deny_write))return 0;return file_service.authorize(file_service.context,name,args);}
 static int forward_execute(void *p,pg_slice name,pg_slice args,char *out,size_t cap,size_t *size){(void)p;if(name.size==4){++reads;if(oversize_read){*size=cap;return 0;}if(partial_read){memcpy(out,"alpha",5);*size=5;return PG_TOOL_PARTIAL;}}else{assert(name.size==5);++writes;}int rc=file_service.execute(file_service.context,name,args,out,cap,size);if(name.size==5&&!rc){if(crash_after_write)_exit(73);if(fail_after_write)return 1;}return rc;}
 static int invoke(const char *args){char out[128]={0};size_t n=777;char *copy=strdup(args);assert(copy);int rc=service.execute(service.context,s("edit"),s(args),out,sizeof(out),&n);assert(!strcmp(args,copy));free(copy);if(!rc)assert(json_object_get_uint64(json_object_object_get(editor.details,"firstChangedLine"))>0);assert(n>0&&n<sizeof(out));memcpy(last_output,out,sizeof(out));return rc;}
-static void put(const char *bytes){int fd=open("file.txt",O_WRONLY|O_CREAT|O_TRUNC,0600);assert(fd>=0&&write(fd,bytes,strlen(bytes))==(ssize_t)strlen(bytes));assert(!close(fd));}
-static void expect(const char *bytes){char content[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,content,sizeof(content));assert(n==(ssize_t)strlen(bytes)&&!memcmp(content,bytes,(size_t)n));assert(!close(fd));}
+static void put_bytes(const void *bytes,size_t size){int fd=open("file.txt",O_WRONLY|O_CREAT|O_TRUNC,0600);assert(fd>=0);const char *p=bytes;while(size){ssize_t n=write(fd,p,size);if(n<0&&errno==EINTR)continue;assert(n>0);p+=n;size-=(size_t)n;}assert(!close(fd));}
+static void put(const char *bytes){put_bytes(bytes,strlen(bytes));}
+static void expect_bytes(const void *bytes,size_t size){int fd=open("file.txt",O_RDONLY);assert(fd>=0);char *content=malloc(size?size:1);assert(content);size_t used=0;while(used<size){ssize_t n=read(fd,content+used,size-used);if(n<0&&errno==EINTR)continue;assert(n>0);used+=(size_t)n;}char extra;assert(read(fd,&extra,1)==0&&!memcmp(content,bytes,size));free(content);assert(!close(fd));}
+static void expect(const char *bytes){expect_bytes(bytes,strlen(bytes));}
 static unsigned fds(void){DIR *dir=opendir("/proc/self/fd");assert(dir);unsigned n=0;while(readdir(dir))++n;assert(!closedir(dir));return n;}
 static pg_agent agent;
 static unsigned stage,answer;
@@ -123,6 +126,7 @@ int main(int argc,char **argv){
  };
  for(size_t i=0;i<sizeof(shapes)/sizeof(*shapes);++i){put("alpha\nbeta\n");unsigned r=reads,w=writes,c=checks;assert(definition.validate(definition.context,s(shapes[i])));assert(!invoke(shapes[i]));assert(reads==r+1&&writes==w+1&&checks==c+2);expect("ALPHA\nbeta\n");}
  {char large[10000];size_t used=0;for(unsigned i=0;i<500;++i){int n=snprintf(large+used,sizeof(large)-used,"alpha-%u payload\n",i);assert(n>0);used+=(size_t)n;}put(large);unsigned w=writes;assert(invoke(shapes[0])&&writes==w);int fd=open("file.txt",O_RDONLY);assert(fd>=0);char bytes[10000];ssize_t n=read(fd,bytes,sizeof(bytes));assert(n==(ssize_t)used&&!memcmp(bytes,large,used)&&!close(fd));}
+ {size_t prefix=196608,input_size=prefix+7;char *original=malloc(input_size),*expected=malloc(input_size+1);assert(original&&expected);memset(original,'a',prefix);memcpy(original+prefix,"target\n",7);memset(expected,'a',prefix);memcpy(expected+prefix,"changed\n",8);put_bytes(original,input_size);assert(!invoke("{\"path\":\"file.txt\",\"oldText\":\"target\",\"newText\":\"changed\"}"));expect_bytes(expected,prefix+8);free(expected);free(original);}
  put("alpha\n\n[read: more lines; use offset=2 to continue]\n");assert(!invoke(shapes[0]));expect("ALPHA\n\n[read: more lines; use offset=2 to continue]\n");
  {char original[2100],expected[2100];memcpy(original,"alpha",5);memset(original+5,'\n',2001);original[2006]=0;memcpy(expected,original,2007);memcpy(expected,"ALPHA",5);put(original);assert(!invoke(shapes[0]));expect(expected);}
  put("alpha\n");partial_read=1;{unsigned w=writes;assert(invoke(shapes[0])&&writes==w);expect("alpha\n");}partial_read=0;
@@ -150,7 +154,7 @@ int main(int argc,char **argv){
  deny_write=1;r=reads;w=writes;assert(invoke(shapes[0])&&reads==r+1&&writes==w);expect("alpha\n");deny_write=0;
  oversize_read=1;w=writes;assert(invoke(shapes[0])&&writes==w);expect("alpha\n");oversize_read=0;
  fail_after_write=1;assert(invoke(shapes[0])&&strstr(last_output,"partially changed"));expect("ALPHA\n");fail_after_write=0;put("alpha\n");
- char escaped[4096];memset(escaped,'\t',3000);memcpy(escaped+3000,"alpha\n",7);put(escaped);w=writes;assert(invoke(shapes[0])&&writes==w&&strstr(last_output,"bounds"));expect(escaped);put("alpha\n");
+	char escaped[4096],escaped_expected[4096];memset(escaped,'\t',3000);memcpy(escaped+3000,"alpha\n",7);memcpy(escaped_expected,escaped,sizeof(escaped));memcpy(escaped_expected+3000,"ALPHA\n",6);put(escaped);assert(!invoke(shapes[0]));expect(escaped_expected);put("alpha\n");
  assert(!rename("file.txt","quote\"name.txt"));assert(!invoke("{\"path\":\"quote\\\"name.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(!rename("quote\"name.txt","file.txt"));expect("ALPHA\n");put("alpha\n");
  assert(invoke("{\"path\":\"missing/file.txt\",\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));assert(access("missing",F_OK));
  assert(!rename("file.txt","@file"));assert(!invoke("{\"path\":\"@@file\",\"oldText\":\"alpha\",\"newText\":\"AT\"}"));assert(!rename("@file","file.txt"));expect("AT\n");put("alpha\n");

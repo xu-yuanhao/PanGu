@@ -1,20 +1,22 @@
 .intel_syntax noprefix
 #define ORIGINAL 0
-#define FUZZY 4096
-#define EDITED 8192
-#define FINAL 12288
-#define ARENA 16384
-#define NEEDLE 20480
-#define RECORDS 24576
-#define ON 25856
-#define FN 25864
-#define EN 25872
-#define AN 25888
-#define COUNT 25896
-#define USED 25904
-#define CRLF 25908
-#define BOM 25912
-#define WORK_BYTES 25920
+#define FUZZY 8
+#define EDITED 16
+#define FINAL 24
+#define ARENA 32
+#define NEEDLE 40
+#define RECORDS 48
+#define ON 56
+#define FN 64
+#define EN 72
+#define AN 80
+#define COUNT 88
+#define USED 96
+#define CRLF 100
+#define BOM 104
+#define EDIT_CAP 112
+#define FINAL_CAP 120
+#define WORK_BYTES 136
 #define OLD 0
 #define OLD_N 8
 #define NEW 16
@@ -42,8 +44,6 @@
  mov r13,rdx
  xor r14d,r14d
  xor r15d,r15d
- cmp r12,4096
- jae .Llf_bad
  test r12,r12
  jz .Llf_ok
  test rbx,rbx
@@ -112,6 +112,9 @@
  push r15
  sub rsp,48
  mov [rsp+16],rdx
+ test rdx,rdx
+ jz .Lfuzzy_invalid
+ mov qword ptr [rdx],0
  mov qword ptr [rsp],0
  lea rdx,[rsp]
  mov ecx,14 /* STABLE|COMPAT|COMPOSE, asserted in the C boundary tests. */
@@ -122,6 +125,12 @@
  js .Lfuzzy_invalid
  mov rbx,[rsp]
  mov r12,rax
+ mov rdi,rbx
+ lea rsi,[r12+1]
+ call realloc@PLT
+ test rax,rax
+ jz .Lfuzzy_realloc_failed
+ mov rbx,rax
  xor r13d,r13d
  xor r14d,r14d
  mov qword ptr [rsp+24],0 /* last non-whitespace byte */
@@ -211,20 +220,10 @@
  jmp .Lfuzzy_loop
 .Lfuzzy_done:
  mov r14,[rsp+24]
- cmp r14,4096
- jae .Lfuzzy_quota
- mov rdi,[rsp+16]
- mov rsi,rbx
- mov rdx,r14
- call memcpy@PLT
- mov rdi,rbx
- call utf8proc_free@PLT
+ mov byte ptr [rbx+r14],0
+ mov rax,[rsp+16]
+ mov [rax],rbx
  mov rax,r14
- jmp .Lfuzzy_return
-.Lfuzzy_quota:
- mov rdi,rbx
- call utf8proc_free@PLT
- mov rax,-2
  jmp .Lfuzzy_return
 .Lfuzzy_free_bad:
  mov rdi,rbx
@@ -233,6 +232,11 @@
  mov rax,-1
  jmp .Lfuzzy_return
 .Lfuzzy_no_memory:
+ mov rax,-3
+ jmp .Lfuzzy_return
+.Lfuzzy_realloc_failed:
+ mov rdi,rbx
+ call utf8proc_free@PLT
  mov rax,-3
 .Lfuzzy_return:
  add rsp,48
@@ -375,13 +379,15 @@
 .Lspan_base_end:
  cmp r10,[rdi+FN]
  jae .Lspan_original_end
- cmp byte ptr [rdi+r10+FUZZY],10
+ mov rax,[rdi+FUZZY]
+ cmp byte ptr [rax+r10],10
  lea r10,[r10+1]
  jne .Lspan_base_end
 .Lspan_original_end:
  cmp r11,[rdi+ON]
  jae .Lspan_check
- cmp byte ptr [rdi+r11+ORIGINAL],10
+ mov rax,[rdi+ORIGINAL]
+ cmp byte ptr [rax+r11],10
  lea r11,[r11+1]
  jne .Lspan_original_end
 .Lspan_check:
@@ -419,9 +425,10 @@
  mov rcx,rax
  add rcx,rdx
  jc .Lappend_bad
- cmp rcx,4096
+ cmp rcx,[rbx+EDIT_CAP]
  jae .Lappend_bad
- lea rdi,[rbx+EDITED+rax]
+ mov rdi,[rbx+EDITED]
+ add rdi,rax
  add [rbx+EN],rdx
  call memcpy@PLT
  xor eax,eax
@@ -463,8 +470,6 @@ pg_edit_text_apply:
  jz .Lreturn
  cmp r13,16
  ja .Lreturn
- cmp rsi,4096
- jae .Lquota
  test rsi,rsi
  jz .Lallocate
  test rdi,rdi
@@ -477,6 +482,71 @@ pg_edit_text_apply:
  jz .Lno_memory
  mov rbx,rax
  mov [rbx+COUNT],r13
+ mov rax,[rsp+8]
+ inc rax
+ jz .Lquota
+ mov rdi,rax
+ call malloc@PLT
+ test rax,rax
+ jz .Lno_memory
+ mov [rbx+ORIGINAL],rax
+ mov rdi,r13
+ imul rdi,rdi,RECORD_BYTES
+ call malloc@PLT
+ test rax,rax
+ jz .Lno_memory
+ mov [rbx+RECORDS],rax
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],0
+ xor ebp,ebp
+.Lmeasure_edits:
+ cmp rbp,r13
+ jae .Lmeasure_done
+ mov rax,rbp
+ shl rax,5
+ lea rax,[r12+rax]
+ mov rcx,[rax+8]
+ add [rsp+24],rcx
+ jc .Lquota
+ mov rcx,[rax+24]
+ add [rsp+24],rcx
+ jc .Lquota
+ add [rsp+32],rcx
+ jc .Lquota
+ inc rbp
+ jmp .Lmeasure_edits
+.Lmeasure_done:
+ mov rax,[rsp+24]
+ inc rax
+ jz .Lquota
+ mov rdi,rax
+ call malloc@PLT
+ test rax,rax
+ jz .Lno_memory
+ mov [rbx+ARENA],rax
+ mov rax,[rsp+8]
+ add rax,[rsp+32]
+ jc .Lquota
+ inc rax
+ jz .Lquota
+ mov [rbx+EDIT_CAP],rax
+ mov rdi,rax
+ call malloc@PLT
+ test rax,rax
+ jz .Lno_memory
+ mov [rbx+EDITED],rax
+ mov rax,[rbx+EDIT_CAP]
+ dec rax
+ add rax,rax
+ jc .Lquota
+ add rax,4
+ jc .Lquota
+ mov [rbx+FINAL_CAP],rax
+ mov rdi,rax
+ call malloc@PLT
+ test rax,rax
+ jz .Lno_memory
+ mov [rbx+FINAL],rax
  mov rdi,[rsp]
  mov rsi,[rsp+8]
  cmp rsi,3
@@ -508,7 +578,7 @@ pg_edit_text_apply:
 .Lnormalize_content:
  mov rdi,[rsp]
  mov rsi,[rsp+8]
- lea rdx,[rbx+ORIGINAL]
+ mov rdx,[rbx+ORIGINAL]
  call .Llf
  test rax,rax
  js .Lreturn
@@ -526,15 +596,15 @@ pg_edit_text_apply:
  jc .Lquota
  add [rsp+24],rax
  jc .Lquota
- cmp qword ptr [rsp+24],4096
- jae .Lquota
- imul r11,rbp,RECORD_BYTES
- lea r11,[rbx+RECORDS+r11]
+ mov r11,[rbx+RECORDS]
+ mov rax,rbp
+ imul rax,RECORD_BYTES
+ add r11,rax
  mov [rsp+32],r10
  mov [rsp+40],r11
  mov rdi,[r10]
  mov rsi,[r10+8]
- lea rdx,[rbx+ARENA]
+ mov rdx,[rbx+ARENA]
  add rdx,[rbx+AN]
  mov [r11+OLD],rdx
  call .Llf
@@ -546,7 +616,7 @@ pg_edit_text_apply:
  mov r10,[rsp+32]
  mov rdi,[r10+16]
  mov rsi,[r10+24]
- lea rdx,[rbx+ARENA]
+ mov rdx,[rbx+ARENA]
  add rdx,[rbx+AN]
  mov [r11+NEW],rdx
  call .Llf
@@ -558,7 +628,7 @@ pg_edit_text_apply:
  inc rbp
  jmp .Lnormalize_edit
 .Lfuzzy_content:
- lea rdi,[rbx+ORIGINAL]
+ mov rdi,[rbx+ORIGINAL]
  mov rsi,[rbx+ON]
  lea rdx,[rbx+FUZZY]
  call .Lfuzzy
@@ -570,11 +640,11 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lmatch_begin
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov [rsp+40],rax
  mov rdx,[rax+OLD]
  mov rcx,[rax+OLD_N]
- lea rdi,[rbx+ORIGINAL]
+ mov rdi,[rbx+ORIGINAL]
  mov rsi,[rbx+ON]
  call memmem@PLT
  test rax,rax
@@ -587,12 +657,16 @@ pg_edit_text_apply:
  test rax,rax
  js .Lunicode_error
  mov rcx,rax
- lea rdi,[rbx+FUZZY]
+ mov rdi,[rbx+FUZZY]
  mov rsi,[rbx+FN]
- lea rdx,[rbx+NEEDLE]
+ mov rdx,[rbx+NEEDLE]
  call memmem@PLT
- test rax,rax
- jz .Lnot_found
+ mov [rsp+80],rax
+ mov rdi,[rbx+NEEDLE]
+ call utf8proc_free@PLT
+ mov qword ptr [rbx+NEEDLE],0
+ cmp qword ptr [rsp+80],0
+ je .Lnot_found
  mov dword ptr [rbx+USED],1
 .Linitial_next:
  inc rbp
@@ -603,7 +677,7 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lsort_begin
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov [rsp+40],rax
  mov rdi,[rax+OLD]
  mov rsi,[rax+OLD_N]
@@ -612,18 +686,18 @@ pg_edit_text_apply:
  test rax,rax
  js .Lunicode_error
  mov [rsp+32],rax
- lea rdi,[rbx+FUZZY]
+ mov rdi,[rbx+FUZZY]
  mov rsi,[rbx+FN]
- lea rdx,[rbx+NEEDLE]
+ mov rdx,[rbx+NEEDLE]
  mov rcx,rax
  call .Loccurrences
  cmp rax,1
- jg .Lambiguous
- lea rdi,[rbx+ORIGINAL]
+ jg .Lmatch_ambiguous
+ mov rdi,[rbx+ORIGINAL]
  mov rsi,[rbx+ON]
  cmp dword ptr [rbx+USED],0
  je .Lmatch_base
- lea rdi,[rbx+FUZZY]
+ mov rdi,[rbx+FUZZY]
  mov rsi,[rbx+FN]
 .Lmatch_base:
  mov [rsp+24],rdi
@@ -631,32 +705,50 @@ pg_edit_text_apply:
  mov rdx,[rax+OLD]
  mov rcx,[rax+OLD_N]
  call memmem@PLT
- mov r10,[rsp+40]
- mov r11,[r10+OLD_N]
  test rax,rax
- jnz .Lmatched
+ jnz .Lmatch_exact_found
  mov rdi,[rsp+24]
  mov rsi,[rbx+FN]
- lea rdx,[rbx+NEEDLE]
+ mov rdx,[rbx+NEEDLE]
  mov rcx,[rsp+32]
  call memmem@PLT
+ mov [rsp+80],rax
+ mov rdi,[rbx+NEEDLE]
+ call utf8proc_free@PLT
+ mov qword ptr [rbx+NEEDLE],0
+ mov rax,[rsp+80]
  test rax,rax
  jz .Lnot_found
  mov r10,[rsp+40]
  mov r11,[rsp+32]
+ jmp .Lmatched
+.Lmatch_exact_found:
+ mov [rsp+80],rax
+ mov rdi,[rbx+NEEDLE]
+ call utf8proc_free@PLT
+ mov qword ptr [rbx+NEEDLE],0
+ mov rax,[rsp+80]
+ mov r10,[rsp+40]
+ mov r11,[r10+OLD_N]
 .Lmatched:
  sub rax,[rsp+24]
  mov [r10+AT],rax
  mov [r10+LENGTH],r11
  inc rbp
  jmp .Lmatch
+.Lmatch_ambiguous:
+ mov rdi,[rbx+NEEDLE]
+ call utf8proc_free@PLT
+ mov qword ptr [rbx+NEEDLE],0
+ jmp .Lambiguous
 .Lsort_begin:
  mov ebp,1
 .Lsort:
  cmp rbp,r13
  jae .Loverlap_begin
  imul rax,rbp,RECORD_BYTES
- lea rsi,[rbx+RECORDS+rax]
+ mov rsi,[rbx+RECORDS]
+ add rsi,rax
  lea rdi,[rsp+48]
  mov ecx,10
  rep movsq
@@ -667,7 +759,8 @@ pg_edit_text_apply:
  jz .Linsert_done
  dec rax
  imul rax,rax,RECORD_BYTES
- lea rsi,[rbx+RECORDS+rax]
+ mov rsi,[rbx+RECORDS]
+ add rsi,rax
  mov rdx,[rsi+AT]
  cmp rdx,[rsp+48+AT]
  jbe .Linsert_done
@@ -678,7 +771,8 @@ pg_edit_text_apply:
  jmp .Linsert
 .Linsert_done:
  imul rax,[rsp+24],RECORD_BYTES
- lea rdi,[rbx+RECORDS+rax]
+ mov rdi,[rbx+RECORDS]
+ add rdi,rax
  lea rsi,[rsp+48]
  mov ecx,10
  rep movsq
@@ -690,7 +784,7 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lbuild_begin
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov rcx,[rax+AT-RECORD_BYTES]
  add rcx,[rax+LENGTH-RECORD_BYTES]
  cmp rcx,[rax+AT]
@@ -706,11 +800,11 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lbuild_tail
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov [rsp+40],rax
  mov rdx,[rax+AT]
  sub rdx,[rsp+24]
- lea rsi,[rbx+ORIGINAL]
+ mov rsi,[rbx+ORIGINAL]
  add rsi,[rsp+24]
  mov rdi,rbx
  call .Lappend
@@ -730,11 +824,11 @@ pg_edit_text_apply:
  inc rbp
  jmp .Lbuild_exact
 .Lbuild_fuzzy:
- lea rdi,[rbx+ORIGINAL]
+ mov rdi,[rbx+ORIGINAL]
  mov rsi,[rbx+ON]
  call .Lline_count
  mov [rsp+32],rax
- lea rdi,[rbx+FUZZY]
+ mov rdi,[rbx+FUZZY]
  mov rsi,[rbx+FN]
  call .Lline_count
  cmp rax,[rsp+32]
@@ -744,7 +838,7 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lgroups_begin
  imul rsi,rbp,RECORD_BYTES
- lea rsi,[rbx+RECORDS+rsi]
+ add rsi,[rbx+RECORDS]
  mov rdi,rbx
  call .Lspans
  test eax,eax
@@ -757,7 +851,7 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lbuild_tail
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov rcx,[rax+BS]
  mov [rsp+32],rcx
  mov rcx,[rax+BE]
@@ -772,7 +866,7 @@ pg_edit_text_apply:
  cmp rbp,r13
  jae .Lemit_group
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov rcx,[rax+BS]
  cmp rcx,[rsp+40]
  jae .Lemit_group
@@ -789,7 +883,7 @@ pg_edit_text_apply:
  mov [rsp+72],rbp
  mov rdx,[rsp+48]
  sub rdx,[rsp+24]
- lea rsi,[rbx+ORIGINAL]
+ mov rsi,[rbx+ORIGINAL]
  add rsi,[rsp+24]
  mov rdi,rbx
  call .Lappend
@@ -800,11 +894,11 @@ pg_edit_text_apply:
  cmp rbp,[rsp+72]
  jae .Lemit_group_tail
  imul rax,rbp,RECORD_BYTES
- lea rax,[rbx+RECORDS+rax]
+ add rax,[rbx+RECORDS]
  mov [rsp+80],rax
  mov rdx,[rax+AT]
  sub rdx,[rsp+32]
- lea rsi,[rbx+FUZZY]
+ mov rsi,[rbx+FUZZY]
  add rsi,[rsp+32]
  mov rdi,rbx
  call .Lappend
@@ -826,7 +920,7 @@ pg_edit_text_apply:
 .Lemit_group_tail:
  mov rdx,[rsp+40]
  sub rdx,[rsp+32]
- lea rsi,[rbx+FUZZY]
+ mov rsi,[rbx+FUZZY]
  add rsi,[rsp+32]
  mov rdi,rbx
  call .Lappend
@@ -838,7 +932,7 @@ pg_edit_text_apply:
 .Lbuild_tail:
  mov rdx,[rbx+ON]
  sub rdx,[rsp+24]
- lea rsi,[rbx+ORIGINAL]
+ mov rsi,[rbx+ORIGINAL]
  add rsi,[rsp+24]
  mov rdi,rbx
  call .Lappend
@@ -847,8 +941,8 @@ pg_edit_text_apply:
  mov rdx,[rbx+EN]
  cmp rdx,[rbx+ON]
  jne .Lrestore
- lea rdi,[rbx+EDITED]
- lea rsi,[rbx+ORIGINAL]
+ mov rdi,[rbx+EDITED]
+ mov rsi,[rbx+ORIGINAL]
  call memcmp@PLT
  test eax,eax
  jz .Lunchanged
@@ -856,28 +950,32 @@ pg_edit_text_apply:
  xor ecx,ecx
  cmp dword ptr [rbx+BOM],0
  je .Lrestore_begin
- mov byte ptr [rbx+FINAL],0xef
- mov byte ptr [rbx+FINAL+1],0xbb
- mov byte ptr [rbx+FINAL+2],0xbf
+ mov rax,[rbx+FINAL]
+ mov byte ptr [rax],0xef
+ mov byte ptr [rax+1],0xbb
+ mov byte ptr [rax+2],0xbf
  mov ecx,3
 .Lrestore_begin:
  xor edx,edx
 .Lrestore_loop:
  cmp rdx,[rbx+EN]
  jae .Lpublish
- mov al,[rbx+EDITED+rdx]
+ mov rax,[rbx+EDITED]
+ mov al,[rax+rdx]
  cmp al,10
  jne .Lrestore_byte
  cmp dword ptr [rbx+CRLF],0
  je .Lrestore_byte
- cmp rcx,4095
+ cmp rcx,[rbx+FINAL_CAP]
  jae .Lquota
- mov byte ptr [rbx+FINAL+rcx],13
+ mov rsi,[rbx+FINAL]
+ mov byte ptr [rsi+rcx],13
  inc rcx
 .Lrestore_byte:
- cmp rcx,4095
+ cmp rcx,[rbx+FINAL_CAP]
  jae .Lquota
- mov [rbx+FINAL+rcx],al
+ mov rsi,[rbx+FINAL]
+ mov [rsi+rcx],al
  inc rcx
  inc rdx
  jmp .Lrestore_loop
@@ -886,7 +984,7 @@ pg_edit_text_apply:
  jae .Lquota
  mov [rsp+24],rcx
  mov rdi,r14
- lea rsi,[rbx+FINAL]
+ mov rsi,[rbx+FINAL]
  mov rdx,rcx
  call memcpy@PLT
  mov rax,[rsp+24]
@@ -920,6 +1018,20 @@ pg_edit_text_apply:
 .Lreturn:
  test rbx,rbx
  jz .Lreturn_result
+ mov rdi,[rbx+NEEDLE]
+ call utf8proc_free@PLT
+ mov rdi,[rbx+FUZZY]
+ call utf8proc_free@PLT
+ mov rdi,[rbx+RECORDS]
+ call free@PLT
+ mov rdi,[rbx+ARENA]
+ call free@PLT
+ mov rdi,[rbx+FINAL]
+ call free@PLT
+ mov rdi,[rbx+EDITED]
+ call free@PLT
+ mov rdi,[rbx+ORIGINAL]
+ call free@PLT
  mov rdi,rbx
  call free@PLT
 .Lreturn_result:

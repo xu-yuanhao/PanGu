@@ -233,30 +233,41 @@ pg_edit_diff_create:
  test rax,rax
  jz .Led_exit
  mov qword ptr [rax],0
- cmp qword ptr [rbx+BEFOREN],4096
- jae .Led_exit
- cmp qword ptr [rbx+AFTERN],4096
- jae .Led_exit
  cmp qword ptr [rbx+PATHN],4096
  jae .Led_exit
- mov edi,1
- mov esi,8192
+ cmp qword ptr [rbx+BEFOREN],0x7fffffff
+ ja .Led_exit
+ cmp qword ptr [rbx+AFTERN],0x7fffffff
+ ja .Led_exit
+ mov rdi,[rbx+BEFOREN]
+ add rdi,[rbx+AFTERN]
+ jc .Led_alloc
+ add rdi,2
+ jc .Led_alloc
+ mov esi,1
  call calloc@PLT
  mov [rbx+TEXT],rax
  test rax,rax
  jz .Led_alloc
  mov rdi,[rbx+BEFOREN]
  add rdi,[rbx+AFTERN]
+ jc .Led_alloc
  add rdi,2
+ jc .Led_alloc
  mov esi,16
  call calloc@PLT
  mov [rbx+OLD],rax
  test rax,rax
  jz .Led_alloc
  mov rdx,[rbx+BEFOREN]
- inc rdx
+ add rdx,1
+ jc .Led_alloc
+	movabs r10,0x0fffffffffffffff
+	cmp rdx,r10
+ ja .Led_alloc
  shl rdx,4
  add rax,rdx
+ jc .Led_alloc
  mov [rbx+NEW],rax
  mov rdi,[rbx+BEFORE]
  mov rsi,[rbx+BEFOREN]
@@ -268,7 +279,8 @@ pg_edit_diff_create:
  mov rdi,[rbx+AFTER]
  mov rsi,[rbx+AFTERN]
  mov rdx,[rbx+TEXT]
- add rdx,4096
+ add rdx,[rbx+BEFOREN]
+ inc rdx
  mov rcx,[rbx+NEW]
  call .Led_tokens
  mov [rbx+M],rax
@@ -289,6 +301,7 @@ pg_edit_diff_create:
  mov [rbx+WIDTH],rcx
  mov rdi,[rbx+N]
  add rdi,[rbx+M]
+ jc .Led_alloc
  mov [rbx+SUM],rdi
  lea rdi,[rdi+rdi+3]
  mov esi,16
@@ -586,11 +599,29 @@ pg_edit_diff_create:
  jmp .Led_select_loop
 .Led_render_allocate:
  mov rdi,[rbx+SUM]
+	movabs rax,0x07ffffffffffffff
+	cmp rdi,rax
+ ja .Led_alloc
  shl rdi,5
  add rdi,[rbx+BEFOREN]
+ jc .Led_alloc
  add rdi,[rbx+AFTERN]
+ jc .Led_alloc
+ mov rax,[rbx+BEFOREN]
+ add rax,[rbx+AFTERN]
+ jc .Led_alloc
+ add rax,rax
+ jc .Led_alloc
+ add rdi,rax
+ jc .Led_alloc
  mov rax,[rbx+PATHN]
- lea rdi,[rdi+rax*2+1024]
+ shl rax,1
+ add rdi,rax
+ jc .Led_alloc
+ add rdi,1024
+ jc .Led_alloc
+	cmp rdi,0x7fffffff
+	ja .Led_alloc
  mov [rbx+CAP],rdi
  mov esi,2
  call calloc@PLT

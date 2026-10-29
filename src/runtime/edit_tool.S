@@ -9,12 +9,14 @@
 #define P_BYTES 552
 #define FIRST_LINE 552
 #define CONTENT 560
-#define RESULT 4656
-#define IO_SIZE 8752
-#define TREE 8760
-#define ENCODED 8768
-#define ENCODED_N 8776
-#define FRAME 8808
+#define CONTENT_CAP 568
+#define RESULT 576
+#define RESULT_CAP 584
+#define IO_SIZE 592
+#define TREE 600
+#define ENCODED 608
+#define ENCODED_N 616
+#define FRAME 648
 .section .rodata
 .Lname: .asciz "edit"
 .Ldescription: .asciz "Edit one file using a relative or absolute POSIX path using edits: an array of {oldText,newText}. Paths support home expansion, file URLs and lexical dot segments. Targets must be unique, non-overlapping regions of the original file. Merge changes to the same block. Preserves BOM, line endings and untouched line blocks. At most 16 edits."
@@ -37,6 +39,8 @@
 .Lmemory: .asciz "Edit memory allocation failed"
 .Lok: .asciz "Successfully replaced %zu block(s); first changed line %zu"
 .Lsummary_error: .asciz "Edit succeeded; could not format change summary"
+.Lread_limit: .asciz "read output limit exceeded"
+.set LREAD_LIMIT_N, 26
 .text
 
 /* Strict bounded JSON parse; caller owns the returned object. */
@@ -55,7 +59,7 @@
  jz .Ljson_bad
  test r12,r12
  jz .Ljson_bad
- cmp r12,4096
+ cmp r12,PG_TL_ARGUMENT_LIMIT
  jae .Ljson_bad
  xor esi,esi
  mov rdx,r12
@@ -140,7 +144,7 @@
  mov rdi,rbx
  call json_object_get_string_len@PLT
  mov r13d,eax
- cmp r13,4096
+ cmp r13,PG_TL_ARGUMENT_LIMIT
  jae .Lstring_bad
  mov rdi,rbx
  call json_object_get_string@PLT
@@ -310,6 +314,8 @@
  call .Lstring
  test eax,eax
  jnz .Lparse_bad
+ cmp qword ptr [rbx+P_PATH_N],4096
+ jae .Lparse_bad
  mov rdi,r12
  lea rsi,[rip+.Lold]
  mov rdx,rsp
@@ -544,6 +550,7 @@
 /* (editor,name,len,out,args,argslen,size*) -> authorized service execution. */
 .Lio:
  mov rax,[rsp+8]
+ mov r10,[rsp+16]
  push rbp
  push rbx
  push r12
@@ -558,6 +565,7 @@
  mov r15,r8
  mov [rsp],r9
  mov [rsp+8],rax
+ mov [rsp+16],r10
  mov rdi,[rbx]
  mov rcx,r15
  mov r8,r9
@@ -570,8 +578,10 @@
  mov rcx,r15
  mov r8,[rsp]
  mov r9,r14
- push qword ptr [rsp+8]
- push 4096
+ mov rax,[rsp+8]
+ mov r10,[rsp+16]
+ push rax
+ push r10
  call [rbx+16]
  add rsp,16
  jmp .Lio_return
@@ -594,16 +604,17 @@
  push r13
  push r14
  push r15
- sub rsp,4096
- mov byte ptr [rsp],0
- sub rsp,4096
- mov byte ptr [rsp],0
- sub rsp,616
+ sub rsp,FRAME
  mov rbp,rsp
  mov rbx,rdi
  mov r12,rcx
  mov r13,r8
  mov r14,r9
+ mov qword ptr [rbp+CONTENT],0
+ mov qword ptr [rbp+CONTENT_CAP],0
+ mov qword ptr [rbp+RESULT],0
+ mov qword ptr [rbp+RESULT_CAP],0
+ mov qword ptr [rbp+TREE],0
  push rsi
  push rdx
  mov rdi,rbx
@@ -642,37 +653,97 @@
  je .Lmemory_error
  test eax,eax
  jnz .Lquota_error
+ mov qword ptr [rbp+CONTENT_CAP],65536
+ mov rdi,65536
+ call malloc@PLT
+ test rax,rax
+ jz .Lmemory_error
+ mov [rbp+CONTENT],rax
+.Lread_retry:
  mov qword ptr [rbp+IO_SIZE],0
  lea rax,[rbp+IO_SIZE]
- push 0
+ mov rdx,[rbp+CONTENT_CAP]
+ push rdx
  push rax
  mov rdi,rbx
  lea rsi,[rip+.Lread]
  mov edx,4
- lea rcx,[rbp+CONTENT]
+ mov rcx,[rbp+CONTENT]
  mov r8,[rbp+ENCODED]
  mov r9,[rbp+ENCODED_N]
  call .Lio
  add rsp,16
+ test eax,eax
+ jz .Lread_complete
+	mov edx,LREAD_LIMIT_N
+	cmp qword ptr [rbp+IO_SIZE],rdx
+ jne .Lread_failed
+ mov rdi,[rbp+CONTENT]
+ lea rsi,[rip+.Lread_limit]
+ mov edx,LREAD_LIMIT_N
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lread_failed
+ mov rax,[rbp+CONTENT_CAP]
+	movabs r10,0x7fffffffffffffff
+	cmp rax,r10
+ ja .Lquota_error
+ shl rax,1
+ mov [rbp+CONTENT_CAP],rax
+ mov rdi,[rbp+CONTENT]
+ mov rsi,rax
+ call realloc@PLT
+ test rax,rax
+ jz .Lmemory_error
+ mov [rbp+CONTENT],rax
+ jmp .Lread_retry
+.Lread_failed:
  lea r15,[rip+.Lread_error]
  test eax,eax
- jnz .Lcleanup
- cmp qword ptr [rbp+IO_SIZE],4096
- jae .Lquota_error
+ jmp .Lcleanup
+.Lread_complete:
+	mov rax,[rbp+IO_SIZE]
+	cmp rax,[rbp+CONTENT_CAP]
+	jae .Lquota_error
  mov rdi,[rbp+TREE]
  call json_object_put@PLT
  mov qword ptr [rbp+TREE],0
  mov rax,[rbp+IO_SIZE]
  mov [rbp+FIRST_LINE],rax
+ xor r10d,r10d
+ xor r11d,r11d
+.Lresult_measure:
+ cmp r11,[rbp+P_COUNT]
+ jae .Lresult_measure_done
+ mov rax,r11
+ shl rax,5
+ lea rdx,[rbp+P_EDITS+rax]
+ add r10,[rdx+24]
+ jc .Lquota_error
+ inc r11
+ jmp .Lresult_measure
+.Lresult_measure_done:
+ add r10,[rbp+FIRST_LINE]
+ jc .Lquota_error
+ add r10,r10
+ jc .Lquota_error
+ add r10,4
+ jc .Lquota_error
+ mov [rbp+RESULT_CAP],r10
+ mov rdi,r10
+ call malloc@PLT
+ test rax,rax
+ jz .Lmemory_error
+ mov [rbp+RESULT],rax
  lea rax,[rbp+IO_SIZE]
  push 0
  push rax
- lea rdi,[rbp+CONTENT]
- mov rsi,[rbp+IO_SIZE]
+ mov rdi,[rbp+CONTENT]
+ mov rsi,[rbp+FIRST_LINE]
  lea rdx,[rbp+P_EDITS]
  mov rcx,[rbp+P_COUNT]
- lea r8,[rbp+RESULT]
- mov r9d,4096
+ mov r8,[rbp+RESULT]
+ mov r9,[rbp+RESULT_CAP]
  call pg_edit_text_apply
  add rsp,16
  cmp eax,0
@@ -700,9 +771,9 @@
 .Lwrite_request:
  mov rdi,[rbp+P_PATH]
  mov rsi,[rbp+P_PATH_N]
- lea rdx,[rbp+CONTENT]
+ mov rdx,[rbp+CONTENT]
  mov rcx,[rbp+FIRST_LINE]
- lea r8,[rbp+RESULT]
+ mov r8,[rbp+RESULT]
  mov r9,[rbp+IO_SIZE]
  sub rsp,16
  lea rax,[rbx+56]
@@ -718,7 +789,7 @@
  call json_object_get_uint64@PLT
  mov [rbp+FIRST_LINE],rax
  mov rdi,rbp
- lea rsi,[rbp+RESULT]
+	mov rsi,[rbp+RESULT]
  mov rdx,[rbp+IO_SIZE]
  mov ecx,1
  call .Lrequest
@@ -732,12 +803,12 @@
  jnz .Lquota_error
  mov qword ptr [rbp+IO_SIZE],0
  lea rax,[rbp+IO_SIZE]
- push 0
+ push 4096
  push rax
  mov rdi,rbx
  lea rsi,[rip+.Lwrite]
  mov edx,5
- lea rcx,[rbp+CONTENT]
+ mov rcx,[rbp+CONTENT]
  mov r8,[rbp+ENCODED]
  mov r9,[rbp+ENCODED_N]
  call .Lio
@@ -755,6 +826,12 @@
 .Lquota_error:
  lea r15,[rip+.Lquota]
 .Lcleanup:
+ mov rdi,[rbp+CONTENT]
+ call free@PLT
+ mov qword ptr [rbp+CONTENT],0
+ mov rdi,[rbp+RESULT]
+ call free@PLT
+ mov qword ptr [rbp+RESULT],0
  lea rax,[rip+.Lok]
  cmp r15,rax
  je .Lcleanup_keep_details
@@ -826,8 +903,9 @@
  jz .Lserialize_memory
  mov rdi,rax
  call strlen@PLT
- cmp rax,4096
- jae .Lserialize_bad
+	movabs rdx,0x7fffffff
+	cmp rax,rdx
+	ja .Lserialize_bad
  mov [rbp+ENCODED_N],rax
  xor eax,eax
  add rsp,8

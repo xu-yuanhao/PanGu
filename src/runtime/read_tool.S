@@ -413,10 +413,13 @@ li_execute_read:
  mov rbx, rdi
  mov r12, rcx
  mov r13, r8
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_capacity_ready
  cmp r13,PG_RTL_OUTPUT_MAX
  jbe .Lrd_capacity
  mov r13d,PG_RTL_OUTPUT_MAX
 .Lrd_capacity:
+.Lrd_capacity_ready:
  mov r14, r9
  mov [rsp+4240],rsi
  mov [rsp+4248],rdx
