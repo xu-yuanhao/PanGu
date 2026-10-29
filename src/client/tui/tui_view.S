@@ -657,7 +657,8 @@ tui_view_banner:
  je .Lbanner_legacy
  cmp qword ptr [rbx+TUI_LI_VIEW_EDITOR], 0
  je .Lbanner_legacy
- cmp dword ptr [rbx+TUI_LI_VIEW_TERMINAL_ROWS], 8
+ /* At five rows the layout still has header, one body row, editor and footer. */
+ cmp dword ptr [rbx+TUI_LI_VIEW_TERMINAL_ROWS], 5
  jb .Lbanner_legacy
  mov dword ptr [rbx+TUI_LI_VIEW_SHELL], 1
  mov rdi, rbx
@@ -2661,7 +2662,10 @@ li_observe_result_text:
 .Lshell_start: .asciz "\033[r\033[2J\033[H\033[1mPanGu\033[0m  ·  Agent\r\n"
 .Lshell_region: .asciz "\033[2;%ur\033[2;1H\0337"
 .Lshell_restore: .asciz "\0338"
-.Lshell_editor_fmt: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter send · Alt+Enter newline · F1 help\033[0m\033[%u;1H────\r\n"
+.Lshell_editor_fmt_full: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter send · Alt+Enter newline · F1 help\033[0m\033[%u;1H────\r\n"
+.Lshell_editor_fmt_medium: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter send · Alt+Enter newline\033[0m\033[%u;1H────\r\n"
+.Lshell_editor_fmt_short: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter send\033[0m\033[%u;1H────\r\n"
+.Lshell_editor_fmt_tiny: .asciz "\033[r\0338\0337\033[%u;1H\033[J\033[%u;1H\033[2mEnter\033[0m\033[%u;1H────\r\n"
 .Lshell_reset: .asciz "\033[r\033[999;1H\r\n"
 .section .text
 /* One saved output cursor belongs exclusively to the conversation region.
@@ -2735,7 +2739,24 @@ li_shell_editor:
  call li_vputs
  mov rdi, rsp
  mov esi, 160
- lea rdx, [rip+.Lshell_editor_fmt]
+ lea rdx, [rip+.Lshell_editor_fmt_full]
+ cmp dword ptr [rbx+TUI_LI_VIEW_TERMINAL_ROWS], 8
+ jb .Lshell_editor_compact_select
+ cmp dword ptr [rbx+TUI_LI_VIEW_COLS], 44
+ jae .Lshell_editor_format_ready
+.Lshell_editor_compact_select:
+ cmp dword ptr [rbx+TUI_LI_VIEW_COLS], 32
+ jb .Lshell_editor_choose_short
+ lea rdx, [rip+.Lshell_editor_fmt_medium]
+ jmp .Lshell_editor_format_ready
+.Lshell_editor_choose_short:
+ cmp dword ptr [rbx+TUI_LI_VIEW_COLS], 11
+ jb .Lshell_editor_choose_tiny
+ lea rdx, [rip+.Lshell_editor_fmt_short]
+ jmp .Lshell_editor_format_ready
+.Lshell_editor_choose_tiny:
+ lea rdx, [rip+.Lshell_editor_fmt_tiny]
+.Lshell_editor_format_ready:
  mov ecx, [rbx+TUI_LI_VIEW_BODY_END]
  inc ecx
  mov r8d, [rbx+TUI_LI_VIEW_TERMINAL_ROWS]

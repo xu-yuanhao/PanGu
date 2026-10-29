@@ -1005,6 +1005,34 @@ def case_visible_shell_frames():
     print('ok: visible_shell_header_editor_footer_user_and_long_draft')
 
 
+def case_compact_shell_frames():
+    import pyte
+    d = Demo('no_tool', cols=16, rows=5)
+    try:
+        wait_idle(d)
+        d.send(b'abc')
+        deadline = time.monotonic() + .2
+        while time.monotonic() < deadline:
+            d.pump(.02)
+        screen = pyte.Screen(16, 5)
+        stream = pyte.Stream(screen)
+        stream.feed(d.output.decode('utf-8', 'replace'))
+        assert screen.display[0].startswith('PanGu')
+        assert screen.display[3].startswith('> abc')
+        assert screen.display[4].startswith('Enter')
+        d.send(b'\r')
+        d.until(RUN_FINISHED_OK, 10)
+        stream.feed(d.output.decode('utf-8', 'replace'))
+        assert screen.display[0].startswith('PanGu')
+        assert screen.display[4].startswith('Enter')
+        d.send(b'\x15/quit\r')
+        d.until(PASTE_OFF, 5)
+        d.finish(0)
+    finally:
+        d.close()
+    print('ok: compact_shell_five_rows_preserves_header_editor_footer_during_stream')
+
+
 def main():
     if not DEMO.exists():
         subprocess.run(['bash', str(ROOT / 'tools/client/tui/build.sh')], check=True)
@@ -1038,6 +1066,7 @@ def main():
     case_poll_error_failure_path()
     if os.environ.get('PANGU_TUI_VISUAL'):
         case_visible_shell_frames()
+        case_compact_shell_frames()
         case_logo_welcome_tiers()
     if os.environ.get('PANGU_TUI_PRODUCT'):
         case_product_prompt_history(os.environ['PANGU_TUI_PRODUCT'])

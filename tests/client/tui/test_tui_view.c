@@ -238,6 +238,40 @@ static void test_plain_mode(void)
 	T_RUN("plain_mode");
 }
 
+static void test_compact_shell_height_and_width(void)
+{
+	tstr out;
+	tui_view v;
+	tui_input in;
+
+	tstr_clear(&out);
+	tui_input_init(&in);
+	tui_view_init(&v, tstr_sink(&out), 1, &in);
+	v.terminal_rows = 5;
+	tui_view_set_size(&v, 16);
+	tui_view_banner(&v, "fake-runtime");
+	T_CHECK(v.shell_active == 1);
+	T_CHECK(v.shell_body_end == 2);
+	T_CHECK(tstr_contains(&out, "\033[2;2r"));
+	T_CHECK(tstr_contains(&out, "\033[2mEnter\033[0m"));
+	T_CHECK(!tstr_contains(&out, "Enter send ·"));
+
+	tstr_clear(&out);
+	tui_view_redraw_editor(&v);
+	T_CHECK(tstr_contains(&out, "\033[4;1H"));
+	T_CHECK(tstr_contains(&out, "> "));
+	T_CHECK(tstr_contains(&out, "\033[5;1H"));
+
+	tstr_clear(&out);
+	tui_input_init(&in);
+	tui_view_init(&v, tstr_sink(&out), 1, &in);
+	v.terminal_rows = 4;
+	tui_view_banner(&v, "fake-runtime");
+	T_CHECK(v.shell_active == 0);
+	T_CHECK(tstr_contains(&out, "[tui] 盘古薄客户端"));
+	T_RUN("compact_shell_height_and_width");
+}
+
 static void test_error_and_cancel_lines(void)
 {
 	tstr out;
@@ -711,6 +745,7 @@ int main(void)
 	test_utf8_absorb_split();
 	test_truncation_marker();
 	test_plain_mode();
+	test_compact_shell_height_and_width();
 	test_error_and_cancel_lines();
 	printf("test_tui_view: all passed\n");
 	return 0;
