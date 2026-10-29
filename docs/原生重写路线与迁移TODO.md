@@ -300,8 +300,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/submissions.ts:admitSubmission`、`harness.ts:Conversation.submit`与TaskRuntime事务；复用原生输入准入、Generation和Scheduler所有权。
-- 实际调用链：`pg_task_access_submit`校验当前phase/Session，通过runner commit_with调用既有`pg_durable_inputs_admit`，提交确认后转交Submission receipt。产品任务使用它向拥有的分叉会话提交，原输入API负责状态查询与去重；所有公共布局保持不变。
-- 验证：产品Host ASan/UBSan通过子会话展示Entry提交、持久receipt及requestId重复返回；产品构建、Assembly检查通过。真实DeepSeek `test_product_resources.py --live-conversations`通过task-owned分叉Submission→实际子Generation→父Task终态join，并完成既有新建/分叉/写文件/reset回归。G00使用Git登记文件当前快照，项目外`claude/`保留；新增导出与依赖已自审。
-- 接口与差异：Task提交同样遵守当前mutation事务，输出只在整体提交后有效；父Task本身可产生生命周期提交，去重以相同Submission ID/状态验证。完整父子恢复与取消仍需按K10场景补齐。
-- 下一交付物：推进子会话执行中重开与父取消的完整路径。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Agent快照读取与Scheduler恢复语义；实际产品Task/子会话调用链。
+- 实际调用链：产品`prepare_load`通过`pg_agent_state_read`读取持久Agent快照，替换仅看缓存的peek路径。后台子会话在缓存清空或Scheduler重开后无需先成为前台，就能使用其已保存配置；沿原有snapshot/cache机制加载。
+- 验证：产品Host ASan/UBSan核对创建带配置会话→清空文档缓存→实际prompt preparer仍包含保存指令；产品构建、Assembly检查通过。真实DeepSeek `--live-conversations`通过创建子会话/提交→关闭Scheduler→清空缓存→重开Scheduler/Client→子Generation使用保存指令→父终态等待；后续新建/分叉/写文件/reset同批通过。G00在Git登记文件当前快照通过（项目外`claude/`保留）。
+- 接口与差异：无新增接口或布局；修复重开后台会话未预热Agent缓存时配置可能丢失的问题。当前新增验证为Scheduler关闭/重开与冷缓存，完整进程/存储重开和父取消工作流仍需继续完成。
+- 下一交付物：接通任务/会话取消操作，验证持久取消意图沿owned子会话级联；同时补齐实际进程重开工作流。
