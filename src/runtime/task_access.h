@@ -1,0 +1,20 @@
+#ifndef PANGU_TASK_ACCESS_H
+#define PANGU_TASK_ACCESS_H
+#include "task_runner.h"
+#include "document_reader.h"
+/* Borrowed phase capability; valid until phase cleanup. History is optional
+   for current reads/memos and required for snapshot_as_of. Outputs are detached
+   and owned; status follows pg_task_status except document reads, which retain
+   document-reader statuses. Memo names are explicit byte slices, including embedded NUL;
+   PanGu stores their hex byte spelling as Task.memos keys. found distinguishes
+   JSON null from absence. Candidate is borrowed; first durable winner remains. */
+typedef struct {pg_task_runner *runner;const struct json_object *phase;
+ const pg_document_history_reader *history;uint64_t task_id,conversation;} pg_task_access;
+int pg_task_access_open(pg_task_access *,pg_task_runner *,const pg_document_history_reader *);
+int pg_task_access_memo(const pg_task_access *,pg_slice,const struct json_object *candidate,
+ unsigned has_candidate,struct json_object **value,unsigned *found);
+int pg_task_access_get_task(const pg_task_access *,uint64_t,struct json_object **);
+int pg_task_access_snapshot(const pg_task_access *,const pg_document_definition *,const pg_document_address *,struct json_object **);
+int pg_task_access_snapshot_as_of(const pg_task_access *,const pg_document_definition *,const pg_document_address *,uint64_t,struct json_object **);
+pg_task_runner *pg_task_scheduler_find(pg_task_scheduler *,uint64_t);
+#endif

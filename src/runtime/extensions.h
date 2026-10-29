@@ -2,6 +2,7 @@
 #define PANGU_EXTENSIONS_H
 #include "agent_state.h"
 #include "task_provider.h"
+#include "task_access.h"
 /* Immutable descriptors/code are protected by their snapshot/Host lease.
    Callback output descriptors borrow immutable strings, contexts and callbacks
    from that same lease. render transfers an owned JSON string or NULL (omit).
@@ -29,9 +30,9 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
    Decisions transfer owned strict JSON. Request is borrowed through completion
    or cancellation. 0 completed, 1 pending with stable request, negative error. Cancel releases
    pending callback resources before its extension lease closes. */
-typedef struct {unsigned event,reserved;void *context;int (*poll)(void *,const struct json_object *,struct json_object **);void (*cancel)(void *,const struct json_object *);} pg_extension_hook;
+typedef struct {unsigned event,reserved;void *context;int (*poll)(void *,const struct json_object *,struct json_object **,const pg_task_access *);void (*cancel)(void *,const struct json_object *);} pg_extension_hook;
 typedef struct {const char *name;const pg_tool_definition *tools;size_t tool_count;const pg_extension_section *sections;size_t section_count;const pg_extension_wrap *wraps;size_t wrap_count;const pg_extension_hook *hooks;size_t hook_count;const pg_task_definition *const *tasks;size_t task_count;} pg_extension;
-#define PG_EXTENSIONS_ABI 6u
+#define PG_EXTENSIONS_ABI 7u
 /* Host extensions.registry. A facade acquire returns an immutable snapshot
    and lease on success (0), none on failure; release drops that lease.
    defaults is an optional stable-name JSON array;
@@ -52,6 +53,7 @@ int pg_extension_hook_poll(void *,struct json_object **);
 /* A Generation phase keeps its selection across hook events. Switching events
    requires the previous event completed; close releases the whole scope. */
 int pg_extension_hook_poll_event(void *,unsigned,const struct json_object *,struct json_object **);
+int pg_extension_hook_bind_access(void *,pg_task_runner *,const pg_document_history_reader *);
 void pg_extension_hook_close(void *);
 /* One operation lease: unchanged base definitions dispatch through the injected
    provider; extension/replaced definitions use the composed registry. */

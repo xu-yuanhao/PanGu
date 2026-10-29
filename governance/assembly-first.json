@@ -334,6 +334,10 @@
     "src/runtime/prompt_preparer.S": {
       "role": "assembly-core",
       "reason": "Durable异步prepare、section续接、取消及请求配置组合"
+    },
+    "src/runtime/task_access.S": {
+      "role": "assembly-core",
+      "reason": "TaskRuntime持久memo首写获胜及phase约束读取"
     }
   }
 }

@@ -41,9 +41,9 @@
 
 ## 本批验证与集成状态
 
-- `prompt_preparer.S`将异步section接入实际Generation：稳定输入、phase固定扩展快照、挂起/续接及先取消callback再释放引用；wrapper传递render/cancel。Renderer完成后仍走同一提示计划与SystemEntry/request原子提交。
-- 入队和Compaction同步读取配置，Generation请求单独推进异步渲染；暂停丢弃未完成render且不写SystemEntry，调度器重开按当前注册表重新准备。
-- 产品ASan/UBSan通过取消、撤销、暂停/重开、无半成品SystemEntry及引用归零；Runtime整批与产品构建通过。真实DeepSeek通过替换、重开后的新标签、错误保留与omit；完成回调断言实际请求system中的对应内容。G00候选登记镜像与Assembly通过；claude/外部目录保持。
+- `task_access.S`接入DSO自定义任务的持久memo和getTask；Task/Hook共享asking Task的memos，先写获胜、null与缺失区分，Session事务重读后提交；终态沿原有路径清理memos。
+- Tool/Generation/Compaction的真实hook scope绑定当前Runner，为callback提供phase-scoped access；读取复用DocumentReader与guarded Storage，未绑定history时历史读取明确拒绝。
+- 产品ASan/UBSan通过memo争用候选、null、任务读取及调度器重开；真实DeepSeek hooks及已有完整扩展工作流、Runtime整批、产品构建、候选G00/Assembly通过；完整HookApi与嵌套调用仍属待完成范围。
 
 ## 当前接口边界
 

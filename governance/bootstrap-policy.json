@@ -656,6 +656,8 @@
     "src/runtime/system_prompt.S": "native-source",
     "src/runtime/system_prompt.h": "native-source",
     "tools/runtime/test_system_prompt.py": "gate-test",
-    "src/runtime/prompt_preparer.S": "native-source"
+    "src/runtime/prompt_preparer.S": "native-source",
+    "src/runtime/task_access.S": "native-source",
+    "src/runtime/task_access.h": "native-source"
   }
 }

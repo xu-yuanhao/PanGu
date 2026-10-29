@@ -269,8 +269,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/prompt.ts` 异步renderSections/错误保留、`generation.ts` prepare与scheduler的phase Context/取消；`harness-prompt.test.ts` 的异步section、wrapper、omit和取消用例。Pi/Harness采用提交及跟踪差异保持本批固定。
-- 实际调用链：同步配置读取用于入队和Compaction；Generation通过独立async prepare绑定读取owned输入/ContextView → 组合并租用扩展快照 → 同一renderer挂起/续接 → 原有section/tool提示计划 → 原子SystemEntry/request提交。Renderer输入地址跨poll稳定；撤销不改变已挂起快照，取消/暂停先释放callback资源再归还代码引用。调度器重开后按当前注册表重新准备；wrapper保留异步render/cancel字段。
-- 验证：产品`--native-tasks --sanitize`通过挂起撤销、取消、SystemEntry数量不变、暂停/重开后的新快照及所有者引用归零；Runtime整批和产品构建通过。真实DeepSeek通过A→B替换、重开后C、错误保留C与omit，provider完成回调直接断言实际请求system中的对应标签/移除。模型夹具使用公开工作区标签表达动态事实。G00候选登记镜像和Assembly通过，工作区claude/外部目录保持。
-- 接口与自审：extensions.registry ABI6，section40字节尾部增加cancel；Generation320字节尾部独立绑定prepare，私有operation416字节持有prepare state。`prompt_preparer.S`手写Assembly负责状态与组合；C仅加载/注入资源配置与模型元数据。Host/Client/TUI原函数表保持，新增源码/导出/依赖已登记；同步便利入口遇pending返回3并取消，产品请求使用异步入口。
-- 剩余与下一交付物：K09继续完整HookApi的运行时读取/记忆接口；K07/K08仍有未启动串行调用取消及更完整内容/控制语义。下一组对照TaskRuntime/ToolTask的memo、嵌套调用与事务入口，集中接入已有任务、文档及工具消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的scheduler.ts runtime memo/read、types.ts TaskRuntime与harness/types.ts HookApi；harness-tasks.test.ts首写获胜/null/属性名和harness-tasks-recovery.test.ts跨phase/接手保留。原有终态replace路径删除memos，复用既有Session事务。
+- 实际调用链：DSO自定义Task → phase-scoped task_access → Session mutation line重读Task → 已有memo返回、缺失时提交首个候选；后续phase/调度器重开读取同一事实。实际Tool/Generation/Compaction hook scope绑定当前Runner，将同一access作为第四参数传给插件；请求前/响应后hooks使用asking Task的memo。getTask通过readOnLine与guarded Storage读取，snapshot入口复用现有DocumentReader。
+- 验证：产品ASan/UBSan通过扩展任务首写获胜、第二候选返回首值、null与缺失区分、getTask及调度器重开。真实DeepSeek请求前/响应后hooks共享memo、扩展工具/压缩/异步section完整工作流通过；Runtime整批与产品构建退出0，候选登记镜像G00与Assembly通过。嵌套调用与完整HookApi尚未勾选。
+- 接口与自审：extensions.registry ABI7，hook poll第四参数为借用pg_task_access；描述符尺寸保持，私有hook scope104字节。task_access采用手写Assembly，公开头注明phase有效期、所有权与状态；memo名字按字节hex映射到PanGu自身Task.memos。新增源码/导出/依赖登记，插件链接开放task_access公开入口。
+- 剩余与下一交付物：文档历史读取需由产品绑定fork-aware history provider；完整HookApi的模型目录与更完整调用生命周期检查继续核对。嵌套工具/子任务调用仍需沿ToolTask/TaskRuntime成组接入，保持既有任务、事务与所有权链。

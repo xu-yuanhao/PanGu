@@ -2372,7 +2372,8 @@
         "model.mimo.local.v0",
         "json-c",
         "system libc",
-        "task.provider.local.v0"
+        "task.provider.local.v0",
+        "task.access.local.v0"
       ],
       "role": "Pi Registry snapshot selection, ordered tool/section composition, wraps and Generation/Tool/Compaction phase hooks with native scoped leases",
       "exports": [
@@ -2388,7 +2389,8 @@
         "pg_extensions_validate",
         "pg_extension_prepare_open",
         "pg_extension_prepare_poll",
-        "pg_extension_prepare_close"
+        "pg_extension_prepare_close",
+        "pg_extension_hook_bind_access"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/{registry,agent,prompt}.ts"
@@ -2446,6 +2448,30 @@
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/prompt.ts, generation.ts and harness-prompt.test.ts"
+      ]
+    },
+    {
+      "id": "task.access.local.v0",
+      "sources": [
+        "src/runtime/task_access.S",
+        "src/runtime/task_access.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "session.documents.reader.local.v0",
+        "json-c"
+      ],
+      "role": "Phase-scoped TaskRuntime committed reads and first-writer-wins durable memos",
+      "exports": [
+        "pg_task_access_open",
+        "pg_task_access_memo",
+        "pg_task_access_get_task",
+        "pg_task_access_snapshot",
+        "pg_task_access_snapshot_as_of",
+        "pg_task_scheduler_find"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22 scheduler.ts runtime memo/read; harness-tasks.test.ts"
       ]
     }
   ],

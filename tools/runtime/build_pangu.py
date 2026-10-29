@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # The approved inventory is the single product input list. No .c default/fallback.
 SOURCES = list(json.loads((ROOT / 'governance/assembly-first.json').read_text())['sources'])
 PLUGIN_EXPORTS = ['-Wl,--export-dynamic-symbol=' + name for name in
-                  ('pg_host_*', 'pg_task_runner_commit', 'pg_task_runner_commit_with')]
+                  ('pg_host_*', 'pg_task_access_*', 'pg_task_runner_commit', 'pg_task_runner_commit_with')]
 
 def implementation(stem):
     matches = [name for name in SOURCES if str(Path(name).with_suffix('')) == stem]

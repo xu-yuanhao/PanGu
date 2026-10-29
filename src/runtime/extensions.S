@@ -326,7 +326,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],6
+ cmp dword ptr [rbx],7
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],72
  jne .Lx_validate_bad
@@ -491,7 +491,7 @@ pg_extensions_resolve:
  rep stosq
  test r12,r12
  jz .Lx_resolve_provider
- cmp dword ptr [r12],6
+ cmp dword ptr [r12],7
  jne .Lx_resolve_bad
  cmp dword ptr [r12+4],72
  jne .Lx_resolve_bad
@@ -1313,7 +1313,7 @@ pg_extension_hook_open:
  mov r14,rcx
  mov qword ptr [r14],0
  mov edi,1
- mov esi,64
+ mov esi,104
  call calloc@PLT
  test rax,rax
  jz .Lxh_open_bad
@@ -1426,6 +1426,11 @@ pg_extension_hook_poll:
  mov rdi,[rbp+8]
  mov rsi,[rbx+8]
  lea rdx,[rbx+16]
+ xor ecx,ecx
+ cmp qword ptr [rbx+64],0
+ je .Lxh_no_access
+ lea rcx,[rbx+64]
+.Lxh_no_access:
  call [rbp+16]
  cmp eax,1
  je .Lxh_poll_pending
@@ -1949,3 +1954,10 @@ pg_extensions_prepare:
 .Lxp_sync_end:
  mov eax,r12d
  XE 16
+
+.text
+.globl pg_extension_hook_bind_access
+.type pg_extension_hook_bind_access,@function
+pg_extension_hook_bind_access:
+ add rdi,64
+ jmp pg_task_access_open@PLT
