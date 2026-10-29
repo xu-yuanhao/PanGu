@@ -167,6 +167,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 中断/abort结果读取已提交Live输出与元数据后再结算清理；实际3000字节输出跨重开保留。缺定义的restart任务等待安装并执行abort，普通取消可使缺定义任务以orphaned结束；Client取消清除restart原因，派生取消识别显式祖先意图。
 - [x] executeTool在缺少存储结果时按真实Task outcome返回faulted/orphaned及具体原因，客户端也发布失败结束。模型工具父调用接通结算清理，Live按完整后代树移除并保留无关分支；注入终态记录、实际write/read和跨级清理通过。
 - [x] 工具执行API接通details/diagnostic持久进度：输入复制、details null、诊断形状校验、快照观察、最终结果fallback/诊断顺序与中断恢复。模型/嵌套工具共用Live槽及进度提交，Generation响应结算清理上一轮模型工具槽；模型直接调用和子调用专项通过。
+- [x] 输出预算采用Chord完整行/UTF-8 head/tail算法，现有4096字节缓冲接通2000行进度和最终结果预算；累计droppedBytes/droppedLines、最终截断诊断和中断恢复诊断进入实际工具链。2408组固定上游源码对照、持续输出及最终/中断专项通过。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -277,8 +278,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts ToolExecutionApi.details/diagnostic、publishProgress、complete/fromSlot，types.ts ToolDiagnostic与live.ts clearProgress/finishSlot。延续固定Pi/Harness快照，采用其进度→最终结果和中断恢复语义。
-- 实际调用链：调用级原生工具通过pg_tool_execution_details/diagnostic提交复制后的JSON → 当前ToolTask mutation写Live所属tools/nestedTools槽 → 公开snapshot/watch读取 → 执行结束时以工具显式details优先、报告诊断在最终诊断前的顺序合并 → afterTool及原有结果事务保存。中断沿同一槽恢复。模型工具在意图事务创建running槽，OUTPUT使用同一持久窗口；Generation响应结算清理上一轮模型工具槽，避免连续对话累积。
-- 验证：产品`--native-tasks --sanitize`通过details null/对象更新、调用后修改源JSON不污染进度、非法诊断拒绝、模型/嵌套调用的观察与最终结果、3000字节中断输出连同details/诊断恢复、既有safe重开与取消。真实DeepSeek `--live-agent --sanitize`通过；Runtime整批、最终构建、动态导出回读、Assembly与候选G00均通过。
-- 接口与自审：新增details/diagnostic公开函数，沿既有80字节调用级capability和DSO导出范围使用；报告函数仅在活跃执行期接受调用。tool_live以槽类别选择同一字段delta实现，Generation通过公开clear_model事务入口清理已完成轮次。正常结果合并保留显式details null，诊断在当前报告和最终结果之间转移所有权；恢复路径与正常合并区分，避免覆盖最终输出或重复合并中断诊断。产品结构尺寸及事件ABI保持，导出与依赖登记已更新。
-- 剩余与下一交付物：完整嵌套行为保持未勾选；仍需truncation诊断/行预算/节流、完整usage/duration摘要、异常Task自身Live状态最终化、structuredOutput schema及完整结果控制语义。下一批集中输出预算和结果契约，完成后再核对整组上游工具行为。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的packages/chord/src/output.ts boundOutput/headRange/tailRange、对应output.test.ts，以及Durable harness/tool.ts complete/fromSlot/truncated。保留上游完整行和字符边界算法，在现有4096字节原生缓冲中接入2000行预算。
+- 实际调用链：Tool OUTPUT合并已持久窗口与新块 → pg_output_bound按tail保留完整行/UTF-8边界 → 同事务累加丢弃字节与行数 → Live观察/输出事件。最终afterTool结果按head预算处理并追加warn/truncated诊断；中断从Live恢复时将原报告、截断计数诊断和中断诊断依次合并，再经结果事务保存。
+- 验证：test_output_window.py直接运行固定Chord output.ts，对2408组空输入/零预算/空行/尾换行/多字节及head/tail组合与原生结果逐项比较，通过。产品`--native-tasks --sanitize`通过两块2100/100行输出的累计丢弃200行/字节、2000行窗口、最终2100行结果丢弃100行/字节及诊断、中断后保留2000行与100行/字节截断诊断；既有UTF-8字节窗口、details和恢复流程通过。Runtime整批、产品构建、真实DeepSeek `--live-agent --sanitize`、Assembly及候选镜像G00均通过。
+- 接口与自审：output_window.S/h提供无分配的精确输入切片与计数，直接由进度和最终结果两个消费者使用；公开头说明UTF-8借用与输入/输出所有权。新增源码、导出、模块依赖、差异检查与实际构建登记同步。Tool最终结果重复poll不会重复追加截断诊断；中断路径保持原先所有权清理与错误类别，事件ABI不变。
+- 剩余与下一交付物：完整工具行为保持未勾选；需接通Pi默认50KiB及各工具可配置的完整retain/输出上限、进度节流/清洗、完整usage/duration摘要、异常Task自身Live状态最终化、structuredOutput schema与结果控制语义。下一批继续按工具输出/结果契约整组推进，并核对实际消费者预算。

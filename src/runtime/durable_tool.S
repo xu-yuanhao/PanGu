@@ -1103,6 +1103,10 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
  mov dword ptr [r14+4316],1
 .Ldt_after_hooks_done:
+ mov rdi,r14
+ call .Ldt_bound_final
+ test eax,eax
+ jnz .Ldt_poll_error
  mov dword ptr [r14+4284],0
  cmp dword ptr [r14+4236],0
  je .Ldt_poll_final
@@ -2185,13 +2189,13 @@ pg_durable_tool_executing:
  push r12
  push r13
  push r14
- sub rsp,96
+ sub rsp,144
  mov rbx,rdi
  mov r12,rdx
  mov qword ptr [rcx],0
  mov rdi,rsp
  xor eax,eax
- mov ecx,12
+ mov ecx,18
  rep stosq
  mov rax,[rbx+8]
  DGET "qword ptr [rax+32]",input
@@ -2252,6 +2256,10 @@ pg_durable_tool_executing:
  mov rdi,rax
  call json_object_get_uint64@PLT
  mov [rsp+56],rax
+ DGET rbp,live_dropped_lines
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+128],rax
  DGET rbp,hook_output
  mov r14,rax
  mov rdi,rax
@@ -2280,21 +2288,16 @@ pg_durable_tool_executing:
  lea rsi,[rbx+128]
  mov rdx,[rbx+4224]
  call memcpy@PLT
- xor r14d,r14d
- cmp qword ptr [rsp+32],4096
- jbe .Ldt_progress_tail
- mov r14,[rsp+32]
- sub r14,4096
- mov rdx,[rsp+8]
-.Ldt_progress_boundary:
- cmp r14,[rsp+32]
- jae .Ldt_progress_tail
- movzx eax,byte ptr [rdx+r14]
- and eax,192
- cmp eax,128
- jne .Ldt_progress_tail
- inc r14
- jmp .Ldt_progress_boundary
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+32]
+ mov edx,4096
+ mov ecx,2000
+ mov r8d,1
+ lea r9,[rsp+96]
+ call pg_output_bound@PLT
+ test eax,eax
+ jnz .Ldt_progress_end
+ mov r14,[rsp+96]
 .Ldt_progress_tail:
  lea rdi,[rip+.Ldt_live_output_json]
  call json_tokener_parse@PLT
@@ -2319,6 +2322,15 @@ pg_durable_tool_executing:
  call json_object_new_uint64@PLT
  mov rdi,[rsp+40]
  lea rsi,[rip+.Ldt_live_dropped_bytes]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_progress_end
+ mov rdi,[rsp+128]
+ add rdi,[rsp+120]
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ldt_live_dropped_lines]
  mov rdx,rax
  call .Ldt_set
  test eax,eax
@@ -2348,7 +2360,7 @@ pg_durable_tool_executing:
  mov rdi,[rsp+8]
  call free@PLT
  mov eax,[rsp+72]
- add rsp,96
+ add rsp,144
  pop r14
  pop r13
  pop r12
@@ -2463,6 +2475,23 @@ pg_durable_tool_executing:
  inc r14
  jmp .Ldt_restore_copy_diagnostics
 .Ldt_restore_error_diagnostics:
+ cmp dword ptr [rsp+40],0
+ jne .Ldt_restore_errors_ready
+ DGET "qword ptr [rsp]",live_dropped_bytes
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r12,rax
+ DGET "qword ptr [rsp]",live_dropped_lines
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rdi,r13
+ mov rsi,r12
+ lea rcx,[rip+.Ldt_tail_word]
+ call .Ldt_truncated
+ test eax,eax
+ jnz .Ldt_restore_end
+.Ldt_restore_errors_ready:
  DGET "qword ptr [rbx+4272]",diagnostics
  mov r12,rax
  xor r14d,r14d
@@ -2672,3 +2701,140 @@ pg_durable_tool_executing:
  ret
 .section .rodata
 .Ldt_live_tools: .asciz "tools"
+
+.section .rodata
+.Ldt_live_dropped_lines: .asciz "droppedLines"
+.Ldt_head_word: .asciz "beginning"
+.Ldt_tail_word: .asciz "end"
+.Ldt_truncation_format: .asciz "Output truncated to its %s: %llu lines, %llu bytes dropped"
+.Ldt_truncation_json: .asciz "{\"severity\":\"warn\",\"code\":\"truncated\"}"
+.text
+.Ldt_truncated:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ test r12,r12
+ jz .Ldt_truncated_ok
+ lea rdi,[rsp]
+ lea rsi,[rip+.Ldt_truncation_format]
+ mov rdx,r14
+ mov rcx,r13
+ mov r8,r12
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Ldt_truncated_alloc
+ lea rdi,[rip+.Ldt_truncation_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ldt_truncated_alloc
+ mov rdi,[rsp]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Ldt_message]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_truncated_end
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldt_truncated_alloc
+ mov qword ptr [rsp+8],0
+.Ldt_truncated_ok:
+ xor eax,eax
+ jmp .Ldt_truncated_end
+.Ldt_truncated_alloc:
+ mov eax,5
+.Ldt_truncated_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldt_ensure_diagnostics:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ cmp qword ptr [rdi+4272],0
+ jne .Ldt_diagnostics_get
+ call json_object_new_object@PLT
+ mov [rbx+4272],rax
+ test rax,rax
+ jz .Ldt_diagnostics_return
+.Ldt_diagnostics_get:
+ DGET "qword ptr [rbx+4272]",diagnostics
+ test rax,rax
+ jnz .Ldt_diagnostics_return
+ call json_object_new_array@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Ldt_diagnostics_return
+ mov rdi,[rbx+4272]
+ lea rsi,[rip+.Ldt_diagnostics]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_diagnostics_failed
+ mov rax,r12
+ jmp .Ldt_diagnostics_return
+.Ldt_diagnostics_failed:
+ xor eax,eax
+.Ldt_diagnostics_return:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ldt_bound_final:
+ push rbx
+ sub rsp,32
+ mov rbx,rdi
+ lea rdi,[rbx+128]
+ mov rsi,[rbx+4224]
+ mov edx,4096
+ mov ecx,2000
+ xor r8d,r8d
+ mov r9,rsp
+ call pg_output_bound@PLT
+ test eax,eax
+ jnz .Ldt_bound_final_end
+ cmp qword ptr [rsp+16],0
+ je .Ldt_bound_final_end
+ mov rax,[rsp+8]
+ mov [rbx+4224],rax
+ mov rdi,rbx
+ call .Ldt_ensure_diagnostics
+ test rax,rax
+ jz .Ldt_bound_final_alloc
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ mov rdx,[rsp+24]
+ lea rcx,[rip+.Ldt_head_word]
+ call .Ldt_truncated
+ jmp .Ldt_bound_final_end
+.Ldt_bound_final_alloc:
+ mov eax,5
+.Ldt_bound_final_end:
+ add rsp,32
+ pop rbx
+ ret

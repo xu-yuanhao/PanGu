@@ -664,6 +664,9 @@
     "src/runtime/tool_execution.h": "native-source",
     "src/runtime/tool_execution.S": "native-source",
     "src/runtime/tool_live.S": "native-source",
-    "src/runtime/tool_live.h": "native-source"
+    "src/runtime/tool_live.h": "native-source",
+    "src/runtime/output_window.h": "native-source",
+    "src/runtime/output_window.S": "native-source",
+    "tools/runtime/test_output_window.py": "gate-test"
   }
 }

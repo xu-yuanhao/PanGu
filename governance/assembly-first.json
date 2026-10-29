@@ -350,6 +350,10 @@
     "src/runtime/tool_live.S": {
       "role": "assembly-core",
       "reason": "Durable嵌套工具Live状态和字段增量事务"
+    },
+    "src/runtime/output_window.S": {
+      "role": "assembly-core",
+      "reason": "Chord工具输出完整行/UTF-8 head与tail预算及丢弃计数"
     }
   }
 }

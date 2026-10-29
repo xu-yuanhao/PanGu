@@ -9,7 +9,7 @@ from build_pangu import implementation
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream', 'request_context')]
 PATH_SOURCES = [implementation('src/runtime/' + name) for name in ('tool_path', 'tool_path_posix')]
-DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'document_reader', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'task_graph', 'view_watch', 'conversation_view', 'durable_tool', 'nested_call', 'tool_live', 'durable_generation', 'durable_compaction', 'usage', 'compaction_hooks', 'agent_state', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'request_context', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
+DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'document_reader', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'task_graph', 'view_watch', 'conversation_view', 'durable_tool', 'nested_call', 'tool_live', 'output_window', 'durable_generation', 'durable_compaction', 'usage', 'compaction_hooks', 'agent_state', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'request_context', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
 PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
     'pipe2', 'fcntl', 'sigemptyset', 'sigaddset', 'sigaction', 'clock_gettime', 'read', 'waitid', 'waitpid', 'kill',
     'posix_spawn_file_actions_init', 'posix_spawnattr_init', 'posix_spawn_file_actions_addfchdir_np',
@@ -22,6 +22,7 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)
+        subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_output_window.py')], check=True)
         if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction','--live-auto-compaction','--live-overflow-compaction','--live-background-compaction','--live-compaction-retry','--live-compaction-race','--live-owned-compaction-race')):
             if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
                 raise SystemExit('Model API key required in the environment')
