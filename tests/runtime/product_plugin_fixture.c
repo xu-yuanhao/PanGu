@@ -71,7 +71,7 @@ static const pg_extension generation={"generation",0,0,0,0,0,0,generation_hooks,
 static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2,timing_hooks,2},broken={"broken",0,0,broken_sections,1,broken_wraps,1,0,0};
 static const pg_extension *extensions[]={&reviewer,&timing,&broken,&policy,&generation};
 static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&(!strcmp(extension,"broken")||!strcmp(extension,"policy")||!strcmp(extension,"generation")));if(error)(*(unsigned *)context)++;}
-static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,5,0,&hook_stats,report};
+static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,5,0,&hook_stats,report,0,0,0};
 static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"task.definitions",(void *)&provider)||pg_host_provide(host,owner,"extensions.registry",&registry);}
 static int stop(void *context){(void)context;if(active_tasks||pending_before||pending_after||pending_request||pending_response||pending_yield)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}
 static const char *const exports[]={"task.definitions","extensions.registry"};

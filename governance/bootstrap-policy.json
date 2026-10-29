@@ -650,6 +650,8 @@
     "src/runtime/agent_state.S": "native-source",
     "src/runtime/agent_state.h": "native-source",
     "src/runtime/extensions.S": "native-source",
-    "src/runtime/extensions.h": "native-source"
+    "src/runtime/extensions.h": "native-source",
+    "src/runtime/extension_registry.S": "native-source",
+    "src/runtime/extension_registry.h": "native-source"
   }
 }

@@ -9,6 +9,7 @@
 #include "../runtime/task_provider.h"
 #include "../runtime/agent_state.h"
 #include "../runtime/extensions.h"
+#include "../runtime/extension_registry.h"
 #include "../runtime/conversation_view.h"
 #include "../runtime/request_context.h"
 #include "../runtime/tool_provider.h"
@@ -79,6 +80,7 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools,leased_tools;
+ pg_extension_registry extension_registry;pg_extension_control extension_control;
  const pg_extensions *extensions;pg_extension_result model_extensions,tool_extensions;pg_extension_tools extension_tools;
  pg_tool_registry offered_tools,allowed_tools;
  pg_agent_tools_gate tool_gate;
@@ -300,7 +302,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(!selected||!executor||!executor->execute||!executor->authorize||pg_host_get(scope,owner,"session")!=&durable.session)return 1;
  if(selected->abi!=PG_MODEL_PROVIDER_ABI||selected->size!=sizeof(*selected)||!selected->identity||!*selected->identity||strlen(selected->identity)>63||!selected->configure||!selected->model.start||!selected->model.next||!selected->model.close)return 1;
  durable.model_metadata=pg_host_find(scope->parent,"model.metadata");if(durable.model_metadata&&(durable.model_metadata->abi!=PG_MODEL_METADATA_ABI||durable.model_metadata->size!=sizeof(pg_model_metadata)||!durable.model_metadata->describe))return 1;
- durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;durable.extensions=pg_host_find(scope->parent,"extensions.registry");
+ durable.model_provider=selected;durable.tool_provider=toolset;durable.selected_tools=*executor;durable.extensions=pg_host_find(scope->parent,"extensions.registry");if(pg_extension_registry_open(&durable.extension_registry,durable.extensions))return 1;durable.extensions=&durable.extension_registry.facade;pg_extension_registry_service(&durable.extension_registry,&durable.extension_control);
  pg_tools *files=pg_host_get(scope,owner,"files");if(!files)return 1;
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
@@ -333,16 +335,16 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
  foreground_agent_state=(pg_agent_state_ops){0,agent_state_read,agent_state_configure};
  conversation_view_binding=(pg_conversation_view_binding){&durable.session,&durable.tasks,0,0,0};pg_conversation_view_service(&conversation_view_binding,&foreground_conversation_view);pg_task_graph_service(&task_graph_binding,&durable.scheduler,&foreground_task_graph);pg_usage_service(&durable.session,&foreground_usage);pg_observation_service(&durable.session,&foreground_observation);
- return pg_host_provide(scope,owner,"agent.state",&foreground_agent_state)||pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
+ return pg_host_provide(scope,owner,"extensions.control",&durable.extension_control)||pg_host_provide(scope,owner,"agent.state",&foreground_agent_state)||pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
  (void)ctx;pg_conversation_view_close(&conversation_view_binding);pg_view_binding_close(&task_graph_binding);foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
- if(durable.tools_draining)return 1;pg_extensions_close(&durable.model_extensions);pg_extensions_close(&durable.tool_extensions);durable.extensions=0;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
+ if(durable.tools_draining)return 1;pg_extensions_close(&durable.model_extensions);pg_extensions_close(&durable.tool_extensions);if(pg_extension_registry_close(&durable.extension_registry))return 1;durable.extensions=0;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state","extensions.control"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
-static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,9,agent_start,agent_stop};
+static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,10,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},

@@ -322,6 +322,10 @@
     "src/runtime/extensions.S": {
       "role": "assembly-core",
       "reason": "Pi Extension选择/组合/wrapper与统一Task hook引擎，phase固定选择、临时请求/参数结果链及挂起取消"
+    },
+    "src/runtime/extension_registry.S": {
+      "role": "assembly-core",
+      "reason": "Pi Registry不可变快照安装/替换/撤销与原生代码所有者lease，发布及关闭状态机"
     }
   }
 }

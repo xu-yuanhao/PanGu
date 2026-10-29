@@ -456,7 +456,8 @@
         "conversation.view.local.v0",
         "task.provider.local.v0",
         "agent.state.local.v0",
-        "extensions.local.v0"
+        "extensions.local.v0",
+        "extension.registry.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2376,10 +2377,36 @@
         "pg_extension_hook_poll",
         "pg_extension_hook_close",
         "pg_extension_hook_resolve_open",
-        "pg_extension_hook_poll_event"
+        "pg_extension_hook_poll_event",
+        "pg_extensions_validate"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/{registry,agent,prompt}.ts"
+      ]
+    },
+    {
+      "id": "extension.registry.local.v0",
+      "sources": [
+        "src/runtime/extension_registry.S",
+        "src/runtime/extension_registry.h"
+      ],
+      "dependencies": [
+        "extensions.local.v0",
+        "json-c",
+        "system libc"
+      ],
+      "role": "Pi Registry immutable publication and native descriptor/code lifetime through retired snapshot leases",
+      "exports": [
+        "pg_extension_registry_open",
+        "pg_extension_registry_install",
+        "pg_extension_registry_remove",
+        "pg_extension_registry_close",
+        "pg_extension_registry_release",
+        "pg_extension_registry_describe",
+        "pg_extension_registry_service"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/registry.ts; Harness/Cordis scoped disposal"
       ]
     }
   ],

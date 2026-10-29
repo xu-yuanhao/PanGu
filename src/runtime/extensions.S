@@ -28,9 +28,14 @@ pg_extensions_close:
  call free@PLT
  mov rdi,[rbx+1200]
  call free@PLT
+ cmp qword ptr [rbx+1240],0
+ je .Lx_close_clear
+ mov rdi,[rbx+1232]
+ call [rbx+1240]
+.Lx_close_clear:
  mov rdi,rbx
  xor eax,eax
- mov ecx,154
+ mov ecx,156
  rep stosq
  pop rbx
  ret
@@ -321,9 +326,9 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],3
+ cmp dword ptr [rbx],4
  jne .Lx_validate_bad
- cmp dword ptr [rbx+4],48
+ cmp dword ptr [rbx+4],72
  jne .Lx_validate_bad
  cmp qword ptr [rbx+16],2147483646
  ja .Lx_validate_bad
@@ -482,8 +487,28 @@ pg_extensions_resolve:
  mov [rsp+1184],rsi
  mov rdi,rbx
  xor eax,eax
- mov ecx,154
+ mov ecx,156
  rep stosq
+ test r12,r12
+ jz .Lx_resolve_provider
+ cmp dword ptr [r12],4
+ jne .Lx_resolve_bad
+ cmp dword ptr [r12+4],72
+ jne .Lx_resolve_bad
+ cmp qword ptr [r12+56],0
+ je .Lx_resolve_provider
+ cmp qword ptr [r12+64],0
+ je .Lx_resolve_bad
+ mov rdi,[r12+48]
+ lea rsi,[rsp+1240]
+ lea rdx,[rbx+1232]
+ call [r12+56]
+ test eax,eax
+ jnz .Lx_resolve_bad
+ mov rax,[r12+64]
+ mov [rbx+1240],rax
+ mov r12,[rsp+1240]
+.Lx_resolve_provider:
  mov [rbx+1216],r12
  mov rdi,r12
  call .Lx_validate
@@ -1193,6 +1218,19 @@ pg_extension_hook_open:
  mov [r14],rax
  mov [rax],rbx
  mov [rax+52],r12d
+ mov rdi,rbx
+ mov esi,r12d
+ call .Lxh_has_event
+ test eax,eax
+ jnz .Lxh_open_copy
+ mov rdi,r13
+ call json_object_get@PLT
+ mov rdx,[r14]
+ mov [rdx+8],rax
+ xor eax,eax
+ jmp .Lxh_open_end
+.Lxh_open_copy:
+ mov rax,[r14]
  mov rdi,r13
  lea rsi,[rax+8]
  xor edx,edx
@@ -1521,7 +1559,7 @@ pg_extension_hook_resolve_open:
  mov [rsp+8],r9
  mov qword ptr [r9],0
  mov edi,1
- mov esi,1232
+ mov esi,1248
  call calloc@PLT
  mov rbp,rax
  test rax,rax
@@ -1579,12 +1617,23 @@ pg_extension_hook_poll_event:
  cmp dword ptr [rbx+48],0
  jne .Lxh_event_bad
  mov qword ptr [rsp],0
+ mov rdi,[rbx]
+ mov esi,r12d
+ call .Lxh_has_event
+ test eax,eax
+ jnz .Lxh_event_copy
+ mov rdi,r13
+ call json_object_get@PLT
+ mov [rsp],rax
+ jmp .Lxh_event_install
+.Lxh_event_copy:
  mov rdi,r13
  mov rsi,rsp
  xor edx,edx
  call json_object_deep_copy@PLT
  test eax,eax
  jnz .Lxh_event_release
+.Lxh_event_install:
  mov rdi,[rbx+8]
  call json_object_put@PLT
  mov rdi,[rbx+16]
@@ -1608,3 +1657,68 @@ pg_extension_hook_poll_event:
  mov eax,-5
 .Lxh_event_end:
  XE 32
+.text
+.Lxh_has_event:
+ mov rax,[rdi+1200]
+ mov r8,[rdi+1208]
+ xor ecx,ecx
+.Lxh_has_extension:
+ cmp rcx,r8
+ jae .Lxh_has_no
+ mov rdx,[rax+rcx*8]
+ mov r9,[rdx+56]
+ mov r10,[rdx+64]
+ xor r11d,r11d
+.Lxh_has_hook:
+ cmp r11,r10
+ jae .Lxh_has_next
+ mov rdi,r11
+ shl rdi,5
+ cmp esi,[r9+rdi]
+ je .Lxh_has_yes
+ inc r11
+ jmp .Lxh_has_hook
+.Lxh_has_next:
+ inc rcx
+ jmp .Lxh_has_extension
+.Lxh_has_yes:
+ mov eax,1
+ ret
+.Lxh_has_no:
+ xor eax,eax
+ ret
+
+.text
+/* Publication validates native tool contracts and schemas without executing
+   plugin callbacks. Resolution reuses the immutable published descriptors. */
+.globl pg_extensions_validate
+.type pg_extensions_validate,@function
+pg_extensions_validate:
+ XF 1200
+ mov rbx,rdi
+ call .Lx_validate
+ test eax,eax
+ jnz .Lx_validate_full_end
+ test rbx,rbx
+ jz .Lx_validate_full_end
+ xor r12d,r12d
+.Lx_validate_full_each:
+ cmp r12,[rbx+16]
+ jae .Lx_validate_full_ok
+ mov rax,[rbx+8]
+ mov rax,[rax+r12*8]
+ mov rsi,[rax+8]
+ mov rdx,[rax+16]
+ mov rdi,rsp
+ call pg_tool_registry_init@PLT
+ test eax,eax
+ jnz .Lx_validate_full_bad
+ inc r12
+ jmp .Lx_validate_full_each
+.Lx_validate_full_ok:
+ xor eax,eax
+ jmp .Lx_validate_full_end
+.Lx_validate_full_bad:
+ mov eax,5
+.Lx_validate_full_end:
+ XE 1200

@@ -1,7 +1,7 @@
 #ifndef PANGU_EXTENSIONS_H
 #define PANGU_EXTENSIONS_H
 #include "agent_state.h"
-/* Immutable descriptors/code live until every dependent Agent lease closes.
+/* Immutable descriptors/code are protected by their snapshot/Host lease.
    Callback output descriptors borrow immutable strings, contexts and callbacks
    from that same lease. render transfers an owned JSON string or NULL (omit).
    Callbacks are synchronous; nonzero errors are reported and skip the target. */
@@ -25,14 +25,17 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
    pending callback resources before its extension lease closes. */
 typedef struct {unsigned event,reserved;void *context;int (*poll)(void *,const struct json_object *,struct json_object **);void (*cancel)(void *,const struct json_object *);} pg_extension_hook;
 typedef struct {const char *name;const pg_tool_definition *tools;size_t tool_count;const pg_extension_section *sections;size_t section_count;const pg_extension_wrap *wraps;size_t wrap_count;const pg_extension_hook *hooks;size_t hook_count;} pg_extension;
-#define PG_EXTENSIONS_ABI 3u
-/* Host extensions.registry. defaults is an optional stable-name JSON array;
+#define PG_EXTENSIONS_ABI 4u
+/* Host extensions.registry. A facade acquire returns an immutable snapshot
+   and lease on success (0), none on failure; release drops that lease.
+   defaults is an optional stable-name JSON array;
    absent defaults select coding followed by all installed extensions. coding
    denotes the injected base coding-tool provider. */
-typedef struct {uint32_t abi,size;const pg_extension *const *entries;size_t count;const struct json_object *defaults;void *context;void (*report)(void *,const char *extension,const char *target,int);} pg_extensions;
-typedef struct {pg_tool_registry tools;pg_extension_section *sections;size_t section_count;const pg_extension **selected;size_t selected_count;const pg_extensions *provider;unsigned tools_changed,reserved;} pg_extension_result;
+typedef struct pg_extensions_tag {uint32_t abi,size;const pg_extension *const *entries;size_t count;const struct json_object *defaults;void *context;void (*report)(void *,const char *extension,const char *target,int);void *snapshot_context;int (*acquire)(void *,const struct pg_extensions_tag **,void **);void (*release)(void *);} pg_extensions;
+typedef struct {pg_tool_registry tools;pg_extension_section *sections;size_t section_count;const pg_extension **selected;size_t selected_count;const pg_extensions *provider;unsigned tools_changed,reserved;void *snapshot_lease;void (*snapshot_release)(void *);} pg_extension_result;
 /* Fresh/closed result; failure closes partial output. Native tool quota follows
    the existing registry. Name selection follows AgentState.extensions. */
+int pg_extensions_validate(const pg_extensions *);
 int pg_extensions_resolve(const pg_extensions *,const struct json_object *state,const pg_tool_registry *base,pg_extension_result *);
 void pg_extensions_close(pg_extension_result *);
 int pg_extension_hook_resolve_open(const pg_extensions *,const struct json_object *,const pg_tool_registry *,unsigned,const struct json_object *,void **);
