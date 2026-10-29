@@ -70,6 +70,13 @@ pg_agent_state_read:
 .globl pg_agent_state_stage
 .type pg_agent_state_stage,@function
 pg_agent_state_stage:
+ xor r8d,r8d
+ jmp .La_stage_entry
+.globl pg_agent_state_add_tools
+.type pg_agent_state_add_tools,@function
+pg_agent_state_add_tools:
+ mov r8d,1
+.La_stage_entry:
  AF 176
  mov rbx,rdi
  mov r12,rsi
@@ -79,15 +86,20 @@ pg_agent_state_stage:
  xor eax,eax
  mov ecx,22
  rep stosq
+ mov [rsp+168],r8d
  mov rdi,r13
  mov esi,4
+ add esi,r8d
  call json_object_is_type@PLT
  test eax,eax
  jz .La_stage_bad
+ cmp dword ptr [rsp+168],0
+ jne .La_stage_validated
  mov rdi,r13
  call .La_validate_text_fields
  test eax,eax
  jnz .La_stage_bad
+.La_stage_validated:
  mov rdi,r13
  call pg_document_value_valid@PLT
  test eax,eax
@@ -117,6 +129,15 @@ pg_agent_state_stage:
  call pg_document_change_snapshot@PLT
  test eax,eax
  jnz .La_stage_bad
+ cmp dword ptr [rsp+168],0
+ je .La_stage_replace_fields
+ mov rdi,[rsp+120]
+ mov rsi,r13
+ call .La_control_add
+ test eax,eax
+ jnz .La_stage_bad
+ jmp .La_stage_patch
+.La_stage_replace_fields:
  xor r12d,r12d
 .La_stage_field:
  lea rax,[rip+.La_fields]
@@ -739,3 +760,232 @@ pg_agent_tools_names:
  mov eax,5
 .La_names_end:
  AE 16
+
+.text
+/* Strict value equality preserves first occurrence in tool-name arrays. */
+.La_control_contains:
+ AF 0
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+.La_control_contains_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .La_control_contains_no
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .La_control_contains_end
+ inc r13
+ jmp .La_control_contains_each
+.La_control_contains_no:
+ xor eax,eax
+.La_control_contains_end:
+ AE 0
+/* mode 0 appends unique names, mode 1 removes named exclusions. */
+.La_control_names:
+ AF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r14d,edx
+ xor r13d,r13d
+.La_control_names_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .La_control_names_ok
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .La_control_names_bad
+ test r14d,r14d
+ jnz .La_control_names_remove
+ mov rdi,rbx
+ mov rsi,rbp
+ call .La_control_contains
+ test eax,eax
+ jnz .La_control_names_next
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .La_control_names_next
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ jmp .La_control_names_bad
+.La_control_names_remove:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ mov [rsp+8],rax
+.La_control_remove_each:
+ cmp qword ptr [rsp+8],0
+ je .La_control_names_next
+ dec qword ptr [rsp+8]
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,rbp
+ call json_object_equal@PLT
+ test eax,eax
+ jz .La_control_remove_each
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .La_control_names_bad
+ jmp .La_control_remove_each
+.La_control_names_next:
+ inc r13
+ jmp .La_control_names_each
+.La_control_names_ok:
+ xor eax,eax
+ jmp .La_control_names_end
+.La_control_names_bad:
+ mov eax,5
+.La_control_names_end:
+ AE 16
+.La_control_install:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .La_control_install_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,5
+.La_control_install_end:
+ pop rbx
+ ret
+/* tools and modelTools retain their array or add/remove representation. */
+.La_control_add:
+ AF 32
+ mov rbx,rdi
+ mov r12,rsi
+ xor r14d,r14d
+.La_control_field:
+ lea r13,[rip+.La_tools]
+ test r14d,r14d
+ jz .La_control_field_get
+ lea r13,[rip+.La_model_tools]
+.La_control_field_get:
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_object_get@PLT
+ mov rbp,rax
+ test rax,rax
+ jnz .La_control_field_type
+ test r14d,r14d
+ jz .La_control_field_next
+ call json_object_new_object@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .La_control_add_bad
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,rax
+ call .La_control_install
+ test eax,eax
+ jnz .La_control_add_end
+.La_control_field_type:
+ mov rdi,rbp
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .La_control_object
+ mov rdi,rbp
+ mov rsi,r12
+ xor edx,edx
+ call .La_control_names
+ test eax,eax
+ jnz .La_control_add_end
+ jmp .La_control_field_next
+.La_control_object:
+ mov rdi,rbp
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .La_control_add_bad
+ mov rdi,rbp
+ lea rsi,[rip+.La_remove]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .La_control_model_add
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .La_control_add_bad
+ mov rdi,[rsp]
+ mov rsi,r12
+ mov edx,1
+ call .La_control_names
+ test eax,eax
+ jnz .La_control_add_end
+ test r14d,r14d
+ jz .La_control_model_add
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .La_control_model_add
+ mov rdi,rbp
+ lea rsi,[rip+.La_remove]
+ call json_object_object_del@PLT
+.La_control_model_add:
+ test r14d,r14d
+ jz .La_control_field_next
+ mov rdi,rbp
+ lea rsi,[rip+.La_add]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jnz .La_control_add_array
+ call json_object_new_array@PLT
+ mov r13,rax
+ test rax,rax
+ jz .La_control_add_bad
+ mov rdi,rbp
+ lea rsi,[rip+.La_add]
+ mov rdx,rax
+ call .La_control_install
+ test eax,eax
+ jnz .La_control_add_end
+.La_control_add_array:
+ mov rdi,r13
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .La_control_add_bad
+ mov rdi,r13
+ mov rsi,r12
+ xor edx,edx
+ call .La_control_names
+ test eax,eax
+ jnz .La_control_add_end
+.La_control_field_next:
+ inc r14d
+ cmp r14d,2
+ jb .La_control_field
+ xor eax,eax
+ jmp .La_control_add_end
+.La_control_add_bad:
+ mov eax,5
+.La_control_add_end:
+ AE 32
+.section .rodata
+.La_add: .asciz "add"

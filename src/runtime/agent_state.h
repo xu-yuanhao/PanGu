@@ -6,6 +6,9 @@
    names; absent fields stay unchanged and JSON null removes a stored field.
    stage participates in the caller's Session transaction and borrows inputs. */
 int pg_agent_state_stage(pg_document_tx *,uint64_t,const struct json_object *,int (*mint)(void *,uint64_t *));
+/* Tool result addTools: append explicit selections, remove exclusions and
+   extend modelTools.add in the same Doc transaction. Names are borrowed. */
+int pg_agent_state_add_tools(pg_document_tx *,uint64_t,const struct json_object *,int (*mint)(void *,uint64_t *));
 int pg_agent_state_read(pg_durable_session *,uint64_t,struct json_object **);
 /* Mutation callbacks use adopted cache only; preload with read when opening
    each conversation, before admitting inputs or scheduling recovered work. */

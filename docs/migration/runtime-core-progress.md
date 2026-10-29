@@ -20,6 +20,7 @@
 | 跨块流窗口 | `output_window.S`保存清洗前raw margin及全流计数，head/tail逐块快照与固定Chord的220组流直接一致；Tool已替换旧拼接路径，释放与恢复沿调用级生命周期 |
 | 输出清洗与结果元数据 | `output_window.S`清理流窗口/事件控制字符，2464组上游预算/清洗对照；Tool诊断动态渲染支持7000字节，单调计时duration进入结果/嵌套返回/摘要 |
 | 工具输出预算 | `output_window.S`移植Chord完整行/UTF-8 head/tail；工具定义携带bytes/lines/retain，默认50KiB/2000行/head、bash tail；动态Tool缓冲、70KiB/零预算、累计丢弃/截断诊断和恢复通过 |
+| 工具结果控制 | `durable_tool.S`/`durable_generation.S`/`agent_state.S`：control随模型工具receipt提交，工具轮次合并addTools、最后handoff和全体terminate；工具选择、reset新head和final/postTools队列边界同事务，真实DeepSeek写入后直接结束，SQLite/JSONL增量配置回滚/重开通过 |
 | 工具最终结果 | `tools.S`/`durable_tool.S`：显式省略output采用报告窗口，零长度保持空结果；afterTool改写文本后去除旧窗口截断提示。返回时撤销执行API并固定duration，后置hook/close等待不计入执行耗时；实际省略/空/错误/替换与200ms hook专项通过 |
 | 工具输出API | `tool_execution.S`/`durable_tool.S`：output、retained_output、output_window接入同一调用级流，读取尚未持久刷新的独立快照，tail支持OutputSkip全流计数，head与执行生命周期拒绝边界；固定Chord 260组流及真实产品验证通过 |
 | 工具报告进度 | `tool_execution.S`公开details/diagnostic持久提交，模型/嵌套工具共用Live槽和观察；最终结果合并报告details/诊断，中断可恢复；Generation结算清理前轮模型工具槽 |

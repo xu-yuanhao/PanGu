@@ -2674,16 +2674,20 @@ pg_durable_context_order:
  push r12
  push r13
  push r14
- sub rsp,80
+ sub rsp,112
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
+ mov r14,rdx
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
  movdqu [rsp+32],xmm0
  movdqu [rsp+48],xmm0
  movdqu [rsp+64],xmm0
+ movdqu [rsp+80],xmm0
+ movdqu [rsp+96],xmm0
+ mov [rsp+72],r14
  mov rax,[rbx]
  mov rax,[rax]
  mov r14,[rax+64]
@@ -2699,17 +2703,108 @@ pg_durable_context_order:
  call pg_durable_inputs_prepare@PLT
  test eax,eax
  jnz .Lgg_handoff_end
+ mov rdi,rbx
+ mov rsi,r12
+ lea rdx,[rsp+80]
+ call .Lgg_round_controls
+ test eax,eax
+ jnz .Lgg_handoff_end
+ GGET "qword ptr [rsp+80]",add_tools
+ mov [rsp+104],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lgg_handoff_control_reset
+ mov rdi,[rsp+72]
+ mov rsi,[rsp+32]
+ mov rdx,[rsp+104]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rcx,[rax+32]
+ call pg_agent_state_add_tools@PLT
+ test eax,eax
+ jnz .Lgg_handoff_end
+.Lgg_handoff_control_reset:
+ GGET "qword ptr [rsp+80]",handoff_control
+ test rax,rax
+ jz .Lgg_handoff_boundary
+ mov [rsp+104],rax
+ lea rdi,[rip+.Lgg_control_reset_json]
+ call json_tokener_parse@PLT
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lgg_handoff_alloc
+ GGET rax,model
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_content]
+ mov rdx,[rsp+104]
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_handoff_end
+ mov rax,[rbx+8]
+ mov rax,[rax+8]
+ mov rdi,[rax]
+ call [rax+40]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lgg_timestamp]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_handoff_end
+ mov qword ptr [rsp+96],0
+ mov rdi,r12
+ mov rsi,[rsp+32]
+ mov rdx,[rsp+88]
+ mov rax,[rbx+8]
+ mov rcx,[rax+16]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ lea r9,[rsp+96]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lgg_handoff_end
+ GGET "qword ptr [rsp+96]",id
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_head]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_handoff_end
+.Lgg_handoff_boundary:
+ GGET "qword ptr [rsp+80]",terminate_control
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov [rsp+104],eax
+ xor r8d,r8d
+ test eax,eax
+ jz .Lgg_handoff_apply
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",state
+ GGET rax,checkpoint
+ GGET rax,assistant
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r8,rax
+.Lgg_handoff_apply:
  mov rdi,r14
  mov rsi,r12
  mov rdx,[rsp]
- xor ecx,ecx
- xor r8d,r8d
+ mov ecx,[rsp+104]
  lea r9,[rsp+16]
  call pg_durable_inputs_apply@PLT
  test eax,eax
  jnz .Lgg_handoff_end
+ cmp dword ptr [rsp+104],0
+ jne .Lgg_handoff_selected_users
  cmp dword ptr [rsp+24],0
  je .Lgg_handoff_start
+.Lgg_handoff_selected_users:
  mov rdi,[rsp+16]
  call json_object_array_length@PLT
  test rax,rax
@@ -2757,8 +2852,14 @@ pg_durable_context_order:
  call json_object_put@PLT
  mov rdi,[rsp+48]
  call json_object_put@PLT
+ mov rdi,[rsp+80]
+ call json_object_put@PLT
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
  mov eax,ebp
- add rsp,80
+ add rsp,112
  pop r14
  pop r13
  pop r12
@@ -5728,3 +5829,185 @@ pg_durable_generation_bind_hooks:
 pg_durable_generation_bind_prepare:
  mov [rdi+312],rsi
  ret
+
+.text
+/* Read all tool outcomes before any round mutation, preserving call order. */
+.Lgg_round_controls:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r13],0
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ mov dword ptr [rsp+56],1
+ lea rdi,[rip+.Lgg_controls_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_controls_alloc
+ mov rax,[rbx+8]
+ GGET "qword ptr [rax+32]",state
+ GGET rax,checkpoint
+ GGET rax,tools_key
+ mov [rsp+8],rax
+ xor r14d,r14d
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .Lgg_controls_each
+ mov dword ptr [rsp+56],0
+.Lgg_controls_each:
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lgg_controls_done
+ mov rdi,[rsp+8]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rdi,r12
+ mov esi,2
+ lea rcx,[rsp+16]
+ call pg_record_tx_read@PLT
+ test eax,eax
+ jnz .Lgg_controls_end
+ GGET "qword ptr [rsp+16]",state
+ GGET rax,outcome
+ mov [rsp+24],rax
+ GGET rax,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_control_completed]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_controls_nonterminating
+ GGET "qword ptr [rsp+24]",result
+ mov [rsp+24],rax
+ GGET rax,control
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lgg_controls_nonterminating
+ GGET rax,terminate_control
+ mov rdi,rax
+ mov esi,1
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_controls_keep_running
+ GGET "qword ptr [rsp+32]",terminate_control
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lgg_controls_add
+.Lgg_controls_keep_running:
+ mov dword ptr [rsp+56],0
+.Lgg_controls_add:
+ GGET "qword ptr [rsp+32]",add_tools
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lgg_controls_handoff
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_controls_invalid
+ mov qword ptr [rsp+48],0
+.Lgg_controls_add_each:
+ mov rdi,[rsp+40]
+ call json_object_array_length@PLT
+ cmp [rsp+48],rax
+ jae .Lgg_controls_handoff
+ mov rdi,[rsp+40]
+ mov rsi,[rsp+48]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rbp,rax
+ GGET "qword ptr [rsp]",add_tools
+ mov rdi,rax
+ mov rsi,rbp
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lgg_controls_added
+ mov rdi,rbp
+ call json_object_put@PLT
+ jmp .Lgg_controls_alloc
+.Lgg_controls_added:
+ inc qword ptr [rsp+48]
+ jmp .Lgg_controls_add_each
+.Lgg_controls_handoff:
+ GGET "qword ptr [rsp+32]",handoff_control
+ test rax,rax
+ jz .Lgg_controls_next
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgg_controls_invalid
+ GGET "qword ptr [rsp+32]",handoff_control
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_handoff_control]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_controls_end
+ jmp .Lgg_controls_next
+.Lgg_controls_nonterminating:
+ mov dword ptr [rsp+56],0
+.Lgg_controls_next:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ inc r14
+ jmp .Lgg_controls_each
+.Lgg_controls_done:
+ mov edi,[rsp+56]
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgg_terminate_control]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_controls_end
+ mov rax,[rsp]
+ mov [r13],rax
+ mov qword ptr [rsp],0
+ xor eax,eax
+ jmp .Lgg_controls_end
+.Lgg_controls_invalid:
+ mov eax,4
+ jmp .Lgg_controls_end
+.Lgg_controls_alloc:
+ mov eax,5
+.Lgg_controls_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_control: .asciz "control"
+.Lgg_add_tools: .asciz "addTools"
+.Lgg_handoff_control: .asciz "handoff"
+.Lgg_terminate_control: .asciz "terminate"
+.Lgg_control_completed: .asciz "completed"
+.Lgg_controls_json: .asciz "{\"terminate\":true,\"addTools\":[]}"
+.Lgg_control_reset_json: .asciz "{\"kind\":\"pangu.reset\",\"head\":\"self\",\"model\":[{\"role\":\"user\",\"content\":\"\",\"timestamp\":0}]}"

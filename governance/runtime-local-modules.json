@@ -1824,7 +1824,8 @@
         "system libc POSIX regex",
         "usage.local.v0",
         "conversation.view.local.v0",
-        "tool.live.local.v0"
+        "tool.live.local.v0",
+        "agent.state.local.v0"
       ],
       "role": "Native Generation/Tool/Client, Compaction and Submission/Inbox behavior: owned threshold compaction with atomic summary placement, durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions. Coordinated built-in Harness Generation/Inputs/Compaction: measured context threshold, owned blocking child/wait, direct summary Entry and resumed preparation.",
       "exports": [
@@ -2365,7 +2366,8 @@
         "pg_agent_tool_allowed",
         "pg_agent_state_peek",
         "pg_agent_tools_service",
-        "pg_agent_tools_names"
+        "pg_agent_tools_names",
+        "pg_agent_state_add_tools"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/agent.ts"

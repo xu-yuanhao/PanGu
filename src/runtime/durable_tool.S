@@ -755,6 +755,14 @@ pg_durable_tool_init:
  DGET "qword ptr [rsp+8]",id
  mov r14,rax
  DREF rbp,entry_id,r14
+ cmp dword ptr [rbx+168],0
+ jne .Ldt_stage_transfer
+ mov rdi,rbp
+ mov rsi,[rbx+184]
+ lea rdx,[rip+.Ldt_control]
+ call .Ldt_copy_optional
+ test eax,eax
+ jnz .Ldt_stage_end
 .Ldt_stage_transfer:
  mov rax,[rsp+16]
  mov [r13],rax
@@ -3401,3 +3409,6 @@ pg_durable_tool_output_window:
 .Ldt_reported_warning_end:
  pop rbx
  ret
+
+.section .rodata
+.Ldt_control: .asciz "control"

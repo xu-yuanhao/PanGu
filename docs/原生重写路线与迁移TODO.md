@@ -172,6 +172,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Chord流文本清洗接入Live窗口和输出事件，保留制表/换行及普通Unicode；诊断渲染按实际长度分配，7000字节诊断进入最终模型文本。单调时钟durationMs写入结果/嵌套返回/摘要，2464组固定上游对照和产品场景通过。
 - [x] 原生流buffer保留清洗前原始margin、累计字节/换行与末尾状态；head在窗口固定后只计数，tail快照保留上游所需的前一字符/换行。Tool已原位替换旧窗口拼接；220组逐块快照直接对照、实际大输出/清洗/恢复/取消通过。
 - [x] 工具调用API接入output、retainedOutput和outputWindow：报告与异步OUTPUT共用调用级buffer/节流/事件，owned快照含尚未刷新的输出，tail接受OutputSkip并保留全流计数；head拒绝skip，执行前/释放后拒绝访问。固定Chord 260组多块快照对照、实际工具/中断/清洗/跳过输出、原生ABI和真实模型工作流通过。最终OK/ERROR可显式省略output并采用报告窗口，显式空输出保持独立；afterTool改写文本时去掉原窗口截断提示。工具返回后撤销执行API，duration在返回时固定，200ms后置hook等待不计入执行时间。
+- [x] ToolControl接入真实Generation工具轮次：模型工具终态receipt保存control，Generation按调用顺序归并addTools、最后一个handoff与全体terminate；配置增量、上下文reset和队列边界同事务提交。数组/排除表/未设置选择、去重、终止true/false/混合与取消结果、最后handoff和终止后不建后继通过；两后端工具选择回滚/重开、真实DeepSeek写文件后直接结束通过。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -282,8 +283,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Durable `tool.ts` run/finalResult与afterTool结果消费者，`harness-tools.test.ts` 的reported output、截断和显式结果用例；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：原生工具最终OK/ERROR以PG_TOOL_OUTPUT_REPORTED表示省略output，registry保留该状态，Durable在afterTool前读取最新报告窗口作为结果；零长度仍是显式空文本。报告窗口截断量在afterTool之后追加诊断，文本被hook改写时清除原窗口截断提示；最终文本继续按既有预算处理。返回时固定单调执行终点并撤销执行API，后置hook、资源close等待和重复结算不再增长执行耗时。
-- 验证：产品 `test_product_resources.py --native-tasks --sanitize` 通过：省略输出/显式空输出/错误结果、跳过输出的截断诊断、hook替换后去除旧截断提示、afterTool期间output/retained/start/details拒绝访问；200ms后置hook用例验证执行duration不包含等待。Runtime整批通过；随后权限收紧由上述专项复验，产品构建与Assembly检查通过。
-- 接口与自审：工具函数表尺寸保持；tools.h为最终OK/ERROR定义SIZE_MAX输出省略标记，WAIT/OUTPUT仍要求实际长度，旧零长度含义保持。Tool私有400字节，保存报告截断量与结束时间；快照owned text在复制后释放，hook结果替换按原生文本值比较，truncate诊断只追加一次。源码、构建与既有登记一致。
-- 剩余与下一交付物：完整工具行为保持未勾选。继续成组完成structuredOutput schema与结果control/摘要消费者、异常Task自身Live最终化；进度仍需实际写入后缀/元数据字节计量及统一details/diagnostic调度语义。原生结果目前以文本表达，空Content与多内容块的完整映射仍随结果协议补齐。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Durable `tool.ts` settle、`generation.ts` finishToolRound、`agent.ts` addTools及 `harness-tools.test.ts` 的全部终止/混合结果/工具增量场景；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：afterTool结果的control进入模型工具Task receipt；Generation完成整轮后先读取全部Task终态，按调用顺序合并工具名、选择最后handoff，全部completed结果均terminate=true才走final边界。addTools按已有tools/modelTools的数组或add/remove形式追加/解除排除；handoff写PanGu reset与用户消息，先更新边界head，再复用现有Submission final/postTools事务决定结束或创建后继。配置、reset、队列与Generation终态原子提交；嵌套结果不输出control。
+- 验证：产品 `test_product_resources.py --native-tasks --sanitize` 七组控制轮次通过：终止true/false/混合、取消工具不终止、去重与数组/排除表/未设置选择、最后handoff及terminate同时handoff、后继数量与终态。Runtime整批通过，包含SQLite/JSONL工具选择增量、回滚和重开；随后handoff借用槽/owned Entry槽分离由产品专项复验。真实DeepSeek `--live-agent --sanitize` 调用write落盘后由terminate结束，最后Entry为tool-result，无额外assistant；产品构建与Assembly检查通过。
+- 接口与自审：新增pg_agent_state_add_tools，使用既有Document事务/差异提交与C ABI，字段尺寸保持；Generation增加agent.state实际模块依赖，导出同步登记。先读所有Task/prepare再写，handoff reset的head使用实际新Entry ID；输入计划与owned JSON逐项释放，原生嵌套调用保持独立receipt；排除独立安装目录 `claude/` 的登记文件候选镜像G00通过。
+- 剩余与下一交付物：完整工具行为保持未勾选。下一组完成structuredOutput schema与完整结果/错误摘要、异常Task自身Live最终化；工具进度仍需实际写入后缀/元数据字节计量及统一details/diagnostic调度语义。空Content与多内容块的完整映射随结果协议补齐。
