@@ -2468,7 +2468,8 @@
         "pg_task_access_get_task",
         "pg_task_access_snapshot",
         "pg_task_access_snapshot_as_of",
-        "pg_task_scheduler_find"
+        "pg_task_scheduler_find",
+        "pg_task_access_create_task"
       ],
       "reference_basis": [
         "Pi d5b3de22 scheduler.ts runtime memo/read; harness-tasks.test.ts"

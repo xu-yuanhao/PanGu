@@ -447,3 +447,102 @@ pg_task_access_snapshot_as_of:
 .Lsnapshot_as_closed:
  mov eax,14
  AE 32
+
+.text
+.globl pg_task_access_create_task
+.type pg_task_access_create_task,@function
+pg_task_access_create_task:
+ AF 112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov [rsp+80],r8
+ mov [rsp+88],r9
+ mov qword ptr [r9],0
+ call .Laccess_valid
+ mov ebp,7
+ test eax,eax
+ jz .Lchild_end
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov [rsp],r12
+ mov [rsp+8],r13
+ mov [rsp+16],r14
+ mov rax,[r12+24]
+ mov [rsp+24],rax
+ mov rax,[r12+32]
+ mov [rsp+32],rax
+ mov rax,[rsp+80]
+ mov [rsp+40],rax
+ mov rax,[rbx+32]
+ mov [rsp+56],rax
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rip+.Lchild_stage]
+ call pg_task_runner_commit_with@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lchild_end
+ mov rax,[rsp+88]
+ mov rdx,[rsp+72]
+ mov [rax],rdx
+.Lchild_end:
+ mov eax,ebp
+ AE 112
+.Lchild_stage:
+ AF 32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rcx
+ mov qword ptr [r13],0
+ mov qword ptr [rsp],0
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lchild_bad
+ mov r14,[rbx]
+ mov rdi,[r14]
+ mov esi,[r14+8]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Lchild_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lchild_name]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lchild_bad
+ mov rdi,[r14+16]
+ call json_object_new_uint64@PLT
+ test rax,rax
+ jz .Lchild_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lchild_version]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lchild_bad
+ mov rdi,r12
+ mov rsi,[rsp]
+ mov rdx,[rbx+8]
+ mov rcx,[rbx+16]
+ lea r8,[rbx+24]
+ lea r9,[rbx+72]
+ call pg_record_tx_create_task@PLT
+ test eax,eax
+ jnz .Lchild_bad
+ xor ebp,ebp
+ jmp .Lchild_stage_end
+.Lchild_bad:
+ mov ebp,4
+.Lchild_stage_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ AE 32
+.section .rodata
+.Lchild_name: .asciz "name"
+.Lchild_version: .asciz "version"

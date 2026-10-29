@@ -16,5 +16,10 @@ int pg_task_access_memo(const pg_task_access *,pg_slice,const struct json_object
 int pg_task_access_get_task(const pg_task_access *,uint64_t,struct json_object **);
 int pg_task_access_snapshot(const pg_task_access *,const pg_document_definition *,const pg_document_address *,struct json_object **);
 int pg_task_access_snapshot_as_of(const pg_task_access *,const pg_document_definition *,const pg_document_address *,uint64_t,struct json_object **);
+/* Commit child creation on the parent's guarded mutation line. Creation's
+   conversation defaults to this capability; ownership options remain explicit.
+   Success transfers the durable ID; failed admission clears it. */
+int pg_task_access_create_task(const pg_task_access *,const pg_task_definition *,
+ const struct json_object *input,const struct json_object *options,int (*mint)(void *,uint64_t *),uint64_t *);
 pg_task_runner *pg_task_scheduler_find(pg_task_scheduler *,uint64_t);
 #endif

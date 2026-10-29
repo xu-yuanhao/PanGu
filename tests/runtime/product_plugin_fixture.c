@@ -18,8 +18,9 @@ static int poll_task(void *context,pg_task_runner *runner,const struct json_obje
  struct json_object *next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":\"EXTENSION_TASK_DONE\"}}");
  if(!next)return -5;int result=pg_task_runner_commit(runner,next);json_object_put(next);return result?-(int)result:0;
 }
+static int child_abort(void *context,pg_task_runner *runner,const json_object *record){(void)context;(void)record;json_object *next=json_tokener_parse("{\"status\":\"terminal\",\"outcome\":{\"status\":\"aborted\"}}");assert(next);int result=pg_task_runner_commit(runner,next);json_object_put(next);return result?-(int)result:0;}
 static const pg_task_phase phases[]={{{"work",4},0,poll_task,cleanup}};
-static const pg_task_definition definition={.name={"example.work",12},.version=1,.initial=initial,.phases=phases,.phase_count=1};
+static const pg_task_definition definition={.name={"example.work",12},.version=1,.initial=initial,.phases=phases,.phase_count=1,.abort=child_abort,.abort_cleanup=cleanup};
 static const pg_task_definition *definitions[]={&definition};
 static int allow(void *context,pg_slice arguments){(void)context;(void)arguments;return 1;}
 static int echo(void *context,pg_slice arguments,char *out,size_t capacity,size_t *size){(void)context;(void)arguments;const char *text="EXTENSION_TOOL_RESULT";*size=strlen(text);if(*size>=capacity){*size=0;return PG_TOOL_ERROR;}memcpy(out,text,*size+1);return PG_TOOL_OK;}
