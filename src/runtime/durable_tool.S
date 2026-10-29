@@ -531,6 +531,18 @@ pg_durable_tool_init:
  call .Ldt_set
  test eax,eax
  jnz .Ldt_stage_end
+ cmp qword ptr [rbx+136],0
+ jne .Ldt_stage_content_ready
+ test dword ptr [rbx+372],2
+ jz .Ldt_stage_content_ready
+ DGET r14,content
+ mov rdi,rax
+ xor esi,esi
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Ldt_stage_alloc
+.Ldt_stage_content_ready:
  DGET "qword ptr [rsp]",data
  mov rbp,rax
  DREF rbp,arguments,"qword ptr [rbx+24]"
@@ -805,6 +817,11 @@ pg_durable_tool_init:
  call .Ldt_copy_optional
  test eax,eax
  jnz .Ldt_stage_end
+ mov rdi,rbx
+ mov rsi,rbp
+ call .Ldt_error_summary
+ test eax,eax
+ jnz .Ldt_stage_end
  mov rdi,[rsp+48]
  mov rsi,[rsp+24]
  mov rax,[rbx+8]
@@ -823,6 +840,23 @@ pg_durable_tool_init:
  call .Ldt_nested_metadata
  test eax,eax
  jnz .Ldt_stage_end
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_structured_output]
+ lea rdx,[rsp+40]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Ldt_nested_output_ready
+ mov rdi,[rbx+128]
+ mov esi,[rbx+136]
+ call json_object_new_string_len@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_structured_output]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+.Ldt_nested_output_ready:
+ mov qword ptr [rsp+40],0
  mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",input
  mov rbp,rax
@@ -3363,7 +3397,7 @@ pg_durable_tool_output_window:
  mov [rbx+376],rax
  mov rax,[rsp+24]
  mov [rbx+384],rax
- mov dword ptr [rbx+372],1
+ mov dword ptr [rbx+372],3
  xor eax,eax
  jmp .Ldt_reported_release
 .Ldt_reported_bad:
@@ -3381,8 +3415,8 @@ pg_durable_tool_output_window:
 .Ldt_reported_warning:
  push rbx
  mov rbx,rdi
- cmp dword ptr [rbx+372],0
- je .Ldt_reported_warning_ok
+ test dword ptr [rbx+372],1
+ jz .Ldt_reported_warning_ok
  cmp qword ptr [rbx+376],0
  je .Ldt_reported_warning_done
  call .Ldt_ensure_diagnostics
@@ -3400,7 +3434,7 @@ pg_durable_tool_output_window:
  test eax,eax
  jnz .Ldt_reported_warning_end
 .Ldt_reported_warning_done:
- mov dword ptr [rbx+372],0
+ and dword ptr [rbx+372],-2
 .Ldt_reported_warning_ok:
  xor eax,eax
  jmp .Ldt_reported_warning_end
@@ -3412,3 +3446,149 @@ pg_durable_tool_output_window:
 
 .section .rodata
 .Ldt_control: .asciz "control"
+
+.text
+/* Native strings retain a scalar boundary within the 500 UTF-16-unit bound. */
+.Ldt_summary_append:
+ mov r8,[rdi+2000]
+ mov r9,[rdi+2008]
+ xor ecx,ecx
+ cmp dword ptr [rdi+2048],0
+ jne .Ldt_summary_append_end
+.Ldt_summary_append_each:
+ cmp rcx,rdx
+ jae .Ldt_summary_append_end
+ movzx eax,byte ptr [rsi+rcx]
+ mov r10d,1
+ mov r11d,1
+ cmp eax,128
+ jb .Ldt_summary_append_width
+ inc r10d
+ cmp eax,224
+ jb .Ldt_summary_append_width
+ inc r10d
+ cmp eax,240
+ jb .Ldt_summary_append_width
+ inc r10d
+ inc r11d
+.Ldt_summary_append_width:
+ lea rax,[rcx+r10]
+ cmp rax,rdx
+ ja .Ldt_summary_append_stop
+ lea rax,[r9+r11]
+ cmp rax,500
+ ja .Ldt_summary_append_stop
+ add r9,r11
+.Ldt_summary_append_copy:
+ mov al,[rsi+rcx]
+ mov [rdi+r8],al
+ inc rcx
+ inc r8
+ dec r10d
+ jnz .Ldt_summary_append_copy
+ jmp .Ldt_summary_append_each
+.Ldt_summary_append_stop:
+ mov dword ptr [rdi+2048],1
+.Ldt_summary_append_end:
+ mov [rdi+2000],r8
+ mov [rdi+2008],r9
+ ret
+/* Keep bounded error text in the done slot without retaining a large result. */
+.Ldt_error_summary:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,2064
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp+2000],0
+ mov qword ptr [rsp+2008],0
+ mov dword ptr [rsp+2016],0
+ mov dword ptr [rsp+2048],0
+ cmp dword ptr [rbx+164],0
+ je .Ldt_summary_ok
+ DGET "qword ptr [rbx+184]",diagnostics
+ mov r13,rax
+ xor r14d,r14d
+.Ldt_summary_diagnostic_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_summary_fallback
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ DGET rax,severity
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldt_summary_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_error]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_summary_next
+ cmp dword ptr [rsp+2016],0
+ je .Ldt_summary_message
+ mov rdi,rsp
+ lea rsi,[rip+.Ldt_summary_newline]
+ mov edx,1
+ call .Ldt_summary_append
+.Ldt_summary_message:
+ mov dword ptr [rsp+2016],1
+ DGET rbp,message
+ mov rbp,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+2024],rax
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rdi,rsp
+ mov rsi,rax
+ mov rdx,[rsp+2024]
+ call .Ldt_summary_append
+ cmp dword ptr [rsp+2048],0
+ jne .Ldt_summary_install
+ cmp qword ptr [rsp+2008],500
+ jae .Ldt_summary_install
+.Ldt_summary_next:
+ inc r14
+ jmp .Ldt_summary_diagnostic_each
+.Ldt_summary_fallback:
+ cmp dword ptr [rsp+2016],0
+ jne .Ldt_summary_install
+ mov rdi,rsp
+ mov rsi,[rbx+128]
+ mov rdx,[rbx+136]
+ call .Ldt_summary_append
+.Ldt_summary_install:
+ cmp qword ptr [rsp+2000],0
+ je .Ldt_summary_ok
+ mov rdi,rsp
+ mov esi,[rsp+2000]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ldt_summary_alloc
+ mov rdi,r12
+ lea rsi,[rip+.Ldt_error]
+ mov rdx,rax
+ call .Ldt_set
+ jmp .Ldt_summary_end
+.Ldt_summary_ok:
+ xor eax,eax
+ jmp .Ldt_summary_end
+.Ldt_summary_alloc:
+ mov eax,5
+.Ldt_summary_end:
+ add rsp,2064
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_summary_newline: .ascii "\n"
