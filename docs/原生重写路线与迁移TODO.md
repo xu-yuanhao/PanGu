@@ -175,6 +175,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] ToolControl接入真实Generation工具轮次：模型工具终态receipt保存control，Generation按调用顺序归并addTools、最后一个handoff与全体terminate；配置增量、上下文reset和队列边界同事务提交。数组/排除表/未设置选择、去重、终止true/false/混合与取消结果、最后handoff和终止后不建后继通过；两后端工具选择回滚/重开、真实DeepSeek写文件后直接结束通过。
 - [x] Live文本更新采用追加或有界重叠后的裁头/追加，操作量供Tool进度按原生Op payload计费；details/diagnostic确认提交后更新同一输出暂停期限。模型/嵌套槽的10KB追加、Unicode尾窗口、无变化零提交、计量和原有暂停/取消场景通过，保持同步元数据API。
 - [x] 结构化工具结果接入固定调用声明与外部Draft-7强类型校验：bash声明、嵌套合法/缺失/不匹配结果、错误文本诊断与模型非致命报告进入真实链；DSO ABI同步更新，产品ASan/UBSan及组合/$ref/regex/数组/null专项通过。完整TypeBox差异和定义前置准入见交接区。
+- [x] afterTool多内容块结果接入预算、Entry、嵌套返回和错误摘要：text/image数组无截断保序，整体text裁切时只合并保留位置的文本并保留图片；程序值不含渲染诊断，空/单text/单image/多块、head/tail与错误摘要产品ASan/UBSan场景通过。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -285,8 +286,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tool.ts` structuredOutputError/finalResult，`tools/bash.ts` shellStructuredOutputSchema及嵌套结果消费者。原生验证桥接采用Valijson `af2383509277f8e8051acbb3e4b3060f4779aa10`、nlohmann/json `55f93686c01528224f448c19128836e7df245f72`；Harness保持固定快照。
-- 实际调用链：工具声明的output_limits携带可选structured_output_schema，组合器按调用级固定工具快照解析；Tool在execute效果前通过C ABI编译契约，afterTool之后复用契约进行强类型验证。嵌套调用的无声明/缺失/不匹配结果删除结构化值并追加invalid_structured_output、标记isError；模型调用保留文本结果并通过非致命报告通知宿主。schema工具错误结果可省略结构化值，缺error诊断时补充输出文本；已声明但无结构化值的嵌套返回保留内部标志，查询不会错误回退文本。bash接入自身声明。
-- 验证：产品 `--native-tasks --sanitize` 最终复验通过合法值、类型不符、缺失值、错误文本补诊断及既有恢复/控制场景；Draft-7组合/$ref/regex/数组约束、无效JSON定义拒绝、null值与模型无声明非致命报告均通过。效果前无效Schema专项确认execute计数不变、faulted终态和完整实例/租约释放，合法调用按调用级编译一次。Runtime整批日志完成且无失败；产品构建及构建缓存入口复验通过。G00登记候选镜像（排除独立安装目录claude）、Assembly、7项语言门禁自测与17项文件准入自测通过。
-- 接口与自审：工具定义/注册表尺寸保持；pg_tool_output_limits扩展schema指针，Tool Host追加声明解析及非致命报告回调，Tool私有416字节保存compiled contract与一次性结算标记；provider ABI=4、extensions ABI=10同步到汇编校验/注册表与DSO夹具。C++仅桥接外部Schema库和异常/所有权，Agent结果策略仍用汇编。构建从固定URL按SHA256取得头文件到用户缓存，编译对象按源码/头/编译器/选项缓存；许可证见schema-libraries。外部Schema无网络fetcher。
-- 剩余与下一交付物：完整工具行为保持未勾选。Draft-7验证桥接与Pi TypeBox错误文字/格式规则的差异仍需对应语料核对，契约已在execute前编译并随调用释放；无效定义产品专项验证没有执行效果。跨调用编译缓存及完整TypeBox语料差异继续核对。随后补齐多内容块结果、异常Task自身Live最终化及统一异步details/diagnostic调度语义。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tool.ts` boundContent/outputValue/finalResult/errorTextOf、`harness-tools.test.ts` explicit content及 `harness-nested-tools.test.ts` mixed image/error summary场景，Harness保持固定快照。
+- 实际调用链：afterTool允许文本或Content数组。Tool独立持有已验证text/image数组，聚合text后复用原有完整行/UTF-8总预算；无截断保留每块，截断时保留head第一块或tail最后块承载裁切文本，其余图片顺序保持。Entry在诊断渲染前复制实际Content；嵌套默认返回空字符串、单text字符串、单image对象或完整数组，diagnostics独立。错误摘要对多个text用换行连接。
+- 验证：产品ASan/UBSan六组混合结果通过（普通混合、tail截断、单图片、空数组、head截断、多text错误摘要），Runtime整批通过；产品构建、Assembly检查通过。原有结构化Schema、工具控制、取消/重开场景仍由同一产品专项覆盖。
+- 接口与自审：afterTool结果output扩展为string或Content数组，工具定义/Host公共布局保持；Tool私有432字节保存owned数组。原地保留一条结果链，图片数据/MIME和文本类型检查在采纳前完成；文本预算、Schema与诊断在同一结算路径，释放数组先于调用销毁。图片最终模型传输/资源处理的完整范围仍属于K05/K08。
+- 剩余与下一交付物：完整工具行为保持未勾选。继续将Content结果接通完整模型图片协议和工具资源消费者，核对TypeBox语料差异；异常Task自身Live最终化及统一异步details/diagnostic调度语义继续保留。当前afterTool内部兼容已有文本结果入口，多内容块用户行为由新增数组路径提供。

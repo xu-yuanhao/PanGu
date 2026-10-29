@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,416
+ mov esi,432
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -441,6 +441,8 @@ pg_durable_tool_init:
  call free@PLT
  mov rdi,[r12+400]
  call pg_json_schema_close@PLT
+ mov rdi,[r12+416]
+ call json_object_put@PLT
  mov rdi,r12
  call free@PLT
  mov qword ptr [rbx+56],0
@@ -545,6 +547,22 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_stage_alloc
 .Ldt_stage_content_ready:
+ cmp qword ptr [rbx+416],0
+ je .Ldt_content_staged
+ mov rdi,[rbx+416]
+ lea rsi,[rsp+40]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldt_stage_alloc
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_content]
+ mov rdx,[rsp+40]
+ mov qword ptr [rsp+40],0
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+.Ldt_content_staged:
  DGET "qword ptr [rsp]",data
  mov rbp,rax
  DREF rbp,arguments,"qword ptr [rbx+24]"
@@ -850,9 +868,8 @@ pg_durable_tool_init:
  jnz .Ldt_nested_output_ready
  cmp qword ptr [rbx+400],0
  jne .Ldt_nested_schema_marker
- mov rdi,[rbx+128]
- mov esi,[rbx+136]
- call json_object_new_string_len@PLT
+ mov rdi,rbx
+ call .Ldt_content_value
  mov rdi,r14
  lea rsi,[rip+.Ldt_structured_output]
  mov rdx,rax
@@ -2062,6 +2079,22 @@ pg_durable_tool_bind_hooks:
  DGET "qword ptr [rsp+16]",hook_output
  mov [rsp+24],rax
  mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_hooks_string_output
+ mov rdi,r13
+ mov rsi,[rsp+24]
+ call .Ldt_content_accept
+ test eax,eax
+ jnz .Ldt_hooks_bad
+ mov dword ptr [r13+372],0
+ jmp .Ldt_hooks_content_metadata
+.Ldt_hooks_string_output:
+ mov rdi,[r13+416]
+ call json_object_put@PLT
+ mov qword ptr [r13+416],0
+ mov rdi,[rsp+24]
  mov esi,6
  call json_object_is_type@PLT
  test eax,eax
@@ -2114,6 +2147,7 @@ pg_durable_tool_bind_hooks:
  call memcpy@PLT
  mov rax,[rsp+32]
  mov [r13+136],rax
+.Ldt_hooks_content_metadata:
  DGET "qword ptr [rsp+16]",is_error
  mov rdi,rax
  call json_object_get_boolean@PLT
@@ -2953,6 +2987,10 @@ pg_durable_tool_executing:
  mov rax,[rsp+8]
  mov [rbx+136],rax
  mov rdi,rbx
+ call .Ldt_content_trim
+ test eax,eax
+ jnz .Ldt_bound_final_end
+ mov rdi,rbx
  call .Ldt_ensure_diagnostics
  test rax,rax
  jz .Ldt_bound_final_alloc
@@ -3585,10 +3623,55 @@ pg_durable_tool_output_window:
 .Ldt_summary_fallback:
  cmp dword ptr [rsp+2016],0
  jne .Ldt_summary_install
+ cmp qword ptr [rbx+416],0
+ jne .Ldt_summary_content
  mov rdi,rsp
  mov rsi,[rbx+128]
  mov rdx,[rbx+136]
  call .Ldt_summary_append
+ jmp .Ldt_summary_install
+.Ldt_summary_content:
+ mov r13,[rbx+416]
+ xor r14d,r14d
+.Ldt_summary_content_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_summary_install
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ DGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_summary_content_next
+ cmp dword ptr [rsp+2016],0
+ je .Ldt_summary_content_text
+ mov rdi,rsp
+ lea rsi,[rip+.Ldt_summary_newline]
+ mov edx,1
+ call .Ldt_summary_append
+.Ldt_summary_content_text:
+ mov dword ptr [rsp+2016],1
+ DGET rbp,text
+ mov rbp,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+2024],rax
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rdi,rsp
+ mov rsi,rax
+ mov rdx,[rsp+2024]
+ call .Ldt_summary_append
+.Ldt_summary_content_next:
+ inc r14
+ jmp .Ldt_summary_content_each
 .Ldt_summary_install:
  cmp qword ptr [rsp+2000],0
  je .Ldt_summary_ok
@@ -3924,3 +4007,299 @@ pg_durable_tool_progress_recorded:
  pop rbx
  pop rbp
  ret
+
+.text
+/* Explicit Content owns a detached array; text shares one aggregate budget. */
+.Ldt_content_accept:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ call printbuf_new@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Ldc_bad
+ xor r14d,r14d
+.Ldc_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldc_copy
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ DGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_fail
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_image
+ DGET rbp,text
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldc_fail
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ mov [rsp+8],rax
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,r13
+ mov edx,[rsp+8]
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Ldc_fail
+ jmp .Ldc_next
+.Ldc_image:
+ DGET rbp,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_image_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_fail
+ DGET rbp,data
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldc_fail
+ mov rdi,rbp
+ lea rsi,[rip+.Ldc_mime]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldc_fail
+.Ldc_next:
+ inc r14
+ jmp .Ldc_each
+.Ldc_copy:
+ mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldc_fail
+ movsxd rbp,dword ptr [r13+8]
+ lea rdi,[rbp+1]
+ call malloc@PLT
+ test rax,rax
+ jz .Ldc_fail
+ mov r12,rax
+ mov rdi,rax
+ mov rsi,[r13]
+ mov rdx,rbp
+ call memcpy@PLT
+ mov byte ptr [r12+rbp],0
+ mov rdi,[rbx+128]
+ call free@PLT
+ mov [rbx+128],r12
+ mov [rbx+136],rbp
+ mov [rbx+248],rbp
+ mov rdi,[rbx+416]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+416],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Ldc_release
+.Ldc_fail:
+ mov ebp,5
+.Ldc_release:
+ mov rdi,r13
+ call printbuf_free@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ jmp .Ldc_end
+.Ldc_bad:
+ mov eax,5
+.Ldc_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* When bounded, retain one text block at the head/tail position and all images. */
+.Ldt_content_trim:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,[rdi+416]
+ test r12,r12
+ jz .Ldct_ok
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+8],-1
+ xor r14d,r14d
+.Ldct_find:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldct_build
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ DGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldct_find_next
+ cmp qword ptr [rsp+8],-1
+ je .Ldct_select
+ cmp dword ptr [rbx+272],0
+ je .Ldct_find_next
+.Ldct_select:
+ mov [rsp+8],r14
+.Ldct_find_next:
+ inc r14
+ jmp .Ldct_find
+.Ldct_build:
+ call json_object_new_array@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Ldct_bad
+ xor r14d,r14d
+.Ldct_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldct_install
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ DGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldct_keep
+ cmp r14,[rsp+8]
+ jne .Ldct_next
+ mov rdi,rbp
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ldct_release
+ mov rbp,[rsp]
+ mov rdi,[rbx+128]
+ mov esi,[rbx+136]
+ call json_object_new_string_len@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_text]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldct_release
+.Ldct_keep:
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldct_release
+ mov qword ptr [rsp+16],0
+.Ldct_next:
+ inc r14
+ jmp .Ldct_each
+.Ldct_install:
+ mov rdi,[rbx+416]
+ call json_object_put@PLT
+ mov [rbx+416],r13
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ldct_ok:
+ xor eax,eax
+ jmp .Ldct_end
+.Ldct_release:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,r13
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Ldct_bad:
+ mov eax,5
+.Ldct_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldt_content_value:
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rdi+416]
+ test rdi,rdi
+ jz .Ldcv_text
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldcv_text
+ cmp rax,1
+ jne .Ldcv_array
+ mov rdi,[rbx+416]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rbx,rax
+ DGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldcv_item
+ DGET rbx,text
+ mov rdi,rax
+ jmp .Ldcv_get
+.Ldcv_item:
+ mov rdi,rbx
+ jmp .Ldcv_get
+.Ldcv_array:
+ mov rdi,[rbx+416]
+.Ldcv_get:
+ call json_object_get@PLT
+ pop rbx
+ ret
+.Ldcv_text:
+ mov rdi,[rbx+128]
+ mov esi,[rbx+136]
+ call json_object_new_string_len@PLT
+ pop rbx
+ ret
+.section .rodata
+.Ldc_image_word: .asciz "image"
+.Ldc_mime: .asciz "mimeType"

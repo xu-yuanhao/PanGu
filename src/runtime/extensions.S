@@ -1584,11 +1584,19 @@ pg_extension_hook_poll:
  mov esi,6
  call json_object_is_type@PLT
  test eax,eax
+ jnz .Lxh_poll_after_string
+ mov rdi,[rsp+24]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
  jz .Lxh_poll_invalid
+ jmp .Lxh_poll_after_diagnostics
+.Lxh_poll_after_string:
  mov rdi,[rsp+24]
  call json_object_get_string_len@PLT
  cmp eax,2147483646
  ja .Lxh_poll_invalid
+.Lxh_poll_after_diagnostics:
  mov rdi,[rbx+16]
  lea rsi,[rip+.Lxh_diagnostics]
  call json_object_object_get@PLT

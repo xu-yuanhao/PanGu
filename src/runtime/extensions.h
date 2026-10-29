@@ -21,7 +21,7 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
 #define PG_EXTENSION_AFTER_TOOLS 6u
 #define PG_EXTENSION_BEFORE_COMPACT 7u
 /* Tool request {call,result?}; before decisions {arguments?,block?}, after decisions
-   replace native {output:string,isError?,details?,diagnostics?,structuredOutput?,usage?}.
+   replace native {output:string|Content[],isError?,details?,diagnostics?,structuredOutput?,usage?}.
    beforeRequest uses canonical {messages,...} and returns {messages}; response
    and yield use {message}, yield may return {continue:string|content[]};
    afterTools observes {assistant,results}; beforeCompact receives
