@@ -11,7 +11,7 @@
 .Lfailed: .asciz "Write failed; file or parent directories may have changed"
 .section .text
 
-/* Parse detached bounded arguments. Stack: token, object, value, end, outputs. */
+/* Parse detached bounded arguments. Content is returned as owned bytes. */
 .type .Lparse,@function
 .Lparse:
  push rbx
@@ -28,11 +28,16 @@
  mov [rsp+56],r9d
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+24],0
+ mov rax,[rsp+40]
+ mov qword ptr [rax],0
+ mov rax,[rsp+48]
+ mov qword ptr [rax],0
  test rbx,rbx
  jz .Lparse_bad
  test r12,r12
  jz .Lparse_bad
- cmp r12,4096
+ cmp r12,PG_TL_ARGUMENT_LIMIT
  jae .Lparse_bad
  mov rdi,rbx
  xor esi,esi
@@ -163,8 +168,16 @@
  mov rdi,[rsp+16]
  call json_object_get_string_len@PLT
  mov r13d,eax
+ test r15d,r15d
+ jz .Lpath_length
+ cmp r13,PG_TL_ARGUMENT_LIMIT
+ jae .Lparse_bad
+.Lpath_length:
+ test r15d,r15d
+ jnz .Lstring_length_ready
  cmp r13,4096
  jae .Lparse_bad
+.Lstring_length_ready:
  mov rdi,[rsp+16]
  call json_object_get_string@PLT
  mov r14,rax
@@ -195,10 +208,21 @@
  inc r15d
  jmp .Lfield
 .Lcopy_content:
- mov rdi,[rsp+40]
+ mov rdi,r13
+ inc rdi
+ call malloc@PLT
+ test rax,rax
+ jz .Lparse_bad
+ mov [rsp+24],rax
+ mov rdi,rax
  mov rsi,r14
  mov rdx,r13
  call memcpy@PLT
+ mov rax,[rsp+24]
+ mov byte ptr [rax+r13],0
+ mov rdi,[rsp+40]
+ mov [rdi],rax
+ mov qword ptr [rsp+24],0
  mov rax,[rsp+48]
  mov [rax],r13
  xor ebx,ebx
@@ -206,6 +230,8 @@
 .Lparse_bad:
  mov ebx,1
 .Lparse_cleanup:
+ mov rdi,[rsp+24]
+ call free@PLT
  mov rdi,[rsp+8]
  test rdi,rdi
  jz .Lparse_token
@@ -235,14 +261,19 @@
 .Lvalidate_path_mode:
  sub rsp,8216
  mov [rsp+8208],r10d
+ mov qword ptr [rsp+4096],0
  mov rdi,rsi
  mov rsi,rdx
  mov rdx,rsp
  lea rcx,[rsp+4096]
- lea r8,[rsp+8192]
+ lea r8,[rsp+4104]
  mov r9d,[rsp+8208]
  call .Lparse
  xor eax,1
+ mov [rsp+4112],eax
+ mov rdi,[rsp+4096]
+ call free@PLT
+ mov eax,[rsp+4112]
  add rsp,8216
  ret
 .size .Lvalidate,.-.Lvalidate
@@ -258,7 +289,7 @@
  ret
 .size .Lauthorize,.-.Lauthorize
 
-/* Stack: path[4096], content[4096], length, stat[144], saved outputs. */
+/* Stack: path[4096], content pointer/length, stat[144], saved outputs. */
 .type .Lexecute,@function
 .Lexecute:
  xor r10d,r10d
@@ -272,6 +303,7 @@
  push r14
  push r15
  sub rsp,8384
+ mov qword ptr [rsp+4096],0
  mov rbx,rdi
  mov [rsp+8344],rcx
  mov [rsp+8352],r8
@@ -290,7 +322,7 @@
  mov rsi,rdx
  mov rdx,rsp
  lea rcx,[rsp+4096]
- lea r8,[rsp+8192]
+ lea r8,[rsp+4104]
  mov r9d,[rsp+8376]
  call .Lparse
  test eax,eax
@@ -394,11 +426,12 @@
  jnz .Lwrite_error
  xor r14d,r14d
 .Lwrite_more:
- cmp r14,[rsp+8192]
+ cmp r14,[rsp+4104]
  jae .Lsync
  mov edi,r13d
- lea rsi,[rsp+4096+r14]
- mov rdx,[rsp+8192]
+ mov rax,[rsp+4096]
+ lea rsi,[rax+r14]
+ mov rdx,[rsp+4104]
  sub rdx,r14
  call write@PLT
  test rax,rax
@@ -457,6 +490,10 @@
 .Lno_output:
  mov eax,1
 .Lexecute_return:
+ mov [rsp+8368],eax
+ mov rdi,[rsp+4096]
+ call free@PLT
+ mov eax,[rsp+8368]
  add rsp,8384
  pop r15
  pop r14

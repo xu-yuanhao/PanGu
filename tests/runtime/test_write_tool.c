@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "../../src/runtime/write_tool_layout.h"
+#include "../../src/runtime/tools_layout.h"
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -29,7 +30,7 @@ static pg_tool_definition tool;
 static pg_tools service;
 static pg_slice slice(const char *s){return (pg_slice){s,strlen(s)};}
 static int run(const char *args){char out[128]={0};size_t size=999;writes=0;int rc=service.execute(service.context,slice("write"),slice(args),out,sizeof(out),&size);assert(size>0&&size<sizeof(out));assert(rc==0||rc==1);return rc;}
-static void expect_file(const char *path,const char *bytes,size_t n){char b[4096];int fd=open(path,O_RDONLY|O_NOFOLLOW);assert(fd>=0);ssize_t got=read(fd,b,sizeof(b));assert(got==(ssize_t)n&&!memcmp(b,bytes,n));assert(!close(fd));}
+static void expect_file(const char *path,const char *bytes,size_t n){char *b=malloc(n?n:1);assert(b);int fd=open(path,O_RDONLY|O_NOFOLLOW);assert(fd>=0);size_t used=0;while(used<n){ssize_t got=read(fd,b+used,n-used);assert(got>0);used+=(size_t)got;}char extra;assert(read(fd,&extra,1)==0);assert(!memcmp(b,bytes,n));assert(!close(fd));free(b);}
 static unsigned descriptors(void){DIR *d=opendir("/proc/self/fd");assert(d);unsigned count=0;while(readdir(d))++count;assert(!closedir(d));return count;}
 int main(void){
  char temporary[]="/tmp/pangu-write-XXXXXX";assert(mkdtemp(temporary));
@@ -40,6 +41,7 @@ int main(void){
  pg_tool_registry registry;assert(!pg_tool_registry_init(&registry,&tool,1));service=pg_tool_registry_service(&registry);
  assert(!run("{\"path\":\"a/b/file\",\"content\":\"hello\\n世界\"}"));
  expect_file("a/b/file","hello\n世界",12);
+ char large[65536];memset(large,'W',sizeof(large));json_object *large_args=json_object_new_object();assert(large_args);json_object_object_add(large_args,"path",json_object_new_string("large.bin"));json_object_object_add(large_args,"content",json_object_new_string_len(large,sizeof(large)));const char *large_json=json_object_to_json_string_ext(large_args,JSON_C_TO_STRING_PLAIN);assert(large_json&&strlen(large_json)>PG_TL_TEXT_LIMIT&&strlen(large_json)<PG_TL_ARGUMENT_LIMIT);assert(!run(large_json));expect_file("large.bin",large,sizeof(large));json_object_put(large_args);assert(!unlink("large.bin"));
  assert(!run("{\"path\":\"a/b/file\",\"content\":\"x\"}"));expect_file("a/b/file","x",1);
  assert(!run("{\"path\":\"a/b/file\",\"content\":\"\"}"));expect_file("a/b/file","",0);
  assert(!run("{\"path\":\"binary\",\"content\":\"a\\u0000b\"}"));expect_file("binary","a\0b",3);

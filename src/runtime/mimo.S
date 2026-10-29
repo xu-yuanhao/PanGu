@@ -56,6 +56,32 @@ pg_mimo_bind_tools:
  ret
 .size pg_mimo_bind_tools, .-pg_mimo_bind_tools
 
+.type .Lclear_argument_buffers,@function
+.Lclear_argument_buffers:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ xor r12d,r12d
+.Lclear_arg_loop:
+ mov rdi,[rbx+PG_MM_ARGUMENT_OVERFLOW+r12*8]
+ mov qword ptr [rbx+PG_MM_ARGUMENT_OVERFLOW+r12*8],0
+ mov qword ptr [rbx+PG_MM_ARGUMENT_LENGTH+r12*8],0
+ mov qword ptr [rbx+PG_MM_ARGUMENT_CAPACITY+r12*8],0
+ call free@PLT
+ inc r12d
+ cmp r12d,PG_MM_CALL_LIMIT
+ jb .Lclear_arg_loop
+ lea rdi,[rbx+PG_MM_ARGUMENTS]
+ xor esi,esi
+ mov edx,PG_MM_USAGE-PG_MM_ARGUMENTS
+ call memset@PLT
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size .Lclear_argument_buffers,.-.Lclear_argument_buffers
+
 /* ---- void li_close(void *ctx)：释放 easy/multi/headers/request 后置空。
  * 依赖 curl_slist_free_all/free 的 NULL 安全；重复调用幂等。文件内私有。 */
 .type li_close,@function
@@ -63,6 +89,8 @@ li_close:
  push rbx
  mov rbx,rdi
  call .Ltransport_close
+ mov rdi,rbx
+ call .Lclear_argument_buffers
  mov rdi,[rbx+PG_MM_USAGE]
  mov qword ptr [rbx+PG_MM_USAGE],0
  call json_object_put@PLT
@@ -198,6 +226,8 @@ li_start:
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* s */
  call .Ltransport_close               /* 保留已绑定请求配置 */
+ mov rdi,rbx
+ call .Lclear_argument_buffers
  mov rdi,[rbx+PG_MM_USAGE]
  mov qword ptr [rbx+PG_MM_USAGE],0
  call json_object_put@PLT
@@ -581,11 +611,16 @@ li_next:
  PG_MM_CALL_SLOT r14,rax
  imul r15,r13,PG_MM_CALL_BYTES
  lea r15,[rbx+PG_MM_CALLS+r15]
- mov [r15],r14
- mov rdi,r14
- call strlen@PLT
- mov [r15+8],rax
- mov [rsp+24],rax
+ mov rax,[rbx+PG_MM_ARGUMENT_OVERFLOW+r13*8]
+ test rax,rax
+ jnz .Lready_dynamic_arguments
+ mov rax,r14
+.Lready_dynamic_arguments:
+ mov [r15],rax
+ mov [rsp+16],rax
+ mov rdx,[rbx+PG_MM_ARGUMENT_LENGTH+r13*8]
+ mov [r15+8],rdx
+ mov [rsp+24],rdx
  lea rdi,[r14+PG_MM_TEXT_LIMIT]
  mov [r15+16],rdi
  call strlen@PLT
@@ -603,7 +638,7 @@ li_next:
  jz .Lready_bad
  mov [rsp],rax
  mov rdi,rax
- mov rsi,r14
+ mov rsi,[rsp+16]
  mov rdx,[rsp+24]
  call json_tokener_parse_ex@PLT
  mov [rsp+8],rax
@@ -618,7 +653,8 @@ li_next:
 .Lready_tail:
  cmp rax,[rsp+24]
  jae .Lready_type
- movzx ecx,byte ptr [r14+rax]
+ mov rdx,[rsp+16]
+ movzx ecx,byte ptr [rdx+rax]
  cmp ecx,32
  je .Lready_space
  cmp ecx,9

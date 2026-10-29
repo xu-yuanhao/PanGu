@@ -4,6 +4,8 @@
  * tools.h/契约头的真实布局一致，漂移即编译失败。 */
 #define PG_TL_LIMIT 16
 #define PG_TL_TEXT_LIMIT 4096
+/* Bounds complete serialized tool arguments, independently of display text. */
+#define PG_TL_ARGUMENT_LIMIT 131072
 #define PG_TL_ID_LIMIT 64
 
 /* pg_slice（src/contracts/client.h） */
@@ -93,6 +95,7 @@ PG_TL_ASSERT_OFF(pg_tool_async, dispose, 32);
 _Static_assert(PG_TOOL_OK==0&&PG_TOOL_ERROR==1&&PG_TOOL_WAIT==2&&PG_TOOL_OUTPUT==3&&PG_TOOL_PARTIAL==4,"tool statuses");
 _Static_assert(PG_TOOL_LIMIT == PG_TL_LIMIT, "tool limit drifted");
 _Static_assert(PG_TEXT_LIMIT == PG_TL_TEXT_LIMIT, "text limit drifted");
+_Static_assert(PG_TL_ARGUMENT_LIMIT > PG_TL_TEXT_LIMIT, "tool argument limit drifted");
 _Static_assert(PG_ID_LIMIT == PG_TL_ID_LIMIT, "id limit drifted");
 _Static_assert(json_type_object == PG_TL_JSON_OBJECT, "json_type_object drifted");
 _Static_assert(json_type_string == PG_TL_JSON_STRING, "json_type_string drifted");

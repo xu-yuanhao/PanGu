@@ -1,5 +1,6 @@
 #ifndef PG_MIMO_LAYOUT_H
 #define PG_MIMO_LAYOUT_H
+#include "tools_layout.h"
 /* mimo_projection.S / mimo_stream.S / mimo.S 与 C 测试共享的布局/枚举常量。
  * 数值只有这一份；C 侧 _Static_assert 对齐 session.h/agent.h/tools.h/mimo.h
  * 与本机公开 libcurl/json-c 头，漂移即编译失败，不手抄私有结构。
@@ -102,7 +103,10 @@
 #define PG_MM_REASONING 169440
 #define PG_MM_USAGE 173536
 #define PG_MM_CONFIGURATION 173544
-#define PG_MM_BYTES 173552
+#define PG_MM_ARGUMENT_OVERFLOW 173552
+#define PG_MM_ARGUMENT_LENGTH 173616
+#define PG_MM_ARGUMENT_CAPACITY 173680
+#define PG_MM_BYTES 173744
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -217,6 +221,9 @@ PG_MM_ASSERT_OFF(pg_mimo, transport_error, PG_MM_TRANSPORT_ERROR);
 PG_MM_ASSERT_OFF(pg_mimo, reasoning, PG_MM_REASONING);
 PG_MM_ASSERT_OFF(pg_mimo, usage, PG_MM_USAGE);
 PG_MM_ASSERT_OFF(pg_mimo, configuration, PG_MM_CONFIGURATION);
+PG_MM_ASSERT_OFF(pg_mimo, argument_overflow, PG_MM_ARGUMENT_OVERFLOW);
+PG_MM_ASSERT_OFF(pg_mimo, argument_length, PG_MM_ARGUMENT_LENGTH);
+PG_MM_ASSERT_OFF(pg_mimo, argument_capacity, PG_MM_ARGUMENT_CAPACITY);
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
 _Static_assert(CURLE_COULDNT_RESOLVE_PROXY==5 && CURLE_COULDNT_RESOLVE_HOST==6 && CURLE_COULDNT_CONNECT==7 && CURLE_HTTP2==16 && CURLE_PARTIAL_FILE==18 && CURLE_OPERATION_TIMEDOUT==28 && CURLE_GOT_NOTHING==52 && CURLE_SEND_ERROR==55 && CURLE_RECV_ERROR==56 && CURLE_HTTP2_STREAM==92,"native retry CURL mapping");
 PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);

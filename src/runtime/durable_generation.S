@@ -1,4 +1,5 @@
 #include "session_layout.h"
+#include "tools_layout.h"
 .intel_syntax noprefix
 .macro GGET object,key
  mov rdi,\object
@@ -1859,7 +1860,7 @@ pg_durable_context_order:
  jnz .Lgg_call_alloc
  mov rdi,[r12]
  mov rsi,[r12+8]
- cmp rsi,4096
+ cmp rsi,PG_TL_ARGUMENT_LIMIT
  jae .Lgg_call_invalid
  call strndup@PLT
  mov [rsp],rax

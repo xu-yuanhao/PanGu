@@ -17,6 +17,9 @@ typedef struct {
  char reasoning[PG_TEXT_LIMIT];
  struct json_object *usage; /* owned final provider usage snapshot */
  struct json_object *configuration; /* private owned request identity/options */
+ /* Provider owns overflow; call slices borrow it until decode/start/close. */
+ char *argument_overflow[PG_TOOL_BATCH_LIMIT];
+ size_t argument_length[PG_TOOL_BATCH_LIMIT],argument_capacity[PG_TOOL_BATCH_LIMIT];
 } pg_mimo;
 /* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint

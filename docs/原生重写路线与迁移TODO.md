@@ -142,6 +142,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `tools/{read,write,edit,bash,edit-diff,image-processor}.ts`、`env/`、`images/`、`truncate.ts`；`tools.test.ts`、`tools-read-differential.test.ts`、`tools-images.test.ts`、`env-node.test.ts`。
 
 - [ ] 在剩余 read/write/edit/bash 行为上补齐上游输入准备、完整文件、UTF-8/二进制、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
+- [x] 工具参数贯通Mimo SSE、Durable Generation与工具分派，按增量动态保存到128 KiB上限；write分配并写入完整内容，64 KiB实际文件字节回读一致，文本显示预算保持原值。
 - [x] read普通UTF-8分页接入Pi Durable的50 KiB/2000行预算和续读offset，移除固定1 MiB扫描上限；多页重组与大于1 MiB的行偏移通过。模型可见读取剥离文件开头UTF-8 BOM，Edit内部完整快照保留原始字节。
 - [x] read默认图片路径接入Durable结果与请求：PNG/JPEG/GIF/WebP头部尺寸、默认inline限制、base64、读取稳定性重试；afterTool保留图片，真实read Task持久结果可投影为模型附件。
 - [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
@@ -291,8 +292,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/read.ts`、`truncate.ts`、`env/decode.ts` 与 `env/node.ts`；对应 `tools.test.ts`、`tools-read-differential.test.ts`。核对最新Pi `e7a0df27c09d11bf4161d3605246cbf57a129cb2` 后，上述Durable读实现与截断函数未变。
-- 实际调用链：Assembly `pg_read_tool_definition` 由应用tools服务直接调用；读取按4 KiB块扫描所需行，在2000行或50 KiB预算处停止，支持续读offset，移除人为1 MiB扫描封顶；公开read剥离UTF-8 BOM，内部snapshot保留Edit所需的原始字节。
-- 验证：`python3 -B tools/runtime/build_test.py` 全部通过，覆盖跨50 KiB多页重组、超过1 MiB后读取指定行、read/snapshot的BOM差异、输出/保护页边界与持久工具流程；先前实际DeepSeek TUI完成read→write→edit→bash→回读、PanGu身份和会话重开续聊。
-- 接口与差异：`PG_RTL_OUTPUT_MAX` 为51201字节（含NUL），与Durable的50 KiB文本预算一致；页预算仍为2000行。非UTF-8字节目前按PanGu错误拒绝，Pi TextDecoder会替换；超长首行提示、完整工具参数和写入容量也受后续调用链约束，K08与验收仍未完成。
-- 剩余与下一交付物：沿模型参数→Agent会话消息→持久Tool任务→文件服务整段链路处理超出4 KiB的write/edit输入，再对齐超长首行及非UTF-8读取语义；随后接入并行消费者的同路径写/edit串行化，完成工具差异核对。K08验收仍需固定工具语料与上游实际函数比对及真实TUI工作流。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/{read,write}.ts`、`truncate.ts`、`env/decode.ts` 与 `env/node.ts`；对应 `tools.test.ts`、`tools-read-differential.test.ts`。核对最新Pi `e7a0df27c09d11bf4161d3605246cbf57a129cb2` 后，读写实现与相关上游行为未变。
+- 实际调用链：Mimo SSE按工具调用增量动态累积JSON，Durable Generation复制完整调用，持久Tool任务交给工具分派；`write_tool.S`将content保存在有界owned缓冲中并完整写文件。参数上限128 KiB，模型事件借用缓冲在下一次decode/start/close前有效，start/close负责释放。
+- 验证：`python3 -B tools/runtime/test_mimo_asm.py` 在O0/O2与UBSan下通过，覆盖分片6 KiB调用、解析及start/close释放；`python3 -B tools/runtime/build_test.py` 全部通过，含64 KiB文件精确回读；产品构建与Assembly检查通过。
+- 接口与差异：工具JSON上限为128 KiB，独立于4 KiB显示文本预算；Pi Durable write未设置该参数上限。Durable Generation和持久Tool接口可传递完整JSON；本批的长调用传输与文件写入分别以无网络传输夹具和真实本地文件验证。
+- 剩余与下一交付物：把同一参数通路接入edit的多项替换与文件内容，再核对read非UTF-8/超长首行和编码工具共用文件操作行为。K08整体及read→edit→write→bash真实TUI验收保持未完成。

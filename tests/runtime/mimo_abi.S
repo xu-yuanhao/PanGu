@@ -37,6 +37,8 @@ WRAP_TRASH strcmp
 WRAP_TRASH strncmp
 WRAP_TRASH memchr
 WRAP_TRASH memcpy
+WRAP_TRASH malloc
+WRAP_TRASH realloc
 WRAP_TRASH strchr
 WRAP_TRASH free
 WRAP_TRASH getenv

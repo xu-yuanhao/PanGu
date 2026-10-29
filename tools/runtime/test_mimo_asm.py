@@ -26,7 +26,7 @@ SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/mimo_stream.S'),
        str(ROOT / 'src/runtime/request_context.S')]
 ABI_WRAPS = ['-Wl,--wrap=' + n for n in (
-    'strlen', 'strcmp', 'strncmp', 'memchr', 'memcpy', 'strchr', 'free',
+    'strlen', 'strcmp', 'strncmp', 'memchr', 'memcpy', 'malloc', 'realloc', 'strchr', 'free',
     'getenv', 'strdup', 'json_object_object_add', 'json_object_array_add',
     'json_object_new_string', 'json_object_new_string_len', 'json_object_put',
     'json_tokener_parse_ex', 'json_tokener_get_error', 'json_object_get_string', 'json_object_is_type',

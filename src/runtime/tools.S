@@ -70,7 +70,7 @@ li_name_valid:
 .size li_name_valid, .-li_name_valid
 
 /* ---- json_object *li_parse_object(const char *data, size_t size)
- * 严格完整 JSON object：非空、长度上限、无嵌入 NUL、尾随空白外无残余。 ---- */
+ * 严格完整 JSON object：非空、有界、无嵌入 NUL、尾随空白外无残余。 ---- */
 .type li_parse_object,@function
 li_parse_object:
  push rbx
@@ -84,7 +84,7 @@ li_parse_object:
  jz .Lpo_null
  test r12, r12
  jz .Lpo_null
- cmp r12, PG_TL_TEXT_LIMIT
+ cmp r12, PG_TL_ARGUMENT_LIMIT
  jae .Lpo_null
  mov rdi, rbx
  xor esi, esi
@@ -98,7 +98,7 @@ li_parse_object:
  mov r13, rax /* tok */
  mov rdi, r13
  mov rsi, rbx
- mov edx, r12d /* size < PG_TEXT_LIMIT，int 安全 */
+ mov edx, r12d /* size < PG_TL_ARGUMENT_LIMIT，int 安全 */
  call json_tokener_parse_ex@PLT
  mov r14, rax /* o */
  mov rdi, r13

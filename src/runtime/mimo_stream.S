@@ -3,8 +3,9 @@
  * 输入是已去除 CR/LF 的完整一行：空行/":" 注释→WAIT 0；"data:" 前缀外→1；
  * "[DONE]" 仅在 finish_reason 之后接受一次。JSON 须完整（parse_end 后仅
  * 空白），单 choice（长度恰 1）、tool_calls 按整数index 0..7分别累积；id/name/
- * arguments 为增量追加（null 视为缺席），text 为当前分片整串替换。解码出的
- * 字符串含嵌入 NUL、超出定长容量即拒绝。finish_reason：stop 需无工具 id，
+ * arguments 为增量追加（null 视为缺席），text 为当前分片整串替换。工具参数
+ * 动态累积并限制在 128 KiB；其他字符串含嵌入 NUL、超出定长容量即拒绝。
+ * finish_reason：stop 需无工具 id，
  * tool_calls 需所有索引连续、id/name齐备且ID唯一；length/end为文本终态。
  * usage可在空choices分片中更新；已finish后拒绝新的choice，DONE后拒绝数据。
  * event 借用 m 内缓冲，有效期至下一次 decode/生命周期调用。布局见
@@ -173,9 +174,154 @@ li_accumulate:
  ret
 .size li_accumulate, .-li_accumulate
 
+/* ---- int li_accumulate_argument(value, pg_mimo *, index)：有界追加工具JSON。 ---- */
+.type li_accumulate_argument,@function
+li_accumulate_argument:
+ test rdi,rdi
+ jz .Laa_absent
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,48
+ mov r12,rdi
+ mov rbx,rsi
+ mov r13d,edx
+ cmp r13d,PG_MM_CALL_LIMIT
+ jae .Laa_bad
+ mov esi,PG_MM_JSON_NULL
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Laa_ok
+ mov rdi,r12
+ mov esi,PG_MM_JSON_STRING
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Laa_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ test eax,eax
+ js .Laa_bad
+ mov r14d,eax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov r15,rax
+ test r15,r15
+ jz .Laa_bad
+ mov rdi,r15
+ xor esi,esi
+ mov rdx,r14
+ call memchr@PLT
+ test rax,rax
+ jnz .Laa_bad
+ mov rax,[rbx+PG_MM_ARGUMENT_LENGTH+r13*8]
+ mov [rsp],rax
+ mov rdx,r14
+ add rdx,rax
+ jc .Laa_bad
+ cmp rdx,PG_TL_ARGUMENT_LIMIT
+ jae .Laa_bad
+ mov [rsp+8],rdx
+ mov rax,r13
+ PG_MM_CALL_SLOT r10,rax
+ mov [rsp+16],r10
+ mov rax,[rbx+PG_MM_ARGUMENT_OVERFLOW+r13*8]
+ mov [rsp+24],rax
+ test rax,rax
+ jnz .Laa_dynamic
+ cmp qword ptr [rsp+8],PG_MM_TEXT_LIMIT
+ jae .Laa_grow
+ mov rdi,[rsp+16]
+ add rdi,[rsp]
+ mov rsi,r15
+ mov rdx,r14
+ inc rdx
+ call memcpy@PLT
+ mov rax,[rsp+8]
+ mov [rbx+PG_MM_ARGUMENT_LENGTH+r13*8],rax
+ xor eax,eax
+ jmp .Laa_out
+.Laa_dynamic:
+ mov rax,[rsp+8]
+ inc rax
+ mov [rsp+32],rax
+ mov r10,[rbx+PG_MM_ARGUMENT_CAPACITY+r13*8]
+ cmp r10,rax
+ jae .Laa_append
+.Laa_grow:
+ mov rax,[rsp+8]
+ inc rax
+ mov [rsp+32],rax
+ mov r10,[rbx+PG_MM_ARGUMENT_CAPACITY+r13*8]
+ test r10,r10
+ jnz .Laa_grow_loop
+ mov r10,PG_MM_TEXT_LIMIT*2
+.Laa_grow_loop:
+ cmp r10,[rsp+32]
+ jae .Laa_allocate
+ shl r10,1
+ jmp .Laa_grow_loop
+.Laa_allocate:
+ mov [rsp+40],r10
+ mov rdi,[rsp+24]
+ test rdi,rdi
+ jnz .Laa_reallocate
+ mov rdi,r10
+ call malloc@PLT
+ test rax,rax
+ jz .Laa_bad
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ mov rdx,[rsp]
+ inc rdx
+ call memcpy@PLT
+ mov rax,[rsp+24]
+ mov [rbx+PG_MM_ARGUMENT_OVERFLOW+r13*8],rax
+ mov rax,[rsp+40]
+ mov [rbx+PG_MM_ARGUMENT_CAPACITY+r13*8],rax
+ jmp .Laa_append
+.Laa_reallocate:
+ mov rsi,[rsp+40]
+ call realloc@PLT
+ test rax,rax
+ jz .Laa_bad
+ mov [rbx+PG_MM_ARGUMENT_OVERFLOW+r13*8],rax
+ mov rdx,[rsp+40]
+ mov [rbx+PG_MM_ARGUMENT_CAPACITY+r13*8],rdx
+.Laa_append:
+ mov rdi,[rbx+PG_MM_ARGUMENT_OVERFLOW+r13*8]
+ add rdi,[rsp]
+ mov rsi,r15
+ mov rdx,r14
+ inc rdx
+ call memcpy@PLT
+ mov rax,[rsp+8]
+ mov [rbx+PG_MM_ARGUMENT_LENGTH+r13*8],rax
+ xor eax,eax
+ jmp .Laa_out
+.Laa_bad:
+ mov eax,1
+.Laa_out:
+ add rsp,48
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Laa_ok:
+ xor eax,eax
+ jmp .Laa_out
+.Laa_absent:
+ xor eax,eax
+ ret
+.size li_accumulate_argument,.-li_accumulate_argument
+
 /* ---- int pg_mimo_decode_line(pg_mimo *m, const char *line, pg_model_event *event)
  * 栈帧 112 字节：[0]=tok [8]=choices [16]=choice [24]=delta [32]=data
- * [40]=calls [48]=content [56]=reason [64]=call [72]=index，[80]=delta个数，[88]=迭代，[96]=slot，[104]=fn/内层迭代。 ---- */
+ * [40]=calls [48]=content [56]=reason [64]=call [72]=index，[80]=delta个数，[88]=迭代，[96]=slot，[104]=fn，[112]=call index。 ---- */
 .globl pg_mimo_decode_line
 .type pg_mimo_decode_line,@function
 pg_mimo_decode_line:
@@ -184,7 +330,7 @@ pg_mimo_decode_line:
  push r13
  push r14
  push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
- sub rsp, 112
+ sub rsp, 128
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* line */
  mov r13, rdx                         /* event */
@@ -365,6 +511,7 @@ pg_mimo_decode_line:
  mov [rbx+PG_MM_CALL_COUNT],ecx
 .Lcall_counted:
  PG_MM_CALL_SLOT r12,rax
+ mov [rsp+112],eax
  mov [rsp+96],r12
  mov rdi,[rsp+64]
  lea rsi,[rip+.Lstr_function]
@@ -398,9 +545,9 @@ pg_mimo_decode_line:
  lea rsi,[rip+.Lstr_arguments]
  call li_get
  mov rdi,rax
- mov rsi,r12
- mov edx,PG_MM_TEXT_LIMIT
- call li_accumulate
+ mov rsi,rbx
+ mov edx,[rsp+112]
+ call li_accumulate_argument
  or r15d,eax
  inc qword ptr [rsp+88]
  mov rax,[rsp+88]
@@ -569,7 +716,7 @@ pg_mimo_decode_line:
 .Ldl_ok:
  xor eax, eax
 .Ldl_out:
- add rsp, 112
+ add rsp, 128
  pop r15
  pop r14
  pop r13
