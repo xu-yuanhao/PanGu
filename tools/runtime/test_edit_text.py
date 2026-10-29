@@ -47,6 +47,9 @@ def corpus():
     add('alpha\nbeta\ngamma\ndelta\n', ('alpha\n', 'ALPHA\n'), ('gamma\n', 'GAMMA\n'))
     add('one\ntwo\nthree\n', ('one\ntwo\n', 'ONE\nTWO\n'), ('two\nthree\n', 'TWO\nTHREE\n'))
     add('abc', ('a', 'a'))
+    add('a\0b\nkeep\0end\n', ('a\0b', 'A\0B'))
+    add('before\0tail\r\nnext\n', ('before', 'after\0new'))
+    add('Ａ\0Ｂ\n', ('A\0B', 'changed\0result'))
     add('abc', ('missing', 'x'))
     add('abc', ('', 'x'))
     add('abc', ('a', 'x'), ('x', 'y'))
@@ -141,12 +144,12 @@ def compare_diff(binary, module):
     manifest = module.resolve().parents[1] / 'package.json'
     assert json.loads(manifest.read_text())['version'] == '8.0.4', 'jsdiff version mismatch'
     rng = random.Random(54)
-    cases = [{'before': '', 'after': ''}, {'before': 'same', 'after': 'same'},
+    cases = [{'before': '', 'after': ''}, {'before': 'same', 'after': 'same'}, {'before':'a\0b\nkeep\0end\n','after':'A\0B\nkeep\0end\n'},
              {'before': '\ufeffone\r\ntwo\r\n', 'after': '\ufeffone\r\nTWO\r\n'},
              {'before': '\n' * 2048 + 'tail', 'after': '\n' * 2048 + 'changed'}]
     for _ in range(240):
-        a = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n']) for _ in range(rng.randrange(28)))
-        b = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n']) for _ in range(rng.randrange(28)))
+        a = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n', 'a\0b\n', '\0\n']) for _ in range(rng.randrange(28)))
+        b = ''.join(rng.choice(['a\n', 'b\n', '\n', '中\n', '😀\n', 'a\0b\n', '\0\n']) for _ in range(rng.randrange(28)))
         if rng.randrange(3) == 0: a = a.rstrip('\n')
         if rng.randrange(3) == 0: b = b.rstrip('\n')
         cases.append({'before': a, 'after': b})

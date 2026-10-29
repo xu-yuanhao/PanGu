@@ -52,8 +52,6 @@
  cmp r14,r12
  jae .Llf_ok
  movzx eax,byte ptr [rbx+r14]
- test eax,eax
- jz .Llf_bad
  cmp eax,128
  jae .Llf_unicode
  inc r14

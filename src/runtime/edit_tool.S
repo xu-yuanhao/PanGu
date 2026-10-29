@@ -129,7 +129,7 @@
  ret
 .size .Ljson,.-.Ljson
 
-/* Borrow one decoded UTF-8 string into a slice, refusing embedded NUL. */
+/* Borrow a decoded UTF-8 string with its explicit byte length. */
 .Lstring:
  push rbx
  push r12
@@ -151,12 +151,6 @@
  call json_object_get_string@PLT
  mov [r12],rax
  mov [r12+8],r13
- mov rdi,rax
- xor esi,esi
- mov rdx,r13
- call memchr@PLT
- test rax,rax
- jnz .Lstring_bad
  xor eax,eax
  jmp .Lstring_return
 .Lstring_bad:
@@ -336,6 +330,12 @@
  jnz .Lparse_bad
  cmp qword ptr [rbx+P_PATH_N],4096
  jae .Lparse_bad
+ mov rdi,[rbx+P_PATH]
+ xor esi,esi
+ mov rdx,[rbx+P_PATH_N]
+ call memchr@PLT
+ test rax,rax
+ jnz .Lparse_bad
  mov rdi,r12
  lea rsi,[rip+.Lold]
  mov rdx,rsp

@@ -67,7 +67,7 @@ static void recovery(int root){
 }
 static void json_cases(void){
  json_object *cases=json_object_from_fd(STDIN_FILENO),*answers=json_object_new_array();assert(cases&&answers&&json_object_is_type(cases,json_type_array));
- for(size_t i=0;i<json_object_array_length(cases);++i){json_object *item=json_object_array_get_idx(cases,i),*content=0,*args=0;assert(json_object_object_get_ex(item,"content",&content)&&json_object_is_type(content,json_type_string));assert(json_object_object_get_ex(item,"arguments",&args));put(json_object_get_string(content));int rc=invoke(json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN));char bytes[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,bytes,sizeof(bytes));assert(n>=0&&n<4096&&!close(fd));json_object *answer=json_object_new_object();assert(answer);json_object_object_add(answer,"status",json_object_new_int(rc));json_object_object_add(answer,"output",json_object_new_string_len(bytes,(int)n));assert(!json_object_array_add(answers,answer));}
+ for(size_t i=0;i<json_object_array_length(cases);++i){json_object *item=json_object_array_get_idx(cases,i),*content=0,*args=0;assert(json_object_object_get_ex(item,"content",&content)&&json_object_is_type(content,json_type_string));assert(json_object_object_get_ex(item,"arguments",&args));put_bytes(json_object_get_string(content),(size_t)json_object_get_string_len(content));int rc=invoke(json_object_to_json_string_ext(args,JSON_C_TO_STRING_PLAIN));char bytes[4096];int fd=open("file.txt",O_RDONLY);assert(fd>=0);ssize_t n=read(fd,bytes,sizeof(bytes));assert(n>=0&&n<4096&&!close(fd));json_object *answer=json_object_new_object();assert(answer);json_object_object_add(answer,"status",json_object_new_int(rc));json_object_object_add(answer,"output",json_object_new_string_len(bytes,(int)n));assert(!json_object_array_add(answers,answer));}
  puts(json_object_to_json_string_ext(answers,JSON_C_TO_STRING_PLAIN));json_object_put(answers);json_object_put(cases);
 }
 static void success_summaries(void){
@@ -92,6 +92,9 @@ static void success_summaries(void){
 
 static void diff_contract(void){
  struct json_object *value=0;
+ assert(!pg_edit_diff_create(s("case.txt"),(pg_slice){"a\0b\n",4},(pg_slice){"A\0B\n",4},&value));
+ const char nul_diff[]="-1 a\0b\n+1 A\0B",nul_patch[]="--- case.txt\n+++ case.txt\n@@ -1,1 +1,1 @@\n-a\0b\n+A\0B\n";
+ json_object *nul_value=json_object_object_get(value,"diff");assert(json_object_get_string_len(nul_value)==sizeof(nul_diff)-1&&!memcmp(json_object_get_string(nul_value),nul_diff,sizeof(nul_diff)-1));nul_value=json_object_object_get(value,"patch");assert(json_object_get_string_len(nul_value)==sizeof(nul_patch)-1&&!memcmp(json_object_get_string(nul_value),nul_patch,sizeof(nul_patch)-1));json_object_put(value);
  assert(!pg_edit_diff_create(s("case.txt"),s("one\ntwo\n"),s("one\nTHREE\n"),&value));
  assert(!strcmp(json_object_get_string(json_object_object_get(value,"diff"))," 1 one\n-2 two\n+2 THREE"));
  assert(!strcmp(json_object_get_string(json_object_object_get(value,"patch")),"--- case.txt\n+++ case.txt\n@@ -1,2 +1,2 @@\n one\n-two\n+THREE\n"));
@@ -137,7 +140,7 @@ int main(int argc,char **argv){
  put("alpha\n");partial_read=1;{unsigned w=writes;assert(invoke(shapes[0])&&writes==w);expect("alpha\n");}partial_read=0;
  put("alpha\nbeta\ngamma\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"gamma\",\"newText\":\"GAMMA\"}],\"oldText\":\"alpha\",\"newText\":\"ALPHA\"}"));expect("ALPHA\nbeta\nGAMMA\n");
  put("\xef\xbb\xbfone\r\nsay ‘hello’ — world  \r\nkeep  \r\n");assert(!invoke("{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"say 'hello' - world\",\"newText\":\"changed\\nnext\"}]}"));expect("\xef\xbb\xbfone\r\nchanged\r\nnext\r\nkeep  \r\n");
- const char *bad[]={"", "{}", "[]", "null", "{\"path\":\"file.txt\",\"edits\":[]}",
+ const char *bad[]={"", "{}", "[]", "null", "{\"path\":\"file.txt\",\"edits\":[]}","{\"path\":\"file\\u0000.txt\",\"oldText\":\"a\",\"newText\":\"b\"}",
   "{\"path\":\"file.txt\",\"edits\":\"garbage\"}","{\"path\":\"file.txt\",\"edits\":null}",
   "{\"path\":\"file.txt\",\"edits\":[{}]}","{\"path\":\"file.txt\",\"edits\":[null]}",
   "{\"path\":\"file.txt\",\"oldText\":null,\"newText\":null}",
@@ -145,7 +148,6 @@ int main(int argc,char **argv){
   "{\"path\":\"file.txt\",\"edits\":{\"oldText\":\"original\",\"newText\":\"x\",\"extra\":1},\"oldText\":\"original\",\"newText\":\"wrong\"}",
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"a\",\"newText\":7}]}",
   "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"\",\"newText\":\"b\"}]}",
-  "{\"path\":\"file.txt\",\"edits\":[{\"oldText\":\"a\\u0000b\",\"newText\":\"c\"}]}",
 
   "{\"path\":\"file.txt\",\"oldText\":\"a\"}","{\"path\":\"file.txt\",\"oldText\":\"a\",\"newText\":\"b\",\"other\":1}",
   "{\"path\":\"file.txt\",\"oldText\":\"a\",\"newText\":\"b\"} {}"};

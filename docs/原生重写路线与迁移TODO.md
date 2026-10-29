@@ -143,7 +143,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [ ] 在剩余 read/write/edit/bash 行为上补齐上游输入准备、完整文件、UTF-8/二进制、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
 - [x] 工具参数贯通Mimo SSE、Durable Generation与工具分派，按增量动态保存到128 KiB上限；write分配并写入完整内容，64 KiB实际文件字节回读一致，文本显示预算保持原值。
-- [x] Edit完整读改写接入同一调用链：内部完整快照按需扩容，Assembly文本工作区及Pi diff/patch按文件大小分配，内部write解析支持大文件；196 KiB文件端到端编辑后逐字节回读一致；替换向量按实际数量扩容，128项及逆序/BOM/CRLF批量编辑对照通过，模型可见参数边界保持128 KiB。
+- [x] Edit完整读改写接入同一调用链：内部完整快照按需扩容，Assembly文本工作区及Pi diff/patch按文件大小分配，内部write解析支持大文件；196 KiB文件端到端编辑后逐字节回读一致；替换向量按实际数量扩容，128项及逆序/BOM/CRLF批量编辑对照通过，NUL正文从参数、文本变换、实际写入到diff/patch按显式长度保留，模型可见参数边界保持128 KiB。
 - [x] read普通UTF-8分页接入Pi Durable的50 KiB/2000行预算和续读offset，移除固定1 MiB扫描上限；多页重组与大于1 MiB的行偏移通过。模型可见读取剥离文件开头UTF-8 BOM，保留NUL并按TextDecoder规则替换非法UTF-8；Number型offset/limit按slice语义选择行，超长首行返回码点完整前缀，续读提示进入诊断元数据。1600组固定Pi正文差分及读取改写/追加行为通过；Edit内部完整快照保留BOM。
 - [x] read默认图片路径接入Durable结果与请求：PNG/JPEG/GIF/WebP头部尺寸、默认inline限制、base64、读取稳定性重试；afterTool保留图片，真实read Task持久结果可投影为模型附件。
 - [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
@@ -293,8 +293,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/{edit,edit-diff,write,file-mutation-queue}.ts`及`tools.test.ts`。Edit原始函数与prepare语料沿用内容相同的`38ff99177fba`固定源码，脚本校验摘要后实际执行上游函数。
-- 实际调用链：`edit_tool.S`的schema、参数修复、校验、读改写和文本引擎统一采用动态替换向量；验证和执行分别持有并释放向量，去除固定栈数组。`edit_text.S`按数量分配匹配记录并检查乘法边界。一次调用可完成128项原文件非重叠替换；成功正文采用Pi的数量/路径表达，firstChangedLine继续放在结构化details。
-- 验证：文本专项在O0/O2、UBSan下通过，1304组文本与95组工具/参数语料实际对照Pi，覆盖17/32/65/128项、逆序、BOM/CRLF及修复参数。真实文件工具专项在ASan/UBSan下通过，含校验/执行十处向量扩容失败时无文件副作用、196 KiB读改写、diff/patch及中断恢复。最终产品构建、Assembly检查与`git diff --check`通过。
-- 接口与差异：公开结构/函数ABI不变，删除无人使用的固定数量宏；模型JSON仍限128 KiB。当前原生文件工具同步执行并由工作区提供者串行租约保护；上游逐文件队列在异步ExecutionEnv中的并发隔离语义仍保留在K08。
-- 剩余与下一交付物：成组补齐K08的完整诊断/details、NUL等文本边界、write/edit同文件并发及其余超时/取消、溢出文件与错误语义，再用真实TUI核对read→edit→write→bash→回读。K08整体验收仍未完成。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/{edit,edit-diff}.ts`及`env/node.ts`的TextDecoder文本语义；实际执行内容相同的固定`38ff99177fba`Edit函数与jsdiff 8.0.4核对结果。
+- 实际调用链：`edit_tool.S`对oldText/newText保留NUL，仅文件路径拒绝NUL；`edit_text.S`沿显式slice长度归一化、匹配和输出。`edit_diff.S`格式化行前缀后按长度复制正文，diff/patch不依赖正文的NUL终止。真实读改写经既有完整快照、JSON请求和write服务落盘，UTF-8/BOM/CRLF与动态批量编辑继续复用。
+- 验证：1307组文本在O0/O2 UBSan下对照Pi；95组工具/参数在ASan/UBSan下对照Pi，含NUL原文/替换/模糊匹配和文件字节回读。245组diff/patch/firstChangedLine直接对照Pi与jsdiff 8.0.4，含随机NUL行；NUL路径拒绝、原有分配失败/中断恢复、Assembly检查及`git diff --check`通过，最终产品构建通过。
+- 接口与差异：公开结构/函数ABI不变；文本slice的显式长度成为NUL边界依据，路径继续符合POSIX文件名约束。上批128项动态编辑、Read的1600组正文差分与读取改写重试作为已有基线。
+- 剩余与下一交付物：成组补齐K08的完整诊断/details、write/edit逐文件异步并发与其余超时/取消、溢出文件和错误语义，再用真实TUI核对read→edit→write→bash→回读。K08整体验收仍未完成。

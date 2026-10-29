@@ -45,7 +45,7 @@ static void cases(void){
  pg_text_edit chain[]={{s("a"),s("x")},{s("x"),s("y")}};check("a b",chain,2,PG_EDIT_NOT_FOUND,0);
  pg_text_edit empty={s(""),s("x")};check("a",&empty,1,PG_EDIT_INVALID,0);
  pg_text_edit invalid={{"\xff",1},s("x")};check("a",&invalid,1,PG_EDIT_INVALID,0);
- pg_text_edit nul={{"a\0b",3},s("x")};check("a",&nul,1,PG_EDIT_INVALID,0);
+ pg_text_edit nul={{"a\0b",3},s("x")};check("a",&nul,1,PG_EDIT_NOT_FOUND,0);
  char out[4096];memset(out,'Q',sizeof(out));size_t n=88;
  pg_text_edit replace={s("a"),s("result")};
  for(size_t cap=0;cap<8;++cap){memset(out,'Q',sizeof(out));n=88;int rc=pg_edit_text_apply(s("a"),&replace,1,out,cap,&n);assert((cap<7&&rc==PG_EDIT_QUOTA&&!n&&out[0]=='Q')||(cap==7&&!rc&&n==6&&!strcmp(out,"result")));}

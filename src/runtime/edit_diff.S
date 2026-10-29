@@ -92,7 +92,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define END 288
 #define START 296
 #define FREE 304
-#define FRAME 312
+#define TOKEN 312
+#define FRAME 328
 .text
 /* rdi source, rsi length, rdx normalized storage, rcx token storage. */
 .Led_tokens:
@@ -688,6 +689,7 @@ pg_edit_diff_create:
 .Led_display_line:
  xor r13d,r13d
  call .Led_token
+ mov [rbx+TOKEN],rax
  /* rax token address; r15 token length without terminal LF. */
  mov rdi,[rbx+DISPLAY]
  add rdi,[rbx+DLEN]
@@ -699,13 +701,19 @@ pg_edit_diff_create:
  mov r9,[rbx+OLDNUM]
  cmp r14d,43
  cmove r9,[rbx+NEWNUM]
- sub rsp,16
- mov [rsp],r15
- mov [rsp+8],rax
  xor eax,eax
  call snprintf@PLT
- add rsp,16
  add [rbx+DLEN],rax
+ mov rdi,[rbx+DISPLAY]
+ add rdi,[rbx+DLEN]
+ mov rsi,[rbx+TOKEN]
+ mov rdx,r15
+ call memcpy@PLT
+ add [rbx+DLEN],r15
+ mov rdi,[rbx+DISPLAY]
+ mov rax,[rbx+DLEN]
+ mov byte ptr [rdi+rax],10
+ inc qword ptr [rbx+DLEN]
 .Led_display_advance:
  cmp r14d,43
  je .Led_display_new
@@ -796,17 +804,21 @@ pg_edit_diff_create:
  mov r15,[rax+8]
  call .Led_token
  mov r13,rdx
+ mov [rbx+TOKEN],rax
  mov rdi,[rbx+PATCH]
  add rdi,[rbx+PLEN]
- mov rsi,[rbx+CAP]
- sub rsi,[rbx+PLEN]
- lea rdx,[rip+.Led_patch_line]
- mov ecx,r14d
- mov r8d,r15d
- mov r9,rax
- xor eax,eax
- call snprintf@PLT
- add [rbx+PLEN],rax
+ mov byte ptr [rdi],r14b
+ inc rdi
+ mov rsi,[rbx+TOKEN]
+ mov rdx,r15
+ call memcpy@PLT
+ mov rax,[rbx+PLEN]
+ add rax,r15
+ inc rax
+ mov rdi,[rbx+PATCH]
+ mov byte ptr [rdi+rax],10
+ inc rax
+ mov [rbx+PLEN],rax
  test r13,r13
  jnz .Led_patch_line_done
  mov rdi,[rbx+PATCH]
@@ -970,8 +982,7 @@ pg_edit_diff_create:
 .Led_empty: .asciz ""
 .Led_headers: .asciz "--- %.*s\n+++ %.*s\n"
 .Led_ellipsis: .asciz " %*s ...\n"
-.Led_numbered: .asciz "%c%*zu %.*s\n"
-.Led_patch_line: .asciz "%c%.*s\n"
+.Led_numbered: .asciz "%c%*zu "
 .Led_hunk_format: .asciz "@@ -%zu,%zu +%zu,%zu @@\n"
 .Led_no_eof: .ascii "\\ No newline at end of file\n"
 .Led_diff_key: .asciz "diff"

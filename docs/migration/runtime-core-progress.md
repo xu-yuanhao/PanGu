@@ -59,9 +59,9 @@
 
 ## 本批验证与集成状态
 
-- Edit的schema、解析、原文件匹配和实际写入使用按数量分配的替换向量；128项单次调用经真实文件读改写通过。成功消息沿Pi采用数量/路径，首个变更行保留在details。
-- 1304组文本与95组工具/参数语料对照实际固定Pi函数，覆盖17/32/65/128项、BOM/CRLF、逆序和参数修复；文本O0/O2 UBSan、文件工具ASan/UBSan及十处扩容失败无副作用通过。
-- Read已完成的1600组正文差分、Number/slice选择、替代解码、首行前缀与读取改写重试继续作为基线；完整truncation details、NUL等Edit边界与逐文件异步并发仍按K08补齐。
+- Edit的oldText/newText、原文件归一化、匹配、写入与diff/patch按显式长度保留NUL；路径继续拒绝NUL。动态替换向量、BOM/CRLF、原文件非重叠匹配与结构化details共用既有实现。
+- 1307组文本、95组工具/参数和245组diff/patch/firstChangedLine实际对照固定Pi/jsdiff，包含NUL、多块替换、逆序与模糊匹配；文本O0/O2 UBSan、真实文件工具ASan/UBSan与已有失败/中断恢复通过。
+- 上批128项单次Edit和Read的1600组正文差分继续作为基线；完整truncation details及逐文件异步并发仍按K08补齐。
 
 ## 当前接口边界
 
