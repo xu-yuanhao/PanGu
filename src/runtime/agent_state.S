@@ -717,7 +717,8 @@ pg_agent_state_peek:
  mov eax,5
  jmp .La_validate_text_end
 .La_validate_text_ok:
- xor eax,eax
+ mov rdi,rbx
+ call .Lam_validate
 .La_validate_text_end:
  AE 16
 .section .data.rel.ro
@@ -1580,6 +1581,17 @@ pg_agent_conversation_stage:
  call json_object_get_string_len@PLT
  test eax,eax
  jz .Lam_bad
+ cmp eax,255
+ ja .Lam_bad
+ mov [rsp+16],eax
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ xor esi,esi
+ mov edx,[rsp+16]
+ call memchr@PLT
+ test rax,rax
+ jnz .Lam_bad
  lea rax,[rip+.Lam_targets]
  mov rsi,[rax+r14*8]
  mov rdi,rbx
@@ -1695,4 +1707,32 @@ pg_agent_conversation_stage:
 .Lam_sources: .quad .Lam_provider,.Lam_model_id
 .Lam_targets: .quad .Lam_model_provider,.La_model
 .Lam_levels: .quad .Lam_off,.Lam_minimal,.Lam_low,.Lam_medium,.Lam_high,.Lam_xhigh,.Lam_max,0
+.section .note.GNU-stack,"",@progbits
+
+.text
+/* Reuse request translation to reject unsupported values before Doc mutation. */
+.Lam_validate:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ call json_object_new_object@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lam_validate_bad
+ mov rdi,rax
+ mov rsi,rbx
+ call .Lam_prepare
+ mov ebx,eax
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,ebx
+ jmp .Lam_validate_end
+.Lam_validate_bad:
+ mov eax,5
+.Lam_validate_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
 .section .note.GNU-stack,"",@progbits
