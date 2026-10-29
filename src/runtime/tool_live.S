@@ -197,6 +197,48 @@ pg_tool_live_stage:
  cmp rax,r13
  jne .Llv_each
  mov dword ptr [rsp+200],1
+ LG r14,status
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Llv_fields_begin
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Llv_done]
+ call strcmp@PLT
+ test eax,eax
+ jz .Llv_clear_begin
+ mov rdi,rbp
+ lea rsi,[rip+.Llv_running]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Llv_fields_begin
+.Llv_clear_begin:
+ mov qword ptr [rsp+192],0
+.Llv_clear_field:
+ mov rax,[rsp+192]
+ lea rdx,[rip+.Llv_progress_fields]
+ mov rbp,[rdx+rax*8]
+ test rbp,rbp
+ jz .Llv_fields_begin
+ mov rdi,[rsp+176]
+ mov rsi,rbp
+ lea rdx,[rsp+160]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Llv_clear_next
+ mov rdi,[rsp+152]
+ lea rsi,[rip+.Llv_delete_field_json]
+ mov rdx,[rsp+136]
+ xor ecx,ecx
+ mov r8,rbp
+ call .Llv_op
+ test eax,eax
+ jnz .Llv_finish
+.Llv_clear_next:
+ inc qword ptr [rsp+192]
+ jmp .Llv_clear_field
+.Llv_fields_begin:
  mov qword ptr [rsp+192],0
 .Llv_field:
  mov rax,[rsp+192]
@@ -432,3 +474,11 @@ pg_tool_live_created:
 .Llv_id: .asciz "id"
 .section .data.rel.ro
 .Llv_call_fields: .quad .Llv_id,.Llv_name,.Llv_arguments,0
+
+.section .rodata
+.Llv_done: .asciz "done"
+.Llv_running: .asciz "running"
+.Llv_delete_field_json: .asciz "[\"d\",[\"nestedTools\",0,\"\"]]"
+.section .data.rel.ro
+.Llv_progress_fields:
+ .quad .Llv_output,.Llv_details,.Llv_diagnostics,.Llv_droppedBytes,.Llv_droppedLines,0

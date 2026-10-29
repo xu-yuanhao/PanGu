@@ -986,6 +986,12 @@ pg_durable_tool_init:
  je .Ldt_poll_pending
  cmp eax,3
  jne .Ldt_poll_end_result
+ mov rdi,rbx
+ mov rsi,r14
+ lea rdx,[rip+.Ldt_progress_stage]
+ call pg_task_runner_commit_with@PLT
+ test eax,eax
+ jnz .Ldt_poll_error
  mov rax,[r12]
  mov rcx,[rax+32]
  test rcx,rcx
@@ -2104,3 +2110,179 @@ pg_durable_tool_executing:
 .section .rodata
 .Ldt_live_done_json: .asciz "{\"status\":\"done\",\"summary\":{}}"
 .Ldt_live_summary: .asciz "summary"
+
+.text
+/* Persist a bounded UTF-8 tail before publishing its output event. */
+.Ldt_progress_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rdx
+ mov qword ptr [rcx],0
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,12
+ rep stosq
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldt_progress_ok
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_progress_ok
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+64],rax
+ mov rsi,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ lea rdx,[rsp]
+ call pg_live_peek@PLT
+ test eax,eax
+ jnz .Ldt_progress_end
+ DGET "qword ptr [rsp]",live_nested_tools
+ mov r13,rax
+ test rax,rax
+ jz .Ldt_progress_ok
+ xor r14d,r14d
+.Ldt_progress_find:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_progress_ok
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ DGET rax,live_task_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,[rbx+8]
+ cmp rax,[rdx+16]
+ je .Ldt_progress_slot
+ inc r14
+ jmp .Ldt_progress_find
+.Ldt_progress_slot:
+ DGET rbp,live_dropped_bytes
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+56],rax
+ DGET rbp,hook_output
+ mov r14,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+24],rax
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov [rsp+16],rax
+ mov rdi,[rsp+24]
+ add rdi,[rbx+4224]
+ mov [rsp+32],rdi
+ inc rdi
+ call malloc@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ldt_progress_alloc
+ cmp qword ptr [rsp+24],0
+ je .Ldt_progress_copy_chunk
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ mov rdx,[rsp+24]
+ call memcpy@PLT
+.Ldt_progress_copy_chunk:
+ mov rdi,[rsp+8]
+ add rdi,[rsp+24]
+ lea rsi,[rbx+128]
+ mov rdx,[rbx+4224]
+ call memcpy@PLT
+ xor r14d,r14d
+ cmp qword ptr [rsp+32],4096
+ jbe .Ldt_progress_tail
+ mov r14,[rsp+32]
+ sub r14,4096
+ mov rdx,[rsp+8]
+.Ldt_progress_boundary:
+ cmp r14,[rsp+32]
+ jae .Ldt_progress_tail
+ movzx eax,byte ptr [rdx+r14]
+ and eax,192
+ cmp eax,128
+ jne .Ldt_progress_tail
+ inc r14
+ jmp .Ldt_progress_boundary
+.Ldt_progress_tail:
+ lea rdi,[rip+.Ldt_live_output_json]
+ call json_tokener_parse@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Ldt_progress_alloc
+ mov rdi,[rsp+8]
+ add rdi,r14
+ mov rsi,[rsp+32]
+ sub rsi,r14
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ldt_progress_alloc
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ldt_hook_output]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_progress_end
+ mov rdi,[rsp+56]
+ add rdi,r14
+ call json_object_new_uint64@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Ldt_live_dropped_bytes]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_progress_end
+ mov rdi,r12
+ mov rsi,[rsp+64]
+ mov rax,[rbx+8]
+ mov rdx,[rax+16]
+ mov rcx,[rsp+40]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+24]
+ xor r9d,r9d
+ call pg_tool_live_stage@PLT
+ jmp .Ldt_progress_end
+.Ldt_progress_ok:
+ xor eax,eax
+ jmp .Ldt_progress_end
+.Ldt_progress_alloc:
+ mov eax,5
+.Ldt_progress_end:
+ mov [rsp+72],eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov eax,[rsp+72]
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_live_nested_tools: .asciz "nestedTools"
+.Ldt_live_task_id: .asciz "taskId"
+.Ldt_live_dropped_bytes: .asciz "droppedBytes"
+.Ldt_live_output_json: .asciz "{}"

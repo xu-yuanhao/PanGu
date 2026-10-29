@@ -652,10 +652,19 @@ pg_durable_client_output:
  call json_object_object_get@PLT
  mov rdi,rax
  call json_object_get_int@PLT
+ mov [rsp+140],eax
+ cmp dword ptr [rsp+88],3
+ jne .Ldc_tool_regular_mode
+ mov dword ptr [rsp+88],1
+ jmp .Ldc_tool_finished_check
+.Ldc_tool_regular_mode:
  cmp dword ptr [rsp+88],0
  je .Ldc_tool_start_once
- cmp eax,1
- jne .Ldc_tool_end
+ test eax,eax
+ jz .Ldc_tool_end
+.Ldc_tool_finished_check:
+ cmp eax,2
+ je .Ldc_tool_end
  jmp .Ldc_tool_read
 .Ldc_tool_start_once:
  test eax,eax
@@ -670,6 +679,16 @@ pg_durable_client_output:
  call [r13+8]
  test eax,eax
  jnz .Ldc_tool_fail
+ CGET "qword ptr [rsp]",kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_tool_end
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_nested_tool_task]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_tool_end
  CGET "qword ptr [rsp]",input
  mov r14,rax
  mov dword ptr [rsp+136],0
@@ -684,11 +703,31 @@ pg_durable_client_output:
  test eax,eax
  jnz .Ldc_tool_model_input
  mov dword ptr [rsp+136],1
+ cmp dword ptr [rsp+88],0
+ jne .Ldc_nested_identity
+ CGET "qword ptr [rsp]",state
+ CGET rax,checkpoint
+ CGET rax,phase
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_tool_end
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_execute_phase]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldc_tool_end
+.Ldc_nested_identity:
  CGET r14,call
  mov [rsp+128],rax
  CGET rax,id
  jmp .Ldc_tool_call_identity
 .Ldc_tool_model_input:
+ cmp dword ptr [rsp+88],0
+ je .Ldc_tool_model_identity
+ cmp dword ptr [rsp+140],0
+ je .Ldc_tool_end
+.Ldc_tool_model_identity:
  CGET r14,call_id
 .Ldc_tool_call_identity:
  mov rbp,rax
@@ -738,6 +777,12 @@ pg_durable_client_output:
  jmp .Ldc_tool_find
 .Ldc_tool_found:
  CGET "qword ptr [rsp+128]",arguments
+ cmp dword ptr [rsp+136],0
+ je .Ldc_tool_arguments_ready
+ CGET "qword ptr [rsp]",state
+ CGET rax,checkpoint
+ CGET rax,arguments
+.Ldc_tool_arguments_ready:
  mov rdi,rax
  xor esi,esi
  call json_object_to_json_string_ext@PLT
@@ -940,6 +985,15 @@ pg_durable_client_publish:
  mov rdi,rbx
  xor edx,edx
  call pg_durable_client_tool@PLT
+ CGET "qword ptr [rsp]",value
+ CGET rax,id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,rbx
+ mov edx,3
+ call pg_durable_client_tool@PLT
+ jmp .Ldc_publish_tool_state
 .Ldc_publish_tool_finish:
  CGET "qword ptr [rsp]",value
  CGET rax,id
@@ -949,6 +1003,7 @@ pg_durable_client_publish:
  mov rdi,rbx
  mov edx,1
  call pg_durable_client_tool@PLT
+.Ldc_publish_tool_state:
  CGET "qword ptr [rsp]",value
  mov r14,rax
  CGET r14,kind
@@ -2673,3 +2728,8 @@ pg_durable_client_fault_task:
 .Ldc_terminal: .asciz "terminal"
 
 .Ldc_nested_tool_task: .asciz "pangu.tool"
+
+.section .rodata
+.Ldc_execute_phase: .asciz "execute"
+.Ldc_checkpoint: .asciz "checkpoint"
+.Ldc_phase: .asciz "phase"

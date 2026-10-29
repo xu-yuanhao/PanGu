@@ -314,6 +314,30 @@ pg_nested_call_start:
  call json_object_object_add@PLT
  test eax,eax
  jnz .Ln_stage_bad
+ NG "qword ptr [rbx+24]",id
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ln_stage_bad
+ mov [rsp+48],rax
+ mov rdi,rax
+ mov esi,'/'
+ call strrchr@PLT
+ test rax,rax
+ jz .Ln_parent_identity_ready
+ sub rax,[rsp+48]
+ mov esi,eax
+ mov rdi,[rsp+48]
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Ln_stage_bad
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Ln_parentCallId]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ln_stage_bad
+.Ln_parent_identity_ready:
  lea rdi,[rip+.Ln_options_json]
  call json_tokener_parse@PLT
  mov [rsp+24],rax
@@ -493,3 +517,7 @@ pg_nested_call_peek:
  call json_object_deep_copy@PLT
 .Ln_peek_end:
  NE 64
+
+.section .rodata
+.Ln_id: .asciz "id"
+.Ln_parentCallId: .asciz "parentCallId"
