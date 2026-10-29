@@ -270,7 +270,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的scheduler.ts runtime memo/read、types.ts TaskRuntime与harness/types.ts HookApi；harness-tasks.test.ts首写获胜/null/属性名和harness-tasks-recovery.test.ts跨phase/接手保留。原有终态replace路径删除memos，复用既有Session事务。
-- 实际调用链：DSO自定义Task → phase-scoped task_access → Session mutation line重读Task → 已有memo返回、缺失时提交首个候选；后续phase/调度器重开读取同一事实。实际Tool/Generation/Compaction hook scope绑定当前Runner，将同一access作为第四参数传给插件；请求前/响应后hooks使用asking Task的memo。getTask通过readOnLine与guarded Storage读取，snapshot入口复用现有DocumentReader。
-- 验证：产品ASan/UBSan通过扩展任务首写获胜、第二候选返回首值、null与缺失区分、getTask及调度器重开。真实DeepSeek请求前/响应后hooks共享memo、扩展工具/压缩/异步section完整工作流通过；Runtime整批与产品构建退出0，候选登记镜像G00与Assembly通过。嵌套调用与完整HookApi尚未勾选。
+- 实际调用链：DSO自定义Task → phase-scoped task_access → Session mutation line重读Task → 已有memo返回、缺失时提交首个候选；后续phase/调度器重开读取同一事实。实际Tool/Generation/Compaction hook scope绑定当前Runner，将同一access作为第四参数传给插件；请求前/响应后hooks使用asking Task的memo。getTask通过readOnLine与guarded Storage读取，snapshot入口复用现有DocumentReader；产品绑定fork-aware Entry/commit sequence及Document存储，实际hooks可读取当前/指定Entry时的文档。
+- 验证：产品ASan/UBSan通过扩展任务首写获胜、第二候选返回首值、null与缺失区分、getTask及调度器重开。真实DeepSeek请求前/响应后hooks共享memo、扩展工具/压缩/异步section完整工作流通过；本轮增加hooks当前/历史读取，完整真实DeepSeek复验退出0；Runtime整批与产品构建退出0，候选登记镜像G00与Assembly通过。嵌套调用与完整HookApi尚未勾选。
 - 接口与自审：extensions.registry ABI7，hook poll第四参数为借用pg_task_access；描述符尺寸保持，私有hook scope104字节。task_access采用手写Assembly，公开头注明phase有效期、所有权与状态；memo名字按字节hex映射到PanGu自身Task.memos。新增源码/导出/依赖登记，插件链接开放task_access公开入口。
-- 剩余与下一交付物：文档历史读取需由产品绑定fork-aware history provider；完整HookApi的模型目录与更完整调用生命周期检查继续核对。嵌套工具/子任务调用仍需沿ToolTask/TaskRuntime成组接入，保持既有任务、事务与所有权链。
+- 剩余与下一交付物：文档历史读取已绑定产品fork-aware history provider，新增ASan/UBSan验证配置前后当前/历史值分离及不可见Entry拒绝；完整HookApi的模型目录与更完整调用生命周期检查继续核对。嵌套工具/子任务调用仍需沿ToolTask/TaskRuntime成组接入，保持既有任务、事务与所有权链。

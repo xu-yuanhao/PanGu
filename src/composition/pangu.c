@@ -81,7 +81,7 @@ static struct {
  const pg_tool_registry *declared_tools;
  const pg_tool_provider *tool_provider;
  pg_tools selected_tools,leased_tools;
- pg_extension_registry extension_registry;pg_extension_control extension_control;pg_task_resolver task_resolver;pg_prompt_preparer prompt_preparer;pg_durable_prepare async_prepare;
+ pg_extension_registry extension_registry;pg_extension_control extension_control;pg_task_resolver task_resolver;pg_document_history_reader task_history;pg_prompt_preparer prompt_preparer;pg_durable_prepare async_prepare;
  const pg_extensions *extensions;pg_extension_result model_extensions,tool_extensions;pg_extension_tools extension_tools;
  pg_tool_registry offered_tools,allowed_tools;
  pg_agent_tools_gate tool_gate;
@@ -150,6 +150,7 @@ static void foreground(void){
 static int backend_close(void *ctx){(void)ctx;int result=pg_record_jsonl_close(&durable.backend);if(!result)durable.storage_ready=0;return result?-1:0;}
 static int record_read(void *ctx,unsigned table,uint64_t id,struct json_object **out){(void)ctx;return pg_record_memory_read(&durable.backend.memory,(pg_record_table)table,id,out);}
 static int record_scan(void *ctx,const pg_memory_query *query,pg_memory_page *page){(void)ctx;return pg_record_memory_scan(&durable.backend.memory,query,page);}
+static int task_history_entry(void *ctx,uint64_t conversation,uint64_t id,json_object **out,uint64_t *sequence){return pg_record_memory_entry(ctx,id,conversation,out,sequence);}
 static int document_scan(void *ctx,const pg_document_query *query,pg_memory_page *page){(void)ctx;return pg_record_memory_scan_documents(&durable.backend.memory,query,page);}
 static int mint(void *ctx,uint64_t *id){(void)ctx;return pg_record_memory_mint(&durable.backend.memory,id);}
 static int resolve(void *ctx,pg_slice name,const pg_task_definition **out){
@@ -219,13 +220,13 @@ static int model_fetch_deferred(void *ctx,const pg_model *model,const struct jso
 static int model_cancel_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->cancel_deferred?durable.model_provider->cancel_deferred(model->context,handle):0;}
 static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
 static int extension_tool_hook_poll(void *ctx,uint64_t id,unsigned event,const json_object *request,void **state,json_object **out){
- (void)ctx;(void)id;*out=0;if(!*state){if(pg_extension_hook_open(&durable.tool_extensions,event,request,state))return -5;pg_task_runner *runner=pg_task_scheduler_find(&durable.scheduler,id);if(!runner||pg_extension_hook_bind_access(*state,runner,0))return -5;}int result=pg_extension_hook_poll(*state,out);if(!result){pg_extension_hook_close(*state);*state=0;}return result;
+ (void)ctx;(void)id;*out=0;if(!*state){if(pg_extension_hook_open(&durable.tool_extensions,event,request,state))return -5;pg_task_runner *runner=pg_task_scheduler_find(&durable.scheduler,id);if(!runner||pg_extension_hook_bind_access(*state,runner,&durable.task_history))return -5;}int result=pg_extension_hook_poll(*state,out);if(!result){pg_extension_hook_close(*state);*state=0;}return result;
 }
 static void extension_tool_hook_close(void *ctx,void *state){(void)ctx;pg_extension_hook_close(state);}
 static int extension_tool_validate(void *ctx,const json_object *call){(void)ctx;return pg_tool_registry_check_json(&durable.allowed_tools,call);}
 static const pg_durable_tool_hooks extension_tool_hooks={0,extension_tool_hook_poll,extension_tool_hook_close,extension_tool_validate};
 static int extension_generation_hook_poll(void *ctx,uint64_t id,unsigned event,const json_object *request,void **state,json_object **out){
- (void)ctx;*out=0;if(!*state){json_object *task=0,*selection=0;if(record_read(0,PG_TABLE_TASK,id,&task))return -5;uint64_t conversation=json_object_get_uint64(json_object_object_get(task,"conversationId"));json_object_put(task);int result=pg_agent_state_read(&durable.session,conversation,&selection);if(!result)result=pg_extension_hook_resolve_open(durable.extensions,selection,durable.declared_tools,event,request,state);json_object_put(selection);if(!result){pg_task_runner *runner=pg_task_scheduler_find(&durable.scheduler,id);result=!runner?7:pg_extension_hook_bind_access(*state,runner,0);}if(result)return -5;}return pg_extension_hook_poll_event(*state,event,request,out);
+ (void)ctx;*out=0;if(!*state){json_object *task=0,*selection=0;if(record_read(0,PG_TABLE_TASK,id,&task))return -5;uint64_t conversation=json_object_get_uint64(json_object_object_get(task,"conversationId"));json_object_put(task);int result=pg_agent_state_read(&durable.session,conversation,&selection);if(!result)result=pg_extension_hook_resolve_open(durable.extensions,selection,durable.declared_tools,event,request,state);json_object_put(selection);if(!result){pg_task_runner *runner=pg_task_scheduler_find(&durable.scheduler,id);result=!runner?7:pg_extension_hook_bind_access(*state,runner,&durable.task_history);}if(result)return -5;}return pg_extension_hook_poll_event(*state,event,request,out);
 }
 static const pg_durable_generation_hooks extension_generation_hooks={0,extension_generation_hook_poll,extension_tool_hook_close};
 static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
@@ -330,6 +331,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  if(json_object_object_add(durable.configuration,"provider",json_object_new_string(selected->identity)))return 1;
  durable.resource_host=(pg_resource_host){0,resource_build,resource_busy};if(pg_resources_open(&durable.resources,&durable.resource_host,durable.configuration))return 1;
  foreground_resources=(pg_resource_ops){&durable.resources,pg_resources_reload,pg_resources_snapshot,resource_release,pg_resources_expand};
+ pg_record_memory_documents(&durable.backend.memory,&durable.task_history.documents);durable.task_history.context=&durable.backend.memory;durable.task_history.entry=task_history_entry;
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
  durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;if(durable.extensions)pg_durable_tool_bind_hooks(&durable.tool,&extension_tool_hooks);
  durable.prompt_preparer=(pg_prompt_preparer){durable.extensions,durable.declared_tools,0,prepare_load,prepare_finish,wall_time};durable.async_prepare=(pg_durable_prepare){&durable.prompt_preparer,pg_prompt_preparer_poll,pg_prompt_preparer_close};

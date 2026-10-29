@@ -42,7 +42,7 @@
 ## 本批验证与集成状态
 
 - `task_access.S`接入DSO自定义任务的持久memo和getTask；Task/Hook共享asking Task的memos，先写获胜、null与缺失区分，Session事务重读后提交；终态沿原有路径清理memos。
-- Tool/Generation/Compaction的真实hook scope绑定当前Runner，为callback提供phase-scoped access；读取复用DocumentReader与guarded Storage，未绑定history时历史读取明确拒绝。
+- Tool/Generation/Compaction的真实hook scope绑定当前Runner，为callback提供phase-scoped access；读取复用DocumentReader与guarded Storage；产品绑定fork-aware Entry/commit sequence及Document存储，hooks可读取当前/历史快照。新增专项核对配置前后值分离和不可见Entry拒绝。
 - 产品ASan/UBSan通过memo争用候选、null、任务读取及调度器重开；真实DeepSeek hooks及已有完整扩展工作流、Runtime整批、产品构建、候选G00/Assembly通过；完整HookApi与嵌套调用仍属待完成范围。
 
 ## 当前接口边界
