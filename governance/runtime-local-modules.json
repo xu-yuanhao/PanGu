@@ -1851,6 +1851,8 @@
         "pg_durable_generation_bind_compaction",
         "pg_durable_request_read",
         "pg_durable_compaction_bind_hooks",
+        "pg_durable_compaction_bind_extensions",
+        "pg_compaction_hook_bind_scope",
         "pg_compaction_hook_open",
         "pg_compaction_hook_poll",
         "pg_compaction_hook_close",
@@ -2367,7 +2369,7 @@
         "json-c",
         "system libc"
       ],
-      "role": "Pi Registry snapshot selection, ordered tool/section composition and wraps with native scoped leases",
+      "role": "Pi Registry snapshot selection, ordered tool/section composition, wraps and Generation/Tool/Compaction phase hooks with native scoped leases",
       "exports": [
         "pg_extensions_resolve",
         "pg_extensions_prepare",

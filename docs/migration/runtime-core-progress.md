@@ -23,6 +23,7 @@
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
+| 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
@@ -39,9 +40,9 @@
 
 ## 本批验证与集成状态
 
-- Generation四个hook事件接入真实请求/响应/工具轮次与回答边界；统一引擎按phase保留扩展，临时请求修改与持久会话记录分离。onYield与排队输入/reset按提交时事实决定，续接保留placed输入。
-- 产品`--native-tasks --sanitize`通过事件切换/挂起/释放、原Tool hook链和请求未提供工具拒绝；Runtime整批退出0，两后端Durable专项通过。
-- `--live-extensions`真实DeepSeek通过请求marker、写文件及afterTools、YIELD_START→YIELD_END续接、会话记录核对、Tool声明名单与请求前取消；最终产品构建、G00/Assembly检查通过。
+- 可变扩展注册表已接通产品：完整候选验证、同名保序替换、撤销、不可变快照和所有者引用；当前phase使用旧快照，新解析采用新状态。关闭Host时等待外借快照后释放父DSO。
+- beforeCompact采用同一扩展注册表及事件引擎，固定请求/选择跨挂起续接，首个decline/summary决定；摘要沿既有持久任务及Submission放置，取消释放callback与代码引用。原有注入式压缩服务保持可组合。
+- 产品ASan/UBSan通过真实压缩任务中的挂起撤销/替换、旧摘要放置、新任务decline、取消与所有者引用归零；原compaction.hooks专项、Runtime整批及产品构建通过。真实DeepSeek扩展闭环通过：请求修改、工具执行、续接、运行中撤销、取消和新注册表压缩后继续对话，模型准确回忆已放置摘要中的marker。
 
 ## 当前接口边界
 

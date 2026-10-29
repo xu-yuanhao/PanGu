@@ -661,7 +661,7 @@ static void compaction_lifecycle_cases(void){
 static uint64_t usage_model_tokens(struct json_object *ledger){uint64_t tokens=0;struct json_object *models=json_object_object_get(ledger,"models");json_object_object_foreach(models,key,value){(void)key;tokens+=json_object_get_uint64(json_object_object_get(value,"totalTokens"));}return tokens;}
 static int compaction_live_cases(unsigned automatic){
  unsigned retry_case=automatic==4;if(retry_case)automatic=0;
- _Static_assert(sizeof(pg_durable_compaction)==264&&offsetof(pg_durable_compaction,hooks)==256&&sizeof(pg_compaction_request)==32,"compaction ABI");
+ _Static_assert(sizeof(pg_durable_compaction)==272&&offsetof(pg_durable_compaction,hooks)==256&&sizeof(pg_compaction_request)==32,"compaction ABI");
  assert(getenv("PANGU_MODEL_API_KEY")||getenv("MIMO_API_KEY"));assert(!curl_global_init(CURL_GLOBAL_DEFAULT));
  for(unsigned backend=0;backend<2;backend++){
   char parent[]="/tmp/pangu-compaction-live-XXXXXX";assert(mkdtemp(parent));generation_case *g=calloc(1,sizeof(*g));assert(g);g->scenario=retry_case?31:(automatic==3||automatic==5||automatic==6)?30:automatic==2?25:automatic?24:23;task_case *base=&g->tools.base;base->f.kind=backend;base->f.now=100;snprintf(base->f.path,sizeof(base->f.path),"%s/%s",parent,backend?".pangu":"pangu.sqlite");backend_open(&base->f);seed(&base->f);open_session(&base->f);task_bind(base);generation_bind(g);

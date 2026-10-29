@@ -461,7 +461,7 @@ pg_extensions_close:
  add rax,[r13+56]
  cmp dword ptr [rax],1
  jb .Lx_validate_bad
- cmp dword ptr [rax],6
+ cmp dword ptr [rax],7
  ja .Lx_validate_bad
  cmp qword ptr [rax+16],0
  je .Lx_validate_bad
@@ -1341,6 +1341,8 @@ pg_extension_hook_poll:
  call pg_document_value_valid@PLT
  test eax,eax
  jz .Lxh_poll_invalid
+ cmp dword ptr [rbx+52],7
+ je .Lxh_poll_compact
  cmp dword ptr [rbx+52],3
  je .Lxh_poll_before_request
  cmp dword ptr [rbx+52],5
@@ -1394,6 +1396,32 @@ pg_extension_hook_poll:
  test eax,eax
  jnz .Lxh_poll_bad
  jmp .Lxh_poll_next_hook
+.Lxh_poll_compact:
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_decline]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lxh_poll_compact_accept
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_summary]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+.Lxh_poll_compact_accept:
+ mov rdi,[rbx+16]
+ call json_object_get@PLT
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_decision]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_stop
 .Lxh_poll_before_request:
  mov rdi,[rbx+16]
  lea rsi,[rip+.Lxh_messages]
@@ -1599,9 +1627,13 @@ pg_extension_hook_resolve_open:
 .Lxh_after_response: .asciz "afterResponse"
 .Lxh_yield: .asciz "onYield"
 .Lxh_after_tools: .asciz "afterTools"
+.Lxh_before_compact: .asciz "beforeCompact"
+.Lxh_decline: .asciz "decline"
+.Lxh_summary: .asciz "summary"
+.Lxh_decision: .asciz "decision"
 .section .data.rel.ro
 .balign 8
-.Lxh_events: .quad 0,.Lxh_before,.Lxh_after,.Lxh_before_request,.Lxh_after_response,.Lxh_yield,.Lxh_after_tools
+.Lxh_events: .quad 0,.Lxh_before,.Lxh_after,.Lxh_before_request,.Lxh_after_response,.Lxh_yield,.Lxh_after_tools,.Lxh_before_compact
 .text
 .globl pg_extension_hook_poll_event
 .type pg_extension_hook_poll_event,@function

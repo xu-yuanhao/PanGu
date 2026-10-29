@@ -1283,6 +1283,7 @@ pg_durable_compaction_init:
  je .Lcc_init_return
  mov [rdi],rsi
  mov qword ptr [rdi+256],0
+ mov qword ptr [rdi+264],0
  lea rax,[rip+.Lcc_task_name]
  mov [rdi+8],rax
  mov qword ptr [rdi+16],16
@@ -1460,7 +1461,10 @@ pg_durable_compaction_init:
  jmp .Lcc_select_phase_end
 .Lcc_select_hooks:
  cmp qword ptr [rbx+256],0
+ jne .Lcc_select_has_hooks
+ cmp qword ptr [rbx+264],0
  je .Lcc_select_phase_prepare
+.Lcc_select_has_hooks:
  cmp qword ptr [r12+56],0
  jne .Lcc_select_hook_storage
  mov edi,1
@@ -1496,6 +1500,11 @@ pg_durable_compaction_init:
  call pg_compaction_hook_open@PLT
  test eax,eax
  jnz .Lcc_select_phase_bad
+ mov rax,[r12+56]
+ mov rdi,[rax+176]
+ mov rsi,[rbx+264]
+ mov rdx,[r12+16]
+ call pg_compaction_hook_bind_scope@PLT
 .Lcc_select_hook_poll:
  mov rax,[r12+56]
  mov rdi,[rax+176]
@@ -3531,5 +3540,10 @@ pg_durable_compaction_bind_hooks:
  mov [rdi+256],rsi
  ret
 
+.globl pg_durable_compaction_bind_extensions
+.type pg_durable_compaction_bind_extensions,@function
+pg_durable_compaction_bind_extensions:
+ mov [rdi+264],rsi
+ ret
 .section .rodata
 .Lcc_decline: .asciz "decline"

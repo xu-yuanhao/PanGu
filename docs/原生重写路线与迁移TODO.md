@@ -154,6 +154,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 扩展快照接通实际请求/工具链：稳定名称默认/显式/add/remove选择、工具和提示段同名覆盖保序、同步wrapTool/wrapSection、改名/错误移除并报告、标签渲染及请求内固定选择；未改动的基础工具仍走注入提供者。
 - [x] beforeTool/afterTool进入真实Tool阶段：意图前校验/参数链/首个block、最终参数checkpoint、结果替换链与元数据、pending/取消/重开、异常处理；实际DeepSeek写入路径由hook改写，原assistant记录保持。
 - [x] Generation四阶段hooks进入产品：beforeRequest临时消息链、afterResponse/afterTools观察、onYield首个续接；phase固定选择、挂起/取消、回答与续接/队列边界原子提交。新请求保存offeredTools并随并行/串行子任务传递，未提供的工具在效果前拒绝。
+- [x] 可变注册表接入实际消费者：同名替换保序、完整候选验证后发布、安装/撤销及独立所有者引用；运行中phase固定快照，旧快照归还后释放，Host关闭等待外借快照。
+- [x] beforeCompact接入同一扩展选择/注册表：首个decline/summary、挂起/取消、阶段快照及替换后下一任务采用新hook；摘要进入原有Task/Submission持久放置链。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -264,8 +266,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` generation request/classify/answer/finishToolRound，以及scheduler.ts每phase固定Agent的hook runner；沿最新跟踪`6eb99ad`的unoffered准入修复，按PanGu请求工具声明保存名字列表。Harness/Cordis继续约束代码lease与释放。
-- 实际调用链：Generation请求视图 → beforeRequest临时消息链 → 真实模型 → 终态afterResponse → 工具轮次afterTools或回答onYield → 原子记录/边界提交。onYield在无排队用户/reset时追加PanGu用户Entry并创建后继Generation，placed输入保留至最终回答；原请求消息与会话记录分离。phase scope跨多个hook事件固定扩展并在取消/结束释放。offeredTools随请求配置、并行/串行Tool输入保存，未提供名字在解析/Hook/效果前拒绝。
-- 验证：产品ASan/UBSan通过通用hook phase事件切换/挂起/释放、既有Tool hooks与原生DSO、未提供工具拒绝且无beforeTool调用/文件。真实DeepSeek完成临时marker请求（历史无临时用户消息）、文件写入与afterTools、YIELD_START→续接UserEntry→YIELD_END，以及请求前挂起取消；实际Tool任务均有声明名单。Runtime整批、两后端Durable专项和产品构建通过，最终检查见当前实现记录。
-- 接口与自审：extensions.registry ABI3采用统一32字节hook描述符和单一事件引擎；Generation312字节尾部绑定hooks，操作持有phase scope与owned JSON。Client/Task/TUI布局保持。Inputs新增内部续接边界kind6，保留旧边界含义；新增源码入口已登记，旧Tool专名hook导出已原地替换。
-- 剩余与下一交付物：K09继续完整HookApi、运行中安装/替换/撤销、异步section/失败回退/SystemEntry计划；K07/K08仍核对未启动串行调用取消的细分结果及更完整内容/控制语义。下一批把扩展注册表发布与宿主生命周期连接到现有消费者，按完整配置变更/运行/撤销工作流推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/registry.ts`、`compaction.ts` select/beforeCompact/place及scheduler的phase固定Agent；Pi跟踪`6eb99ad`、Harness跟踪`f3803c9`的已知差异沿本批固定快照评估。Harness/Cordis提供作用域/代码引用与释放语义。
+- 实际调用链：Host extensions.control → 注册表候选验证/发布 → prepare、模型、工具及hook消费者取得不可变快照。压缩select构建固定entries/messages/firstKept → 同一扩展beforeCompact → 首个decline或summary → 原有持久任务/Submission放置；未决定时沿注入压缩服务及模型摘要路径继续。挂起中替换/撤销保留旧phase，下一任务解析新快照；取消先释放callback资源，再归还快照。
+- 验证：`test_product_resources.py --native-tasks --sanitize`通过注册表候选失败、替换/撤销、旧快照执行、延迟所有者释放及Host关闭等待；新增实际压缩任务覆盖挂起中撤销并替换、旧摘要落库、下一任务decline、取消及引用归零。原`--compaction-hooks`服务专项通过；Runtime整批与产品构建通过。真实DeepSeek扩展闭环通过，挂起撤销/替换形成的摘要可在继续对话中准确回忆，原请求/工具/续接与取消工作流保持。
+- 接口与自审：extensions.registry ABI4提供acquire/release，扩展结果1248字节持有lease；注册表104字节，控制函数表32字节。beforeCompact为统一hook事件7；Compaction272字节尾部绑定现有hook函数表，私有压缩hook状态72字节持有scope。Client/Task/TUI布局保持。新增导出已登记；控制差异为模块入口登记，G00/Assembly通过。
+- 剩余与下一交付物：K09继续自定义Task与可变注册表/调度定义引用整合、完整HookApi、异步section/失败回退/SystemEntry计划；K07/K08继续串行未启动调用取消及内容/控制语义。下一交付物将注册表中的自定义Task与现有Scheduler解析/清理连接，完成安装、执行、替换、撤销与持久重开工作流。

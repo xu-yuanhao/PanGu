@@ -15,11 +15,14 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
 #define PG_EXTENSION_AFTER_RESPONSE 4u
 #define PG_EXTENSION_ON_YIELD 5u
 #define PG_EXTENSION_AFTER_TOOLS 6u
+#define PG_EXTENSION_BEFORE_COMPACT 7u
 /* Tool request {call,result?}; before decisions {arguments?,block?}, after decisions
    replace native {output:string,isError?,details?,diagnostics?,structuredOutput?,usage?}.
    beforeRequest uses canonical {messages,...} and returns {messages}; response
    and yield use {message}, yield may return {continue:string|content[]};
-   afterTools observes {assistant,results}.
+   afterTools observes {assistant,results}; beforeCompact receives
+   {reason,entries,messages,firstKept,instructions?}, first {decline:true} or
+   {summary:string} wins.
    Decisions transfer owned strict JSON. Request is borrowed through completion
    or cancellation. 0 completed, 1 pending with stable request, negative error. Cancel releases
    pending callback resources before its extension lease closes. */

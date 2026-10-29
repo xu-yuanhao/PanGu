@@ -65,6 +65,8 @@ pg_compaction_hook_open:
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
  movdqu [rsp+16],xmm0
+ test rbx,rbx
+ jz .Lh_open_alloc
  cmp dword ptr [rbx],1
  jne .Lh_open_bad
  cmp dword ptr [rbx+4],40
@@ -77,7 +79,7 @@ pg_compaction_hook_open:
  je .Lh_open_bad
 .Lh_open_alloc:
  mov edi,1
- mov esi,48
+ mov esi,72
  call calloc@PLT
  mov [rsp],rax
  test rax,rax
@@ -220,7 +222,31 @@ pg_compaction_hook_poll:
  HF 32
  mov rbx,rdi
  mov r12,[rdi]
+ cmp dword ptr [rbx+44],0
+ jne .Lh_poll_next
+ mov rax,[rbx+56]
+ test rax,rax
+ jz .Lh_poll_next
+ mov qword ptr [rsp],0
+ mov rdi,[rax]
+ mov rsi,[rbx+64]
+ mov edx,7
+ mov rcx,[rbx+8]
+ lea r8,[rbx+48]
+ mov r9,rsp
+ call [rax+8]
+ test eax,eax
+ jnz .Lh_poll_scoped_return
+ mov dword ptr [rbx+44],1
+ HG "qword ptr [rsp]",decision
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rbx+24],rax
+ mov rdi,[rsp]
+ call json_object_put@PLT
 .Lh_poll_next:
+ test r12,r12
+ jz .Lh_poll_done
  cmp qword ptr [rbx+24],0
  jne .Lh_poll_done
  mov rax,[rbx+32]
@@ -264,6 +290,12 @@ pg_compaction_hook_poll:
 .Lh_poll_done:
  xor eax,eax
  HE 32
+.Lh_poll_scoped_return:
+ mov [rsp+8],eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,[rsp+8]
+ HE 32
 .Lh_poll_pending:
  mov rdi,[rsp]
  call json_object_put@PLT
@@ -302,6 +334,15 @@ pg_compaction_hook_close:
  mov rsi,[rbx+8]
  call [rcx+16]
 .Lh_close_values:
+ mov rax,[rbx+56]
+ test rax,rax
+ jz .Lh_close_request
+ cmp qword ptr [rbx+48],0
+ je .Lh_close_request
+ mov rdi,[rax]
+ mov rsi,[rbx+48]
+ call [rax+16]
+.Lh_close_request:
  mov rdi,[rbx+8]
  call json_object_put@PLT
  mov rdi,[rbx+16]
@@ -313,7 +354,14 @@ pg_compaction_hook_close:
  pop rbx
 .Lh_close_return:
  ret
+.globl pg_compaction_hook_bind_scope
+.type pg_compaction_hook_bind_scope,@function
+pg_compaction_hook_bind_scope:
+ mov [rdi+56],rsi
+ mov [rdi+64],rdx
+ ret
 .section .rodata
+.Lh_decision: .asciz "decision"
 .Lh_firstKept: .asciz "firstKept"
 .Lh_reason: .asciz "reason"
 .Lh_instructions: .asciz "instructions"

@@ -16,12 +16,14 @@ typedef struct {
  pg_task_definition definition;
  pg_task_phase phases[4];
  const pg_compaction_hooks *hooks;
+ const pg_durable_generation_hooks *extension_hooks;
 } pg_durable_compaction;
 /* Host uses the selected model with an empty executable tool catalog. Borrow
    it through scheduler cleanup. Start commits one conversation-owned Task;
    drive the existing Scheduler and query its durable terminal outcome. */
 int pg_durable_compaction_init(pg_durable_compaction *,const pg_durable_generation_host *);
 void pg_durable_compaction_bind_hooks(pg_durable_compaction *,const pg_compaction_hooks *);
+void pg_durable_compaction_bind_extensions(pg_durable_compaction *,const pg_durable_generation_hooks *);
 int pg_durable_compaction_start(pg_durable_compaction *,pg_durable_session *,
  const pg_task_runner_host *,const pg_compaction_request *,uint64_t *task_id);
 typedef struct {
