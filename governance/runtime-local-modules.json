@@ -273,10 +273,11 @@
         "POSIX directory-relative file APIs",
         "tools.path.local.v0"
       ],
-      "role": "handwritten cwd-relative or absolute POSIX UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; Shared Pi path preparation maps pasted @/spaces, home and file URLs and folds lexical dot segments before POSIX symlink resolution; regular-file and explicit safe replay checks remain; explicit internal snapshot factory shares the read engine but rejects pagination arguments and never truncates source input",
+      "role": "handwritten cwd-relative or absolute POSIX reader; default Durable inline PNG/JPEG/GIF/WebP metadata path with header dimensions, 4.5 MiB base64/2000px limits, stable reads and one retry; UTF-8 regular-file line pager; positive integer offset/limit, 4095-byte/2000-line output and 1 MiB scan ceiling; PARTIAL is not a full-file snapshot; Shared Pi path preparation maps pasted @/spaces, home and file URLs and folds lexical dot segments before POSIX symlink resolution; regular-file and explicit safe replay checks remain; explicit internal snapshot factory shares the read engine but rejects pagination arguments and never truncates source input",
       "exports": [
         "pg_read_tool_open",
         "pg_read_tool_close",
+        "pg_read_tool_snapshot",
         "pg_read_tool_definition",
         "pg_read_snapshot_definition"
       ],

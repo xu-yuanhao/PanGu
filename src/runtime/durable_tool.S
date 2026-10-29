@@ -1219,6 +1219,15 @@ pg_durable_tool_init:
  call json_object_is_type@PLT
  test eax,eax
  jz .Ldt_snapshot_invalid
+ DGET "qword ptr [r14+184]",hook_output
+ test rax,rax
+ jz .Ldt_snapshot_diagnostics
+ mov rdi,r14
+ mov rsi,rax
+ call .Ldt_content_accept
+ test eax,eax
+ jnz .Ldt_snapshot_invalid
+.Ldt_snapshot_diagnostics:
  DGET "qword ptr [r14+184]",diagnostics
  test rax,rax
  jz .Ldt_snapshot_mark
@@ -1929,9 +1938,16 @@ pg_durable_tool_bind_hooks:
  test rax,rax
  jz .Ldt_hooks_bad
 .Ldt_hooks_result:
+ mov rdi,[r13+416]
+ test rdi,rdi
+ jz .Ldt_hooks_text_result
+ call json_object_get@PLT
+ jmp .Ldt_hooks_output_ready
+.Ldt_hooks_text_result:
  mov rdi,[r13+128]
  mov esi,[r13+136]
  call json_object_new_string_len@PLT
+.Ldt_hooks_output_ready:
  mov rdi,[rsp]
  lea rsi,[rip+.Ldt_hook_output]
  mov rdx,rax

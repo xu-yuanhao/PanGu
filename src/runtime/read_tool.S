@@ -15,7 +15,7 @@
 .Lmsg_offset: .asciz "read offset is beyond end of file"
 .Lmsg_scan: .asciz "read scan limit exceeded (1 MiB per call)"
 .Lread_name:     .asciz "read"
-.Lread_desc: .asciz "Read a regular UTF-8 text file using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution. Oversized individual lines are refused."
+.Lread_desc: .asciz "Read text files and inline PNG, JPEG, GIF or WebP images using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution. Oversized individual lines are refused."
 .Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
@@ -249,6 +249,11 @@ li_validate:
 /* ---- int li_authorize(void *ctx, args.data, args.size)：根 fd 有效即可 ---- */
 .type li_authorize,@function
 li_authorize:
+ push rdi
+ mov rdi,[rdi+PG_RTL_RESULT]
+ call json_object_put@PLT
+ pop rdi
+ mov qword ptr [rdi+PG_RTL_RESULT],0
  mov ecx, dword ptr [rdi + PG_RTL_DIRECTORY]
  xor eax, eax
  test ecx, ecx
@@ -413,6 +418,13 @@ li_execute_read:
  mov r13d,PG_RTL_OUTPUT_MAX
 .Lrd_capacity:
  mov r14, r9
+ mov [rsp+4240],rsi
+ mov [rsp+4248],rdx
+ mov rdi,[rbx+PG_RTL_RESULT]
+ call json_object_put@PLT
+ mov qword ptr [rbx+PG_RTL_RESULT],0
+ mov rsi,[rsp+4240]
+ mov rdx,[rsp+4248]
  cmp r13, 2
  jb .Lrd_invalid
  mov r8, rdx
@@ -461,6 +473,22 @@ li_execute_read:
  and eax, PG_RTL_S_IFMT
  cmp eax, PG_RTL_S_IFREG
  jne .Lrd_refused
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_text_file
+ mov rdi,rbx
+ mov rsi,[rsp+4256]
+ mov rdx,[rsp+4096+48]
+ call .Lread_image
+ cmp eax,-1
+ je .Lrd_text_file
+ mov [rsp+4344],eax
+ mov rdi,[rsp+4256]
+ call close@PLT
+ mov qword ptr [r14],0
+ mov byte ptr [r12],0
+ mov eax,[rsp+4344]
+ jmp .Lrd_out
+.Lrd_text_file:
  mov qword ptr [rsp+4344],0 /* final complete/partial status */
  cmp qword ptr [rsp+4272],1
  je .Lrd_initial_status
@@ -705,6 +733,7 @@ pg_read_tool_open:
  jz .Lro_bad
  push rbx /* r 跨 open 调用保存于 callee-saved */
  mov rbx, rdi
+ mov qword ptr [rbx+PG_RTL_RESULT],0
  mov rdi, rsi
  mov esi, 0xB0000 /* O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW（flags 为第2参） */
  xor eax, eax
@@ -784,3 +813,421 @@ pg_read_snapshot_definition:
 .size pg_read_snapshot_definition,.-pg_read_snapshot_definition
 
 .section .note.GNU-stack,"",@progbits
+
+/* Pi Durable tools/read.ts and tools/image.ts, d5b3de22; MIT.
+   The opened regular file stays owned by the caller. */
+.macro RI_ENTER
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,392
+.endm
+.macro RI_LEAVE
+ add rsp,392
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.endm
+.text
+.globl pg_read_tool_snapshot
+.type pg_read_tool_snapshot,@function
+pg_read_tool_snapshot:
+ test rdi,rdi
+ jz .Lris_bad
+ test rsi,rsi
+ jz .Lris_bad
+ push rbx
+ mov rbx,rsi
+ mov qword ptr [rsi],0
+ mov rdi,[rdi+PG_RTL_RESULT]
+ test rdi,rdi
+ jz .Lris_empty
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ pop rbx
+ ret
+.Lris_empty:
+ mov qword ptr [rbx],0
+ xor eax,eax
+ pop rbx
+ ret
+.Lris_bad:
+ mov eax,5
+ ret
+.Lread_image:
+ RI_ENTER
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ xor ebp,ebp
+ mov qword ptr [rsp+360],0
+ mov edi,r12d
+ mov rsi,rsp
+ mov edx,32
+ xor ecx,ecx
+ call pread@PLT
+ test rax,rax
+ js .Lrim_not_image
+ mov rdi,rsp
+ mov rsi,rax
+ call .Lrim_format
+ test eax,eax
+ jz .Lrim_not_image
+ cmp eax,5
+ je .Lrim_unsupported
+ cmp r13,3538944
+ ja .Lrim_unsupported
+ mov dword ptr [rsp+336],0
+.Lrim_attempt:
+ mov edi,r12d
+ lea rsi,[rsp+32]
+ call fstat@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov r13,[rsp+32+48]
+ cmp r13,3538944
+ ja .Lrim_unsupported
+ lea rdi,[r13+1]
+ call malloc@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lrim_unsupported
+ xor r15d,r15d
+.Lrim_read:
+ cmp r15,r13
+ jae .Lrim_check
+ mov edi,r12d
+ lea rsi,[r14+r15]
+ mov rdx,r13
+ sub rdx,r15
+ mov rcx,r15
+ call pread@PLT
+ test rax,rax
+ jle .Lrim_unsupported
+ add r15,rax
+ jmp .Lrim_read
+.Lrim_check:
+ mov edi,r12d
+ lea rsi,[rsp+176]
+ call fstat@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov rax,[rsp+32+48]
+ cmp rax,[rsp+176+48]
+ jne .Lrim_changed
+ mov rax,[rsp+32+88]
+ cmp rax,[rsp+176+88]
+ jne .Lrim_changed
+ mov rax,[rsp+32+96]
+ cmp rax,[rsp+176+96]
+ jne .Lrim_changed
+ mov rdi,r14
+ mov rsi,r13
+ call .Lrim_format
+ test eax,eax
+ jz .Lrim_unsupported
+ cmp eax,5
+ je .Lrim_unsupported
+ test edx,edx
+ jz .Lrim_unsupported
+ test ecx,ecx
+ jz .Lrim_unsupported
+ cmp edx,2000
+ ja .Lrim_unsupported
+ cmp ecx,2000
+ ja .Lrim_unsupported
+ lea rdi,[rip+.Lrim_mimes]
+ dec eax
+ movsxd r15,dword ptr [rdi+rax*4]
+ add r15,rdi
+ lea rax,[r13+2]
+ xor edx,edx
+ mov ecx,3
+ div rcx
+ shl rax,2
+ mov [rsp+328],rax
+ lea rdi,[rax+1]
+ call malloc@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lrim_unsupported
+ mov rdi,r14
+ mov rsi,r13
+ mov rdx,rbp
+ call .Lrim_base64
+ lea rdi,[rip+.Lrim_success]
+ call json_tokener_parse@PLT
+ mov [rsp+360],rax
+ test rax,rax
+ jz .Lrim_unsupported
+ mov rdi,rax
+ lea rsi,[rip+.Lrim_output]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+368],rax
+ mov rdi,rbp
+ mov esi,[rsp+328]
+ call json_object_new_string_len@PLT
+ mov rdx,rax
+ mov rdi,[rsp+368]
+ lea rsi,[rip+.Lrim_data]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov rdi,r15
+ call json_object_new_string@PLT
+ mov rdx,rax
+ mov rdi,[rsp+368]
+ lea rsi,[rip+.Lrim_mime]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov rax,[rsp+360]
+ mov [rbx+PG_RTL_RESULT],rax
+ xor eax,eax
+ mov [rsp+352],eax
+ jmp .Lrim_finish
+.Lrim_changed:
+ mov rdi,r14
+ call free@PLT
+ xor r14d,r14d
+ inc dword ptr [rsp+336]
+ cmp dword ptr [rsp+336],1
+ jbe .Lrim_attempt
+.Lrim_unsupported:
+ mov rdi,[rsp+360]
+ call json_object_put@PLT
+ lea rdi,[rip+.Lrim_failure]
+ call json_tokener_parse@PLT
+ mov [rbx+PG_RTL_RESULT],rax
+ mov dword ptr [rsp+352],1
+ jmp .Lrim_finish
+.Lrim_not_image:
+ mov dword ptr [rsp+352],-1
+.Lrim_finish:
+ mov rdi,r14
+ call free@PLT
+ mov rdi,rbp
+ call free@PLT
+ mov eax,[rsp+352]
+ RI_LEAVE
+/* Returns the recognized inline format and header dimensions. */
+.Lrim_format:
+ xor eax,eax
+ xor edx,edx
+ xor ecx,ecx
+ cmp rsi,3
+ jb .Lrif_end
+ cmp word ptr [rdi],0xd8ff
+ jne .Lrif_png
+ cmp byte ptr [rdi+2],0xff
+ jne .Lrif_png
+ cmp rsi,4
+ jb .Lrif_end
+ cmp byte ptr [rdi+3],0xf7
+ je .Lrif_end
+ mov eax,2
+ mov r8d,2
+.Lrif_jpeg:
+ lea r9,[r8+9]
+ cmp r9,rsi
+ ja .Lrif_end
+ cmp byte ptr [rdi+r8],0xff
+ jne .Lrif_end
+ movzx r9d,byte ptr [rdi+r8+1]
+ cmp r9d,0xff
+ jne .Lrif_marker
+ inc r8
+ jmp .Lrif_jpeg
+.Lrif_marker:
+ cmp r9d,0xc0
+ jb .Lrif_segment
+ cmp r9d,0xcf
+ ja .Lrif_segment
+ cmp r9d,0xc4
+ je .Lrif_segment
+ cmp r9d,0xc8
+ je .Lrif_segment
+ cmp r9d,0xcc
+ je .Lrif_segment
+ movzx edx,word ptr [rdi+r8+7]
+ rol dx,8
+ movzx ecx,word ptr [rdi+r8+5]
+ rol cx,8
+ ret
+.Lrif_segment:
+ movzx r9d,word ptr [rdi+r8+2]
+ rol r9w,8
+ lea r8,[r8+r9+2]
+ jmp .Lrif_jpeg
+.Lrif_png:
+ cmp rsi,16
+ jb .Lrif_gif
+ mov r8,0x0a1a0a0d474e5089
+ cmp [rdi],r8
+ jne .Lrif_gif
+ cmp dword ptr [rdi+8],0x0d000000
+ jne .Lrif_end
+ cmp dword ptr [rdi+12],0x52444849
+ jne .Lrif_end
+ mov eax,1
+ cmp rsi,24
+ jb .Lrif_end
+ mov edx,[rdi+16]
+ bswap edx
+ mov ecx,[rdi+20]
+ bswap ecx
+ mov r8d,8
+.Lrif_png_chunk:
+ lea r9,[r8+8]
+ cmp r9,rsi
+ ja .Lrif_end
+ cmp dword ptr [rdi+r8+4],0x4c546361
+ je .Lrif_unrecognized
+ cmp dword ptr [rdi+r8+4],0x54414449
+ je .Lrif_end
+ mov r9d,[rdi+r8]
+ bswap r9d
+ lea r8,[r8+r9+12]
+ cmp r8,rsi
+ jbe .Lrif_png_chunk
+ ret
+.Lrif_gif:
+ cmp rsi,6
+ jb .Lrif_bmp
+ cmp dword ptr [rdi],0x38464947
+ jne .Lrif_webp
+ cmp word ptr [rdi+4],0x6137
+ je .Lrif_gif_found
+ cmp word ptr [rdi+4],0x6139
+ jne .Lrif_webp
+.Lrif_gif_found:
+ mov eax,3
+ cmp rsi,10
+ jb .Lrif_end
+ movzx edx,word ptr [rdi+6]
+ movzx ecx,word ptr [rdi+8]
+ ret
+.Lrif_webp:
+ cmp rsi,12
+ jb .Lrif_bmp
+ cmp dword ptr [rdi],0x46464952
+ jne .Lrif_bmp
+ cmp dword ptr [rdi+8],0x50424557
+ jne .Lrif_bmp
+ mov eax,4
+ cmp rsi,30
+ jb .Lrif_end
+ cmp dword ptr [rdi+12],0x20385056
+ jne .Lrif_lossless
+ movzx edx,word ptr [rdi+26]
+ and edx,0x3fff
+ movzx ecx,word ptr [rdi+28]
+ and ecx,0x3fff
+ ret
+.Lrif_lossless:
+ cmp dword ptr [rdi+12],0x4c385056
+ jne .Lrif_extended
+ mov edx,[rdi+21]
+ mov ecx,edx
+ and edx,0x3fff
+ inc edx
+ shr ecx,14
+ and ecx,0x3fff
+ inc ecx
+ ret
+.Lrif_extended:
+ cmp dword ptr [rdi+12],0x58385056
+ jne .Lrif_end
+ mov edx,[rdi+24]
+ and edx,0xffffff
+ inc edx
+ mov ecx,[rdi+26]
+ shr ecx,8
+ inc ecx
+ ret
+.Lrif_bmp:
+ cmp word ptr [rdi],0x4d42
+ jne .Lrif_unrecognized
+ mov eax,5
+ ret
+.Lrif_unrecognized:
+ xor eax,eax
+.Lrif_end:
+ ret
+.Lrim_base64:
+ xor r8d,r8d
+ xor r9d,r9d
+ lea r10,[rip+.Lrim_alphabet]
+.Lrib_loop:
+ cmp r8,rsi
+ jae .Lrib_done
+ movzx eax,byte ptr [rdi+r8]
+ shl eax,16
+ lea rcx,[r8+1]
+ cmp rcx,rsi
+ jae .Lrib_encode
+ movzx ecx,byte ptr [rdi+r8+1]
+ shl ecx,8
+ or eax,ecx
+ lea rcx,[r8+2]
+ cmp rcx,rsi
+ jae .Lrib_encode
+ movzx ecx,byte ptr [rdi+r8+2]
+ or eax,ecx
+.Lrib_encode:
+ mov ecx,eax
+ shr ecx,18
+ mov cl,[r10+rcx]
+ mov [rdx+r9],cl
+ mov ecx,eax
+ shr ecx,12
+ and ecx,63
+ mov cl,[r10+rcx]
+ mov [rdx+r9+1],cl
+ mov byte ptr [rdx+r9+2],'='
+ mov byte ptr [rdx+r9+3],'='
+ lea rcx,[r8+1]
+ cmp rcx,rsi
+ jae .Lrib_next
+ mov ecx,eax
+ shr ecx,6
+ and ecx,63
+ mov cl,[r10+rcx]
+ mov [rdx+r9+2],cl
+ lea rcx,[r8+2]
+ cmp rcx,rsi
+ jae .Lrib_next
+ and eax,63
+ mov al,[r10+rax]
+ mov [rdx+r9+3],al
+.Lrib_next:
+ add r8,3
+ add r9,4
+ jmp .Lrib_loop
+.Lrib_done:
+ mov byte ptr [rdx+r9],0
+ ret
+.section .rodata
+.Lrim_mimes:
+ .long .Lrim_png-.Lrim_mimes,.Lrim_jpeg-.Lrim_mimes,.Lrim_gif-.Lrim_mimes,.Lrim_webp-.Lrim_mimes
+.Lrim_png: .asciz "image/png"
+.Lrim_jpeg: .asciz "image/jpeg"
+.Lrim_gif: .asciz "image/gif"
+.Lrim_webp: .asciz "image/webp"
+.Lrim_alphabet: .asciz "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+.Lrim_output: .asciz "output"
+.Lrim_data: .asciz "data"
+.Lrim_mime: .asciz "mimeType"
+.Lrim_success: .asciz "{\"output\":[{\"type\":\"image\"}],\"diagnostics\":[{\"severity\":\"info\",\"code\":\"image\",\"message\":\"Read image file.\"}]}"
+.Lrim_failure: .asciz "{\"output\":[],\"diagnostics\":[{\"severity\":\"error\",\"code\":\"unsupported_image\",\"message\":\"Image cannot be sent within inline format, size and dimension limits without an image processor, or changed while being read.\"}]}"

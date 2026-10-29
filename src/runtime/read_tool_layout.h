@@ -3,7 +3,8 @@
 /* read_tool.S 与 C 测试共享的布局/平台常量；Linux x86-64 公开 ABI，
  * C 侧断言与 <fcntl.h>/<sys/stat.h> 真实值一致。 */
 #define PG_RTL_DIRECTORY 0
-#define PG_RTL_READ_TOOL_BYTES 4
+#define PG_RTL_RESULT 8
+#define PG_RTL_READ_TOOL_BYTES 16
 #define PG_RTL_SCAN_LIMIT 1048576
 #define PG_RTL_PAGE_LINES 2000
 #define PG_RTL_OUTPUT_MAX 4096
@@ -30,6 +31,7 @@
 #define PG_RTL_ASSERT_OFF(t, f, v) _Static_assert(offsetof(t, f) == (v), #t "." #f " layout drifted")
 #define PG_RTL_ASSERT_SIZE(t, v) _Static_assert(sizeof(t) == (v), #t " size drifted")
 PG_RTL_ASSERT_OFF(pg_read_tool, directory, PG_RTL_DIRECTORY);
+PG_RTL_ASSERT_OFF(pg_read_tool, result, PG_RTL_RESULT);
 PG_RTL_ASSERT_SIZE(pg_read_tool, PG_RTL_READ_TOOL_BYTES);
 _Static_assert(O_RDONLY == PG_RTL_O_RDONLY, "O_RDONLY drifted");
 _Static_assert(O_DIRECTORY == PG_RTL_O_DIRECTORY, "O_DIRECTORY drifted");

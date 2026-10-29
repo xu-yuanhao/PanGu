@@ -294,6 +294,7 @@ static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){
 static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
  const char *name=json_object_get_string(json_object_object_get(call,"name"));
+ if(name&&!strcmp(name,"read"))return pg_read_tool_snapshot(&reader,out);
  if(name&&!strcmp(name,"bash")){int result=pg_bash_tool_snapshot(&shell_tool,out);return result==1?0:result;}
  if(!name||strcmp(name,"edit")||!editor.details)return 0;
  struct json_object *value=json_object_new_object();if(!value)return 5;

@@ -102,7 +102,7 @@ int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--diff-json"))return diff_json();
  diff_contract();
  char root[]="/tmp/pangu-edit-tool-XXXXXX";assert(mkdtemp(root));int saved=open(".",O_RDONLY|O_DIRECTORY);assert(saved>=0&&!chdir(root));
- pg_read_tool reader={-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
+ pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,"."));pg_write_tool writer={reader.directory};
  pg_tool_definition file_entries[]={pg_read_snapshot_definition(&reader),pg_write_file_definition(&writer)};assert(!pg_tool_registry_init(&files,file_entries,2));file_service=pg_tool_registry_service(&files);
  service=pg_tool_registry_service(&registry);editor.files=(pg_tools){0,forward_allow,forward_execute,0,0,0,0};definition=pg_edit_tool_definition(&editor);assert(!definition.replay_safe&&!strcmp(definition.name,"edit"));
  pg_tool_definition entries[]={pg_read_tool_definition(&reader),pg_write_tool_definition(&writer),definition};assert(!pg_tool_registry_init(&registry,entries,3));
