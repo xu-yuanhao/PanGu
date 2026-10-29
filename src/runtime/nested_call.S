@@ -367,6 +367,17 @@ pg_nested_call_start:
  call .Ln_change
  test eax,eax
  jnz .Ln_stage_bad
+ mov rdi,r13
+ mov rax,[rsp+96]
+ mov rsi,rax
+ mov rdx,[rbx+40]
+ mov rax,[rbx]
+ mov rcx,[rax+16]
+ mov r8,[rbx+24]
+ mov r9,[rbx+32]
+ call pg_tool_live_created@PLT
+ test eax,eax
+ jnz .Ln_stage_bad
  xor ebp,ebp
  jmp .Ln_stage_end
 .Ln_stage_bad:

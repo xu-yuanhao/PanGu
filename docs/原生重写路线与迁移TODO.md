@@ -161,6 +161,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 异步section接入Generation prepare：固定输入/扩展快照的挂起续接、包装后渲染、取消先清理回调再释放引用；挂起期间不写SystemEntry，调度器重开重新准备，完成后复用原有提示计划和原子提交。入队/压缩只读同步配置，避免触发挂起renderer。
 - [x] 工具按Task保持扩展快照、声明gate、hook与执行租约；扩展父工具挂起时，owned子工具可执行并回传结果，父子取消分别释放。基础提供者与共享异步上下文保持互斥；产品ASan/UBSan及真实DeepSeek扩展工作流通过。
 - [x] 原生工具执行回调接通executeTool的start/poll：调用级实例工厂、显式键/自动序号、madeNestedCalls memo、持久owned子工具与脱离存储的结构化返回；真实write→read、重开复用两条子任务、结果隔离及级联取消通过。实例close后dispose，未绑定工厂拒绝执行。
+- [x] 嵌套工具Live槽接入持久创建/意图/结果事务：pending→running→done、调用/父调用/任务身份、最终arguments与isError摘要，父工具结算清除直属子槽；原生观察读取与safe重开/取消通过。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -271,8 +272,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts ToolExecutionApi/executeTool/checkKey/nestedResult；harness-nested-tools与harness-nested-tools-restart的键复用、非法键、默认调用顺序和safe caller恢复场景。继续沿固定Pi/Harness快照完成本批。
-- 实际调用链：ToolTask acquire → 调用级工厂取得pg_tool_execution/TaskAccess → 保存意图后execute调用pg_tool_execution_start → memo与持久索引/owned ToolTask → 父执行器返回WAIT → 子工具执行/结算 → 父next通过pg_tool_execution_poll读取脱离存储的结果 → 后续read子工具 → 父完成。显式键同参数复用、冲突拒绝；自动键按每次invocation调用顺序恢复，子工具结果保留structuredOutput/details/diagnostics/usage，默认纯文本转structuredOutput。
-- 验证：`test_product_resources.py --native-tasks --sanitize`通过工具回调内部write→read、未绑定工厂/非法键拒绝、重复键/冲突、返回值隔离、结构化对象/details null/诊断、scheduler关闭重开后仅两条子任务、取消前无文件效果及实例创建/释放计数。`--live-extensions --sanitize`真实DeepSeek扩展/工具/hooks/异步section通过；Runtime整批与产品构建通过，导出的pg_tool_execution_start/poll已回读。候选文件镜像G00、Assembly检查通过。
-- 接口与自审：新增tool_execution.S/h，执行准入、键序列、memo与结果续接为手写Assembly。pg_tool_async扩展为40字节，open/dispose必须成对；调用级上下文替换局部执行/校验描述，关闭后撤销能力并dispose。Tools provider ABI=2、Extensions ABI=8，汇编验证/注册表、bash函数表与直接消费者同步迁移；hook事件范围仍为1–7。登记与实际产品构建输入、DSO动态导出同步更新。
-- 剩余与下一交付物：K09/K10完整嵌套行为保持未勾选；仍需Live.nestedTools的pending/running/done与结构化增量、parentCallId及最终参数同步、abandonOnRestart和重启原因、完整structuredOutput schema与结果摘要/异常回退。当前嵌套开始事件仍按任务准入。下一批集中可观察生命周期与恢复策略，沿实际工具调用链完成剩余上游场景。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts startNestedCall、intent、toolSlot与settle；harness-nested-tools的pending/running观察、父调用身份和最终参数场景。继续采用固定Pi/Harness快照。
+- 实际调用链：pg_nested_call_start在同一创建事务加入Live.nestedTools pending槽；ToolTask完成beforeTool后的意图提交同步写running与最终arguments；子工具结果和done/isError摘要同事务提交，父工具结算移除其直属子槽。槽保留taskId/callId/name/parentTaskId/parentCallId，Live仍由同一公开snapshot/watch读取。tool_live.S按字段生成变更，已有槽省略相等字段。
+- 验证：产品`--native-tasks --sanitize`通过实际工具execute读running及parentCallId、子调用准入读pending、子结果读取时读done、write/read、safe重开与取消清理。Runtime整批、真实DeepSeek扩展回归、产品构建、Assembly及候选镜像G00均通过。新增模块已接实际产品和Durable专项构建。
+- 接口与自审：新增手写Assembly tool_live.S/h，pg_tool_live_stage消费当前document Tx，pg_tool_live_created与索引/owned child同批创建。ToolTask意图改用commit_with，将Live和checkpoint一同结算；结果仍通过原有索引/终态提交。既有公开结构与工具调用API不变，文件/模块/依赖和构建登记同步更新。
+- 剩余与下一交付物：完整嵌套行为保持未勾选；Live进度output/details/diagnostics增量、完整错误/usage/duration摘要、全部后代清理、事件按running起始、input.parentCallId、abandonOnRestart及重启原因、structuredOutput schema仍需完成。下一批沿现有Tool执行与观察调用链完成进度发布和事件转换，再集中恢复策略。

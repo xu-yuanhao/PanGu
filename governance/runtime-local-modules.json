@@ -1766,7 +1766,8 @@
         "json-c",
         "tools.registry.local.v0",
         "usage.local.v0",
-        "tool.nested.local.v0"
+        "tool.nested.local.v0",
+        "tool.live.local.v0"
       ],
       "role": "Model-issued pangu.tool durable call/execute consumer: service operation leases, intent before effects, stored/current safe replay conjunction, cooperative async output/cleanup, atomic toolResult Entry and terminal Task receipt; native host owns returned operation drainage",
       "exports": [
@@ -2490,7 +2491,8 @@
         "task.runner.local.v0",
         "session.documents.transaction.local.v0",
         "json-c",
-        "session.documents.reader.local.v0"
+        "session.documents.reader.local.v0",
+        "tool.live.local.v0"
       ],
       "role": "NestedCallDoc index and owned ToolTask creation/result settlement",
       "exports": [
@@ -2523,6 +2525,25 @@
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts ToolExecutionApi/executeTool/checkKey/nestedResult/fallbackResult"
+      ]
+    },
+    {
+      "id": "tool.live.local.v0",
+      "sources": [
+        "src/runtime/tool_live.S",
+        "src/runtime/tool_live.h"
+      ],
+      "dependencies": [
+        "session.durable.lifecycle.local.v0",
+        "json-c"
+      ],
+      "role": "Transaction-scoped nested tool Live slot admission and sparse field updates",
+      "exports": [
+        "pg_tool_live_stage",
+        "pg_tool_live_created"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22 harness/tool.ts startNestedCall/toolSlot/settle"
       ]
     }
   ],

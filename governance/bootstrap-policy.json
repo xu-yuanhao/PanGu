@@ -662,6 +662,8 @@
     "src/runtime/nested_call.S": "native-source",
     "src/runtime/nested_call.h": "native-source",
     "src/runtime/tool_execution.h": "native-source",
-    "src/runtime/tool_execution.S": "native-source"
+    "src/runtime/tool_execution.S": "native-source",
+    "src/runtime/tool_live.S": "native-source",
+    "src/runtime/tool_live.h": "native-source"
   }
 }

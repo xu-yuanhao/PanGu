@@ -15,6 +15,7 @@
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
+| 嵌套Live生命周期 | `tool_live.S`：pending随索引/子Task创建，running/最终参数随意图，done/错误摘要随结果事务；公开snapshot读取父调用关系与状态，父工具结算移除直属子槽 |
 | 工具内嵌套执行 | `tool_execution.S`与调用级工厂：executeTool start/poll、memo、显式/自动键和持久子工具；实际write→read、safe重开复用、结构化返回/诊断、取消及实例释放通过；DSO可通过公开动态符号调用 |
 | 工具调用作用域 | `durable_tool.S`/`extensions.S`与产品组合器：按Task隔离扩展快照/gate/hooks/执行租约，扩展父工具挂起时owned子工具真实写入并回传，父子取消独立释放；共享基础提供者/异步上下文互斥 |
 | Tool hooks | `extensions.S`/`durable_tool.S`：原生beforeTool/afterTool进入意图前与结果提交前，参数与结果按选中扩展顺序传递，拦截/异常、两次校验、pending/取消/重开；工具结果保留最终参数及hook元数据 |

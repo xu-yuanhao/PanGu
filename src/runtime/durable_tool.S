@@ -722,6 +722,41 @@ pg_durable_tool_init:
  xor eax,eax
  jmp .Ldt_stage_end
 .Ldt_stage_nested:
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+24],rax
+ lea rdi,[rip+.Ldt_live_done_json]
+ call json_tokener_parse@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Ldt_stage_alloc
+ DGET rax,live_summary
+ mov rbp,rax
+ DGET r14,is_error
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov edi,eax
+ call json_object_new_boolean@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_is_error]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ mov rdi,[rsp+48]
+ mov rsi,[rsp+24]
+ mov rax,[rbx+8]
+ mov rdx,[rax+16]
+ mov rcx,[rsp+32]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+24]
+ mov r9d,1
+ call pg_tool_live_stage@PLT
+ test eax,eax
+ jnz .Ldt_stage_end
  DGET "qword ptr [rsp]",data
  mov rdi,r14
  mov rsi,rax
@@ -904,52 +939,10 @@ pg_durable_tool_init:
  mov dword ptr [r14+4312],1
  jmp .Ldt_poll_close
 .Ldt_poll_intent:
- lea rdi,[rip+.Ldt_intent_json]
- call json_tokener_parse@PLT
- mov [rsp+16],rax
- test rax,rax
- jz .Ldt_poll_alloc
- DGET rax,checkpoint
- mov r13,rax
- mov rdi,[r14+24]
- call json_object_get@PLT
- mov rdi,r13
- lea rsi,[rip+.Ldt_arguments]
- mov rdx,rax
- call .Ldt_set
- test eax,eax
- jnz .Ldt_poll_intent_error
- xor ebp,ebp
- mov rax,[r14+56]
- test rax,rax
- jz .Ldt_poll_replay
- mov rdi,[r14+32]
- mov rsi,[r14+88]
- mov rdx,[r14+96]
- call rax
- cmp eax,1
- sete bpl
-.Ldt_poll_replay:
- lea rdi,[rip+.Ldt_unsafe]
- test ebp,ebp
- jz .Ldt_poll_replay_string
- lea rdi,[rip+.Ldt_safe]
-.Ldt_poll_replay_string:
- call json_object_new_string@PLT
- mov rdi,r13
- lea rsi,[rip+.Ldt_replay]
- mov rdx,rax
- call .Ldt_set
- test eax,eax
- jnz .Ldt_poll_intent_error
  mov rdi,rbx
- mov rsi,[rsp+16]
- call pg_task_runner_commit@PLT
-.Ldt_poll_intent_error:
- mov ebp,eax
- mov rdi,[rsp+16]
- call json_object_put@PLT
- mov eax,ebp
+ mov rsi,r14
+ lea rdx,[rip+.Ldt_intent_stage]
+ call pg_task_runner_commit_with@PLT
  test eax,eax
  jnz .Ldt_poll_error
 .Ldt_poll_execute:
@@ -1988,3 +1981,126 @@ pg_durable_tool_executing:
  pop rbx
  pop rbp
  ret
+
+.text
+/* The intent and Live running slot share the ToolTask mutation. */
+.Ldt_intent_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13,rcx
+ mov qword ptr [rcx],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ lea rdi,[rip+.Ldt_live_running_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldt_live_stage_bad
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldt_live_intent
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_live_intent
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_arguments]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_live_stage_end
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[rbx+8]
+ mov rdx,[rax+16]
+ mov rdi,r12
+ mov rcx,[rsp]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+24]
+ xor r9d,r9d
+ call pg_tool_live_stage@PLT
+ test eax,eax
+ jnz .Ldt_live_stage_end
+.Ldt_live_intent:
+ lea rdi,[rip+.Ldt_intent_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Ldt_live_stage_bad
+ DGET rax,checkpoint
+ mov r14,rax
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_arguments]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_live_stage_end
+ xor ebp,ebp
+ mov rax,[rbx+56]
+ test rax,rax
+ jz .Ldt_live_policy
+ mov rdi,[rbx+32]
+ mov rsi,[rbx+88]
+ mov rdx,[rbx+96]
+ call rax
+ cmp eax,1
+ sete bpl
+.Ldt_live_policy:
+ lea rdi,[rip+.Ldt_unsafe]
+ test ebp,ebp
+ jz .Ldt_live_replay
+ lea rdi,[rip+.Ldt_safe]
+.Ldt_live_replay:
+ call json_object_new_string@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_replay]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_live_stage_end
+ mov rax,[rsp+8]
+ mov [r13],rax
+ mov qword ptr [rsp+8],0
+ xor eax,eax
+ jmp .Ldt_live_stage_end
+.Ldt_live_stage_bad:
+ mov eax,5
+.Ldt_live_stage_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_live_running_json: .asciz "{\"status\":\"running\"}"
+
+.section .rodata
+.Ldt_live_done_json: .asciz "{\"status\":\"done\",\"summary\":{}}"
+.Ldt_live_summary: .asciz "summary"

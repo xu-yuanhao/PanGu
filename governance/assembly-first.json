@@ -346,6 +346,10 @@
     "src/runtime/tool_execution.S": {
       "role": "assembly-core",
       "reason": "Pi Durable调用级executeTool准入、键序列、memo与持久嵌套结果续接"
+    },
+    "src/runtime/tool_live.S": {
+      "role": "assembly-core",
+      "reason": "Durable嵌套工具Live状态和字段增量事务"
     }
   }
 }
