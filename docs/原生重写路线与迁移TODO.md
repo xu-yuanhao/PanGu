@@ -169,6 +169,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 工具执行API接通details/diagnostic持久进度：输入复制、details null、诊断形状校验、快照观察、最终结果fallback/诊断顺序与中断恢复。模型/嵌套工具共用Live槽及进度提交，Generation响应结算清理上一轮模型工具槽；模型直接调用和子调用专项通过。
 - [x] 输出预算采用Chord完整行/UTF-8 head/tail算法，现有4096字节缓冲接通2000行进度和最终结果预算；累计droppedBytes/droppedLines、最终截断诊断和中断恢复诊断进入实际工具链。2408组固定上游源码对照、持续输出及最终/中断专项通过。
 - [x] 工具定义携带固定output_limits并随选择/wrap/phase快照保留；默认50KiB/2000行/head，bash显式tail；Tool缓冲按预算分配，配置70KiB和零预算、旧4KiB-tail恢复/取消及非法配置拒绝通过。完整工具/注册表/扩展/模型声明布局同步迁移。
+- [x] Chord流文本清洗接入Live窗口和输出事件，保留制表/换行及普通Unicode；诊断渲染按实际长度分配，7000字节诊断进入最终模型文本。单调时钟durationMs写入结果/嵌套返回/摘要，2464组固定上游对照和产品场景通过。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -279,8 +280,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/types.ts ToolRegistration.outputLimits、tool.ts run/complete与tools/bash.ts tail声明；Chord output.ts完整行和字符边界。按选中工具定义固定预算，沿现有输出/结果/恢复调用链实现。
-- 实际调用链：工具定义output_limits随registry选择/wrap复制 → Host acquire按phase固定描述配置Tool缓冲 → execute/next使用实际分配容量 → Live进度及最终结果按固定bytes/lines/retain预算处理。默认50KiB/2000行/head，bash tail，显式零预算保留零字节；head流在丢弃后持续累计遗漏，tail继续滑动，UTF-8与行截断沿既有上游算法。
-- 验证：产品`--native-tasks --sanitize`通过默认50000字节持久结果、自定义70000字节结果、零预算、非法retain拒绝、4KiB-tail旧场景的输出/恢复/取消。真实DeepSeek `--live-agent --sanitize`通过；Runtime整批、最终产品构建、Assembly和候选镜像G00均通过；最后的小预算内部诊断空间与仅acquire期配置边界由产品专项复验。
-- 接口与自审：pg_tool_definition扩展为80字节，registry=1312、extension result=1376；Tools provider ABI=3、Extensions ABI=9，所有实际选择/复制/wrap/模型声明及C/Assembly布局断言同步迁移。Tool操作改为固定288字节状态加owned动态输出缓冲，容量包含结尾NUL，预算计纯内容；公开Host配置入口在acquire前效果期固定，取消/失败由原phase清理释放。新增导出和依赖登记同步。
-- 剩余与下一交付物：完整工具行为保持未勾选；仍需上游流buffer保留margin的精确跨块语义、输出清洗/节流、诊断动态渲染、完整usage/duration摘要、异常Task自身Live状态最终化、structuredOutput schema与结果控制语义。下一批以完整输出/结果场景继续收敛上述差异，避免单独基础功能长期脱离消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Chord output.ts sanitizeOutput/OutputBuffer.snapshot、Durable tool.ts renderDiagnostics/run/nestedResult/summaryOf。继续采用固定Pi/Harness快照，沿已接通的输出→Live→事件→最终结果链实现。
+- 实际调用链：Tool OUTPUT先按预算取窗口，再以sanitizeOutput语义清理显示控制字符后写Live；输出事件中的当前块也经相同清洗。诊断渲染先验证/计算实际长度，一次分配完整模型文本；执行从单调时钟计时，正常结果附durationMs，Tool结果、嵌套调用返回及nested摘要保留duration/usage。既有中断恢复仍读取已持久清洗窗口和诊断。
+- 验证：test_output_window.py直接运行固定Chord，2464组预算/清洗对照通过，含嵌入NUL、控制字符、Unicode注释标记。产品`--native-tasks --sanitize`通过真实工具回调的Live清洗、清洗后输出事件、7000字节诊断及最终模型文本、嵌套duration非负和既有大输出/取消/重开。真实DeepSeek流程在清洗/动态诊断接入后通过；加入耗时后的最终Runtime整批、产品构建、Assembly及候选G00通过。真实模型最终复验在模板问答期返回SECOND_VALUE而非SECOND_WORKSPACE_LABEL，未改动输入/断言的原样复验通过，首次问答偏差仍保留记录。
+- 接口与自审：output_window.S新增原地清洗入口，只收缩有效长度、保留输入所有权，不假设NUL终止；Tool不清洗显式最终结果，遵循上游流snapshot行为。诊断计算保留显式字符串长度及溢出拒绝；monotonic为现有libc clock_gettime ABI胶水调用，计时仅在实际execute开始后产生。新增导出登记，公开布局与事件ABI保持。
+- 剩余与下一交付物：完整工具行为保持未勾选；仍需流buffer保留margin与清洗前累计的精确跨块语义、进度节流、完整error/usage/duration摘要、异常Task自身Live最终化、structuredOutput schema与结果控制。下一批集中持久流窗口/节流和结果完整性，以产品连续输出/恢复场景收敛。

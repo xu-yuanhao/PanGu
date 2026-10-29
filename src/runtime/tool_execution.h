@@ -17,7 +17,7 @@ typedef struct pg_tool_execution {
    and positive integer strings. Arguments are copied on admission. */
 int pg_tool_execution_start(pg_tool_execution *,const char *name,const struct json_object *arguments,const char *key,uint64_t *task_id);
 /* 0 transfers detached {taskId,isError,structuredOutput?,details?,diagnostics,
-   usage?}, 1 pending, other positive task/document status on failure. */
+   usage?,durationMs?}, 1 pending, other positive task/document status on failure. */
 int pg_tool_execution_poll(pg_tool_execution *,uint64_t task_id,struct json_object **);
 /* Synchronous durable progress commits. Inputs are copied; details accepts
    JSON null. Diagnostics require severity info/warn/error and a string message. */

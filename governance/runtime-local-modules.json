@@ -2562,7 +2562,8 @@
       "dependencies": [],
       "role": "Exact whole-line and UTF-8 head/tail output bounds consumed by durable tools",
       "exports": [
-        "pg_output_bound"
+        "pg_output_bound",
+        "pg_output_sanitize"
       ],
       "reference_basis": [
         "Pi d5b3de22 packages/chord/src/output.ts boundOutput/headRange/tailRange"

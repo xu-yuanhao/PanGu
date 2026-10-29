@@ -576,6 +576,12 @@ pg_durable_tool_init:
  jz .Ldt_metadata_done
  DREF rbp,diagnostics,rax
 .Ldt_metadata_done:
+ mov rdi,r14
+ mov rsi,[rbx+184]
+ lea rdx,[rip+.Ldt_duration_ms]
+ call .Ldt_copy_optional
+ test eax,eax
+ jnz .Ldt_stage_end
  cmp qword ptr [rsp+56],0
  je .Ldt_usage_done
  DREF r14,usage,"qword ptr [rsp+56]"
@@ -759,6 +765,18 @@ pg_durable_tool_init:
  lea rsi,[rip+.Ldt_is_error]
  mov rdx,rax
  call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Ldt_duration_ms]
+ call .Ldt_copy_optional
+ test eax,eax
+ jnz .Ldt_stage_end
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Ldt_usage]
+ call .Ldt_copy_optional
  test eax,eax
  jnz .Ldt_stage_end
  mov rdi,[rsp+48]
@@ -1001,6 +1019,8 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_poll_error
 .Ldt_poll_execute:
+ call .Ldt_monotonic
+ movsd [r14+280],xmm0
  cmp dword ptr [rbx+84],0
  jne .Ldt_poll_closed_owner
  mov rax,[r14+48]
@@ -1051,6 +1071,12 @@ pg_durable_tool_init:
  call pg_task_runner_commit_with@PLT
  test eax,eax
  jnz .Ldt_poll_error
+ mov rdi,[r14+128]
+ mov rsi,[r14+136]
+ call pg_output_sanitize@PLT
+ mov [r14+136],rax
+ test rax,rax
+ jz .Ldt_poll_pending
  mov rax,[r12]
  mov rcx,[rax+32]
  test rcx,rcx
@@ -1118,6 +1144,10 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
  mov dword ptr [r14+228],1
 .Ldt_after_hooks_done:
+ mov rdi,r14
+ call .Ldt_duration
+ test eax,eax
+ jnz .Ldt_poll_error
  mov rdi,r14
  call .Ldt_bound_final
  test eax,eax
@@ -1528,8 +1558,49 @@ pg_durable_tool_observation_release:
  mov r13d,10
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ xor r12d,r12d
+ mov qword ptr [rsp+24],22
+.Ldr_measure:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Ldr_allocate
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ DGET r14,severity
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldr_end
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ add [rsp+24],rax
+ jc .Ldr_end
+ DGET r14,message
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldr_end
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ add [rsp+24],rax
+ jc .Ldr_end
+ add qword ptr [rsp+24],4
+ jc .Ldr_end
+ cmp qword ptr [rsp+24],2147483647
+ ja .Ldr_end
+ inc r12
+ jmp .Ldr_measure
+.Ldr_allocate:
+ xor r12d,r12d
  mov edi,1
- mov esi,4096
+ mov rsi,[rsp+24]
  call calloc@PLT
  mov [rsp],rax
  test rax,rax
@@ -1558,7 +1629,7 @@ pg_durable_tool_observation_release:
  call json_object_get_string_len@PLT
  mov [rsp+16],rax
  lea rcx,[r13+rax+3]
- cmp rcx,4085
+ cmp rcx,[rsp+24]
  jae .Ldr_end
  test r12,r12
  jz .Ldr_item
@@ -1591,7 +1662,7 @@ pg_durable_tool_observation_release:
  call json_object_get_string_len@PLT
  mov [rsp+16],rax
  lea rcx,[r13+rax+11]
- cmp rcx,4096
+ cmp rcx,[rsp+24]
  jae .Ldr_end
  mov rdi,rbp
  call json_object_get_string@PLT
@@ -2357,6 +2428,10 @@ pg_durable_tool_executing:
  mov rdi,[rsp+8]
  add rdi,r14
  mov rsi,[rsp+104]
+ call pg_output_sanitize@PLT
+ mov rsi,rax
+ mov rdi,[rsp+8]
+ add rdi,r14
  call json_object_new_string_len@PLT
  test rax,rax
  jz .Ldt_progress_alloc
@@ -2953,3 +3028,100 @@ pg_durable_tool_output_limits:
  pop rbx
  ret
 .size pg_durable_tool_output_limits,.-pg_durable_tool_output_limits
+
+.text
+.Ldt_monotonic:
+ sub rsp,24
+ mov edi,1
+ mov rsi,rsp
+ call clock_gettime@PLT
+ pxor xmm0,xmm0
+ test eax,eax
+ jnz .Ldt_clock_end
+ cvtsi2sd xmm0,qword ptr [rsp]
+ mulsd xmm0,[rip+.Ldt_thousand]
+ pxor xmm1,xmm1
+ cvtsi2sd xmm1,qword ptr [rsp+8]
+ divsd xmm1,[rip+.Ldt_million]
+ addsd xmm0,xmm1
+.Ldt_clock_end:
+ add rsp,24
+ ret
+.Ldt_duration:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ cmp dword ptr [rbx+196],0
+ je .Ldt_duration_ok
+ pxor xmm0,xmm0
+ ucomisd xmm0,[rbx+280]
+ jae .Ldt_duration_ok
+ mov rdi,rbx
+ call .Ldt_ensure_diagnostics
+ test rax,rax
+ jz .Ldt_duration_bad
+ call .Ldt_monotonic
+ subsd xmm0,[rbx+280]
+ pxor xmm1,xmm1
+ maxsd xmm0,xmm1
+ addsd xmm0,[rip+.Ldt_half]
+ cvttsd2si rdi,xmm0
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Ldt_duration_bad
+ mov rdi,[rbx+184]
+ lea rsi,[rip+.Ldt_duration_ms]
+ mov rdx,rax
+ call .Ldt_set
+ jmp .Ldt_duration_end
+.Ldt_duration_bad:
+ mov eax,5
+ jmp .Ldt_duration_end
+.Ldt_duration_ok:
+ xor eax,eax
+.Ldt_duration_end:
+ add rsp,16
+ pop rbx
+ ret
+.Ldt_copy_optional:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test rsi,rsi
+ jz .Ldt_optional_ok
+ mov rdi,rsi
+ mov rsi,rdx
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ldt_optional_ok
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Ldt_optional_ok
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,5
+ jmp .Ldt_optional_end
+.Ldt_optional_ok:
+ xor eax,eax
+.Ldt_optional_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Ldt_duration_ms: .asciz "durationMs"
+.balign 8
+.Ldt_thousand: .double 1000.0
+.Ldt_million: .double 1000000.0
+.Ldt_half: .double 0.5

@@ -7,4 +7,6 @@
    This performs no allocation or sanitization. Output is disjoint from input. */
 typedef struct {size_t offset,size,dropped_bytes,dropped_lines;} pg_output_window;
 int pg_output_bound(pg_slice,size_t max_bytes,size_t max_lines,unsigned tail,pg_output_window *);
+/* In-place Chord sanitizeOutput. Returns retained size; no terminator written. */
+size_t pg_output_sanitize(char *,size_t);
 #endif

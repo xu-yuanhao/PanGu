@@ -368,6 +368,12 @@ pg_tool_execution_poll:
  call .Lte_copy
  test eax,eax
  jnz .Lte_poll_finish
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lte_durationMs]
+ call .Lte_copy
+ test eax,eax
+ jnz .Lte_poll_finish
  mov rdi,r14
  lea rsi,[rip+.Lte_structuredOutput]
  lea rdx,[rsp+24]
@@ -776,3 +782,6 @@ pg_tool_execution_diagnostic:
 .Lte_error_severity: .asciz "error"
 .section .data.rel.ro
 .Lte_severities: .quad .Lte_info,.Lte_warn,.Lte_error_severity,0
+
+.section .rodata
+.Lte_durationMs: .asciz "durationMs"

@@ -177,3 +177,45 @@ pg_output_bound:
  ret
 .size pg_output_bound,.-pg_output_bound
 .section .note.GNU-stack,"",@progbits
+.text
+/* In-place sanitizeOutput over complete UTF-8 text, including embedded NUL. */
+.globl pg_output_sanitize
+.type pg_output_sanitize,@function
+pg_output_sanitize:
+ xor eax,eax
+ xor ecx,ecx
+.Los_each:
+ cmp rcx,rsi
+ jae .Los_end
+ movzx edx,byte ptr [rdi+rcx]
+ cmp dl,32
+ jae .Los_unicode
+ cmp dl,9
+ je .Los_keep
+ cmp dl,10
+ je .Los_keep
+ inc rcx
+ jmp .Los_each
+.Los_unicode:
+ cmp dl,239
+ jne .Los_keep
+ lea r8,[rcx+2]
+ cmp r8,rsi
+ jae .Los_keep
+ cmp byte ptr [rdi+rcx+1],191
+ jne .Los_keep
+ movzx r8d,byte ptr [rdi+rcx+2]
+ cmp r8d,185
+ jb .Los_keep
+ cmp r8d,187
+ ja .Los_keep
+ add rcx,3
+ jmp .Los_each
+.Los_keep:
+ mov [rdi+rax],dl
+ inc rax
+ inc rcx
+ jmp .Los_each
+.Los_end:
+ ret
+.size pg_output_sanitize,.-pg_output_sanitize
