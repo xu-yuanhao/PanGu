@@ -15,6 +15,10 @@ size_t pg_output_sanitize(char *,size_t);
 typedef struct {char *data;size_t size,total_bytes,total_newlines,max_bytes,max_lines;
  unsigned tail,ends_with_newline,full,reserved;} pg_output_buffer;
 typedef struct {char *text;size_t size,dropped_bytes,dropped_lines;} pg_output_snapshot;
+typedef struct {size_t bytes,newlines;unsigned ends_with_newline,reserved;} pg_output_skip;
+/* Omitted decoded text immediately precedes the next push. Tail retention
+   only; a nonempty skip discards previously stored margin, preserving totals. */
+int pg_output_buffer_skip(pg_output_buffer *,const pg_output_skip *);
 int pg_output_buffer_push(pg_output_buffer *,pg_slice);
 int pg_output_buffer_snapshot(pg_output_buffer *,pg_output_snapshot *);
 void pg_output_buffer_close(pg_output_buffer *);

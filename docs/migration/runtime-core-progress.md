@@ -20,6 +20,7 @@
 | 跨块流窗口 | `output_window.S`保存清洗前raw margin及全流计数，head/tail逐块快照与固定Chord的220组流直接一致；Tool已替换旧拼接路径，释放与恢复沿调用级生命周期 |
 | 输出清洗与结果元数据 | `output_window.S`清理流窗口/事件控制字符，2464组上游预算/清洗对照；Tool诊断动态渲染支持7000字节，单调计时duration进入结果/嵌套返回/摘要 |
 | 工具输出预算 | `output_window.S`移植Chord完整行/UTF-8 head/tail；工具定义携带bytes/lines/retain，默认50KiB/2000行/head、bash tail；动态Tool缓冲、70KiB/零预算、累计丢弃/截断诊断和恢复通过 |
+| 工具输出API | `tool_execution.S`/`durable_tool.S`：output、retained_output、output_window接入同一调用级流，读取尚未持久刷新的独立快照，tail支持OutputSkip全流计数，head与执行生命周期拒绝边界；固定Chord 260组流及真实产品验证通过 |
 | 工具报告进度 | `tool_execution.S`公开details/diagnostic持久提交，模型/嵌套工具共用Live槽和观察；最终结果合并报告details/诊断，中断可恢复；Generation结算清理前轮模型工具槽 |
 | 嵌套异常与后代结算 | `tool_execution.S`/`durable_client.S`按Task outcome提供缺结果回退和结束事件；模型/nested父工具结算均清理完整后代Live树，保留无关分支；Task查询支持调度推进中的临时空槽 |
 | 中断结果与缺定义取消 | `tool_live.S`/`durable_tool.S`/`task_runner.S`：恢复已提交部分输出/元数据后结算；restart缺定义等待安装，普通取消缺定义任务结算orphaned/missing_task；真实挂起/重开3000字节输出与取消场景通过 |

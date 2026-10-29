@@ -463,3 +463,39 @@ pg_output_buffer_close:
  pop rbx
  ret
 .size pg_output_buffer_close,.-pg_output_buffer_close
+
+.text
+.globl pg_output_buffer_skip
+.type pg_output_buffer_skip,@function
+pg_output_buffer_skip:
+ mov eax,4
+ test rdi,rdi
+ jz .Lob_skip_end
+ test rsi,rsi
+ jz .Lob_skip_end
+ cmp dword ptr [rdi+48],1
+ jne .Lob_skip_end
+ cmp dword ptr [rsi+16],1
+ ja .Lob_skip_end
+ cmp dword ptr [rsi+20],0
+ jne .Lob_skip_end
+ mov r8,[rsi]
+ mov r9,[rsi+8]
+ cmp r9,r8
+ ja .Lob_skip_end
+ test r8,r8
+ jz .Lob_skip_ok
+ add r8,[rdi+16]
+ jc .Lob_skip_end
+ add r9,[rdi+24]
+ jc .Lob_skip_end
+ mov [rdi+16],r8
+ mov [rdi+24],r9
+ mov eax,[rsi+16]
+ mov [rdi+52],eax
+ mov qword ptr [rdi+8],0
+.Lob_skip_ok:
+ xor eax,eax
+.Lob_skip_end:
+ ret
+.size pg_output_buffer_skip,.-pg_output_buffer_skip

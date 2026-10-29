@@ -1088,36 +1088,13 @@ pg_durable_tool_init:
  je .Ldt_poll_pending
  cmp eax,3
  jne .Ldt_poll_end_result
- lea rdi,[r14+288]
+ mov rdi,rbx
  mov rsi,[r14+128]
  mov rdx,[r14+136]
- call pg_output_buffer_push@PLT
+ xor ecx,ecx
+ call pg_durable_tool_output@PLT
  test eax,eax
  jnz .Ldt_poll_error
- mov dword ptr [r14+368],1
- mov rax,[r14+136]
- add [r14+360],rax
- mov rdi,r14
- xor esi,esi
- call .Ldt_progress_flush
- test eax,eax
- jnz .Ldt_poll_error
- mov rdi,[r14+128]
- mov rsi,[r14+136]
- call pg_output_sanitize@PLT
- mov [r14+136],rax
- test rax,rax
- jz .Ldt_poll_pending
- mov rax,[r12]
- mov rcx,[rax+32]
- test rcx,rcx
- jz .Ldt_poll_pending
- mov rdi,[rax]
- mov rsi,[rbx+16]
- mov rdx,[r14+128]
- mov r8,rcx
- mov rcx,[r14+136]
- call r8
  jmp .Ldt_poll_pending
 .Ldt_poll_end_result:
  cmp eax,1
@@ -3144,3 +3121,172 @@ pg_durable_tool_output_limits:
 .balign 8
 .Ldt_bytes_per_ms: .double 102.4
 .Ldt_progress_interval: .double 100.0
+
+.text
+.globl pg_durable_tool_output
+.type pg_durable_tool_output,@function
+pg_durable_tool_output:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp],0
+ call pg_durable_tool_executing@PLT
+ test eax,eax
+ jz .Ldt_output_bad
+ cmp r13,2147483646
+ ja .Ldt_output_bad
+ test r13,r13
+ jz .Ldt_output_ready
+ test r12,r12
+ jz .Ldt_output_bad
+ mov rdi,r13
+ call malloc@PLT
+ test rax,rax
+ jz .Ldt_output_alloc
+ mov [rsp],rax
+ mov rdi,rax
+ mov rsi,r12
+ mov rdx,r13
+ call memcpy@PLT
+.Ldt_output_ready:
+ mov rbx,[rbx+56]
+ test r14,r14
+ jz .Ldt_output_push
+ lea rdi,[rbx+288]
+ mov rsi,r14
+ call pg_output_buffer_skip@PLT
+ test eax,eax
+ jnz .Ldt_output_end
+.Ldt_output_push:
+ lea rdi,[rbx+288]
+ mov rsi,r12
+ mov rdx,r13
+ call pg_output_buffer_push@PLT
+ test eax,eax
+ jnz .Ldt_output_end
+ test r13,r13
+ jnz .Ldt_output_dirty
+ test r14,r14
+ jz .Ldt_output_ok
+.Ldt_output_dirty:
+ mov dword ptr [rbx+368],1
+ add [rbx+360],r13
+ mov rdi,rbx
+ xor esi,esi
+ call .Ldt_progress_flush
+ test eax,eax
+ jnz .Ldt_output_end
+ test r13,r13
+ jz .Ldt_output_ok
+ mov rdi,[rsp]
+ mov rsi,r13
+ call pg_output_sanitize@PLT
+ test rax,rax
+ jz .Ldt_output_ok
+ mov rcx,rax
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ test r8,r8
+ jz .Ldt_output_ok
+ mov rdi,[rax]
+ mov rax,[rbx+8]
+ mov rsi,[rax+16]
+ mov rdx,[rsp]
+ call r8
+.Ldt_output_ok:
+ xor eax,eax
+ jmp .Ldt_output_end
+.Ldt_output_bad:
+ mov eax,4
+ jmp .Ldt_output_end
+.Ldt_output_alloc:
+ mov eax,5
+.Ldt_output_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_durable_tool_output,.-pg_durable_tool_output
+.globl pg_durable_tool_retained_output
+.type pg_durable_tool_retained_output,@function
+pg_durable_tool_retained_output:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ test r12,r12
+ jz .Ldt_retained_bad
+ pxor xmm0,xmm0
+ movdqu [r12],xmm0
+ movdqu [r12+16],xmm0
+ call pg_durable_tool_executing@PLT
+ test eax,eax
+ jz .Ldt_retained_bad
+ mov rdi,[rbx+56]
+ add rdi,288
+ mov rsi,r12
+ call pg_output_buffer_snapshot@PLT
+ jmp .Ldt_retained_end
+.Ldt_retained_bad:
+ mov eax,4
+.Ldt_retained_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_tool_retained_output,.-pg_durable_tool_retained_output
+.globl pg_durable_tool_output_window
+.type pg_durable_tool_output_window,@function
+pg_durable_tool_output_window:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ test r12,r12
+ jz .Ldt_window_bad
+ pxor xmm0,xmm0
+ movdqu [r12],xmm0
+ movdqu [r12+16],xmm0
+ call pg_durable_tool_executing@PLT
+ test eax,eax
+ jz .Ldt_window_bad
+ mov rax,[rbx+56]
+ cmp dword ptr [rax+272],0
+ je .Ldt_window_head
+ mov rcx,[rax+256]
+ mov [r12],rcx
+ mov rcx,[rax+264]
+ mov [r12+8],rcx
+ movsd xmm0,[rip+.Ldt_progress_interval]
+ movsd [r12+16],xmm0
+ mov qword ptr [r12+24],102400
+ xor eax,eax
+ jmp .Ldt_window_end
+.Ldt_window_head:
+ mov eax,1
+ jmp .Ldt_window_end
+.Ldt_window_bad:
+ mov eax,4
+.Ldt_window_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_tool_output_window,.-pg_durable_tool_output_window

@@ -785,3 +785,42 @@ pg_tool_execution_diagnostic:
 
 .section .rodata
 .Lte_durationMs: .asciz "durationMs"
+
+.text
+.globl pg_tool_execution_output
+.type pg_tool_execution_output,@function
+pg_tool_execution_output:
+ test rdi,rdi
+ jz .Lte_output_invalid
+ mov rdi,[rdi]
+ jmp pg_durable_tool_output@PLT
+.Lte_output_invalid:
+ mov eax,4
+ ret
+.size pg_tool_execution_output,.-pg_tool_execution_output
+
+.text
+.globl pg_tool_execution_retained_output
+.type pg_tool_execution_retained_output,@function
+pg_tool_execution_retained_output:
+ test rdi,rdi
+ jz .Lte_retained_output_invalid
+ mov rdi,[rdi]
+ jmp pg_durable_tool_retained_output@PLT
+.Lte_retained_output_invalid:
+ mov eax,4
+ ret
+.size pg_tool_execution_retained_output,.-pg_tool_execution_retained_output
+
+.text
+.globl pg_tool_execution_output_window
+.type pg_tool_execution_output_window,@function
+pg_tool_execution_output_window:
+ test rdi,rdi
+ jz .Lte_output_window_invalid
+ mov rdi,[rdi]
+ jmp pg_durable_tool_output_window@PLT
+.Lte_output_window_invalid:
+ mov eax,4
+ ret
+.size pg_tool_execution_output_window,.-pg_tool_execution_output_window

@@ -2,6 +2,7 @@
 #define PANGU_DURABLE_TOOL_H
 #include "task_runner.h"
 #include "tools.h"
+#include "output_window.h"
 typedef struct {
  void *context;
  /* Task-owned operation lease: 0 acquired, 1 busy (poll again), 2 unavailable.
@@ -48,6 +49,15 @@ const struct json_object *pg_durable_tool_call(const pg_task_runner *);
 int pg_durable_tool_executing(const pg_task_runner *);
 /* Host pins limits during acquire, before effects; buffer is owned by phase. */
 int pg_durable_tool_output_limits(pg_task_runner *,const pg_tool_output_limits *);
+typedef struct {size_t max_bytes,max_lines;double min_interval_ms;uint64_t bytes_per_second;} pg_tool_output_window;
+/* Executing call only. Complete decoded UTF-8 chunk is borrowed for the call;
+   skipped describes omitted output directly before it, permitted for tail only.
+   Retained snapshot transfers owned text; free() after use. It includes all
+   accepted output, even before its next durable progress commit. */
+int pg_durable_tool_output(pg_task_runner *,pg_slice,const pg_output_skip *);
+int pg_durable_tool_retained_output(pg_task_runner *,pg_output_snapshot *);
+/* 0 tail window copied, 1 head retention (zeroed output), other task error. */
+int pg_durable_tool_output_window(pg_task_runner *,pg_tool_output_window *);
 /* Binding borrows callback table through all phase and hook cleanup. */
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned

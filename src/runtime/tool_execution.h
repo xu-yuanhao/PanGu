@@ -1,6 +1,7 @@
 #ifndef PANGU_TOOL_EXECUTION_H
 #define PANGU_TOOL_EXECUTION_H
 #include "task_access.h"
+#include "durable_tool.h"
 /* Call-owned capability, borrowed until the tool instance is disposed. Sequence
    restarts with an invocation; omitted keys replay by their original call order.
    Host sets resumes from the pinned tool replay policy before opening it. */
@@ -23,4 +24,10 @@ int pg_tool_execution_poll(pg_tool_execution *,uint64_t task_id,struct json_obje
    JSON null. Diagnostics require severity info/warn/error and a string message. */
 int pg_tool_execution_details(pg_tool_execution *,const struct json_object *);
 int pg_tool_execution_diagnostic(pg_tool_execution *,const struct json_object *);
+/* Output follows the current call's configured retention and pacing. Inputs
+   are borrowed; retained text is owned and freed by caller. Window returns 1
+   for head retention. All methods reject a capability outside execution. */
+int pg_tool_execution_output(pg_tool_execution *,pg_slice,const pg_output_skip *);
+int pg_tool_execution_retained_output(pg_tool_execution *,pg_output_snapshot *);
+int pg_tool_execution_output_window(pg_tool_execution *,pg_tool_output_window *);
 #endif
