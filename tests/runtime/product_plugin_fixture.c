@@ -34,7 +34,7 @@ static const pg_extension_section reviewer_sections[]={{"preamble","EXTENSION_RE
 static const pg_extension_section timing_sections[]={{"shared","EXTENSION_SHARED_TOKEN",render,1,0}};
 static const pg_extension_wrap timing_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo","Wrapped native echo",{.tool=tool_wrap}},{PG_EXTENSION_WRAP_SECTION,0,"shared","EXTENSION_WRAPPED_TOKEN",{.section=section_wrap}}};
 static const pg_extension_wrap broken_wraps[]={{PG_EXTENSION_WRAP_TOOL,0,"native_echo",0,{.tool=broken_wrap}}};
-static struct {unsigned errors,before,after,cancels;} hook_stats;
+static struct {unsigned errors,before,after,cancels,requests,responses,yields,rounds,generation_cancels,generation_pending;} hook_stats;
 static const json_object *pending_before,*pending_after;
 static int policy_before(void *context,const json_object *request,json_object **decision){
  (void)context;hook_stats.before++;*decision=0;json_object *call=json_object_object_get(request,"call"),*args=json_object_object_get(call,"arguments");const char *name=json_object_get_string(json_object_object_get(call,"name")),*path=json_object_get_string(json_object_object_get(args,"path"));if(!name||strcmp(name,"write")||!path)return 0;
@@ -51,17 +51,29 @@ static int policy_after(void *context,const json_object *request,json_object **d
  if(!strcmp(path,"hooked.txt")||!strcmp(path,"after-pending.txt"))*decision=json_tokener_parse("{\"output\":\"HOOK_AFTER_RESULT\",\"isError\":false,\"details\":{\"hook\":true}}");return 0;
 }
 static void policy_cancel(void *context,const json_object *request){(void)context;assert(request==pending_before||request==pending_after);if(request==pending_before)pending_before=0;if(request==pending_after)pending_after=0;hook_stats.cancels++;}
-static const pg_extension_tool_hook policy_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,policy_before,policy_cancel},{PG_EXTENSION_AFTER_TOOL,0,0,policy_after,policy_cancel}};
+static const pg_extension_hook policy_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,policy_before,policy_cancel},{PG_EXTENSION_AFTER_TOOL,0,0,policy_after,policy_cancel}};
 static int timing_before(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *args=json_object_object_get(json_object_object_get(request,"call"),"arguments");const char *path=json_object_get_string(json_object_object_get(args,"path"));if(path&&!strcmp(path,"hooked.txt"))assert(!strcmp(json_object_get_string(json_object_object_get(args,"content")),"HOOK_ARGUMENTS"));return 0;}
 static int timing_after(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *args=json_object_object_get(json_object_object_get(request,"call"),"arguments");const char *path=json_object_get_string(json_object_object_get(args,"path"));if(path&&!strcmp(path,"hooked.txt")){assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(request,"result"),"output")),"HOOK_AFTER_RESULT"));assert(!json_object_deep_copy(json_object_object_get(request,"result"),decision,0));json_object_object_add(*decision,"output",json_object_new_string("HOOK_AFTER_CHAINED"));}return 0;}
-static const pg_extension_tool_hook timing_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,timing_before,0},{PG_EXTENSION_AFTER_TOOL,0,0,timing_after,0}};
+static const pg_extension_hook timing_hooks[]={{PG_EXTENSION_BEFORE_TOOL,0,0,timing_before,0},{PG_EXTENSION_AFTER_TOOL,0,0,timing_after,0}};
 static const pg_extension policy={"policy",0,0,0,0,0,0,policy_hooks,2};
+static const json_object *pending_request,*pending_response,*pending_yield;
+static int generation_before(void *context,const json_object *request,json_object **decision){
+ (void)context;*decision=0;if(!pending_request){pending_request=request;hook_stats.generation_pending=1;return 1;}assert(pending_request==request);pending_request=0;hook_stats.generation_pending=0;hook_stats.requests++;json_object *messages=0;assert(!json_object_deep_copy(json_object_object_get(request,"messages"),&messages,0));json_object *message=json_tokener_parse("{\"role\":\"user\",\"content\":\"The transient request marker is BEFORE_REQUEST_MARKER. Keep following the user's task.\"}");assert(messages&&message&&!json_object_array_add(messages,message));*decision=json_object_new_object();assert(*decision&&!json_object_object_add(*decision,"messages",messages));return 0;
+}
+static int generation_after(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;if(!pending_response){pending_response=request;return 1;}assert(pending_response==request);pending_response=0;assert(hook_stats.responses<hook_stats.requests&&json_object_is_type(json_object_object_get(request,"message"),json_type_object));hook_stats.responses++;return 0;}
+static int generation_yield(void *context,const json_object *request,json_object **decision){
+ (void)context;*decision=0;const char *message=json_object_to_json_string(json_object_object_get(request,"message"));if(strstr(message,"YIELD_START")){if(!pending_yield){pending_yield=request;return 1;}assert(pending_yield==request);pending_yield=0;*decision=json_tokener_parse("{\"continue\":\"Reply only YIELD_END.\"}");}hook_stats.yields++;return 0;
+}
+static int generation_tools(void *context,const json_object *request,json_object **decision){(void)context;*decision=0;json_object *results=json_object_object_get(request,"results");assert(json_object_is_type(results,json_type_array)&&json_object_array_length(results)>0&&hook_stats.responses>hook_stats.rounds);hook_stats.rounds++;return 0;}
+static void generation_cancel(void *context,const json_object *request){(void)context;assert(request==pending_request||request==pending_response||request==pending_yield);if(request==pending_request){pending_request=0;hook_stats.generation_pending=0;}if(request==pending_response)pending_response=0;if(request==pending_yield)pending_yield=0;hook_stats.generation_cancels++;}
+static const pg_extension_hook generation_hooks[]={{PG_EXTENSION_BEFORE_REQUEST,0,0,generation_before,generation_cancel},{PG_EXTENSION_AFTER_RESPONSE,0,0,generation_after,generation_cancel},{PG_EXTENSION_ON_YIELD,0,0,generation_yield,generation_cancel},{PG_EXTENSION_AFTER_TOOLS,0,0,generation_tools,0}};
+static const pg_extension generation={"generation",0,0,0,0,0,0,generation_hooks,4};
 static const pg_extension reviewer={"reviewer",&echo_tool,1,reviewer_sections,2,0,0,0,0},timing={"timing",0,0,timing_sections,1,timing_wraps,2,timing_hooks,2},broken={"broken",0,0,broken_sections,1,broken_wraps,1,0,0};
-static const pg_extension *extensions[]={&reviewer,&timing,&broken,&policy};
-static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&(!strcmp(extension,"broken")||!strcmp(extension,"policy")));if(error)(*(unsigned *)context)++;}
-static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,4,0,&hook_stats,report};
+static const pg_extension *extensions[]={&reviewer,&timing,&broken,&policy,&generation};
+static void report(void *context,const char *extension,const char *target,int error){assert(extension&&target&&(!strcmp(extension,"broken")||!strcmp(extension,"policy")||!strcmp(extension,"generation")));if(error)(*(unsigned *)context)++;}
+static pg_extensions registry={PG_EXTENSIONS_ABI,sizeof(pg_extensions),extensions,5,0,&hook_stats,report};
 static int start(void *context,pg_host *host,size_t owner){(void)context;registry.defaults=json_tokener_parse("[\"coding\",\"reviewer\",\"timing\"]");if(!registry.defaults)return 1;return pg_host_provide(host,owner,"task.definitions",(void *)&provider)||pg_host_provide(host,owner,"extensions.registry",&registry);}
-static int stop(void *context){(void)context;if(active_tasks||pending_before||pending_after)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}
+static int stop(void *context){(void)context;if(active_tasks||pending_before||pending_after||pending_request||pending_response||pending_yield)return -1;json_object_put((json_object *)registry.defaults);registry.defaults=0;return 0;}
 static const char *const exports[]={"task.definitions","extensions.registry"};
 static const pg_plugin plugin={"product.tasks",0,0,0,exports,2,start,stop};
 const pg_native_manifest pangu_plugin_v1={PG_NATIVE_ABI,sizeof(pg_native_manifest),sizeof(pg_plugin),0,&plugin,1};

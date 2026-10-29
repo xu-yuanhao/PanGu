@@ -153,6 +153,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Agent配置服务接入pangu.agent文档：字段保留/替换/null清除、无变化不写入、回滚/重开；instructions进入真实请求且保留资源提示，tools/modelTools控制有序模型声明与实际执行入口。
 - [x] 扩展快照接通实际请求/工具链：稳定名称默认/显式/add/remove选择、工具和提示段同名覆盖保序、同步wrapTool/wrapSection、改名/错误移除并报告、标签渲染及请求内固定选择；未改动的基础工具仍走注入提供者。
 - [x] beforeTool/afterTool进入真实Tool阶段：意图前校验/参数链/首个block、最终参数checkpoint、结果替换链与元数据、pending/取消/重开、异常处理；实际DeepSeek写入路径由hook改写，原assistant记录保持。
+- [x] Generation四阶段hooks进入产品：beforeRequest临时消息链、afterResponse/afterTools观察、onYield首个续接；phase固定选择、挂起/取消、回答与续接/队列边界原子提交。新请求保存offeredTools并随并行/串行子任务传递，未提供的工具在效果前拒绝。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -263,8 +264,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/tool.ts` call/finalResult、`types.ts` ToolHooks和工具/hook用例；扩展顺序沿agentHooks。已核对最新跟踪`6eb99ad`：Tool v3新增unoffered准入、cutoff/reject恢复路径；本批完成固定v2的Tool hook链，下批随Generation阶段评估这些修复。
-- 实际调用链：选中扩展的tool_hooks → Tool取得执行lease → 使用原注册表查找/JSON/validator路径校验 → beforeTool按扩展顺序挂起/续接并传递参数，首个block或异常阻止效果 → 再校验 → 固定最终参数/重放策略到checkpoint → 实际工具 → 元数据快照 → afterTool结果链 → 同事务结果Entry/Task终态。hook持有独立请求；原assistant记录不被改写，取消先释放hook再归还插件lease。
-- 验证：产品ASan/UBSan覆盖参数改写与重开、链式顺序、拦截/异常无文件效果、二次校验、afterTool挂起/异常/非法结果保持、取消及DSO清理。DeepSeek真实请求write(original.txt)经挂起hook改成hooked.txt/HOOK_ARGUMENTS，再经结果hook继续回答。两后端原有Tool/恢复专项与Runtime整批通过，产品构建及登记/Assembly检查见实现记录。
-- 接口与自审：extensions.registry ABI2的extension描述符72字节，新增32字节Tool hook描述符；Durable Tool184字节尾部绑定独立hook操作表，原Task/Client/TUI布局保持。状态推进、决策/结果所有权及清理均为汇编。新增只读注册表check入口复用执行器原查找/JSON/validator；没有第二套工具实现。
-- 剩余与下一交付物：K09继续Generation beforeRequest/afterResponse/onYield/afterTools、完整HookApi、运行中安装/替换/撤销、异步section/失败回退/SystemEntry计划和扩展输出完整内容类型。下一批沿模型请求→响应→工具轮次接通Generation hooks与请求已提供工具的准入修复，完整K09仍按覆盖表验收。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` generation request/classify/answer/finishToolRound，以及scheduler.ts每phase固定Agent的hook runner；沿最新跟踪`6eb99ad`的unoffered准入修复，按PanGu请求工具声明保存名字列表。Harness/Cordis继续约束代码lease与释放。
+- 实际调用链：Generation请求视图 → beforeRequest临时消息链 → 真实模型 → 终态afterResponse → 工具轮次afterTools或回答onYield → 原子记录/边界提交。onYield在无排队用户/reset时追加PanGu用户Entry并创建后继Generation，placed输入保留至最终回答；原请求消息与会话记录分离。phase scope跨多个hook事件固定扩展并在取消/结束释放。offeredTools随请求配置、并行/串行Tool输入保存，未提供名字在解析/Hook/效果前拒绝。
+- 验证：产品ASan/UBSan通过通用hook phase事件切换/挂起/释放、既有Tool hooks与原生DSO、未提供工具拒绝且无beforeTool调用/文件。真实DeepSeek完成临时marker请求（历史无临时用户消息）、文件写入与afterTools、YIELD_START→续接UserEntry→YIELD_END，以及请求前挂起取消；实际Tool任务均有声明名单。Runtime整批、两后端Durable专项和产品构建通过，最终检查见当前实现记录。
+- 接口与自审：extensions.registry ABI3采用统一32字节hook描述符和单一事件引擎；Generation312字节尾部绑定hooks，操作持有phase scope与owned JSON。Client/Task/TUI布局保持。Inputs新增内部续接边界kind6，保留旧边界含义；新增源码入口已登记，旧Tool专名hook导出已原地替换。
+- 剩余与下一交付物：K09继续完整HookApi、运行中安装/替换/撤销、异步section/失败回退/SystemEntry计划；K07/K08仍核对未启动串行调用取消的细分结果及更完整内容/控制语义。下一批把扩展注册表发布与宿主生命周期连接到现有消费者，按完整配置变更/运行/撤销工作流推进。

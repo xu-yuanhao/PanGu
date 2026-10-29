@@ -128,6 +128,7 @@ pg_durable_generation_init:
  lea rax,[rip+.Lgg_cleanup]
  mov [rdi+288],rax
  mov qword ptr [rdi+296],0
+ mov qword ptr [rdi+304],0
  xor eax,eax
 .Lgg_init_return:
  ret
@@ -143,7 +144,7 @@ pg_durable_generation_init:
  cmp qword ptr [rbx+56],0
  jne .Lgg_operation_ok
  mov edi,1
- mov esi,360
+ mov esi,400
  call calloc@PLT
  test rax,rax
  jz .Lgg_operation_bad
@@ -168,6 +169,23 @@ pg_durable_generation_init:
  mov r12,[rsi+56]
  test r12,r12
  jz .Lgg_cleanup_end
+ mov rax,[r12]
+ mov rax,[rax+304]
+ test rax,rax
+ jz .Lgg_cleanup_hook_json
+ cmp qword ptr [r12+360],0
+ je .Lgg_cleanup_hook_json
+ mov rdi,[rax]
+ mov rsi,[r12+360]
+ call [rax+16]
+ mov qword ptr [r12+360],0
+.Lgg_cleanup_hook_json:
+ mov rdi,[r12+368]
+ call json_object_put@PLT
+ mov rdi,[r12+376]
+ call json_object_put@PLT
+ mov rdi,[r12+392]
+ call json_object_put@PLT
  cmp dword ptr [r12+80],0
  je .Lgg_cleanup_json
  cmp dword ptr [r12+84],0
@@ -1913,7 +1931,7 @@ pg_durable_context_order:
  jz .Lgg_request_alloc
 .Lgg_request_acquire:
  cmp dword ptr [r14+80],0
- jne .Lgg_request_started
+ jne .Lgg_request_dispatch
  mov rax,[r12]
  mov rdi,[rax]
  mov rsi,[r14+16]
@@ -1928,6 +1946,9 @@ pg_durable_context_order:
  je .Lgg_request_invalid
  cmp qword ptr [r14+48],0
  je .Lgg_request_invalid
+.Lgg_request_dispatch:
+ cmp dword ptr [r14+84],0
+ jne .Lgg_request_started
  GGET "qword ptr [rbx+32]",state
  GGET rax,checkpoint
  GGET rax,handle
@@ -1943,6 +1964,15 @@ pg_durable_context_order:
  call [rcx+80]
  jmp .Lgg_request_start_result
 .Lgg_request_stream_start:
+ mov rdi,r12
+ mov rsi,rbx
+ mov rdx,r14
+ mov ecx,3
+ call .Lgg_hooks
+ cmp eax,1
+ je .Lgg_request_pending
+ test eax,eax
+ jnz .Lgg_request_error
  mov rdi,[r14+32]
  mov rsi,[r14+72]
  mov dword ptr [r14+84],1
@@ -2105,6 +2135,29 @@ pg_durable_context_order:
  xor eax,eax
  jmp .Lgg_request_end
 .Lgg_request_final_settle:
+ mov rdi,r12
+ mov rsi,rbx
+ mov rdx,r14
+ mov ecx,4
+ call .Lgg_hooks
+ cmp eax,1
+ je .Lgg_request_pending
+ test eax,eax
+ jnz .Lgg_request_error
+ mov rdi,r14
+ call .Lgg_is_answer
+ test eax,eax
+ jz .Lgg_request_commit_response
+ mov rdi,r12
+ mov rsi,rbx
+ mov rdx,r14
+ mov ecx,5
+ call .Lgg_hooks
+ cmp eax,1
+ je .Lgg_request_pending
+ test eax,eax
+ jnz .Lgg_request_error
+.Lgg_request_commit_response:
  mov rdi,rbx
  mov rsi,r14
  lea rdx,[rip+.Lgg_stage]
@@ -2383,6 +2436,16 @@ pg_durable_context_order:
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_stage_end
+ GGET "qword ptr [rbx+16]",offered_tools
+ test rax,rax
+ jz .Lgg_stage_offered_ready
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lgg_offered_tools]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_stage_end
+.Lgg_stage_offered_ready:
  mov rdi,r12
  mov rsi,[rsp+80]
  mov rdx,[rsp+96]
@@ -2434,6 +2497,16 @@ pg_durable_context_order:
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_stage_end
+ GGET "qword ptr [rbx+16]",offered_tools
+ test rax,rax
+ jz .Lgg_stage_wait_offered
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_offered_tools]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_stage_end
+.Lgg_stage_wait_offered:
  mov rdi,r14
  lea rsi,[rip+.Lgg_tools_key]
  mov rdx,[rsp+72]
@@ -2471,6 +2544,12 @@ pg_durable_context_order:
  mov rsi,r12
  mov rdx,[rsp+160]
  mov ecx,[rsp+192]
+ cmp ecx,1
+ jne .Lgg_stage_boundary_kind
+ cmp qword ptr [rbx+392],0
+ je .Lgg_stage_boundary_kind
+ mov ecx,6
+.Lgg_stage_boundary_kind:
  mov r8,[rbx+160]
  lea r9,[rsp+168]
  call pg_durable_inputs_apply@PLT
@@ -2479,7 +2558,19 @@ pg_durable_context_order:
  mov rdi,[rsp+168]
  call json_object_array_length@PLT
  test rax,rax
- jz .Lgg_stage_return_state
+ jnz .Lgg_stage_start_users
+ cmp qword ptr [rbx+392],0
+ je .Lgg_stage_return_state
+ cmp dword ptr [rsp+176],0
+ jne .Lgg_stage_return_state
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp+200]
+ call .Lgg_continue_stage
+ test eax,eax
+ jnz .Lgg_stage_end
+ jmp .Lgg_stage_return_state
+.Lgg_stage_start_users:
  mov rdi,[rsp+208]
  mov rsi,r12
  mov rdx,[rsp+200]
@@ -2650,7 +2741,19 @@ pg_durable_context_order:
  call json_object_array_length@PLT
  lea rdx,[rip+.Lgg_handoff]
  test rax,rax
- jz .Lgg_tools_commit
+ jnz .Lgg_tools_next
+ mov rdx,[rbx+56]
+ mov rdi,[rdx]
+ mov rsi,rbx
+ mov ecx,6
+ call .Lgg_hooks
+ cmp eax,1
+ je .Lgg_tools_pending
+ test eax,eax
+ jnz .Lgg_tools_error
+ lea rdx,[rip+.Lgg_handoff]
+ jmp .Lgg_tools_commit
+.Lgg_tools_next:
  lea rdx,[rip+.Lgg_next_tool]
 .Lgg_tools_commit:
  mov rdi,rbx
@@ -2658,6 +2761,10 @@ pg_durable_context_order:
  call pg_task_runner_commit_with@PLT
 .Lgg_tools_error:
  neg eax
+ pop rbx
+ ret
+.Lgg_tools_pending:
+ mov eax,1
  pop rbx
  ret
 .Lgg_abort_stage:
@@ -4039,6 +4146,16 @@ pg_durable_context_read:
  call .Lgg_copy_field
  test eax,eax
  jnz .Lgg_next_end
+ GGET "qword ptr [rsp+80]",offered_tools
+ test rax,rax
+ jz .Lgg_next_offered_ready
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lgg_offered_tools]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_next_end
+.Lgg_next_offered_ready:
  GGET "qword ptr [rsp+80]",pending
  mov r14,rax
  mov rdi,rax
@@ -5105,3 +5222,345 @@ pg_durable_request_read:
 .Lgg_status_poll_json: .asciz "{\"pollAt\":0}"
 .Lgg_status_patch_json: .asciz "[[\"s\",[\"generation\"],null]]"
 .Lgg_at_key: .asciz "at"
+
+.section .rodata
+.Lgg_offered_tools: .asciz "offeredTools"
+.text
+.globl pg_durable_generation_bind_hooks
+.type pg_durable_generation_bind_hooks,@function
+pg_durable_generation_bind_hooks:
+ mov [rdi+304],rsi
+ ret
+/* A terminal non-tool answer is the onYield boundary. */
+.Lgg_is_answer:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ GGET "qword ptr [rbx+24]",error_message
+ test rax,rax
+ jnz .Lgg_answer_no
+ GGET "qword ptr [rbx+24]",stop_reason
+ test rax,rax
+ jz .Lgg_answer_reason_ok
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_answer_no
+ mov r12,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lgg_hook_stop]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_answer_reason_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lgg_hook_length]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_answer_reason_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lgg_hook_tool_use]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgg_answer_no
+.Lgg_answer_reason_ok:
+ GGET "qword ptr [rbx+24]",content
+ mov rbx,rax
+ xor r12d,r12d
+.Lgg_answer_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lgg_answer_yes
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ GGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgg_answer_next
+ mov rdi,rax
+ lea rsi,[rip+.Lgg_tool_call]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgg_answer_no
+.Lgg_answer_next:
+ inc r12
+ jmp .Lgg_answer_each
+.Lgg_answer_no:
+ xor eax,eax
+ jmp .Lgg_answer_end
+.Lgg_answer_yes:
+ mov eax,1
+.Lgg_answer_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Private requests/results are retained while a hook is pending. */
+.Lgg_hooks:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14d,ecx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rbp,[rbx+304]
+ test rbp,rbp
+ jz .Lgg_hooks_ok
+ mov ecx,r14d
+ sub ecx,3
+ mov eax,1
+ shl eax,cl
+ mov [rsp+56],eax
+ test [r13+384],eax
+ jnz .Lgg_hooks_ok
+ cmp qword ptr [r13+368],0
+ jne .Lgg_hooks_poll
+ cmp r14d,3
+ jne .Lgg_hooks_object
+ mov rdi,[r13+344]
+ call json_object_get@PLT
+ mov [r13+368],rax
+ jmp .Lgg_hooks_poll
+.Lgg_hooks_object:
+ call json_object_new_object@PLT
+ mov [r13+368],rax
+ test rax,rax
+ jz .Lgg_hooks_bad
+ cmp r14d,6
+ je .Lgg_hooks_round
+ mov rdi,[r13+24]
+ call json_object_get@PLT
+ mov rdi,[r13+368]
+ lea rsi,[rip+.Lgg_hook_message]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_hooks_bad
+ jmp .Lgg_hooks_poll
+.Lgg_hooks_round:
+ GGET "qword ptr [r12+32]",state
+ GGET rax,checkpoint
+ mov [rsp+16],rax
+ GGET rax,assistant
+ mov rdi,[r13+368]
+ lea rsi,[rip+.Lgg_assistant]
+ mov rdx,rax
+ call .Lgg_copy_field
+ test eax,eax
+ jnz .Lgg_hooks_bad
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_hooks_bad
+ GGET "qword ptr [rsp+16]",tools_key
+ mov [rsp+24],rax
+ mov qword ptr [rsp+32],0
+.Lgg_hooks_round_each:
+ mov rdi,[rsp+24]
+ call json_object_array_length@PLT
+ cmp [rsp+32],rax
+ jae .Lgg_hooks_round_done
+ mov rdi,[rsp+24]
+ mov rsi,[rsp+32]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rdx,rax
+ mov rax,[r12+8]
+ mov rdi,[rax]
+ mov esi,2
+ lea rcx,[rsp+8]
+ call [rax+8]
+ test eax,eax
+ jnz .Lgg_hooks_bad
+ GGET "qword ptr [rsp+8]",state
+ GGET rax,outcome
+ GGET rax,result
+ GGET rax,entry_id
+ test rax,rax
+ jz .Lgg_hooks_round_next
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgg_hooks_bad
+.Lgg_hooks_round_next:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+ inc qword ptr [rsp+32]
+ jmp .Lgg_hooks_round_each
+.Lgg_hooks_round_done:
+ mov rdi,[r13+368]
+ lea rsi,[rip+.Lgg_hook_results]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_hooks_bad
+.Lgg_hooks_poll:
+ mov rdi,[rbp]
+ mov rsi,[r12+16]
+ mov edx,r14d
+ mov rcx,[r13+368]
+ lea r8,[r13+360]
+ lea r9,[r13+376]
+ call [rbp+8]
+ cmp eax,1
+ je .Lgg_hooks_pending
+ test eax,eax
+ jnz .Lgg_hooks_bad
+ cmp r14d,3
+ jne .Lgg_hooks_yield
+ mov rdi,[r13+376]
+ call json_object_get@PLT
+ mov [rsp+48],rax
+ mov rdi,[r13+344]
+ call json_object_put@PLT
+ mov rax,[rsp+48]
+ mov [r13+344],rax
+ mov rdx,[r13+72]
+ mov [rdx+PG_MSG_TEXT],rax
+ jmp .Lgg_hooks_complete
+.Lgg_hooks_yield:
+ cmp r14d,5
+ jne .Lgg_hooks_complete
+ GGET "qword ptr [r13+376]",hook_continue
+ test rax,rax
+ jz .Lgg_hooks_complete
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [r13+392],rax
+.Lgg_hooks_complete:
+ mov eax,[rsp+56]
+ or [r13+384],eax
+ mov rdi,[r13+368]
+ call json_object_put@PLT
+ mov qword ptr [r13+368],0
+ mov rdi,[r13+376]
+ call json_object_put@PLT
+ mov qword ptr [r13+376],0
+.Lgg_hooks_ok:
+ xor ebx,ebx
+ jmp .Lgg_hooks_end
+.Lgg_hooks_pending:
+ mov ebx,1
+ jmp .Lgg_hooks_end
+.Lgg_hooks_bad:
+ mov ebx,5
+.Lgg_hooks_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_hook_message: .asciz "message"
+.Lgg_hook_results: .asciz "results"
+.Lgg_hook_continue: .asciz "continue"
+.text
+/* Same transaction as the final assistant: append continuation and create the
+   successor only after the final queue boundary selected no user or reset. */
+.Lgg_continue_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ lea rdi,[rip+.Lgg_continue_entry]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_continue_bad
+ GGET rax,model
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,[rbx+392]
+ call json_object_get@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_content]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_continue_end
+ mov rax,[rbx+8]
+ mov rax,[rax+8]
+ mov rdi,[rax]
+ call [rax+40]
+ call json_object_new_double@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgg_timestamp]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_continue_end
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,[rsp]
+ mov rax,[rbx+8]
+ mov rcx,[rax+16]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ lea r9,[rsp+8]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lgg_continue_end
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rdi,[rax+64]
+ mov rsi,r12
+ mov rdx,r13
+ xor ecx,ecx
+ lea r8,[rsp+16]
+ call pg_durable_inputs_start@PLT
+ jmp .Lgg_continue_end
+.Lgg_continue_bad:
+ mov eax,5
+.Lgg_continue_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_continue_entry: .asciz "{\"kind\":\"pangu.user\",\"model\":[{\"role\":\"user\",\"content\":\"\"}]}"
+
+.section .rodata
+.Lgg_hook_stop: .asciz "stop"
+.Lgg_hook_length: .asciz "length"
+.Lgg_hook_tool_use: .asciz "toolUse"

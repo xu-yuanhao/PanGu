@@ -24,11 +24,15 @@ typedef struct {
  int (*fetch_deferred)(void *,const pg_model *,const struct json_object *);
  int (*cancel_deferred)(void *,const pg_model *,const struct json_object *);
 } pg_durable_generation_host;
+/* Poll: 0 with owned request, 1 pending, negative error. State retains the
+   phase-selected extensions across events; close cancels/releases the scope. */
+typedef struct {void *context;int (*poll)(void *,uint64_t,unsigned,const struct json_object *,void **,struct json_object **);void (*close)(void *,void *);} pg_durable_generation_hooks;
 typedef struct {
  const pg_durable_generation_host *host;
  pg_task_definition definition;
  pg_task_phase phases[5];
  const pg_task_definition *compaction;
+ const pg_durable_generation_hooks *hooks;
 } pg_durable_generation;
 /* Resolve pangu.generation alongside pangu.tool. prepare saves configuration
    and context cutoff; request streams through the native model service, then
@@ -44,6 +48,7 @@ typedef struct {
    rather than silently losing model context. */
 int pg_durable_generation_init(pg_durable_generation *,const pg_durable_generation_host *);
 /* Optional definition borrowed for the Generation module lifetime. */
+void pg_durable_generation_bind_hooks(pg_durable_generation *,const pg_durable_generation_hooks *);
 void pg_durable_generation_bind_compaction(pg_durable_generation *,const pg_task_definition *);
 /* Read-only committed startup history through the same model projection.
    The latest head leads retained entries; last edits win. Results are ordered

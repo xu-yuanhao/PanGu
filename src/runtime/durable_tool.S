@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,4320
+ mov esi,4336
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -299,6 +299,37 @@ pg_durable_tool_init:
  mov rdi,rax
  call strlen@PLT
  mov [r14+112],rax
+ DGET "qword ptr [rbx+32]",input
+ DGET rax,offered_tools
+ test rax,rax
+ jz .Ldt_open_offered
+ mov r12,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ldt_open_invalid
+ DGET "qword ptr [r14+16]",name
+ mov r13,rax
+ xor ebp,ebp
+.Ldt_open_offered_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Ldt_open_unoffered
+ mov rdi,r12
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,r13
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Ldt_open_offered
+ inc rbp
+ jmp .Ldt_open_offered_each
+.Ldt_open_unoffered:
+ mov dword ptr [r14+4320],1
+.Ldt_open_offered:
  xor ebp,ebp
  jmp .Ldt_open_end
 .Ldt_open_alloc:
@@ -730,6 +761,17 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
 .Ldt_poll_operation:
  mov r14,[rbx+56]
+ cmp dword ptr [r14+4320],0
+ je .Ldt_poll_offered
+ mov dword ptr [r14+4316],1
+ mov dword ptr [r14+4320],0
+ lea rdi,[rip+.Ldt_hook_unavailable_metadata]
+ call json_tokener_parse@PLT
+ mov [r14+4272],rax
+ test rax,rax
+ jz .Ldt_poll_alloc
+ jmp .Ldt_poll_unavailable
+.Ldt_poll_offered:
  cmp dword ptr [r14+4264],0
  jne .Ldt_poll_final
  cmp dword ptr [r14+4236],0
@@ -1759,3 +1801,6 @@ pg_durable_tool_bind_hooks:
 .Ldt_hook_unavailable: .asciz "Tool is not available"
 .Ldt_hook_invalid_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"invalid_arguments\",\"message\":\"Tool arguments are invalid\"}]}"
 .Ldt_hook_unavailable_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"tool_unavailable\",\"message\":\"Tool is not available\"}]}"
+
+.section .rodata
+.Ldt_offered_tools: .asciz "offeredTools"

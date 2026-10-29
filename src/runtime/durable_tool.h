@@ -34,9 +34,10 @@ typedef struct {
  const pg_durable_tool_hooks *hooks;
 } pg_durable_tool;
 /* Borrowed host lives through all tasks and native cleanup. Resolve this
-   definition as pangu.tool. Input {kind:"model",assistant,callId} references
+   definition as pangu.tool. Input {kind:"model",assistant,callId,offeredTools?} references
    a committed pangu.assistant Entry's model[0].content toolCall. call stores
-   intent before execution; recovered execute reruns only when both policies
+   intent before execution; a saved offeredTools array rejects names outside
+   that request before lookup/hooks/effects. Recovered execute reruns only when both policies
    say safe. Result Entry and Task outcome commit atomically through Session.
    Tool output and model-facing identity use PanGu's own Entry namespace. */
 int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);

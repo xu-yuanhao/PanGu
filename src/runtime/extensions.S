@@ -321,7 +321,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],2
+ cmp dword ptr [rbx],3
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],48
  jne .Lx_validate_bad
@@ -456,7 +456,7 @@ pg_extensions_close:
  add rax,[r13+56]
  cmp dword ptr [rax],1
  jb .Lx_validate_bad
- cmp dword ptr [rax],2
+ cmp dword ptr [rax],6
  ja .Lx_validate_bad
  cmp qword ptr [rax+16],0
  je .Lx_validate_bad
@@ -1176,9 +1176,9 @@ pg_extension_tools_service:
 .text
 /* Hook state: result, private request, decision, extension index, hook index,
    active hook, pending, event. Selected extension descriptors remain leased. */
-.globl pg_extension_tool_hook_open
-.type pg_extension_tool_hook_open,@function
-pg_extension_tool_hook_open:
+.globl pg_extension_hook_open
+.type pg_extension_hook_open,@function
+pg_extension_hook_open:
  XF 32
  mov rbx,rdi
  mov r12d,esi
@@ -1203,15 +1203,15 @@ pg_extension_tool_hook_open:
  jmp .Lxh_open_end
 .Lxh_open_release:
  mov rdi,[r14]
- call pg_extension_tool_hook_close
+ call pg_extension_hook_close
  mov qword ptr [r14],0
 .Lxh_open_bad:
  mov eax,5
 .Lxh_open_end:
  XE 32
-.globl pg_extension_tool_hook_close
-.type pg_extension_tool_hook_close,@function
-pg_extension_tool_hook_close:
+.globl pg_extension_hook_close
+.type pg_extension_hook_close,@function
+pg_extension_hook_close:
  push rbx
  mov rbx,rdi
  test rdi,rdi
@@ -1231,6 +1231,13 @@ pg_extension_tool_hook_close:
  call json_object_put@PLT
  mov rdi,[rbx+16]
  call json_object_put@PLT
+ mov rdi,[rbx+56]
+ test rdi,rdi
+ jz .Lxh_close_state
+ call pg_extensions_close
+ mov rdi,[rbx+56]
+ call free@PLT
+.Lxh_close_state:
  mov rdi,rbx
  call free@PLT
 .Lxh_close_end:
@@ -1250,9 +1257,9 @@ pg_extension_tool_hook_close:
 .Lxh_set_end:
  pop rbx
  ret
-.globl pg_extension_tool_hook_poll
-.type pg_extension_tool_hook_poll,@function
-pg_extension_tool_hook_poll:
+.globl pg_extension_hook_poll
+.type pg_extension_hook_poll,@function
+pg_extension_hook_poll:
  XF 48
  mov rbx,rdi
  mov r12,rsi
@@ -1296,8 +1303,14 @@ pg_extension_tool_hook_poll:
  call pg_document_value_valid@PLT
  test eax,eax
  jz .Lxh_poll_invalid
+ cmp dword ptr [rbx+52],3
+ je .Lxh_poll_before_request
+ cmp dword ptr [rbx+52],5
+ je .Lxh_poll_yield
+ cmp dword ptr [rbx+52],2
+ je .Lxh_poll_after
  cmp dword ptr [rbx+52],1
- jne .Lxh_poll_after
+ jne .Lxh_poll_next_hook
  mov rdi,[rbx+16]
  lea rsi,[rip+.Lxh_block]
  call json_object_object_get@PLT
@@ -1343,6 +1356,52 @@ pg_extension_tool_hook_poll:
  test eax,eax
  jnz .Lxh_poll_bad
  jmp .Lxh_poll_next_hook
+.Lxh_poll_before_request:
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_messages]
+ call json_object_object_get@PLT
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_messages]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_next_hook
+.Lxh_poll_yield:
+ mov rdi,[rbx+16]
+ lea rsi,[rip+.Lxh_continue]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lxh_poll_next_hook
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lxh_poll_yield_valid
+ mov rdi,[rsp]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lxh_poll_invalid
+.Lxh_poll_yield_valid:
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,[rbx+8]
+ lea rsi,[rip+.Lxh_continue]
+ mov rdx,rax
+ call .Lxh_set
+ test eax,eax
+ jnz .Lxh_poll_bad
+ jmp .Lxh_poll_stop
 .Lxh_poll_after:
  mov rdi,[rbx+16]
  lea rsi,[rip+.Lxh_output]
@@ -1382,10 +1441,9 @@ pg_extension_tool_hook_poll:
  mov [rsp+16],eax
  mov rdi,r13
  mov rsi,[r14]
- lea rdx,[rip+.Lxh_before]
- cmp dword ptr [rbx+52],1
- je .Lxh_poll_report
- lea rdx,[rip+.Lxh_after]
+ mov eax,[rbx+52]
+ lea rdx,[rip+.Lxh_events]
+ mov rdx,[rdx+rax*8]
 .Lxh_poll_report:
  mov ecx,[rsp+16]
  call .Lx_report
@@ -1448,3 +1506,105 @@ pg_extension_tool_hook_poll:
 .section .rodata
 .Lxh_output: .asciz "output"
 .Lxh_diagnostics: .asciz "diagnostics"
+.text
+/* Generation hooks own a selected snapshot independently of the model lease;
+   tools can borrow their already selected execution snapshot. */
+.globl pg_extension_hook_resolve_open
+.type pg_extension_hook_resolve_open,@function
+pg_extension_hook_resolve_open:
+ XF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14d,ecx
+ mov [rsp],r8
+ mov [rsp+8],r9
+ mov qword ptr [r9],0
+ mov edi,1
+ mov esi,1232
+ call calloc@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lxh_owned_bad
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,rbp
+ call pg_extensions_resolve
+ test eax,eax
+ jnz .Lxh_owned_release
+ mov rdi,rbp
+ mov esi,r14d
+ mov rdx,[rsp]
+ mov rcx,[rsp+8]
+ call pg_extension_hook_open
+ test eax,eax
+ jnz .Lxh_owned_release
+ mov rax,[rsp+8]
+ mov rax,[rax]
+ mov [rax+56],rbp
+ xor eax,eax
+ jmp .Lxh_owned_end
+.Lxh_owned_release:
+ mov rdi,rbp
+ call pg_extensions_close
+ mov rdi,rbp
+ call free@PLT
+.Lxh_owned_bad:
+ mov eax,5
+.Lxh_owned_end:
+ XE 48
+.section .rodata
+.Lxh_messages: .asciz "messages"
+.Lxh_continue: .asciz "continue"
+.Lxh_before_request: .asciz "beforeRequest"
+.Lxh_after_response: .asciz "afterResponse"
+.Lxh_yield: .asciz "onYield"
+.Lxh_after_tools: .asciz "afterTools"
+.section .data.rel.ro
+.balign 8
+.Lxh_events: .quad 0,.Lxh_before,.Lxh_after,.Lxh_before_request,.Lxh_after_response,.Lxh_yield,.Lxh_after_tools
+.text
+.globl pg_extension_hook_poll_event
+.type pg_extension_hook_poll_event,@function
+pg_extension_hook_poll_event:
+ XF 32
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [r14],0
+ cmp [rbx+52],r12d
+ je .Lxh_event_poll
+ cmp dword ptr [rbx+48],0
+ jne .Lxh_event_bad
+ mov qword ptr [rsp],0
+ mov rdi,r13
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lxh_event_release
+ mov rdi,[rbx+8]
+ call json_object_put@PLT
+ mov rdi,[rbx+16]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+8],rax
+ mov qword ptr [rbx+16],0
+ mov qword ptr [rbx+24],0
+ mov qword ptr [rbx+32],0
+ mov qword ptr [rbx+40],0
+ mov [rbx+52],r12d
+.Lxh_event_poll:
+ mov rdi,rbx
+ mov rsi,r14
+ call pg_extension_hook_poll
+ jmp .Lxh_event_end
+.Lxh_event_release:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lxh_event_bad:
+ mov eax,-5
+.Lxh_event_end:
+ XE 32

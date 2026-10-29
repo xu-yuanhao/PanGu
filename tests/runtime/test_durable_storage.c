@@ -414,7 +414,7 @@ static void generation_bind(generation_case *g){durable_tool_case *tools=&g->too
 static int client_started(pg_client client,pg_event *event){for(unsigned i=0;i<8;i++){int n=client.poll(client.context,event);if(n!=1)return 0;if(event->kind==PG_RUN_STARTED)return 1;assert(event->kind==PG_MESSAGE_STARTED||event->kind==PG_MESSAGE_FINISHED||event->kind==PG_ENTRY_APPENDED||event->kind==PG_SUBMISSION_CHANGED||event->kind==PG_TURN_STARTED||event->kind==PG_INBOX_UPDATED);struct json_object *value=json_tokener_parse(event->text.data);assert(value);json_object_put(value);}return 0;}
 static int generation_flow(unsigned mode){
  unsigned live=mode==1||mode==8||mode==15||mode==16||mode==20||mode==21;
- _Static_assert(sizeof(pg_durable_generation_host)==96&&sizeof(pg_durable_generation)==304,"Generation retry ABI");
+ _Static_assert(sizeof(pg_durable_generation_host)==96&&sizeof(pg_durable_generation)==312,"Generation retry ABI");
  _Static_assert(sizeof(pg_durable_client_config)==32&&sizeof(pg_durable_client)==144&&offsetof(pg_durable_client,tool_events)==88,"Durable Client ABI");
  if(live&&!getenv("MIMO_API_KEY")&&!getenv("PANGU_MODEL_API_KEY")){fputs("Model API key required for real Durable model/tool flow\n",stderr);return 2;}
  assert(!curl_global_init(CURL_GLOBAL_DEFAULT));

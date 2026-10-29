@@ -1852,7 +1852,8 @@
         "pg_durable_compaction_bind_hooks",
         "pg_compaction_hook_open",
         "pg_compaction_hook_poll",
-        "pg_compaction_hook_close"
+        "pg_compaction_hook_close",
+        "pg_durable_generation_bind_hooks"
       ],
       "reference_basis": [
         {
@@ -2345,7 +2346,8 @@
         "pg_agent_tools_select",
         "pg_agent_tool_allowed",
         "pg_agent_state_peek",
-        "pg_agent_tools_service"
+        "pg_agent_tools_service",
+        "pg_agent_tools_names"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/agent.ts"
@@ -2370,9 +2372,11 @@
         "pg_extensions_prepare",
         "pg_extensions_close",
         "pg_extension_tools_service",
-        "pg_extension_tool_hook_open",
-        "pg_extension_tool_hook_poll",
-        "pg_extension_tool_hook_close"
+        "pg_extension_hook_open",
+        "pg_extension_hook_poll",
+        "pg_extension_hook_close",
+        "pg_extension_hook_resolve_open",
+        "pg_extension_hook_poll_event"
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/{registry,agent,prompt}.ts"

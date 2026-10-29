@@ -542,6 +542,12 @@ pg_durable_inputs_apply:
  mov r13,rdx
  mov r14,r9
  mov dword ptr [rsp+104],0
+ mov dword ptr [rsp+108],0
+ cmp ecx,6
+ jne .Li_apply_kind_restart
+ mov dword ptr [rsp+108],1
+ mov ecx,1
+.Li_apply_kind_restart:
  cmp ecx,5
  jne .Li_apply_kind_ready
  mov dword ptr [rsp+104],1
@@ -576,6 +582,12 @@ pg_durable_inputs_apply:
  call json_object_array_get_idx@PLT
  mov [rsp+8],rax
  IGET rax,type
+ IEQ rax,input
+ test eax,eax
+ jz .Li_apply_reset_write
+ mov dword ptr [rsp+108],0
+.Li_apply_reset_write:
+ IGET "qword ptr [rsp+8]",type
  IEQ rax,write
  test eax,eax
  jz .Li_apply_reset_next
@@ -590,6 +602,11 @@ pg_durable_inputs_apply:
  inc qword ptr [rsp+56]
  jmp .Li_apply_reset_scan
 .Li_apply_settlement:
+ cmp dword ptr [rsp+108],0
+ je .Li_apply_settle_normal
+ cmp dword ptr [rsp+72],0
+ je .Li_apply_policy
+.Li_apply_settle_normal:
  cmp dword ptr [rsp+76],4
  je .Li_apply_policy
  cmp dword ptr [rsp+76],0

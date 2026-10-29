@@ -696,3 +696,46 @@ pg_agent_state_peek:
  AE 16
 .section .data.rel.ro
 .La_text_fields: .quad .La_instructions,.La_cwd,.La_thinking,0
+.text
+.globl pg_agent_tools_names
+.type pg_agent_tools_names,@function
+pg_agent_tools_names:
+ AF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [r12],0
+ mov qword ptr [rsp],0
+ call json_object_new_array@PLT
+ mov r13,rax
+ test rax,rax
+ jz .La_names_bad
+ xor r14d,r14d
+.La_names_each:
+ cmp r14,[rbx+1152]
+ jae .La_names_done
+ imul rax,r14,72
+ mov rdi,[rbx+rax]
+ call json_object_new_string@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .La_names_bad
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .La_names_bad
+ mov qword ptr [rsp],0
+ inc r14
+ jmp .La_names_each
+.La_names_done:
+ mov [r12],r13
+ xor eax,eax
+ jmp .La_names_end
+.La_names_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,r13
+ call json_object_put@PLT
+ mov eax,5
+.La_names_end:
+ AE 16

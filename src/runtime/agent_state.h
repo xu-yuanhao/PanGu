@@ -17,6 +17,7 @@ int pg_agent_state_prepare(const struct json_object *,const struct json_object *
    selection applies tools. Arrays preserve first occurrence and skip missing
    names; {remove} preserves installed order. Definitions/code stay borrowed. */
 int pg_agent_tools_select(const pg_tool_registry *,const struct json_object *,unsigned model,pg_tool_registry *);
+int pg_agent_tools_names(const pg_tool_registry *,struct json_object **);
 int pg_agent_tool_allowed(const pg_tool_registry *,pg_slice);
 /* Gate retains the original provider callbacks/metadata and rejects disabled
    names before execute, including recovered calls. Borrow through close. */
