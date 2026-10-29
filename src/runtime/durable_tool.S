@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,288
+ mov esi,352
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -127,6 +127,8 @@ pg_durable_tool_init:
  mov qword ptr [r14+256],51200
  mov qword ptr [r14+264],2000
  mov dword ptr [r14+272],0
+ mov qword ptr [r14+320],51200
+ mov qword ptr [r14+328],2000
  DGET r13,input
  mov r12,rax
  DGET rax,kind
@@ -419,6 +421,8 @@ pg_durable_tool_init:
  call json_object_put@PLT
  mov rdi,[r12+24]
  call json_object_put@PLT
+ lea rdi,[r12+288]
+ call pg_output_buffer_close@PLT
  mov rdi,[r12+128]
  call free@PLT
  mov rdi,r12
@@ -1065,6 +1069,12 @@ pg_durable_tool_init:
  je .Ldt_poll_pending
  cmp eax,3
  jne .Ldt_poll_end_result
+ lea rdi,[r14+288]
+ mov rsi,[r14+128]
+ mov rdx,[r14+136]
+ call pg_output_buffer_push@PLT
+ test eax,eax
+ jnz .Ldt_poll_error
  mov rdi,rbx
  mov rsi,r14
  lea rdx,[rip+.Ldt_progress_stage]
@@ -2286,205 +2296,86 @@ pg_durable_tool_executing:
  push r12
  push r13
  push r14
- sub rsp,144
+ sub rsp,64
  mov rbx,rdi
  mov r12,rdx
  mov qword ptr [rcx],0
  mov rdi,rsp
  xor eax,eax
- mov ecx,18
+ mov ecx,8
  rep stosq
- mov rax,[rbx+8]
- DGET "qword ptr [rax+32]",input
- DGET rax,kind
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Ldt_progress_ok
- mov rdi,rax
- lea rsi,[rip+.Ldt_nested]
- call strcmp@PLT
- test eax,eax
- jz .Ldt_progress_bucket_ready
- mov dword ptr [rsp+80],2
-.Ldt_progress_bucket_ready:
- mov rax,[rbx+8]
- DGET "qword ptr [rax+32]",conversation_id
- mov rdi,rax
- call json_object_get_uint64@PLT
- mov [rsp+64],rax
- mov rsi,rax
- mov rax,[rbx+8]
- mov rdi,[rax]
- lea rdx,[rsp]
- call pg_live_peek@PLT
+ lea rdi,[rbx+288]
+ mov rsi,rsp
+ call pg_output_buffer_snapshot@PLT
  test eax,eax
  jnz .Ldt_progress_end
- lea rsi,[rip+.Ldt_live_nested_tools]
- cmp dword ptr [rsp+80],0
- je .Ldt_progress_bucket_read
- lea rsi,[rip+.Ldt_live_tools]
-.Ldt_progress_bucket_read:
- mov rdi,[rsp]
- call json_object_object_get@PLT
- mov r13,rax
- test rax,rax
- jz .Ldt_progress_ok
- xor r14d,r14d
-.Ldt_progress_find:
- mov rdi,r13
- call json_object_array_length@PLT
- cmp r14,rax
- jae .Ldt_progress_ok
- mov rdi,r13
- mov rsi,r14
- call json_object_array_get_idx@PLT
- mov rbp,rax
- DGET rax,live_task_id
- mov rdi,rax
- call json_object_get_uint64@PLT
- mov rdx,[rbx+8]
- cmp rax,[rdx+16]
- je .Ldt_progress_slot
- inc r14
- jmp .Ldt_progress_find
-.Ldt_progress_slot:
- DGET rbp,live_dropped_bytes
- mov rdi,rax
- call json_object_get_uint64@PLT
- mov [rsp+56],rax
- DGET rbp,live_dropped_lines
- mov rdi,rax
- call json_object_get_uint64@PLT
- mov [rsp+128],rax
- DGET rbp,hook_output
- mov r14,rax
- mov rdi,rax
- call json_object_get_string_len@PLT
- mov [rsp+24],rax
- mov rdi,r14
- call json_object_get_string@PLT
- mov [rsp+16],rax
- mov rdi,[rsp+24]
- add rdi,[rbx+136]
- mov [rsp+32],rdi
- inc rdi
- call malloc@PLT
- mov [rsp+8],rax
- test rax,rax
- jz .Ldt_progress_alloc
- cmp qword ptr [rsp+24],0
- je .Ldt_progress_copy_chunk
- mov rdi,rax
- mov rsi,[rsp+16]
- mov rdx,[rsp+24]
- call memcpy@PLT
-.Ldt_progress_copy_chunk:
- mov rdi,[rsp+8]
- add rdi,[rsp+24]
- mov rsi,[rbx+128]
- mov rdx,[rbx+136]
- call memcpy@PLT
- cmp dword ptr [rbx+272],0
- jne .Ldt_progress_bound
- cmp qword ptr [rsp+56],0
- je .Ldt_progress_bound
- mov rax,[rsp+24]
- mov [rsp+104],rax
- mov rax,[rbx+136]
- mov [rsp+112],rax
- xor eax,eax
- mov rcx,[rbx+136]
- mov rdx,[rbx+128]
-.Ldt_progress_count_skip:
- test rcx,rcx
- jz .Ldt_progress_head_ready
- dec rcx
- cmp byte ptr [rdx+rcx],10
- jne .Ldt_progress_count_skip
- inc rax
- jmp .Ldt_progress_count_skip
-.Ldt_progress_head_ready:
- mov [rsp+120],rax
- xor r14d,r14d
- jmp .Ldt_progress_tail
-.Ldt_progress_bound:
- mov rdi,[rsp+8]
- mov rsi,[rsp+32]
- mov rdx,[rbx+256]
- mov rcx,[rbx+264]
- mov r8d,[rbx+272]
- lea r9,[rsp+96]
- call pg_output_bound@PLT
- test eax,eax
- jnz .Ldt_progress_end
- mov r14,[rsp+96]
-.Ldt_progress_tail:
  lea rdi,[rip+.Ldt_live_output_json]
  call json_tokener_parse@PLT
- mov [rsp+40],rax
+ mov [rsp+32],rax
  test rax,rax
  jz .Ldt_progress_alloc
- mov rdi,[rsp+8]
- add rdi,r14
- mov rsi,[rsp+104]
- call pg_output_sanitize@PLT
- mov rsi,rax
- mov rdi,[rsp+8]
- add rdi,r14
+ mov rdi,[rsp]
+ mov esi,[rsp+8]
  call json_object_new_string_len@PLT
- test rax,rax
- jz .Ldt_progress_alloc
- mov rdi,[rsp+40]
+ mov rdi,[rsp+32]
  lea rsi,[rip+.Ldt_hook_output]
  mov rdx,rax
  call .Ldt_set
  test eax,eax
  jnz .Ldt_progress_end
- mov rdi,[rsp+56]
- add rdi,[rsp+112]
+ mov rdi,[rsp+16]
  call json_object_new_uint64@PLT
- mov rdi,[rsp+40]
+ mov rdi,[rsp+32]
  lea rsi,[rip+.Ldt_live_dropped_bytes]
  mov rdx,rax
  call .Ldt_set
  test eax,eax
  jnz .Ldt_progress_end
- mov rdi,[rsp+128]
- add rdi,[rsp+120]
+ mov rdi,[rsp+24]
  call json_object_new_uint64@PLT
- mov rdi,[rsp+40]
+ mov rdi,[rsp+32]
  lea rsi,[rip+.Ldt_live_dropped_lines]
  mov rdx,rax
  call .Ldt_set
  test eax,eax
  jnz .Ldt_progress_end
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldt_progress_bucket
+ mov dword ptr [rsp+40],2
+.Ldt_progress_bucket:
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
  mov rdi,r12
- mov rsi,[rsp+64]
  mov rax,[rbx+8]
  mov rdx,[rax+16]
- mov rcx,[rsp+40]
+ mov rcx,[rsp+32]
  mov rax,[rbx]
  mov rax,[rax]
  mov r8,[rax+24]
- mov r9d,[rsp+80]
+ mov r9d,[rsp+40]
  call pg_tool_live_stage@PLT
- jmp .Ldt_progress_end
-.Ldt_progress_ok:
- xor eax,eax
  jmp .Ldt_progress_end
 .Ldt_progress_alloc:
  mov eax,5
 .Ldt_progress_end:
- mov [rsp+72],eax
+ mov [rsp+48],eax
  mov rdi,[rsp]
- call json_object_put@PLT
- mov rdi,[rsp+40]
- call json_object_put@PLT
- mov rdi,[rsp+8]
  call free@PLT
- mov eax,[rsp+72]
- add rsp,144
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov eax,[rsp+48]
+ add rsp,64
  pop r14
  pop r13
  pop r12
@@ -3014,10 +2905,13 @@ pg_durable_tool_output_limits:
  mov rax,[r12]
  mov [rbx+248],rax
  mov [rbx+256],rax
+ mov [rbx+320],rax
  mov rax,[r12+8]
  mov [rbx+264],rax
+ mov [rbx+328],rax
  mov eax,[r12+16]
  mov [rbx+272],eax
+ mov [rbx+336],eax
  xor eax,eax
  jmp .Ldt_limits_end
 .Ldt_limits_alloc:

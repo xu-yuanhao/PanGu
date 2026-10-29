@@ -219,3 +219,247 @@ pg_output_sanitize:
 .Los_end:
  ret
 .size pg_output_sanitize,.-pg_output_sanitize
+.text
+.macro BF n
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,\n
+.endm
+.macro BE n
+ add rsp,\n
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.endm
+/* Complete decoded chunks; counters measure unsanitized text. */
+.globl pg_output_buffer_push
+.type pg_output_buffer_push,@function
+pg_output_buffer_push:
+ BF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test r13,r13
+ jz .Lob_push_ok
+ test r12,r12
+ jz .Lob_push_bad
+ xor r14d,r14d
+ xor eax,eax
+.Lob_count_chunk:
+ cmp rax,r13
+ jae .Lob_chunk_counted
+ cmp byte ptr [r12+rax],10
+ jne .Lob_count_next
+ inc r14
+.Lob_count_next:
+ inc rax
+ jmp .Lob_count_chunk
+.Lob_chunk_counted:
+ cmp dword ptr [rbx+56],0
+ jne .Lob_accept_count
+ mov rdi,[rbx+8]
+ add rdi,r13
+ jc .Lob_push_bad
+ cmp rdi,2147483646
+ ja .Lob_push_bad
+ inc rdi
+ mov rsi,rdi
+ mov rdi,[rbx]
+ call realloc@PLT
+ test rax,rax
+ jz .Lob_push_alloc
+ mov [rbx],rax
+ mov rdi,rax
+ add rdi,[rbx+8]
+ mov rsi,r12
+ mov rdx,r13
+ call memcpy@PLT
+ add [rbx+8],r13
+ cmp dword ptr [rbx+48],0
+ jne .Lob_accept_count
+ mov rax,[rbx+8]
+ cmp rax,[rbx+32]
+ ja .Lob_head_full
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ call .Lob_newlines
+ cmp rax,[rbx+40]
+ jb .Lob_accept_count
+.Lob_head_full:
+ mov dword ptr [rbx+56],1
+.Lob_accept_count:
+ add [rbx+16],r13
+ add [rbx+24],r14
+ cmp byte ptr [r12+r13-1],10
+ sete al
+ movzx eax,al
+ mov [rbx+52],eax
+.Lob_push_ok:
+ xor eax,eax
+ jmp .Lob_push_end
+.Lob_push_alloc:
+ mov eax,5
+ jmp .Lob_push_end
+.Lob_push_bad:
+ mov eax,4
+.Lob_push_end:
+ BE 16
+.size pg_output_buffer_push,.-pg_output_buffer_push
+.Lob_newlines:
+ xor eax,eax
+ xor ecx,ecx
+.Lob_newline_each:
+ cmp rcx,rsi
+ jae .Lob_newline_end
+ cmp byte ptr [rdi+rcx],10
+ jne .Lob_newline_next
+ inc rax
+.Lob_newline_next:
+ inc rcx
+ jmp .Lob_newline_each
+.Lob_newline_end:
+ ret
+.globl pg_output_buffer_snapshot
+.type pg_output_buffer_snapshot,@function
+pg_output_buffer_snapshot:
+ BF 64
+ mov rbx,rdi
+ mov r12,rsi
+ pxor xmm0,xmm0
+ movdqu [rsi],xmm0
+ movdqu [rsi+16],xmm0
+ mov qword ptr [rsp+32],0
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ mov rdx,[rbx+32]
+ mov rcx,[rbx+40]
+ mov r8d,[rbx+48]
+ mov r9,rsp
+ call pg_output_bound
+ test eax,eax
+ jnz .Lob_snapshot_end
+ mov rdi,[rsp+8]
+ inc rdi
+ call malloc@PLT
+ test rax,rax
+ jz .Lob_snapshot_alloc
+ mov [rsp+32],rax
+ mov rdi,rax
+ mov rsi,[rbx]
+ add rsi,[rsp]
+ mov rdx,[rsp+8]
+ call memcpy@PLT
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+8]
+ call pg_output_sanitize
+ mov r13,rax
+ mov rdx,[rsp+32]
+ mov byte ptr [rdx+rax],0
+ mov rdi,[rbx]
+ mov rsi,[rbx+8]
+ call .Lob_newlines
+ mov r14,rax
+ cmp qword ptr [rbx+8],0
+ je .Lob_stored_lines
+ mov rdx,[rbx]
+ mov rcx,[rbx+8]
+ cmp byte ptr [rdx+rcx-1],10
+ je .Lob_stored_lines
+ inc r14
+.Lob_stored_lines:
+ sub r14,[rsp+24]
+ mov rax,[rbx+24]
+ cmp qword ptr [rbx+16],0
+ je .Lob_total_lines
+ cmp dword ptr [rbx+52],0
+ jne .Lob_total_lines
+ inc rax
+.Lob_total_lines:
+ sub rax,r14
+ mov [r12+24],rax
+ mov rax,[rbx+16]
+ sub rax,[rsp+8]
+ mov [r12+16],rax
+ mov [r12+8],r13
+ mov rax,[rsp+32]
+ mov [r12],rax
+ mov qword ptr [rsp+32],0
+ cmp dword ptr [rbx+48],0
+ je .Lob_snapshot_ok
+ /* Chord tailMargin retains the character before the byte window and the
+    newline before the line window; both are needed for the next chunk. */
+ mov r13,[rbx+8]
+ xor r14d,r14d
+ mov rax,[rbx+32]
+ cmp r13,rax
+ jbe .Lob_margin_lines
+ mov r14,r13
+ sub r14,rax
+ dec r14
+ mov rdx,[rbx]
+.Lob_margin_boundary:
+ test r14,r14
+ jz .Lob_margin_lines
+ movzx eax,byte ptr [rdx+r14]
+ and eax,192
+ cmp eax,128
+ jne .Lob_margin_lines
+ dec r14
+ jmp .Lob_margin_boundary
+.Lob_margin_lines:
+ mov rax,r13
+ xor ecx,ecx
+ mov rdx,[rbx]
+.Lob_margin_line_each:
+ test rax,rax
+ jz .Lob_margin_compact
+ dec rax
+ cmp byte ptr [rdx+rax],10
+ jne .Lob_margin_line_each
+ inc rcx
+ cmp rcx,[rbx+40]
+ jbe .Lob_margin_line_each
+ cmp r14,rax
+ cmovb r14,rax
+.Lob_margin_compact:
+ test r14,r14
+ jz .Lob_snapshot_ok
+ sub r13,r14
+ mov rdi,[rbx]
+ mov rsi,rdi
+ add rsi,r14
+ mov rdx,r13
+ call memmove@PLT
+ mov [rbx+8],r13
+.Lob_snapshot_ok:
+ xor eax,eax
+ jmp .Lob_snapshot_end
+.Lob_snapshot_alloc:
+ mov eax,5
+.Lob_snapshot_end:
+ mov ebp,eax
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov eax,ebp
+ BE 64
+.size pg_output_buffer_snapshot,.-pg_output_buffer_snapshot
+.globl pg_output_buffer_close
+.type pg_output_buffer_close,@function
+pg_output_buffer_close:
+ push rbx
+ mov rbx,rdi
+ mov rdi,[rdi]
+ call free@PLT
+ mov rdi,rbx
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ pop rbx
+ ret
+.size pg_output_buffer_close,.-pg_output_buffer_close

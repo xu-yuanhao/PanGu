@@ -3,6 +3,7 @@
 #undef main
 #include "../../src/runtime/nested_call.h"
 #include "../../src/runtime/tool_live.h"
+#include "../../src/runtime/output_window.h"
 #include <assert.h>
 #include <ftw.h>
 #include <dlfcn.h>
@@ -87,6 +88,7 @@ static int nested_scope_hook(void *context,const json_object *request,json_objec
  if(result)assert(!json_object_get_boolean(json_object_object_get(result,"isError")));json_object_put(member);return pending;
 }
 _Static_assert(sizeof(pg_tool_execution)==80&&offsetof(pg_tool_execution,tool)==40&&offsetof(pg_tool_execution,mint)==48&&offsetof(pg_tool_execution,call_id)==56&&offsetof(pg_tool_execution,sequence)==64&&offsetof(pg_tool_execution,memoized)==72,"Tool execution ABI");
+_Static_assert(sizeof(pg_output_buffer)==64&&offsetof(pg_output_buffer,max_bytes)==32&&offsetof(pg_output_buffer,tail)==48&&sizeof(pg_output_snapshot)==32,"Output stream ABI");
 typedef struct {unsigned opens,disposes,executes,cancels,hold,fallback,lines,large,clean;} execution_stats;
 typedef struct {execution_stats *stats;pg_tool_execution *api;uint64_t child;unsigned phase,outputs;} execution_instance;
 static int execution_open(void *context,pg_tool_execution *api,void **out){
