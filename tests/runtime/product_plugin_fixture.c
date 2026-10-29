@@ -24,7 +24,7 @@ static const pg_task_definition definition={.name={"example.work",12},.version=1
 static const pg_task_definition *definitions[]={&definition};
 static int allow(void *context,pg_slice arguments){(void)context;(void)arguments;return 1;}
 static int echo(void *context,pg_slice arguments,char *out,size_t capacity,size_t *size){(void)context;(void)arguments;const char *text="EXTENSION_TOOL_RESULT";*size=strlen(text);if(*size>=capacity){*size=0;return PG_TOOL_ERROR;}memcpy(out,text,*size+1);return PG_TOOL_OK;}
-static const pg_tool_definition echo_tool={"native_echo","Native extension echo","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,allow,allow,echo,1,0};
+static const pg_tool_definition echo_tool={"native_echo","Native extension echo","{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",0,allow,allow,echo,1,0,0};
 static int render(void *context,const struct json_object *configuration,struct json_object **out){(void)configuration;*out=json_object_new_string(context);return *out?0:5;}
 static int tool_wrap(void *context,const pg_tool_definition *inner,pg_tool_definition *out){*out=*inner;out->description=context;return 0;}
 static int section_wrap(void *context,const pg_extension_section *inner,pg_extension_section *out){*out=*inner;out->context=context;return 0;}

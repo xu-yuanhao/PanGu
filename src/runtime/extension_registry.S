@@ -200,7 +200,7 @@ pg_extension_registry_open:
  xor eax,eax
  mov ecx,13
  rep stosq
- mov dword ptr [rbx],8
+ mov dword ptr [rbx],9
  mov dword ptr [rbx+4],72
  test r12,r12
  jz .Lr_open_facade

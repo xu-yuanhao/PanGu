@@ -21,7 +21,7 @@
 
 .text
 /* Preparation owns inputs, composed snapshot and renderer through phase cleanup.
-   Layout: preparer, inputs[3], renderer, rendered, composed[1248], offered[1184], final. */
+   Layout: preparer, inputs[3], renderer, rendered, composed[1376], offered[1312], final. */
 .globl pg_prompt_preparer_poll
 .type pg_prompt_preparer_poll,@function
 pg_prompt_preparer_poll:
@@ -36,7 +36,7 @@ pg_prompt_preparer_poll:
  test rbp,rbp
  jnz .Lpp_poll
  mov edi,1
- mov esi,2496
+ mov esi,2752
  call calloc@PLT
  mov rbp,rax
  test rax,rax
@@ -63,9 +63,9 @@ pg_prompt_preparer_poll:
  test eax,eax
  jnz .Lpp_bad
 .Lpp_poll:
- cmp dword ptr [rbp+2488],1
+ cmp dword ptr [rbp+2744],1
  je .Lpp_completed
- cmp qword ptr [rbp+2480],0
+ cmp qword ptr [rbp+2736],0
  jne .Lpp_bad
  mov rdi,[rbp+32]
  lea rsi,[rbp+40]
@@ -76,23 +76,23 @@ pg_prompt_preparer_poll:
  jnz .Lpp_bad
  mov rdi,[rbp+40]
  mov rsi,[rbp+8]
- lea rdx,[rbp+2480]
+ lea rdx,[rbp+2736]
  call pg_agent_state_prepare@PLT
  test eax,eax
  jnz .Lpp_bad
  lea rdi,[rbp+48]
- mov rsi,[rbp+2480]
+ mov rsi,[rbp+2736]
  mov edx,1
- lea rcx,[rbp+1296]
+ lea rcx,[rbp+1424]
  call pg_agent_tools_select@PLT
  test eax,eax
  jnz .Lpp_bad
- lea rdi,[rbp+1296]
+ lea rdi,[rbp+1424]
  mov rsi,rsp
  call pg_agent_tools_names@PLT
  test eax,eax
  jnz .Lpp_bad
- mov rdi,[rbp+2480]
+ mov rdi,[rbp+2736]
  lea rsi,[rip+.Lpp_offered]
  mov rdx,[rsp]
  call json_object_object_add@PLT
@@ -103,23 +103,23 @@ pg_prompt_preparer_poll:
  call [rbx+40]
  cvttsd2si rcx,xmm0
  mov rdi,[rbp+24]
- mov rsi,[rbp+2480]
- lea rdx,[rbp+1296]
+ mov rsi,[rbp+2736]
+ lea rdx,[rbp+1424]
  mov r8,[rbp+8]
  call pg_prompt_configure
  test eax,eax
  jnz .Lpp_bad
  mov rdi,[rbx+16]
- mov rsi,[rbp+2480]
+ mov rsi,[rbp+2736]
  call [rbx+32]
  test eax,eax
  jnz .Lpp_bad
- mov rdi,[rbp+2480]
+ mov rdi,[rbp+2736]
  lea rsi,[rip+.Lpp_shown]
  call json_object_object_del@PLT
 .Lpp_completed:
- mov dword ptr [rbp+2488],1
- mov rdi,[rbp+2480]
+ mov dword ptr [rbp+2744],1
+ mov rdi,[rbp+2736]
  call json_object_get@PLT
  mov [r14],rax
  xor r12d,r12d
@@ -153,7 +153,7 @@ pg_prompt_preparer_close:
  call json_object_put@PLT
  mov rdi,[rbx+40]
  call json_object_put@PLT
- mov rdi,[rbx+2480]
+ mov rdi,[rbx+2736]
  call json_object_put@PLT
  mov rdi,rbx
  call free@PLT

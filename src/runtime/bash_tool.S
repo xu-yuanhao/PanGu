@@ -805,6 +805,8 @@ pg_bash_tool_definition:
  mov qword ptr [rdi+PG_TL_DEF_REPLAY_SAFE],0
  lea rax,[rip+.Lasync]
  mov [rdi+PG_TL_DEF_ASYNC],rax
+ lea rax,[rip+.Lbash_output_limits]
+ mov [rdi+PG_TL_DEF_OUTPUT_LIMITS],rax
  mov rax,rdi
  ret
 .size pg_bash_tool_definition,.-pg_bash_tool_definition
@@ -1064,3 +1066,8 @@ pg_bash_tool_snapshot:
 .Lbhs_capture_message: .asciz "Command output capture failed or reached its limit"
 .Lbhs_truncated_code: .asciz "output_truncated"
 .Lbhs_truncated_message: .asciz "Output truncated to the retained tail"
+
+.section .rodata
+.balign 8
+.Lbash_output_limits: .quad 51200,2000
+ .long 1,0

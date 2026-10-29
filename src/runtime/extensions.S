@@ -24,18 +24,18 @@
 pg_extensions_close:
  push rbx
  mov rbx,rdi
- mov rdi,[rbx+1184]
+ mov rdi,[rbx+1312]
  call free@PLT
- mov rdi,[rbx+1200]
+ mov rdi,[rbx+1328]
  call free@PLT
- cmp qword ptr [rbx+1240],0
+ cmp qword ptr [rbx+1368],0
  je .Lx_close_clear
- mov rdi,[rbx+1232]
- call [rbx+1240]
+ mov rdi,[rbx+1360]
+ call [rbx+1368]
 .Lx_close_clear:
  mov rdi,rbx
  xor eax,eax
- mov ecx,156
+ mov ecx,172
  rep stosq
  pop rbx
  ret
@@ -126,7 +126,7 @@ pg_extensions_close:
  test eax,eax
  jz .Lx_choose_found
 .Lx_choose_installed:
- mov rax,[rbx+1216]
+ mov rax,[rbx+1344]
  test rax,rax
  jz .Lx_choose_ok
  mov [rsp],rax
@@ -153,18 +153,18 @@ pg_extensions_close:
 .Lx_choose_found:
  xor ebp,ebp
 .Lx_choose_duplicate:
- cmp rbp,[rbx+1208]
+ cmp rbp,[rbx+1336]
  jae .Lx_choose_append
- mov rax,[rbx+1200]
+ mov rax,[rbx+1328]
  cmp r14,[rax+rbp*8]
  je .Lx_choose_ok
  inc rbp
  jmp .Lx_choose_duplicate
 .Lx_choose_append:
- mov rax,[rbx+1200]
- mov rcx,[rbx+1208]
+ mov rax,[rbx+1328]
+ mov rcx,[rbx+1336]
  mov [rax+rcx*8],r14
- inc qword ptr [rbx+1208]
+ inc qword ptr [rbx+1336]
 .Lx_choose_ok:
  xor eax,eax
  XE 32
@@ -220,20 +220,20 @@ pg_extensions_close:
  XF 16
  mov rbx,rdi
  mov r12,rsi
- mov rsi,[rbx+1152]
- mov edx,72
+ mov rsi,[rbx+1280]
+ mov edx,80
  mov rcx,[r12]
  call .Lx_find
  cmp rax,16
  jae .Lx_tool_bad
- cmp rax,[rbx+1152]
+ cmp rax,[rbx+1280]
  jb .Lx_tool_copy
- inc qword ptr [rbx+1152]
+ inc qword ptr [rbx+1280]
 .Lx_tool_copy:
- imul rax,rax,72
+ imul rax,rax,80
  lea rdi,[rbx+rax]
  mov rsi,r12
- mov ecx,9
+ mov ecx,10
  rep movsq
  xor eax,eax
  jmp .Lx_tool_end
@@ -245,28 +245,28 @@ pg_extensions_close:
  XF 16
  mov rbx,rdi
  mov r12,rsi
- mov rdi,[rbx+1184]
- mov rsi,[rbx+1192]
+ mov rdi,[rbx+1312]
+ mov rsi,[rbx+1320]
  mov edx,40
  mov rcx,[r12]
  call .Lx_find
  mov r13,rax
- cmp rax,[rbx+1192]
+ cmp rax,[rbx+1320]
  jb .Lx_section_copy
  cmp rax,2147483647
  jae .Lx_section_bad
  lea rsi,[rax+1]
  imul rsi,rsi,40
- mov rdi,[rbx+1184]
+ mov rdi,[rbx+1312]
  call realloc@PLT
  test rax,rax
  jz .Lx_section_bad
- mov [rbx+1184],rax
- inc qword ptr [rbx+1192]
+ mov [rbx+1312],rax
+ inc qword ptr [rbx+1320]
 .Lx_section_copy:
  mov rdi,r13
  imul rdi,rdi,40
- add rdi,[rbx+1184]
+ add rdi,[rbx+1312]
  mov rsi,r12
  mov ecx,5
  rep movsq
@@ -326,7 +326,7 @@ pg_extensions_close:
  mov rbx,rdi
  test rbx,rbx
  jz .Lx_validate_ok
- cmp dword ptr [rbx],8
+ cmp dword ptr [rbx],9
  jne .Lx_validate_bad
  cmp dword ptr [rbx+4],72
  jne .Lx_validate_bad
@@ -377,14 +377,14 @@ pg_extensions_close:
 .Lx_validate_tool_each:
  cmp r14,[r13+16]
  jae .Lx_validate_sections_start
- imul rax,r14,72
+ imul rax,r14,80
  mov rdx,[r13+8]
  mov rcx,[rdx+rax]
  test rcx,rcx
  jz .Lx_validate_bad
  mov rdi,rdx
  mov rsi,r14
- mov edx,72
+ mov edx,80
  call .Lx_find
  cmp rax,r14
  jne .Lx_validate_bad
@@ -480,18 +480,18 @@ pg_extensions_close:
 .globl pg_extensions_resolve
 .type pg_extensions_resolve,@function
 pg_extensions_resolve:
- XF 1280
+ XF 1408
  mov rbx,rcx
  mov r12,rdi
  mov r13,rdx
- mov [rsp+1184],rsi
+ mov [rsp+1312],rsi
  mov rdi,rbx
  xor eax,eax
- mov ecx,156
+ mov ecx,172
  rep stosq
  test r12,r12
  jz .Lx_resolve_provider
- cmp dword ptr [r12],8
+ cmp dword ptr [r12],9
  jne .Lx_resolve_bad
  cmp dword ptr [r12+4],72
  jne .Lx_resolve_bad
@@ -500,16 +500,16 @@ pg_extensions_resolve:
  cmp qword ptr [r12+64],0
  je .Lx_resolve_bad
  mov rdi,[r12+48]
- lea rsi,[rsp+1240]
- lea rdx,[rbx+1232]
+ lea rsi,[rsp+1368]
+ lea rdx,[rbx+1360]
  call [r12+56]
  test eax,eax
  jnz .Lx_resolve_bad
  mov rax,[r12+64]
- mov [rbx+1240],rax
- mov r12,[rsp+1240]
+ mov [rbx+1368],rax
+ mov r12,[rsp+1368]
 .Lx_resolve_provider:
- mov [rbx+1216],r12
+ mov [rbx+1344],r12
  mov rdi,r12
  call .Lx_validate
  test eax,eax
@@ -522,39 +522,39 @@ pg_extensions_resolve:
  mov rdi,rsi
  mov esi,8
  call calloc@PLT
- mov [rbx+1200],rax
+ mov [rbx+1328],rax
  test rax,rax
  jz .Lx_resolve_bad
- mov rdi,[rsp+1184]
+ mov rdi,[rsp+1312]
  lea rsi,[rip+.Lx_extensions]
  call json_object_object_get@PLT
- mov [rsp+1192],rax
+ mov [rsp+1320],rax
  mov rdi,rax
  mov esi,5
  call json_object_is_type@PLT
  test eax,eax
  jz .Lx_resolve_edits
  mov rdi,rbx
- mov rsi,[rsp+1192]
+ mov rsi,[rsp+1320]
  xor edx,edx
  call .Lx_select_array
  test eax,eax
  jnz .Lx_resolve_bad
  jmp .Lx_resolve_compose
 .Lx_resolve_edits:
- mov qword ptr [rsp+1200],0
- mov qword ptr [rsp+1208],0
- cmp qword ptr [rsp+1192],0
+ mov qword ptr [rsp+1328],0
+ mov qword ptr [rsp+1336],0
+ cmp qword ptr [rsp+1320],0
  je .Lx_resolve_defaults
- mov rdi,[rsp+1192]
+ mov rdi,[rsp+1320]
  mov esi,4
  call json_object_is_type@PLT
  test eax,eax
  jz .Lx_resolve_bad
- mov rdi,[rsp+1192]
+ mov rdi,[rsp+1320]
  lea rsi,[rip+.Lx_remove]
  call json_object_object_get@PLT
- mov [rsp+1200],rax
+ mov [rsp+1328],rax
  test rax,rax
  jz .Lx_resolve_add
  mov rdi,rax
@@ -563,10 +563,10 @@ pg_extensions_resolve:
  test eax,eax
  jz .Lx_resolve_bad
 .Lx_resolve_add:
- mov rdi,[rsp+1192]
+ mov rdi,[rsp+1320]
  lea rsi,[rip+.Lx_add]
  call json_object_object_get@PLT
- mov [rsp+1208],rax
+ mov [rsp+1336],rax
 .Lx_resolve_defaults:
  test r12,r12
  jz .Lx_resolve_all
@@ -574,7 +574,7 @@ pg_extensions_resolve:
  je .Lx_resolve_all
  mov rdi,rbx
  mov rsi,[r12+24]
- mov rdx,[rsp+1200]
+ mov rdx,[rsp+1328]
  call .Lx_select_array
  test eax,eax
  jnz .Lx_resolve_bad
@@ -583,7 +583,7 @@ pg_extensions_resolve:
  mov rdi,rbx
  lea rsi,[rip+.Lx_coding_name]
  mov edx,6
- mov rcx,[rsp+1200]
+ mov rcx,[rsp+1328]
  call .Lx_choose
  test r12,r12
  jz .Lx_resolve_added
@@ -599,54 +599,54 @@ pg_extensions_resolve:
  mov rdi,rbx
  mov rsi,rbp
  mov rdx,rax
- mov rcx,[rsp+1200]
+ mov rcx,[rsp+1328]
  call .Lx_choose
  inc r14
  jmp .Lx_resolve_all_each
 .Lx_resolve_added:
  mov rdi,rbx
- mov rsi,[rsp+1208]
- mov rdx,[rsp+1200]
+ mov rsi,[rsp+1336]
+ mov rdx,[rsp+1328]
  call .Lx_select_array
  test eax,eax
  jnz .Lx_resolve_bad
 .Lx_resolve_compose:
  xor r14d,r14d
 .Lx_compose_each:
- cmp r14,[rbx+1208]
+ cmp r14,[rbx+1336]
  jae .Lx_resolve_wraps
- mov rax,[rbx+1200]
+ mov rax,[rbx+1328]
  mov rbp,[rax+r14*8]
  lea rax,[rip+.Lx_coding]
  cmp rbp,rax
  jne .Lx_compose_extension
- mov [rsp+1216],r13
- mov rax,[r13+1152]
- mov [rsp+1224],rax
+ mov [rsp+1344],r13
+ mov rax,[r13+1280]
+ mov [rsp+1352],rax
  jmp .Lx_compose_tools_start
 .Lx_compose_extension:
  mov rax,[rbp+8]
- mov [rsp+1216],rax
+ mov [rsp+1344],rax
  mov rax,[rbp+16]
- mov [rsp+1224],rax
+ mov [rsp+1352],rax
 .Lx_compose_tools_start:
- mov qword ptr [rsp+1232],0
+ mov qword ptr [rsp+1360],0
 .Lx_compose_tools:
- mov rax,[rsp+1232]
- cmp rax,[rsp+1224]
+ mov rax,[rsp+1360]
+ cmp rax,[rsp+1352]
  jae .Lx_compose_sections_start
- imul rsi,rax,72
- add rsi,[rsp+1216]
+ imul rsi,rax,80
+ add rsi,[rsp+1344]
  mov rdi,rbx
  call .Lx_tool
  test eax,eax
  jnz .Lx_resolve_bad
- inc qword ptr [rsp+1232]
+ inc qword ptr [rsp+1360]
  jmp .Lx_compose_tools
 .Lx_compose_sections_start:
- mov qword ptr [rsp+1232],0
+ mov qword ptr [rsp+1360],0
 .Lx_compose_sections:
- mov rax,[rsp+1232]
+ mov rax,[rsp+1360]
  cmp rax,[rbp+32]
  jae .Lx_compose_next
  mov rsi,rax
@@ -656,7 +656,7 @@ pg_extensions_resolve:
  call .Lx_section
  test eax,eax
  jnz .Lx_resolve_bad
- inc qword ptr [rsp+1232]
+ inc qword ptr [rsp+1360]
  jmp .Lx_compose_sections
 .Lx_compose_next:
  inc r14
@@ -669,25 +669,25 @@ pg_extensions_resolve:
  /* Validate final tool descriptors into independent fresh registry storage. */
  mov rdi,rsp
  mov rsi,rbx
- mov rdx,[rbx+1152]
+ mov rdx,[rbx+1280]
  call pg_tool_registry_init@PLT
  test eax,eax
  jnz .Lx_resolve_bad
  mov rdi,rbx
  mov rsi,rsp
- mov ecx,148
+ mov ecx,164
  rep movsq
- mov dword ptr [rbx+1224],1
- mov rdx,[rbx+1152]
- cmp rdx,[r13+1152]
+ mov dword ptr [rbx+1352],1
+ mov rdx,[rbx+1280]
+ cmp rdx,[r13+1280]
  jne .Lx_resolve_ok
- imul rdx,rdx,72
+ imul rdx,rdx,80
  mov rdi,rbx
  mov rsi,r13
  call memcmp@PLT
  test eax,eax
  jnz .Lx_resolve_ok
- mov dword ptr [rbx+1224],0
+ mov dword ptr [rbx+1352],0
 .Lx_resolve_ok:
  xor eax,eax
  jmp .Lx_resolve_end
@@ -696,7 +696,7 @@ pg_extensions_resolve:
  call pg_extensions_close
  mov eax,5
 .Lx_resolve_end:
- XE 1280
+ XE 1408
 .section .rodata
 .Lx_coding_name: .asciz "coding"
 .Lx_extensions: .asciz "extensions"
@@ -713,7 +713,7 @@ pg_extensions_resolve:
 .text
 /* Report is observational; native callbacks return errors instead of throwing. */
 .Lx_report:
- mov rax,[rdi+1216]
+ mov rax,[rdi+1344]
  test rax,rax
  jz .Lx_report_end
  cmp qword ptr [rax+40],0
@@ -727,9 +727,9 @@ pg_extensions_resolve:
  mov rbx,rdi
  xor r12d,r12d
 .Lx_wrap_extension:
- cmp r12,[rbx+1208]
+ cmp r12,[rbx+1336]
  jae .Lx_wrap_ok
- mov rax,[rbx+1200]
+ mov rax,[rbx+1328]
  mov r13,[rax+r12*8]
  xor r14d,r14d
 .Lx_wrap_each:
@@ -739,14 +739,14 @@ pg_extensions_resolve:
  shl rbp,5
  add rbp,[r13+40]
  mov [rsp+104],rbp
- mov qword ptr [rsp+112],72
+ mov qword ptr [rsp+112],80
  mov rdi,rbx
- mov rsi,[rbx+1152]
+ mov rsi,[rbx+1280]
  cmp dword ptr [rbp],1
  je .Lx_wrap_find
  mov qword ptr [rsp+112],40
- mov rdi,[rbx+1184]
- mov rsi,[rbx+1192]
+ mov rdi,[rbx+1312]
+ mov rsi,[rbx+1320]
 .Lx_wrap_find:
  mov [rsp+120],rdi
  mov [rsp+128],rsi
@@ -796,10 +796,10 @@ pg_extensions_resolve:
  call memmove@PLT
  cmp dword ptr [rbp],1
  jne .Lx_wrap_drop_section
- dec qword ptr [rbx+1152]
+ dec qword ptr [rbx+1280]
  jmp .Lx_wrap_report
 .Lx_wrap_drop_section:
- dec qword ptr [rbx+1192]
+ dec qword ptr [rbx+1320]
 .Lx_wrap_report:
  mov rdi,rbx
  mov rsi,[r13]
@@ -859,9 +859,9 @@ pg_extension_prepare_poll:
  jz .Lx_prepare_bad
  xor r14d,r14d
 .Lx_prepare_name:
- cmp r14,[rbx+1208]
+ cmp r14,[rbx+1336]
  jae .Lx_prepare_names_done
- mov rax,[rbx+1200]
+ mov rax,[rbx+1328]
  mov rax,[rax+r14*8]
  mov rdi,[rax]
  call json_object_new_string@PLT
@@ -911,11 +911,11 @@ pg_extension_prepare_poll:
 .Lx_prepare_section_start:
  xor r14d,r14d
 .Lx_prepare_section:
- cmp r14,[rbx+1192]
+ cmp r14,[rbx+1320]
  jae .Lx_prepare_prompt_done
  mov rbp,r14
  imul rbp,rbp,40
- add rbp,[rbx+1184]
+ add rbp,[rbx+1312]
  mov qword ptr [rsp+24],0
  mov rdi,[rbp+8]
  mov rsi,r12
@@ -1118,9 +1118,9 @@ pg_extension_prepare_poll:
  lea rbp,[rip+.Lx_render_name]
  xor r13d,r13d
 .Lx_owner_extension:
- cmp r13,[rbx+1208]
+ cmp r13,[rbx+1336]
  jae .Lx_owner_end
- mov rax,[rbx+1200]
+ mov rax,[rbx+1328]
  mov r14,[rax+r13*8]
  mov rdi,[r14+24]
  mov rsi,[r14+32]
@@ -1165,9 +1165,9 @@ pg_extension_prepare_poll:
  mov r13,rdx
  xor r14d,r14d
 .Lx_descriptor_each:
- cmp r14,[rbx+1152]
+ cmp r14,[rbx+1280]
  jae .Lx_descriptor_missing
- imul rbp,r14,72
+ imul rbp,r14,80
  add rbp,rbx
  mov rdi,[rbp]
  call strlen@PLT
@@ -1210,7 +1210,7 @@ pg_extension_prepare_poll:
  jz .Lx_dispatch_composed
  mov rdi,rax
  mov rsi,[rsp+48]
- mov edx,72
+ mov edx,80
  call memcmp@PLT
  test eax,eax
  jnz .Lx_dispatch_composed
@@ -1407,9 +1407,9 @@ pg_extension_hook_poll:
 .Lxh_poll_extension:
  mov r13,[rbx]
  mov rax,[rbx+24]
- cmp rax,[r13+1208]
+ cmp rax,[r13+1336]
  jae .Lxh_poll_done
- mov rdx,[r13+1200]
+ mov rdx,[r13+1328]
  mov r14,[rdx+rax*8]
 .Lxh_poll_hook:
  mov rax,[rbx+32]
@@ -1587,7 +1587,7 @@ pg_extension_hook_poll:
  jz .Lxh_poll_invalid
  mov rdi,[rsp+24]
  call json_object_get_string_len@PLT
- cmp eax,4096
+ cmp eax,2147483646
  ja .Lxh_poll_invalid
  mov rdi,[rbx+16]
  lea rsi,[rip+.Lxh_diagnostics]
@@ -1633,7 +1633,7 @@ pg_extension_hook_poll:
  test eax,eax
  jnz .Lxh_poll_bad
 .Lxh_poll_stop:
- mov rax,[r13+1208]
+ mov rax,[r13+1336]
  mov [rbx+24],rax
  jmp .Lxh_poll_done
 .Lxh_poll_next_hook:
@@ -1694,7 +1694,7 @@ pg_extension_hook_resolve_open:
  mov [rsp+8],r9
  mov qword ptr [r9],0
  mov edi,1
- mov esi,1248
+ mov esi,1376
  call calloc@PLT
  mov rbp,rax
  test rax,rax
@@ -1798,8 +1798,8 @@ pg_extension_hook_poll_event:
  XE 32
 .text
 .Lxh_has_event:
- mov rax,[rdi+1200]
- mov r8,[rdi+1208]
+ mov rax,[rdi+1328]
+ mov r8,[rdi+1336]
  xor ecx,ecx
 .Lxh_has_extension:
  cmp rcx,r8
@@ -1833,7 +1833,7 @@ pg_extension_hook_poll_event:
 .globl pg_extensions_validate
 .type pg_extensions_validate,@function
 pg_extensions_validate:
- XF 1200
+ XF 1328
  mov rbx,rdi
  call .Lx_validate
  test eax,eax
@@ -1861,7 +1861,7 @@ pg_extensions_validate:
 .Lx_validate_full_bad:
  mov eax,5
 .Lx_validate_full_end:
- XE 1200
+ XE 1328
 
 .text
 /* State: composed result, input, output, index, prompt, sections, active,

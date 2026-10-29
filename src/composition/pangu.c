@@ -267,6 +267,7 @@ static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
   int shared_async=scope->definition&&other->definition&&scope->definition->async&&!scope->definition->async->open&&scope->definition->context==other->definition->context&&scope->definition->async==other->definition->async;
   if((scope->shared_base&&other->shared_base)||shared_async){pg_extensions_close(&scope->extensions);free(scope);return 1;}
  }
+ if(scope->definition&&scope->definition->output_limits&&pg_durable_tool_output_limits(runner,scope->definition->output_limits)){pg_extensions_close(&scope->extensions);free(scope);return 2;}
  if(scope->shared_base)pg_edit_tool_clear(&editor);
  if(scope->definition&&scope->definition->async&&scope->definition->async->open){
   scope->factory=scope->definition->async;

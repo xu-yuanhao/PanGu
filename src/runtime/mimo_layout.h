@@ -71,10 +71,10 @@
 #define PG_MM_DEF_NAME 0
 #define PG_MM_DEF_DESCRIPTION 8
 #define PG_MM_DEF_SCHEMA 16
-#define PG_MM_DEF_BYTES 72
+#define PG_MM_DEF_BYTES 80
 #define PG_MM_REG_ENTRIES 0
-#define PG_MM_REG_COUNT 1152
-#define PG_MM_REG_BYTES 1184
+#define PG_MM_REG_COUNT 1280
+#define PG_MM_REG_BYTES 1312
 
 /* pg_mimo（mimo.h；原字段偏移保留） */
 #define PG_MM_EASY 0

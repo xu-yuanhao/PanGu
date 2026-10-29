@@ -21,16 +21,17 @@
 #define PG_TL_DEF_EXECUTE 48
 #define PG_TL_DEF_REPLAY_SAFE 56
 #define PG_TL_DEF_ASYNC 64
-#define PG_TL_DEF_BYTES 72
+#define PG_TL_DEF_OUTPUT_LIMITS 72
+#define PG_TL_DEF_BYTES 80
 
 /* pg_tool_registry（tools.h） */
 #define PG_TL_REG_ENTRIES 0
-#define PG_TL_REG_COUNT 1152
-#define PG_TL_REG_ACTIVE 1160
-#define PG_TL_REG_STATE 1168
-#define PG_TL_REG_CANCEL 1172
-#define PG_TL_REG_DEPTH 1176
-#define PG_TL_REG_BYTES 1184
+#define PG_TL_REG_COUNT 1280
+#define PG_TL_REG_ACTIVE 1288
+#define PG_TL_REG_STATE 1296
+#define PG_TL_REG_CANCEL 1300
+#define PG_TL_REG_DEPTH 1304
+#define PG_TL_REG_BYTES 1312
 
 /* pg_tools 服务函数表（agent.h）；56 字节聚合经 sret 返回 */
 #define PG_TL_SVC_CONTEXT 0
@@ -66,6 +67,7 @@ PG_TL_ASSERT_OFF(pg_tool_definition, authorize, PG_TL_DEF_AUTHORIZE);
 PG_TL_ASSERT_OFF(pg_tool_definition, execute, PG_TL_DEF_EXECUTE);
 PG_TL_ASSERT_OFF(pg_tool_definition, replay_safe, PG_TL_DEF_REPLAY_SAFE);
 PG_TL_ASSERT_OFF(pg_tool_definition, async, PG_TL_DEF_ASYNC);
+PG_TL_ASSERT_OFF(pg_tool_definition, output_limits, PG_TL_DEF_OUTPUT_LIMITS);
 PG_TL_ASSERT_SIZE(pg_tool_definition, PG_TL_DEF_BYTES);
 PG_TL_ASSERT_OFF(pg_tool_registry, entries, PG_TL_REG_ENTRIES);
 PG_TL_ASSERT_OFF(pg_tool_registry, count, PG_TL_REG_COUNT);

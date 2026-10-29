@@ -255,7 +255,7 @@ pg_tool_registry_init:
  push r13
  push r14
  push r15
- sub rsp, 1216 /* scratch[32], detached registry[1184] */
+ sub rsp, 1344 /* scratch[32], detached registry[1312] */
  mov rbx, rdi /* registry，全程占用 */
  mov r12, rsi
  mov r13, rdx
@@ -310,6 +310,16 @@ pg_tool_registry_init:
  cmp cl,dl
  jne .Linit_bad
 .Linit_async_valid:
+ mov rax,[r15+PG_TL_DEF_OUTPUT_LIMITS]
+ test rax,rax
+ jz .Linit_limits_valid
+ cmp qword ptr [rax],2147483646
+ ja .Linit_bad
+ cmp dword ptr [rax+16],1
+ ja .Linit_bad
+ cmp dword ptr [rax+20],0
+ jne .Linit_bad
+.Linit_limits_valid:
  mov rax, qword ptr [r15 + PG_TL_DEF_SCHEMA]
  mov [rsp+16], rax
  mov rdi, rax
@@ -389,7 +399,7 @@ pg_tool_registry_init:
  mov edx, PG_TL_REG_BYTES
  call memcpy@PLT
  xor eax, eax
- add rsp, 1216
+ add rsp, 1344
  pop r15
  pop r14
  pop r13
@@ -398,7 +408,7 @@ pg_tool_registry_init:
  ret
 .Linit_bad:
  mov eax, 1
- add rsp, 1216
+ add rsp, 1344
  pop r15
  pop r14
  pop r13

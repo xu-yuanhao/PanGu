@@ -46,6 +46,8 @@ int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
 const struct json_object *pg_durable_tool_call(const pg_task_runner *);
 /* Effects have started and the invocation has not entered settlement. */
 int pg_durable_tool_executing(const pg_task_runner *);
+/* Host pins limits during acquire, before effects; buffer is owned by phase. */
+int pg_durable_tool_output_limits(pg_task_runner *,const pg_tool_output_limits *);
 /* Binding borrows callback table through all phase and hook cleanup. */
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned

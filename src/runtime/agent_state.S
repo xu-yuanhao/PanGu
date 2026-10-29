@@ -286,9 +286,9 @@ pg_agent_state_prepare:
  mov r13,rdx
  xor r14d,r14d
 .La_find_each:
- cmp r14,[rbx+1152]
+ cmp r14,[rbx+1280]
  jae .La_find_missing
- imul rax,r14,72
+ imul rax,r14,80
  lea rbp,[rbx+rax]
  mov rdi,[rbp]
  call strlen@PLT
@@ -320,12 +320,12 @@ pg_agent_tool_allowed:
  ret
 /* Filter an existing registry into another fresh registry. */
 .La_filter:
- AF 1200
+ AF 1328
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
  xor r14d,r14d
- mov qword ptr [rsp+1152],0
+ mov qword ptr [rsp+1280],0
  test r12,r12
  jz .La_filter_all
  mov rdi,r12
@@ -350,22 +350,22 @@ pg_agent_tool_allowed:
  test eax,eax
  jz .La_filter_bad
 .La_filter_all:
- cmp r14,[rbx+1152]
+ cmp r14,[rbx+1280]
  jae .La_filter_init
- imul rbp,r14,72
+ imul rbp,r14,80
  add rbp,rbx
  test r12,r12
  jz .La_filter_copy
- mov qword ptr [rsp+1168],0
+ mov qword ptr [rsp+1296],0
 .La_remove_each:
  mov rdi,r12
  call json_object_array_length@PLT
- cmp [rsp+1168],rax
+ cmp [rsp+1296],rax
  jae .La_filter_copy
  mov rdi,r12
- mov rsi,[rsp+1168]
+ mov rsi,[rsp+1296]
  call json_object_array_get_idx@PLT
- mov [rsp+1184],rax
+ mov [rsp+1312],rax
  mov rdi,rax
  mov esi,6
  call json_object_is_type@PLT
@@ -373,12 +373,12 @@ pg_agent_tool_allowed:
  jz .La_filter_bad
  mov rdi,[rbp]
  call strlen@PLT
- mov [rsp+1192],rax
- mov rdi,[rsp+1184]
+ mov [rsp+1320],rax
+ mov rdi,[rsp+1312]
  call json_object_get_string_len@PLT
- cmp rax,[rsp+1192]
+ cmp rax,[rsp+1320]
  jne .La_remove_next
- mov rdi,[rsp+1184]
+ mov rdi,[rsp+1312]
  call json_object_get_string@PLT
  mov rdi,rax
  mov rsi,[rbp]
@@ -386,16 +386,16 @@ pg_agent_tool_allowed:
  test eax,eax
  jz .La_filter_all_next
 .La_remove_next:
- inc qword ptr [rsp+1168]
+ inc qword ptr [rsp+1296]
  jmp .La_remove_each
 .La_filter_copy:
- mov rax,[rsp+1152]
- imul rax,rax,72
+ mov rax,[rsp+1280]
+ imul rax,rax,80
  lea rdi,[rsp+rax]
  mov rsi,rbp
- mov ecx,9
+ mov ecx,10
  rep movsq
- inc qword ptr [rsp+1152]
+ inc qword ptr [rsp+1280]
 .La_filter_all_next:
  inc r14
  jmp .La_filter_all
@@ -407,19 +407,19 @@ pg_agent_tool_allowed:
  mov rdi,r12
  mov rsi,r14
  call json_object_array_get_idx@PLT
- mov [rsp+1160],rax
+ mov [rsp+1288],rax
  mov rdi,rax
  mov esi,6
  call json_object_is_type@PLT
  test eax,eax
  jz .La_filter_bad
- mov rdi,[rsp+1160]
+ mov rdi,[rsp+1288]
  call json_object_get_string@PLT
- mov [rsp+1176],rax
- mov rdi,[rsp+1160]
+ mov [rsp+1304],rax
+ mov rdi,[rsp+1288]
  call json_object_get_string_len@PLT
  mov rdi,rbx
- mov rsi,[rsp+1176]
+ mov rsi,[rsp+1304]
  mov edx,eax
  call .La_find
  test rax,rax
@@ -427,44 +427,44 @@ pg_agent_tool_allowed:
  mov rbp,rax
  xor ecx,ecx
 .La_filter_duplicate:
- cmp rcx,[rsp+1152]
+ cmp rcx,[rsp+1280]
  jae .La_filter_copy_array
- imul rax,rcx,72
+ imul rax,rcx,80
  mov rax,[rsp+rax]
  cmp rax,[rbp]
  je .La_filter_array_next
  inc rcx
  jmp .La_filter_duplicate
 .La_filter_copy_array:
- mov rax,[rsp+1152]
- imul rax,rax,72
+ mov rax,[rsp+1280]
+ imul rax,rax,80
  lea rdi,[rsp+rax]
  mov rsi,rbp
- mov ecx,9
+ mov ecx,10
  rep movsq
- inc qword ptr [rsp+1152]
+ inc qword ptr [rsp+1280]
 .La_filter_array_next:
  inc r14
  jmp .La_filter_array
 .La_filter_init:
  mov rdi,r13
  mov rsi,rsp
- mov rdx,[rsp+1152]
+ mov rdx,[rsp+1280]
  call pg_tool_registry_init@PLT
  jmp .La_filter_end
 .La_filter_bad:
  mov eax,5
 .La_filter_end:
- AE 1200
+ AE 1328
 .globl pg_agent_tools_select
 .type pg_agent_tools_select,@function
 pg_agent_tools_select:
- AF 1200
+ AF 1328
  mov rbx,rdi
  mov r12,rsi
  mov r13,rcx
  mov r14d,edx
- cmp qword ptr [rbx+1152],16
+ cmp qword ptr [rbx+1280],16
  ja .La_select_bad
  mov rdi,r12
  lea rsi,[rip+.La_tools]
@@ -488,14 +488,14 @@ pg_agent_tools_select:
 .La_select_copy:
  mov rdi,r13
  mov rsi,rsp
- mov ecx,148
+ mov ecx,164
  rep movsq
  xor eax,eax
  jmp .La_select_end
 .La_select_bad:
  mov eax,5
 .La_select_end:
- AE 1200
+ AE 1328
 .section .rodata
 .La_kind: .asciz "pangu.agent"
 .La_patch: .asciz "[[\"r\",null]]"
@@ -711,9 +711,9 @@ pg_agent_tools_names:
  jz .La_names_bad
  xor r14d,r14d
 .La_names_each:
- cmp r14,[rbx+1152]
+ cmp r14,[rbx+1280]
  jae .La_names_done
- imul rax,r14,72
+ imul rax,r14,80
  mov rdi,[rbx+rax]
  call json_object_new_string@PLT
  mov [rsp],rax

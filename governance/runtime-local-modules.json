@@ -1777,7 +1777,8 @@
         "pg_durable_tool_observation_release",
         "pg_durable_tool_bind_hooks",
         "pg_durable_tool_call",
-        "pg_durable_tool_executing"
+        "pg_durable_tool_executing",
+        "pg_durable_tool_output_limits"
       ],
       "reference_basis": [
         {

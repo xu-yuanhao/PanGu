@@ -823,9 +823,9 @@ pg_prompt_tools:
  jz .Lp_catalog_bad
  xor r14d,r14d
 .Lp_catalog_each:
- cmp r14,[rbx+1152]
+ cmp r14,[rbx+1280]
  jae .Lp_catalog_ok
- imul rbp,r14,72
+ imul rbp,r14,80
  add rbp,rbx
  call json_object_new_object@PLT
  mov [rsp],rax

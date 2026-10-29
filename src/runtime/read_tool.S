@@ -759,6 +759,7 @@ pg_read_tool_definition:
  mov qword ptr [rdi + PG_TL_DEF_EXECUTE], rax
  mov qword ptr [rdi+PG_TL_DEF_REPLAY_SAFE],1
  mov qword ptr [rdi+PG_TL_DEF_ASYNC],0
+ mov qword ptr [rdi+PG_TL_DEF_OUTPUT_LIMITS],0
  mov rax, rdi
  ret
 .size pg_read_tool_definition, .-pg_read_tool_definition
