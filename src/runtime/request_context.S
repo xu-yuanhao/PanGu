@@ -692,10 +692,30 @@ pg_context_messages_model:
  mov [rsp+48],rax
  test rax,rax
  jz .Lr_project_bad
+ mov rdi,[rsp+112]
+ call .Lri_user_content
+ test rax,rax
+ jz .Lr_project_bad
+ mov [rsp+56],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lri_user_ready
+ mov rdi,[rsp+56]
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .Lri_user_ready
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov qword ptr [rsp+40],0
+ jmp .Lr_project_next
+.Lri_user_ready:
  mov rdi,[rsp+40]
  lea rsi,[rip+.Lr_content]
- mov rdx,[rsp+112]
- call .Lr_copy
+ mov rdx,[rsp+56]
+ mov qword ptr [rsp+56],0
+ call .Lr_set
  test eax,eax
  jnz .Lr_project_bad
  mov rdi,[rsp+8]
@@ -1224,3 +1244,97 @@ pg_context_blank:
 .Lri_attached: .asciz "(see attached image)"
 .Lri_images_json: .asciz "[{\"type\":\"text\",\"text\":\"Attached image(s) from tool result:\"}]"
 .Lri_user_json: .asciz "{\"role\":\"user\"}"
+
+.text
+.Lri_user_content:
+ RF 16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lriu_array
+ mov rdi,rbx
+ call json_object_get@PLT
+ RE 16
+.Lriu_array:
+ mov rdi,rbx
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lriu_bad
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lriu_bad
+ xor r12d,r12d
+.Lriu_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lriu_done
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ RG rax,type
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lriu_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lr_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lriu_image
+ RG r13,text
+ mov r14,rax
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lriu_bad
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lriu_next
+ lea rdi,[rip+.Lriu_text_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lriu_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lr_text]
+ mov rdx,r14
+ call .Lr_copy
+ test eax,eax
+ jnz .Lriu_bad
+ jmp .Lriu_append
+.Lriu_image:
+ mov rdi,r13
+ call .Lr_image_part
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lriu_bad
+.Lriu_append:
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lriu_bad
+ mov qword ptr [rsp+8],0
+.Lriu_next:
+ inc r12
+ jmp .Lriu_each
+.Lriu_done:
+ mov rax,[rsp]
+ RE 16
+.Lriu_bad:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ xor eax,eax
+ RE 16
+.section .rodata
+.Lriu_text_json: .asciz "{\"type\":\"text\"}"

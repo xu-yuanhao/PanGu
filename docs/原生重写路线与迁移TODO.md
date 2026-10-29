@@ -286,8 +286,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts` convertMessages工具图片分支及 `openai-completions-tool-result-images.test.ts`，接续Durable多内容块结果；Harness保持固定快照。
-- 实际调用链：request_context从工具Content提取文本、验证图片块；无可见文本时区分see-attached-image/no-tool-output占位。连续toolResult先发布各自tool消息，支持图片的模型再按顺序合并成一条附加user消息，图片转为data MIME/base64 URL；mimo_projection使用带配置的pg_context_messages_model实际编码。input或modelInfo.input中的image显式控制附图，原生通用展示投影保留图片信息，history仍取文本。
-- 验证：产品 `--native-tasks --sanitize` 通过：相邻两工具图片合并、MIME/data URL与顺序、图片占位、纯文本模型不附图、最终pg_mimo_encode_request请求消息数量；已有多内容块/Schema/取消/控制场景保持。Runtime整批、产品构建、Assembly及排除独立claude目录的G00登记候选镜像通过。缺省能力配置在整批中发现的类型边界已修复；最终产品专项复验通过。
-- 接口与自审：新增pg_context_messages_model并登记导出；旧context接口保持。请求构建独立持有图片JSON与分组数组，失败/完成统一释放；图像能力取调用配置，不修改持久原始Content。当前模型目录的完整input能力映射、用户图片输入/提供者兼容选项和图片资源处理继续随K05/K08补齐。
-- 剩余与下一交付物：完整图片传输保持未勾选。下一组统一补齐模型目录能力到保存配置、用户图片内容映射与requiresAssistantAfterToolResult兼容选项；其他协议、TypeBox语料差异、异常Task自身Live最终化及异步元数据调度仍在既有覆盖范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts` convertMessages用户/工具图片分支及 `openai-completions-tool-result-images.test.ts`；模型目录沿用该提交生成数据，Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：模型目录input能力经models.describe进入配置modelInfo；request_context将用户Content逐块转为OpenAI文本/image_url，过滤空文本并跳过空内容数组，清除非协议字段；mimo_projection在真实请求编码入口使用同一转换。已有连续toolResult图片分组与模型能力过滤保持。
+- 验证：产品 `--native-tasks --sanitize` 覆盖用户空文本过滤、空消息省略、混合文本/图片顺序、MIME/data URL、额外字段清理和最终pg_mimo_encode_request；已有工具图片、Schema、控制与取消场景通过。模型配置专项、产品构建和Assembly检查通过；Runtime整批回归通过。
+- 接口与自审：沿现有context公开接口实现，用户和工具图片复用同一转换函数，持久原始Content保持独立；临时JSON明确转移所有权并在失败路径释放。模型目录/描述修改见 `e42785a`，本批请求投影由实施Agent自审。
+- 剩余与下一交付物：完整图片传输保持未勾选。下一组补齐requiresAssistantAfterToolResult及模型兼容配置映射、图片资源读取；其他协议、TypeBox语料差异、异常Task自身Live最终化及异步元数据调度仍在既有覆盖范围。

@@ -12,7 +12,7 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 用户提示资源默认从`~/.pangu/agent`读取，可用`PANGU_AGENT_DIR`指定；项目`.pangu`中的同名SYSTEM/APPEND资源优先，上下文按用户、祖先、项目顺序加载，并按Git worktree关系处理同名指令遮蔽。技能从用户agent目录的`skills`与项目`.pangu/skills`发现，将描述与路径提供给模型，再按需读取正文和技能相对资源。用户和项目的`prompts`目录提供`/模板 参数`；`/skill:名称 参数`显式加载技能正文，展开后的输入进入原有持久执行链。用户agent目录和项目`.pangu`的`settings.json`可通过`skills`、`prompts`数组加载本地文件或目录，相对路径从各自配置目录解析。核心资源服务支持空闲时整体刷新，失败保留当前资源与系统提示。配置可用`!pattern`、`+path`、`-path`调整选择；应用按显式资源优先、同层项目优先处理同名资源。
 
-默认模型元数据服务使用固定Pi生成器产出的聊天目录；用户agent目录的`models.json`可定义模型容量和输出上限。用户/项目`settings.json`中的`compaction.modelOverrides["provider/model"]`逐字段覆盖压缩策略；配置刷新沿既有资源服务采纳，公开模型描述只保存身份、协议和容量。
+默认模型元数据服务使用固定Pi生成器产出的聊天目录；用户agent目录的`models.json`可定义模型容量和输出上限。用户/项目`settings.json`中的`compaction.modelOverrides["provider/model"]`逐字段覆盖压缩策略；配置刷新沿既有资源服务采纳，公开模型描述保存身份、协议、容量和输入内容能力。
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。
 
