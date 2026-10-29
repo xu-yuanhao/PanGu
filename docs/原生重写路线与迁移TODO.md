@@ -200,6 +200,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 任务能力接口通过runner受保护事务创建/分叉会话，复用Harness默认文档/配置/init；产品Host真实任务验证owner归属、分叉配置、init失败整体回滚与过期能力拒绝。
 - [x] task access通过runner受保护事务向子会话提交Submission，确认后返回receipt，复用现有requestId去重、Entry/任务准入与状态查询。
 - [x] task.control与TUI可选入口支持指定任务持久取消；重复取消不重复提交，父取消沿owned子会话级联，调度器重开后子Generation aborted与父终态收束通过产品Host专项。
+- [x] 产品独立seed/resume进程验证owned子会话与Generation持久恢复：直接退出后重读JSONL、保存配置进入真实DeepSeek请求、父等待完成；持久父取消跨进程恢复后子Generation aborted且不发模型请求。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [x] 会话Agent的ModelRef与thinkingLevel进入实际准备配置：provider/modelId映射modelProvider/model，思考级别映射reasoningEffort，off清除参数；配置准入拒绝错误ModelRef/空身份/NUL/未知级别且保留原配置，恢复默认配置、实际请求编码及产品Host专项通过。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
@@ -302,8 +303,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `types.ts:ModelRef/ModelThinkingLevel`及上一批模型请求投影；原生C ABI需在持久写入前验证类型和值。
-- 实际调用链：Agent文档stage复用实际模型/思考投影进行准入，ModelRef要求非空provider/modelId、符合当前模型ABI长度且不含NUL；thinkingLevel限定参考级别。拒绝发生在文档获取/修改前，现有配置与Session保持可用。
-- 验证：实际产品Host ASan/UBSan覆盖错误类型、旧错误字段id、空身份、NUL模型/级别、未知级别及无提交/Session仍空闲；既有模型配置/编码/off/default场景通过。`build_test.py --client`回归、产品构建及Assembly检查通过。
-- 接口与差异：无新增接口/文件，复用一套投影实现；本轮没有模型请求。跨提供者连接选择、完整进程重开和运行中父取消仍由既有覆盖项继续完成。
-- 下一交付物：继续实际进程重开/运行中取消及会话/模型操作联调，按当前覆盖表推进产品调用链。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Scheduler恢复/completing/abort与事务Doc读取；实际产品组合、JSONL及子会话执行链。
+- 实际调用链：已有产品Host在独立seed/resume进程重开同一持久目录。新增`--live-process-conversations`复用现有创建/提交/取消；seed确认提交后直接_exit。Agent/provider读取在已有mutation中复用Doc draft，缺失旧provider身份也在当前事务初始化，避免恢复取消时重复准入只读/写事务。
+- 验证：真实DeepSeek进程退出→新进程JSONL重开→保存子Agent进入请求→子Generation/父等待完成通过；父取消意图跨同样进程边界后子Generation aborted且无模型请求通过。产品Host ASan/UBSan通过；`build_test.py --client`回归、产品构建及Assembly检查通过。
+- 接口与差异：公开函数/布局保持不变；本批修复恢复取消中配置读取违反Session mutation守卫的问题。与此前Scheduler原地重开不同，本次没有共享进程对象。模型正在传输时的取消和完整TUI控件仍按现有覆盖项推进。
+- 下一交付物：继续模型/工具/会话操作联调，集中完成覆盖表中的剩余产品调用链。

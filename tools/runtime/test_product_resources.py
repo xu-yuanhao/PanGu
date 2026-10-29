@@ -11,6 +11,7 @@ def main():
     parser.add_argument('--live',action='store_true')
     parser.add_argument('--live-agent',action='store_true')
     parser.add_argument('--live-conversations',action='store_true')
+    parser.add_argument('--live-process-conversations',action='store_true')
     parser.add_argument('--live-extensions',action='store_true')
     parser.add_argument('--compaction-hooks',action='store_true')
     parser.add_argument('--native-tasks',action='store_true')
@@ -29,6 +30,13 @@ def main():
         library=Path(directory)/'tasks.so'
         if args.native_tasks or args.live_extensions:
             subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-fPIC','-shared',*sanitize,'-DPG_TASK_FIXTURE',str(ROOT/'tests/runtime/product_plugin_fixture.c'),*flags,'-o',str(library)],check=True)
+        if args.live_process_conversations:
+            for suffix in ('','-cancel'):
+                workspace=Path(directory)/('workspace'+suffix)
+                workspace.mkdir()
+                for stage in ('seed','resume'):
+                    subprocess.run([str(output),'--nested-process-'+stage+suffix,str(workspace)],check=True,timeout=120)
+            return
         subprocess.run([str(output),*(['--live-extensions',str(library)] if args.live_extensions else ['--live-agent'] if args.live_agent else ['--live-conversations'] if args.live_conversations else ['--native-tasks',str(library)] if args.native_tasks else ['--compaction-hooks'] if args.compaction_hooks else ['--live-dynamic-context'] if args.live_dynamic_context else ['--live-background-compaction'] if args.live_background_compaction else ['--live-auto-compaction'] if args.live_auto_compaction else ['--live-compaction'] if args.live_compaction else ['--live'] if args.live else [])],check=True,timeout=330)
 if __name__=='__main__':
     main()

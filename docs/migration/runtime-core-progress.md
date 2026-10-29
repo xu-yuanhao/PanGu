@@ -46,6 +46,7 @@
 | 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者；自定义Task按全安装集合解析，Runner持有invocation/失败迁移定义引用并在phase边界接手 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
+| 子会话进程恢复 | 现有产品Host/JSONL在独立seed/resume进程恢复子Generation与父等待；真实DeepSeek回答/保存Agent配置及跨进程父取消→子aborted通过。事务中的Agent/provider读取复用当前Doc draft |
 | 任务会话提交 | `task_access.S`：runner受保护事务调用既有Submission准入，确认后receipt、requestId去重；真实DeepSeek验证拥有的分叉会话在Scheduler重开/冷缓存后使用保存指令执行Generation与父Task终态等待 |
 | 任务会话创建 | `task_access.S`/`agent_state.S`：phase能力校验→runner commit_with→Harness原子stage，显式owner/new/fork、配置与init；真实产品任务验证回滚、归属及过期能力拒绝 |
 | 会话创建与前台 | `agent_state.S`/`durable_session.S`/`durable_client.S`：原子默认文档、Agent分叉点/owner继承、agent/init、独立持久UUIDv7与旧会话补建；产品新建/分叉/选择/历史入口，真实DeepSeek在分叉会话写文件；SQLite/JSONL回滚与重开 |
@@ -96,6 +97,7 @@ python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
 python3 -B tools/runtime/test_product_resources.py --live-agent
 python3 -B tools/runtime/test_product_resources.py --live-conversations
+python3 -B tools/runtime/test_product_resources.py --live-process-conversations
 python3 -B tools/runtime/test_product_resources.py --live-extensions
 python3 -B tools/runtime/test_product_resources.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live-settings

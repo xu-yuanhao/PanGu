@@ -57,7 +57,7 @@ pg_agent_state_read:
  lea rsi,[rip+.La_definition]
  mov rdx,rsp
  mov rcx,r12
- call pg_durable_snapshot@PLT
+ call .Las_snapshot
  cmp eax,8
  jne .La_read_end
  call json_object_new_object@PLT
@@ -1349,7 +1349,7 @@ pg_provider_state_read:
  lea rsi,[rip+.Lac_provider_definition]
  mov rdx,rsp
  mov rcx,r12
- call pg_durable_snapshot@PLT
+ call .Las_snapshot
  AE 48
 .section .rodata
 .Lac_id: .asciz "id"
@@ -1424,6 +1424,10 @@ pg_provider_state_ensure:
  call pg_provider_state_read
  cmp eax,8
  jne .Lac_ensure_end
+ mov rax,[rbx]
+ mov rdi,[rax+160]
+ test rdi,rdi
+ jnz .Lac_ensure_current
  mov rdi,[rbx]
  mov rsi,rsp
  lea rdx,[rsp+48]
@@ -1464,6 +1468,19 @@ pg_provider_state_ensure:
  mov rdi,[rsp+96]
  call json_object_put@PLT
  mov eax,5
+ jmp .Lac_ensure_end
+.Lac_ensure_current:
+ mov rsi,r12
+ lea rdx,[rip+.Lac_provider_definition]
+ lea rcx,[rip+.Lac_provider_initializer]
+ mov r8,[rbx+24]
+ lea r9,[rsp+104]
+ call .Lac_doc
+ test eax,eax
+ jnz .Lac_ensure_end
+ mov rdi,[rsp+104]
+ mov rsi,r13
+ call pg_document_change_snapshot@PLT
  jmp .Lac_ensure_end
 .Lac_ensure_invalid:
  mov eax,4
@@ -1735,4 +1752,29 @@ pg_agent_conversation_stage:
  pop r12
  pop rbx
  ret
+.section .note.GNU-stack,"",@progbits
+
+.text
+/* On a mutation line, use its Doc draft rather than starting a read line. */
+.Las_snapshot:
+ cmp qword ptr [rdi+160],0
+ jne .Las_mutation
+ jmp pg_durable_snapshot@PLT
+.Las_mutation:
+ AF 32
+ mov rbx,rcx
+ mov qword ptr [rbx],0
+ mov rdi,[rdi+160]
+ xor ecx,ecx
+ xor r8d,r8d
+ lea r9,[rsp]
+ mov qword ptr [rsp],0
+ call pg_document_tx_get@PLT
+ test eax,eax
+ jnz .Las_end
+ mov rdi,[rsp]
+ mov rsi,rbx
+ call pg_document_change_snapshot@PLT
+.Las_end:
+ AE 32
 .section .note.GNU-stack,"",@progbits
