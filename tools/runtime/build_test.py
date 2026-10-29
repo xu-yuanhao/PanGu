@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
 from schema_dependency import compile_inputs
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
+from test_tools_asm import read_differential
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream', 'request_context')]
 PATH_SOURCES = [implementation('src/runtime/' + name) for name in ('tool_path', 'tool_path_posix')]
 DURABLE_SOURCES = [implementation('src/runtime/' + name) for name in ['documents', 'document_reader', 'records', 'record_memory', 'delta', 'pending', 'document_tx', 'holds', 'hold_timer', 'durable_session', 'record_sqlite', 'record_jsonl', 'record_jsonl_posix', 'task_runner', 'task_graph', 'view_watch', 'conversation_view', 'durable_tool', 'nested_call', 'tool_live', 'output_window', 'durable_generation', 'durable_compaction', 'usage', 'compaction_hooks', 'agent_state', 'durable_client', 'durable_inputs', 'model_failure', 'model_regex_posix', 'mimo', 'mimo_projection', 'mimo_stream', 'request_context', 'tools', 'read_tool', 'tool_path', 'tool_path_posix', 'write_tool', 'bash_tool', 'process', 'stream_decode']] + [implementation('src/client/tui/runtime_bridge')]
@@ -21,6 +22,7 @@ PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
 SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), str(ROOT / 'tests/runtime/test_agent.c')]
 
 def main():
+    read_differential()
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
         DURABLE_SOURCES.extend(compile_inputs([implementation('src/runtime/json_schema_bridge')],directory,['-fsanitize=undefined','-fno-sanitize-recover=all']))
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)
@@ -319,7 +321,7 @@ def main():
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'),
-                            str(ROOT / 'tests/runtime/test_read_tool.c'), *flags, '-o', output], check=True)
+                            str(ROOT / 'tests/runtime/test_read_tool.c'), '-Wl,--wrap=fstat', *flags, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', *MODEL_SOURCES,

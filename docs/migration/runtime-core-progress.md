@@ -55,13 +55,13 @@
 | 设置与资源路径 | `settings.S`：用户/项目JSON层、递归覆盖与错误诊断、独立所有权；配置skills/prompts的普通文件/目录进入技能发现与模板命令，路径相对所属配置目录解析 |
 | 提示模板/显式技能 | `prompt_templates.S`：用户/项目Markdown模板、引号参数、位置/全部/默认/切片参数单次替换；前台/模板和/skill:name展开后进入持久Submission，显式技能读取当前正文 |
 | 技能资源 | `skills.S`、`skills_posix.c`：用户/项目默认发现、根技能优先、名称/规范路径去重、YAML元数据、校验诊断与转义XML；提示列表→模型read技能/相对资源→write真实闭环 |
-| 编码工具 | `read_tool.S`、`write_tool.S`、`edit_text.S`、`edit_tool.S`、`bash_tool.S`、`process.S`：真实读改写运行；read按Pi Durable的50 KiB/2000行分页且无固定扫描上限，模型可见读取剥离UTF-8 BOM，Edit内部完整快照按需扩容；Assembly文本工作区、diff/patch和内部write请求随文件大小分配，196 KiB文件端到端编辑逐字节回读；模型工具JSON增量动态累积并贯通Generation/工具分派，write完整落盘64 KiB内容；Unicode匹配、异步进程/取消、原始输出文件 |
+| 编码工具 | `read_tool.S`、`write_tool.S`、`edit_text.S`、`edit_tool.S`、`bash_tool.S`、`process.S`：真实读改写运行；read按Pi Durable的50 KiB/2000行分页且无固定扫描上限，模型可见读取剥离UTF-8 BOM、保留NUL并按TextDecoder规则替换非法UTF-8；Edit内部完整快照按需扩容；Assembly文本工作区、diff/patch和内部write请求随文件大小分配，196 KiB文件端到端编辑逐字节回读；模型工具JSON增量动态累积并贯通Generation/工具分派，write完整落盘64 KiB内容；Unicode匹配、异步进程/取消、原始输出文件 |
 
 ## 本批验证与集成状态
 
-- Mimo SSE参数、Durable Generation脱离模型事件及持久Tool JSON路径统一使用128 KiB参数边界；文本显示/输出预算保持原设置。write按content长度分配owned缓冲并完整落盘。
-- Mimo传输/ABI专项在O0/O2与UBSan下通过，覆盖6 KiB分片调用、JSON解析及start/close释放；Runtime整批回归、64 KiB写入和196 KiB Edit实际文件逐字节回读通过，产品构建与Assembly检查通过。
-- Durable Tool的read/edit/write已在同一真实工具通路运行；模型可见参数保持128 KiB边界，Edit内部完整文件路径动态扩容。
+- Read按Pi Durable的Number/slice语义接受offset/limit，保留NUL，流式替代非法UTF-8，超长首行返回码点完整前缀；续读诊断使用既有结果快照，正文不被提示挤占预算。
+- 1600组正文及拒绝条件直接对照固定Pi `referenceRead`/`truncateHead`通过；O0/O2、UBSan专项覆盖UTF-8跨块、容量与读取改写/再次变化/追加日志，最终元数据随close释放。
+- Runtime整套回归在正文/诊断接线后通过；随后稳定性/关闭释放修改由最终工具专项复验。最终产品构建、Assembly检查及产品Host的`--native-tasks --sanitize`集成通过。完整truncation details与诊断文案仍在K08中补齐。
 
 ## 当前接口边界
 

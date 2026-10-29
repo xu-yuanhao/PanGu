@@ -24,6 +24,9 @@
 
 /* struct stat（<sys/stat.h>）：仅普通文件判定所需字段 */
 #define PG_RTL_STAT_MODE 24
+#define PG_RTL_STAT_SIZE 48
+#define PG_RTL_STAT_MTIME 88
+#define PG_RTL_STAT_MTIME_NS 96
 #define PG_RTL_STAT_BYTES 144
 #define PG_RTL_S_IFMT 0170000
 #define PG_RTL_S_IFREG 0100000
@@ -53,6 +56,9 @@ _Static_assert(O_CLOEXEC == PG_RTL_O_CLOEXEC, "O_CLOEXEC drifted");
 _Static_assert(O_NONBLOCK == PG_RTL_O_NONBLOCK, "O_NONBLOCK drifted");
 _Static_assert(F_DUPFD_CLOEXEC == PG_RTL_F_DUPFD_CLOEXEC, "F_DUPFD_CLOEXEC drifted");
 PG_RTL_ASSERT_OFF(struct stat, st_mode, PG_RTL_STAT_MODE);
+PG_RTL_ASSERT_OFF(struct stat, st_size, PG_RTL_STAT_SIZE);
+PG_RTL_ASSERT_OFF(struct stat, st_mtim.tv_sec, PG_RTL_STAT_MTIME);
+PG_RTL_ASSERT_OFF(struct stat, st_mtim.tv_nsec, PG_RTL_STAT_MTIME_NS);
 PG_RTL_ASSERT_SIZE(struct stat, PG_RTL_STAT_BYTES);
 _Static_assert(S_IFMT == PG_RTL_S_IFMT && S_IFREG == PG_RTL_S_IFREG, "stat mode bits drifted");
 #endif

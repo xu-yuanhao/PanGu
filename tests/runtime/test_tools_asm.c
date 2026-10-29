@@ -220,7 +220,7 @@ static void test_sret_aggregates(void)
 	rd = pg_read_tool_definition(&reader);
 	assert(strcmp(rd.name, "read") == 0 && rd.context == &reader);
 	assert(strcmp(rd.schema,
-	       "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}") == 0);
+	       "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"number\"},\"limit\":{\"type\":\"number\"}},\"required\":[\"path\"],\"additionalProperties\":false}") == 0);
 	assert(rd.validate && rd.authorize && rd.execute);
 	(void)abi_probe3((abi_fn3)pg_read_snapshot_definition,(unsigned long)&rd,(unsigned long)&reader,0);
 	check_sentinels();

@@ -1,4 +1,4 @@
-/* POSIX read backend: caller-owned cwd fd; bounded UTF-8 line output.
+/* POSIX read backend: caller-owned cwd fd; bounded TextDecoder-compatible text.
    openat resolves relative/absolute paths, dot segments and symbolic links.
    The opened descriptor is checked as a regular file before reading. */
 #include "read_tool_layout.h"
@@ -11,18 +11,20 @@
 .Lstr_path:      .asciz "path"
 .Lstr_offset: .asciz "offset"
 .Lstr_line_limit: .asciz "limit"
-.Lread_more: .asciz "\n\n[read: more lines; use offset=%llu to continue]"
+.Lread_more: .asciz "{\"diagnostics\":[{\"severity\":\"info\",\"code\":\"truncated\",\"message\":\"Showing text through line %llu. Use offset=%llu to continue.\"}]}"
 .Lmsg_offset: .asciz "read offset is beyond end of file"
+.Lmsg_changed: .asciz "file changed while it was read"
+.Ldouble_zero: .double 0.0
+.Ldouble_one: .double 1.0
 .Lutf8_bom: .byte 0xef,0xbb,0xbf
 .Lread_name:     .asciz "read"
-.Lread_desc: .asciz "Read text files and inline PNG, JPEG, GIF or WebP images using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 50 KiB; follow the next offset when truncated. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution."
-.Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
+.Lread_desc: .asciz "Read text files and inline PNG, JPEG, GIF or WebP images using a relative or absolute path. Optional offset is a 1-based line and limit is a line count. Output is bounded to 2000 lines and 50 KiB; follow the next offset when truncated. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution."
+.Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"number\"},\"limit\":{\"type\":\"number\"}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
 .Lmsg_refused:   .asciz "read refused or unavailable"
 .Lmsg_limit:     .asciz "read output limit exceeded"
-.Lmsg_utf8:      .asciz "invalid UTF-8 file is unsupported"
-.Lmsg_binary:    .asciz "binary file is unsupported"
+.Lread_prefix_note: .asciz "{\"diagnostics\":[{\"severity\":\"warn\",\"code\":\"truncated\",\"message\":\"Read output reached the 50 KiB limit; showing the first line prefix on a UTF-8 boundary. Use bash to inspect the remaining bytes.\"}]}"
 
 .section .text
 
@@ -40,8 +42,10 @@ li_parse_path:
  sub rsp,48
  mov [rsp+4112],rcx
  mov [rsp+4128],r8d
- mov qword ptr [rcx],1
- mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
+ mov rax,0x3ff0000000000000 /* 1.0 */
+ mov [rcx],rax
+ mov rax,0x409f400000000000 /* 2000.0 */
+ mov [rcx+8],rax
  mov qword ptr [rcx+16],0
  mov qword ptr [rsp+4120],1
  mov rbx, rdx /* path 目标 */
@@ -167,25 +171,23 @@ li_parse_path:
  mov rcx,[rsp+4112]
  or qword ptr [rcx+16],2
  mov rdi,[rsp+4096]
- mov esi,3
- call json_object_is_type@PLT
- test eax,eax
- jz .Lpp_bad_put
+ call json_object_get_type@PLT
+ cmp eax,2
+ je .Lpp_option_number
+ cmp eax,3
+ jne .Lpp_bad_put
+.Lpp_option_number:
  mov rdi,[rsp+4096]
- call json_object_get_int64@PLT
- cmp rax,1
- jl .Lpp_bad_put
- cmp rax,2147483647
- ja .Lpp_bad_put
+ call json_object_get_double@PLT
+ movq rax,xmm0
  mov rcx,[rsp+4112]
  mov [rcx+r13*8],rax
  test r13,r13
- jz .Lpp_option_next
+ jnz .Lpp_limit_seen
+ or qword ptr [rcx+16],4
+ jmp .Lpp_option_next
+.Lpp_limit_seen:
  or qword ptr [rcx+16],1
- cmp rax,PG_RTL_PAGE_LINES
- jbe .Lpp_option_next
- mov qword ptr [rcx+8],PG_RTL_PAGE_LINES
- and qword ptr [rcx+16],-2
 .Lpp_option_next:
  inc r13
  cmp r13,2
@@ -295,102 +297,8 @@ li_fail:
  ret
 .size li_fail, .-li_fail
 
-/* ---- int li_utf8(const unsigned char *p, size_t n)：严格 UTF-8 校验 ---- */
-.type li_utf8,@function
-li_utf8:
- push rbx
- push r12
- push r13
- push r14
- push r15
- mov rbx, rdi
- mov r12, rsi
- xor r13d, r13d /* i */
-.Lu_loop:
- cmp r13, r12
- jae .Lu_ok
- movzx eax, byte ptr [rbx + r13]
- inc r13
- cmp al, 128
- jb .Lu_loop
- cmp al, 0xc2
- jb .Lu_bad
- cmp al, 0xdf
- jbe .Lu_seq2
- cmp al, 0xe0
- jb .Lu_bad
- cmp al, 0xef
- jbe .Lu_seq3
- cmp al, 0xf0
- jb .Lu_bad
- cmp al, 0xf4
- jbe .Lu_seq4
- jmp .Lu_bad
-.Lu_seq2:
- mov ecx, 1 /* need */
- and eax, 31
- mov r14, rax /* cp */
- mov r15d, 0x80 /* min */
- jmp .Lu_conts
-.Lu_seq3:
- mov ecx, 2
- and eax, 15
- mov r14, rax
- mov r15d, 0x800
- jmp .Lu_conts
-.Lu_seq4:
- mov ecx, 3
- and eax, 7
- mov r14, rax
- mov r15d, 0x10000
-.Lu_conts:
- mov rdx, r12
- sub rdx, r13 /* 剩余字节 */
- cmp rcx, rdx
- ja .Lu_bad
-.Lu_cont_loop:
- test ecx, ecx
- jz .Lu_check_cp
- movzx eax, byte ptr [rbx + r13]
- inc r13
- and eax, 0xC0
- cmp eax, 0x80
- jne .Lu_bad
- movzx eax, byte ptr [rbx + r13 - 1]
- and eax, 63
- shl r14, 6
- or r14, rax
- dec ecx
- jmp .Lu_cont_loop
-.Lu_check_cp:
- cmp r14, r15 /* cp < min：过短编码 */
- jb .Lu_bad
- mov rax, 0x10FFFF
- cmp r14, rax
- ja .Lu_bad
- mov rax, 0xD800
- cmp r14, rax
- jb .Lu_loop
- mov rax, 0xDFFF
- cmp r14, rax
- jbe .Lu_bad
- jmp .Lu_loop
-.Lu_ok:
- mov eax, 1
- jmp .Lu_out
-.Lu_bad:
- xor eax, eax
-.Lu_out:
- pop r15
- pop r14
- pop r13
- pop r12
- pop rbx
- ret
-.size li_utf8, .-li_utf8
-
 /* ---- int li_execute_read(ctx, args.data, args.size, out, capacity, size*)
- * 栈帧4368：[0]=path/chunk[4096]，[4096]=stat，[4248]=path cursor，
+ * 栈帧4432：[0]=path/chunk[4096]，[4096]=stat，[4248]=path cursor，
  * [4256]=fd，[4264]=output bytes，[4272..4288]=options，
  * [4296..4336]=line/scan/chunk cursors。寄存器：rbx=ctx→part、r12=out、
  * r13=capacity、r14=size*、r15=dir fd。 ---- */
@@ -408,7 +316,7 @@ li_execute_read:
  push r15
  sub rsp,4096
  test byte ptr [rsp],0
- sub rsp,272
+ sub rsp,336
  mov [rsp+4360],r10d
  mov rbx, rdi
  mov r12, rcx
@@ -439,6 +347,37 @@ li_execute_read:
  call li_parse_path
  test eax,eax
  jnz .Lrd_invalid
+ movsd xmm0,[rsp+4272]
+ test qword ptr [rsp+4288],4
+ jnz .Lrd_offset_present
+ pxor xmm0,xmm0
+ jmp .Lrd_start_ready
+.Lrd_offset_present:
+ ucomisd xmm0,[rip+.Ldouble_zero]
+ je .Lrd_start_zero
+ subsd xmm0,[rip+.Ldouble_one]
+ maxsd xmm0,[rip+.Ldouble_zero]
+ jmp .Lrd_start_ready
+.Lrd_start_zero:
+ pxor xmm0,xmm0
+.Lrd_start_ready:
+ movsd [rsp+4392],xmm0
+ cvttsd2si rax,xmm0
+ test rax,rax
+ js .Lrd_offset_large
+ inc rax
+ mov [rsp+4272],rax
+ jmp .Lrd_limit_prepare
+.Lrd_offset_large:
+ mov rax,0x7fffffffffffffff
+ mov [rsp+4272],rax
+.Lrd_limit_prepare:
+ movsd xmm1,[rsp+4280]
+ movsd [rsp+4400],xmm1
+.Lrd_limit_ready:
+ mov rax,[rsp+4288]
+ mov [rsp+4424],rax
+ mov qword ptr [rsp+4352],0
  cmp dword ptr [rsp+4360],0
  je .Lrd_open_root
  test qword ptr [rsp+4288],2
@@ -492,6 +431,68 @@ li_execute_read:
  mov eax,[rsp+4344]
  jmp .Lrd_out
 .Lrd_text_file:
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_bom_ready
+ mov qword ptr [rsp+4408],0
+ mov qword ptr [rsp+4416],1
+.Lrd_scan_lines:
+ mov rdi,[rsp+4256]
+ mov rsi,rsp
+ mov edx,4096
+ mov rcx,[rsp+4408]
+ call pread@PLT
+ test rax,rax
+ js .Lrd_scan_error
+ jz .Lrd_scan_done
+ add [rsp+4408],rax
+ xor ecx,ecx
+.Lrd_count_lines:
+ cmp byte ptr [rsp+rcx],10
+ jne .Lrd_count_next
+ inc qword ptr [rsp+4416]
+.Lrd_count_next:
+ inc rcx
+ cmp rcx,rax
+ jb .Lrd_count_lines
+ jmp .Lrd_scan_lines
+.Lrd_scan_error:
+ call __errno_location@PLT
+ cmp dword ptr [rax],4
+ je .Lrd_scan_lines
+ jmp .Lrd_refused
+.Lrd_scan_done:
+ cvtsi2sd xmm1,qword ptr [rsp+4416]
+ movsd xmm0,[rsp+4392]
+ ucomisd xmm0,xmm1
+ jae .Lrd_offset_close
+ mov rax,[rsp+4416]
+ test qword ptr [rsp+4288],1
+ jz .Lrd_slice_end
+ addsd xmm0,[rsp+4400]
+ minsd xmm0,xmm1
+ cvttsd2si rax,xmm0
+ mov rcx,0x8000000000000000
+ cmp rax,rcx
+ je .Lrd_slice_zero
+ test rax,rax
+ jns .Lrd_slice_end
+ add rax,[rsp+4416]
+ jns .Lrd_slice_end
+.Lrd_slice_zero:
+ xor eax,eax
+.Lrd_slice_end:
+ mov rcx,[rsp+4272]
+ dec rcx
+ sub rax,rcx
+ jns .Lrd_slice_count
+ xor eax,eax
+.Lrd_slice_count:
+ cmp rax,PG_RTL_PAGE_LINES
+ jbe .Lrd_slice_ready
+ mov eax,PG_RTL_PAGE_LINES
+ and qword ptr [rsp+4288],-2
+.Lrd_slice_ready:
+ mov [rsp+4280],rax
  /* Pi's TextDecoder omits a leading UTF-8 BOM for reads beginning at byte 0. */
  cmp dword ptr [rsp+4360],0
  jne .Lrd_bom_ready
@@ -541,6 +542,10 @@ li_execute_read:
  mov qword ptr [rsp+4320],0 /* bytes scanned */
  mov qword ptr [rsp+4328],0 /* chunk length */
  mov qword ptr [rsp+4336],0 /* chunk cursor */
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_next_byte
+ cmp qword ptr [rsp+4280],0
+ je .Lrd_success
 .Lrd_next_byte:
  mov rax,[rsp+4336]
  cmp rax,[rsp+4328]
@@ -556,8 +561,92 @@ li_execute_read:
  mov rdx,[rsp+4296]
  cmp rdx,[rsp+4272]
  jb .Lrd_skip_byte
- test cl,cl
- jz .Lrd_binary_close
+ cmp cl,0x80
+ jb .Lrd_ascii
+ mov byte ptr [rsp+4368],cl
+ cmp cl,0xc2
+ jb .Lrd_replacement
+ cmp cl,0xdf
+ jbe .Lrd_lead2
+ cmp cl,0xef
+ jbe .Lrd_lead3
+ cmp cl,0xf4
+ jbe .Lrd_lead4
+ jmp .Lrd_replacement
+.Lrd_lead2:
+ mov byte ptr [rsp+4372],2
+ jmp .Lrd_decode_start
+.Lrd_lead3:
+ mov byte ptr [rsp+4372],3
+ jmp .Lrd_decode_start
+.Lrd_lead4:
+ mov byte ptr [rsp+4372],4
+.Lrd_decode_start:
+ mov byte ptr [rsp+4373],1
+ mov byte ptr [rsp+4374],0x80
+ mov byte ptr [rsp+4375],0xbf
+ cmp byte ptr [rsp+4368],0xe0
+ jne .Lrd_range_ed
+ mov byte ptr [rsp+4374],0xa0
+ jmp .Lrd_decode_cont
+.Lrd_range_ed:
+ cmp byte ptr [rsp+4368],0xed
+ jne .Lrd_range_f0
+ mov byte ptr [rsp+4375],0x9f
+ jmp .Lrd_decode_cont
+.Lrd_range_f0:
+ cmp byte ptr [rsp+4368],0xf0
+ jne .Lrd_range_f4
+ mov byte ptr [rsp+4374],0x90
+ jmp .Lrd_decode_cont
+.Lrd_range_f4:
+ cmp byte ptr [rsp+4368],0xf4
+ jne .Lrd_decode_cont
+ mov byte ptr [rsp+4375],0x8f
+.Lrd_decode_cont:
+ movzx eax,byte ptr [rsp+4373]
+ cmp al,byte ptr [rsp+4372]
+ jae .Lrd_emit_sequence
+ mov rax,[rsp+4336]
+ cmp rax,[rsp+4328]
+ jb .Lrd_have_cont
+ call .Lrd_chunk
+ test rax,rax
+ js .Lrd_chunk_error
+ jz .Lrd_replacement
+.Lrd_have_cont:
+ mov rax,[rsp+4336]
+ movzx ecx,byte ptr [rsp+rax]
+ inc qword ptr [rsp+4336]
+ cmp cl,0x80
+ jb .Lrd_cont_reject
+ cmp cl,0xbf
+ ja .Lrd_cont_reject
+ cmp byte ptr [rsp+4373],1
+ jne .Lrd_cont_store
+ cmp cl,byte ptr [rsp+4374]
+ jb .Lrd_cont_reject
+ cmp cl,byte ptr [rsp+4375]
+ ja .Lrd_cont_reject
+.Lrd_cont_store:
+ movzx eax,byte ptr [rsp+4373]
+ mov byte ptr [rsp+4368+rax],cl
+ inc byte ptr [rsp+4373]
+ jmp .Lrd_decode_cont
+.Lrd_cont_reject:
+ dec qword ptr [rsp+4336]
+ jmp .Lrd_replacement
+.Lrd_replacement:
+ mov byte ptr [rsp+4368],0xef
+ mov byte ptr [rsp+4369],0xbf
+ mov byte ptr [rsp+4370],0xbd
+ mov qword ptr [rsp+4384],3
+ jmp .Lrd_emit
+.Lrd_emit_sequence:
+ movzx eax,byte ptr [rsp+4372]
+ mov [rsp+4384],rax
+ jmp .Lrd_emit
+.Lrd_ascii:
  mov rax,[rsp+4264]
  lea rdx,[r13-1]
  cmp rax,rdx
@@ -565,7 +654,24 @@ li_execute_read:
  mov [r12+rax],cl
  inc qword ptr [rsp+4264]
  cmp cl,10
+ je .Lrd_newline
+ jmp .Lrd_next_byte
+.Lrd_emit:
+ mov rax,[rsp+4264]
+ mov rcx,r13
+ dec rcx
+ sub rcx,rax
+ cmp rcx,[rsp+4384]
+ jb .Lrd_page_full
+ lea rdi,[r12+rax]
+ lea rsi,[rsp+4368]
+ mov rdx,[rsp+4384]
+ call memcpy@PLT
+ mov rax,[rsp+4384]
+ add [rsp+4264],rax
+ cmp byte ptr [rsp+4368],10
  jne .Lrd_next_byte
+.Lrd_newline:
  inc qword ptr [rsp+4296]
  inc qword ptr [rsp+4304]
  mov rax,[rsp+4264]
@@ -602,68 +708,99 @@ li_execute_read:
  jne .Lrd_limit
  mov rax,[rsp+4312]
  test rax,rax
- jz .Lrd_limit
+ jz .Lrd_first_line_full
  mov [rsp+4264],rax
+ jmp .Lrd_more
+.Lrd_first_line_full:
+ cmp r13,PG_RTL_OUTPUT_MAX
+ jne .Lrd_limit
+ movsd xmm0,[rsp+4392]
+ cvttsd2si rax,xmm0
+ cvtsi2sd xmm1,rax
+ ucomisd xmm0,xmm1
+ je .Lrd_prefix_ready
+ mov qword ptr [rsp+4264],0
+.Lrd_prefix_ready:
+ lea rdi,[rip+.Lread_prefix_note]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lrd_limit
+ mov [rbx+PG_RTL_RESULT],rax
+ mov qword ptr [rsp+4344],4
+ jmp .Lrd_success
 .Lrd_more:
  mov qword ptr [rsp+4344],4
-.Lrd_reserve:
  cmp qword ptr [rsp+4304],0
  je .Lrd_limit
- lea rdi,[rsp+4096]
- mov esi,96
- lea rdx,[rip+.Lread_more]
+ dec qword ptr [rsp+4264]
  mov rcx,[rsp+4272]
  add rcx,[rsp+4304]
+ mov r8,rcx
+ dec rcx
+ mov rdi,rsp
+ mov esi,4096
+ lea rdx,[rip+.Lread_more]
  xor eax,eax
  call snprintf@PLT
  test eax,eax
  js .Lrd_limit
- cmp eax,96
+ cmp eax,4096
  jae .Lrd_limit
- cdqe
- mov [rsp+4352],rax
- add rax,[rsp+4264]
- dec rax
- cmp rax,r13
- jb .Lrd_hint
- dec qword ptr [rsp+4304]
- mov rax,[rsp+4264]
- dec rax
-.Lrd_back_line:
+ mov rdi,rsp
+ call json_tokener_parse@PLT
  test rax,rax
  jz .Lrd_limit
- dec rax
- cmp byte ptr [r12+rax],10
- jne .Lrd_back_line
- inc rax
- mov [rsp+4264],rax
- jmp .Lrd_reserve
-.Lrd_hint:
- dec qword ptr [rsp+4264]
- mov rax,[rsp+4264]
- lea rdi,[r12+rax]
- lea rsi,[rsp+4096]
- mov rdx,[rsp+4352]
- call memcpy@PLT
- mov rax,[rsp+4352]
- add [rsp+4264],rax
+ mov [rbx+PG_RTL_RESULT],rax
 .Lrd_success:
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_stable
+ mov rdi,[rsp+4256]
+ mov rsi,rsp
+ call fstat@PLT
+ test eax,eax
+ jnz .Lrd_refused
+ mov rax,[rsp+PG_RTL_STAT_SIZE]
+ cmp rax,[rsp+4096+PG_RTL_STAT_SIZE]
+ ja .Lrd_stable
+ jne .Lrd_changed
+ mov rax,[rsp+PG_RTL_STAT_MTIME]
+ cmp rax,[rsp+4096+PG_RTL_STAT_MTIME]
+ jne .Lrd_changed
+ mov rax,[rsp+PG_RTL_STAT_MTIME_NS]
+ cmp rax,[rsp+4096+PG_RTL_STAT_MTIME_NS]
+ je .Lrd_stable
+.Lrd_changed:
+ inc qword ptr [rsp+4352]
+ cmp qword ptr [rsp+4352],2
+ jae .Lrd_changed_error
+ lea rdi,[rsp+4096]
+ mov rsi,rsp
+ mov edx,PG_RTL_STAT_BYTES
+ call memcpy@PLT
+ mov rdi,[rsp+4256]
+ xor esi,esi
+ xor edx,edx
+ call lseek@PLT
+ test rax,rax
+ js .Lrd_refused
+ mov rdi,[rbx+PG_RTL_RESULT]
+ mov qword ptr [rbx+PG_RTL_RESULT],0
+ call json_object_put@PLT
+ mov rax,[rsp+4424]
+ mov [rsp+4288],rax
+ jmp .Lrd_text_file
+.Lrd_changed_error:
+ lea rbx,[rip+.Lmsg_changed]
+ jmp .Lrd_close_message
+.Lrd_stable:
  mov rdi,[rsp+4256]
  call close@PLT
  mov qword ptr [rsp+4256],-1
- mov rdi,r12
- mov rsi,[rsp+4264]
- call li_utf8
- test eax,eax
- jz .Lrd_utf8_bad
  mov rax,[rsp+4264]
  mov byte ptr [r12+rax],0
  mov [r14],rax
  mov eax,[rsp+4344]
  jmp .Lrd_out
-.Lrd_binary_close:
- lea rbx,[rip+.Lmsg_binary]
- jmp .Lrd_close_message
 .Lrd_offset_close:
  lea rbx,[rip+.Lmsg_offset]
  jmp .Lrd_close_message
@@ -687,13 +824,6 @@ li_execute_read:
  mov rsi, r13
  mov rdx, r14
  lea rcx, [rip + .Lmsg_limit]
- call li_fail
- jmp .Lrd_out
-.Lrd_utf8_bad:
- mov rdi, r12
- mov rsi, r13
- mov rdx, r14
- lea rcx, [rip + .Lmsg_utf8]
  call li_fail
  jmp .Lrd_out
 .Lrd_invalid:
@@ -727,7 +857,7 @@ li_execute_read:
  lea rcx, [rip + .Lmsg_refused]
  call li_fail
 .Lrd_out:
- add rsp, 4368
+ add rsp, 4432
  pop r15
  pop r14
  pop r13
@@ -795,12 +925,15 @@ pg_read_tool_close:
  mov ecx, dword ptr [rdi + PG_RTL_DIRECTORY]
  test ecx, ecx
  js .Lrc_ret
- push rax
- mov [rsp], rdi
+ push rbx
+ mov rbx,rdi
  mov edi, ecx
  call close@PLT
- pop rcx
- mov dword ptr [rcx + PG_RTL_DIRECTORY], -1
+ mov dword ptr [rbx+PG_RTL_DIRECTORY],-1
+ mov rdi,[rbx+PG_RTL_RESULT]
+ mov qword ptr [rbx+PG_RTL_RESULT],0
+ call json_object_put@PLT
+ pop rbx
 .Lrc_ret:
  ret
 .size pg_read_tool_close, .-pg_read_tool_close
