@@ -293,8 +293,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/{edit,edit-diff}.ts`及`env/node.ts`的TextDecoder文本语义；实际执行内容相同的固定`38ff99177fba`Edit函数与jsdiff 8.0.4核对结果。
-- 实际调用链：`edit_tool.S`对oldText/newText保留NUL，仅文件路径拒绝NUL；`edit_text.S`沿显式slice长度归一化、匹配和输出。`edit_diff.S`格式化行前缀后按长度复制正文，diff/patch不依赖正文的NUL终止。真实读改写经既有完整快照、JSON请求和write服务落盘，UTF-8/BOM/CRLF与动态批量编辑继续复用。
-- 验证：1307组文本在O0/O2 UBSan下对照Pi；95组工具/参数在ASan/UBSan下对照Pi，含NUL原文/替换/模糊匹配和文件字节回读。245组diff/patch/firstChangedLine直接对照Pi与jsdiff 8.0.4，含随机NUL行；NUL路径拒绝、原有分配失败/中断恢复、Assembly检查及`git diff --check`通过，最终产品构建通过。
-- 接口与差异：公开结构/函数ABI不变；文本slice的显式长度成为NUL边界依据，路径继续符合POSIX文件名约束。上批128项动态编辑、Read的1600组正文差分与读取改写重试作为已有基线。
-- 剩余与下一交付物：成组补齐K08的完整诊断/details、write/edit逐文件异步并发与其余超时/取消、溢出文件和错误语义，再用真实TUI核对read→edit→write→bash→回读。K08整体验收仍未完成。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/write.ts`、`tools/edit.ts`及`env/node.ts`；下一条完整调用链来源为`harness/harness.ts`的`createConversation`、`Conversation.fork`与`session/forks.ts`。
+- 实际调用链：`write_tool.S`同时持有请求原始路径和文件操作解析路径；成功结果沿Pi返回原始路径，文件URL、绝对/相对路径和符号链接不被展示为其他路径。结果容量在文件操作前检查，Edit内部write消费者使用可容纳完整路径结果的现有缓冲。
+- 验证：write与edit文件专项ASan/UBSan通过，包含文件URL/符号链接/相对路径的实际结果、Unicode/NUL、64 KiB写入、短写/EINTR、失败/部分写入、容量拒绝无副作用及Edit中断恢复；最终产品构建、Assembly检查与`git diff --check`通过。
+- 接口与差异：公开结构/函数ABI不变。当前K08已形成完整文件读改写基线；完整诊断/details、逐文件异步并发及剩余取消/溢出/错误语义继续由K08覆盖项跟踪。
+- 下一交付物：推进B04/K10的会话创建、分叉与重开调用链。复用`pg_record_tx_create`、`pg_record_tx_fork_conversation`及已有文档复制计划，在实际Session事务中连接会话操作与Client选择；按上游会话/分叉场景验证独立状态、继承历史和持久重开。K08剩余行为在工具组完整验收时统一补齐。

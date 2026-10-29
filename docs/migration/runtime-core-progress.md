@@ -59,9 +59,9 @@
 
 ## 本批验证与集成状态
 
-- Edit的oldText/newText、原文件归一化、匹配、写入与diff/patch按显式长度保留NUL；路径继续拒绝NUL。动态替换向量、BOM/CRLF、原文件非重叠匹配与结构化details共用既有实现。
-- 1307组文本、95组工具/参数和245组diff/patch/firstChangedLine实际对照固定Pi/jsdiff，包含NUL、多块替换、逆序与模糊匹配；文本O0/O2 UBSan、真实文件工具ASan/UBSan与已有失败/中断恢复通过。
-- 上批128项单次Edit和Read的1600组正文差分继续作为基线；完整truncation details及逐文件异步并发仍按K08补齐。
+- Write在解析路径执行文件操作，在成功结果中保留原始请求路径；结果缓冲不足时在文件副作用前拒绝。Edit的内部write消费者已适配完整路径结果容量。
+- write/edit实际文件专项ASan/UBSan通过，覆盖路径、Unicode/NUL、完整内容、短写/EINTR、部分失败、容量拒绝及中断恢复；最终产品构建、Assembly检查通过。
+- Edit动态批量、NUL与diff/patch，以及Read的切片/替代解码/重读为已有基线。后续工作按核心TODO转入会话创建/分叉/重开调用链，K08剩余差异继续保留在覆盖项中。
 
 ## 当前接口边界
 

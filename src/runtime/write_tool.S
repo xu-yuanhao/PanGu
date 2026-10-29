@@ -7,7 +7,7 @@
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"additionalProperties\":false}"
 .Lpath: .asciz "path"
 .Lcontent: .asciz "content"
-.Lok: .asciz "Successfully wrote file"
+.Lok: .asciz "Successfully wrote to %s"
 .Lfailed: .asciz "Write failed; file or parent directories may have changed"
 .section .text
 
@@ -190,6 +190,11 @@
  test rax,rax
  jnz .Lparse_bad
 .Lcopy_path:
+ mov rdi,[rsp+32]
+ add rdi,4112
+ mov rsi,r14
+ lea rdx,[r13+1]
+ call memcpy@PLT
  mov rdi,r14
  mov rsi,r13
  mov rdx,[rsp+32]
@@ -300,13 +305,13 @@
  push r13
  push r14
  push r15
- sub rsp,8384
+ sub rsp,8400
  mov qword ptr [rsp+4096],0
  mov rbx,rdi
- mov [rsp+8344],rcx
- mov [rsp+8352],r8
- mov [rsp+8360],r9
- mov [rsp+8376],r10d
+ mov [rsp+8352],rcx
+ mov [rsp+8360],r8
+ mov [rsp+8368],r9
+ mov [rsp+8384],r10d
  mov r12d,-1
  mov r13d,-1
  test rcx,rcx
@@ -321,10 +326,15 @@
  mov rdx,rsp
  lea rcx,[rsp+4096]
  lea r8,[rsp+4104]
- mov r9d,[rsp+8376]
+ mov r9d,[rsp+8384]
  call .Lparse
  test eax,eax
  jnz .Lwrite_error
+ lea rdi,[rsp+4112]
+ call strlen@PLT
+ add rax,23 /* success prefix and terminator */
+ cmp rax,[rsp+8360]
+ ja .Lwrite_error
  test rbx,rbx
  jz .Lwrite_error
  cmp dword ptr [rbx],0
@@ -409,11 +419,11 @@
  js .Lwrite_error
  mov r13d,eax
  mov edi,r13d
- lea rsi,[rsp+8200]
+ lea rsi,[rsp+8208]
  call fstat@PLT
  test eax,eax
  jnz .Lwrite_error
- mov eax,[rsp+8200+PG_RTL_STAT_MODE]
+ mov eax,[rsp+8208+PG_RTL_STAT_MODE]
  and eax,PG_RTL_S_IFMT
  cmp eax,PG_RTL_S_IFREG
  jne .Lwrite_error
@@ -471,28 +481,46 @@
 .Lmessage:
  lea r14,[rip+.Lok]
  test ebx,ebx
- jz .Lmessage_copy
+ jnz .Lmessage_failed
+ mov rdi,[rsp+8352]
+ mov rsi,[rsp+8360]
+ lea rdx,[rip+.Lok]
+ lea rcx,[rsp+4112]
+ xor eax,eax
+ call snprintf@PLT
+ test eax,eax
+ js .Lmessage_overflow
+ cmp rax,[rsp+8360]
+ jae .Lmessage_overflow
+ mov rdx,[rsp+8368]
+ mov [rdx],rax
+ xor eax,eax
+ jmp .Lexecute_return
+.Lmessage_overflow:
+ mov eax,1
+ jmp .Lexecute_return
+.Lmessage_failed:
  lea r14,[rip+.Lfailed]
 .Lmessage_copy:
  mov rdi,r14
  call strlen@PLT
  mov r15,rax
- mov rdi,[rsp+8344]
+ mov rdi,[rsp+8352]
  mov rsi,r14
  lea rdx,[rax+1]
  call memcpy@PLT
- mov rax,[rsp+8360]
+ mov rax,[rsp+8368]
  mov [rax],r15
  mov eax,ebx
  jmp .Lexecute_return
 .Lno_output:
  mov eax,1
 .Lexecute_return:
- mov [rsp+8368],eax
+ mov [rsp+8376],eax
  mov rdi,[rsp+4096]
  call free@PLT
- mov eax,[rsp+8368]
- add rsp,8384
+ mov eax,[rsp+8376]
+ add rsp,8400
  pop r15
  pop r14
  pop r13

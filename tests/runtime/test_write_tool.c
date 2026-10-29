@@ -29,7 +29,7 @@ int __wrap_fsync(int fd){if(sync_fail){errno=EIO;return -1;}return __real_fsync(
 static pg_tool_definition tool;
 static pg_tools service;
 static pg_slice slice(const char *s){return (pg_slice){s,strlen(s)};}
-static int run(const char *args){char out[128]={0};size_t size=999;writes=0;int rc=service.execute(service.context,slice("write"),slice(args),out,sizeof(out),&size);assert(size>0&&size<sizeof(out));assert(rc==0||rc==1);return rc;}
+static int run(const char *args){char out[128]={0};size_t size=999;writes=0;int rc=service.execute(service.context,slice("write"),slice(args),out,sizeof(out),&size);assert(size>0&&size<sizeof(out));assert(rc==0||rc==1);if(!rc){json_object *input=json_tokener_parse(args);const char *path=json_object_get_string(json_object_object_get(input,"path"));char expected[8192];int length=snprintf(expected,sizeof(expected),"Successfully wrote to %s",path);assert(length>0&&size==(size_t)length&&!memcmp(out,expected,size));json_object_put(input);}return rc;}
 static void expect_file(const char *path,const char *bytes,size_t n){char *b=malloc(n?n:1);assert(b);int fd=open(path,O_RDONLY|O_NOFOLLOW);assert(fd>=0);size_t used=0;while(used<n){ssize_t got=read(fd,b+used,n-used);assert(got>0);used+=(size_t)got;}char extra;assert(read(fd,&extra,1)==0);assert(!memcmp(b,bytes,n));assert(!close(fd));free(b);}
 static unsigned descriptors(void){DIR *d=opendir("/proc/self/fd");assert(d);unsigned count=0;while(readdir(d))++count;assert(!closedir(d));return count;}
 int main(void){
@@ -74,6 +74,7 @@ int main(void){
  for(unsigned i=0;i<32;++i){assert(!run("{\"path\":\"sym\",\"content\":\"x\"}"));assert(!run("{\"path\":\"keep\",\"content\":\"ok\"}"));}
  assert(descriptors()==before);
  char out[64];size_t n=99;assert(tool.execute(tool.context,slice("{\"path\":\"small\",\"content\":\"x\"}"),out,1,&n)&&!n);assert(access("small",F_OK));
+ assert(tool.execute(tool.context,slice("{\"path\":\"uncreated/result-name-that-does-not-fit-the-result-buffer\",\"content\":\"x\"}"),out,sizeof(out),&n)&&n<sizeof(out)&&access("uncreated",F_OK));
  context.directory=-1;assert(!tool.authorize(tool.context,slice("{}")));assert(run("{\"path\":\"closed\",\"content\":\"x\"}"));assert(access("closed",F_OK));
  assert(!unlink("a/b/file")&&!rmdir("a/b")&&!rmdir("a"));
  const char *names[]={"binary","link","sym","hard","fifo","keep"};for(size_t i=0;i<sizeof(names)/sizeof(*names);++i)assert(!unlink(names[i]));

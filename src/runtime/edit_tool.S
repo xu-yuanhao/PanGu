@@ -822,7 +822,7 @@
  jnz .Lquota_error
  mov qword ptr [rbp+IO_SIZE],0
  lea rax,[rbp+IO_SIZE]
- push 4096
+ push 8192
  push rax
  mov rdi,rbx
  lea rsi,[rip+.Lwrite]
@@ -835,7 +835,7 @@
  lea r15,[rip+.Lwrite_error]
  test eax,eax
  jnz .Lcleanup
- cmp qword ptr [rbp+IO_SIZE],4096
+ cmp qword ptr [rbp+IO_SIZE],8192
  jae .Lcleanup
  lea r15,[rip+.Lok]
  jmp .Lcleanup

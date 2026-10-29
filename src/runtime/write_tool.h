@@ -4,7 +4,8 @@
 /* Borrows a trusted directory descriptor. The caller owns its lifetime.
    POSIX relative/absolute paths; parents are created and symlinks followed.
    The opened target must be a regular file before truncation.
-   Calls must be serialized by the owner. Output capacity must be at least 64.
+   Calls must be serialized by the owner. Output capacity must be at least 64
+   and fit the success prefix plus original path; rejection precedes effects.
    An interrupted write may be partial: this tool is not replay-safe. */
 typedef struct { int directory; } pg_write_tool;
 pg_tool_definition pg_write_tool_definition(pg_write_tool *);
