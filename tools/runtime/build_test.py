@@ -24,13 +24,13 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
         DURABLE_SOURCES.extend(compile_inputs([implementation('src/runtime/json_schema_bridge')],directory,['-fsanitize=undefined','-fno-sanitize-recover=all']))
-        if '--conversations' in sys.argv:
+        if '--conversations' in sys.argv or '--client' in sys.argv:
             output=str(Path(directory)/'test-conversations')
             flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc','sqlite3','libcurl'],text=True).split()
             subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',
-                            '-fsanitize=undefined','-fno-sanitize-recover=all',*DURABLE_SOURCES,
+                            '-fsanitize=address,undefined','-fno-sanitize-recover=all',*DURABLE_SOURCES,
                             str(ROOT/'tests/runtime/test_durable_storage.c'),*flags,'-o',output],check=True)
-            subprocess.run([output,'--conversations'],check=True,timeout=20)
+            subprocess.run([output,*(['--conversations'] if '--conversations' in sys.argv else [])],check=True,timeout=90)
             return 0
         read_differential()
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)

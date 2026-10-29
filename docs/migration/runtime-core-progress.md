@@ -59,9 +59,9 @@
 
 ## 本批验证与集成状态
 
-- `durable_session.S`统一原子创建根/独立/分叉会话；复用记录分叉、文档复制与Session提交，hook初始化的Entry/Agent文档同批确认或撤销。产品根启动已从直接StorageWrite切到该入口。
-- SQLite/JSONL根幂等、分叉继承/隔离、hook回滚和重开专项ASan/UBSan通过；产品资源启动组合ASan/UBSan、产品构建与Assembly检查通过。受影响专项入口：`python3 -B tools/runtime/build_test.py --conversations`。
-- 后续接入完整Harness初始化和前台会话选择；现有工具、模型、输入队列和观察能力作为基线复用。
+- Client空闲选择会话时，先核对目标、加载Agent配置和准备输入/事件基线，再替换前台状态；失败保留旧会话/事件，共享Scheduler持续有效。Host的`conversation.client`和TUI可选`pg_tui_runtime_conversations`提供select/current；模型文本及工具进度按持久Task归属过滤，避免跨会话显示。
+- SQLite/JSONL专项ASan/UBSan覆盖切换、失败保留、忙时/缺失/关闭拒绝、重开后的冷配置加载与只读切换；Durable/Client相关回归、产品Host/资源组合ASan/UBSan、产品构建与Assembly检查通过。
+- 后续组合完整Harness创建/初始化与动态历史映射；前台控件消费由TUI线完成。复验：`python3 -B tools/runtime/build_test.py --conversations`。
 
 ## 当前接口边界
 

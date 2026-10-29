@@ -26,12 +26,15 @@ typedef struct {
    submit, queued inputs preserve the active root/cancellation state. */
 int pg_durable_client_inputs_service(pg_durable_client *,pg_inputs_ops *);
 int pg_durable_client_open(pg_durable_client *,const pg_durable_client_config *);
+int pg_durable_client_select(pg_durable_client *,uint64_t conversation);
+int pg_durable_client_conversations_service(pg_durable_client *,pg_conversation_client_ops *);
 pg_client pg_durable_client_service(pg_durable_client *);
 int pg_durable_client_suspend(void *);
 /* Native provider callbacks, serialized on the same foreground loop. */
 int pg_durable_client_emit(pg_durable_client *,const pg_event *);
 void pg_durable_client_tool(pg_durable_client *,uint64_t task_id,unsigned finished);
 void pg_durable_client_output(pg_durable_client *,uint64_t task_id,pg_slice);
+void pg_durable_client_text(pg_durable_client *,uint64_t task_id,pg_slice);
 /* Attach as Record Session publication callback with context=client. */
 void pg_durable_client_publish(void *,const struct json_object *,uint64_t);
 void pg_durable_client_fault(pg_durable_client *);

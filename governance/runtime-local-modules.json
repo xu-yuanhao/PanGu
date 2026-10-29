@@ -475,7 +475,8 @@
         "pg_tui_runtime_compaction",
         "pg_tui_runtime_observation",
         "pg_tui_runtime_task_graph",
-        "pg_tui_runtime_conversation_view"
+        "pg_tui_runtime_conversation_view",
+        "pg_tui_runtime_conversations"
       ],
       "reference_basis": [
         {
@@ -1926,7 +1927,10 @@
         "pg_compaction_hook_poll",
         "pg_compaction_hook_close",
         "pg_durable_generation_bind_hooks",
-        "pg_durable_generation_bind_prepare"
+        "pg_durable_generation_bind_prepare",
+        "pg_durable_client_select",
+        "pg_durable_client_conversations_service",
+        "pg_durable_client_text"
       ],
       "reference_basis": [
         {
@@ -1964,6 +1968,18 @@
           "tests_to_read": [
             "packages/durable/test/harness-compaction.test.ts",
             "packages/durable/test/harness-context.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/harness.ts",
+            "packages/coding-agent/src/core/agent-session-runtime.ts"
+          ],
+          "semantics": "Idle foreground conversation selection within the shared Durable Session: validate existence, preload saved Agent state and prepare new inbox/event state before swapping; failure retains prior binding, scheduler and other conversation tasks keep running; model text and tool progress are filtered by persisted Task conversationId before foreground delivery",
+          "tests_to_read": [
+            "packages/durable/test/harness-conversations.test.ts"
           ]
         }
       ]

@@ -55,12 +55,14 @@ static pg_agent_state_ops foreground_agent_state;
 static pg_view_binding task_graph_binding;
 static pg_conversation_view_binding conversation_view_binding;
 static pg_conversation_view_ops foreground_conversation_view;
+static pg_conversation_client_ops foreground_conversations;
 const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_inputs:0;}
 const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_resources:0;}
 const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_compaction:0;}
 const pg_observation_ops *pg_tui_runtime_observation(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_observation:0;}
 const pg_task_graph_ops *pg_tui_runtime_task_graph(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_task_graph:0;}
 const pg_conversation_view_ops *pg_tui_runtime_conversation_view(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_conversation_view:0;}
+const pg_conversation_client_ops *pg_tui_runtime_conversations(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_conversations:0;}
 static pg_host host,agent_scope;
 static pg_native_plugin extension;
 static pg_model_provider default_model_provider;
@@ -245,7 +247,7 @@ static void model_failure(void *ctx,const pg_model *model,pg_model_failure *out)
 static int model_complete(void *ctx,const pg_model *model,struct json_object *assistant){(void)ctx;return durable.model_provider->complete?durable.model_provider->complete(model->context,assistant):0;}
 static int model_fetch_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->fetch_deferred?durable.model_provider->fetch_deferred(model->context,handle):-1;}
 static int model_cancel_deferred(void *ctx,const pg_model *model,const struct json_object *handle){(void)ctx;return durable.model_provider->cancel_deferred?durable.model_provider->cancel_deferred(model->context,handle):0;}
-static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_event event={.kind=PG_TEXT_DELTA,.text=text};pg_durable_client_emit(&durable.client,&event);}
+static void model_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;pg_durable_client_text(&durable.client,id,text);}
 static int extension_tool_hook_poll(void *ctx,uint64_t id,unsigned event,const json_object *request,void **state,json_object **out){
  (void)ctx;*out=0;tool_scope *scope=tool_scope_find(id);if(!scope)return -5;if(!*state){if(pg_extension_hook_open(&scope->extensions,event,request,state))return -5;pg_task_runner *runner=pg_task_scheduler_find(&durable.scheduler,id);if(!runner||pg_extension_hook_bind_access(*state,runner,&durable.task_history))return -5;}int result=pg_extension_hook_poll(*state,out);if(!result){pg_extension_hook_close(*state);*state=0;}return result;
 }
@@ -412,13 +414,13 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  extension_tasks=pg_host_find(scope->parent,"task.definitions");const pg_task_definition *builtins[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};if(pg_task_provider_validate(extension_tasks,builtins,3))return 1;
  json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;pg_extension_result initial_extensions={0};int invalid_extensions=pg_extensions_resolve(durable.extensions,agent_state,durable.declared_tools,&initial_extensions);pg_extensions_close(&initial_extensions);json_object_put(agent_state);if(invalid_extensions)return 1;
  durable.task_resolver=(pg_task_resolver){0,task_acquire,pg_extension_registry_release};if(pg_task_scheduler_bind_definitions(&durable.scheduler,&durable.task_resolver)||pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
- pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;
+ pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;if(pg_durable_client_conversations_service(&durable.client,&foreground_conversations))return 1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  struct json_object *startup=0;if(pg_durable_request_read(&durable.tasks,1,UINT64_MAX,durable.configuration,&startup))return 1;int projected=pg_context_project(startup,&durable.history);json_object_put(startup);if(projected)return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
  foreground_agent_state=(pg_agent_state_ops){0,agent_state_read,agent_state_configure};
  conversation_view_binding=(pg_conversation_view_binding){&durable.session,&durable.tasks,0,0,0};pg_conversation_view_service(&conversation_view_binding,&foreground_conversation_view);pg_task_graph_service(&task_graph_binding,&durable.scheduler,&foreground_task_graph);pg_usage_service(&durable.session,&foreground_usage);pg_observation_service(&durable.session,&foreground_observation);
- return pg_host_provide(scope,owner,"extensions.control",&durable.extension_control)||pg_host_provide(scope,owner,"agent.state",&foreground_agent_state)||pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
+ return pg_host_provide(scope,owner,"conversation.client",&foreground_conversations)||pg_host_provide(scope,owner,"extensions.control",&durable.extension_control)||pg_host_provide(scope,owner,"agent.state",&foreground_agent_state)||pg_host_provide(scope,owner,"conversation.view",&foreground_conversation_view)||pg_host_provide(scope,owner,"task.graph",&foreground_task_graph)||pg_host_provide(scope,owner,"observation",&foreground_observation)||pg_host_provide(scope,owner,"usage",&foreground_usage)||pg_host_provide(scope,owner,"client",&application.client)||pg_host_provide(scope,owner,"inputs",&durable.inputs)||pg_host_provide(scope,owner,"resources",&foreground_resources)||pg_host_provide(scope,owner,"compaction",&durable.compaction_ops);
 }
 static int agent_suspend(void *ctx){(void)ctx;int result=pg_durable_client_suspend(&durable.client);return result==PG_TASK_PENDING?2:result;}
 static int agent_stop(void *ctx){
@@ -428,9 +430,9 @@ static int agent_stop(void *ctx){
 static pg_read_image_processor native_images={0,pg_image_prepare};
 static int images_start(void *ctx,pg_host *scope,size_t owner){(void)ctx;return pg_host_provide(scope,owner,"image.processor",&native_images);}
 static const char *const image_exports[]={"image.processor"};
-static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state","extensions.control"},*const storage_exports[]={"session"};
+static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","conversation.client","agent.state","extensions.control"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
-static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,10,agent_start,agent_stop};
+static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,11,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"images",0,0,0,image_exports,1,images_start,no_resources},
  {"model",0,model_imports,1,model_exports,4,model_start,model_stop},

@@ -294,8 +294,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts`的`#create`、`Conversation.fork`与`session/forks.ts`；复用已移植的记录创建、分叉复制和Document事务。
-- 实际调用链：`pg_durable_session_create_conversation`在一条Session事务中查找已有根或调用`pg_record_tx_create`，创建hook可使用同一文档事务初始化状态，确认提交后转移返回记录；失败丢弃候选。产品`storage_start`调用此入口建立根会话，替换直接写原始StorageWrite的启动路径。
-- 验证：`build_test.py --conversations`提供受影响专项入口。SQLite/JSONL验证根的幂等打开、独立会话、分叉的Entry/Agent文档继承和会话隔离、hook失败整批回滚与重开；ASan/UBSan专项及实际产品资源/启动组合通过，产品构建和Assembly检查通过。登记文件当前快照G00通过；原工作目录含项目外`claude/`包目录，原地G00仍报告该目录未登记。
-- 接口与差异：已有ABI保持不变，Session头新增原子创建函数并登记导出/来源。当前入口提供Session事务能力，完整Harness创建默认文档、配置/init选项和前台切换仍由K10/K14继续接入。
-- 下一交付物：将统一创建入口接入会话操作服务与空闲Client选择，完成默认文档/Agent配置、按会话历史恢复和提供者身份隔离，再通过同一产品组合重开验证。K08未完成行为保留在其覆盖项，后续工具组验收继续完成。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable的会话身份/独立调度与Coding Agent `core/agent-session-runtime.ts`的会话替换边界；复用原生Client打开、输入队列基线、Agent文档和事件所有权。
+- 实际调用链：`pg_durable_client_select`在空闲时核对目标存在，加载已保存Agent状态并准备候选Client；成功后替换前台队列/观察基线，保留共享Scheduler；模型文本与工具事件按Task的conversationId过滤，其他会话进度不进入当前前台。失败保持当前会话及待交付事件。产品Host导出`conversation.client`，TUI可通过`pg_tui_runtime_conversations`获得独立的select/current函数表；选后历史由既有conversation.view重新读取。
+- 验证：`build_test.py --conversations`的ASan/UBSan专项在SQLite/JSONL验证切换、缺失/非法/忙时/关闭拒绝、候选准备失败保留事件、Scheduler持续有效、重开后加载子会话配置及无存储写入；`build_test.py --client`的Durable/Client相关回归、产品Host服务与资源组合ASan/UBSan、产品构建、Assembly检查通过。原工作目录的项目外`claude/`包目录保留，G00使用登记文件当前快照核对。
+- 接口与差异：已有公开结构/枚举/函数表布局不变，新增`pg_conversation_client_ops`独立可选表。成功选择会使旧借用事件失效；TUI需清理旧展示并读取目标历史。当前仅绑定Runtime选择能力，完整Harness默认文档/配置/init与实际会话选择控件仍由K10/K14和TUI线继续完成。
+- 下一交付物：将Session原子创建与Agent配置/默认文档组合成会话操作服务，接入新建/分叉/选择后的动态历史映射，验证各会话独立模型配置与真实执行；保留K08覆盖项中的未完成行为。

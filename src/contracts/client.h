@@ -30,6 +30,13 @@ typedef struct {
     int (*poll)(void *, pg_event *); /* 1 event, 0 no event; bounded work */
 } pg_client;
 struct json_object;
+/* Foreground conversation binding. select is serialized and requires an idle
+   client: 0 selected, 2 missing, 3 busy, 4 invalid, 5 preparation failed,
+   6 storage error, 7 closed. Failure retains the old binding/observations.
+   Success invalidates borrowed events; reload history from conversation.view.
+   Switching does not close the shared scheduler or abort other conversations.
+   current returns 0 after close. Context stays borrowed through client lifetime. */
+typedef struct {void *context;int (*select)(void *,uint64_t);uint64_t (*current)(void *);} pg_conversation_client_ops;
 /* start copies instructions; reserve_tokens is 2..1000000. Serialized binding
    remains borrowed through poll/release and the owning runtime lifetime. */
 typedef struct {

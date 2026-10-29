@@ -682,6 +682,11 @@ pg_durable_client_output:
  call [r13+8]
  test eax,eax
  jnz .Ldc_tool_fail
+ CGET "qword ptr [rsp]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Ldc_tool_end
  CGET "qword ptr [rsp]",kind
  mov rdi,rax
  call json_object_get_string@PLT
@@ -2775,3 +2780,211 @@ pg_durable_client_fault_task:
 .section .rodata
 .Ldc_nested_failure_message: .asciz "Nested tool ended without a stored result"
 .Ldc_reason: .asciz "reason"
+
+/* Durable conversation identity plus Coding Agent's replacement boundary.
+   Candidate observers are ready before the old foreground binding is released. */
+.text
+.globl pg_durable_client_select
+.type pg_durable_client_select,@function
+pg_durable_client_select:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,208
+ mov rbx,rdi
+ mov r12,rsi
+ mov r14d,4
+ test rbx,rbx
+ jz .Lcs_end
+ test r12,r12
+ jz .Lcs_end
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Lcs_end
+ mov r14d,7
+ cmp qword ptr [rbx],0
+ je .Lcs_end
+ mov rax,[rbx]
+ cmp dword ptr [rax+172],1
+ jne .Lcs_end
+ cmp dword ptr [rbx+68],0
+ jne .Lcs_end
+ cmp dword ptr [rbx+72],0
+ jne .Lcs_end
+ cmp dword ptr [rbx+76],0
+ jne .Lcs_end
+ mov r14d,3
+ cmp dword ptr [rbx+56],0
+ jne .Lcs_end
+ cmp dword ptr [rbx+60],0
+ jne .Lcs_end
+ xor r14d,r14d
+ cmp r12,[rbx+24]
+ je .Lcs_end
+ mov dword ptr [rbx+56],1
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,26
+ rep stosq
+ movdqu xmm0,[rbx]
+ movdqu [rsp+144],xmm0
+ movdqu xmm0,[rbx+16]
+ movdqu [rsp+160],xmm0
+ mov [rsp+168],r12
+ lea rdi,[rsp+184]
+ mov rsi,[rbx]
+ call pg_durable_read_on_line_begin@PLT
+ mov r14d,3
+ test eax,eax
+ jnz .Lcs_unlock
+ mov rax,[rbx+16]
+ mov r15,[rax+8]
+ mov rdi,[r15]
+ xor esi,esi
+ mov rdx,r12
+ lea rcx,[rsp+176]
+ call [r15+8]
+ mov r14d,eax
+ lea rdi,[rsp+184]
+ call pg_durable_read_on_line_end@PLT
+ test r14d,r14d
+ jnz .Lcs_lookup_failed
+ mov rdi,[rsp+176]
+ call json_object_put@PLT
+ mov qword ptr [rsp+176],0
+ mov rdi,[rbx]
+ mov rsi,r12
+ lea rdx,[rsp+176]
+ call pg_agent_state_read@PLT
+ mov r14d,eax
+ mov rdi,[rsp+176]
+ call json_object_put@PLT
+ mov qword ptr [rsp+176],0
+ test r14d,r14d
+ jnz .Lcs_prepare_failed
+ mov rdi,rsp
+ lea rsi,[rsp+144]
+ call pg_durable_client_open@PLT
+ test eax,eax
+ jnz .Lcs_candidate_failed
+ mov rdi,rbx
+ call .Ldc_observations_close
+ mov rdi,rbx
+ mov rsi,rsp
+ mov edx,144
+ call memcpy@PLT
+ xor r14d,r14d
+ jmp .Lcs_end
+.Lcs_candidate_failed:
+ mov rdi,rsp
+ call .Ldc_observations_close
+.Lcs_prepare_failed:
+ mov r14d,5
+ jmp .Lcs_unlock
+.Lcs_lookup_failed:
+ mov rdi,[rsp+176]
+ call json_object_put@PLT
+ cmp r14d,1
+ mov r14d,6
+ jne .Lcs_unlock
+ mov r14d,2
+.Lcs_unlock:
+ mov dword ptr [rbx+56],0
+.Lcs_end:
+ mov eax,r14d
+ add rsp,208
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_select,.-pg_durable_client_select
+
+/* Same queue/JSON cleanup as suspend, with scheduler ownership retained. */
+.Ldc_observations_close:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ jmp .Ldc_suspend_queue
+
+.Lcs_current:
+ xor eax,eax
+ test rdi,rdi
+ jz .Lcs_current_end
+ cmp dword ptr [rdi+68],0
+ jne .Lcs_current_end
+ mov rax,[rdi+24]
+.Lcs_current_end:
+ ret
+.globl pg_durable_client_conversations_service
+.type pg_durable_client_conversations_service,@function
+pg_durable_client_conversations_service:
+ mov eax,1
+ test rdi,rdi
+ jz .Lcs_service_end
+ test rsi,rsi
+ jz .Lcs_service_end
+ mov [rsi],rdi
+ lea rax,[rip+pg_durable_client_select]
+ mov [rsi+8],rax
+ lea rax,[rip+.Lcs_current]
+ mov [rsi+16],rax
+ xor eax,eax
+.Lcs_service_end:
+ ret
+.size pg_durable_client_conversations_service,.-pg_durable_client_conversations_service
+
+.globl pg_durable_client_text
+.type pg_durable_client_text,@function
+pg_durable_client_text:
+ push rbx
+ push r12
+ push r13
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13,rcx
+ test rbx,rbx
+ jz .Lcs_text_end
+ cmp qword ptr [rbx+8],0
+ je .Lcs_text_end
+ cmp dword ptr [rbx+68],0
+ jne .Lcs_text_end
+ mov qword ptr [rsp],0
+ mov rax,[rbx+8]
+ mov rax,[rax+8]
+ mov rdi,[rax]
+ mov rdx,rsi
+ mov esi,2
+ mov rcx,rsp
+ call [rax+8]
+ test eax,eax
+ jnz .Lcs_text_release
+ CGET "qword ptr [rsp]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,[rbx+24]
+ jne .Lcs_text_release
+ lea rdi,[rsp+8]
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov dword ptr [rsp+8],1 /* PG_TEXT_DELTA */
+ mov [rsp+16],r12
+ mov [rsp+24],r13
+ mov rdi,rbx
+ lea rsi,[rsp+8]
+ call pg_durable_client_emit@PLT
+.Lcs_text_release:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+.Lcs_text_end:
+ add rsp,80
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_text,.-pg_durable_client_text
