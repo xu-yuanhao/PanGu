@@ -13,6 +13,7 @@
 #include <sys/mman.h>
 static pg_process process;
 static pg_bash_tool tool;
+static pg_execution_env execution_environment;
 static pg_tool_registry registry;
 static pg_tools svc;
 static char result[4096];static size_t n;
@@ -29,7 +30,7 @@ int __wrap_unlink(const char *path){if(fail_unlink&&!strcmp(path,tool.path)){fai
 struct json_tokener *__wrap_json_tokener_new(void){if(token_fault&&++token_calls==token_fault)return 0;return __real_json_tokener_new();}
 static pg_slice s(const char *p){return (pg_slice){p,strlen(p)};}
 static uint64_t now(void){struct timespec t;assert(!clock_gettime(CLOCK_MONOTONIC,&t));return (uint64_t)t.tv_sec*1000+(uint64_t)t.tv_nsec/1000000;}
-static void setup(int root){pg_process_init(&process);pg_process_ops ops=pg_process_service(&process);assert(!pg_bash_tool_init(&tool,&ops,root,0));pg_tool_definition d=pg_bash_tool_definition(&tool);assert(!d.replay_safe&&d.async);assert(!pg_tool_registry_init(&registry,&d,1));svc=pg_tool_registry_service(&registry);}
+static void setup(int root){pg_process_init(&process);execution_environment=(pg_execution_env){.abi=PG_EXECUTION_ENV_ABI,.size=sizeof(pg_execution_env),.process=pg_process_service(&process),.directory=root};assert(!pg_bash_tool_init(&tool,&execution_environment));pg_tool_definition d=pg_bash_tool_definition(&tool);assert(!d.replay_safe&&d.async);assert(!pg_tool_registry_init(&registry,&d,1));svc=pg_tool_registry_service(&registry);}
 static int start(const char *args){return svc.execute(svc.context,s("bash"),s(args),result,sizeof(result),&n);}
 static void released(void){uint64_t until=now()+3000;while(svc.close(svc.context)){assert(now()<until);usleep(1000);}assert(!registry.active&&process.pid==-1&&tool.file==-1);}
 static int drain(int rc,unsigned *chunks){uint64_t until=now()+6000;while(rc>=PG_TOOL_WAIT){assert(now()<until);if(rc==PG_TOOL_OUTPUT){assert(n&&n<sizeof(result));++*chunks;}else usleep(1000);rc=svc.next(svc.context,result,sizeof(result),&n);}assert(n<sizeof(result));result[n]=0;if(tool.stage==5){struct json_object *metadata=0;assert(!pg_bash_tool_snapshot(&tool,&metadata));struct json_object *structured=json_object_object_get(metadata,"structuredOutput");assert(json_object_get_int(json_object_object_get(structured,"exitCode"))==tool.exit_code);assert(json_object_get_boolean(json_object_object_get(structured,"truncated"))==(int)(tool.flags&1));assert((size_t)json_object_get_string_len(json_object_object_get(structured,"output"))==tool.tail_size);if(tool.reason||tool.exit_code||tool.flags&3)assert(json_object_array_length(json_object_object_get(metadata,"diagnostics")));json_object_put(metadata);}released();return rc;}
@@ -53,6 +54,15 @@ static void raw_and_tail(void){
  assert(run_command("printf '\\357\\273\\277'; printf '%05000d' 0; printf '\\377'")==PG_TOOL_OK&&tool.path[0]);int fd=open(tool.path,O_RDONLY);assert(fd>=0);unsigned char data[5004];assert(read(fd,data,sizeof(data))==(ssize_t)sizeof(data)&&!memcmp(data,"\xef\xbb\xbf",3)&&data[5003]==0xff);assert(!close(fd));assert(memmem(result,n,"\xef\xbf\xbd",3));remove_artifact();
  assert(run_command("printf 'a'; printf '\\360\\237\\231\\202%.0s' {1..1000}")==PG_TOOL_OK&&tool.tail_size==3072&&tool.path[0]);for(size_t i=0;i<tool.tail_size;i+=4)assert(!memcmp(tool.tail+i,"\xf0\x9f\x99\x82",4));remove_artifact();
 }
+typedef struct {int directory;char *const *environment;unsigned calls,reject;} prepare_fixture;
+static int prepare_command(void *context,pg_execution_request *request){prepare_fixture *fixture=context;fixture->calls++;assert(request->command.size==15&&!memcmp(request->command.data,"printf original",15));if(fixture->reject)return 1;request->command=s(": > prepared; printf '%s' \"$PANGU_TEST_PREPARED\"");request->directory=fixture->directory;request->environment=fixture->environment;return 0;}
+static void execution_prepare(int root){
+ assert(!mkdirat(root,"prepared-dir",0700));int directory=openat(root,"prepared-dir",O_RDONLY|O_DIRECTORY|O_CLOEXEC);assert(directory>=0);char *environment[]={"PANGU_TEST_PREPARED=ready",0};prepare_fixture fixture={directory,environment,0,0};
+ setup(root);execution_environment.context=&fixture;execution_environment.prepare=prepare_command;
+ assert(run_command("printf original")==PG_TOOL_OK&&strstr(result,"ready")&&fixture.calls==1&&faccessat(directory,"prepared",F_OK,0)==0);
+ assert(!unlinkat(directory,"prepared",0));fixture.reject=1;assert(run_command("printf original")==PG_TOOL_ERROR&&strstr(result,"preparation rejected")&&fixture.calls==2&&tool.stage==6&&process.pid==-1&&tool.file==-1&&faccessat(directory,"prepared",F_OK,0)<0&&errno==ENOENT);
+ assert(!close(directory)&&!unlinkat(root,"prepared-dir",AT_REMOVEDIR));
+}
 static void cancellation(void){unsigned chunks=0;int rc=start("{\"command\":\"printf begin; sleep 2; printf late\"}");assert(rc==PG_TOOL_WAIT);uint64_t until=now()+1000;do{assert(now()<until);usleep(1000);rc=svc.next(svc.context,result,sizeof(result),&n);}while(rc==PG_TOOL_WAIT);assert(rc==PG_TOOL_OUTPUT&&n==5&&!memcmp(result,"begin",5));svc.cancel(svc.context);svc.cancel(svc.context);assert(drain(rc,&chunks)==PG_TOOL_ERROR&&strstr(result,"begin")&&!strstr(result,"late")&&strstr(result,"reason=cancelled")&&!tool.path[0]);
  rc=start("{\"command\":\"printf abandoned; sleep 2\"}");assert(rc==PG_TOOL_WAIT);char path[64];strcpy(path,tool.path);released();assert(access(path,F_OK)<0&&errno==ENOENT);
 }
@@ -68,11 +78,11 @@ static void failures(void){
 }
 static void quota(void){assert(run_command("head -c 18000000 /dev/zero")==PG_TOOL_ERROR&&tool.captured==PG_BASH_CAPTURE_LIMIT&&tool.path[0]);struct stat st;assert(!stat(tool.path,&st)&&st.st_size==PG_BASH_CAPTURE_LIMIT);assert(memmem(result,n,"partial raw output",18));remove_artifact();}
 static void layout_and_provider(int root){
- pg_process_ops ops=pg_process_service(&process);pg_bash_tool before=tool;pg_process_ops bad=ops;bad.next=0;
- assert(pg_bash_tool_init(&tool,&bad,root,0)&&!memcmp(&before,&tool,sizeof(tool)));
+ pg_bash_tool before=tool;pg_execution_env bad=execution_environment;bad.process.next=0;
+ assert(pg_bash_tool_init(&tool,&bad)&&!memcmp(&before,&tool,sizeof(tool)));
  long page=sysconf(_SC_PAGESIZE);size_t length=(size_t)page*6;
  char *map=mmap(0,length,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page,(size_t)page*4,PROT_READ|PROT_WRITE));
- pg_bash_tool *tail=(pg_bash_tool*)(map+5*page-sizeof(*tail));pg_process_init(&process);assert(!pg_bash_tool_init(tail,&ops,root,0));pg_tool_definition d=pg_bash_tool_definition(tail);
+ pg_bash_tool *tail=(pg_bash_tool*)(map+5*page-sizeof(*tail));pg_process_init(&process);assert(!pg_bash_tool_init(tail,&execution_environment));pg_tool_definition d=pg_bash_tool_definition(tail);
  char *output=mmap(0,(size_t)page*2,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(output!=MAP_FAILED&&!mprotect(output,(size_t)page,PROT_READ|PROT_WRITE));char *end=output+page-4096;size_t size;
  assert(d.execute(tail,s("{\"command\":\"printf guard\"}"),end,4095,&size)==PG_TOOL_ERROR&&!size&&tail->stage==0);
  int rc=d.execute(tail,s("{\"command\":\"printf guard\"}"),end,4096,&size);uint64_t until=now()+2000;
@@ -85,4 +95,4 @@ static int loop_start(void *ctx,const pg_session *session){(void)ctx;answering=s
 static int loop_next(void *ctx,pg_model_event *event){(void)ctx;*event=(pg_model_event){0};if(answering)event->kind=PG_MODEL_DONE;else{event->kind=PG_MODEL_CALL;event->text=s("{\"command\":\"printf '%06000d' 0\"}");event->call_id=s("bash-proof");event->tool_name=s("bash");}return 0;}
 static void loop_noop(void *ctx){(void)ctx;}
 static void long_loop(int root){for(unsigned attempt=0;attempt<5;++attempt){setup(root);assert(!pg_agent_init(&loop_agent,(pg_model){0,loop_start,loop_next,loop_noop,loop_noop},svc));pg_client client=pg_agent_client(&loop_agent);assert(!client.submit(client.context,s("unit command request")));uint64_t until=now()+3000;size_t streamed=0;int ended=0;while(!ended){assert(now()<until);pg_event event;if(!client.poll(client.context,&event)){usleep(1000);continue;}if(event.kind==PG_TOOL_OUTPUT_DELTA)streamed+=event.text.size;if(event.kind==PG_RUN_FINISHED){assert(event.outcome==PG_SUCCESS);ended=1;}}assert(streamed==6000&&tool.tail_size==3072&&tool.path[0]);struct stat st;assert(!stat(tool.path,&st)&&st.st_size==6000);remove_artifact();}}
-int main(void){char path[]="/tmp/pangu-bash-test-XXXXXX";assert(mkdtemp(path));int root=open(path,O_RDONLY|O_DIRECTORY|O_CLOEXEC);assert(root>=0);setup(root);size_t descriptors=fd_count();arguments();long_output();raw_and_tail();cancellation();failures();quota();layout_and_provider(root);long_loop(root);assert(fd_count()==descriptors&&!close(root)&&!rmdir(path));puts("bash tool: real command/status/UTF-8, timeout/cancel, tail/spill/quota, parser/IO faults and page boundaries OK");return 0;}
+int main(void){char path[]="/tmp/pangu-bash-test-XXXXXX";assert(mkdtemp(path));int root=open(path,O_RDONLY|O_DIRECTORY|O_CLOEXEC);assert(root>=0);setup(root);size_t descriptors=fd_count();arguments();long_output();raw_and_tail();execution_prepare(root);setup(root);cancellation();failures();quota();layout_and_provider(root);long_loop(root);assert(fd_count()==descriptors&&!close(root)&&!rmdir(path));puts("bash tool: injected ExecutionEnv preparation, command/status/UTF-8, timeout/cancel, tail/spill/quota, parser/IO faults and page boundaries OK");return 0;}

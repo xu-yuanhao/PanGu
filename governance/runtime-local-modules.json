@@ -464,7 +464,8 @@
         "extension.registry.local.v0",
         "system.prompt.local.v0",
         "tool.execution.local.v0",
-        "images.prepare.local.v0"
+        "images.prepare.local.v0",
+        "execution.env.local.v0"
       ],
       "role": "Static composition of workspace/process/files, model lease and task-owned tool invocation factories, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -764,6 +765,39 @@
       ]
     },
     {
+      "id": "execution.env.local.v0",
+      "sources": [
+        "src/runtime/execution_env.h"
+      ],
+      "dependencies": [
+        "tools.read.posix.local.v0",
+        "tools.write.posix.local.v0",
+        "process.posix.local.v0"
+      ],
+      "role": "versioned borrowed ExecutionEnv service composing workspace, file and process capabilities; BashPrepare-style callback can replace each call's command, working directory and explicit environment before process start",
+      "exports": [
+        "PG_EXECUTION_ENV_ABI",
+        "pg_execution_env",
+        "pg_execution_request"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/tools/bash.ts",
+            "packages/durable/src/env/index.ts",
+            "packages/durable/src/env/node.ts"
+          ],
+          "semantics": "ExecutionEnv combines file-system and shell capabilities; BashPrepare changes command, cwd and environment before exec. Native provider composes replaceable host services and prepares synchronously before process spawn.",
+          "tests_to_read": [
+            "packages/durable/test/tools.test.ts",
+            "packages/durable/test/env-node.test.ts"
+          ]
+        }
+      ]
+    },
+    {
       "id": "tool.bash.local.v0",
       "sources": [
         "src/runtime/bash_tool.h",
@@ -772,12 +806,12 @@
       ],
       "dependencies": [
         "tools.registry.local.v0",
-        "process.posix.local.v0",
+        "execution.env.local.v0",
         "stream.decode.local.v0",
         "json-c",
         "system libc"
       ],
-      "role": "handwritten cooperative bash adapter; explicit borrowed process service/cwd/environment, validated command and timeout, separate stream decoding, 3072-byte/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
+      "role": "handwritten cooperative bash adapter; borrowed ExecutionEnv service, validated prepared command/cwd/environment and timeout, separate stream decoding, 3072-byte/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
       "exports": [
         "pg_bash_tool_init",
         "pg_bash_tool_definition",

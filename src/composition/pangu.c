@@ -16,6 +16,7 @@
 #include "../runtime/tool_provider.h"
 #include "../runtime/tool_execution.h"
 #include "../runtime/read_tool.h"
+#include "../runtime/execution_env.h"
 #include "../runtime/image_processor.h"
 #include "../runtime/write_tool.h"
 #include "../runtime/edit_tool.h"
@@ -68,7 +69,7 @@ static int native_tool_snapshot(void *,uint64_t,const struct json_object *,struc
 static int native_model_configure(void *,const struct json_object *,const pg_tool_registry *);
 static void native_model_failure(void *,pg_model_failure *);
 static int native_model_complete(void *,struct json_object *);
-static struct {const char *path,*session_directory;pg_model model;pg_tools tools,files;pg_process_ops process;pg_client client;} application;
+static struct {const char *path,*session_directory;pg_model model;pg_tools tools,files;pg_process_ops process;pg_execution_env execution_env;pg_client client;} application;
 typedef struct tool_scope {
  struct tool_scope *next;
  uint64_t task_id;
@@ -127,6 +128,12 @@ static int process_start(void *ctx,pg_host *scope,size_t owner){
  return pg_host_provide(scope,owner,"process",&application.process);
 }
 static int process_stop(void *ctx){(void)ctx;return pg_process_close(&command_process);}
+static int execution_start(void *ctx,pg_host *scope,size_t owner){
+ (void)ctx;pg_read_tool *workspace=pg_host_get(scope,owner,"workspace");pg_tools *files=pg_host_get(scope,owner,"files");pg_process_ops *process=pg_host_get(scope,owner,"process");
+ if(!workspace||!files||!process)return 1;
+ application.execution_env=(pg_execution_env){.abi=PG_EXECUTION_ENV_ABI,.size=sizeof(pg_execution_env),.workspace=workspace,.files=*files,.process=*process,.directory=workspace->directory,.environment=command_environment};
+ return pg_host_provide(scope,owner,"execution.env",&application.execution_env);
+}
 static int files_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;writer.directory=root->directory;
  pg_tool_definition definitions[]={pg_read_snapshot_definition(root),pg_write_file_definition(&writer)};
@@ -135,10 +142,10 @@ static int files_start(void *ctx,pg_host *scope,size_t owner){
 }
 static int no_resources(void *ctx){(void)ctx;return 0;}
 static int tools_start(void *ctx,pg_host *scope,size_t owner){
- (void)ctx;pg_read_tool *root=pg_host_get(scope,owner,"workspace");pg_tools *files=pg_host_get(scope,owner,"files");pg_process_ops *process=pg_host_get(scope,owner,"process");
- if(root&&pg_read_tool_configure_images(root,0,pg_host_get(scope,owner,"image.processor")))return 1;
- if(!root||!files||!process||pg_bash_tool_init(&shell_tool,process,root->directory,command_environment))return 1;
- editor.files=*files;pg_tool_definition definitions[]={pg_read_tool_definition(root),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor),pg_bash_tool_definition(&shell_tool)};
+ (void)ctx;pg_execution_env *execution=pg_host_get(scope,owner,"execution.env");
+ if(execution&&execution->workspace&&pg_read_tool_configure_images(execution->workspace,0,pg_host_get(scope,owner,"image.processor")))return 1;
+ if(!execution||!execution->workspace||pg_bash_tool_init(&shell_tool,execution))return 1;
+ editor.files=execution->files;pg_tool_definition definitions[]={pg_read_tool_definition(execution->workspace),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor),pg_bash_tool_definition(&shell_tool)};
  if(pg_tool_registry_init(&registry,definitions,4))return 1;application.tools=pg_tool_registry_service(&registry);
  default_tool_provider=(pg_tool_provider){PG_TOOL_PROVIDER_ABI,sizeof(pg_tool_provider),application.tools,&registry,0,native_tool_snapshot,"pangu.coding-tools.v1"};
  return pg_host_provide(scope,owner,"tools",&application.tools)||pg_host_provide(scope,owner,"tool.registry",&registry)||pg_host_provide(scope,owner,"tools.base",&application.tools)||pg_host_provide(scope,owner,"tool.registry.base",&registry)||pg_host_provide(scope,owner,"tools.provider",&default_tool_provider)||pg_host_provide(scope,owner,"tools.provider.base",&default_tool_provider);
@@ -423,14 +430,15 @@ static pg_read_image_processor native_images={0,pg_image_prepare};
 static int images_start(void *ctx,pg_host *scope,size_t owner){(void)ctx;return pg_host_provide(scope,owner,"image.processor",&native_images);}
 static const char *const image_exports[]={"image.processor"};
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state","extensions.control"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process","image.processor"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
+static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,10,agent_start,agent_stop};
 static const pg_plugin plugins[]={
  {"images",0,0,0,image_exports,1,images_start,no_resources},
  {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
- {"tools",0,tool_imports,4,tools_exports,6,tools_start,tools_stop},
+ {"tools",0,tool_imports,2,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},
+ {"execution",0,execution_imports,3,execution_exports,1,execution_start,no_resources},
  {"workspace",0,0,0,workspace_exports,1,workspace_start,workspace_stop},
  {"storage",0,0,0,storage_exports,1,storage_start,storage_stop},
 };

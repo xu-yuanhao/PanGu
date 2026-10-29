@@ -111,7 +111,7 @@
     },
     "src/runtime/bash_tool.S": {
       "role": "assembly-core",
-      "reason": "手写bash参数/异步工具状态、逐流解码/尾部保留、原始输出文件和错误清理；借用进程服务与成熟json-c/libc"
+      "reason": "手写bash参数/异步工具状态、每次调用的执行准备、逐流解码/尾部保留、原始输出文件和错误清理；通过ExecutionEnv借用工作区、文件与进程服务"
     },
     "src/runtime/prompt.S": {
       "role": "assembly-core",

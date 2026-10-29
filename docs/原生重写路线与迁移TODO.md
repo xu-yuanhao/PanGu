@@ -145,7 +145,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] read默认图片路径接入Durable结果与请求：PNG/JPEG/GIF/WebP头部尺寸、默认inline限制、base64、读取稳定性重试；afterTool保留图片，真实read Task持久结果可投影为模型附件。
 - [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
 - [x] 原生图片处理器接入应用：真实解码、八种EXIF转正、Lanczos缩放、PNG/JPEG候选与质量梯度、字节预算降采样、BMP转换及损坏图片拒绝；实际read持久结果覆盖缩放/坐标说明。
-- [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询。已有诊断文本渲染、bash结构化结果与单条工具消息投影；完整ExecutionEnv待补齐。
+- [x] 完成 edit 的 diff/patch/首行结果与工具结构化结果。真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询；bash结构化结果与诊断已投影。
+- [x] 将工作区、文件和进程能力组合为注入的 ExecutionEnv 宿主服务。BashPrepare式回调可在启动前调整命令、工作目录和显式环境；拒绝调用时不创建输出文件也不启动进程。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
 ### K09 — 完整原生 Extension 能力
@@ -289,8 +290,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `images/index.ts` prepare/encodeWithin、`tools/read.ts`、`tools-images.test.ts` 的方向/尺寸/字节预算/格式转换/损坏图片用例；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：应用images插件提供可替换image.processor，tools显式依赖并发布含BMP的read描述。手写Assembly处理策略：解码后合规原图直接保留，EXIF转正、按宽高缩放、PNG/JPEG候选与80/70/55/40质量、尺寸逐次3/4缩小直至预算成立，生成prepared内容与转换/缩放说明。libvips C桥接只做解码/方向/缩放/编码及库所有权；read经原工具快照、afterTool、Entry和请求投影交付图片。
-- 验证：产品 `--native-tasks --sanitize` 通过八方向尺寸与像素位置、原JPEG保留、BMP转PNG、紧字节预算降采样、1像素仍不合规拒绝、损坏数据拒绝；实际read Task把4000x2 BMP变为2000x1 PNG并持久保存坐标映射，既有图片/Schema/控制/取消/插件场景保持。Runtime整批、产品构建、Assembly及排除独立claude目录的G00候选镜像通过。
-- 接口与自审：新增image_processor.S/h和image_codec_vips.c，已登记源、依赖、公开接口及实际构建输入；系统动态libvips 8.18.7（LGPL-2.1-or-later）经pkg-config链接。原base64汇编入口供两条现有消费者复用；codec handles、编码malloc字节和prepared JSON逐阶段拥有并统一释放。原生编解码器的压缩字节/质量实现与Photon不同，验收比较格式、内容方向、尺寸、预算与说明。
-- 剩余与下一交付物：K08整体保持未勾选。现已接通调用线程内的处理器路径；Node上游worker调度、取消及空闲释放随原生异步执行环境继续移植。下一组集中完成K08执行环境/长操作续接及其工具消费者；其他提供者协议、Schema差异和异常Task自身Live最终化继续按覆盖表推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/bash.ts` 的 `BashPrepare`、`env/index.ts` 的 `ExecutionEnv` 与 `env/node.ts` 的 `exec`；对应 `tools.test.ts` 与 `env-node.test.ts`。
+- 实际调用链：新增版本化 `execution.env` 宿主服务，由workspace、files、process插件组合并交给tools插件。Assembly Bash在创建spill文件前调用prepare，接受更新后的命令、目录fd和显式环境，验证后进入现有可取消Process生命周期；TUI和Durable Task仍走原工具结果链。
+- 验证：Bash真实进程专项通过命令/cwd/环境变更与拒绝副作用、超时/取消、流解码、截断/spill、配额及页边界；Runtime整批、产品构建、实际宿主/TUI启动及排除独立 `claude/` 克隆的G00镜像检查通过。
+- 接口与差异：公开 `pg_execution_env` ABI 组合借用服务，`pg_execution_request` 提供单次Bash准备入口；回调在当前宿主同步执行，命令目录用借用fd表达，默认环境仍由PanGu显式提供。新增头文件已登记到bootstrap策略和模块依赖。
+- 剩余与下一交付物：K08整体保持未勾选。继续沿Pi read/write/edit/bash调用者补齐路径与输入差异，并把read→edit→write→bash→回读接入真实模型完整调用；上游worker/并行长操作在对应消费者出现时继续移植。

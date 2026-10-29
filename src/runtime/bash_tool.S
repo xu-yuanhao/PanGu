@@ -1,5 +1,6 @@
 #include "bash_tool_layout.h"
 #include "tools_layout.h"
+#include "execution_env.h"
 .intel_syntax noprefix
 .section .rodata
 .Lname: .asciz "bash"
@@ -9,6 +10,7 @@
 .Ltimeout: .asciz "timeout"
 .Ltemplate: .asciz "/tmp/pangu-output-XXXXXX"
 .Linvalid: .asciz "Invalid bash arguments or active operation"
+.Lprepare_invalid: .asciz "Bash execution preparation rejected the command"
 .Lstatus: .asciz "\n[exit=%d; reason=%s]\n"
 .Lfull: .asciz "[earlier output omitted; full raw output: %s]\n"
 .Lpartial: .asciz "[output capture failed or limit reached; partial raw output: %s]\n"
@@ -32,27 +34,27 @@ pg_bash_tool_init:
  jz .Linit_bad
  test rsi,rsi
  jz .Linit_bad
- test edx,edx
- js .Linit_bad
- cmp qword ptr [rsi+8],0
+ cmp dword ptr [rsi],PG_EXECUTION_ENV_ABI
+ jne .Linit_bad
+ cmp dword ptr [rsi+4],PG_EE_BYTES
+ jb .Linit_bad
+ cmp dword ptr [rsi+PG_EE_DIRECTORY],0
+ jl .Linit_bad
+ cmp qword ptr [rsi+PG_EE_PROCESS+8],0
  je .Linit_bad
- cmp qword ptr [rsi+16],0
+ cmp qword ptr [rsi+PG_EE_PROCESS+16],0
  je .Linit_bad
- cmp qword ptr [rsi+24],0
+ cmp qword ptr [rsi+PG_EE_PROCESS+24],0
  je .Linit_bad
- cmp qword ptr [rsi+32],0
+ cmp qword ptr [rsi+PG_EE_PROCESS+32],0
  je .Linit_bad
  mov r8,rdi
- mov r9,rcx
- mov r10d,edx
+ mov r9,rsi
  xor eax,eax
  mov ecx,PG_BH_BYTES/8
  rep stosq
  mov rdi,r8
- mov ecx,5
- rep movsq
- mov [r8+PG_BH_ROOT],r10d
- mov [r8+PG_BH_ENV],r9
+ mov [r8+PG_BH_ENVIRONMENT],r9
  mov dword ptr [r8+PG_BH_FILE],-1
  xor eax,eax
  ret
@@ -275,7 +277,10 @@ pg_bash_tool_init:
  xor eax,eax
  test rdi,rdi
  jz .Lauth_ret
- cmp dword ptr [rdi+PG_BH_ROOT],0
+ mov rdx,[rdi+PG_BH_ENVIRONMENT]
+ test rdx,rdx
+ jz .Lauth_ret
+ cmp dword ptr [rdx+PG_EE_DIRECTORY],0
  jl .Lauth_ret
  mov eax,1
 .Lauth_ret:
@@ -316,6 +321,55 @@ pg_bash_tool_init:
  call .Lparse
  test eax,eax
  jnz .Lexecute_invalid
+ mov rax,[rbx+PG_BH_ENVIRONMENT]
+ mov [rsp+4112],rsp
+ mov rcx,[rsp+4096]
+ mov [rsp+4120],rcx
+ mov ecx,[rax+PG_EE_DIRECTORY]
+ mov [rsp+4128],ecx
+ mov qword ptr [rsp+4132],0
+ mov rcx,[rax+PG_EE_ENVIRONMENT]
+ mov [rsp+4136],rcx
+ mov r9,[rax+PG_EE_PREPARE]
+ test r9,r9
+ jz .Lprepare_ready
+ mov rdi,[rax+PG_EE_CONTEXT]
+ lea rsi,[rsp+4112]
+ call r9
+ test eax,eax
+ jnz .Lexecute_prepare_invalid
+.Lprepare_ready:
+ mov rax,[rsp+4120]
+ cmp rax,4095
+ ja .Lexecute_invalid
+ mov rcx,[rsp+4112]
+ test rcx,rcx
+ jnz .Lprepare_command_present
+ test rax,rax
+ jnz .Lexecute_invalid
+.Lprepare_command_present:
+ test rax,rax
+ jz .Lprepare_command_checked
+ mov rdi,rcx
+ xor esi,esi
+ mov rdx,rax
+ call memchr@PLT
+ test rax,rax
+ jnz .Lexecute_invalid
+.Lprepare_command_checked:
+ cmp dword ptr [rsp+4128],0
+ jl .Lexecute_invalid
+ mov rax,[rsp+4112]
+ mov [rsp+4144],rax
+ mov rax,[rsp+4120]
+ mov [rsp+4096],rax
+ movsxd rax,dword ptr [rsp+4128]
+ mov [rsp+4112],rax
+ mov qword ptr [rsp+4120],0
+ mov rax,[rsp+4136]
+ mov [rsp+4128],rax
+ mov rax,[rsp+4104]
+ mov [rsp+4136],rax
  lea rdi,[rbx+PG_BH_FILE]
  xor esi,esi
  mov edx,PG_BH_BYTES-PG_BH_FILE
@@ -335,19 +389,12 @@ pg_bash_tool_init:
  mov [rbx+PG_BH_FILE],eax
  test eax,eax
  js .Lexecute_temp_failed
- mov eax,[rbx+PG_BH_ROOT]
- mov [rsp+4112],eax
- mov dword ptr [rsp+4116],0
- mov qword ptr [rsp+4120],0
- mov rax,[rbx+PG_BH_ENV]
- mov [rsp+4128],rax
- mov rax,[rsp+4104]
- mov [rsp+4136],rax
- mov rdi,[rbx]
+ mov rax,[rbx+PG_BH_ENVIRONMENT]
+ mov rdi,[rax+PG_EE_PROCESS]
  lea rsi,[rsp+4112]
- mov rdx,rsp
+ mov rdx,[rsp+4144]
  mov rcx,[rsp+4096]
- call [rbx+8]
+ call [rax+PG_EE_PROCESS+8]
  test eax,eax
  jnz .Lexecute_failed
  mov eax,2
@@ -370,6 +417,16 @@ pg_bash_tool_init:
  mov rdx,[rsp+4152]
  mov [rdx],rax
 .Lexecute_bad_direct:
+ mov eax,1
+ jmp .Lexecute_return
+.Lexecute_prepare_invalid:
+ mov rdi,r14
+ lea rsi,[rip+.Lprepare_invalid]
+ call strcpy@PLT
+ lea rdi,[rip+.Lprepare_invalid]
+ call strlen@PLT
+ mov rdx,[rsp+4152]
+ mov [rdx],rax
  mov eax,1
 .Lexecute_return:
  add rsp,4160
@@ -552,9 +609,10 @@ pg_bash_tool_init:
  je .Lfinal
  jmp .Lnext_invalid
 .Lpoll:
- mov rdi,[rbx]
+ mov rax,[rbx+PG_BH_ENVIRONMENT]
+ mov rdi,[rax+PG_EE_PROCESS]
  mov rsi,rsp
- call [rbx+16]
+ call [rax+PG_EE_PROCESS+16]
  test eax,eax
  jz .Lwait
  js .Lprovider_error
@@ -740,8 +798,9 @@ pg_bash_tool_init:
 .Lcancel:
  test rdi,rdi
  jz .Lcancel_return
- mov rax,[rdi+24]
- mov rdi,[rdi]
+ mov rdx,[rdi+PG_BH_ENVIRONMENT]
+ mov rax,[rdx+PG_EE_PROCESS+24]
+ mov rdi,[rdx+PG_EE_PROCESS]
  jmp rax
 .Lcancel_return:
  ret
@@ -750,8 +809,9 @@ pg_bash_tool_init:
  mov rbx,rdi
  test rbx,rbx
  jz .Lclose_ok
- mov rdi,[rbx]
- call [rbx+32]
+ mov rax,[rbx+PG_BH_ENVIRONMENT]
+ mov rdi,[rax+PG_EE_PROCESS]
+ call [rax+PG_EE_PROCESS+32]
  test eax,eax
  jnz .Lclose_return
  cmp dword ptr [rbx+PG_BH_STAGE],5
