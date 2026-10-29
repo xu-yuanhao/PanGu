@@ -157,6 +157,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 可变注册表接入实际消费者：同名替换保序、完整候选验证后发布、安装/撤销及独立所有者引用；运行中phase固定快照，旧快照归还后释放，Host关闭等待外借快照。
 - [x] beforeCompact接入同一扩展选择/注册表：首个decline/summary、挂起/取消、阶段快照及替换后下一任务采用新hook；摘要进入原有Task/Submission持久放置链。
 - [x] 自定义Task接入可变注册表和实际Scheduler：全安装集合按稳定名字解析、跨扩展/内置冲突拒绝、phase边界接手、撤销或不兼容候选保留旧invocation；调度器重开后缺定义等待安装，迁移失败身份缓存及替换后恢复，任务图同步blocked原因，代码引用在清理后释放。
+- [x] 同步section失败保留已展示文本；section/tool声明按上游计划持久pangu.system：无变化不写、值/增删最小patch、顺序重排、head后的完整基线/旧delta omit，工具变化附最后一条；与request checkpoint/cutoff同事务提交，新计划计入压缩阈值。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -267,8 +268,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/registry.ts`任务集合/重名拒绝、`scheduler.ts` Reservation/Phase/fit/resolve及 `harness-tasks-recovery.test.ts` 的缺定义等待、phase handover、撤销后继续与迁移失败恢复。Pi跟踪`6eb99ad`、Harness跟踪`f3803c9`的已知差异沿当前固定快照评估；Harness/Cordis提供代码引用与释放语义。
-- 实际调用链：原生Extension.tasks → 完整候选校验与注册表发布 → scoped Task resolver → Scheduler/Runner取得定义及epoch lease → 挂起中固定原phase → 清理后下一phase选择合适的新定义。已运行invocation在撤销/不兼容替换时沿旧定义继续；调度器关闭后归还引用，重开按当前注册表解析。迁移失败固定候选身份并阻塞，定义替换后重试；任务图通过同一scoped resolver只读查询原因。DSO专项的自定义任务已直接来自Extension.tasks。
-- 验证：`test_product_resources.py --native-tasks --sanitize`通过缺定义→安装、挂起替换/无重叠、撤销后原任务完成、关闭/重开后的缺定义等待、失败迁移只调用一次、替换迁移后版本2完成、任务图missing_task/migration_failed、重名/内置名拒绝及所有者引用归零。Runtime整批与产品构建退出0；G00/Assembly通过。既有模型请求/工具及压缩引擎未改动。
-- 接口与自审：extensions.registry ABI5，Extension88字节尾部增加tasks/count；Runner160字节保存scoped resolver、invocation和失败候选lease；Scheduler80字节尾部持有独立resolver绑定，原host函数表及Client/TUI布局保持。新增公开入口及实际依赖已登记。所有权在头文件注明；控制修改为模块导出/依赖登记，候选发布失败保留原状态。
-- 剩余与下一交付物：K09继续完整HookApi、异步section/失败回退/SystemEntry计划；K07/K08继续未启动串行调用取消及更完整内容/控制语义。下一交付物将扩展section的运行/失败保留与系统提示计划接入真实请求和持久SystemEntry，按上游完整提示渲染调用链推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `harness/prompt.ts` renderSections/replaySections/planSystemEntries/planSections/planTools、`generation.ts` prepare/thresholdCompaction和`harness-prompt.test.ts`。共享声明比较取pi-ai transcript；身份与kind适配PanGu。
+- 实际调用链：Host prepare读取当前ContextView/shown → 扩展同步渲染及失败保留 → 原生prompt planner产生section/tool delta → Generation在同一事务追加pangu.system并保存最终cutoff/request checkpoint → 现有上下文折叠与真实模型。无变化不追加记录，顺序变化按上游重排，压缩后写完整基线并omit仍保留的旧system delta。资源提示为pangu段、Agent instructions为末尾带标签段；请求以持久system投影为准。新计划计入阈值估算；后台任务查询先于Entry写入。
+- 验证：90组原生计划与实际固定Pi prompt.ts直接对照通过，覆盖section/tool值与顺序变化、删除/重新添加及head基线/omit。产品ASan/UBSan通过旧快照/自定义Task/压缩和新增渲染失败保留；Runtime整批及产品构建通过。真实DeepSeek扩展闭环通过：持久system声明、压缩后基线、下一prepare无重复Entry及无重复提示投影；后台压缩/摘要后回忆通过。后台夹具backgroundTokens由4000调整为2000，给完整声明留出区间，仍验证长历史触发一次、摘要后继续；生产策略未改。登记候选镜像G00通过，Assembly通过；工作区另有他方新增claude/未登记目录，未修改该目录。
+- 接口与自审：`system_prompt.h`提供owned replay/plan/tools/configure；原生实现为手写Assembly。新增源码/专项及模块导出/依赖已登记，Runtime入口复用同一专项。Generation的提交stage扩展SystemEntry和cutoff原子性，既有公开布局与Client/TUI ABI保持。临时promptPlan在保存request配置时移除，工具元数据沿现有注入执行目录运行。
+- 剩余与下一交付物：K09继续异步section取消/快照、完整HookApi；K07/K08继续未启动串行调用取消及更完整内容/控制语义。下一组沿原生异步prepare入口接入section挂起、取消和释放，复用本批提示计划/持久提交与既有注册表lease。

@@ -2616,6 +2616,39 @@ pg_durable_compaction_create:
  inc r13
  jmp .Lcc_estimate_sum
 .Lcc_estimate_done:
+ CGET "qword ptr [rsp+48]",prompt_plan
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lcc_estimate_result
+ mov qword ptr [rsp+32],0
+.Lcc_estimate_planned_entry:
+ mov rdi,[rsp+24]
+ call json_object_array_length@PLT
+ cmp [rsp+32],rax
+ jae .Lcc_estimate_result
+ mov rdi,[rsp+24]
+ mov rsi,[rsp+32]
+ call json_object_array_get_idx@PLT
+ CGET rax,model
+ mov [rsp+40],rax
+ mov qword ptr [rsp+56],0
+.Lcc_estimate_planned_message:
+ mov rdi,[rsp+40]
+ call json_object_array_length@PLT
+ cmp [rsp+56],rax
+ jae .Lcc_estimate_planned_next
+ mov rdi,[rsp+40]
+ mov rsi,[rsp+56]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call .Lcc_tokens
+ add [rsp+8],rax
+ inc qword ptr [rsp+56]
+ jmp .Lcc_estimate_planned_message
+.Lcc_estimate_planned_next:
+ inc qword ptr [rsp+32]
+ jmp .Lcc_estimate_planned_entry
+.Lcc_estimate_result:
  mov rax,[rsp+8]
  CE 64
 .globl pg_durable_compaction_threshold
@@ -3547,3 +3580,6 @@ pg_durable_compaction_bind_extensions:
  ret
 .section .rodata
 .Lcc_decline: .asciz "decline"
+
+.section .rodata
+.Lcc_prompt_plan: .asciz "promptPlan"

@@ -326,6 +326,10 @@
     "src/runtime/extension_registry.S": {
       "role": "assembly-core",
       "reason": "Pi Registry不可变快照安装/替换/撤销与原生代码所有者lease，发布及关闭状态机"
+    },
+    "src/runtime/system_prompt.S": {
+      "role": "assembly-core",
+      "reason": "Durable位置化section/tool差异计划、head重基线与声明重放"
     }
   }
 }

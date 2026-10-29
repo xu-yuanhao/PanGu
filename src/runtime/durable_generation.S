@@ -480,8 +480,12 @@ pg_durable_generation_init:
  call .Lgg_copy_compacted
  test eax,eax
  jnz .Lgg_prepare_end
+ GGET "qword ptr [r14+16]",prompt_plan
+ test rax,rax
+ jnz .Lgg_prepare_staged
  cmp qword ptr [r14+336],0
  je .Lgg_prepare_commit_request
+.Lgg_prepare_staged:
  mov [rsp+80],r14
  mov rax,[r14+320]
  mov [rsp+88],rax
@@ -491,7 +495,7 @@ pg_durable_generation_init:
  mov [rsp+104],rax
  mov rdi,rbx
  lea rsi,[rsp+80]
- lea rdx,[rip+.Lgg_prepare_background_stage]
+ lea rdx,[rip+.Lgg_prepare_prompt_stage]
  call pg_task_runner_commit_with@PLT
  jmp .Lgg_prepare_end
 .Lgg_prepare_commit_request:
@@ -864,12 +868,12 @@ pg_durable_generation_init:
  jnz .Lgg_collapse_next
  GGET rbp,tools_added
  mov rdi,rax
- call .Lgg_empty_tool_changes
+ call .Lgg_check_tool_changes
  test eax,eax
  jnz .Lgg_collapse_bad
  GGET rbp,tools_removed
  mov rdi,rax
- call .Lgg_empty_tool_changes
+ call .Lgg_check_tool_changes
  test eax,eax
  jnz .Lgg_collapse_bad
  GGET rbp,content
@@ -1038,8 +1042,8 @@ pg_durable_generation_init:
  pop r12
  pop rbx
  ret
-/* Tool changes require the matching execution registry, not just prompt text. */
-.Lgg_empty_tool_changes:
+/* Positional declarations are metadata; execution uses the injected catalog. */
+.Lgg_check_tool_changes:
  test rdi,rdi
  jz .Lgg_empty_changes_ok
  push rbx
@@ -1048,11 +1052,7 @@ pg_durable_generation_init:
  call json_object_is_type@PLT
  test eax,eax
  jz .Lgg_empty_changes_bad
- mov rdi,rbx
- call json_object_array_length@PLT
- test rax,rax
- setnz al
- movzx eax,al
+ xor eax,eax
  pop rbx
  ret
 .Lgg_empty_changes_bad:
@@ -5564,3 +5564,123 @@ pg_durable_generation_bind_hooks:
 .Lgg_hook_stop: .asciz "stop"
 .Lgg_hook_length: .asciz "length"
 .Lgg_hook_tool_use: .asciz "toolUse"
+
+.text
+.Lgg_prepare_prompt_stage:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+56],0
+ mov rax,[rbx]
+ cmp qword ptr [rax+336],0
+ je .Lgg_prompt_stage_plan
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,r14
+ call .Lgg_prepare_background_stage
+ test eax,eax
+ jnz .Lgg_prompt_stage_end
+ mov qword ptr [rsp+56],1
+.Lgg_prompt_stage_plan:
+ mov rax,[rbx]
+ GGET "qword ptr [rax+16]",prompt_plan
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgg_prompt_stage_finish
+ mov rax,[rbx+24]
+ GGET rax,checkpoint
+ mov [rsp+32],rax
+ GGET rax,configuration
+ mov rbp,rax
+ lea rdi,[rip+.Lgg_empty_string]
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_system_prompt]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgg_prompt_stage_end
+ mov rdi,rbp
+ lea rsi,[rip+.Lgg_prompt_plan]
+ call json_object_object_del@PLT
+ mov rax,[rbx]
+ mov rax,[rax+8]
+ GGET "qword ptr [rax+24]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+40],rax
+ mov qword ptr [rsp+8],0
+.Lgg_prompt_stage_entry:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp [rsp+8],rax
+ jae .Lgg_prompt_stage_finish
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ call json_object_array_get_idx@PLT
+ mov rdx,rax
+ mov rdi,r12
+ mov rsi,[rsp+40]
+ mov rax,[rbx]
+ mov rcx,[rax+8]
+ mov rcx,[rcx+16]
+ mov rax,[rax]
+ mov rax,[rax]
+ mov r8,[rax+32]
+ lea r9,[rsp+16]
+ call pg_record_tx_append_entry@PLT
+ test eax,eax
+ jnz .Lgg_prompt_stage_end
+ GGET "qword ptr [rsp+16]",id
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lgg_cutoff]
+ mov rdx,rax
+ call .Lgg_copy_field
+ mov [rsp+48],eax
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ cmp dword ptr [rsp+48],0
+ jne .Lgg_prompt_stage_bad
+ inc qword ptr [rsp+8]
+ jmp .Lgg_prompt_stage_entry
+.Lgg_prompt_stage_finish:
+ cmp qword ptr [rsp+56],0
+ jne .Lgg_prompt_stage_success
+.Lgg_prompt_stage_state:
+ mov rdi,[rbx+24]
+ call json_object_get@PLT
+ mov [r14],rax
+.Lgg_prompt_stage_success:
+ xor eax,eax
+ jmp .Lgg_prompt_stage_end
+.Lgg_prompt_stage_bad:
+ mov eax,5
+.Lgg_prompt_stage_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgg_prompt_plan: .asciz "promptPlan"

@@ -652,6 +652,9 @@
     "src/runtime/extensions.S": "native-source",
     "src/runtime/extensions.h": "native-source",
     "src/runtime/extension_registry.S": "native-source",
-    "src/runtime/extension_registry.h": "native-source"
+    "src/runtime/extension_registry.h": "native-source",
+    "src/runtime/system_prompt.S": "native-source",
+    "src/runtime/system_prompt.h": "native-source",
+    "tools/runtime/test_system_prompt.py": "gate-test"
   }
 }

@@ -21,6 +21,7 @@
 | 扩展任务 | `task_provider.S`：可选Host task.definitions校验/查找，保留内置任务、拒绝重名/无效定义；原生DSO通过公开commit/commit_with执行checkpoint与终态，Scheduler重开后继续，消费者清理先于库卸载 |
 | Task/Scheduler | `task_runner.S`：phase/checkpoint、sleep/wake、发现/公平推进、所有权/等待图、取消级联、暂停与进程恢复 |
 | 上下文压缩 | `durable_compaction.S`：UTF-16估算/合法Entry切点、结构化摘要、固定范围与配置、持久阶段恢复、原子Submission/任务终态；完整摘要输入采用owned JSON与借用模型视图，Host服务和可选TUI表；容量阈值触发Generation-owned压缩、原子直接Entry放置、等待父任务重开及恢复生成，后台阈值触发/去重/空闲调度 |
+| 提示计划 | `system_prompt.S`：已展示section/工具声明重放、最小变化/顺序重排、head后基线与omit；Generation同事务追加pangu.system和request cutoff；同步render失败保留旧文本 |
 | 系统上下文 | `durable_generation.S`：当前OpenAI路径折叠system正文和命名section，覆盖保序、null删除/重加追加，结果进入实际模型提示和历史恢复 |
 | 上下文投影 | `durable_generation.S`：请求/历史共用cutoff分页、最新head优先、旧head编辑保留、omit/replace最后生效；超过300条记录与两后端重开通过；工具结果按调用次序整理，首个同ID匹配、孤立过滤与临时缺失回执 |
 | 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者；自定义Task按全安装集合解析，Runner持有invocation/失败迁移定义引用并在phase边界接手 |
@@ -40,9 +41,9 @@
 
 ## 本批验证与集成状态
 
-- Extension.tasks接入同一可变注册表，发布前校验安装集合中的任务重名及内置名；实际Scheduler通过scoped resolver取得定义和代码引用，task.definitions仍可作为注入的宿主服务提供定义。
-- 运行中phase固定定义，替换在下一phase接手；撤销或不兼容替换时已运行invocation继续原定义。关闭调度器后释放引用，重开按当前安装集合解析；缺定义任务等待安装，迁移失败身份被固定并阻塞，换定义后可恢复。任务图只读显示同源blocked原因。
-- 产品`--native-tasks --sanitize`通过安装/挂起替换/撤销后继续、调度器重开、失败迁移去重和恢复、跨扩展/内置冲突拒绝及引用归零；DSO自定义任务直接由Extension.tasks提供。Runtime整批、产品构建及G00/Assembly通过。
+- `system_prompt.S`移植Durable的有序section/tool重放和差异计划：无变化省略、最小patch、顺序重排、head后完整基线/旧delta omit，工具变化放在最后一条system Entry。
+- 产品prepare提供已展示section供失败回退，资源及Agent instructions分别进入pangu段和末尾instructions段。Generation将pangu.system与request checkpoint/cutoff同事务提交，实际请求使用持久投影；新计划纳入压缩阈值，后台查询先于Entry写入。
+- 90组计划与固定Pi真实prompt模块直接对照通过；产品ASan/UBSan、Runtime整批及产品构建通过。真实DeepSeek扩展闭环、压缩后基线、无重复计划/提示投影及后台摘要后回忆通过；登记候选镜像G00和Assembly通过，当前工作区另有claude/外部目录未登记。
 
 ## 当前接口边界
 

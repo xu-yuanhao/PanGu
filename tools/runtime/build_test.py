@@ -21,6 +21,7 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
+        subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)
         if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction','--live-auto-compaction','--live-overflow-compaction','--live-background-compaction','--live-compaction-retry','--live-compaction-race','--live-owned-compaction-race')):
             if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
                 raise SystemExit('Model API key required in the environment')

@@ -872,6 +872,25 @@ pg_extensions_prepare:
  mov rdi,rax
  call json_object_get@PLT
  mov [rsp+16],rax
+ call json_object_new_object@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lx_prepare_bad
+ mov rdi,[rsp+16]
+ test rdi,rdi
+ jz .Lx_prepare_section_start
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lx_prepare_section_start
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lx_pangu_section]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+.Lx_prepare_section_start:
  xor r14d,r14d
 .Lx_prepare_section:
  cmp r14,[rbx+1192]
@@ -946,6 +965,14 @@ pg_extensions_prepare:
  mov [rsp+24],rax
  mov qword ptr [rsp+40],0
 .Lx_render_append:
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdi,[rsp+56]
+ mov rsi,[rbp]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
  lea rdi,[rsp+16]
  mov rsi,[rsp+24]
  mov edx,2
@@ -965,6 +992,23 @@ pg_extensions_prepare:
  mov rdx,[rbp]
  mov ecx,[rsp+64]
  call .Lx_report
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov qword ptr [rsp+24],0
+ mov rdi,r12
+ lea rsi,[rip+.Lx_shown]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lx_render_next
+ mov rdi,rax
+ mov rsi,[rbp]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lx_render_next
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+24],rax
+ jmp .Lx_render_append
 .Lx_render_next:
  mov rdi,[rsp+24]
  call json_object_put@PLT
@@ -972,6 +1016,13 @@ pg_extensions_prepare:
  inc r14
  jmp .Lx_prepare_section
 .Lx_prepare_prompt_done:
+ mov rdi,[r13]
+ lea rsi,[rip+.Lx_prompt_sections]
+ mov rdx,[rsp+56]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lx_prepare_bad
+ mov qword ptr [rsp+56],0
  mov rdi,[r13]
  lea rsi,[rip+.Lx_system]
  mov rdx,[rsp+16]
@@ -1001,10 +1052,15 @@ pg_extensions_prepare:
  call json_object_put@PLT
  mov rdi,[rsp+48]
  call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
  mov eax,ebp
  XE 80
 .section .rodata
 .Lx_render_name: .asciz "section"
+.Lx_shown: .asciz "shown"
+.Lx_prompt_sections: .asciz "promptSections"
+.Lx_pangu_section: .asciz "pangu"
 
 .text
 /* Same owner rule as agent.ts sectionExtension: the last selected extension

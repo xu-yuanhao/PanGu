@@ -457,7 +457,8 @@
         "task.provider.local.v0",
         "agent.state.local.v0",
         "extensions.local.v0",
-        "extension.registry.local.v0"
+        "extension.registry.local.v0",
+        "system.prompt.local.v0"
       ],
       "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2414,6 +2415,28 @@
       ],
       "reference_basis": [
         "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/registry.ts; Harness/Cordis scoped disposal"
+      ]
+    },
+    {
+      "id": "system.prompt.local.v0",
+      "sources": [
+        "src/runtime/system_prompt.S",
+        "src/runtime/system_prompt.h"
+      ],
+      "dependencies": [
+        "json-c",
+        "model.mimo.local.v0",
+        "tools.registry.local.v0"
+      ],
+      "role": "Durable ordered section/tool replay, minimal positional SystemEntry plans and post-head baselines",
+      "exports": [
+        "pg_prompt_replay",
+        "pg_prompt_plan",
+        "pg_prompt_tools",
+        "pg_prompt_configure"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 harness/prompt.ts, generation.ts and harness-prompt.test.ts"
       ]
     }
   ],
