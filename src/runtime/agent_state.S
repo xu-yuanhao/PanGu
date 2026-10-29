@@ -1465,3 +1465,55 @@ pg_provider_state_ensure:
  AE 112
 .size pg_provider_state_ensure,.-pg_provider_state_ensure
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_agent_conversation_stage
+.type pg_agent_conversation_stage,@function
+pg_agent_conversation_stage:
+ AF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ test r14,r14
+ jz .Lacs_invalid
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lacs_invalid
+ test r12,r12
+ jz .Lacs_invalid
+ test r13,r13
+ jz .Lacs_invalid
+ mov rax,[rbx]
+ test rax,rax
+ jz .Lacs_invalid
+ cmp [rax+152],r12
+ jne .Lacs_invalid
+ mov rcx,[rbx+8]
+ cmp [r12+8],rcx
+ jne .Lacs_invalid
+ mov rcx,[rbx+16]
+ cmp [r12+16],rcx
+ jne .Lacs_invalid
+ cmp qword ptr [rax+160],0
+ je .Lacs_invalid
+ mov [rsp],rbx
+ mov [rsp+8],r13
+ mov rax,rsp
+ mov [rsp+16],rax
+ mov rax,[rbx+24]
+ mov [rsp+24],rax
+ mov rax,[rbx+32]
+ mov [rsp+32],rax
+ lea rax,[rip+.Lac_created]
+ mov [rsp+40],rax
+ mov rdi,r12
+ mov rsi,r13
+ lea rdx,[rsp+16]
+ mov rcx,r14
+ call pg_record_tx_create@PLT
+ AE 48
+.Lacs_invalid:
+ mov eax,1
+ AE 48
+.section .note.GNU-stack,"",@progbits

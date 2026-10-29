@@ -197,6 +197,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Harness创建服务接入Live/Inbox/Usage/Provider/Agent默认文档、独立UUIDv7身份、分叉点/任务owner配置继承及同事务agent/init；产品conversation.client支持独立/分叉创建后选择，真实DeepSeek完成各自对话与分叉写文件，两后端回滚/重开通过。
 - [x] conversation.catalog提供升降序游标分页、owner筛选、记录查询和名称读写；Coding Agent式元数据Entry规范CR/LF与Unicode首尾空白，名称变化进入会话观察，分叉继承/清空隔离、跨页读取与两后端重开通过。
 - [x] conversation.actions.reset接入真实Submission/队列边界，空上下文和显式handoff消息共用head重置；公开接口保留Submission ID用于状态查询，忙时reset/后续队列顺序及两后端专项通过。
+- [x] 任务能力接口通过runner受保护事务创建/分叉会话，复用Harness默认文档/配置/init；产品Host真实任务验证owner归属、分叉配置、init失败整体回滚与过期能力拒绝。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -298,8 +299,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts:ConversationImpl.reset`、`inbox.ts:applyBoundary`及`generation.ts`工具handoff后继边界；复用现有Submission准入和reset/stale实现。
-- 实际调用链：`pg_durable_client_reset`构造`pangu.reset` head=self Entry，经既有Client输入准入进入Durable Submission链。NULL handoff清空上下文，显式UTF-8切片添加用户消息（保留空串/NUL）和host时钟；返回持久Submission ID。产品Host导出`conversation.actions`，TUI通过`pg_tui_runtime_conversation_actions`消费独立reset函数表。
-- 验证：`build_test.py --client` ASan/UBSan覆盖通过公开reset入口提交忙时handoff、reset边界、旧输入unanswered和后续队列顺序及SQLite/JSONL恢复；实际产品Host ASan/UBSan验证非法UTF-8拒绝、NUL handoff历史、空上下文重置。产品构建、Assembly检查通过。真实DeepSeek `test_product_resources.py --live-conversations`通过新建/分叉/写文件→handoff reset→新上下文回答→空reset历史检查；G00在Git登记文件当前快照通过（项目外`claude/`保留），控制新增导出与绑定已自审。
-- 接口与差异：新增独立16字节操作表，既有Runtime/会话表布局不变；reset不新建会话、不更改Agent配置/provider身份，忙时结果通过Submission状态查询。工具结果handoff沿既有Generation路径处理；完整嵌套会话工具API仍需接通。
-- 下一交付物：将任务/工具拥有的新建与分叉会话接入现有task access能力，成组验证父子执行、恢复与级联取消。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts`创建流程、`types.ts:ConversationCreateOptions`与TaskRuntime事务语义；沿用当前Harness默认文档/分叉/owner验证实现。
+- 实际调用链：`pg_agent_conversation_stage`在已经准入的Session事务上复用创建hook、agent/init；`pg_task_access_create_conversation`校验当前phase和Session，通过`pg_task_runner_commit_with`调用它，输出只在提交确认后转交。调用者显式选择owner/new/fork；提供者绑定必须与当前Tx的read context/read一致。产品Host注册的真实任务通过该接口创建拥有的子会话及分叉。
+- 验证：产品资源/Host ASan/UBSan通过实际任务创建、owner归属、配置继承/分叉、init失败回滚和过期能力拒绝；`build_test.py --client`相关两后端回归、产品构建、Assembly检查通过。本批无模型请求；G00按Git登记文件当前快照核对，项目外`claude/`保留。
+- 接口与差异：新增stage与task access公开函数，现有结构/函数表布局不变；动态插件构建已有`pg_task_access_*`导出规则覆盖新入口。会话创建绑定由实际组合者注入，尚需将它接入完整工具会话API；本批不宣称跨会话模型执行/恢复/级联取消工作流整体验收。
+- 下一交付物：工具会话API接通上述能力与Submission/等待，在实际子会话运行Generation，验证父等待、子会话恢复和父取消的完整路径。

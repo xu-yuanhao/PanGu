@@ -21,5 +21,10 @@ int pg_task_access_snapshot_as_of(const pg_task_access *,const pg_document_defin
    Success transfers the durable ID; failed admission clears it. */
 int pg_task_access_create_task(const pg_task_access *,const pg_task_definition *,
  const struct json_object *input,const struct json_object *options,int (*mint)(void *,uint64_t *),uint64_t *);
+struct pg_agent_conversation_binding;
+struct pg_agent_conversation_options;
+/* Uses the active task mutation guard and preserves explicit ownership.
+   Creation options, init and providers are borrowed for this synchronous call. */
+int pg_task_access_create_conversation(const pg_task_access *,struct pg_agent_conversation_binding *,const struct pg_agent_conversation_options *,struct json_object **);
 pg_task_runner *pg_task_scheduler_find(pg_task_scheduler *,uint64_t);
 #endif

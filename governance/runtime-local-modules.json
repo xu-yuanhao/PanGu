@@ -2457,6 +2457,7 @@
         "pg_agent_tools_names",
         "pg_agent_state_add_tools",
         "pg_agent_conversation_create",
+        "pg_agent_conversation_stage",
         "pg_provider_state_read",
         "pg_provider_state_ensure"
       ],
@@ -2564,7 +2565,8 @@
       "dependencies": [
         "task.runner.local.v0",
         "session.documents.reader.local.v0",
-        "json-c"
+        "json-c",
+        "agent.state.local.v0"
       ],
       "role": "Phase-scoped TaskRuntime committed reads and first-writer-wins durable memos",
       "exports": [
@@ -2574,7 +2576,8 @@
         "pg_task_access_snapshot",
         "pg_task_access_snapshot_as_of",
         "pg_task_scheduler_find",
-        "pg_task_access_create_task"
+        "pg_task_access_create_task",
+        "pg_task_access_create_conversation"
       ],
       "reference_basis": [
         "Pi d5b3de22 scheduler.ts runtime memo/read; harness-tasks.test.ts"

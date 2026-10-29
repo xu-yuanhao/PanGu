@@ -542,3 +542,55 @@ pg_task_access_create_task:
 .section .rodata
 .Lchild_name: .asciz "name"
 .Lchild_version: .asciz "version"
+
+.text
+.globl pg_task_access_create_conversation
+.type pg_task_access_create_conversation,@function
+pg_task_access_create_conversation:
+ AF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp+16],0
+ mov ebp,4
+ test r14,r14
+ jz .Lacc_end
+ mov qword ptr [r14],0
+ test r12,r12
+ jz .Lacc_end
+ test r13,r13
+ jz .Lacc_end
+ call .Laccess_valid
+ mov ebp,7
+ test eax,eax
+ jz .Lacc_end
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp [r12],rax
+ jne .Lacc_end
+ mov [rsp],r12
+ mov [rsp+8],r13
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rip+.Lacc_stage]
+ call pg_task_runner_commit_with@PLT
+ mov ebp,eax
+ test eax,eax
+ jnz .Lacc_end
+ mov rax,[rsp+16]
+ mov [r14],rax
+ mov qword ptr [rsp+16],0
+.Lacc_end:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ AE 48
+.Lacc_stage:
+ mov qword ptr [rcx],0
+ mov rax,rdi
+ mov rdi,[rax]
+ mov rdx,[rax+8]
+ lea rcx,[rax+16]
+ jmp pg_agent_conversation_stage@PLT
+.section .note.GNU-stack,"",@progbits

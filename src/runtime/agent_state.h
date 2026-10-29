@@ -38,6 +38,8 @@ typedef struct pg_agent_conversation_options {
  pg_conversation_request target;const struct json_object *agent;void *context;
  int (*init)(void *,pg_record_tx *,uint64_t);
 } pg_agent_conversation_options;
+/* Stage on an already admitted Session transaction; caller settles it. */
+int pg_agent_conversation_stage(pg_agent_conversation_binding *,pg_record_tx *,const pg_agent_conversation_options *,struct json_object **);
 int pg_agent_conversation_create(pg_agent_conversation_binding *,const pg_agent_conversation_options *,struct json_object **);
 int pg_provider_state_read(pg_durable_session *,uint64_t,struct json_object **);
 /* Missing legacy identity is initialized once before the provider request. */
