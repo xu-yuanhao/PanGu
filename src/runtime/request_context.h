@@ -12,5 +12,8 @@ struct json_object *pg_context_text(const struct json_object *);
 int pg_context_messages(const struct json_object *,struct json_object **);
 /* Owned {messages,history}: OpenAI messages and flat startup display rows from
    {systemPrompt,messages} canonical context. No borrowed input survives. */
+/* Provider configuration input or modelInfo.input advertises image support;
+   adjacent tool results collect image parts into one following user message. */
+int pg_context_messages_model(const struct json_object *,const struct json_object *,struct json_object **);
 int pg_context_project(const struct json_object *,struct json_object **);
 #endif

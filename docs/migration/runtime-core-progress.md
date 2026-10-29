@@ -21,6 +21,7 @@
 | 输出清洗与结果元数据 | `output_window.S`清理流窗口/事件控制字符，2464组上游预算/清洗对照；Tool诊断动态渲染支持7000字节，单调计时duration进入结果/嵌套返回/摘要 |
 | 工具输出预算 | `output_window.S`移植Chord完整行/UTF-8 head/tail；工具定义携带bytes/lines/retain，默认50KiB/2000行/head、bash tail；动态Tool缓冲、70KiB/零预算、累计丢弃/截断诊断和恢复通过 |
 | 工具结果控制 | `durable_tool.S`/`durable_generation.S`/`agent_state.S`：control随模型工具receipt提交，工具轮次合并addTools、最后handoff和全体terminate；工具选择、reset新head和final/postTools队列边界同事务，真实DeepSeek写入后直接结束，SQLite/JSONL增量配置回滚/重开通过 |
+| 工具图片请求映射 | `request_context.S`/`mimo_projection.S`：文本与图片分开，连续工具图片按顺序合为后置user/image_url消息，模型input配置控制附图，纯图片使用明确占位；实际编码专项通过，目录能力/用户图片及提供者兼容项仍待补齐 |
 | 工具多内容块 | `durable_tool.S`/`extensions.S`：afterTool接受text/image数组，整体文本预算裁切时保留图片顺序，Entry与嵌套程序值在诊断渲染前分别复制；无截断保留各块，空/单text/单image/多块沿Durable输出值语义 |
 | 结构化工具契约 | `durable_tool.S`按固定调用声明处理无声明/缺失/不匹配，嵌套错误与模型非致命报告分开；`json_schema_bridge.cpp`仅桥接固定Valijson Draft-7强类型校验，bash声明接通；无效契约在execute前拒绝并完整释放，完整TypeBox语料差异仍待完成 |
 | 嵌套结果与错误摘要 | `durable_tool.S`：done槽保存至多500 UTF-16单元的诊断优先错误摘要，保留有效UTF-8；成功/空错误省略字段。省略空输出保存空Content，默认程序值取实际输出而非harness诊断；八组错误/Unicode/NUL及空结果专项通过 |

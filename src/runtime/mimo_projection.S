@@ -220,9 +220,10 @@ pg_mimo_encode_request:
  cmp qword ptr [r12+PG_MM_MSG_TEXT],0
  je .Linvalid
  mov rdi,[r12+PG_MM_MSG_TEXT]
- lea rsi,[rsp+136]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ lea rdx,[rsp+136]
  mov qword ptr [rsp+136],0
- call pg_context_messages@PLT
+ call pg_context_messages_model@PLT
  test eax,eax
  jnz .Linvalid
  mov rdi,[rsp+136]

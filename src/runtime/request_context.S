@@ -228,7 +228,15 @@ pg_context_text:
  lea rsi,[rip+.Lr_text]
  call strcmp@PLT
  test eax,eax
- jnz .Lr_text_bad
+ jz .Lr_text_accept
+ mov rdi,r13
+ call .Lr_image_part
+ test rax,rax
+ jz .Lr_text_bad
+ mov rdi,rax
+ call json_object_put@PLT
+ jmp .Lr_text_next
+.Lr_text_accept:
  RG r13,text
  lea rdi,[rsp]
  mov rsi,rax
@@ -236,6 +244,7 @@ pg_context_text:
  call pg_context_append
  test eax,eax
  jnz .Lr_text_bad
+.Lr_text_next:
  inc r12
  jmp .Lr_text_block
 .Lr_text_done:
@@ -322,27 +331,50 @@ pg_context_text:
 .globl pg_context_messages
 .type pg_context_messages,@function
 pg_context_messages:
+ xor ecx,ecx
+ xor r8d,r8d
  xor edx,edx
  jmp .Lr_project
 .globl pg_context_project
 .type pg_context_project,@function
 pg_context_project:
+ xor ecx,ecx
+ xor r8d,r8d
  mov edx,1
+ jmp .Lr_project
+.globl pg_context_messages_model
+.type pg_context_messages_model,@function
+pg_context_messages_model:
+ mov rcx,rsi
+ mov rsi,rdx
+ mov r8d,1
+ xor edx,edx
 .Lr_project:
  test rdi,rdi
  jz .Lr_invalid_input
  test rsi,rsi
  jz .Lr_invalid_input
- RF 160
+ RF 192
  mov rbx,rdi
  mov r12,rsi
  mov r14d,edx
+ mov r15,rcx
+ mov ebp,r8d
  mov qword ptr [r12],0
  mov rdi,rsp
  xor eax,eax
- mov ecx,20
+ mov ecx,24
  rep stosq
  mov [rsp+144],r14d
+ mov [rsp+160],r15
+ mov [rsp+168],ebp
+ mov dword ptr [rsp+176],1
+ test ebp,ebp
+ jz .Lri_capability_ready
+ mov rdi,r15
+ call .Lri_capability
+ mov [rsp+176],eax
+.Lri_capability_ready:
  call json_object_new_array@PLT
  mov [rsp],rax
  test rax,rax
@@ -683,6 +715,7 @@ pg_context_project:
  test rax,rax
  jz .Lr_project_bad
  RG "qword ptr [rsp+24]",content
+ mov [rsp+184],rax
  mov rdi,rax
  call pg_context_text
  mov [rsp+48],rax
@@ -727,6 +760,15 @@ pg_context_project:
  test eax,eax
  jz .Lr_project_append
  lea rdi,[rip+.Lr_no_output]
+ mov [rsp+120],rdi
+ mov rdi,[rsp+184]
+ call .Lri_has_image
+ test eax,eax
+ jz .Lri_placeholder_ready
+ lea rax,[rip+.Lri_attached]
+ mov [rsp+120],rax
+.Lri_placeholder_ready:
+ mov rdi,[rsp+120]
  call json_object_new_string@PLT
  mov rdi,[rsp+40]
  lea rsi,[rip+.Lr_content]
@@ -735,6 +777,55 @@ pg_context_project:
  test eax,eax
  jnz .Lr_project_bad
 .Lr_project_append:
+ mov rdi,[rsp]
+ mov rsi,[rsp+40]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lr_project_bad
+ mov qword ptr [rsp+40],0
+ RG "qword ptr [rsp+24]",role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lr_toolResult]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lr_project_next
+ cmp dword ptr [rsp+176],0
+ je .Lr_project_next
+ mov rdi,[rsp+184]
+ lea rsi,[rsp+152]
+ call .Lri_collect
+ test eax,eax
+ jnz .Lr_project_bad
+ lea rsi,[r13+1]
+ mov rdi,[rsp+104]
+ call json_object_array_get_idx@PLT
+ RG rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lri_group_end
+ mov rdi,rax
+ lea rsi,[rip+.Lr_toolResult]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lr_project_next
+.Lri_group_end:
+ cmp qword ptr [rsp+152],0
+ je .Lr_project_next
+ lea rdi,[rip+.Lri_user_json]
+ call json_tokener_parse@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lr_project_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lr_content]
+ mov rdx,[rsp+152]
+ call .Lr_set
+ test eax,eax
+ jnz .Lr_project_bad
+ mov qword ptr [rsp+152],0
  mov rdi,[rsp]
  mov rsi,[rsp+40]
  call json_object_array_add@PLT
@@ -801,8 +892,10 @@ pg_context_project:
  call json_object_put@PLT
  mov rdi,[rsp+80]
  call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
  mov eax,ebx
- RE 160
+ RE 192
 .section .rodata
 .Lr_empty: .asciz ""
 .Lr_no_output: .asciz "(no tool output)"
@@ -910,3 +1003,224 @@ pg_context_blank:
 .Lr_invalid_input:
  mov eax,5
  ret
+
+.text
+/* Validate canonical image data and build one independent OpenAI image part. */
+.Lr_image_part:
+ RF 48
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ RG rbx,type
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lri_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lri_image]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lri_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lri_data]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lri_bad
+ mov r12,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lri_mime]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lr_string
+ test rax,rax
+ jz .Lri_bad
+ mov r13,rax
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lri_url_format]
+ mov rdx,r13
+ mov rcx,r12
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lri_bad
+ lea rdi,[rip+.Lri_part_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lri_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lri_image_url]
+ call json_object_object_get@PLT
+ mov rbx,rax
+ mov rdi,[rsp]
+ call json_object_new_string@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lri_url]
+ mov rdx,rax
+ call .Lr_set
+ test eax,eax
+ jnz .Lri_bad
+ mov rdi,[rsp]
+ call free@PLT
+ mov rax,[rsp+8]
+ RE 48
+.Lri_bad:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ xor eax,eax
+ RE 48
+.section .rodata
+.Lri_image: .asciz "image"
+.Lri_data: .asciz "data"
+.Lri_mime: .asciz "mimeType"
+.Lri_url: .asciz "url"
+.Lri_image_url: .asciz "image_url"
+.Lri_url_format: .asciz "data:%s;base64,%s"
+.Lri_part_json: .asciz "{\"type\":\"image_url\",\"image_url\":{}}"
+
+.text
+.Lri_capability:
+ RF 0
+ mov rbx,rdi
+ RG rbx,modelInfo
+ test rax,rax
+ cmovnz rbx,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lri_input]
+ call json_object_object_get@PLT
+ mov rbx,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lri_cap_no
+ xor r12d,r12d
+.Lri_cap_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lri_cap_no
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lri_cap_next
+ mov rdi,rax
+ lea rsi,[rip+.Lri_image]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lri_cap_yes
+.Lri_cap_next:
+ inc r12
+ jmp .Lri_cap_each
+.Lri_cap_no:
+ xor eax,eax
+ RE 0
+.Lri_cap_yes:
+ mov eax,1
+ RE 0
+.Lri_has_image:
+ RF 0
+ mov rbx,rdi
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lri_has_no
+ xor r12d,r12d
+.Lri_has_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lri_has_no
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ RG rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lri_has_next
+ mov rdi,rax
+ lea rsi,[rip+.Lri_image]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lri_has_yes
+.Lri_has_next:
+ inc r12
+ jmp .Lri_has_each
+.Lri_has_no:
+ xor eax,eax
+ RE 0
+.Lri_has_yes:
+ mov eax,1
+ RE 0
+.Lri_collect:
+ RF 16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov qword ptr [rsp],0
+ mov rdi,rbx
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lri_collect_ok
+.Lri_collect_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lri_collect_ok
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ RG rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lri_image]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lri_collect_next
+ mov rdi,r14
+ call .Lr_image_part
+ mov [rsp],rax
+ test rax,rax
+ jz .Lri_collect_bad
+ cmp qword ptr [r12],0
+ jne .Lri_collect_append
+ lea rdi,[rip+.Lri_images_json]
+ call json_tokener_parse@PLT
+ mov [r12],rax
+ test rax,rax
+ jz .Lri_collect_bad
+.Lri_collect_append:
+ mov rdi,[r12]
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lri_collect_bad
+ mov qword ptr [rsp],0
+.Lri_collect_next:
+ inc r13
+ jmp .Lri_collect_each
+.Lri_collect_ok:
+ xor eax,eax
+ RE 16
+.Lri_collect_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,5
+ RE 16
+.section .rodata
+.Lr_modelInfo: .asciz "modelInfo"
+.Lri_input: .asciz "input"
+.Lri_attached: .asciz "(see attached image)"
+.Lri_images_json: .asciz "[{\"type\":\"text\",\"text\":\"Attached image(s) from tool result:\"}]"
+.Lri_user_json: .asciz "{\"role\":\"user\"}"

@@ -159,7 +159,8 @@
         "pg_context_text",
         "pg_context_project",
         "pg_context_messages",
-        "pg_context_blank"
+        "pg_context_blank",
+        "pg_context_messages_model"
       ],
       "reference_basis": [
         {
