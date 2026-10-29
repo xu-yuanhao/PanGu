@@ -13,6 +13,7 @@
 | 插件组合 | `host.S`、`native_plugin.S`：依赖排序、父子作用域、局部替换、协作释放、本地库入口 |
 | 记录/文档/Session | `records.S`、`record_memory.S`、`documents.S`、`document_tx.S`、`document_reader.S`、`pending.S`、`holds.S`、`hold_timer.S`、`durable_session.S`：原子提交/采纳、查询/分页、revision、延迟保存、观察与关闭 |
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
+| 指定任务取消 | `task_graph.S`：Host task.control/TUI独立入口保存abort意图，重复无写入，Scheduler沿owned子会话收束；产品父取消/调度器重开/子Generation aborted通过 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
 | 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT发布实时块并合并持久UTF-8窗口/丢弃量，done清除进度，Task/Live保留父调用关系 |

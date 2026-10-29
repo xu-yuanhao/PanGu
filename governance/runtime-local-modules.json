@@ -475,6 +475,7 @@
         "pg_tui_runtime_compaction",
         "pg_tui_runtime_observation",
         "pg_tui_runtime_task_graph",
+        "pg_tui_runtime_task_control",
         "pg_tui_runtime_conversation_view",
         "pg_tui_runtime_conversations",
         "pg_tui_runtime_conversation_catalog",
@@ -2362,7 +2363,9 @@
       "role": "Pi Durable task-graph live nodes, state/ownership projection and registry metadata inspection",
       "exports": [
         "pg_task_graph_read",
-        "pg_task_graph_service"
+        "pg_task_graph_service",
+        "pg_task_abort",
+        "pg_task_control_service"
       ]
     },
     {

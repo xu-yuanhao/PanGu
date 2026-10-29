@@ -579,3 +579,138 @@ pg_task_graph_service:
 .Lq_restart_limit: .asciz "restart_limit"
 
 .text
+
+.text
+.globl pg_task_control_service
+.type pg_task_control_service,@function
+pg_task_control_service:
+ mov [rsi],rdi
+ lea rax,[rip+pg_task_abort]
+ mov [rsi+8],rax
+ ret
+.globl pg_task_abort
+.type pg_task_abort,@function
+pg_task_abort:
+ QF 112
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov ebp,4
+ test rbx,rbx
+ jz .Lqa_end
+ test r12,r12
+ jz .Lqa_end
+ mov rax,9007199254740991
+ cmp r12,rax
+ ja .Lqa_end
+ mov ebp,7
+ cmp dword ptr [rbx+60],1
+ jne .Lqa_end
+ cmp dword ptr [rbx+64],0
+ jne .Lqa_end
+ mov ebp,3
+ cmp dword ptr [rbx+56],0
+ jne .Lqa_end
+ mov r13,[rbx+8]
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,[r13]
+ mov r8,[r13+8]
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Lqa_end
+ mov rdi,rsp
+ mov esi,2
+ mov rdx,r12
+ lea rcx,[rsp+96]
+ call pg_record_tx_read@PLT
+ mov ebp,2
+ cmp eax,7
+ je .Lqa_abort
+ mov ebp,6
+ test eax,eax
+ jnz .Lqa_abort
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lqa_state]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lqa_status]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lqa_abort
+ mov rdi,rax
+ lea rsi,[rip+.Lqa_terminal]
+ call strcmp@PLT
+ mov ebp,1
+ test eax,eax
+ jz .Lqa_abort
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lqa_requested]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lqa_mark
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lqa_reason]
+ call json_object_object_get@PLT
+ xor ebp,ebp
+ test rax,rax
+ jz .Lqa_abort
+.Lqa_mark:
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lqa_reason]
+ call json_object_object_del@PLT
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov ebp,5
+ test rax,rax
+ jz .Lqa_abort
+ mov [rsp+104],rax
+ mov rdi,[rsp+96]
+ lea rsi,[rip+.Lqa_requested]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lqa_abort
+ mov qword ptr [rsp+104],0
+ mov rdi,rsp
+ mov rsi,[rsp+96]
+ mov rdx,[r13]
+ mov rcx,[r13+40]
+ call pg_record_tx_set_task@PLT
+ mov ebp,6
+ test eax,eax
+ jnz .Lqa_abort
+ mov rdi,[rbx]
+ xor esi,esi
+ xor edx,edx
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Lqa_end
+ xor ebp,ebp
+ jmp .Lqa_end
+.Lqa_abort:
+ mov rdi,[rbx]
+ call pg_durable_session_abort@PLT
+.Lqa_end:
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov rdi,[rsp+104]
+ call json_object_put@PLT
+ mov eax,ebp
+ QE 112
+.section .rodata
+.Lqa_state: .asciz "state"
+.Lqa_status: .asciz "status"
+.Lqa_terminal: .asciz "terminal"
+.Lqa_reason: .asciz "abortReason"
+.Lqa_requested: .asciz "abortRequested"
+.section .note.GNU-stack,"",@progbits

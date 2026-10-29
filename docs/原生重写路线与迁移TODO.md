@@ -199,6 +199,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] conversation.actions.reset接入真实Submission/队列边界，空上下文和显式handoff消息共用head重置；公开接口保留Submission ID用于状态查询，忙时reset/后续队列顺序及两后端专项通过。
 - [x] 任务能力接口通过runner受保护事务创建/分叉会话，复用Harness默认文档/配置/init；产品Host真实任务验证owner归属、分叉配置、init失败整体回滚与过期能力拒绝。
 - [x] task access通过runner受保护事务向子会话提交Submission，确认后返回receipt，复用现有requestId去重、Entry/任务准入与状态查询。
+- [x] task.control与TUI可选入口支持指定任务持久取消；重复取消不重复提交，父取消沿owned子会话级联，调度器重开后子Generation aborted与父终态收束通过产品Host专项。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -300,8 +301,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Agent快照读取与Scheduler恢复语义；实际产品Task/子会话调用链。
-- 实际调用链：产品`prepare_load`通过`pg_agent_state_read`读取持久Agent快照，替换仅看缓存的peek路径。后台子会话在缓存清空或Scheduler重开后无需先成为前台，就能使用其已保存配置；沿原有snapshot/cache机制加载。
-- 验证：产品Host ASan/UBSan核对创建带配置会话→清空文档缓存→实际prompt preparer仍包含保存指令；产品构建、Assembly检查通过。真实DeepSeek `--live-conversations`通过创建子会话/提交→关闭Scheduler→清空缓存→重开Scheduler/Client→子Generation使用保存指令→父终态等待；后续新建/分叉/写文件/reset同批通过。G00在Git登记文件当前快照通过（项目外`claude/`保留）。
-- 接口与差异：无新增接口或布局；修复重开后台会话未预热Agent缓存时配置可能丢失的问题。当前新增验证为Scheduler关闭/重开与冷缓存，完整进程/存储重开和父取消工作流仍需继续完成。
-- 下一交付物：接通任务/会话取消操作，验证持久取消意图沿owned子会话级联；同时补齐实际进程重开工作流。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `scheduler.ts:abort`持久取消标记与既有ordinary ownership级联；原生Scheduler已经负责子先收束、恢复和abort处理。
+- 实际调用链：`pg_task_abort`经Session事务读取指定Task，对非终态写abortRequested并清除旧restart原因，重复标记无新增提交；后续Scheduler poll沿既有所有权传播/收束。产品Host提供`task.control`，TUI通过`pg_tui_runtime_task_control`取得独立abort操作表。
+- 验证：产品Host ASan/UBSan覆盖非法/缺失/终态、重复取消幂等、真实父任务创建owned分叉并提交Generation→父持久取消→Scheduler关闭/重开→子Generation aborted/父终态；该场景在模型请求开始前取消，无模型请求。`build_test.py --client`回归、产品构建、Assembly检查通过；G00在Git登记文件当前快照通过（项目外`claude/`保留），新增导出与服务登记已自审。
+- 接口与差异：独立16字节任务控制表，既有任务图与Runtime表不变；abort只确认持久意图，调度器协作处理实际取消/清理，终态通过现有Task读取/任务图查询。完整进程/存储重开和正在传输的子模型取消工作流继续补齐。
+- 下一交付物：围绕任务/会话操作完成实际进程重开与运行中取消联调，再继续覆盖表中的模型配置和完整工具会话API。
