@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "../../src/runtime/read_tool.h"
+#include "../../src/runtime/read_tool_layout.h"
 #include "../../src/runtime/tool_path.h"
 #include <assert.h>
 #include <stdio.h>
@@ -11,21 +12,21 @@
 #include <sys/mman.h>
 static pg_slice s(const char *v){return (pg_slice){v,strlen(v)};}
 static void pages(pg_tools tools,const char *path){
- FILE *f=fopen(path,"wb");assert(f);char original[24000];size_t total=0;for(unsigned i=1;i<=300;++i){int n=snprintf(original+total,sizeof(original)-total,"line-%03u: abcdefghijklmnopqrstuvwxyz0123456789 中文🙂\n",i);assert(n>0);total+=(size_t)n;}assert(fwrite(original,1,total,f)==total&&!fclose(f));
- char out[4096],args[256],assembled[24000];size_t n,used=0;unsigned offset=1,rounds=0;
+ FILE *f=fopen(path,"wb");assert(f);char original[90000];size_t total=0;for(unsigned i=1;i<=1200;++i){int n=snprintf(original+total,sizeof(original)-total,"line-%04u: abcdefghijklmnopqrstuvwxyz0123456789 中文🙂\n",i);assert(n>0);total+=(size_t)n;}assert(total>51200&&fwrite(original,1,total,f)==total&&!fclose(f));
+ char out[PG_RTL_OUTPUT_MAX],args[256],assembled[90000];size_t n,used=0;unsigned offset=1,rounds=0;
  for(;;){snprintf(args,sizeof(args),"{\"path\":\"sample.c\",\"offset\":%u}",offset);int rc=tools.execute(tools.context,s("read"),s(args),out,sizeof(out),&n);assert(rc==PG_TOOL_OK||rc==PG_TOOL_PARTIAL);assert(n<sizeof(out)&&out[n]==0);char *hint=strstr(out,"\n\n[read: more lines; use offset=");if(!hint){assert(used+n<=sizeof(assembled));memcpy(assembled+used,out,n);used+=n;break;}unsigned next=0;assert(sscanf(hint,"\n\n[read: more lines; use offset=%u",&next)==1&&next>offset&&rc==PG_TOOL_PARTIAL);size_t bytes=(size_t)(hint-out);assert(used+bytes+1<sizeof(assembled));memcpy(assembled+used,out,bytes);used+=bytes;assembled[used++]='\n';offset=next;assert(++rounds<10);}
- assert(rounds>=2&&used==total&&!memcmp(assembled,original,total));
+ assert(rounds>=1&&used==total&&!memcmp(assembled,original,total));
  long page=sysconf(_SC_PAGESIZE);assert(page>=4096);char *map=mmap(0,(size_t)page*3,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);assert(map!=MAP_FAILED&&!mprotect(map+page*2,(size_t)page,PROT_NONE));for(size_t cap=96;cap<=4096;cap+=250){char *tail=map+page*2-cap;tail[-1]='G';int rc=tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2,\"limit\":100}"),tail,cap,&n);assert((rc==PG_TOOL_PARTIAL||rc==PG_TOOL_ERROR)&&n<cap&&tail[-1]=='G');}assert(!munmap(map,(size_t)page*3));
 
- assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":301}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n==0);
- assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":302}"),out,sizeof(out),&n)==PG_TOOL_ERROR&&strstr(out,"beyond end"));
- assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2,\"limit\":1}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&strstr(out,"line-002")&&!strstr(out,"line-003")&&strstr(out,"offset=3"));
+ assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":1201}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n==0);
+ assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":1202}"),out,sizeof(out),&n)==PG_TOOL_ERROR&&strstr(out,"beyond end"));
+ assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2,\"limit\":1}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&strstr(out,"line-0002")&&!strstr(out,"line-0003")&&strstr(out,"offset=3"));
  const char *bad[]={"{\"path\":\"sample.c\",\"offset\":0}","{\"path\":\"sample.c\",\"limit\":-1}","{\"path\":\"sample.c\",\"limit\":1.5}","{\"path\":\"sample.c\",\"offset\":true}","{\"path\":\"sample.c\",\"offset\":\"2\"}","{\"path\":\"sample.c\",\"limit\":null}","{\"path\":\"sample.c\",\"limit\":2147483648}","{\"path\":\"sample.c\",\"limit\":2,\"extra\":1}"};for(size_t i=0;i<sizeof(bad)/sizeof(*bad);++i)assert(tools.execute(tools.context,s("read"),s(bad[i]),out,sizeof(out),&n)==PG_TOOL_ERROR);
  f=fopen(path,"wb");assert(f);for(unsigned i=0;i<2500;++i)assert(fputc('\n',f)!=EOF);assert(!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&strstr(out,"offset=2001"));
  f=fopen(path,"wb");assert(f);for(unsigned i=0;i<4094;++i)assert(fputc('a',f)!=EOF);assert(fputs("\n🙂\n",f)>=0&&!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n==5&&!memcmp(out,"🙂\n",5));
- f=fopen(path,"wb");assert(f);for(unsigned i=0;i<4000;++i)assert(fputc('a',f)!=EOF);assert(fputc('\n',f)!=EOF);for(unsigned i=0;i<100;++i)assert(fputc('b',f)!=EOF);assert(fputc('\n',f)!=EOF&&!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n>4000&&n<4096&&strstr(out,"offset=2"));
+ f=fopen(path,"wb");assert(f);for(unsigned i=0;i<49000;++i)assert(fputc('a',f)!=EOF);assert(fputc('\n',f)!=EOF);for(unsigned i=0;i<3000;++i)assert(fputc('b',f)!=EOF);assert(fputc('\n',f)!=EOF&&!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n>49000&&n<PG_RTL_OUTPUT_MAX&&strstr(out,"offset=2"));
  assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\\u0000suffix\":2}"),out,sizeof(out),&n)==PG_TOOL_ERROR);
- f=fopen(path,"wb");assert(f);for(unsigned i=0;i<1048577;++i)assert(fputc('a',f)!=EOF);assert(!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":2}"),out,sizeof(out),&n)==PG_TOOL_ERROR&&strstr(out,"scan limit"));
+ f=fopen(path,"wb");assert(f);char lines[65536];for(size_t i=0;i<sizeof(lines);i+=2){lines[i]='a';lines[i+1]='\n';}for(unsigned i=0;i<20;++i)assert(fwrite(lines,1,sizeof(lines),f)==sizeof(lines));assert(!fclose(f));assert(tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\",\"offset\":550000,\"limit\":1}"),out,sizeof(out),&n)==PG_TOOL_PARTIAL&&n>=2&&!memcmp(out,"a\n",2)&&strstr(out,"offset=550001"));
 }
 static void prepared_paths(void){
  const char *cases[][2]={{"a//b/./c/../d/","a/b/d"},{"missing/../file","file"},{"link/../file","file"},{"../../a/../x","../../x"},{"/a/../../b","/b"},{"a/..","."},{"/..","/"},{"@./中文","中文"},{"a\xc2\xa0" "b","a b"},{"x\xe2\x80\xaf" "y","x y"},{"file:///tmp/a%20b/../c","/tmp/c"},{"file://localhost/tmp/%E4%B8%AD","/tmp/中"},{"file://remote/tmp/x","file:/remote/tmp/x"},{"file:///tmp/a%2Fb","file:/tmp/a%2Fb"},{"file:///tmp/%FF","file:/tmp/%FF"},{"file:///tmp/a%zz","file:/tmp/a%zz"},{"file://%6cocalhost/tmp/a","/tmp/a"},{"file://localhost","/"},{"file://%00/tmp/a","file:/%00/tmp/a"},{"file:///tmp/a?x=%2f","/tmp/a"}};
@@ -38,6 +39,10 @@ int main(void){prepared_paths();char root[]="/tmp/pangu-read-XXXXXX",path[512];a
  snprintf(path,sizeof(path),"%s/sample.c",root);FILE *f=fopen(path,"w");assert(f);fputs("int answer = 42;\n",f);fclose(f);
  pg_read_tool reader={.directory=-1};assert(!pg_read_tool_open(&reader,root));pg_tool_definition d=pg_read_tool_definition(&reader);pg_tool_registry r={0};assert(!pg_tool_registry_init(&r,&d,1));pg_tools tools=pg_tool_registry_service(&r);char out[128];size_t n;
  assert(!tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n));assert(n==17&&!memcmp(out,"int answer = 42;\n",17));
+ f=fopen(path,"wb");assert(f);const unsigned char bom_text[]={0xef,0xbb,0xbf,'b','o','m','\n'};assert(fwrite(bom_text,1,sizeof(bom_text),f)==sizeof(bom_text)&&!fclose(f));
+ assert(!tools.execute(tools.context,s("read"),s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n)&&n==4&&!memcmp(out,"bom\n",4));
+ pg_tool_definition snapshot=pg_read_snapshot_definition(&reader);assert(!snapshot.execute(snapshot.context,s("{\"path\":\"sample.c\"}"),out,sizeof(out),&n)&&n==sizeof(bom_text)&&!memcmp(out,bom_text,sizeof(bom_text)));
+ f=fopen(path,"wb");assert(f);fputs("int answer = 42;\n",f);assert(!fclose(f));
  assert(d.validate(d.context,s("{\"path\":\"literal\\\\u0000\"}")));assert(!d.validate(d.context,s("{\"path\\u0000suffix\":\"sample.c\"}")));
  const char *bad[]={"{\"path\":\"sample.c\",\"extra\":1}","{\"path\":4}"};
  for(size_t i=0;i<sizeof(bad)/sizeof(bad[0]);++i)assert(tools.execute(tools.context,s("read"),s(bad[i]),out,sizeof(out),&n));

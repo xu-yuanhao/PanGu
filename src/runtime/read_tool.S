@@ -13,9 +13,9 @@
 .Lstr_line_limit: .asciz "limit"
 .Lread_more: .asciz "\n\n[read: more lines; use offset=%llu to continue]"
 .Lmsg_offset: .asciz "read offset is beyond end of file"
-.Lmsg_scan: .asciz "read scan limit exceeded (1 MiB per call)"
+.Lutf8_bom: .byte 0xef,0xbb,0xbf
 .Lread_name:     .asciz "read"
-.Lread_desc: .asciz "Read text files and inline PNG, JPEG, GIF or WebP images using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 4095 bytes; follow the next offset when truncated. Each call scans at most 1 MiB. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution. Oversized individual lines are refused."
+.Lread_desc: .asciz "Read text files and inline PNG, JPEG, GIF or WebP images using a relative or absolute path. Optional offset is a 1-based line and limit is a positive line count. Output is bounded to 2000 lines and 50 KiB; follow the next offset when truncated. Paths support home expansion, file URLs and lexical dot segments before POSIX resolution."
 .Lread_schema: .asciz "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2147483647}},\"required\":[\"path\"],\"additionalProperties\":false}"
 .Lmsg_invalid:   .asciz "invalid read path"
 .Lmsg_root:      .asciz "read root unavailable"
@@ -489,6 +489,43 @@ li_execute_read:
  mov eax,[rsp+4344]
  jmp .Lrd_out
 .Lrd_text_file:
+ /* Pi's TextDecoder omits a leading UTF-8 BOM for reads beginning at byte 0. */
+ cmp dword ptr [rsp+4360],0
+ jne .Lrd_bom_ready
+.Lrd_bom_read:
+ mov rdi,[rsp+4256]
+ lea rsi,[rsp+4344]
+ mov edx,3
+ xor ecx,ecx
+ xor eax,eax
+ call pread@PLT
+ test rax,rax
+ jge .Lrd_bom_read_done
+ call __errno_location@PLT
+ cmp dword ptr [rax],4
+ je .Lrd_bom_read
+ jmp .Lrd_refused
+.Lrd_bom_read_done:
+ cmp rax,3
+ jne .Lrd_bom_ready
+ lea rsi,[rsp+4344]
+ lea rdi,[rip+.Lutf8_bom]
+ mov edx,3
+ call memcmp@PLT
+ test eax,eax
+ jne .Lrd_bom_ready
+.Lrd_bom_seek:
+ mov rdi,[rsp+4256]
+ mov esi,3
+ xor edx,edx
+ call lseek@PLT
+ cmp rax,-1
+ jne .Lrd_bom_ready
+ call __errno_location@PLT
+ cmp dword ptr [rax],4
+ je .Lrd_bom_seek
+ jmp .Lrd_refused
+.Lrd_bom_ready:
  mov qword ptr [rsp+4344],0 /* final complete/partial status */
  cmp qword ptr [rsp+4272],1
  je .Lrd_initial_status
@@ -628,9 +665,7 @@ li_execute_read:
  lea rbx,[rip+.Lmsg_offset]
  jmp .Lrd_close_message
 .Lrd_chunk_error:
- cmp rax,-2
- jne .Lrd_refused
- lea rbx,[rip+.Lmsg_scan]
+ jmp .Lrd_refused
 .Lrd_close_message:
  mov rdi,[rsp+4256]
  call close@PLT
@@ -700,11 +735,6 @@ li_execute_read:
 .Lrd_chunk:
  push rbx
  mov rbx,rsp
- mov rdx,PG_RTL_SCAN_LIMIT
- sub rdx,[rbx+16+4320]
- jz .Lrd_scan_exhausted
- cmp rdx,4096
- jbe .Lrd_chunk_size
  mov edx,4096
 .Lrd_chunk_size:
  mov rdi,[rbx+16+4256]
@@ -716,8 +746,6 @@ li_execute_read:
  mov [rbx+16+4328],rax
  mov qword ptr [rbx+16+4336],0
  jmp .Lrd_chunk_return
-.Lrd_scan_exhausted:
- mov rax,-2
 .Lrd_chunk_return:
  pop rbx
  ret
@@ -1637,4 +1665,4 @@ pg_read_tool_configure_images:
 .Lrim_resized_format: .asciz "%s Resized from %llux%llu to %llux%llu. Multiply coordinates by %.2f to map them to the original."
 
 .section .rodata
-.Lread_image_desc: .asciz "Read text files and image attachments (jpg, png, gif, webp, bmp). Images are decoded, oriented and prepared within model limits. Optional offset/limit select text lines; text output is bounded to 2000 lines and 4095 bytes, scanning at most 1 MiB per call. Use the next offset to continue."
+.Lread_image_desc: .asciz "Read text files and image attachments (jpg, png, gif, webp, bmp). Images are decoded, oriented and prepared within model limits. Optional offset/limit select text lines; text output is bounded to 2000 lines and 50 KiB. Use the next offset to continue."

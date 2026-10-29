@@ -141,7 +141,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 来源：Durable `tools/{read,write,edit,bash,edit-diff,image-processor}.ts`、`env/`、`images/`、`truncate.ts`；`tools.test.ts`、`tools-read-differential.test.ts`、`tools-images.test.ts`、`env-node.test.ts`。
 
-- [ ] 在现有 read/write/edit/bash 服务上补齐上游输入准备、路径/目录、分页/完整文件、UTF-8/二进制/图片、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
+- [ ] 在剩余 read/write/edit/bash 行为上补齐上游输入准备、完整文件、UTF-8/二进制、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
+- [x] read普通UTF-8分页接入Pi Durable的50 KiB/2000行预算和续读offset，移除固定1 MiB扫描上限；多页重组与大于1 MiB的行偏移通过。模型可见读取剥离文件开头UTF-8 BOM，Edit内部完整快照保留原始字节。
 - [x] read默认图片路径接入Durable结果与请求：PNG/JPEG/GIF/WebP头部尺寸、默认inline限制、base64、读取稳定性重试；afterTool保留图片，真实read Task持久结果可投影为模型附件。
 - [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
 - [x] 原生图片处理器接入应用：真实解码、八种EXIF转正、Lanczos缩放、PNG/JPEG候选与质量梯度、字节预算降采样、BMP转换及损坏图片拒绝；实际read持久结果覆盖缩放/坐标说明。
@@ -290,8 +291,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/bash.ts` 的 `BashPrepare`、`env/index.ts` 的 `ExecutionEnv` 与 `env/node.ts` 的 `exec`；对应 `tools.test.ts` 与 `env-node.test.ts`。
-- 实际调用链：新增版本化 `execution.env` 宿主服务，由workspace、files、process插件组合并交给tools插件。Assembly Bash在创建spill文件前调用prepare，接受更新后的命令、目录fd和显式环境，验证后进入现有可取消Process生命周期；TUI和Durable Task仍走原工具结果链。
-- 验证：Bash真实进程专项通过命令/cwd/环境变更与拒绝副作用、超时/取消、流解码、截断/spill、配额及页边界；Runtime整批、产品构建、实际宿主/TUI启动及排除独立 `claude/` 克隆的G00镜像检查通过。
-- 接口与差异：公开 `pg_execution_env` ABI 组合借用服务，`pg_execution_request` 提供单次Bash准备入口；回调在当前宿主同步执行，命令目录用借用fd表达，默认环境仍由PanGu显式提供。新增头文件已登记到bootstrap策略和模块依赖。
-- 剩余与下一交付物：K08整体保持未勾选。继续沿Pi read/write/edit/bash调用者补齐路径与输入差异，并把read→edit→write→bash→回读接入真实模型完整调用；上游worker/并行长操作在对应消费者出现时继续移植。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/read.ts`、`truncate.ts`、`env/decode.ts` 与 `env/node.ts`；对应 `tools.test.ts`、`tools-read-differential.test.ts`。核对最新Pi `e7a0df27c09d11bf4161d3605246cbf57a129cb2` 后，上述Durable读实现与截断函数未变。
+- 实际调用链：Assembly `pg_read_tool_definition` 由应用tools服务直接调用；读取按4 KiB块扫描所需行，在2000行或50 KiB预算处停止，支持续读offset，移除人为1 MiB扫描封顶；公开read剥离UTF-8 BOM，内部snapshot保留Edit所需的原始字节。
+- 验证：`python3 -B tools/runtime/build_test.py` 全部通过，覆盖跨50 KiB多页重组、超过1 MiB后读取指定行、read/snapshot的BOM差异、输出/保护页边界与持久工具流程；先前实际DeepSeek TUI完成read→write→edit→bash→回读、PanGu身份和会话重开续聊。
+- 接口与差异：`PG_RTL_OUTPUT_MAX` 为51201字节（含NUL），与Durable的50 KiB文本预算一致；页预算仍为2000行。非UTF-8字节目前按PanGu错误拒绝，Pi TextDecoder会替换；超长首行提示、完整工具参数和写入容量也受后续调用链约束，K08与验收仍未完成。
+- 剩余与下一交付物：沿模型参数→Agent会话消息→持久Tool任务→文件服务整段链路处理超出4 KiB的write/edit输入，再对齐超长首行及非UTF-8读取语义；随后接入并行消费者的同路径写/edit串行化，完成工具差异核对。K08验收仍需固定工具语料与上游实际函数比对及真实TUI工作流。
