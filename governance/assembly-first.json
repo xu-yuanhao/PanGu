@@ -359,6 +359,15 @@
       "role": "cpp-bridge",
       "bridge_kind": "external-library",
       "reason": "Valijson/nlohmann JSON Schema Draft-7的C ABI、异常与所有权桥接；工具结果状态和错误策略由汇编执行"
+    },
+    "src/runtime/image_processor.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable图片处理策略：格式/方向/尺寸/字节判断、编码候选与降采样、prepared所有权及诊断元数据"
+    },
+    "src/runtime/image_codec_vips.c": {
+      "role": "c-bridge",
+      "bridge_kind": "external-library",
+      "reason": "libvips解码、EXIF转正、Lanczos缩放与PNG/JPEG编解码的C ABI胶水；选择与预算策略由汇编实现"
     }
   }
 }

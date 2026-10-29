@@ -280,7 +280,8 @@
         "pg_read_tool_snapshot",
         "pg_read_tool_configure_images",
         "pg_read_tool_definition",
-        "pg_read_snapshot_definition"
+        "pg_read_snapshot_definition",
+        "pg_image_base64"
       ],
       "reference_basis": [
         {
@@ -462,7 +463,8 @@
         "extensions.local.v0",
         "extension.registry.local.v0",
         "system.prompt.local.v0",
-        "tool.execution.local.v0"
+        "tool.execution.local.v0",
+        "images.prepare.local.v0"
       ],
       "role": "Static composition of workspace/process/files, model lease and task-owned tool invocation factories, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2608,10 +2610,41 @@
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts structuredOutputError; Valijson SchemaParser/Validator"
       ]
+    },
+    {
+      "id": "images.prepare.local.v0",
+      "sources": [
+        "src/runtime/image_processor.S",
+        "src/runtime/image_processor.h",
+        "src/runtime/image_codec_vips.c"
+      ],
+      "dependencies": [
+        "tools.read.posix.local.v0",
+        "json-c",
+        "libvips 8.18.7 (LGPL-2.1-or-later; system dynamic library)"
+      ],
+      "role": "Assembly Pi Durable prepare/encodeWithin policy; libvips C bridge decodes/orients/scales/encodes. Host image.processor is replaceable. JPEG qualities 80/70/55/40, PNG/JPEG order, 3/4 size reduction and prepared ownership follow Pi.",
+      "exports": [
+        "pg_image_prepare",
+        "pg_image_codec_open",
+        "pg_image_codec_orient",
+        "pg_image_codec_encode",
+        "pg_image_codec_close"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/images/index.ts",
+            "packages/durable/src/tools/image-processor.ts"
+          ]
+        }
+      ]
     }
   ],
   "build": "python3 -B tools/runtime/build_test.py",
-  "product_runtime_dependencies": "Core uses C ABI layouts; hosted adapters use registered libcurl/json-c/libc/POSIX, edit text uses libutf8proc for Unicode normalization. TUI history search uses libunistring.so.5 through a scoped dlopen C ABI adapter.",
+  "product_runtime_dependencies": "Core uses C ABI layouts; hosted adapters use registered libcurl/json-c/libc/POSIX, edit text uses libutf8proc for Unicode normalization. TUI history search uses libunistring.so.5 through a scoped dlopen C ABI adapter. Image processing uses system libvips through the registered C ABI bridge.",
   "limits": {
     "messages": 64,
     "text_bytes_including_terminator": 4096,

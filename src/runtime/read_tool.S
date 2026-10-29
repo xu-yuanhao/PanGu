@@ -782,6 +782,10 @@ pg_read_tool_definition:
  lea rax, [rip + .Lread_name]
  mov qword ptr [rdi + PG_TL_DEF_NAME], rax
  lea rax, [rip + .Lread_desc]
+ cmp qword ptr [rsi+PG_RTL_IMAGES],0
+ je .Lread_description_ready
+ lea rax,[rip+.Lread_image_desc]
+.Lread_description_ready:
  mov qword ptr [rdi + PG_TL_DEF_DESCRIPTION], rax
  lea rax, [rip + .Lread_schema]
  mov qword ptr [rdi + PG_TL_DEF_SCHEMA], rax
@@ -983,7 +987,7 @@ pg_read_tool_snapshot:
  mov rdi,r14
  mov rsi,r13
  mov rdx,rbp
- call .Lrim_base64
+ call pg_image_base64
  jmp .Lrim_build
 .Lrim_process:
  lea rdi,[rip+.Lrim_mimes]
@@ -1371,7 +1375,9 @@ pg_read_tool_snapshot:
  xor eax,eax
 .Lrif_end:
  ret
-.Lrim_base64:
+.globl pg_image_base64
+.type pg_image_base64,@function
+pg_image_base64:
  xor r8d,r8d
  xor r9d,r9d
  lea r10,[rip+.Lrim_alphabet]
@@ -1629,3 +1635,6 @@ pg_read_tool_configure_images:
 .Lrim_height: .asciz "height"
 .Lrim_converted_format: .asciz "%s Converted from %s to %s."
 .Lrim_resized_format: .asciz "%s Resized from %llux%llu to %llux%llu. Multiply coordinates by %.2f to map them to the original."
+
+.section .rodata
+.Lread_image_desc: .asciz "Read text files and image attachments (jpg, png, gif, webp, bmp). Images are decoded, oriented and prepared within model limits. Optional offset/limit select text lines; text output is bounded to 2000 lines and 4095 bytes, scanning at most 1 MiB per call. Use the next offset to continue."

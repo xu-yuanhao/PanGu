@@ -16,6 +16,7 @@
 #include "../runtime/tool_provider.h"
 #include "../runtime/tool_execution.h"
 #include "../runtime/read_tool.h"
+#include "../runtime/image_processor.h"
 #include "../runtime/write_tool.h"
 #include "../runtime/edit_tool.h"
 #include "../runtime/bash_tool.h"
@@ -135,6 +136,7 @@ static int files_start(void *ctx,pg_host *scope,size_t owner){
 static int no_resources(void *ctx){(void)ctx;return 0;}
 static int tools_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_read_tool *root=pg_host_get(scope,owner,"workspace");pg_tools *files=pg_host_get(scope,owner,"files");pg_process_ops *process=pg_host_get(scope,owner,"process");
+ if(root&&pg_read_tool_configure_images(root,0,pg_host_get(scope,owner,"image.processor")))return 1;
  if(!root||!files||!process||pg_bash_tool_init(&shell_tool,process,root->directory,command_environment))return 1;
  editor.files=*files;pg_tool_definition definitions[]={pg_read_tool_definition(root),pg_write_tool_definition(&writer),pg_edit_tool_definition(&editor),pg_bash_tool_definition(&shell_tool)};
  if(pg_tool_registry_init(&registry,definitions,4))return 1;application.tools=pg_tool_registry_service(&registry);
@@ -417,12 +419,16 @@ static int agent_stop(void *ctx){
  (void)ctx;pg_conversation_view_close(&conversation_view_binding);pg_view_binding_close(&task_graph_binding);foreground();if(durable.client_ready){int result=pg_durable_client_suspend(&durable.client);if(result)return result==PG_TASK_PENDING?1:-1;durable.client_ready=0;}else if(durable.scheduler.active){if(pg_task_scheduler_close(&durable.scheduler))return 1;}
  if(durable.tool_scopes)return 1;pg_extensions_close(&durable.model_extensions);if(pg_extension_registry_close(&durable.extension_registry))return 1;durable.extensions=0;extension_tasks=0;durable.records.publish=0;json_object_put(durable.history);durable.history=0;if(pg_resources_close(&durable.resources))return 1;json_object_put(durable.configuration);durable.configuration=0;return 0;
 }
+static pg_read_image_processor native_images={0,pg_image_prepare};
+static int images_start(void *ctx,pg_host *scope,size_t owner){(void)ctx;return pg_host_provide(scope,owner,"image.processor",&native_images);}
+static const char *const image_exports[]={"image.processor"};
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","observation","task.graph","conversation.view","agent.state","extensions.control"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
+static const char *const file_imports[]={"workspace"},*const tool_imports[]={"workspace","files","process","image.processor"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,10,agent_start,agent_stop};
 static const pg_plugin plugins[]={
+ {"images",0,0,0,image_exports,1,images_start,no_resources},
  {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
- {"tools",0,tool_imports,3,tools_exports,6,tools_start,tools_stop},
+ {"tools",0,tool_imports,4,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},
  {"workspace",0,0,0,workspace_exports,1,workspace_start,workspace_stop},

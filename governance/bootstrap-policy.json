@@ -671,6 +671,9 @@
     "tools/runtime/schema_dependency.py": "development-tool",
     "src/runtime/json_schema_bridge.cpp": "native-source",
     "src/runtime/json_schema_bridge.h": "native-source",
-    "docs/licenses/schema-libraries.md": "document"
+    "docs/licenses/schema-libraries.md": "document",
+    "src/runtime/image_processor.h": "native-source",
+    "src/runtime/image_processor.S": "native-source",
+    "src/runtime/image_codec_vips.c": "native-source"
   }
 }

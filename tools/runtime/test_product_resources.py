@@ -21,7 +21,7 @@ def main():
     args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='pangu-product-resource-test-') as directory:
         output=Path(directory)/'test-product-resources'
-        flags=subprocess.check_output(['pkg-config','--cflags','--libs','libcurl','json-c','libutf8proc','sqlite3','libgit2','yaml-0.1','libpcre2-8'],text=True).split()
+        flags=subprocess.check_output(['pkg-config','--cflags','--libs','libcurl','json-c','libutf8proc','sqlite3','libgit2','yaml-0.1','libpcre2-8','vips'],text=True).split()
         sanitize=['-fsanitize=address,undefined','-fno-sanitize-recover=all'] if args.sanitize else []
         sources=compile_inputs([name for name in SOURCES if name!='src/composition/pangu.c'],directory,sanitize)
         subprocess.run(['/usr/bin/clang-23','-D_POSIX_C_SOURCE=200809L','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',*sanitize,*PLUGIN_EXPORTS,*sources,str(ROOT/'tests/runtime/test_product_resources.c'),*flags,'-ldl','-o',str(output)],check=True)
