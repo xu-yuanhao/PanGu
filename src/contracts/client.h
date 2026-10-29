@@ -42,6 +42,25 @@ typedef struct {void *context;int (*select)(void *,uint64_t);uint64_t (*current)
     agent is an optional borrowed change; output owns the committed record.
     The foreground selection stays unchanged. Same status family as select. */
  int (*create)(void *,uint64_t parent,uint64_t at,const struct json_object *agent,struct json_object **);} pg_conversation_client_ops;
+/* Zero owner IDs omit filters. order/cursor_order: 0 default, 1 ascending,
+   2 descending. Round-trip the returned cursor's after/order without changing
+   its scan order. A NULL query uses an ascending page of 64 records. */
+typedef struct {
+ uint64_t owner_conversation,owner_task,after;size_t limit;
+ unsigned order,has_cursor,cursor_order,reserved;
+} pg_conversation_query;
+/* Serialized reads return detached records with an optional display name.
+   list owns {items,cursor}, cursor is null or {after,order}; read owns a record.
+   rename appends metadata without changing model context or selection and
+   accepts explicit-length UTF-8; an empty sanitized name clears the title.
+   Statuses follow the foreground selection family. Context is borrowed. */
+typedef struct {
+ void *context;
+ int (*list)(void *,const pg_conversation_query *,struct json_object **);
+ int (*read)(void *,uint64_t,struct json_object **);
+ int (*rename)(void *,uint64_t,pg_slice);
+ void (*release)(struct json_object *);
+} pg_conversation_catalog_ops;
 /* start copies instructions; reserve_tokens is 2..1000000. Serialized binding
    remains borrowed through poll/release and the owning runtime lifetime. */
 typedef struct {

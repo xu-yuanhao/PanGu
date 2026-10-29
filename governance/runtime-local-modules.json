@@ -476,7 +476,8 @@
         "pg_tui_runtime_observation",
         "pg_tui_runtime_task_graph",
         "pg_tui_runtime_conversation_view",
-        "pg_tui_runtime_conversations"
+        "pg_tui_runtime_conversations",
+        "pg_tui_runtime_conversation_catalog"
       ],
       "reference_basis": [
         {
@@ -1931,6 +1932,8 @@
         "pg_durable_client_select",
         "pg_durable_client_create",
         "pg_durable_client_history",
+        "pg_durable_client_catalog_service",
+        "pg_durable_client_rename",
         "pg_durable_client_conversations_service",
         "pg_durable_client_text"
       ],
@@ -2369,11 +2372,18 @@
         "task.runner.local.v0",
         "session.documents.reader.local.v0",
         "json-c",
-        "view.watch.local.v0"
+        "view.watch.local.v0",
+        "session.documents.transaction.local.v0",
+        "model.mimo.local.v0",
+        "libutf8proc",
+        "system libc"
       ],
       "role": "Pi Durable ConversationView on a native readOnLine: active entries, existing documents and queued native Submissions",
       "exports": [
         "pg_conversation_view_read",
+        "pg_conversation_list",
+        "pg_conversation_info",
+        "pg_conversation_rename",
         "pg_conversation_view_service",
         "pg_conversation_watch_open",
         "pg_conversation_watch_next",

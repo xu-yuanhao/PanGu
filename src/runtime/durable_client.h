@@ -33,6 +33,8 @@ int pg_durable_client_select(pg_durable_client *,uint64_t conversation);
 /* Owned display rows for the selected conversation, serialized without pumping. */
 int pg_durable_client_history(pg_durable_client *,struct json_object **);
 int pg_durable_client_conversations_service(pg_durable_client *,pg_conversation_client_ops *);
+int pg_durable_client_catalog_service(pg_durable_client *,pg_conversation_catalog_ops *);
+int pg_durable_client_rename(pg_durable_client *,struct pg_agent_conversation_binding *,uint64_t,pg_slice);
 pg_client pg_durable_client_service(pg_durable_client *);
 int pg_durable_client_suspend(void *);
 /* Native provider callbacks, serialized on the same foreground loop. */

@@ -3142,3 +3142,117 @@ pg_durable_client_create:
  ret
 .size pg_durable_client_create,.-pg_durable_client_create
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_client_catalog_service
+.type pg_durable_client_catalog_service,@function
+pg_durable_client_catalog_service:
+ mov eax,4
+ test rdi,rdi
+ jz .Lcat_service_end
+ test rsi,rsi
+ jz .Lcat_service_end
+ mov [rsi],rdi
+ lea rax,[rip+.Lcat_list]
+ mov [rsi+8],rax
+ lea rax,[rip+.Lcat_read]
+ mov [rsi+16],rax
+ mov qword ptr [rsi+24],0
+ mov rax,qword ptr [rip+json_object_put@GOTPCREL]
+ mov [rsi+32],rax
+ xor eax,eax
+.Lcat_service_end:
+ ret
+.size pg_durable_client_catalog_service,.-pg_durable_client_catalog_service
+.Lcat_list:
+ mov r8,qword ptr [rip+pg_conversation_list@GOTPCREL]
+ jmp .Lcat_read_line
+.Lcat_read:
+ mov r8,qword ptr [rip+pg_conversation_info@GOTPCREL]
+.Lcat_read_line:
+ push rbx
+ push r12
+ push r13
+ sub rsp,32
+ mov rax,rdi
+ mov rbx,r8
+ mov r12,rsi
+ mov r13,rdx
+ mov edi,4
+ test r13,r13
+ jz .Lcat_read_end
+ mov qword ptr [r13],0
+ test rax,rax
+ jz .Lcat_read_end
+ mov edi,7
+ cmp qword ptr [rax+8],0
+ je .Lcat_read_end
+ cmp dword ptr [rax+68],0
+ jne .Lcat_read_end
+ mov edi,3
+ cmp dword ptr [rax+56],0
+ jne .Lcat_read_end
+ mov rdx,[rax]
+ mov [rsp],rdx
+ mov rdx,[rax+8]
+ mov rdx,[rdx+8]
+ mov [rsp+8],rdx
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov rdi,rsp
+ mov rsi,r12
+ mov rdx,r13
+ call rbx
+ mov edi,eax
+.Lcat_read_end:
+ mov eax,edi
+ add rsp,32
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.globl pg_durable_client_rename
+.type pg_durable_client_rename,@function
+pg_durable_client_rename:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov eax,4
+ test rbx,rbx
+ jz .Lcat_rename_end
+ test r12,r12
+ jz .Lcat_rename_end
+ mov rdx,[r12]
+ cmp rdx,[rbx]
+ jne .Lcat_rename_end
+ mov eax,7
+ cmp qword ptr [rbx+8],0
+ je .Lcat_rename_end
+ cmp dword ptr [rbx+68],0
+ jne .Lcat_rename_end
+ mov eax,3
+ cmp dword ptr [rbx+56],0
+ jne .Lcat_rename_end
+ mov dword ptr [rbx+56],1
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ mov rcx,r15
+ call pg_conversation_rename@PLT
+ mov dword ptr [rbx+56],0
+.Lcat_rename_end:
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_rename,.-pg_durable_client_rename
+.section .note.GNU-stack,"",@progbits

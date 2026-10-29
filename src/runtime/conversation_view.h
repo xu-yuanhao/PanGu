@@ -22,4 +22,8 @@ void pg_conversation_view_close(pg_conversation_view_binding *);
 typedef struct {void *context;int (*read)(void *,uint64_t,struct json_object **);void (*release)(struct json_object *);
  int (*watch)(void *,uint64_t,pg_conversation_watch *);int (*next)(pg_conversation_watch *,struct json_object **);void (*close)(pg_conversation_watch *);} pg_conversation_view_ops;
 void pg_conversation_view_service(pg_conversation_view_binding *,pg_conversation_view_ops *);
+int pg_conversation_list(pg_conversation_view_binding *,const pg_conversation_query *,struct json_object **);
+int pg_conversation_info(pg_conversation_view_binding *,uint64_t,struct json_object **);
+struct pg_agent_conversation_binding;
+int pg_conversation_rename(struct pg_agent_conversation_binding *,uint64_t,pg_slice);
 #endif

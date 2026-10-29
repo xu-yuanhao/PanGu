@@ -47,6 +47,7 @@
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
 | 会话创建与前台 | `agent_state.S`/`durable_session.S`/`durable_client.S`：原子默认文档、Agent分叉点/owner继承、agent/init、独立持久UUIDv7与旧会话补建；产品新建/分叉/选择/历史入口，真实DeepSeek在分叉会话写文件；SQLite/JSONL回滚与重开 |
 | 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
+| 会话目录 | `conversation_view.S`/`durable_client.S`：Host/TUI会话列表/记录/命名，ID顺序/owner筛选/游标分页、独立元数据Entry、Unicode与换行规范、名称观察及分叉/清空隔离；两后端重开 |
 | 会话视图 | `conversation_view.S`：conversation.view Host/TUI只读入口，统一会话/原始有效Entry/已有Live与UsageDoc/queued Submission，readOnLine保护与分页、重开 |
 | 会话用量 | `usage.S`：pangu.usage按models/tools累计，Generation/工具结果/摘要尝试同批提交；响应模型身份优先，计数及已报告cost、可选reasoning/cacheWrite1h，Host usage读取与重开 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入；参数缓冲清理保留工具注册表，连续请求携带当前声明 |
