@@ -343,7 +343,7 @@ pg_tool_execution_poll:
  test eax,eax
  jnz .Lte_poll_finish
  test r14,r14
- jz .Lte_poll_transfer
+ jz .Lte_poll_fallback
  mov rdi,rbp
  mov rsi,r14
  lea rdx,[rip+.Lte_isError]
@@ -386,6 +386,91 @@ pg_tool_execution_poll:
  mov rdi,rbp
  lea rsi,[rip+.Lte_structuredOutput]
  mov rdx,rax
+ call .Lte_add
+ test eax,eax
+ jnz .Lte_poll_finish
+ jmp .Lte_poll_transfer
+.Lte_poll_fallback:
+ EG "qword ptr [rsp]",state
+ EG rax,outcome
+ mov [rsp+40],rax
+ EG rax,status
+ mov r12,rax
+ mov rdi,rbp
+ lea rsi,[rip+.Lte_diagnostics]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lte_code]
+ mov rdx,rax
+ call .Lte_add
+ test eax,eax
+ jnz .Lte_poll_finish
+ EG "qword ptr [rsp+40]",error
+ EG rax,message
+ test rax,rax
+ jnz .Lte_fallback_reason
+ EG "qword ptr [rsp+40]",reason
+.Lte_fallback_reason:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+56],rax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov r12,rax
+ lea rax,[rip+.Lte_ended_format]
+ mov [rsp+40],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lte_faulted]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lte_fallback_orphan
+ lea rax,[rip+.Lte_failed_format]
+ mov [rsp+40],rax
+ jmp .Lte_fallback_format
+.Lte_fallback_orphan:
+ mov rdi,r12
+ lea rsi,[rip+.Lte_orphaned]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lte_fallback_format
+ lea rax,[rip+.Lte_orphan_format]
+ mov [rsp+40],rax
+.Lte_fallback_format:
+ EG "qword ptr [rsp]",input
+ EG rax,call
+ EG rax,name
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ mov qword ptr [rsp+48],0
+ lea rdi,[rsp+48]
+ mov rsi,[rsp+40]
+ mov rdx,r12
+ mov rcx,[rsp+56]
+ test rcx,rcx
+ jnz .Lte_fallback_printf
+ lea rcx,[rip+.Lte_unknown_reason]
+.Lte_fallback_printf:
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lte_poll_alloc
+ mov rdi,[rsp+48]
+ call json_object_new_string@PLT
+ mov r12,rax
+ mov rdi,[rsp+48]
+ call free@PLT
+ test r12,r12
+ jz .Lte_poll_alloc
+ mov rdi,r14
+ lea rsi,[rip+.Lte_message]
+ mov rdx,r12
  call .Lte_add
  test eax,eax
  jnz .Lte_poll_finish
@@ -443,3 +528,19 @@ pg_tool_execution_poll:
 .Lte_content: .asciz "content"
 .Lte_text: .asciz "text"
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lte_outcome: .asciz "outcome"
+.Lte_error: .asciz "error"
+.Lte_message: .asciz "message"
+.Lte_reason: .asciz "reason"
+.Lte_code: .asciz "code"
+
+.section .rodata
+.Lte_faulted: .asciz "faulted"
+.Lte_orphaned: .asciz "orphaned"
+.Lte_failed_format: .asciz "Tool %s failed: %s"
+.Lte_orphan_format: .asciz "Tool %s could not resume: %s"
+.Lte_ended_format: .asciz "Tool %s ended without a result"
+.Lte_unknown_reason: .asciz "Unknown task outcome"
+.Lte_call: .asciz "call"

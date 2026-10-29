@@ -610,6 +610,11 @@ pg_durable_tool_init:
  call strcmp@PLT
  test eax,eax
  jz .Ldt_stage_nested
+ mov rdi,rbx
+ mov rsi,[rsp+48]
+ call .Ldt_prune_children
+ test eax,eax
+ jnz .Ldt_stage_end
  mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",conversation_id
  mov rdi,rax
@@ -2498,3 +2503,57 @@ pg_durable_tool_executing:
 
 .section .rodata
 .Ldt_aborted_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"aborted\",\"message\":\"Tool call was aborted\"}]}"
+
+.text
+.Ldt_prune_children:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rbp,rax
+ mov rsi,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rdx,rsp
+ call pg_live_peek@PLT
+ cmp eax,8
+ je .Ldt_prune_ok
+ test eax,eax
+ jnz .Ldt_prune_end
+ DGET "qword ptr [rsp]",live_nested_tools
+ test rax,rax
+ jz .Ldt_prune_ok
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Ldt_prune_ok
+ mov rdi,r12
+ mov rsi,rbp
+ mov rax,[rbx+8]
+ mov rdx,[rax+16]
+ xor ecx,ecx
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+24]
+ mov r9d,1
+ call pg_tool_live_stage@PLT
+ jmp .Ldt_prune_end
+.Ldt_prune_ok:
+ xor eax,eax
+.Ldt_prune_end:
+ mov ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret

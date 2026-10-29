@@ -16,6 +16,7 @@
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
 | 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT先持久UTF-8尾窗口/丢弃字节再发布，done清除进度，Task/Live保留父调用关系 |
+| 嵌套异常与后代结算 | `tool_execution.S`/`durable_client.S`按Task outcome提供缺结果回退和结束事件；模型/nested父工具结算均清理完整后代Live树，保留无关分支；Task查询支持调度推进中的临时空槽 |
 | 中断结果与缺定义取消 | `tool_live.S`/`durable_tool.S`/`task_runner.S`：恢复已提交部分输出/元数据后结算；restart缺定义等待安装，普通取消缺定义任务结算orphaned/missing_task；真实挂起/重开3000字节输出与取消场景通过 |
 | 嵌套重启策略 | `task_runner.S`/`tool_execution.S`/`durable_tool.S`：unsafe调用子任务重开先放弃、restart向普通后代传播，已启动/未启动分诊断；safe重跑沿原键恢复并先清空进度，产品父子孙任务与无副作用恢复通过 |
 | 工具内嵌套执行 | `tool_execution.S`与调用级工厂：executeTool start/poll、memo、显式/自动键和持久子工具；实际write→read、safe重开复用、结构化返回/诊断、取消及实例释放通过；DSO可通过公开动态符号调用 |

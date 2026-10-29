@@ -323,16 +323,12 @@ pg_task_scheduler_find:
 .Lfind_runner:
  cmp rcx,rdx
  jae .Lfind_runner_missing
- lea r9,[rcx+rdx]
- shr r9,1
- mov rax,[r8+r9*8]
+ mov rax,[r8+rcx*8]
+ inc rcx
+ test rax,rax
+ jz .Lfind_runner
  cmp [rax+16],rsi
  je .Lfind_runner_found
- jb .Lfind_runner_right
- mov rdx,r9
- jmp .Lfind_runner
-.Lfind_runner_right:
- lea rcx,[r9+1]
  jmp .Lfind_runner
 .Lfind_runner_missing:
  xor eax,eax

@@ -116,7 +116,7 @@
 .globl pg_tool_live_stage
 .type pg_tool_live_stage,@function
 pg_tool_live_stage:
- LF 224
+ LF 240
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -124,7 +124,7 @@ pg_tool_live_stage:
  mov rbp,r8
  mov rdi,rsp
  xor eax,eax
- mov ecx,28
+ mov ecx,30
  rep stosq
  mov [rsp+208],r9d
  lea rax,[rip+.Llv_kind]
@@ -163,6 +163,14 @@ pg_tool_live_stage:
  mov [rsp+152],rax
  test rax,rax
  jz .Llv_bad
+ cmp dword ptr [rsp+208],0
+ je .Llv_each
+ mov rdi,[rsp+128]
+ mov rsi,r13
+ call .Llv_descendants
+ mov [rsp+224],rax
+ test rax,rax
+ jz .Llv_bad
 .Llv_each:
  cmp qword ptr [rsp+136],0
  je .Llv_created
@@ -173,11 +181,16 @@ pg_tool_live_stage:
  mov [rsp+176],rax
  cmp dword ptr [rsp+208],0
  je .Llv_match
- LG rax,parentTaskId
+ LG rax,taskId
  mov rdi,rax
  call json_object_get_uint64@PLT
  cmp rax,r13
- jne .Llv_match
+ je .Llv_match
+ mov rsi,rax
+ mov rdi,[rsp+224]
+ call .Llv_member
+ test eax,eax
+ jz .Llv_match
  mov rdi,[rsp+152]
  lea rsi,[rip+.Llv_delete_json]
  mov rdx,[rsp+136]
@@ -277,6 +290,23 @@ pg_tool_live_stage:
  inc qword ptr [rsp+192]
  jmp .Llv_field
 .Llv_created:
+ cmp qword ptr [rsp+144],0
+ jne .Llv_slot_fields
+ cmp qword ptr [rsp+128],0
+ je .Llv_slot_fields
+ test r14,r14
+ jnz .Llv_slot_fields
+ lea rdi,[rip+.Llv_remove_array_json]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Llv_bad
+ mov rdi,[rsp+152]
+ mov rsi,rax
+ call .Llv_array
+ test eax,eax
+ jnz .Llv_finish
+ jmp .Llv_commit
+.Llv_slot_fields:
  test r14,r14
  jz .Llv_commit
  cmp dword ptr [rsp+200],0
@@ -322,8 +352,10 @@ pg_tool_live_stage:
  call json_object_put@PLT
  mov rdi,[rsp+152]
  call json_object_put@PLT
+ mov rdi,[rsp+224]
+ call json_object_put@PLT
  mov eax,[rsp+216]
- LE 224
+ LE 240
 .size pg_tool_live_stage,.-pg_tool_live_stage
 .section .rodata
 .Llv_kind: .asciz "pangu.live"
@@ -534,3 +566,106 @@ pg_tool_live_read:
  mov eax,ebx
  LE 32
 .size pg_tool_live_read,.-pg_tool_live_read
+
+.text
+/* Stable task IDs become private dictionary keys for the linear ancestry pass. */
+.Llv_member:
+ push rbx
+ sub rsp,32
+ mov rbx,rdi
+ mov rcx,rsi
+ mov rdi,rsp
+ mov esi,32
+ lea rdx,[rip+.Llv_id_format]
+ xor eax,eax
+ call snprintf@PLT
+ mov rdi,rbx
+ mov rsi,rsp
+ call json_object_object_get@PLT
+ test rax,rax
+ setnz al
+ movzx eax,al
+ add rsp,32
+ pop rbx
+ ret
+.Llv_mark:
+ push rbx
+ sub rsp,32
+ mov rbx,rdi
+ mov rcx,rsi
+ mov rdi,rsp
+ mov esi,32
+ lea rdx,[rip+.Llv_id_format]
+ xor eax,eax
+ call snprintf@PLT
+ mov edi,1
+ call json_object_new_boolean@PLT
+ test rax,rax
+ jz .Llv_mark_bad
+ mov rdi,rbx
+ mov rsi,rsp
+ mov rdx,rax
+ call .Llv_set
+ jmp .Llv_mark_end
+.Llv_mark_bad:
+ mov eax,5
+.Llv_mark_end:
+ add rsp,32
+ pop rbx
+ ret
+.Llv_descendants:
+ LF 16
+ mov rbx,rdi
+ mov r12,rsi
+ call json_object_new_object@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Llv_tree_end
+ mov rdi,rax
+ mov rsi,r12
+ call .Llv_mark
+ test eax,eax
+ jnz .Llv_tree_bad
+ test rbx,rbx
+ jz .Llv_tree_end
+ xor r14d,r14d
+.Llv_tree_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Llv_tree_end
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ LG rax,parentTaskId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,r13
+ call .Llv_member
+ test eax,eax
+ jz .Llv_tree_next
+ LG rbp,taskId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,r13
+ call .Llv_mark
+ test eax,eax
+ jnz .Llv_tree_bad
+.Llv_tree_next:
+ inc r14
+ jmp .Llv_tree_each
+.Llv_tree_bad:
+ mov rdi,r13
+ call json_object_put@PLT
+ xor r13d,r13d
+.Llv_tree_end:
+ mov rax,r13
+ LE 16
+.section .rodata
+.Llv_id_format: .asciz "%llu"
+
+.section .rodata
+.Llv_remove_array_json: .asciz "[\"d\",[\"nestedTools\"]]"

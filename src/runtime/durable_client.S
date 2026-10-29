@@ -873,9 +873,41 @@ pg_durable_client_output:
  jnz .Ldc_tool_end
  CGET "qword ptr [rsp+16]",result
  test rax,rax
- jz .Ldc_tool_end
+ jz .Ldc_nested_result_missing
  mov r14,rax
  jmp .Ldc_tool_result_message
+.Ldc_nested_result_missing:
+ CGET "qword ptr [rsp]",state
+ CGET rax,outcome
+ mov r14,rax
+ CGET rax,error
+ CGET rax,message
+ test rax,rax
+ jnz .Ldc_nested_failure_text
+ CGET r14,reason
+ test rax,rax
+ jnz .Ldc_nested_failure_text
+ lea rax,[rip+.Ldc_nested_failure_message]
+ mov [rsp+32],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [rsp+40],rax
+ jmp .Ldc_nested_failure_ready
+.Ldc_nested_failure_text:
+ mov r14,rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+32],rax
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov [rsp+40],rax
+.Ldc_nested_failure_ready:
+ CGET "qword ptr [rsp+128]",name
+ mov rbp,rax
+ mov dword ptr [rsp+24],3
+ mov dword ptr [rsp+28],1
+ mov dword ptr [rsp+80],2
+ jmp .Ldc_tool_name_ready
 .Ldc_tool_name_ready:
  cmp dword ptr [rsp+88],2
  jne .Ldc_tool_name_copy
@@ -2739,3 +2771,7 @@ pg_durable_client_fault_task:
 
 .section .rodata
 .Ldc_abort_reason: .asciz "abortReason"
+
+.section .rodata
+.Ldc_nested_failure_message: .asciz "Nested tool ended without a stored result"
+.Ldc_reason: .asciz "reason"
