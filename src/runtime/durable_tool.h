@@ -58,6 +58,9 @@ int pg_durable_tool_output(pg_task_runner *,pg_slice,const pg_output_skip *);
 int pg_durable_tool_retained_output(pg_task_runner *,pg_output_snapshot *);
 /* 0 tail window copied, 1 head retention (zeroed output), other task error. */
 int pg_durable_tool_output_window(pg_task_runner *,pg_tool_output_window *);
+/* Internal consumer receipt: a confirmed synchronous metadata commit buys the
+   same output pacing pause, measured on its native Op payload. No new write. */
+void pg_durable_tool_progress_recorded(pg_task_runner *,size_t);
 /* Binding borrows callback table through all phase and hook cleanup. */
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned

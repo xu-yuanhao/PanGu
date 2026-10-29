@@ -8,6 +8,10 @@
    Fields and documents are borrowed; publication follows Storage adoption. */
 int pg_tool_live_stage(pg_document_tx *,uint64_t conversation,uint64_t task_id,
  const struct json_object *fields,int (*mint)(void *,uint64_t *),unsigned remove_children);
+/* Same mutation, optionally returns serialized native Op payload bytes for
+   progress pacing. The byte count is usable only after a successful commit. */
+int pg_tool_live_stage_metered(pg_document_tx *,uint64_t,uint64_t,
+ const struct json_object *,int (*mint)(void *,uint64_t *),unsigned,size_t *);
 int pg_tool_live_created(pg_document_tx *,uint64_t,uint64_t,uint64_t,const struct json_object *,int (*mint)(void *,uint64_t *));
 /* Detached adopted slot; PG_DOC_MISSING when absent. */
 int pg_tool_live_read(pg_durable_session *,uint64_t,uint64_t,struct json_object **);

@@ -173,6 +173,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 原生流buffer保留清洗前原始margin、累计字节/换行与末尾状态；head在窗口固定后只计数，tail快照保留上游所需的前一字符/换行。Tool已原位替换旧窗口拼接；220组逐块快照直接对照、实际大输出/清洗/恢复/取消通过。
 - [x] 工具调用API接入output、retainedOutput和outputWindow：报告与异步OUTPUT共用调用级buffer/节流/事件，owned快照含尚未刷新的输出，tail接受OutputSkip并保留全流计数；head拒绝skip，执行前/释放后拒绝访问。固定Chord 260组多块快照对照、实际工具/中断/清洗/跳过输出、原生ABI和真实模型工作流通过。最终OK/ERROR可显式省略output并采用报告窗口，显式空输出保持独立；afterTool改写文本时去掉原窗口截断提示。工具返回后撤销执行API，duration在返回时固定，200ms后置hook等待不计入执行时间。省略输出且窗口为空时保存空Content；嵌套默认程序值在诊断渲染之外由实际输出确定。失败Live摘要优先拼接error诊断，否则取输出，最多500 UTF-16单元并保留原生UTF-8字符边界；成功或空错误省略error字段。
 - [x] ToolControl接入真实Generation工具轮次：模型工具终态receipt保存control，Generation按调用顺序归并addTools、最后一个handoff与全体terminate；配置增量、上下文reset和队列边界同事务提交。数组/排除表/未设置选择、去重、终止true/false/混合与取消结果、最后handoff和终止后不建后继通过；两后端工具选择回滚/重开、真实DeepSeek写文件后直接结束通过。
+- [x] Live文本更新采用追加或有界重叠后的裁头/追加，操作量供Tool进度按原生Op payload计费；details/diagnostic确认提交后更新同一输出暂停期限。模型/嵌套槽的10KB追加、Unicode尾窗口、无变化零提交、计量和原有暂停/取消场景通过，保持同步元数据API。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -283,8 +284,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Durable `tool.ts` finalResult/outputValue/summaryOf/errorTextOf，以及 `harness-nested-tools.test.ts` 的diagnostics优先、500字符摘要和空输出场景；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：Tool结算在done槽提交前生成失败摘要，按error诊断顺序拼接或回退原始结果文本，保留duration/usage；成功或空错误不写error。省略输出且保留窗口为空时提交空Content，diagnostics仍独立渲染。嵌套结果没有显式structuredOutput时，直接将实际输出文本存为程序值，避免调用者把渲染后的harness诊断当成工具数据；旧查询回退仍可读取既有PanGu记录。
-- 验证：产品 `test_product_resources.py --native-tasks --sanitize` 通过八组摘要（长ASCII、输出回退、多诊断、emoji、空error、成功、字符边界、嵌入NUL）及省略空输出/仅诊断/空错误结果。检查实际Live槽和嵌套返回，保留原有取消/重开/ToolControl场景。Runtime整批、产品构建与Assembly检查均通过；本次未改模型协议，沿用上一批真实DeepSeek工具控制工作流结果。
-- 接口与自审：仅改现有Tool实现，公开函数表/布局/文件登记保持。摘要用固定栈缓冲保存最多500 UTF-16单元，截断遇到跨边界标量时停在该字符之前，PanGu持久字符串保持有效UTF-8；与JS孤立surrogate的表示差异明确。省略输出标志与截断诊断待处理位分别维护，owned JSON按现有事务释放。
-- 剩余与下一交付物：完整工具行为保持未勾选。继续完整structuredOutput schema契约/校验与多内容块结果；异常Task自身Live最终化、实际写入后缀/元数据字节计量及统一details/diagnostic调度语义仍在工具覆盖范围。当前基础Schema服务是显式子集，完整结果校验需复用成熟验证实现并接入实际工具定义。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Chord `delta/tracker.ts` emitChangedValue、`delta/index.ts` overlap，以及Durable `tool.ts` publishProgress和Chord Progress字节节流消费者；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：tool_live原有稀疏字段更新先比较文本，增长前缀用a，有界尾/头重叠用t+a，其余保留s；模型/嵌套路径共用。metered入口返回本次原生Op JSON payload字节数，Tool确认提交后按100KiB/s与至少100ms设置下次期限，替换输入chunk字节计量。同步details/diagnostic提交也回报实际操作量，更新同一后续输出期限；原有待处理输出、最终/清理强制刷新保持。
+- 验证：`test_product_resources.py --native-tasks --sanitize` 通过。两种Live槽均验证10KB文本追加只产生a且payload小于256字节、Unicode前缀滚动使用t+a并得到准确全文、重复相同字段零字节/零Storage提交；原有报告API、八组错误摘要、取消/重开和ToolControl保持。Runtime整批、产品构建与Assembly检查通过。
+- 接口与自审：新增pg_tool_live_stage_metered和pg_durable_tool_progress_recorded，既有函数表与私有Tool尺寸保持，导出登记同步。计量仅在成功提交后采用；Op路径和UTF-16裁头复用现有Delta执行器。原生重叠探测上限65536字节、探针64字节、每档8候选；其操作选择可与JS UTF-16探测不同，最终文本保持一致。速率按PanGu实际序列化Op payload而非上游字符串近似计量；排除独立安装目录 `claude/` 的登记候选镜像G00通过。
+- 剩余与下一交付物：完整工具行为保持未勾选。同步元数据API尚未合并为上游mark/markAndWait的统一异步进度；完整structuredOutput schema契约/成熟验证桥接、多内容块结果及异常Task自身Live最终化继续保留在工具覆盖范围。下一批集中接通结果契约的定义、选中快照与校验消费者。

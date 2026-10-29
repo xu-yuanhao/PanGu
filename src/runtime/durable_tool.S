@@ -2445,7 +2445,11 @@ pg_durable_tool_executing:
  mov rax,[rax]
  mov r8,[rax+24]
  mov r9d,[rsp+40]
- call pg_tool_live_stage@PLT
+ lea rax,[rbx+360]
+ sub rsp,16
+ mov [rsp],rax
+ call pg_tool_live_stage_metered@PLT
+ add rsp,16
  jmp .Ldt_progress_end
 .Ldt_progress_alloc:
  mov eax,5
@@ -3260,7 +3264,6 @@ pg_durable_tool_output:
  jz .Ldt_output_ok
 .Ldt_output_dirty:
  mov dword ptr [rbx+368],1
- add [rbx+360],r13
  mov rdi,rbx
  xor esi,esi
  call .Ldt_progress_flush
@@ -3592,3 +3595,32 @@ pg_durable_tool_output_window:
  ret
 .section .rodata
 .Ldt_summary_newline: .ascii "\n"
+
+.text
+.globl pg_durable_tool_progress_recorded
+.type pg_durable_tool_progress_recorded,@function
+pg_durable_tool_progress_recorded:
+ push rbx
+ sub rsp,16
+ mov [rsp+8],rsi
+ mov rbx,rdi
+ call pg_durable_tool_executing@PLT
+ test eax,eax
+ jz .Ldt_recorded_end
+ cmp qword ptr [rsp+8],0
+ je .Ldt_recorded_end
+ mov rbx,[rbx+56]
+ call .Ldt_monotonic
+ movsd [rsp],xmm0
+ pxor xmm0,xmm0
+ cvtsi2sd xmm0,qword ptr [rsp+8]
+ divsd xmm0,[rip+.Ldt_bytes_per_ms]
+ maxsd xmm0,[rip+.Ldt_progress_interval]
+ addsd xmm0,[rsp]
+ maxsd xmm0,[rbx+352]
+ movsd [rbx+352],xmm0
+.Ldt_recorded_end:
+ add rsp,16
+ pop rbx
+ ret
+.size pg_durable_tool_progress_recorded,.-pg_durable_tool_progress_recorded

@@ -116,7 +116,14 @@
 .globl pg_tool_live_stage
 .type pg_tool_live_stage,@function
 pg_tool_live_stage:
- LF 240
+ xor r10d,r10d
+ jmp .Llv_stage_entry
+.globl pg_tool_live_stage_metered
+.type pg_tool_live_stage_metered,@function
+pg_tool_live_stage_metered:
+ mov r10,[rsp+8]
+.Llv_stage_entry:
+ LF 256
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
@@ -124,8 +131,13 @@ pg_tool_live_stage:
  mov rbp,r8
  mov rdi,rsp
  xor eax,eax
- mov ecx,30
+ mov ecx,32
  rep stosq
+ mov [rsp+240],r10
+ test r10,r10
+ jz .Llv_meter_ready
+ mov qword ptr [r10],0
+.Llv_meter_ready:
  mov [rsp+208],r9d
  lea rax,[rip+.Llv_kind]
  mov [rsp],rax
@@ -299,6 +311,18 @@ pg_tool_live_stage:
  jnz .Llv_field_next
 .Llv_field_write:
  mov rdi,[rsp+152]
+ mov rsi,[rsp+160]
+ mov rdx,[rsp+184]
+ mov rcx,[rsp+136]
+ mov r8,rbp
+ call .Llv_text_ops
+ cmp eax,1
+ je .Llv_field_replace
+ test eax,eax
+ jnz .Llv_finish
+ jmp .Llv_field_next
+.Llv_field_replace:
+ mov rdi,[rsp+152]
  lea rsi,[rip+.Llv_field_json]
  mov rdx,[rsp+136]
  mov rcx,[rsp+184]
@@ -364,6 +388,18 @@ pg_tool_live_stage:
  test eax,eax
  jnz .Llv_finish
 .Llv_append_ops:
+ cmp qword ptr [rsp+240],0
+ je .Llv_unmetered
+ mov rdi,[rsp+152]
+ xor esi,esi
+ lea rdx,[rsp+248]
+ call json_object_to_json_string_length@PLT
+ test rax,rax
+ jz .Llv_bad
+ mov rax,[rsp+240]
+ mov rcx,[rsp+248]
+ mov [rax],rcx
+.Llv_unmetered:
  mov rdi,[rsp+112]
  mov rsi,[rsp+152]
  call pg_document_change_append@PLT
@@ -382,7 +418,7 @@ pg_tool_live_stage:
  mov rdi,[rsp+224]
  call json_object_put@PLT
  mov eax,[rsp+216]
- LE 240
+ LE 256
 .size pg_tool_live_stage,.-pg_tool_live_stage
 .section .rodata
 .Llv_kind: .asciz "pangu.live"
@@ -763,3 +799,185 @@ pg_tool_live_clear_model:
 .size pg_tool_live_clear_model,.-pg_tool_live_clear_model
 .section .rodata
 .Llv_clear_model_json: .asciz "[[\"d\",[\"tools\"]]]"
+
+.text
+/* Chord emitChangedValue: append a prefix extension, otherwise probe a bounded
+   suffix/prefix overlap and trim before appending. Fallback is a leaf set. */
+.Llv_text_ops:
+ LF 112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov rbp,r8
+ mov qword ptr [rsp+96],0
+ mov rdi,r12
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Llv_text_fallback
+ mov rdi,r13
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Llv_text_fallback
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov [rsp],rax
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov [rsp+8],rax
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov [rsp+16],rax
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov [rsp+24],rax
+ cmp rax,[rsp+8]
+ jbe .Llv_text_overlap
+ mov rdi,[rsp]
+ mov rsi,[rsp+16]
+ mov rdx,[rsp+8]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Llv_text_overlap
+ mov rax,[rsp+8]
+ mov [rsp+40],rax
+ jmp .Llv_text_append
+.Llv_text_overlap:
+ cmp qword ptr [rsp+8],0
+ je .Llv_text_fallback
+ cmp qword ptr [rsp+24],0
+ je .Llv_text_fallback
+ mov rax,[rsp+8]
+ mov ecx,65536
+ cmp rax,rcx
+ cmova rax,rcx
+ mov rcx,[rsp+8]
+ sub rcx,rax
+ mov rdx,[rsp]
+.Llv_text_scan_boundary:
+ movzx eax,byte ptr [rdx+rcx]
+ and eax,192
+ cmp eax,128
+ jne .Llv_text_scan_ready
+ inc rcx
+ jmp .Llv_text_scan_boundary
+.Llv_text_scan_ready:
+ add rdx,rcx
+ mov [rsp+48],rdx
+ mov rax,[rsp+24]
+ cmp rax,64
+ jbe .Llv_text_probe
+ mov eax,64
+.Llv_text_probe:
+ mov [rsp+56],rax
+.Llv_text_pass:
+ mov rax,[rsp+48]
+ mov [rsp+64],rax
+ mov qword ptr [rsp+72],0
+.Llv_text_candidate:
+ mov rsi,[rsp]
+ add rsi,[rsp+8]
+ sub rsi,[rsp+64]
+ jbe .Llv_text_probe_short
+ mov rdi,[rsp+64]
+ mov rdx,[rsp+16]
+ mov rcx,[rsp+56]
+ call memmem@PLT
+ test rax,rax
+ jz .Llv_text_probe_short
+ inc qword ptr [rsp+72]
+ cmp qword ptr [rsp+72],8
+ ja .Llv_text_probe_short
+ lea rcx,[rax+1]
+ mov [rsp+64],rcx
+ mov rdx,[rsp]
+ add rdx,[rsp+8]
+ sub rdx,rax
+ mov [rsp+40],rdx
+ cmp rdx,[rsp+24]
+ ja .Llv_text_candidate
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ call memcmp@PLT
+ test eax,eax
+ jnz .Llv_text_candidate
+ jmp .Llv_text_trim
+.Llv_text_probe_short:
+ cmp qword ptr [rsp+56],1
+ je .Llv_text_fallback
+ mov qword ptr [rsp+56],1
+ jmp .Llv_text_pass
+.Llv_text_trim:
+ mov rdx,[rsp+8]
+ sub rdx,[rsp+40]
+ mov rsi,[rsp]
+ xor ecx,ecx
+ xor edi,edi
+.Llv_text_trim_units:
+ cmp rcx,rdx
+ jae .Llv_text_trim_op
+ movzx eax,byte ptr [rsi+rcx]
+ and eax,192
+ cmp eax,128
+ je .Llv_text_trim_next
+ inc rdi
+ cmp byte ptr [rsi+rcx],240
+ jb .Llv_text_trim_next
+ inc rdi
+.Llv_text_trim_next:
+ inc rcx
+ jmp .Llv_text_trim_units
+.Llv_text_trim_op:
+ call json_object_new_uint64@PLT
+ mov [rsp+96],rax
+ test rax,rax
+ jz .Llv_text_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Llv_trim_json]
+ mov rdx,r14
+ mov rcx,rax
+ mov r8,rbp
+ call .Llv_op
+ mov [rsp+104],eax
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov qword ptr [rsp+96],0
+ cmp dword ptr [rsp+104],0
+ jne .Llv_text_saved_error
+.Llv_text_append:
+ mov rsi,[rsp+24]
+ sub rsi,[rsp+40]
+ jz .Llv_text_ok
+ mov rdi,[rsp+16]
+ add rdi,[rsp+40]
+ call json_object_new_string_len@PLT
+ mov [rsp+96],rax
+ test rax,rax
+ jz .Llv_text_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Llv_append_json]
+ mov rdx,r14
+ mov rcx,rax
+ mov r8,rbp
+ call .Llv_op
+ mov [rsp+104],eax
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+.Llv_text_saved_error:
+ mov eax,[rsp+104]
+ jmp .Llv_text_end
+.Llv_text_ok:
+ xor eax,eax
+ jmp .Llv_text_end
+.Llv_text_fallback:
+ mov eax,1
+ jmp .Llv_text_end
+.Llv_text_bad:
+ mov eax,5
+.Llv_text_end:
+ LE 112
+.section .rodata
+.Llv_append_json: .asciz "[\"a\",[\"nestedTools\",0,\"\"],null]"
+.Llv_trim_json: .asciz "[\"t\",[\"nestedTools\",0,\"\"],0]"

@@ -1781,7 +1781,8 @@
         "pg_durable_tool_output_limits",
         "pg_durable_tool_output",
         "pg_durable_tool_retained_output",
-        "pg_durable_tool_output_window"
+        "pg_durable_tool_output_window",
+        "pg_durable_tool_progress_recorded"
       ],
       "reference_basis": [
         {
@@ -2555,7 +2556,8 @@
         "pg_tool_live_stage",
         "pg_tool_live_created",
         "pg_tool_live_read",
-        "pg_tool_live_clear_model"
+        "pg_tool_live_clear_model",
+        "pg_tool_live_stage_metered"
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts startNestedCall/toolSlot/settle"

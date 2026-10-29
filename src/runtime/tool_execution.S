@@ -681,6 +681,12 @@ pg_tool_execution_diagnostic:
  mov rsi,rsp
  lea rdx,[rip+.Lte_report_stage]
  call pg_task_runner_commit_with@PLT
+ test eax,eax
+ jnz .Lte_report_finish
+ mov rdi,[rbx]
+ mov rsi,[rsp+88]
+ call pg_durable_tool_progress_recorded@PLT
+ xor eax,eax
  jmp .Lte_report_finish
 .Lte_report_invalid:
  mov eax,4
@@ -700,16 +706,23 @@ pg_tool_execution_diagnostic:
  mov eax,[rsp+80]
  EE 96
 .Lte_report_stage:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
  mov qword ptr [rcx],0
- mov rax,rdi
+ lea rax,[rbx+88]
+ mov [rsp],rax
  mov rdi,rdx
- mov rsi,[rax+24]
- mov rcx,[rax+16]
- mov r8,[rax+8]
- mov r9d,[rax+32]
- mov rax,[rax]
+ mov rsi,[rbx+24]
+ mov rcx,[rbx+16]
+ mov r8,[rbx+8]
+ mov r9d,[rbx+32]
+ mov rax,[rbx]
  mov rdx,[rax+16]
- jmp pg_tool_live_stage@PLT
+ call pg_tool_live_stage_metered@PLT
+ add rsp,16
+ pop rbx
+ ret
 .Lte_diagnostic_valid:
  EF 16
  mov rbx,rdi
