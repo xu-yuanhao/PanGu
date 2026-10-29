@@ -37,7 +37,11 @@ struct json_object;
    Switching does not close the shared scheduler or abort other conversations.
    current returns 0 after close. Context stays borrowed through client lifetime. */
 typedef struct {void *context;int (*select)(void *,uint64_t);uint64_t (*current)(void *);
- int (*history)(void *,struct json_object **);void (*release)(struct json_object *);} pg_conversation_client_ops;
+ int (*history)(void *,struct json_object **);void (*release)(struct json_object *);
+ /* parent/at both zero creates an independent conversation; both nonzero forks.
+    agent is an optional borrowed change; output owns the committed record.
+    The foreground selection stays unchanged. Same status family as select. */
+ int (*create)(void *,uint64_t parent,uint64_t at,const struct json_object *agent,struct json_object **);} pg_conversation_client_ops;
 /* start copies instructions; reserve_tokens is 2..1000000. Serialized binding
    remains borrowed through poll/release and the owning runtime lifetime. */
 typedef struct {

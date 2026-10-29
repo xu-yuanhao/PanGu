@@ -229,6 +229,13 @@ static void test_start_setup(void) {
     assert(count_easy_cleanup==2&&count_multi_cleanup==2&&count_slist_free==2);
 }
 
+static void test_bound_tools_survive_request_cleanup(void){
+ reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();assert(!setenv("MIMO_API_KEY","transport-unit-key",1));
+ pg_tool_registry registry={.entries={{.name="write",.description="Write a file",.schema="{\"type\":\"object\"}"}},.count=1};pg_mimo_bind_tools(&m,&registry);
+ for(unsigned attempt=0;attempt<2;attempt++){assert(!start()&&m.tools==&registry);json_object *wire=json_tokener_parse(captured_post);assert(wire);json_object *tools=json_object_object_get(wire,"tools");assert(json_object_is_type(tools,json_type_array)&&json_object_array_length(tools)==1&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(json_object_array_get_idx(tools,0),"function"),"name")),"write"));json_object_put(wire);model.close(model.context);assert(m.tools==&registry);}
+ pg_mimo_bind_tools(&m,0);
+}
+
 static void test_text_stream(void) {
     pg_model_event e;
     reset_script();
@@ -495,6 +502,7 @@ static void test_saved_connection(void){
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
+    test_bound_tools_survive_request_cleanup();
     test_text_stream();
     test_tool_stream();
     test_transport_failures();

@@ -72,9 +72,14 @@ pg_mimo_bind_tools:
  inc r12d
  cmp r12d,PG_MM_CALL_LIMIT
  jb .Lclear_arg_loop
+ /* Preserve the request metadata and registry between the two buffers. */
  lea rdi,[rbx+PG_MM_ARGUMENTS]
  xor esi,esi
- mov edx,PG_MM_USAGE-PG_MM_ARGUMENTS
+ mov edx,PG_MM_USED-PG_MM_ARGUMENTS
+ call memset@PLT
+ lea rdi,[rbx+PG_MM_EXTRA]
+ xor esi,esi
+ mov edx,PG_MM_USAGE-PG_MM_EXTRA
  call memset@PLT
  add rsp,8
  pop r12
@@ -242,10 +247,7 @@ li_start:
  mov byte ptr [rbx + PG_MM_ARGUMENTS], 0
  mov byte ptr [rbx + PG_MM_ID], 0
  mov byte ptr [rbx + PG_MM_NAME], 0
- lea rdi,[rbx+PG_MM_EXTRA]
- xor esi,esi
- mov edx,PG_MM_USAGE-PG_MM_EXTRA
- call memset@PLT
+
  lea rdi,[rip+.Lstr_pangu_key]
  call getenv@PLT
  test rax,rax

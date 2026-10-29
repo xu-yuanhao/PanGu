@@ -45,11 +45,11 @@
 | 扩展组合与生命周期 | `extensions.S`、`extension_registry.S`：稳定名称选择、工具/section/wrap及Generation/Tool/Compaction hooks；候选原子发布、同名替换、撤销与phase快照，所有者引用延迟释放，Host关闭等待消费者；自定义Task按全安装集合解析，Runner持有invocation/失败迁移定义引用并在phase边界接手 |
 | Generation/Tool | `durable_generation.S`、`durable_tool.S`：保存配置、模型请求、工具轮次、原子结果、副作用恢复；真实DeepSeek在SQLite/JSONL通过 |
 | Submission/输入队列 | `durable_inputs.S`：去重、admission、one/all steer/follow-up边界、展示写入、reset/stale、失败策略、撤回/状态与持久结算；产品导出inputs服务 |
-| 前台 Client | `durable_client.S`：严格UTF-8输入、原子创建任务、忙时拒绝、事件借用、取消、暂停重开与历史；专项ASan/UBSan通过 |
+| 会话创建与前台 | `agent_state.S`/`durable_session.S`/`durable_client.S`：原子默认文档、Agent分叉点/owner继承、agent/init、独立持久UUIDv7与旧会话补建；产品新建/分叉/选择/历史入口，真实DeepSeek在分叉会话写文件；SQLite/JSONL回滚与重开 |
 | 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
 | 会话视图 | `conversation_view.S`：conversation.view Host/TUI只读入口，统一会话/原始有效Entry/已有Live与UsageDoc/queued Submission，readOnLine保护与分页、重开 |
 | 会话用量 | `usage.S`：pangu.usage按models/tools累计，Generation/工具结果/摘要尝试同批提交；响应模型身份优先，计数及已报告cost、可选reasoning/cacheWrite1h，Host usage读取与重开 |
-| 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入 |
+| 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入；参数缓冲清理保留工具注册表，连续请求携带当前声明 |
 | 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
 | 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
 | 设置与资源路径 | `settings.S`：用户/项目JSON层、递归覆盖与错误诊断、独立所有权；配置skills/prompts的普通文件/目录进入技能发现与模板命令，路径相对所属配置目录解析 |
@@ -89,6 +89,7 @@ python3 -B tools/runtime/build_test.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live
 python3 -B tools/runtime/test_product_resources.py --live
 python3 -B tools/runtime/test_product_resources.py --live-agent
+python3 -B tools/runtime/test_product_resources.py --live-conversations
 python3 -B tools/runtime/test_product_resources.py --live-extensions
 python3 -B tools/runtime/test_product_resources.py --live-compaction
 python3 -B tools/runtime/test_pangu_pty.py --live-settings

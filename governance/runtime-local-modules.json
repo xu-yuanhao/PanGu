@@ -1929,6 +1929,7 @@
         "pg_durable_generation_bind_hooks",
         "pg_durable_generation_bind_prepare",
         "pg_durable_client_select",
+        "pg_durable_client_create",
         "pg_durable_client_history",
         "pg_durable_client_conversations_service",
         "pg_durable_client_text"
@@ -2427,9 +2428,11 @@
         "session.documents.reader.local.v0",
         "tools.registry.local.v0",
         "json-c",
-        "model.mimo.local.v0"
+        "model.mimo.local.v0",
+        "session.durable.lifecycle.local.v0",
+        "system libc"
       ],
-      "role": "Pi AgentDoc mutation/read, request instructions and stable-name model/execution tool selection",
+      "role": "Pi AgentDoc mutation/read, request instructions, stable-name tool selection and atomic Harness conversation defaults/configuration/initialization with independent provider UUIDv7 identities",
       "exports": [
         "pg_agent_state_stage",
         "pg_agent_state_read",
@@ -2439,10 +2442,13 @@
         "pg_agent_state_peek",
         "pg_agent_tools_service",
         "pg_agent_tools_names",
-        "pg_agent_state_add_tools"
+        "pg_agent_state_add_tools",
+        "pg_agent_conversation_create",
+        "pg_provider_state_read",
+        "pg_provider_state_ensure"
       ],
       "reference_basis": [
-        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/agent.ts"
+        "Pi d5b3de22d0e24a3e9c38a9410d3329b099717283 packages/durable/src/harness/{agent,harness,provider}.ts; packages/ai/src/utils/uuid.ts"
       ]
     },
     {

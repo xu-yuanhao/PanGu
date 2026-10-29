@@ -2936,6 +2936,7 @@ pg_durable_client_conversations_service:
  mov [rsi+24],rax
  mov rax,qword ptr [rip+json_object_put@GOTPCREL]
  mov [rsi+32],rax
+ mov qword ptr [rsi+40],0
  xor eax,eax
 .Lcs_service_end:
  ret
@@ -3066,4 +3067,78 @@ pg_durable_client_history:
 .size pg_durable_client_history,.-pg_durable_client_history
 .section .rodata
 .Lcsh_history_key: .asciz "history"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_durable_client_create
+.type pg_durable_client_create,@function
+pg_durable_client_create:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15d,4
+ test r14,r14
+ jz .Lcc_end
+ mov qword ptr [r14],0
+ test rbx,rbx
+ jz .Lcc_end
+ test r12,r12
+ jz .Lcc_end
+ test r13,r13
+ jz .Lcc_end
+ mov rax,[r12]
+ test rax,rax
+ jz .Lcc_end
+ cmp rax,[rbx]
+ jne .Lcc_end
+ mov r15d,7
+ mov rax,[rbx]
+ cmp dword ptr [rax+172],1
+ jne .Lcc_end
+ cmp qword ptr [rbx+8],0
+ je .Lcc_end
+ cmp dword ptr [rbx+68],0
+ jne .Lcc_end
+ mov r15d,3
+ cmp dword ptr [rbx+56],0
+ jne .Lcc_end
+ cmp dword ptr [rbx+60],0
+ jne .Lcc_end
+ mov r15d,5
+ cmp dword ptr [rbx+72],0
+ jne .Lcc_end
+ cmp dword ptr [rbx+76],0
+ jne .Lcc_end
+ mov dword ptr [rbx+56],1
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ call pg_agent_conversation_create@PLT
+ mov dword ptr [rbx+56],0
+ xor r15d,r15d
+ test eax,eax
+ jz .Lcc_end
+ mov r15d,5
+ cmp eax,1
+ jne .Lcc_storage
+ mov r15d,4
+.Lcc_storage:
+ cmp eax,6
+ jne .Lcc_end
+ mov r15d,6
+.Lcc_end:
+ mov eax,r15d
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_create,.-pg_durable_client_create
 .section .note.GNU-stack,"",@progbits

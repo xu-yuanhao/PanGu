@@ -194,6 +194,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 文本Submission接入真实产品：requestId去重、输入/写入admission、状态轮询/撤回、steer/follow-up的one/all边界、忙时reject、展示写入、reset/stale、失败keep/continue/withdraw及持久结算。
 - [x] 根/独立/分叉会话通过统一Session创建入口原子提交；创建hook的Entry和Agent文档同批保存，已有根会话不重复初始化，hook失败整体撤销。产品根启动接入；SQLite/JSONL分叉历史与文档继承、隔离及重开通过。
 - [x] 前台空闲选择会话保留共享Scheduler，失败保持旧绑定；当前会话历史经同一canonical投影读取并直接绑定TUI历史行，父/分叉内容隔离、两后端重开通过。
+- [x] Harness创建服务接入Live/Inbox/Usage/Provider/Agent默认文档、独立UUIDv7身份、分叉点/任务owner配置继承及同事务agent/init；产品conversation.client支持独立/分叉创建后选择，真实DeepSeek完成各自对话与分叉写文件，两后端回滚/重开通过。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -295,8 +296,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/{view,context}.ts`及Coding Agent `core/agent-session-runtime.ts`的会话替换；Harness固定`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。沿用当前原生上下文/历史投影。
-- 实际调用链：`conversation.client`提供select/current/history/release；`pg_durable_client_history`在Session只读事务内按当前会话读取canonical context并投影拥有所有权的历史行数组，复用Generation的head/编辑/工具配对语义。产品启动与选后历史使用同一入口，返回数组可交给`pg_tui_bridge_set_history_rows`；持有数组直到桥接更换历史或关闭。
-- 验证：`build_test.py --conversations`与`--client`的ASan/UBSan通过，覆盖父/分叉历史、TUI桥接实际读取、忙时与关闭拒绝及两后端重开；产品资源/Host组合ASan/UBSan、产品构建、Assembly检查通过。本轮未调用模型。G00按Git登记文件的当前快照执行；工作区项目外`claude/`独立仓库保留。
-- 接口与差异：可选`pg_conversation_client_ops`扩展history/release，当前表大小40字节；已有Client与TUI Runtime主表不变。完整会话操作控件由TUI线消费此入口。Harness默认文档/配置/init及新建/分叉产品操作服务尚需接通。
-- 下一交付物：将Session原子创建与Agent配置/默认文档组合成会话操作服务，接入新建/分叉/选择和独立模型配置；K08剩余行为继续按覆盖项推进。
+- 来源：Pi固定`d5b3de22d0e24a3e9c38a9410d3329b099717283`的Durable `harness/{harness,agent,provider}.ts`、`session/forks.ts`及pi-ai `utils/uuid.ts`；沿用此前固定Harness快照和原生Session/文档/分叉实现。
+- 实际调用链：`pg_agent_conversation_create`在一个Session事务内初始化内置文档，分叉保留asOf Agent配置，任务拥有的新会话复制owner配置，再应用agent与init。`pg_durable_client_create`提供前台空闲准入；产品`conversation.client.create(parent,at,agent,&record)`创建独立/分叉会话，select/history沿既有入口。provider身份为持久UUIDv7；旧会话缺身份时在模型请求前补建，实际请求配置携带自身sessionId。
+- 验证：SQLite/JSONL的ASan/UBSan专项覆盖默认文档、身份顺序/重开、asOf与owner继承、init回滚、空闲创建/选择/历史与旧会话身份补建；实际Host资源组合、产品构建和Assembly检查通过。真实DeepSeek `test_product_resources.py --live-conversations`验证独立/分叉指令、独立provider配置和实际write文件；`--live-agent`验证既有编码与控制流程。模型传输O0/O2/UBSan专项通过。`build_test.py`整批Runtime回归通过；G00对Git登记文件当前快照通过（工作区项目外`claude/`保留）。控制登记按新增导出/实际libc依赖自审，既有ABI主表保持不变。
+- 接口与差异：可选会话操作表现在包含create，返回拥有所有权的Conversation记录；创建不改变当前选择。此次真实闭环发现并修复`mimo.S`参数清理覆盖工具注册表指针的问题，传输回归验证连续start/close后工具声明仍随请求发送。TUI可直接消费会话表；会话列表/命名与选择控件继续由所属步骤接通。
+- 下一交付物：接通可分页的会话列表/记录查询及产品会话管理操作，配合TUI选择入口；随后按K10补齐reset/handoff和嵌套会话的完整行为覆盖。

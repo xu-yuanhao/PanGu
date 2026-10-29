@@ -989,3 +989,479 @@ pg_agent_tools_names:
  AE 32
 .section .rodata
 .La_add: .asciz "add"
+
+.text
+/* Document request assembled against the caller's already admitted mutation. */
+.Lac_doc:
+ AF 112
+ mov rbx,rdi
+ mov r12,r9
+ mov r9,rcx
+ mov r10,rdx
+ mov r11,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov rax,[r10]
+ mov [rsp],rax
+ mov rax,[r10+8]
+ mov [rsp+8],rax
+ mov [rsp+32],r11
+ mov dword ptr [rsp+40],1
+ mov [rsp+48],r10
+ mov rax,rsp
+ mov [rsp+56],rax
+ mov [rsp+72],r9
+ mov [rsp+80],r8
+ lea rax,[rip+.La_checkpoint]
+ mov [rsp+96],rax
+ mov rdi,rbx
+ lea rsi,[rsp+48]
+ mov rdx,r12
+ call pg_document_tx_doc@PLT
+ AE 112
+.Lac_json_initial:
+ push rbx
+ mov rbx,rdx
+ call json_tokener_parse@PLT
+ mov [rbx],rax
+ test rax,rax
+ setz al
+ movzx eax,al
+ pop rbx
+ ret
+/* Pi uuidv7: wall time never decreases; random-seeded sequence orders this host. */
+.Lac_provider_initial:
+ AF 96
+ mov rbx,rdx
+ mov qword ptr [rbx],0
+ xor r12d,r12d
+.Lac_random:
+ lea rdi,[rsp+r12]
+ mov esi,16
+ sub rsi,r12
+ xor edx,edx
+ call getrandom@PLT
+ test rax,rax
+ jg .Lac_random_bytes
+ call __errno_location@PLT
+ cmp dword ptr [rax],4
+ je .Lac_random
+ jmp .Lac_uuid_bad
+.Lac_random_bytes:
+ add r12,rax
+ cmp r12,16
+ jb .Lac_random
+ xor edi,edi
+ lea rsi,[rsp+16]
+ call clock_gettime@PLT
+ test eax,eax
+ jnz .Lac_uuid_bad
+ mov rax,[rsp+24]
+ xor edx,edx
+ mov ecx,1000000
+ div rcx
+ imul rdx,[rsp+16],1000
+ add rax,rdx
+ mov rcx,0xffffffffffff
+ cmp rax,rcx
+ ja .Lac_uuid_bad
+ cmp rax,[rip+.Lac_timestamp]
+ jae .Lac_uuid_time
+ mov rax,[rip+.Lac_timestamp]
+.Lac_uuid_time:
+ mov [rip+.Lac_timestamp],rax
+ mov ecx,5
+.Lac_uuid_time_byte:
+ mov [rsp+rcx],al
+ shr rax,8
+ dec ecx
+ jns .Lac_uuid_time_byte
+ cmp byte ptr [rip+.Lac_seeded],0
+ jne .Lac_uuid_sequence_next
+ /* Random bytes 1..5 were replaced by timestamp: retain an independent
+    random 40-bit seed from bytes 11..15. */
+ xor r13d,r13d
+ mov ecx,11
+.Lac_uuid_sequence_seed:
+ shl r13,8
+ movzx eax,byte ptr [rsp+rcx]
+ or r13,rax
+ inc ecx
+ cmp ecx,16
+ jb .Lac_uuid_sequence_seed
+ mov byte ptr [rip+.Lac_seeded],1
+ jmp .Lac_uuid_sequence_ready
+.Lac_uuid_sequence_next:
+ mov r13,[rip+.Lac_sequence]
+ inc r13
+ mov rax,0x1ffffffffff
+ cmp r13,rax
+ ja .Lac_uuid_bad
+.Lac_uuid_sequence_ready:
+ mov [rip+.Lac_sequence],r13
+ mov rax,r13
+ shr rax,37
+ or al,0x70
+ mov [rsp+6],al
+ mov rax,r13
+ shr rax,29
+ mov [rsp+7],al
+ mov rax,r13
+ shr rax,23
+ and al,0x3f
+ or al,0x80
+ mov [rsp+8],al
+ mov rax,r13
+ shr rax,15
+ mov [rsp+9],al
+ mov rax,r13
+ shr rax,7
+ mov [rsp+10],al
+ mov al,[rsp+11]
+ and al,1
+ mov rdx,r13
+ shl dl,1
+ or al,dl
+ mov [rsp+11],al
+ xor ecx,ecx
+ xor edx,edx
+ lea r8,[rip+.Lac_hex]
+.Lac_uuid_hex:
+ cmp ecx,4
+ je .Lac_uuid_dash
+ cmp ecx,6
+ je .Lac_uuid_dash
+ cmp ecx,8
+ je .Lac_uuid_dash
+ cmp ecx,10
+ jne .Lac_uuid_hex_byte
+.Lac_uuid_dash:
+ mov byte ptr [rsp+rdx+32],45
+ inc edx
+.Lac_uuid_hex_byte:
+ movzx eax,byte ptr [rsp+rcx]
+ mov esi,eax
+ shr eax,4
+ and esi,15
+ mov al,[r8+rax]
+ mov [rsp+rdx+32],al
+ inc edx
+ mov al,[r8+rsi]
+ mov [rsp+rdx+32],al
+ inc edx
+ inc ecx
+ cmp ecx,16
+ jb .Lac_uuid_hex
+ lea rdi,[rsp+32]
+ mov esi,36
+ call json_object_new_string_len@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lac_uuid_bad
+ call json_object_new_object@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lac_uuid_string_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lac_session_id]
+ mov rdx,r12
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lac_uuid_object_bad
+ mov [rbx],r13
+ xor eax,eax
+ AE 96
+.Lac_uuid_object_bad:
+ mov rdi,r13
+ call json_object_put@PLT
+.Lac_uuid_string_bad:
+ mov rdi,r12
+ call json_object_put@PLT
+.Lac_uuid_bad:
+ mov eax,5
+ AE 96
+
+.Lac_created:
+ AF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp+24],0
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rbp,[rax+160]
+ mov rdi,r13
+ lea rsi,[rip+.Lac_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r14,rax
+ mov qword ptr [rsp],0
+.Lac_created_docs:
+ mov rax,[rsp]
+ lea rdx,[rip+.Lac_documents]
+ shl rax,4
+ mov rcx,[rdx+rax+8]
+ mov rdx,[rdx+rax]
+ test rdx,rdx
+ jz .Lac_created_owner
+ mov rax,[rbx]
+ mov r8,[rax+24]
+ mov rdi,rbp
+ mov rsi,r14
+ lea r9,[rsp+16]
+ call .Lac_doc
+ test eax,eax
+ jnz .Lac_created_bad
+ inc qword ptr [rsp]
+ jmp .Lac_created_docs
+.Lac_created_owner:
+ mov rdi,r13
+ lea rsi,[rip+.Lac_parent]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lac_created_configure
+ mov rdi,r13
+ lea rsi,[rip+.Lac_owner]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lac_created_configure
+ mov rdi,rax
+ lea rsi,[rip+.Lac_conversation_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,rbp
+ lea rdx,[rip+.La_definition]
+ lea rcx,[rip+.La_initializer]
+ mov rax,[rbx]
+ mov r8,[rax+24]
+ lea r9,[rsp+16]
+ call .Lac_doc
+ test eax,eax
+ jnz .Lac_created_bad
+ mov rdi,[rsp+16]
+ lea rsi,[rsp+24]
+ call pg_document_change_snapshot@PLT
+ test eax,eax
+ jnz .Lac_created_bad
+ mov rax,[rbx]
+ mov rcx,[rax+24]
+ mov rdi,rbp
+ mov rsi,r14
+ mov rdx,[rsp+24]
+ call pg_agent_state_stage@PLT
+ test eax,eax
+ jnz .Lac_created_bad
+.Lac_created_configure:
+ mov rax,[rbx+8]
+ mov rdx,[rax+32]
+ test rdx,rdx
+ jz .Lac_created_init
+ mov rax,[rbx]
+ mov rcx,[rax+24]
+ mov rdi,rbp
+ mov rsi,r14
+ call pg_agent_state_stage@PLT
+ test eax,eax
+ jnz .Lac_created_bad
+.Lac_created_init:
+ mov rax,[rbx+8]
+ cmp qword ptr [rax+48],0
+ je .Lac_created_ok
+ mov rdi,[rax+40]
+ mov rsi,r12
+ mov rdx,r14
+ call [rax+48]
+ test eax,eax
+ jnz .Lac_created_bad
+.Lac_created_ok:
+ xor r12d,r12d
+ jmp .Lac_created_end
+.Lac_created_bad:
+ mov r12d,5
+.Lac_created_end:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,r12d
+ AE 48
+.globl pg_agent_conversation_create
+.type pg_agent_conversation_create,@function
+pg_agent_conversation_create:
+ AF 48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test r13,r13
+ jz .Lac_create_invalid
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Lac_create_invalid
+ test r12,r12
+ jz .Lac_create_invalid
+ mov [rsp],rbx
+ mov [rsp+8],r12
+ mov rax,rsp
+ mov [rsp+16],rax
+ mov rax,[rbx+24]
+ mov [rsp+24],rax
+ mov rax,[rbx+32]
+ mov [rsp+32],rax
+ lea rax,[rip+.Lac_created]
+ mov [rsp+40],rax
+ mov rdi,[rbx]
+ mov rsi,r12
+ lea rdx,[rsp+16]
+ mov rcx,[rbx+8]
+ mov r8,[rbx+16]
+ mov r9,r13
+ call pg_durable_session_create_conversation@PLT
+ AE 48
+.Lac_create_invalid:
+ mov eax,1
+ AE 48
+.globl pg_provider_state_read
+.type pg_provider_state_read,@function
+pg_provider_state_read:
+ AF 48
+ mov rbx,rdi
+ mov r12,rdx
+ mov r8,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,6
+ rep stosq
+ lea rax,[rip+.Lac_provider_kind]
+ mov [rsp],rax
+ mov qword ptr [rsp+8],14
+ mov [rsp+32],r8
+ mov dword ptr [rsp+40],1
+ mov rdi,rbx
+ lea rsi,[rip+.Lac_provider_definition]
+ mov rdx,rsp
+ mov rcx,r12
+ call pg_durable_snapshot@PLT
+ AE 48
+.section .rodata
+.Lac_id: .asciz "id"
+.Lac_parent: .asciz "parent"
+.Lac_owner: .asciz "owner"
+.Lac_conversation_id: .asciz "conversationId"
+.Lac_session_id: .asciz "sessionId"
+.Lac_hex: .ascii "0123456789abcdef"
+.Lac_empty: .asciz "{}"
+.Lac_inbox_empty: .asciz "{\"items\":[]}"
+.Lac_usage_empty: .asciz "{\"models\":{},\"tools\":{}}"
+.Lac_live_kind: .asciz "pangu.live"
+.Lac_inbox_kind: .asciz "pangu.inbox"
+.Lac_usage_kind: .asciz "pangu.usage"
+.Lac_provider_kind: .asciz "pangu.provider"
+.section .data.rel.ro
+.balign 8
+.Lac_live_definition:
+ .quad .Lac_live_kind,10,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lac_inbox_definition:
+ .quad .Lac_inbox_kind,11,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lac_usage_definition:
+ .quad .Lac_usage_kind,11,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lac_provider_definition:
+ .quad .Lac_provider_kind,14,1
+ .long 1,1,2,0
+ .quad 0,0
+.Lac_empty_initializer: .quad .Lac_empty,.Lac_json_initial
+.Lac_inbox_initializer: .quad .Lac_inbox_empty,.Lac_json_initial
+.Lac_usage_initializer: .quad .Lac_usage_empty,.Lac_json_initial
+.Lac_provider_initializer: .quad 0,.Lac_provider_initial
+.Lac_documents:
+ .quad .Lac_live_definition,.Lac_empty_initializer
+ .quad .Lac_inbox_definition,.Lac_inbox_initializer
+ .quad .Lac_usage_definition,.Lac_usage_initializer
+ .quad .Lac_provider_definition,.Lac_provider_initializer
+ .quad .La_definition,.La_initializer
+ .quad 0,0
+.section .bss
+.balign 8
+.Lac_timestamp: .zero 8
+.Lac_sequence: .zero 8
+.Lac_seeded: .zero 1
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_provider_state_ensure
+.type pg_provider_state_ensure,@function
+pg_provider_state_ensure:
+ AF 112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test r13,r13
+ jz .Lac_ensure_invalid
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Lac_ensure_invalid
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov rdi,[rbx]
+ mov rsi,r12
+ mov rdx,r13
+ call pg_provider_state_read
+ cmp eax,8
+ jne .Lac_ensure_end
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,[rbx+8]
+ mov r8,[rbx+16]
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Lac_ensure_end
+ lea rdi,[rsp+48]
+ mov rsi,r12
+ lea rdx,[rip+.Lac_provider_definition]
+ lea rcx,[rip+.Lac_provider_initializer]
+ mov r8,[rbx+24]
+ lea r9,[rsp+104]
+ call .Lac_doc
+ test eax,eax
+ jnz .Lac_ensure_abort
+ mov rdi,[rsp+104]
+ lea rsi,[rsp+96]
+ call pg_document_change_snapshot@PLT
+ test eax,eax
+ jnz .Lac_ensure_abort
+ mov rdi,[rbx]
+ xor esi,esi
+ xor edx,edx
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Lac_ensure_release
+ mov rax,[rsp+96]
+ mov [r13],rax
+ xor eax,eax
+ jmp .Lac_ensure_end
+.Lac_ensure_abort:
+ mov rdi,[rbx]
+ call pg_durable_session_abort@PLT
+.Lac_ensure_release:
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov eax,5
+ jmp .Lac_ensure_end
+.Lac_ensure_invalid:
+ mov eax,4
+.Lac_ensure_end:
+ AE 112
+.size pg_provider_state_ensure,.-pg_provider_state_ensure
+.section .note.GNU-stack,"",@progbits

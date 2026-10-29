@@ -56,6 +56,8 @@ static pg_view_binding task_graph_binding;
 static pg_conversation_view_binding conversation_view_binding;
 static pg_conversation_view_ops foreground_conversation_view;
 static pg_conversation_client_ops foreground_conversations;
+static pg_agent_conversation_binding conversation_creation;
+static pg_fork_storage conversation_forks;
 const tui_inputs_ops *pg_tui_runtime_inputs(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_inputs:0;}
 const tui_resource_ops *pg_tui_runtime_resources(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_resources:0;}
 const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?&foreground_compaction:0;}
@@ -183,6 +185,13 @@ static int record_scan(void *ctx,const pg_memory_query *query,pg_memory_page *pa
 static int task_history_entry(void *ctx,uint64_t conversation,uint64_t id,json_object **out,uint64_t *sequence){return pg_record_memory_entry(ctx,id,conversation,out,sequence);}
 static int document_scan(void *ctx,const pg_document_query *query,pg_memory_page *page){(void)ctx;return pg_record_memory_scan_documents(&durable.backend.memory,query,page);}
 static int mint(void *ctx,uint64_t *id){(void)ctx;return pg_record_memory_mint(&durable.backend.memory,id);}
+static int fork_entry(void *ctx,uint64_t conversation,uint64_t id,json_object **out,uint64_t *sequence){(void)ctx;return pg_record_memory_entry(&durable.backend.memory,id,conversation,out,sequence);}
+static int fork_documents(void *ctx,const pg_fork_query *query,pg_fork_page *out){
+ (void)ctx;pg_document_query request={.scope=PG_DOC_CONVERSATION,.owner=query->conversation_id,.at=query->at,.limit=256,.after=query->after,.has_cursor=query->has_cursor};pg_memory_page page={0};int status=pg_record_memory_scan_documents(&durable.backend.memory,&request,&page);*out=(pg_fork_page){.items=page.items,.after=(int64_t)page.after,.has_next=page.has_next};return status;
+}
+static int conversation_create(void *ctx,uint64_t parent,uint64_t at,const json_object *agent,json_object **out){
+ pg_agent_conversation_options options={.target={.parent=parent,.entry=at},.agent=agent};return pg_durable_client_create(ctx,&conversation_creation,&options,out);
+}
 static int resolve(void *ctx,pg_slice name,const pg_task_definition **out){
  (void)ctx;const pg_task_definition *definitions[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};*out=0;
  for(size_t i=0;i<3;i++)if(name.size==definitions[i]->name.size&&!memcmp(name.data,definitions[i]->name.data,name.size)){*out=definitions[i];return 0;}return pg_task_provider_find(extension_tasks,name,out);
@@ -199,7 +208,7 @@ static int storage_start(void *ctx,pg_host *scope,size_t owner){
  if(pg_document_holds_open(&durable.holds,&durable.cache,0,monotonic,0))return 1;durable.holds_ready=1;
  pg_hold_timer_host timer={0,timer_arm,timer_cancel,timer_enqueue};if(pg_hold_timer_open(&durable.timer,&durable.holds,&durable.records,&timer))return 1;durable.timer_ready=1;
  pg_durable_close close={0,backend_close};if(pg_durable_session_open(&durable.session,&durable.records,&durable.cache,&durable.holds,&durable.timer,&close))return 1;durable.session_ready=1;
- pg_conversation_request root_request={.root=1};pg_conversation_host creation={.mint=mint};struct json_object *root=0;int status=pg_durable_session_create_conversation(&durable.session,&root_request,&creation,0,record_read,&root);json_object_put(root);if(status)return 1;
+ conversation_forks=(pg_fork_storage){0,fork_entry,fork_documents,mint};conversation_creation=(pg_agent_conversation_binding){&durable.session,0,record_read,mint,&conversation_forks};pg_agent_conversation_options root_request={.target={.root=1}};struct json_object *root=0;int status=pg_agent_conversation_create(&conversation_creation,&root_request,&root);json_object_put(root);if(status)return 1;
  return pg_host_provide(scope,owner,"session",&durable.session);
 }
 static int storage_stop(void *ctx){
@@ -207,7 +216,7 @@ static int storage_stop(void *ctx){
  if(durable.timer_ready)pg_hold_timer_stop(&durable.timer);if(durable.holds_ready)pg_document_holds_finish(&durable.holds,&durable.records);if(durable.cache_ready)pg_document_cache_close(&durable.cache);if(durable.storage_ready)return backend_close(0);return 0;
 }
 static int prepare_load(void *ctx,uint64_t conversation,pg_prompt_inputs *inputs){
- (void)ctx;json_object *replayed=0;int result=pg_agent_state_peek(&durable.session,conversation,&inputs->state);if(!result)result=pg_durable_context_read(&durable.tasks,conversation,UINT64_MAX,&inputs->view);if(!result)result=pg_prompt_replay(inputs->view,&replayed);if(!result)result=json_object_deep_copy(durable.configuration,&inputs->configuration,0);json_object *shown=0;if(!result){shown=json_object_get(json_object_object_get(replayed,"sections"));result=json_object_object_add(inputs->configuration,"shown",shown);if(!result)shown=0;}json_object_put(shown);json_object_put(replayed);return result;
+ (void)ctx;json_object *replayed=0,*identity=0;int result=pg_provider_state_ensure(&conversation_creation,conversation,&identity);if(!result)result=pg_agent_state_peek(&durable.session,conversation,&inputs->state);if(!result)result=pg_durable_context_read(&durable.tasks,conversation,UINT64_MAX,&inputs->view);if(!result)result=pg_prompt_replay(inputs->view,&replayed);if(!result)result=json_object_deep_copy(durable.configuration,&inputs->configuration,0);json_object *shown=0;if(!result){shown=json_object_get(json_object_object_get(replayed,"sections"));result=json_object_object_add(inputs->configuration,"shown",shown);if(!result)shown=0;}json_object_put(shown);if(!result){json_object *id=json_object_get(json_object_object_get(identity,"sessionId"));result=json_object_object_add(inputs->configuration,"sessionId",id);if(result)json_object_put(id);}json_object_put(identity);json_object_put(replayed);return result;
 }
 static int prepare_finish(void *ctx,json_object *configuration){
  (void)ctx;
@@ -414,7 +423,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  extension_tasks=pg_host_find(scope->parent,"task.definitions");const pg_task_definition *builtins[]={&durable.generation.definition,&durable.tool.definition,&durable.compaction.definition};if(pg_task_provider_validate(extension_tasks,builtins,3))return 1;
  json_object *agent_state=0;if(pg_agent_state_read(&durable.session,1,&agent_state))return 1;pg_extension_result initial_extensions={0};int invalid_extensions=pg_extensions_resolve(durable.extensions,agent_state,durable.declared_tools,&initial_extensions);pg_extensions_close(&initial_extensions);json_object_put(agent_state);if(invalid_extensions)return 1;
  durable.task_resolver=(pg_task_resolver){0,task_acquire,pg_extension_registry_release};if(pg_task_scheduler_bind_definitions(&durable.scheduler,&durable.task_resolver)||pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
- pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;if(pg_durable_client_conversations_service(&durable.client,&foreground_conversations))return 1;
+ pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;if(pg_durable_client_conversations_service(&durable.client,&foreground_conversations))return 1;foreground_conversations.create=conversation_create;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
  if(foreground_conversations.history(foreground_conversations.context,&durable.history))return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};

@@ -26,6 +26,9 @@ typedef struct {
    submit, queued inputs preserve the active root/cancellation state. */
 int pg_durable_client_inputs_service(pg_durable_client *,pg_inputs_ops *);
 int pg_durable_client_open(pg_durable_client *,const pg_durable_client_config *);
+struct pg_agent_conversation_binding;
+struct pg_agent_conversation_options;
+int pg_durable_client_create(pg_durable_client *,struct pg_agent_conversation_binding *,const struct pg_agent_conversation_options *,struct json_object **);
 int pg_durable_client_select(pg_durable_client *,uint64_t conversation);
 /* Owned display rows for the selected conversation, serialized without pumping. */
 int pg_durable_client_history(pg_durable_client *,struct json_object **);
