@@ -6,6 +6,7 @@ import sys
 import os
 ROOT = Path(__file__).resolve().parents[2]
 from build_pangu import implementation
+from schema_dependency import compile_inputs
 from test_mimo_asm import ABI_WRAPS, CURL_WRAPS, ALLOC_WRAPS
 MODEL_SOURCES = [implementation('src/runtime/' + name) for name in ('mimo', 'mimo_projection', 'mimo_stream', 'request_context')]
 PATH_SOURCES = [implementation('src/runtime/' + name) for name in ('tool_path', 'tool_path_posix')]
@@ -21,6 +22,7 @@ SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/sess
 
 def main():
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
+        DURABLE_SOURCES.extend(compile_inputs([implementation('src/runtime/json_schema_bridge')],directory,['-fsanitize=undefined','-fno-sanitize-recover=all']))
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_output_window.py')], check=True)
         if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction','--live-auto-compaction','--live-overflow-compaction','--live-background-compaction','--live-compaction-retry','--live-compaction-race','--live-owned-compaction-race')):

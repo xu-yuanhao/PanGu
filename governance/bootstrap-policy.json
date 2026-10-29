@@ -667,6 +667,10 @@
     "src/runtime/tool_live.h": "native-source",
     "src/runtime/output_window.h": "native-source",
     "src/runtime/output_window.S": "native-source",
-    "tools/runtime/test_output_window.py": "gate-test"
+    "tools/runtime/test_output_window.py": "gate-test",
+    "tools/runtime/schema_dependency.py": "development-tool",
+    "src/runtime/json_schema_bridge.cpp": "native-source",
+    "src/runtime/json_schema_bridge.h": "native-source",
+    "docs/licenses/schema-libraries.md": "document"
   }
 }

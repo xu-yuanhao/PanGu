@@ -380,6 +380,11 @@ pg_tool_execution_poll:
  call json_object_object_get_ex@PLT
  test eax,eax
  jnz .Lte_poll_structured
+ EG r14,structuredOutputDeclared
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lte_poll_transfer
  EG r14,content
  mov rdi,rax
  xor esi,esi
@@ -837,3 +842,6 @@ pg_tool_execution_output_window:
  mov eax,4
  ret
 .size pg_tool_execution_output_window,.-pg_tool_execution_output_window
+
+.section .rodata
+.Lte_structuredOutputDeclared: .asciz "structuredOutputDeclared"

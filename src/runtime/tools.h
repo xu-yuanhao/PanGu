@@ -8,7 +8,7 @@
 /* Borrowed immutable strings and contexts must outlive the registry and runs.
    validate checks tool-specific schema semantics; policy is separate from visibility.
    Validators/authorization are side-effect free; callbacks return promptly. */
-typedef struct {size_t max_bytes,max_lines;unsigned tail,reserved;} pg_tool_output_limits;
+typedef struct {size_t max_bytes,max_lines;unsigned tail,reserved;const char *structured_output_schema;} pg_tool_output_limits;
 struct pg_tool_execution;
 typedef struct {
  int (*next)(void *, char *, size_t, size_t *);

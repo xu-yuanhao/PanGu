@@ -1768,7 +1768,8 @@
         "usage.local.v0",
         "tool.nested.local.v0",
         "tool.live.local.v0",
-        "output.window.local.v0"
+        "output.window.local.v0",
+        "json.schema.external.v0"
       ],
       "role": "Model-issued pangu.tool durable call/execute consumer: service operation leases, intent before effects, stored/current safe replay conjunction, cooperative async output/cleanup, atomic toolResult Entry and terminal Task receipt; native host owns returned operation drainage",
       "exports": [
@@ -2581,6 +2582,28 @@
       ],
       "reference_basis": [
         "Pi d5b3de22 packages/chord/src/output.ts boundOutput/headRange/tailRange"
+      ]
+    },
+    {
+      "id": "json.schema.external.v0",
+      "sources": [
+        "src/runtime/json_schema_bridge.cpp",
+        "src/runtime/json_schema_bridge.h"
+      ],
+      "dependencies": [
+        "json-c",
+        "Valijson af2383509277f8e8051acbb3e4b3060f4779aa10",
+        "nlohmann/json 55f93686c01528224f448c19128836e7df245f72",
+        "libstdc++"
+      ],
+      "role": "External Draft-7 Schema compiler/strong validator through owned C ABI; no Agent business state",
+      "exports": [
+        "pg_json_schema_compile",
+        "pg_json_schema_validate",
+        "pg_json_schema_close"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22 harness/tool.ts structuredOutputError; Valijson SchemaParser/Validator"
       ]
     }
   ],

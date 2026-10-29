@@ -23,6 +23,10 @@ typedef struct {
     repeating the effect. Metadata stays owned by this task through commit. Diagnostics are rendered
     as a separate model text block; structuredOutput is stored in Entry.data. */
  int (*snapshot)(void *,uint64_t task_id,const struct json_object *call,struct json_object **);
+ /* Resolve from the invocation's pinned declaration. Borrowed through final
+    result validation. Contract reports are nonfatal extension diagnostics. */
+ const char *(*structured_schema)(void *,uint64_t,const struct json_object *);
+ void (*report_contract)(void *,uint64_t,const char *);
 } pg_durable_tool_host;
 /* poll returns 0 with owned final {call,result?}, 1 pending, negative error.
    state is closed before the executor lease; validate returns 1/0/-1 for

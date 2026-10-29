@@ -305,6 +305,10 @@ static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,st
  (void)ctx;const pg_tool_provider *selected=durable.tool_provider;*out=0;tool_scope *scope=tool_scope_find(id);if(!scope)return 5;if(!scope->base)return 0;
  return selected->snapshot?selected->snapshot(selected->context,id,call,out):0;
 }
+static const char *tool_schema(void *ctx,uint64_t id,const struct json_object *call){
+ (void)ctx;(void)call;tool_scope *scope=tool_scope_find(id);return scope&&scope->definition&&scope->definition->output_limits?scope->definition->output_limits->structured_output_schema:0;
+}
+static void tool_contract_report(void *ctx,uint64_t id,const char *message){(void)ctx;fprintf(stderr,"PanGu tool %llu contract: %s\n",(unsigned long long)id,message);}
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}
 static int client_submit(void *ctx,pg_slice text){
  (void)ctx;char expanded[4096];size_t size=0;if(foreground_resources.expand(foreground_resources.context,text,expanded,sizeof(expanded),&size))return 1;
@@ -384,7 +388,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  foreground_resources=(pg_resource_ops){&durable.resources,pg_resources_reload,pg_resources_snapshot,resource_release,pg_resources_expand};
  pg_record_memory_documents(&durable.backend.memory,&durable.task_history.documents);durable.task_history.context=&durable.backend.memory;durable.task_history.entry=task_history_entry;
  durable.tasks=(pg_task_runner_host){0,record_read,record_scan,document_scan,resolve,wall_time,report};
- durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;if(durable.extensions)pg_durable_tool_bind_hooks(&durable.tool,&extension_tool_hooks);
+ durable.tool_host=(pg_durable_tool_host){0,tool_acquire,tool_release,mint,tool_progress,tool_snapshot,tool_schema,tool_contract_report};if(pg_durable_tool_init(&durable.tool,&durable.tool_host))return 1;if(durable.extensions)pg_durable_tool_bind_hooks(&durable.tool,&extension_tool_hooks);
  durable.prompt_preparer=(pg_prompt_preparer){durable.extensions,durable.declared_tools,0,prepare_load,prepare_finish,wall_time};durable.async_prepare=(pg_durable_prepare){&durable.prompt_preparer,pg_prompt_preparer_poll,pg_prompt_preparer_close};
  durable.generation_host=(pg_durable_generation_host){0,prepare,model_acquire,model_release,mint,model_progress,&durable.tool.definition,model_failure,&durable.inputs,model_complete,model_fetch_deferred,model_cancel_deferred};if(pg_durable_generation_init(&durable.generation,&durable.generation_host))return 1;pg_durable_generation_bind_prepare(&durable.generation,&durable.async_prepare);if(durable.extensions)pg_durable_generation_bind_hooks(&durable.generation,&extension_generation_hooks);
  durable.compaction_host=durable.generation_host;durable.compaction_host.prepare=prepare;durable.compaction_host.acquire=compaction_acquire;durable.compaction_host.progress=0;if(pg_durable_compaction_init(&durable.compaction,&durable.compaction_host))return 1;pg_durable_generation_bind_compaction(&durable.generation,&durable.compaction.definition);const pg_compaction_hooks *hooks=pg_host_find(scope->parent,"compaction.hooks");if(hooks&&(hooks->abi!=PG_COMPACTION_HOOKS_ABI||hooks->size!=sizeof(*hooks)||!hooks->report||(hooks->count&&!hooks->entries)))return 1;pg_durable_compaction_bind_hooks(&durable.compaction,hooks);pg_durable_compaction_bind_extensions(&durable.compaction,&extension_generation_hooks);

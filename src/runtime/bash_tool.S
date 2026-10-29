@@ -1067,7 +1067,10 @@ pg_bash_tool_snapshot:
 .Lbhs_truncated_code: .asciz "output_truncated"
 .Lbhs_truncated_message: .asciz "Output truncated to the retained tail"
 
-.section .rodata
+.section .data.rel.ro
 .balign 8
 .Lbash_output_limits: .quad 51200,2000
  .long 1,0
+ .quad .Lbash_structured_schema
+.section .rodata
+.Lbash_structured_schema: .asciz "{\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"},\"truncated\":{\"type\":\"boolean\"},\"fullOutputPath\":{\"type\":\"string\"},\"exitCode\":{\"type\":\"number\"}},\"required\":[\"output\",\"truncated\",\"exitCode\"]}"

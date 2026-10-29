@@ -47,4 +47,12 @@ class LanguageTests(unittest.TestCase):
         self.policy['sources']['src/core.c']={'role':'assembly-core','reason':'pretend'}
         self.assertTrue(self.check())
 
+
+    def test_external_cpp_library_bridge(self):
+        (self.root/'src/schema.cpp').write_text('extern "C" int bridge();\n')
+        self.policy['sources']={'src/schema.cpp':{'role':'cpp-bridge','bridge_kind':'external-library','reason':'external validator ABI'}}
+        self.assertEqual(self.check(['src/schema.cpp']),[])
+        self.policy['sources']['src/schema.cpp']['bridge_kind']='business-state'
+        self.assertTrue(self.check())
+
 if __name__=='__main__':unittest.main()

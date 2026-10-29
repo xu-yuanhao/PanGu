@@ -39,7 +39,7 @@ def inspect(root, sources=None):
                 if set(rule) != {'role', 'reason', 'bridge_kind'} or p.suffix != '.c' or rule['bridge_kind'] not in {'external-library', 'platform-layout', 'static-composition'}:
                     errors.append('invalid C bridge: ' + name)
             elif role == 'cpp-bridge':
-                if set(rule) != {'role', 'reason', 'bridge_kind'} or p.suffix != '.cpp' or rule['bridge_kind'] != 'approved-gui-bridge':
+                if set(rule) != {'role', 'reason', 'bridge_kind'} or p.suffix != '.cpp' or rule['bridge_kind'] not in {'approved-gui-bridge', 'external-library'}:
                     errors.append('invalid C++ bridge: ' + name)
             else:
                 errors.append('unapproved implementation language/role: ' + name)

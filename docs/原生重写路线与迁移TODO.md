@@ -174,6 +174,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 工具调用API接入output、retainedOutput和outputWindow：报告与异步OUTPUT共用调用级buffer/节流/事件，owned快照含尚未刷新的输出，tail接受OutputSkip并保留全流计数；head拒绝skip，执行前/释放后拒绝访问。固定Chord 260组多块快照对照、实际工具/中断/清洗/跳过输出、原生ABI和真实模型工作流通过。最终OK/ERROR可显式省略output并采用报告窗口，显式空输出保持独立；afterTool改写文本时去掉原窗口截断提示。工具返回后撤销执行API，duration在返回时固定，200ms后置hook等待不计入执行时间。省略输出且窗口为空时保存空Content；嵌套默认程序值在诊断渲染之外由实际输出确定。失败Live摘要优先拼接error诊断，否则取输出，最多500 UTF-16单元并保留原生UTF-8字符边界；成功或空错误省略error字段。
 - [x] ToolControl接入真实Generation工具轮次：模型工具终态receipt保存control，Generation按调用顺序归并addTools、最后一个handoff与全体terminate；配置增量、上下文reset和队列边界同事务提交。数组/排除表/未设置选择、去重、终止true/false/混合与取消结果、最后handoff和终止后不建后继通过；两后端工具选择回滚/重开、真实DeepSeek写文件后直接结束通过。
 - [x] Live文本更新采用追加或有界重叠后的裁头/追加，操作量供Tool进度按原生Op payload计费；details/diagnostic确认提交后更新同一输出暂停期限。模型/嵌套槽的10KB追加、Unicode尾窗口、无变化零提交、计量和原有暂停/取消场景通过，保持同步元数据API。
+- [x] 结构化工具结果接入固定调用声明与外部Draft-7强类型校验：bash声明、嵌套合法/缺失/不匹配结果、错误文本诊断与模型非致命报告进入真实链；DSO ABI同步更新，产品ASan/UBSan及组合/$ref/regex/数组/null专项通过。完整TypeBox差异和定义前置准入见交接区。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -284,8 +285,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Chord `delta/tracker.ts` emitChangedValue、`delta/index.ts` overlap，以及Durable `tool.ts` publishProgress和Chord Progress字节节流消费者；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：tool_live原有稀疏字段更新先比较文本，增长前缀用a，有界尾/头重叠用t+a，其余保留s；模型/嵌套路径共用。metered入口返回本次原生Op JSON payload字节数，Tool确认提交后按100KiB/s与至少100ms设置下次期限，替换输入chunk字节计量。同步details/diagnostic提交也回报实际操作量，更新同一后续输出期限；原有待处理输出、最终/清理强制刷新保持。
-- 验证：`test_product_resources.py --native-tasks --sanitize` 通过。两种Live槽均验证10KB文本追加只产生a且payload小于256字节、Unicode前缀滚动使用t+a并得到准确全文、重复相同字段零字节/零Storage提交；原有报告API、八组错误摘要、取消/重开和ToolControl保持。Runtime整批、产品构建与Assembly检查通过。
-- 接口与自审：新增pg_tool_live_stage_metered和pg_durable_tool_progress_recorded，既有函数表与私有Tool尺寸保持，导出登记同步。计量仅在成功提交后采用；Op路径和UTF-16裁头复用现有Delta执行器。原生重叠探测上限65536字节、探针64字节、每档8候选；其操作选择可与JS UTF-16探测不同，最终文本保持一致。速率按PanGu实际序列化Op payload而非上游字符串近似计量；排除独立安装目录 `claude/` 的登记候选镜像G00通过。
-- 剩余与下一交付物：完整工具行为保持未勾选。同步元数据API尚未合并为上游mark/markAndWait的统一异步进度；完整structuredOutput schema契约/成熟验证桥接、多内容块结果及异常Task自身Live最终化继续保留在工具覆盖范围。下一批集中接通结果契约的定义、选中快照与校验消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tool.ts` structuredOutputError/finalResult，`tools/bash.ts` shellStructuredOutputSchema及嵌套结果消费者。原生验证桥接采用Valijson `af2383509277f8e8051acbb3e4b3060f4779aa10`、nlohmann/json `55f93686c01528224f448c19128836e7df245f72`；Harness保持固定快照。
+- 实际调用链：工具声明的output_limits携带可选structured_output_schema，组合器按调用级固定工具快照解析；Tool afterTool之后通过C ABI编译/强类型验证。嵌套调用的无声明/缺失/不匹配结果删除结构化值并追加invalid_structured_output、标记isError；模型调用保留文本结果并通过非致命报告通知宿主。schema工具错误结果可省略结构化值，缺error诊断时补充输出文本；已声明但无结构化值的嵌套返回保留内部标志，查询不会错误回退文本。bash接入自身声明。
+- 验证：产品 `--native-tasks --sanitize` 最终复验通过合法值、类型不符、缺失值、错误文本补诊断及既有恢复/控制场景；Draft-7组合/$ref/regex/数组约束、无效JSON定义拒绝、null值与模型无声明非致命报告均通过。Runtime整批日志完成且无失败；产品构建及构建缓存入口复验通过。G00登记候选镜像（排除独立安装目录claude）、Assembly、7项语言门禁自测与17项文件准入自测通过。
+- 接口与自审：工具定义/注册表尺寸保持；pg_tool_output_limits扩展schema指针，Tool Host追加声明解析及非致命报告回调，Tool私有416字节保存compiled contract与一次性结算标记；provider ABI=4、extensions ABI=10同步到汇编校验/注册表与DSO夹具。C++仅桥接外部Schema库和异常/所有权，Agent结果策略仍用汇编。构建从固定URL按SHA256取得头文件到用户缓存，编译对象按源码/头/编译器/选项缓存；许可证见schema-libraries。外部Schema无网络fetcher。
+- 剩余与下一交付物：完整工具行为保持未勾选。Draft-7验证桥接与Pi TypeBox错误文字/格式规则的差异仍需对应语料核对，schema无效定义的前置准入与编译缓存生命周期待集中完成。随后补齐多内容块结果、异常Task自身Live最终化及统一异步details/diagnostic调度语义。

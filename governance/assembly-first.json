@@ -354,6 +354,11 @@
     "src/runtime/output_window.S": {
       "role": "assembly-core",
       "reason": "Chord工具输出完整行/UTF-8 head与tail预算及丢弃计数"
+    },
+    "src/runtime/json_schema_bridge.cpp": {
+      "role": "cpp-bridge",
+      "bridge_kind": "external-library",
+      "reason": "Valijson/nlohmann JSON Schema Draft-7的C ABI、异常与所有权桥接；工具结果状态和错误策略由汇编执行"
     }
   }
 }

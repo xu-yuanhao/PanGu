@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,400
+ mov esi,416
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -439,6 +439,8 @@ pg_durable_tool_init:
  call pg_output_buffer_close@PLT
  mov rdi,[r12+128]
  call free@PLT
+ mov rdi,[r12+400]
+ call pg_json_schema_close@PLT
  mov rdi,r12
  call free@PLT
  mov qword ptr [rbx+56],0
@@ -846,11 +848,23 @@ pg_durable_tool_init:
  call json_object_object_get_ex@PLT
  test eax,eax
  jnz .Ldt_nested_output_ready
+ cmp qword ptr [rbx+400],0
+ jne .Ldt_nested_schema_marker
  mov rdi,[rbx+128]
  mov esi,[rbx+136]
  call json_object_new_string_len@PLT
  mov rdi,r14
  lea rsi,[rip+.Ldt_structured_output]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ jmp .Ldt_nested_output_ready
+.Ldt_nested_schema_marker:
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Ldt_schema_declared]
  mov rdx,rax
  call .Ldt_set
  test eax,eax
@@ -1223,6 +1237,10 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
  mov rdi,r14
  call .Ldt_bound_final
+ test eax,eax
+ jnz .Ldt_poll_error
+ mov rdi,r14
+ call .Ldt_contract_result
  test eax,eax
  jnz .Ldt_poll_error
  mov dword ptr [r14+196],0
@@ -3624,3 +3642,257 @@ pg_durable_tool_progress_recorded:
  pop rbx
  ret
 .size pg_durable_tool_progress_recorded,.-pg_durable_tool_progress_recorded
+
+.text
+/* code and borrowed length-delimited message become an owned diagnostic. */
+.Ldt_contract_diagnostic:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov qword ptr [rsp],0
+ call .Ldt_ensure_diagnostics
+ mov rbp,rax
+ test rax,rax
+ jz .Ldt_contract_diag_bad
+ lea rdi,[rip+.Ldt_contract_diag_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldt_contract_diag_bad
+ mov rdi,r12
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_contract_code]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_contract_diag_end
+ mov rdi,r13
+ mov esi,r14d
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_message]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_contract_diag_end
+ mov rdi,rbp
+ mov rsi,[rsp]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldt_contract_diag_bad
+ mov qword ptr [rsp],0
+ xor eax,eax
+ jmp .Ldt_contract_diag_end
+.Ldt_contract_diag_bad:
+ mov eax,5
+.Ldt_contract_diag_end:
+ mov [rsp+8],eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,[rsp+8]
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Ldt_contract_result:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ cmp dword ptr [rbx+408],0
+ jne .Ldt_contract_ok
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ setz al
+ movzx eax,al
+ mov [rsp+48],eax
+ DGET "qword ptr [rbx+16]",name
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp qword ptr [rax+48],0
+ je .Ldt_contract_value
+ mov rdi,[rax]
+ mov rcx,[rbx+8]
+ mov rsi,[rcx+16]
+ mov rdx,[rbx+16]
+ call [rax+48]
+ test rax,rax
+ jz .Ldt_contract_value
+ mov rdi,rax
+ lea rsi,[rbx+400]
+ mov rdx,rsp
+ call pg_json_schema_compile@PLT
+ test eax,eax
+ jnz .Ldt_contract_end
+.Ldt_contract_value:
+ mov rdi,[rbx+184]
+ lea rsi,[rip+.Ldt_structured_output]
+ lea rdx,[rsp+16]
+ call json_object_object_get_ex@PLT
+ mov [rsp+52],eax
+ cmp qword ptr [rbx+400],0
+ jne .Ldt_contract_declared
+ test eax,eax
+ jz .Ldt_contract_done
+ lea rsi,[rip+.Ldt_contract_undeclared_format]
+ jmp .Ldt_contract_format_name
+.Ldt_contract_declared:
+ cmp dword ptr [rsp+52],0
+ jne .Ldt_contract_validate
+ cmp dword ptr [rbx+164],0
+ jne .Ldt_contract_error_text
+ lea rsi,[rip+.Ldt_contract_missing_format]
+ jmp .Ldt_contract_format_name
+.Ldt_contract_validate:
+ mov rdi,[rbx+400]
+ mov rsi,[rsp+16]
+ mov rdx,rsp
+ call pg_json_schema_validate@PLT
+ test eax,eax
+ jz .Ldt_contract_done
+ cmp eax,1
+ jne .Ldt_contract_end
+ mov rcx,[rsp]
+ test rcx,rcx
+ jnz .Ldt_contract_validation_detail
+ lea rcx,[rip+.Ldt_contract_invalid_default]
+.Ldt_contract_validation_detail:
+ lea rdi,[rsp+8]
+ lea rsi,[rip+.Ldt_contract_invalid_format]
+ mov rdx,r12
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Ldt_contract_bad
+ jmp .Ldt_contract_broken
+.Ldt_contract_format_name:
+ lea rdi,[rsp+8]
+ mov rdx,r12
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Ldt_contract_bad
+.Ldt_contract_broken:
+ mov rdi,[rbx+184]
+ lea rsi,[rip+.Ldt_structured_output]
+ call json_object_object_del@PLT
+ cmp dword ptr [rsp+48],0
+ je .Ldt_contract_report
+ mov dword ptr [rbx+164],1
+ mov rdi,[rsp+8]
+ call strlen@PLT
+ mov rcx,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Ldt_contract_invalid_code]
+ mov rdx,[rsp+8]
+ call .Ldt_contract_diagnostic
+ test eax,eax
+ jnz .Ldt_contract_end
+ jmp .Ldt_contract_done
+.Ldt_contract_report:
+ mov rax,[rbx]
+ mov rax,[rax]
+ cmp qword ptr [rax+56],0
+ je .Ldt_contract_done
+ mov rdi,[rax]
+ mov rcx,[rbx+8]
+ mov rsi,[rcx+16]
+ mov rdx,[rsp+8]
+ call [rax+56]
+ jmp .Ldt_contract_done
+.Ldt_contract_error_text:
+ cmp dword ptr [rsp+48],0
+ je .Ldt_contract_done
+ DGET "qword ptr [rbx+184]",diagnostics
+ mov r13,rax
+ xor r14d,r14d
+.Ldt_contract_error_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_contract_error_output
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ DGET rax,severity
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldt_contract_error_next
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_error]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldt_contract_done
+.Ldt_contract_error_next:
+ inc r14
+ jmp .Ldt_contract_error_each
+.Ldt_contract_error_output:
+ cmp qword ptr [rbx+136],0
+ je .Ldt_contract_done
+ mov rdi,rbx
+ lea rsi,[rip+.Ldt_contract_tool_error_code]
+ mov rdx,[rbx+128]
+ mov rcx,[rbx+136]
+ call .Ldt_contract_diagnostic
+ test eax,eax
+ jnz .Ldt_contract_end
+.Ldt_contract_done:
+ mov dword ptr [rbx+408],1
+.Ldt_contract_ok:
+ xor eax,eax
+ jmp .Ldt_contract_end
+.Ldt_contract_bad:
+ mov eax,5
+.Ldt_contract_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_schema_declared: .asciz "structuredOutputDeclared"
+.Ldt_contract_code: .asciz "code"
+.Ldt_contract_diag_json: .asciz "{\"severity\":\"error\",\"code\":\"\",\"message\":\"\"}"
+.Ldt_contract_invalid_code: .asciz "invalid_structured_output"
+.Ldt_contract_tool_error_code: .asciz "tool_error"
+.Ldt_contract_invalid_default: .asciz "root: invalid"
+.Ldt_contract_undeclared_format: .asciz "Tool %s returned structuredOutput but declares no structuredOutputSchema"
+.Ldt_contract_missing_format: .asciz "Tool %s returned no structuredOutput"
+.Ldt_contract_invalid_format: .asciz "Tool %s returned structuredOutput that does not match its schema: %s"

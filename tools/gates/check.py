@@ -15,7 +15,7 @@ KINDS = {"client-asset", "instructions", "document", "control", "gate", "gate-te
 # Only "gate" may use .mjs; documents/controls/tests stay .md/.json/.py.
 SUFFIXES = {"client-asset": ".svg", "instructions": ".md", "document": ".md", "control": ".json",
             "gate": (".py", ".mjs"), "gate-test": ".py",
-            "native-source": (".c", ".h", ".S"), "native-test": (".c", ".S"),
+            "native-source": (".c", ".h", ".S", ".cpp"), "native-test": (".c", ".S"),
             "development-tool": ".py", "legacy-source": (".c", ".h", ".cpp", ".S"),
             "client-source": (".c", ".h", ".S"), "client-test": (".c", ".h"),
             "client-build": ".sh", "client-tool": ".py", "repository-config": ""}

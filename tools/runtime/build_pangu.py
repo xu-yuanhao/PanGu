@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import sys
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from schema_dependency import compile_inputs
 # The approved inventory is the single product input list. No .c default/fallback.
 SOURCES = list(json.loads((ROOT / 'governance/assembly-first.json').read_text())['sources'])
 PLUGIN_EXPORTS = ['-Wl,--export-dynamic-symbol=' + name for name in
@@ -35,7 +37,7 @@ def build(output):
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                     *PLUGIN_EXPORTS,
-                    *[str(ROOT / p) for p in SOURCES], *flags, '-ldl', '-o', str(output)], check=True)
+                    *compile_inputs(SOURCES, output.parent), *flags, '-ldl', '-o', str(output)], check=True)
     return output
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

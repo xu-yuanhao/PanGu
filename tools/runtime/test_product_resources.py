@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import tempfile
 from build_pangu import ROOT, SOURCES, PLUGIN_EXPORTS
+from schema_dependency import compile_inputs
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -22,7 +23,7 @@ def main():
         output=Path(directory)/'test-product-resources'
         flags=subprocess.check_output(['pkg-config','--cflags','--libs','libcurl','json-c','libutf8proc','sqlite3','libgit2','yaml-0.1','libpcre2-8'],text=True).split()
         sanitize=['-fsanitize=address,undefined','-fno-sanitize-recover=all'] if args.sanitize else []
-        sources=[str(ROOT/name) for name in SOURCES if name!='src/composition/pangu.c']
+        sources=compile_inputs([name for name in SOURCES if name!='src/composition/pangu.c'],directory,sanitize)
         subprocess.run(['/usr/bin/clang-23','-D_POSIX_C_SOURCE=200809L','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',*sanitize,*PLUGIN_EXPORTS,*sources,str(ROOT/'tests/runtime/test_product_resources.c'),*flags,'-ldl','-o',str(output)],check=True)
         library=Path(directory)/'tasks.so'
         if args.native_tasks or args.live_extensions:
