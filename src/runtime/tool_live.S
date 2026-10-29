@@ -150,8 +150,28 @@ pg_tool_live_stage:
  call pg_document_change_snapshot@PLT
  test eax,eax
  jnz .Llv_finish
- LG "qword ptr [rsp+120]",nestedTools
+ lea rsi,[rip+.Llv_nestedTools]
+ test dword ptr [rsp+208],2
+ jz .Llv_bucket_read
+ lea rsi,[rip+.Llv_tools]
+.Llv_bucket_read:
+ mov rdi,[rsp+120]
+ call json_object_object_get@PLT
  mov [rsp+128],rax
+ test dword ptr [rsp+208],4
+ jz .Llv_bucket_keep
+ test rax,rax
+ jz .Llv_ok
+ lea rdi,[rip+.Llv_clear_model_json]
+ call json_tokener_parse@PLT
+ mov [rsp+152],rax
+ test rax,rax
+ jz .Llv_bad
+ mov rdi,[rsp+112]
+ mov rsi,rax
+ call pg_document_change_append@PLT
+ jmp .Llv_finish
+.Llv_bucket_keep:
  test rax,rax
  jz .Llv_empty_length
  mov rdi,rax
@@ -163,8 +183,8 @@ pg_tool_live_stage:
  mov [rsp+152],rax
  test rax,rax
  jz .Llv_bad
- cmp dword ptr [rsp+208],0
- je .Llv_each
+ test dword ptr [rsp+208],1
+ jz .Llv_each
  mov rdi,[rsp+128]
  mov rsi,r13
  call .Llv_descendants
@@ -179,8 +199,8 @@ pg_tool_live_stage:
  mov rsi,[rsp+136]
  call json_object_array_get_idx@PLT
  mov [rsp+176],rax
- cmp dword ptr [rsp+208],0
- je .Llv_match
+ test dword ptr [rsp+208],1
+ jz .Llv_match
  LG rax,taskId
  mov rdi,rax
  call json_object_get_uint64@PLT
@@ -337,6 +357,13 @@ pg_tool_live_stage:
  call json_object_array_length@PLT
  test rax,rax
  jz .Llv_ok
+ test dword ptr [rsp+208],2
+ jz .Llv_append_ops
+ mov rdi,[rsp+152]
+ call .Llv_model_paths
+ test eax,eax
+ jnz .Llv_finish
+.Llv_append_ops:
  mov rdi,[rsp+112]
  mov rsi,[rsp+152]
  call pg_document_change_append@PLT
@@ -523,6 +550,7 @@ pg_tool_live_read:
  mov r12,rcx
  mov qword ptr [rcx],0
  mov qword ptr [rsp],0
+ mov dword ptr [rsp+8],0
  mov rdx,rsp
  call pg_live_peek@PLT
  test eax,eax
@@ -530,13 +558,13 @@ pg_tool_live_read:
  LG "qword ptr [rsp]",nestedTools
  mov r13,rax
  test rax,rax
- jz .Llv_read_missing
+ jz .Llv_read_next_bucket
  xor r14d,r14d
 .Llv_read_each:
  mov rdi,r13
  call json_object_array_length@PLT
  cmp r14,rax
- jae .Llv_read_missing
+ jae .Llv_read_next_bucket
  mov rdi,r13
  mov rsi,r14
  call json_object_array_get_idx@PLT
@@ -557,6 +585,16 @@ pg_tool_live_read:
  jz .Llv_read_end
  mov eax,3
  jmp .Llv_read_end
+.Llv_read_next_bucket:
+ cmp dword ptr [rsp+8],0
+ jne .Llv_read_missing
+ mov dword ptr [rsp+8],1
+ LG "qword ptr [rsp]",tools
+ mov r13,rax
+ test rax,rax
+ jz .Llv_read_missing
+ xor r14d,r14d
+ jmp .Llv_read_each
 .Llv_read_missing:
  mov eax,8
 .Llv_read_end:
@@ -669,3 +707,59 @@ pg_tool_live_read:
 
 .section .rodata
 .Llv_remove_array_json: .asciz "[\"d\",[\"nestedTools\"]]"
+
+.text
+.Llv_model_paths:
+ LF 16
+ mov rbx,rdi
+ xor r12d,r12d
+.Llv_model_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Llv_model_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov esi,1
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ lea rdi,[rip+.Llv_tools]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Llv_model_bad
+ mov r14,rax
+ mov rdi,r13
+ xor esi,esi
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Llv_model_release
+ inc r12
+ jmp .Llv_model_each
+.Llv_model_release:
+ mov rdi,r14
+ call json_object_put@PLT
+.Llv_model_bad:
+ mov eax,5
+ jmp .Llv_model_end
+.Llv_model_ok:
+ xor eax,eax
+.Llv_model_end:
+ LE 16
+.section .rodata
+.Llv_tools: .asciz "tools"
+
+.text
+.globl pg_tool_live_clear_model
+.type pg_tool_live_clear_model,@function
+pg_tool_live_clear_model:
+ mov r8,rdx
+ xor edx,edx
+ xor ecx,ecx
+ mov r9d,6
+ jmp pg_tool_live_stage
+.size pg_tool_live_clear_model,.-pg_tool_live_clear_model
+.section .rodata
+.Llv_clear_model_json: .asciz "[[\"d\",[\"tools\"]]]"

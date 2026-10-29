@@ -2341,6 +2341,14 @@ pg_durable_context_order:
  mov dword ptr [rsp+192],2
  jmp .Lgg_stage_output
 .Lgg_stage_success:
+ mov rdi,[rsp+216]
+ mov rsi,[rsp+144]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov rdx,[rax+32]
+ call pg_tool_live_clear_model@PLT
+ test eax,eax
+ jnz .Lgg_stage_end
  lea rdi,[rip+.Lgg_terminal_json]
  call json_tokener_parse@PLT
  mov [rsp+64],rax

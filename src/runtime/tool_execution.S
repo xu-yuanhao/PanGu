@@ -544,3 +544,235 @@ pg_tool_execution_poll:
 .Lte_ended_format: .asciz "Tool %s ended without a result"
 .Lte_unknown_reason: .asciz "Unknown task outcome"
 .Lte_call: .asciz "call"
+.text
+.globl pg_tool_execution_details
+.type pg_tool_execution_details,@function
+pg_tool_execution_details:
+ mov rdx,rsi
+ xor esi,esi
+ jmp .Lte_report
+.size pg_tool_execution_details,.-pg_tool_execution_details
+.globl pg_tool_execution_diagnostic
+.type pg_tool_execution_diagnostic,@function
+pg_tool_execution_diagnostic:
+ mov rdx,rsi
+ mov esi,1
+ jmp .Lte_report
+.size pg_tool_execution_diagnostic,.-pg_tool_execution_diagnostic
+.Lte_report:
+ EF 96
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13d,esi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,12
+ rep stosq
+ test rbx,rbx
+ jz .Lte_report_invalid
+ mov rdi,[rbx]
+ call pg_durable_tool_executing@PLT
+ test eax,eax
+ jz .Lte_report_invalid
+ test r12,r12
+ jnz .Lte_report_value
+ test r13d,r13d
+ jnz .Lte_report_invalid
+ jmp .Lte_report_valid
+.Lte_report_value:
+ mov rdi,r12
+ call pg_document_value_valid@PLT
+ test eax,eax
+ jz .Lte_report_invalid
+ test r13d,r13d
+ jz .Lte_report_valid
+ mov rdi,r12
+ call .Lte_diagnostic_valid
+ test eax,eax
+ jz .Lte_report_invalid
+.Lte_report_valid:
+ mov rax,[rbx]
+ mov [rsp],rax
+ mov rax,[rbx+48]
+ mov [rsp+8],rax
+ mov rax,[rbx+32]
+ mov [rsp+24],rax
+ mov rax,[rbx]
+ EG "qword ptr [rax+32]",input
+ EG rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lte_nested]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lte_report_bucket
+ mov dword ptr [rsp+32],2
+.Lte_report_bucket:
+ call json_object_new_object@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lte_report_alloc
+ test r12,r12
+ jz .Lte_report_copy_ready
+ mov rdi,r12
+ lea rsi,[rsp+56]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lte_report_alloc
+.Lte_report_copy_ready:
+ test r13d,r13d
+ jnz .Lte_report_diagnostic
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lte_details]
+ mov rdx,[rsp+56]
+ mov qword ptr [rsp+56],0
+ call .Lte_add
+ test eax,eax
+ jnz .Lte_report_finish
+ jmp .Lte_report_commit
+.Lte_report_diagnostic:
+ mov rax,[rbx]
+ mov rdi,[rax]
+ mov rsi,[rbx+32]
+ mov rdx,[rbx+24]
+ lea rcx,[rsp+48]
+ call pg_tool_live_read@PLT
+ test eax,eax
+ jnz .Lte_report_finish
+ EG "qword ptr [rsp+48]",diagnostics
+ test rax,rax
+ jz .Lte_report_new_array
+ mov rdi,rax
+ lea rsi,[rsp+72]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lte_report_alloc
+ jmp .Lte_report_append
+.Lte_report_new_array:
+ call json_object_new_array@PLT
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lte_report_alloc
+.Lte_report_append:
+ mov rdi,[rsp+72]
+ mov rsi,[rsp+56]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lte_report_alloc
+ mov qword ptr [rsp+56],0
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lte_diagnostics]
+ mov rdx,[rsp+72]
+ mov qword ptr [rsp+72],0
+ call .Lte_add
+ test eax,eax
+ jnz .Lte_report_finish
+.Lte_report_commit:
+ mov rdi,[rbx]
+ mov rsi,rsp
+ lea rdx,[rip+.Lte_report_stage]
+ call pg_task_runner_commit_with@PLT
+ jmp .Lte_report_finish
+.Lte_report_invalid:
+ mov eax,4
+ jmp .Lte_report_finish
+.Lte_report_alloc:
+ mov eax,5
+.Lte_report_finish:
+ mov [rsp+80],eax
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call json_object_put@PLT
+ mov eax,[rsp+80]
+ EE 96
+.Lte_report_stage:
+ mov qword ptr [rcx],0
+ mov rax,rdi
+ mov rdi,rdx
+ mov rsi,[rax+24]
+ mov rcx,[rax+16]
+ mov r8,[rax+8]
+ mov r9d,[rax+32]
+ mov rax,[rax]
+ mov rdx,[rax+16]
+ jmp pg_tool_live_stage@PLT
+.Lte_diagnostic_valid:
+ EF 16
+ mov rbx,rdi
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lte_diagnostic_bad
+ EG rbx,message
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lte_diagnostic_bad
+ EG rbx,severity
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lte_diagnostic_bad
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lte_diagnostic_bad
+ xor r13d,r13d
+.Lte_severity_each:
+ lea rax,[rip+.Lte_severities]
+ mov rsi,[rax+r13*8]
+ test rsi,rsi
+ jz .Lte_diagnostic_bad
+ mov rdi,r12
+ call strcmp@PLT
+ test eax,eax
+ jz .Lte_diagnostic_code
+ inc r13
+ jmp .Lte_severity_each
+.Lte_diagnostic_code:
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov edx,4
+ cmp r13d,2
+ jne .Lte_severity_length
+ inc edx
+.Lte_severity_length:
+ cmp eax,edx
+ jne .Lte_diagnostic_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lte_code]
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lte_diagnostic_ok
+ mov rdi,[rsp]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lte_diagnostic_bad
+.Lte_diagnostic_ok:
+ mov eax,1
+ jmp .Lte_diagnostic_end
+.Lte_diagnostic_bad:
+ xor eax,eax
+.Lte_diagnostic_end:
+ EE 16
+.section .rodata
+.Lte_severity: .asciz "severity"
+.Lte_info: .asciz "info"
+.Lte_warn: .asciz "warn"
+.Lte_error_severity: .asciz "error"
+.section .data.rel.ro
+.Lte_severities: .quad .Lte_info,.Lte_warn,.Lte_error_severity,0

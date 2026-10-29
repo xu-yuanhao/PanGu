@@ -19,4 +19,8 @@ int pg_tool_execution_start(pg_tool_execution *,const char *name,const struct js
 /* 0 transfers detached {taskId,isError,structuredOutput?,details?,diagnostics,
    usage?}, 1 pending, other positive task/document status on failure. */
 int pg_tool_execution_poll(pg_tool_execution *,uint64_t task_id,struct json_object **);
+/* Synchronous durable progress commits. Inputs are copied; details accepts
+   JSON null. Diagnostics require severity info/warn/error and a string message. */
+int pg_tool_execution_details(pg_tool_execution *,const struct json_object *);
+int pg_tool_execution_diagnostic(pg_tool_execution *,const struct json_object *);
 #endif

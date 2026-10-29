@@ -1818,7 +1818,8 @@
         "libutf8proc",
         "system libc POSIX regex",
         "usage.local.v0",
-        "conversation.view.local.v0"
+        "conversation.view.local.v0",
+        "tool.live.local.v0"
       ],
       "role": "Native Generation/Tool/Client, Compaction and Submission/Inbox behavior: owned threshold compaction with atomic summary placement, durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions. Coordinated built-in Harness Generation/Inputs/Compaction: measured context threshold, owned blocking child/wait, direct summary Entry and resumed preparation.",
       "exports": [
@@ -2521,7 +2522,9 @@
       "role": "Call-scoped native ToolExecutionApi with guarded nested admission, memo, automatic/explicit keys and detached durable result continuation",
       "exports": [
         "pg_tool_execution_start",
-        "pg_tool_execution_poll"
+        "pg_tool_execution_poll",
+        "pg_tool_execution_details",
+        "pg_tool_execution_diagnostic"
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts ToolExecutionApi/executeTool/checkKey/nestedResult/fallbackResult"
@@ -2541,7 +2544,8 @@
       "exports": [
         "pg_tool_live_stage",
         "pg_tool_live_created",
-        "pg_tool_live_read"
+        "pg_tool_live_read",
+        "pg_tool_live_clear_model"
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts startNestedCall/toolSlot/settle"

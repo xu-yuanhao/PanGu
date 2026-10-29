@@ -4,10 +4,13 @@
 /* On the caller's mutation line, upsert sparse fields of a nested tool slot.
    A new slot supplies identity, arguments and status. remove_children removes
    all descendants of the settling caller after their results have committed.
+   Flags: bit 0 removes nested descendants; bit 1 selects model tools slots.
    Fields and documents are borrowed; publication follows Storage adoption. */
 int pg_tool_live_stage(pg_document_tx *,uint64_t conversation,uint64_t task_id,
  const struct json_object *fields,int (*mint)(void *,uint64_t *),unsigned remove_children);
 int pg_tool_live_created(pg_document_tx *,uint64_t,uint64_t,uint64_t,const struct json_object *,int (*mint)(void *,uint64_t *));
 /* Detached adopted slot; PG_DOC_MISSING when absent. */
 int pg_tool_live_read(pg_durable_session *,uint64_t,uint64_t,struct json_object **);
+/* Generation retires the previous model-tool round on response settlement. */
+int pg_tool_live_clear_model(pg_document_tx *,uint64_t,int (*mint)(void *,uint64_t *));
 #endif

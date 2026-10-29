@@ -887,6 +887,7 @@ pg_durable_tool_init:
 .Ldt_abort_output:
  call .Ldt_message_output
  mov rdi,r12
+ xor esi,esi
  call .Ldt_restore_partial
  test eax,eax
  jnz .Ldt_abort_error
@@ -1082,6 +1083,11 @@ pg_durable_tool_init:
  test eax,eax
  jz .Ldt_snapshot_invalid
 .Ldt_snapshot_mark:
+ mov rdi,r14
+ mov esi,1
+ call .Ldt_restore_partial
+ test eax,eax
+ jnz .Ldt_poll_error
  mov dword ptr [r14+4268],1
 .Ldt_snapshot_done:
  cmp dword ptr [r14+4316],0
@@ -1140,9 +1146,11 @@ pg_durable_tool_init:
  call json_tokener_parse@PLT
  mov [r14+4272],rax
  mov rdi,r14
+ xor esi,esi
  call .Ldt_restore_partial
  test eax,eax
  jnz .Ldt_poll_error
+ mov dword ptr [r14+4268],1
  jmp .Ldt_poll_close
 .Ldt_poll_unavailable:
  cmp dword ptr [r14+4244],0
@@ -2053,6 +2061,7 @@ pg_durable_tool_executing:
  mov qword ptr [rcx],0
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ mov dword ptr [rsp+16],0
  lea rdi,[rip+.Ldt_live_running_json]
  call json_tokener_parse@PLT
  mov [rsp],rax
@@ -2069,13 +2078,20 @@ pg_durable_tool_executing:
  lea rsi,[rip+.Ldt_nested]
  call strcmp@PLT
  test eax,eax
- jnz .Ldt_live_intent
+ jz .Ldt_live_bucket_ready
+ mov dword ptr [rsp+16],2
+.Ldt_live_bucket_ready:
  mov rdi,[rbx+24]
  call json_object_get@PLT
  mov rdi,[rsp]
  lea rsi,[rip+.Ldt_arguments]
  mov rdx,rax
  call .Ldt_set
+ test eax,eax
+ jnz .Ldt_live_stage_end
+ mov rdi,[rsp]
+ mov rsi,rbx
+ call .Ldt_live_identity
  test eax,eax
  jnz .Ldt_live_stage_end
  mov rax,[rbx+8]
@@ -2090,7 +2106,7 @@ pg_durable_tool_executing:
  mov rax,[rbx]
  mov rax,[rax]
  mov r8,[rax+24]
- xor r9d,r9d
+ mov r9d,[rsp+16]
  call pg_tool_live_stage@PLT
  test eax,eax
  jnz .Ldt_live_stage_end
@@ -2188,7 +2204,9 @@ pg_durable_tool_executing:
  lea rsi,[rip+.Ldt_nested]
  call strcmp@PLT
  test eax,eax
- jnz .Ldt_progress_ok
+ jz .Ldt_progress_bucket_ready
+ mov dword ptr [rsp+80],2
+.Ldt_progress_bucket_ready:
  mov rax,[rbx+8]
  DGET "qword ptr [rax+32]",conversation_id
  mov rdi,rax
@@ -2201,7 +2219,13 @@ pg_durable_tool_executing:
  call pg_live_peek@PLT
  test eax,eax
  jnz .Ldt_progress_end
- DGET "qword ptr [rsp]",live_nested_tools
+ lea rsi,[rip+.Ldt_live_nested_tools]
+ cmp dword ptr [rsp+80],0
+ je .Ldt_progress_bucket_read
+ lea rsi,[rip+.Ldt_live_tools]
+.Ldt_progress_bucket_read:
+ mov rdi,[rsp]
+ call json_object_object_get@PLT
  mov r13,rax
  test rax,rax
  jz .Ldt_progress_ok
@@ -2307,7 +2331,7 @@ pg_durable_tool_executing:
  mov rax,[rbx]
  mov rax,[rax]
  mov r8,[rax+24]
- xor r9d,r9d
+ mov r9d,[rsp+80]
  call pg_tool_live_stage@PLT
  jmp .Ldt_progress_end
 .Ldt_progress_ok:
@@ -2355,6 +2379,7 @@ pg_durable_tool_executing:
  push r14
  sub rsp,48
  mov rbx,rdi
+ mov [rsp+40],esi
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  mov qword ptr [rsp+16],0
@@ -2380,6 +2405,15 @@ pg_durable_tool_executing:
  test rax,rax
  jz .Ldt_restore_alloc
 .Ldt_restore_metadata:
+ cmp dword ptr [rsp+40],0
+ je .Ldt_restore_details
+ mov rdi,[rbx+4272]
+ lea rsi,[rip+.Ldt_details]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Ldt_restore_diagnostics
+.Ldt_restore_details:
  DGET "qword ptr [rsp]",details
  mov r12,rax
  mov rdi,[rsp]
@@ -2461,6 +2495,8 @@ pg_durable_tool_executing:
  test eax,eax
  jnz .Ldt_restore_alloc
  mov qword ptr [rsp+16],0
+ cmp dword ptr [rsp+40],0
+ jne .Ldt_restore_ok
  DGET "qword ptr [rsp]",hook_output
  mov r12,rax
  test rax,rax
@@ -2544,8 +2580,45 @@ pg_durable_tool_executing:
  mov r8,[rax+24]
  mov r9d,1
  call pg_tool_live_stage@PLT
- jmp .Ldt_prune_end
+ test eax,eax
+ jnz .Ldt_prune_end
 .Ldt_prune_ok:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rsi,rbp
+ mov rdx,[rax+16]
+ mov rcx,rsp
+ call pg_tool_live_read@PLT
+ cmp eax,8
+ je .Ldt_prune_no_slot
+ test eax,eax
+ jnz .Ldt_prune_end
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ lea rdi,[rip+.Ldt_live_done_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Ldt_prune_alloc
+ mov rdi,r12
+ mov rsi,rbp
+ mov rax,[rbx+8]
+ mov rdx,[rax+16]
+ mov rcx,[rsp]
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r8,[rax+24]
+ mov r9d,2
+ call pg_tool_live_stage@PLT
+ jmp .Ldt_prune_end
+.Ldt_prune_alloc:
+ mov eax,5
+ jmp .Ldt_prune_end
+.Ldt_prune_no_slot:
  xor eax,eax
 .Ldt_prune_end:
  mov ebx,eax
@@ -2557,3 +2630,45 @@ pg_durable_tool_executing:
  pop rbx
  pop rbp
  ret
+
+.text
+.Ldt_live_identity:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov rax,[rsi+8]
+ mov rdi,[rax+16]
+ call json_object_new_uint64@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Ldt_live_task_id]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_identity_end
+ DGET "qword ptr [r12+16]",id
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Ldt_call_id]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_identity_end
+ DGET "qword ptr [r12+16]",name
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Ldt_name]
+ mov rdx,rax
+ call .Ldt_set
+.Ldt_identity_end:
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ldt_live_tools: .asciz "tools"
