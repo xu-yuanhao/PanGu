@@ -1151,6 +1151,7 @@ pg_task_runner_commit:
  pop rbp
  ret
 /* Resolve one borrowed definition, locally materializing migrations before reservation. */
+/* rdx retains candidate presence for missing-definition abort classification. */
 .Ltr_resolve:
  push rbp
  push rbx
@@ -1350,6 +1351,7 @@ pg_task_runner_commit:
  mov rdi,[rsp+16]
  call json_object_put@PLT
  mov eax,ebp
+ mov rdx,[rsp]
  add rsp,64
  pop r14
  pop r13
@@ -1536,7 +1538,23 @@ pg_task_runner_poll:
  call .Ltr_resolve
  mov ebp,eax
  test eax,eax
+ jz .Ltr_poll_resolved
+ cmp eax,3
+ jne .Ltr_poll_unlock
+ test rdx,rdx
  jnz .Ltr_poll_unlock
+ cmp r13d,1
+ jne .Ltr_poll_unlock
+ TGET "qword ptr [rbx+24]",abort_reason
+ test rax,rax
+ jnz .Ltr_poll_unlock
+ cmp qword ptr [rbx+120],0
+ jne .Ltr_poll_unlock
+ mov rdi,rbx
+ call .Ltr_orphan_missing
+ mov ebp,eax
+ jmp .Ltr_poll_unlock
+.Ltr_poll_resolved:
  cmp r13d,2
  jne .Ltr_cutoff_available
  mov rax,[rbx+40]
@@ -3764,15 +3782,11 @@ pg_task_scheduler_bind_definitions:
  test r14,r14
  jz .Ltw_origin_request
  dec r14
- mov rdi,r12
- call .Ltw_failed
- test eax,eax
- jnz .Ltw_origin_request
  TGET "qword ptr [r12+16]",abort_requested
  mov rdi,rax
  call json_object_get_boolean@PLT
  test eax,eax
- jz .Ltw_origin_parent
+ jz .Ltw_origin_failure
  TGET "qword ptr [r12+16]",abort_reason
  mov rdi,rax
  lea rsi,[rip+.Ltr_restart_reason]
@@ -3780,7 +3794,13 @@ pg_task_scheduler_bind_definitions:
  test eax,eax
  jz .Ltw_origin_request
  mov r13d,1
- jmp .Ltw_origin_done
+.Ltw_origin_failure:
+ test r13d,r13d
+ jnz .Ltw_origin_parent
+ mov rdi,r12
+ call .Ltw_failed
+ test eax,eax
+ jnz .Ltw_origin_request
 .Ltw_origin_parent:
  mov rdi,rbx
  mov rsi,[r12+8]
@@ -3797,3 +3817,33 @@ pg_task_scheduler_bind_definitions:
  pop r12
  pop rbx
  ret
+
+.text
+.Ltr_orphan_missing:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ lea rdi,[rip+.Ltr_orphan_json]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Ltr_orphan_alloc
+ mov rdi,rbx
+ mov rsi,rax
+ xor edx,edx
+ call .Ltr_replace
+ mov ebx,eax
+ jmp .Ltr_orphan_end
+.Ltr_orphan_alloc:
+ mov ebx,5
+.Ltr_orphan_end:
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Ltr_orphan_json: .asciz "{\"status\":\"terminal\",\"outcome\":{\"status\":\"orphaned\",\"reason\":\"missing_task\"}}"

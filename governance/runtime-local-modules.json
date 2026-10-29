@@ -2540,7 +2540,8 @@
       "role": "Transaction-scoped nested tool Live slot admission and sparse field updates",
       "exports": [
         "pg_tool_live_stage",
-        "pg_tool_live_created"
+        "pg_tool_live_created",
+        "pg_tool_live_read"
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts startNestedCall/toolSlot/settle"

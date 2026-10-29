@@ -874,10 +874,17 @@ pg_durable_tool_init:
  mov rsi,[rsp]
  jmp .Ldt_abort_output
 .Ldt_abort_ordinary:
+ lea rdi,[rip+.Ldt_aborted_metadata]
+ call json_tokener_parse@PLT
+ mov [r12+4272],rax
  mov rdi,r12
  lea rsi,[rip+.Ldt_aborted_message]
 .Ldt_abort_output:
  call .Ldt_message_output
+ mov rdi,r12
+ call .Ldt_restore_partial
+ test eax,eax
+ jnz .Ldt_abort_error
  mov rdi,r12
  call .Ldt_finish
 .Ldt_abort_error:
@@ -1124,6 +1131,13 @@ pg_durable_tool_init:
  mov rdi,r14
  lea rsi,[rip+.Ldt_interrupted_message]
  call .Ldt_message_output
+ lea rdi,[rip+.Ldt_restart_metadata]
+ call json_tokener_parse@PLT
+ mov [r14+4272],rax
+ mov rdi,r14
+ call .Ldt_restore_partial
+ test eax,eax
+ jnz .Ldt_poll_error
  jmp .Ldt_poll_close
 .Ldt_poll_unavailable:
  cmp dword ptr [r14+4244],0
@@ -2325,3 +2339,162 @@ pg_durable_tool_executing:
 .Ldt_restart_message: .asciz "Tool was interrupted by a restart and may have partially run"
 .Ldt_abandoned_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"abandoned\",\"message\":\"Tool was not started: its caller ended with a restart\"}]}"
 .Ldt_restart_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"interrupted\",\"message\":\"Tool was interrupted by a restart and may have partially run\"}]}"
+
+.text
+/* Recover durable progress before the terminal transaction clears the slot. */
+.Ldt_restore_partial:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+32]",conversation_id
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rdx,[rax+16]
+ mov rcx,rsp
+ call pg_tool_live_read@PLT
+ cmp eax,8
+ je .Ldt_restore_ok
+ test eax,eax
+ jnz .Ldt_restore_end
+ cmp qword ptr [rbx+4272],0
+ jne .Ldt_restore_metadata
+ call json_object_new_object@PLT
+ mov [rbx+4272],rax
+ test rax,rax
+ jz .Ldt_restore_alloc
+.Ldt_restore_metadata:
+ DGET "qword ptr [rsp]",details
+ mov r12,rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ldt_details]
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ldt_restore_diagnostics
+ mov rdi,r12
+ call json_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,[rbx+4272]
+ lea rsi,[rip+.Ldt_details]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldt_restore_alloc
+ mov qword ptr [rsp+24],0
+.Ldt_restore_diagnostics:
+ call json_object_new_array@PLT
+ mov r13,rax
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Ldt_restore_alloc
+ DGET "qword ptr [rsp]",diagnostics
+ mov r12,rax
+ xor r14d,r14d
+.Ldt_restore_copy_diagnostics:
+ test r12,r12
+ jz .Ldt_restore_error_diagnostics
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_restore_error_diagnostics
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldt_restore_alloc
+ mov qword ptr [rsp+24],0
+ inc r14
+ jmp .Ldt_restore_copy_diagnostics
+.Ldt_restore_error_diagnostics:
+ DGET "qword ptr [rbx+4272]",diagnostics
+ mov r12,rax
+ xor r14d,r14d
+.Ldt_restore_errors_each:
+ test r12,r12
+ jz .Ldt_restore_install_diagnostics
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Ldt_restore_install_diagnostics
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Ldt_restore_alloc
+ mov qword ptr [rsp+24],0
+ inc r14
+ jmp .Ldt_restore_errors_each
+.Ldt_restore_install_diagnostics:
+ mov rdi,[rbx+4272]
+ lea rsi,[rip+.Ldt_diagnostics]
+ mov rdx,r13
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldt_restore_alloc
+ mov qword ptr [rsp+16],0
+ DGET "qword ptr [rsp]",hook_output
+ mov r12,rax
+ test rax,rax
+ jz .Ldt_restore_ok
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Ldt_restore_ok
+ cmp eax,4096
+ ja .Ldt_restore_alloc
+ mov [rbx+4224],rax
+ mov rbp,rax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ lea rdi,[rbx+128]
+ mov rsi,rax
+ mov rdx,rbp
+ call memcpy@PLT
+.Ldt_restore_ok:
+ xor eax,eax
+ jmp .Ldt_restore_end
+.Ldt_restore_alloc:
+ mov eax,5
+.Ldt_restore_end:
+ mov [rsp+32],eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,[rsp+32]
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Ldt_aborted_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"aborted\",\"message\":\"Tool call was aborted\"}]}"

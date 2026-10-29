@@ -164,6 +164,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 嵌套工具Live槽接入持久创建/意图/结果事务：pending→running→done、调用/父调用/任务身份、最终arguments与isError摘要，父工具结算清除直属子槽；原生观察读取与safe重开/取消通过。
 - [x] 嵌套工具开始事件改为已提交execute意图，执行前取消只结束；开始参数取最终checkpoint。OUTPUT先提交Live的4096字节UTF-8尾窗口/droppedBytes再发布，done清除临时进度；Task输入保存parentCallId。真实父子工具、两段输出/多字节截断、重开与取消通过。
 - [x] executeTool按父工具replay策略登记abandonOnRestart；Scheduler重开先标记放弃，派生取消保留既有意图边界并向普通后代传递restart。已执行/未执行工具分别返回interrupted/abandoned诊断，safe重跑先清除旧Live进度；实际父子孙任务及无副作用重开通过。
+- [x] 中断/abort结果读取已提交Live输出与元数据后再结算清理；实际3000字节输出跨重开保留。缺定义的restart任务等待安装并执行abort，普通取消可使缺定义任务以orphaned结束；Client取消清除restart原因，派生取消识别显式祖先意图。
 - [ ] 实现 extension注册/选择、工具增减、section/wrapSection、wrapTool、generation/tool/compaction hooks和自定义task。
 - [ ] 将本地原生插件装载、更新、依赖变化与宿主作用域生命周期连接；状态保存稳定名字/数据，运行时解析服务。
 - [ ] 验收：两个原生扩展可组合、替换、撤销并正确清理；提交中的配置变化、工具声明与实际可执行集合一致；hook错误/取消与上游顺序对应。
@@ -274,8 +275,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts executeTool/abort/execute、scheduler.ts open/abandon/cascade；harness-nested-tools-restart的safe恢复、不安全调用放弃、已启动/门前等待及普通孙任务原因传播场景。继续沿固定Pi/Harness快照完成。
-- 实际调用链：调用级工厂固定父工具resumes → executeTool创建时按replay策略登记abandonOnRestart → Scheduler open扫描现存live任务，在任何handler前保存abortRequested/restart → 现有owned-child取消路径向普通后代传递restart并等待abort清理 → Tool abort按checkpoint区分interrupted/abandoned并与结果提交。安全恢复继续复用原子调用，在再次execute前同事务重写running并清除旧进度。
-- 验证：产品`--native-tasks --sanitize`通过safe write/read恢复复用、重跑入口无旧output/丢弃量、unsafe调用创建放弃标记、重开后父工具不再次execute、已启动父工具interrupted/未启动write abandoned诊断、普通孙任务保留restart后aborted、无文件效果及实例全部释放。Runtime整批、最终产品构建、Assembly及候选镜像G00通过；真实DeepSeek扩展首轮在预期文件检查失败，增加失败文件名诊断后整批复验通过，首轮缺失原因尚未确认。
-- 接口与自审：nested_call_start增加显式0/1放弃参数，直接消费者同步；tool_execution既有布局resumes保存固定replay策略。Scheduler利用私有open阶段标记区分重开恢复与本次新创建任务，先标记后分派；现有取消意图作为派生owner cascade边界。相关状态逻辑均为手写Assembly，公开结构尺寸与事件ABI保持。
-- 剩余与下一交付物：完整嵌套行为保持未勾选；缺定义的restart阻塞/显式取消升级、完整异常回退与部分输出恢复、details/diagnostics进度、行预算/节流、完整usage/duration摘要、全部后代Live清理、structuredOutput schema仍需按上游补齐。下一批沿Tool结果/恢复消费者完成中断结果、缺定义和取消升级场景。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts fromSlot/abort/execute、scheduler.ts blocked/abort/cascade；nested-tools-restart的持久部分输出、缺定义等待/安装与普通取消orphan场景。继续沿固定Pi/Harness快照完成。
+- 实际调用链：工具中断/abort先通过pg_tool_live_read取得已采纳槽，恢复非空output、details与既有diagnostics，再附中断/取消诊断 → 原有结果事务保存并清理Live。Scheduler缺定义的restart任务保持blocked，安装后走abort；无restart原因的普通取消在定义缺失时写orphaned/missing_task，已找到但版本/迁移不合的定义保持原有阻塞。Client取消清除restart原因，派生owner取消扫描祖先普通意图，已有restart边界仍抵抗单纯failed结算覆盖。
+- 验证：产品`--native-tasks --sanitize`通过实际父工具发布3000字节输出、子write挂起、关闭重开后结果保留原输出并报告interrupted，原有无副作用/孙任务restart保持；缺定义restart等待、安装后aborted、持久普通取消意图后orphaned。Runtime整批通过；最终产品构建、Assembly、候选G00及真实DeepSeek `--live-agent --sanitize`回归通过。
+- 接口与自审：tool_live公开只读槽副本入口，返回独立JSON；Tool恢复合并诊断，所有临时JSON与引用在失败/正常返回释放。Task解析在私有返回寄存器中保留候选存在信息，显式取消只对确实缺定义的任务生成missing_task；取消沿现有Session提交。公开结构尺寸和事件ABI不变，模块导出登记已更新。
+- 剩余与下一交付物：完整嵌套行为保持未勾选；仍需faulted/orphaned调用结果精确回退、取消升级的完整客户端工作流、truncation诊断/行预算/节流、工具details/diagnostics进度、完整usage/duration摘要、全部后代Live清理及structuredOutput schema。下一批集中结果契约、异常回退与完整后代结算，避免基础接口继续拆细。

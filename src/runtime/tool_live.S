@@ -482,3 +482,55 @@ pg_tool_live_created:
 .section .data.rel.ro
 .Llv_progress_fields:
  .quad .Llv_output,.Llv_details,.Llv_diagnostics,.Llv_droppedBytes,.Llv_droppedLines,0
+.text
+.globl pg_tool_live_read
+.type pg_tool_live_read,@function
+pg_tool_live_read:
+ LF 32
+ mov rbx,rdx
+ mov r12,rcx
+ mov qword ptr [rcx],0
+ mov qword ptr [rsp],0
+ mov rdx,rsp
+ call pg_live_peek@PLT
+ test eax,eax
+ jnz .Llv_read_end
+ LG "qword ptr [rsp]",nestedTools
+ mov r13,rax
+ test rax,rax
+ jz .Llv_read_missing
+ xor r14d,r14d
+.Llv_read_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Llv_read_missing
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ LG rax,taskId
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ cmp rax,rbx
+ je .Llv_read_found
+ inc r14
+ jmp .Llv_read_each
+.Llv_read_found:
+ mov rdi,rbp
+ mov rsi,r12
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jz .Llv_read_end
+ mov eax,3
+ jmp .Llv_read_end
+.Llv_read_missing:
+ mov eax,8
+.Llv_read_end:
+ mov ebx,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebx
+ LE 32
+.size pg_tool_live_read,.-pg_tool_live_read

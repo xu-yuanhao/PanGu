@@ -365,6 +365,9 @@ pg_durable_client_open:
  call .Ldc_set_owned
  test eax,eax
  jnz .Ldc_cancel_error
+ mov rdi,[rsp+104]
+ lea rsi,[rip+.Ldc_abort_reason]
+ call json_object_object_del@PLT
  mov rdi,[rsp+96]
  mov rsi,[rsp+104]
  call json_object_array_add@PLT
@@ -2733,3 +2736,6 @@ pg_durable_client_fault_task:
 .Ldc_execute_phase: .asciz "execute"
 .Ldc_checkpoint: .asciz "checkpoint"
 .Ldc_phase: .asciz "phase"
+
+.section .rodata
+.Ldc_abort_reason: .asciz "abortReason"
