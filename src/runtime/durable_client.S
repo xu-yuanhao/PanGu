@@ -2932,6 +2932,10 @@ pg_durable_client_conversations_service:
  mov [rsi+8],rax
  lea rax,[rip+.Lcs_current]
  mov [rsi+16],rax
+ lea rax,[rip+pg_durable_client_history]
+ mov [rsi+24],rax
+ mov rax,qword ptr [rip+json_object_put@GOTPCREL]
+ mov [rsi+32],rax
  xor eax,eax
 .Lcs_service_end:
  ret
@@ -2988,3 +2992,78 @@ pg_durable_client_text:
  pop rbx
  ret
 .size pg_durable_client_text,.-pg_durable_client_text
+
+.text
+.globl pg_durable_client_history
+.type pg_durable_client_history,@function
+pg_durable_client_history:
+ push rbx
+ push r12
+ push r13
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov r13d,4
+ test r12,r12
+ jz .Lcsh_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Lcsh_end
+ mov r13d,7
+ cmp qword ptr [rbx+8],0
+ je .Lcsh_end
+ cmp dword ptr [rbx+68],0
+ jne .Lcsh_end
+ mov r13d,3
+ cmp dword ptr [rbx+56],0
+ jne .Lcsh_end
+ mov rdi,rsp
+ mov rsi,[rbx]
+ call pg_durable_read_on_line_begin@PLT
+ test eax,eax
+ jnz .Lcsh_end
+ mov rax,[rbx+8]
+ mov rdi,[rax+8]
+ mov rsi,[rbx+24]
+ mov rdx,-1
+ lea rcx,[rsp+16]
+ call pg_durable_context_read@PLT
+ mov r13d,5
+ test eax,eax
+ jnz .Lcsh_release
+ mov rdi,[rsp+16]
+ lea rsi,[rsp+24]
+ call pg_context_project@PLT
+ test eax,eax
+ jnz .Lcsh_release
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lcsh_history_key]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lcsh_release
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [r12],rax
+ xor r13d,r13d
+.Lcsh_release:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,rsp
+ call pg_durable_read_on_line_end@PLT
+.Lcsh_end:
+ mov eax,r13d
+ add rsp,32
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_client_history,.-pg_durable_client_history
+.section .rodata
+.Lcsh_history_key: .asciz "history"
+.section .note.GNU-stack,"",@progbits

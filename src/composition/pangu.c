@@ -416,7 +416,7 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  durable.task_resolver=(pg_task_resolver){0,task_acquire,pg_extension_registry_release};if(pg_task_scheduler_bind_definitions(&durable.scheduler,&durable.task_resolver)||pg_task_scheduler_open(&durable.scheduler,&durable.session,&durable.tasks,5))return 1;
  pg_durable_client_config config={&durable.session,&durable.scheduler,&durable.inputs,1};if(pg_durable_client_open(&durable.client,&config))return 1;durable.client_ready=1;if(pg_durable_client_conversations_service(&durable.client,&foreground_conversations))return 1;
  durable.records.context=&durable.client;durable.records.publish=pg_durable_client_publish;
- struct json_object *startup=0;if(pg_durable_request_read(&durable.tasks,1,UINT64_MAX,durable.configuration,&startup))return 1;int projected=pg_context_project(startup,&durable.history);json_object_put(startup);if(projected)return 1;
+ if(foreground_conversations.history(foreground_conversations.context,&durable.history))return 1;
  durable.native_client=pg_durable_client_service(&durable.client);application.client=(pg_client){0,client_submit,client_cancel,client_poll};
  foreground_agent_state=(pg_agent_state_ops){0,agent_state_read,agent_state_configure};
  conversation_view_binding=(pg_conversation_view_binding){&durable.session,&durable.tasks,0,0,0};pg_conversation_view_service(&conversation_view_binding,&foreground_conversation_view);pg_task_graph_service(&task_graph_binding,&durable.scheduler,&foreground_task_graph);pg_usage_service(&durable.session,&foreground_usage);pg_observation_service(&durable.session,&foreground_observation);
@@ -454,7 +454,7 @@ int main(int argc,char **argv){
  pg_host *parent=&host;const char *plugin=getenv("PANGU_PLUGIN");if(plugin){if(pg_native_open(&extension,plugin,&host)){fprintf(stderr,"Cannot activate native extension (error=%u).\n",extension.error);goto cleanup;}parent=&extension.host;}
  if(pg_host_init_child(&agent_scope,parent,&agent_plugin,1)||pg_host_start(&agent_scope)){fprintf(stderr,"Cannot activate Agent consumer (error=%u).\n",agent_scope.error);goto cleanup;}
  tui_tool_observer observer={&durable.client,pg_durable_client_tool_observe,pg_durable_tool_observation_release};
- pg_client *client=pg_host_find(&agent_scope,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history_rows(&bridge,json_object_object_get(durable.history,"history"))||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
+ pg_client *client=pg_host_find(&agent_scope,"client");if(!client)goto cleanup;pg_tui_bridge bridge;if(pg_tui_bridge_init(&bridge,*client)||pg_tui_bridge_set_history_rows(&bridge,durable.history)||pg_tui_bridge_set_detach(&bridge,agent_suspend,0)||pg_tui_bridge_set_tool_observer(&bridge,&observer))goto cleanup;
  if(pg_durable_client_inputs_service(&durable.client,&foreground_inputs))goto cleanup;inputs_owner=&bridge.ops;
  tui_app_config config={STDIN_FILENO,STDOUT_FILENO,1,&bridge.ops,20};int reason=tui_app_run(&config);inputs_owner=0;bridge.ops.shutdown(bridge.ops.ctx);rc=reason<0||reason==TUI_EXIT_POLL_ERROR||bridge.stop_error?1:0;if(rc)fprintf(stderr,"PanGu terminal stopped (reason=%d, bridge=%u).\n",reason,bridge.stop_error);
 cleanup:

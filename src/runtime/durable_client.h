@@ -27,6 +27,8 @@ typedef struct {
 int pg_durable_client_inputs_service(pg_durable_client *,pg_inputs_ops *);
 int pg_durable_client_open(pg_durable_client *,const pg_durable_client_config *);
 int pg_durable_client_select(pg_durable_client *,uint64_t conversation);
+/* Owned display rows for the selected conversation, serialized without pumping. */
+int pg_durable_client_history(pg_durable_client *,struct json_object **);
 int pg_durable_client_conversations_service(pg_durable_client *,pg_conversation_client_ops *);
 pg_client pg_durable_client_service(pg_durable_client *);
 int pg_durable_client_suspend(void *);

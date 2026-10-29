@@ -193,6 +193,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 文本Submission接入真实产品：requestId去重、输入/写入admission、状态轮询/撤回、steer/follow-up的one/all边界、忙时reject、展示写入、reset/stale、失败keep/continue/withdraw及持久结算。
 - [x] 根/独立/分叉会话通过统一Session创建入口原子提交；创建hook的Entry和Agent文档同批保存，已有根会话不重复初始化，hook失败整体撤销。产品根启动接入；SQLite/JSONL分叉历史与文档继承、隔离及重开通过。
+- [x] 前台空闲选择会话保留共享Scheduler，失败保持旧绑定；当前会话历史经同一canonical投影读取并直接绑定TUI历史行，父/分叉内容隔离、两后端重开通过。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -294,8 +295,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable的会话身份/独立调度与Coding Agent `core/agent-session-runtime.ts`的会话替换边界；复用原生Client打开、输入队列基线、Agent文档和事件所有权。
-- 实际调用链：`pg_durable_client_select`在空闲时核对目标存在，加载已保存Agent状态并准备候选Client；成功后替换前台队列/观察基线，保留共享Scheduler；模型文本与工具事件按Task的conversationId过滤，其他会话进度不进入当前前台。失败保持当前会话及待交付事件。产品Host导出`conversation.client`，TUI可通过`pg_tui_runtime_conversations`获得独立的select/current函数表；选后历史由既有conversation.view重新读取。
-- 验证：`build_test.py --conversations`的ASan/UBSan专项在SQLite/JSONL验证切换、缺失/非法/忙时/关闭拒绝、候选准备失败保留事件、Scheduler持续有效、重开后加载子会话配置及无存储写入；`build_test.py --client`的Durable/Client相关回归、产品Host服务与资源组合ASan/UBSan、产品构建、Assembly检查通过。原工作目录的项目外`claude/`包目录保留，G00使用登记文件当前快照核对。
-- 接口与差异：已有公开结构/枚举/函数表布局不变，新增`pg_conversation_client_ops`独立可选表。成功选择会使旧借用事件失效；TUI需清理旧展示并读取目标历史。当前仅绑定Runtime选择能力，完整Harness默认文档/配置/init与实际会话选择控件仍由K10/K14和TUI线继续完成。
-- 下一交付物：将Session原子创建与Agent配置/默认文档组合成会话操作服务，接入新建/分叉/选择后的动态历史映射，验证各会话独立模型配置与真实执行；保留K08覆盖项中的未完成行为。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/{view,context}.ts`及Coding Agent `core/agent-session-runtime.ts`的会话替换；Harness固定`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。沿用当前原生上下文/历史投影。
+- 实际调用链：`conversation.client`提供select/current/history/release；`pg_durable_client_history`在Session只读事务内按当前会话读取canonical context并投影拥有所有权的历史行数组，复用Generation的head/编辑/工具配对语义。产品启动与选后历史使用同一入口，返回数组可交给`pg_tui_bridge_set_history_rows`；持有数组直到桥接更换历史或关闭。
+- 验证：`build_test.py --conversations`与`--client`的ASan/UBSan通过，覆盖父/分叉历史、TUI桥接实际读取、忙时与关闭拒绝及两后端重开；产品资源/Host组合ASan/UBSan、产品构建、Assembly检查通过。本轮未调用模型。G00按Git登记文件的当前快照执行；工作区项目外`claude/`独立仓库保留。
+- 接口与差异：可选`pg_conversation_client_ops`扩展history/release，当前表大小40字节；已有Client与TUI Runtime主表不变。完整会话操作控件由TUI线消费此入口。Harness默认文档/配置/init及新建/分叉产品操作服务尚需接通。
+- 下一交付物：将Session原子创建与Agent配置/默认文档组合成会话操作服务，接入新建/分叉/选择和独立模型配置；K08剩余行为继续按覆盖项推进。
