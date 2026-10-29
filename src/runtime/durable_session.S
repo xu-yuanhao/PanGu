@@ -5472,3 +5472,99 @@ pg_durable_read_on_line_end:
  ret
 .size pg_durable_read_on_line_end,.-pg_durable_read_on_line_end
 .section .note.GNU-stack,"",@progbits
+
+/* Pi Harness.#create: one mutation line through creation and confirmation. */
+.text
+.globl pg_durable_session_create_conversation
+.type pg_durable_session_create_conversation,@function
+pg_durable_session_create_conversation:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ mov r15,r8
+ mov [rsp+104],r9
+ mov eax,1
+ test r9,r9
+ jz .Lconversation_return
+ mov qword ptr [r9],0
+ test r12,r12
+ jz .Lconversation_return
+ test r13,r13
+ jz .Lconversation_return
+ cmp dword ptr [r12+28],0
+ jne .Lconversation_return
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,13
+ rep stosq
+ mov rdi,rbx
+ mov rsi,rsp
+ lea rdx,[rsp+48]
+ mov rcx,r14
+ mov r8,r15
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Lconversation_return
+ cmp dword ptr [r12+24],1
+ jne .Lconversation_create
+ cmp qword ptr [r12],0
+ jne .Lconversation_create
+ cmp qword ptr [r12+8],0
+ jne .Lconversation_create
+ cmp qword ptr [r12+16],0
+ jne .Lconversation_create
+ mov rdi,rsp
+ xor esi,esi
+ mov edx,1
+ lea rcx,[rsp+96]
+ call pg_record_tx_read@PLT
+ test eax,eax
+ jz .Lconversation_settle
+ cmp eax,7 /* PG_TX_MISSING */
+ jne .Lconversation_abort
+.Lconversation_create:
+ mov rdi,rsp
+ mov rsi,r12
+ mov rdx,r13
+ lea rcx,[rsp+96]
+ call pg_record_tx_create@PLT
+ test eax,eax
+ jnz .Lconversation_abort
+.Lconversation_settle:
+ mov rdi,rbx
+ xor esi,esi
+ xor edx,edx
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Lconversation_failed
+ mov rdx,[rsp+104]
+ mov rcx,[rsp+96]
+ mov [rdx],rcx
+ jmp .Lconversation_return
+.Lconversation_abort:
+ mov r15d,eax
+ mov rdi,rbx
+ call pg_durable_session_abort@PLT
+ mov eax,r15d
+.Lconversation_failed:
+ mov r15d,eax
+ mov rdi,[rsp+96]
+ call json_object_put@PLT
+ mov eax,r15d
+.Lconversation_return:
+ add rsp,112
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_durable_session_create_conversation,.-pg_durable_session_create_conversation

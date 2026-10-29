@@ -693,7 +693,31 @@ static int compaction_live_cases(unsigned automatic){
  curl_global_cleanup();puts(automatic==6?"PASS: Generation-owned blocking summary wins, waiting parent resumes, delayed background settles stale across reopen on SQLite/JSONL":automatic==5?"PASS: newer real summary wins; delayed background summary settles stale across reopen on SQLite/JSONL":retry_case?"PASS: summary transient failure -> persistent retry/sleep reopen -> real summary/place/recall on SQLite/JSONL":automatic==3?"PASS: background compaction, foreground idle/Esc/duplicate admission, two reopens and real model recall on SQLite/JSONL":automatic==2?"PASS: overflow error Entry and owned compaction, phase reopen and continued real model on SQLite/JSONL":automatic?"PASS: automatic owned compaction, waiting-parent and saved-summary reopen, atomic direct Entry and resumed real model on SQLite/JSONL":"PASS: real summary of >64 messages, pinned select reopen, saved-summary reopen, atomic placement and continued model recall on SQLite/JSONL");return 0;
 }
 
+
+static unsigned conversation_created_calls,conversation_created_fail;
+static int conversation_mint(void *context,uint64_t *id){return pg_record_memory_mint(context,id);}
+static int conversation_entry(void *context,uint64_t conversation,uint64_t id,json_object **out,uint64_t *sequence){return pg_record_memory_entry(context,id,conversation,out,sequence);}
+static int conversation_scan(void *context,const pg_fork_query *query,pg_fork_page *out){pg_document_query q={.scope=PG_DOC_CONVERSATION,.owner=query->conversation_id,.at=query->at,.limit=256,.after=query->after,.has_cursor=query->has_cursor};pg_memory_page page={0};int rc=pg_record_memory_scan_documents(context,&q,&page);*out=(pg_fork_page){.items=page.items,.after=(int64_t)page.after,.has_next=page.has_next};return rc;}
+static int conversation_created(void *context,pg_record_tx *tx,const json_object *record){fixture *f=context;conversation_created_calls++;json_object *draft=json_tokener_parse("{\"kind\":\"created\"}"),*entry=0;int rc=pg_record_tx_append_entry(tx,json_object_get_uint64(json_object_object_get(record,"id")),draft,0,conversation_mint,&entry);json_object_put(draft);json_object_put(entry);if(!rc){json_object *configuration=json_tokener_parse("{\"instructions\":\"PanGu conversation\"}");rc=pg_agent_state_stage(f->session.active_documents,json_object_get_uint64(json_object_object_get(record,"id")),configuration,conversation_mint);json_object_put(configuration);}return rc?rc:(int)conversation_created_fail;}
+static void conversation_creation_cases(void){
+ _Static_assert(sizeof(pg_record_tx)==48&&sizeof(pg_document_tx)==48,"conversation transaction frame");
+ for(unsigned kind=0;kind<2;kind++){
+  fixture f={.kind=kind,.now=100};char parent[]="/tmp/pangu-conversations-XXXXXX";assert(mkdtemp(parent));snprintf(f.path,sizeof(f.path),"%s/%s",parent,kind?".pangu":"pangu.sqlite");backend_open(&f);open_session(&f);
+  pg_fork_storage fork={f.memory,conversation_entry,conversation_scan,conversation_mint};pg_conversation_host host={.context=&f,.mint=conversation_mint,.fork=&fork,.created=conversation_created};pg_conversation_request request={.root=1};json_object *record=0;conversation_created_calls=conversation_created_fail=0;
+  assert(!pg_durable_session_create_conversation(&f.session,&request,&host,f.memory,read_record,&record)&&json_object_get_uint64(json_object_object_get(record,"id"))==1&&conversation_created_calls==1);json_object_put(record);uint64_t sequence=f.records.sequence;
+  assert(!pg_durable_session_create_conversation(&f.session,&request,&host,f.memory,read_record,&record)&&conversation_created_calls==1&&f.records.sequence==sequence);json_object_put(record);
+  request=(pg_conversation_request){0};assert(!pg_durable_session_create_conversation(&f.session,&request,&host,f.memory,read_record,&record));uint64_t independent=json_object_get_uint64(json_object_object_get(record,"id"));json_object_put(record);
+  request=(pg_conversation_request){.parent=1,.entry=2};assert(!pg_durable_session_create_conversation(&f.session,&request,&host,f.memory,read_record,&record));uint64_t child=json_object_get_uint64(json_object_object_get(record,"id"));assert(json_object_get_uint64(json_object_object_get(json_object_object_get(record,"parent"),"at"))==2);json_object_put(record);
+  uint64_t at=0;assert(!pg_record_memory_entry(f.memory,2,child,&record,&at));json_object_put(record);assert(pg_record_memory_entry(f.memory,2,independent,&record,&at)==PG_MEMORY_MISSING&&!record);
+  assert(!pg_agent_state_read(&f.session,child,&record)&&strstr(json_object_to_json_string(record),"PanGu conversation"));json_object_put(record);
+  assert(!pg_durable_session_begin(&f.session,&f.tx,&f.docs,f.memory,read_record));json_object *change=json_tokener_parse("{\"instructions\":\"fork-only\"}");assert(!pg_agent_state_stage(&f.docs,child,change,conversation_mint)&&!pg_durable_session_settle(&f.session,0,0,0));json_object_put(change);assert(!pg_agent_state_read(&f.session,1,&record)&&strstr(json_object_to_json_string(record),"PanGu conversation"));json_object_put(record);
+  size_t rows=f.memory->count;conversation_created_fail=1;request=(pg_conversation_request){0};assert(pg_durable_session_create_conversation(&f.session,&request,&host,f.memory,read_record,&record)==PG_TX_CREATION_FAILED&&!record&&f.memory->count==rows&&pg_durable_session_idle(&f.session));conversation_created_fail=0;
+  assert(!pg_durable_session_close(&f.session));backend_open(&f);open_session(&f);assert(!pg_record_memory_read(f.memory,PG_TABLE_CONVERSATION,child,&record)&&json_object_get_uint64(json_object_object_get(json_object_object_get(record,"parent"),"conversationId"))==1);json_object_put(record);assert(!pg_record_memory_entry(f.memory,2,child,&record,&at));json_object_put(record);assert(!pg_agent_state_read(&f.session,child,&record)&&strstr(json_object_to_json_string(record),"fork-only"));json_object_put(record);assert(!pg_durable_session_close(&f.session));cleanup(&f,parent);
+ }
+ puts("PASS: atomic root/new/fork Session creation, idempotent root, hook rollback, inherited Entry isolation and SQLite/JSONL reopen");
+}
 int main(int argc,char **argv){
+ if(argc==2&&!strcmp(argv[1],"--conversations")){conversation_creation_cases();return 0;}
  if(argc==2&&!strcmp(argv[1],"--live-owned-compaction-race"))return compaction_live_cases(6);
  if(argc==2&&!strcmp(argv[1],"--live-compaction-race"))return compaction_live_cases(5);
  if(argc==2&&!strcmp(argv[1],"--live-compaction-retry"))return compaction_live_cases(4);
@@ -704,6 +728,7 @@ int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--live-deferred"))return generation_flow(16);
  if(argc==2&&!strcmp(argv[1],"--live-sequential"))return generation_flow(20);
  if(argc==2&&!strcmp(argv[1],"--live-inputs"))return generation_flow(21);
+ conversation_creation_cases();
  conversation_view_queue_cases();
  migration_graph_cases();
  task_graph_cases();

@@ -59,9 +59,9 @@
 
 ## 本批验证与集成状态
 
-- Write在解析路径执行文件操作，在成功结果中保留原始请求路径；结果缓冲不足时在文件副作用前拒绝。Edit的内部write消费者已适配完整路径结果容量。
-- write/edit实际文件专项ASan/UBSan通过，覆盖路径、Unicode/NUL、完整内容、短写/EINTR、部分失败、容量拒绝及中断恢复；最终产品构建、Assembly检查通过。
-- Edit动态批量、NUL与diff/patch，以及Read的切片/替代解码/重读为已有基线。后续工作按核心TODO转入会话创建/分叉/重开调用链，K08剩余差异继续保留在覆盖项中。
+- `durable_session.S`统一原子创建根/独立/分叉会话；复用记录分叉、文档复制与Session提交，hook初始化的Entry/Agent文档同批确认或撤销。产品根启动已从直接StorageWrite切到该入口。
+- SQLite/JSONL根幂等、分叉继承/隔离、hook回滚和重开专项ASan/UBSan通过；产品资源启动组合ASan/UBSan、产品构建与Assembly检查通过。受影响专项入口：`python3 -B tools/runtime/build_test.py --conversations`。
+- 后续接入完整Harness初始化和前台会话选择；现有工具、模型、输入队列和观察能力作为基线复用。
 
 ## 当前接口边界
 

@@ -22,9 +22,17 @@ PROCESS_WRAPS = ['-Wl,--wrap=' + name for name in (
 SOURCES = [implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), str(ROOT / 'tests/runtime/test_agent.c')]
 
 def main():
-    read_differential()
     with tempfile.TemporaryDirectory(prefix='pangu-agent-') as directory:
         DURABLE_SOURCES.extend(compile_inputs([implementation('src/runtime/json_schema_bridge')],directory,['-fsanitize=undefined','-fno-sanitize-recover=all']))
+        if '--conversations' in sys.argv:
+            output=str(Path(directory)/'test-conversations')
+            flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc','sqlite3','libcurl'],text=True).split()
+            subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',
+                            '-fsanitize=undefined','-fno-sanitize-recover=all',*DURABLE_SOURCES,
+                            str(ROOT/'tests/runtime/test_durable_storage.c'),*flags,'-o',output],check=True)
+            subprocess.run([output,'--conversations'],check=True,timeout=20)
+            return 0
+        read_differential()
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_system_prompt.py')], check=True)
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_output_window.py')], check=True)
         if any(flag in sys.argv for flag in ('--live-generation','--live-partial','--live-deferred','--live-sequential','--live-inputs','--live-compaction','--live-auto-compaction','--live-overflow-compaction','--live-background-compaction','--live-compaction-retry','--live-compaction-race','--live-owned-compaction-race')):

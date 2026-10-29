@@ -192,13 +192,12 @@ static void report(void *ctx,uint64_t id,int error){(void)ctx;fprintf(stderr,"Pa
 static int storage_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;if(pg_record_jsonl_open(&durable.backend,application.session_directory,1))return 1;durable.storage_ready=1;
  durable.records=(pg_record_session){.storage=pg_record_jsonl_storage(&durable.backend),.sequence=durable.backend.memory.next_sequence-1};
- struct json_object *root=0;int status=record_read(0,PG_TABLE_CONVERSATION,1,&root);json_object_put(root);
- if(status){if(status!=PG_MEMORY_MISSING)return 1;struct json_object *seed=json_tokener_parse("[{\"type\":\"conversation\",\"value\":{\"id\":1}}]");if(!seed)return 1;int result=pg_records_commit(&durable.records,seed);json_object_put(seed);if(result)return 1;}
  pg_document_storage storage;pg_record_memory_documents(&durable.backend.memory,&storage);
  pg_document_cache_hooks hooks={.clock=monotonic};if(pg_document_cache_open(&durable.cache,&storage,&hooks,0))return 1;durable.cache_ready=1;
  if(pg_document_holds_open(&durable.holds,&durable.cache,0,monotonic,0))return 1;durable.holds_ready=1;
  pg_hold_timer_host timer={0,timer_arm,timer_cancel,timer_enqueue};if(pg_hold_timer_open(&durable.timer,&durable.holds,&durable.records,&timer))return 1;durable.timer_ready=1;
  pg_durable_close close={0,backend_close};if(pg_durable_session_open(&durable.session,&durable.records,&durable.cache,&durable.holds,&durable.timer,&close))return 1;durable.session_ready=1;
+ pg_conversation_request root_request={.root=1};pg_conversation_host creation={.mint=mint};struct json_object *root=0;int status=pg_durable_session_create_conversation(&durable.session,&root_request,&creation,0,record_read,&root);json_object_put(root);if(status)return 1;
  return pg_host_provide(scope,owner,"session",&durable.session);
 }
 static int storage_stop(void *ctx){

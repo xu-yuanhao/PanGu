@@ -41,6 +41,14 @@ pg_record_tx_status pg_durable_session_begin(pg_durable_session *,pg_record_tx *
  int (*read)(void *,unsigned,uint64_t,struct json_object **));
 pg_record_tx_status pg_durable_session_settle(pg_durable_session *,unsigned deferred,uint64_t within_ms,const pg_document_scan *);
 pg_record_tx_status pg_durable_session_abort(pg_durable_session *);
+/* Atomic new/root/fork conversation creation on the Session mutation line.
+   Existing root returns without rerunning creation hooks. host.created may
+   use session.active_documents to initialize documents in the same commit.
+   Output is detached and transferred only after confirmed settlement; failure
+   discards staged changes. Providers and request stay borrowed through return. */
+pg_record_tx_status pg_durable_session_create_conversation(pg_durable_session *,
+ const pg_conversation_request *,const pg_conversation_host *,void *read_context,
+ int (*read)(void *,unsigned,uint64_t,struct json_object **),struct json_object **);
 int pg_durable_session_idle(const pg_durable_session *);
 int pg_durable_session_close(pg_durable_session *);
 /* Descriptor borrowed by Tx.read_context. Synchronous providers return 0 owned

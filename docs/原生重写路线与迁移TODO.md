@@ -192,6 +192,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `harness/{harness,submissions,inbox}.ts`、`session/forks.ts`；`harness-inbox`、`harness-host-inputs`、`harness-conversations`、`harness-nested-tools*`、`session-forks` 测试。
 
 - [x] 文本Submission接入真实产品：requestId去重、输入/写入admission、状态轮询/撤回、steer/follow-up的one/all边界、忙时reject、展示写入、reset/stale、失败keep/continue/withdraw及持久结算。
+- [x] 根/独立/分叉会话通过统一Session创建入口原子提交；创建hook的Entry和Agent文档同批保存，已有根会话不重复初始化，hook失败整体撤销。产品根启动接入；SQLite/JSONL分叉历史与文档继承、隔离及重开通过。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
 - [ ] 验收：队列和分叉在重开后保持顺序/归属，已结算输入可再次查询；取消等待、取消当前任务与关闭宿主的语义可区分。
@@ -293,8 +294,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/write.ts`、`tools/edit.ts`及`env/node.ts`；下一条完整调用链来源为`harness/harness.ts`的`createConversation`、`Conversation.fork`与`session/forks.ts`。
-- 实际调用链：`write_tool.S`同时持有请求原始路径和文件操作解析路径；成功结果沿Pi返回原始路径，文件URL、绝对/相对路径和符号链接不被展示为其他路径。结果容量在文件操作前检查，Edit内部write消费者使用可容纳完整路径结果的现有缓冲。
-- 验证：write与edit文件专项ASan/UBSan通过，包含文件URL/符号链接/相对路径的实际结果、Unicode/NUL、64 KiB写入、短写/EINTR、失败/部分写入、容量拒绝无副作用及Edit中断恢复；最终产品构建、Assembly检查与`git diff --check`通过。
-- 接口与差异：公开结构/函数ABI不变。当前K08已形成完整文件读改写基线；完整诊断/details、逐文件异步并发及剩余取消/溢出/错误语义继续由K08覆盖项跟踪。
-- 下一交付物：推进B04/K10的会话创建、分叉与重开调用链。复用`pg_record_tx_create`、`pg_record_tx_fork_conversation`及已有文档复制计划，在实际Session事务中连接会话操作与Client选择；按上游会话/分叉场景验证独立状态、继承历史和持久重开。K08剩余行为在工具组完整验收时统一补齐。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts`的`#create`、`Conversation.fork`与`session/forks.ts`；复用已移植的记录创建、分叉复制和Document事务。
+- 实际调用链：`pg_durable_session_create_conversation`在一条Session事务中查找已有根或调用`pg_record_tx_create`，创建hook可使用同一文档事务初始化状态，确认提交后转移返回记录；失败丢弃候选。产品`storage_start`调用此入口建立根会话，替换直接写原始StorageWrite的启动路径。
+- 验证：`build_test.py --conversations`提供受影响专项入口。SQLite/JSONL验证根的幂等打开、独立会话、分叉的Entry/Agent文档继承和会话隔离、hook失败整批回滚与重开；ASan/UBSan专项及实际产品资源/启动组合通过，产品构建和Assembly检查通过。登记文件当前快照G00通过；原工作目录含项目外`claude/`包目录，原地G00仍报告该目录未登记。
+- 接口与差异：已有ABI保持不变，Session头新增原子创建函数并登记导出/来源。当前入口提供Session事务能力，完整Harness创建默认文档、配置/init选项和前台切换仍由K10/K14继续接入。
+- 下一交付物：将统一创建入口接入会话操作服务与空闲Client选择，完成默认文档/Agent配置、按会话历史恢复和提供者身份隔离，再通过同一产品组合重开验证。K08未完成行为保留在其覆盖项，后续工具组验收继续完成。

@@ -1439,7 +1439,8 @@
         "pg_durable_read_on_line_begin",
         "pg_durable_read_on_line_end",
         "pg_durable_session_begin_close_notified",
-        "pg_durable_session_fail"
+        "pg_durable_session_fail",
+        "pg_durable_session_create_conversation"
       ],
       "reference_basis": [
         {
@@ -1592,6 +1593,19 @@
           "tests_to_read": [
             "packages/durable/test/session-watches.test.ts",
             "packages/durable/test/harness-context.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/durable/src/harness/harness.ts",
+            "packages/durable/src/session/forks.ts"
+          ],
+          "semantics": "Atomic Session new/root/fork creation through existing record creation and document transaction; existing root returns without reinitializing; creation hook and documents share commit, failure aborts staged work; product root bootstrap consumes the same entry",
+          "tests_to_read": [
+            "packages/durable/test/harness-conversations.test.ts",
+            "packages/durable/test/session-forks.test.ts"
           ]
         }
       ]
