@@ -1961,3 +1961,17 @@ pg_extensions_prepare:
 pg_extension_hook_bind_access:
  add rdi,64
  jmp pg_task_access_open@PLT
+
+.text
+.globl pg_extension_tools_uses_base
+.type pg_extension_tools_uses_base,@function
+pg_extension_tools_uses_base:
+ push rbx
+ mov rbx,rdi
+ call .Lx_dispatch_route
+ cmp rax,rbx
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.size pg_extension_tools_uses_base,.-pg_extension_tools_uses_base

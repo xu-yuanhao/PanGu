@@ -1627,7 +1627,8 @@ pg_durable_tool_bind_hooks:
  cmp qword ptr [rbp+24],0
  je .Ldt_hooks_build
  mov rdi,[rbp]
- mov rsi,[r13+16]
+ mov rsi,[r12+16]
+ mov rdx,[r13+16]
  call [rbp+24]
  cmp eax,1
  jne .Ldt_hooks_validation_error
@@ -1738,7 +1739,8 @@ pg_durable_tool_bind_hooks:
  cmp qword ptr [rbp+24],0
  je .Ldt_hooks_ok
  mov rdi,[rbp]
- mov rsi,[r13+16]
+ mov rsi,[r12+16]
+ mov rdx,[r13+16]
  call [rbp+24]
  cmp eax,1
  jne .Ldt_hooks_validation_error
@@ -1898,3 +1900,18 @@ pg_durable_tool_bind_hooks:
 .Ldt_call: .asciz "call"
 .Ldt_parent: .asciz "parent"
 .Ldt_key: .asciz "key"
+
+.text
+.globl pg_durable_tool_call
+.type pg_durable_tool_call,@function
+pg_durable_tool_call:
+ xor eax,eax
+ test rdi,rdi
+ jz .Ldt_call_end
+ mov rax,[rdi+56]
+ test rax,rax
+ jz .Ldt_call_end
+ mov rax,[rax+16]
+.Ldt_call_end:
+ ret
+.size pg_durable_tool_call,.-pg_durable_tool_call

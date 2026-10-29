@@ -59,6 +59,8 @@ void pg_extension_hook_close(void *);
    provider; extension/replaced definitions use the composed registry. */
 typedef struct {pg_tools base,composed;const pg_tool_registry *base_catalog,*composed_catalog;const pg_tools *active;} pg_extension_tools;
 pg_tools pg_extension_tools_service(pg_extension_tools *);
+/* Same immutable descriptor routing as dispatch, without starting an operation. */
+int pg_extension_tools_uses_base(pg_extension_tools *,pg_slice);
 /* Detached request config: selected stable names and ordered rendered sections
    appended to resource prompt. Agent instructions are applied afterwards. */
 /* Open borrows the composed result through close, owns a stable detached input.

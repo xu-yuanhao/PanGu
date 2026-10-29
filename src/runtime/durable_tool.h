@@ -4,7 +4,7 @@
 #include "tools.h"
 typedef struct {
  void *context;
- /* Exclusive operation lease: 0 acquired, 1 busy (poll again), 2 unavailable.
+ /* Task-owned operation lease: 0 acquired, 1 busy (poll again), 2 unavailable.
     On success all service callbacks obey pg_tools, with async triple complete.
     Failed acquisition owns no resources. */
  int (*acquire)(void *,uint64_t task_id,pg_tools *);
@@ -25,8 +25,9 @@ typedef struct {
 } pg_durable_tool_host;
 /* poll returns 0 with owned final {call,result?}, 1 pending, negative error.
    state is closed before the executor lease; validate returns 1/0/-1 for
-   valid arguments/invalid arguments/unavailable tool. */
-typedef struct {void *context;int (*poll)(void *,uint64_t,unsigned,const struct json_object *,void **,struct json_object **);void (*close)(void *,void *);int (*validate)(void *,const struct json_object *);} pg_durable_tool_hooks;
+   valid arguments/invalid arguments/unavailable tool. validate receives the owning
+   task ID, including before/after argument rewriting. */
+typedef struct {void *context;int (*poll)(void *,uint64_t,unsigned,const struct json_object *,void **,struct json_object **);void (*close)(void *,void *);int (*validate)(void *,uint64_t,const struct json_object *);} pg_durable_tool_hooks;
 typedef struct {
  const pg_durable_tool_host *host;
  pg_task_definition definition;
@@ -41,6 +42,8 @@ typedef struct {
    say safe. Result Entry and Task outcome commit atomically through Session.
    Tool output and model-facing identity use PanGu's own Entry namespace. */
 int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
+/* Borrowed current call, valid through this Tool phase cleanup. NULL before open. */
+const struct json_object *pg_durable_tool_call(const pg_task_runner *);
 /* Binding borrows callback table through all phase and hook cleanup. */
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned

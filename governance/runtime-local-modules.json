@@ -1772,7 +1772,8 @@
         "pg_durable_tool_init",
         "pg_durable_tool_observe",
         "pg_durable_tool_observation_release",
-        "pg_durable_tool_bind_hooks"
+        "pg_durable_tool_bind_hooks",
+        "pg_durable_tool_call"
       ],
       "reference_basis": [
         {
@@ -2382,6 +2383,7 @@
         "pg_extensions_prepare",
         "pg_extensions_close",
         "pg_extension_tools_service",
+        "pg_extension_tools_uses_base",
         "pg_extension_hook_open",
         "pg_extension_hook_poll",
         "pg_extension_hook_close",
