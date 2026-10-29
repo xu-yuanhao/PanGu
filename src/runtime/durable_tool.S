@@ -110,7 +110,7 @@ pg_durable_tool_init:
  mov r13,rdx
  mov qword ptr [rsp],0
  mov edi,1
- mov esi,352
+ mov esi,384
  call calloc@PLT
  mov r14,rax
  test rax,rax
@@ -380,6 +380,18 @@ pg_durable_tool_init:
  mov r12,[rsi+56]
  test r12,r12
  jz .Ldt_cleanup_end
+ cmp dword ptr [r12+368],0
+ je .Ldt_cleanup_progress_done
+ mov rdi,r12
+ call .Ldt_progress_cleanup_flush
+ test eax,eax
+ jz .Ldt_cleanup_progress_done
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rsi,[rbx+16]
+ mov edx,6
+ call [rax+48]
+.Ldt_cleanup_progress_done:
  mov dword ptr [r12+196],0
  mov rax,[r12]
  mov rax,[rax+176]
@@ -949,6 +961,11 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
 .Ldt_poll_operation:
  mov r14,[rbx+56]
+ mov rdi,r14
+ xor esi,esi
+ call .Ldt_progress_flush
+ test eax,eax
+ jnz .Ldt_poll_error
  cmp dword ptr [r14+232],0
  je .Ldt_poll_offered
  mov dword ptr [r14+228],1
@@ -1075,10 +1092,12 @@ pg_durable_tool_init:
  call pg_output_buffer_push@PLT
  test eax,eax
  jnz .Ldt_poll_error
- mov rdi,rbx
- mov rsi,r14
- lea rdx,[rip+.Ldt_progress_stage]
- call pg_task_runner_commit_with@PLT
+ mov dword ptr [r14+368],1
+ mov rax,[r14+136]
+ add [r14+360],rax
+ mov rdi,r14
+ xor esi,esi
+ call .Ldt_progress_flush
  test eax,eax
  jnz .Ldt_poll_error
  mov rdi,[r14+128]
@@ -1104,6 +1123,11 @@ pg_durable_tool_init:
  movzx eax,al
  mov [r14+164],eax
 .Ldt_poll_close:
+ mov rdi,r14
+ mov esi,1
+ call .Ldt_progress_flush
+ test eax,eax
+ jnz .Ldt_poll_error
  cmp dword ptr [r14+180],0
  jne .Ldt_snapshot_done
  mov rax,[r12]
@@ -3019,3 +3043,102 @@ pg_durable_tool_output_limits:
 .Ldt_thousand: .double 1000.0
 .Ldt_million: .double 1000000.0
 .Ldt_half: .double 0.5
+
+.text
+/* Foreground polling supplies cooperative timer wakeups; the first dirty
+   snapshot flushes immediately, later chunks coalesce until the deadline. */
+.Ldt_progress_flush:
+ push rbx
+ push r12
+ sub rsp,24
+ mov rbx,rdi
+ mov r12d,esi
+ cmp dword ptr [rbx+368],0
+ je .Ldt_flush_ok
+ call .Ldt_monotonic
+ movsd [rsp],xmm0
+ test r12d,r12d
+ jnz .Ldt_flush_due
+ ucomisd xmm0,[rbx+352]
+ jb .Ldt_flush_ok
+.Ldt_flush_due:
+ mov rdi,[rbx+8]
+ mov rsi,rbx
+ lea rdx,[rip+.Ldt_progress_stage]
+ call pg_task_runner_commit_with@PLT
+ test eax,eax
+ jnz .Ldt_flush_end
+ pxor xmm0,xmm0
+ cvtsi2sd xmm0,qword ptr [rbx+360]
+ divsd xmm0,[rip+.Ldt_bytes_per_ms]
+ maxsd xmm0,[rip+.Ldt_progress_interval]
+ addsd xmm0,[rsp]
+ movsd [rbx+352],xmm0
+ mov qword ptr [rbx+360],0
+ mov dword ptr [rbx+368],0
+.Ldt_flush_ok:
+ xor eax,eax
+.Ldt_flush_end:
+ add rsp,24
+ pop r12
+ pop rbx
+ ret
+/* Phase cleanup has revoked TaskRunner commits; settle the admitted progress
+   through the same Session before freeing the invocation's raw window. */
+.Ldt_progress_cleanup_flush:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,160
+ mov rbx,rdi
+ mov r12,[rdi+8]
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,20
+ rep stosq
+ mov rdi,[r12]
+ mov rax,[rdi]
+ cmp dword ptr [rax+52],0
+ jne .Ldt_cleanup_flush_closed
+ mov rax,[r12+8]
+ mov rcx,[rax]
+ mov r8,[rax+8]
+ mov rsi,rsp
+ lea rdx,[rsp+88]
+ call pg_durable_session_begin@PLT
+ test eax,eax
+ jnz .Ldt_cleanup_flush_end
+ mov rdi,rbx
+ mov rsi,rsp
+ lea rdx,[rsp+88]
+ lea rcx,[rsp+144]
+ call .Ldt_progress_stage
+ test eax,eax
+ jnz .Ldt_cleanup_flush_abort
+ mov rdi,[r12]
+ xor esi,esi
+ xor edx,edx
+ xor ecx,ecx
+ call pg_durable_session_settle@PLT
+ test eax,eax
+ jnz .Ldt_cleanup_flush_abort
+ mov dword ptr [rbx+368],0
+ jmp .Ldt_cleanup_flush_end
+.Ldt_cleanup_flush_abort:
+ mov ebp,eax
+ mov rdi,[r12]
+ call pg_durable_session_abort@PLT
+ mov eax,ebp
+ jmp .Ldt_cleanup_flush_end
+.Ldt_cleanup_flush_closed:
+ xor eax,eax
+.Ldt_cleanup_flush_end:
+ add rsp,160
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.balign 8
+.Ldt_bytes_per_ms: .double 102.4
+.Ldt_progress_interval: .double 100.0
