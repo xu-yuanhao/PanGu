@@ -338,6 +338,10 @@
     "src/runtime/task_access.S": {
       "role": "assembly-core",
       "reason": "TaskRuntime持久memo首写获胜及phase约束读取"
+    },
+    "src/runtime/nested_call.S": {
+      "role": "assembly-core",
+      "reason": "持久嵌套工具索引、owned任务创建和结果文档结算"
     }
   }
 }

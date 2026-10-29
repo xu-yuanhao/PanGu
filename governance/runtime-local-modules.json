@@ -1764,7 +1764,8 @@
         "task.runner.local.v0",
         "json-c",
         "tools.registry.local.v0",
-        "usage.local.v0"
+        "usage.local.v0",
+        "tool.nested.local.v0"
       ],
       "role": "Model-issued pangu.tool durable call/execute consumer: service operation leases, intent before effects, stored/current safe replay conjunction, cooperative async output/cleanup, atomic toolResult Entry and terminal Task receipt; native host owns returned operation drainage",
       "exports": [
@@ -2473,6 +2474,29 @@
       ],
       "reference_basis": [
         "Pi d5b3de22 scheduler.ts runtime memo/read; harness-tasks.test.ts"
+      ]
+    },
+    {
+      "id": "tool.nested.local.v0",
+      "sources": [
+        "src/runtime/nested_call.S",
+        "src/runtime/nested_call.h"
+      ],
+      "dependencies": [
+        "task.runner.local.v0",
+        "session.documents.transaction.local.v0",
+        "json-c",
+        "session.documents.reader.local.v0"
+      ],
+      "role": "NestedCallDoc index and owned ToolTask creation/result settlement",
+      "exports": [
+        "pg_nested_call_document",
+        "pg_nested_call_start",
+        "pg_nested_call_settle",
+        "pg_nested_call_read"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22 harness/tool.ts NestedCallDoc/startNestedCall/settle"
       ]
     }
   ],

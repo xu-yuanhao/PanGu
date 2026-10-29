@@ -125,7 +125,19 @@ pg_durable_tool_init:
  call json_object_get_string@PLT
  test rax,rax
  jz .Ldt_open_invalid
+ mov rbp,rax
  mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_open_model
+ DGET r12,call
+ mov r13,rax
+ test rax,rax
+ jz .Ldt_open_invalid
+ jmp .Ldt_open_found
+.Ldt_open_model:
+ mov rdi,rbp
  lea rsi,[rip+.Ldt_model]
  call strcmp@PLT
  test eax,eax
@@ -588,6 +600,16 @@ pg_durable_tool_init:
  mov qword ptr [rsp+40],0
 .Ldt_diagnostics_ready:
  mov rax,[rbx+8]
+ DGET "qword ptr [rax+24]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldt_stage_nested
+ mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",conversation_id
  mov rdi,rax
  call json_object_get_uint64@PLT
@@ -603,6 +625,7 @@ pg_durable_tool_init:
  call pg_record_tx_append_entry@PLT
  test eax,eax
  jnz .Ldt_stage_alloc
+ .Ldt_stage_outcome:
  lea rdi,[rip+.Ldt_outcome_json]
  call json_tokener_parse@PLT
  mov [rsp+16],rax
@@ -659,16 +682,68 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_stage_end
 .Ldt_stage_receipt:
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+24]",input
+ DGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_nested]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_stage_model_receipt
+ mov rax,[rsp+16]
+ DGET rax,outcome
+ DGET rax,result
+ mov rbp,rax
+ lea rdi,[rip+.Ldt_nested]
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_kind]
+ mov rdx,rax
+ call .Ldt_set
+ test eax,eax
+ jnz .Ldt_stage_end
+ mov rdi,rbp
+ lea rsi,[rip+.Ldt_entry_id]
+ call json_object_object_del@PLT
+ jmp .Ldt_stage_transfer
+.Ldt_stage_model_receipt:
  DGET r14,result
  mov rbp,rax
  DGET "qword ptr [rsp+8]",id
  mov r14,rax
  DREF rbp,entry_id,r14
+.Ldt_stage_transfer:
  mov rax,[rsp+16]
  mov [r13],rax
  mov qword ptr [rsp+16],0
  xor eax,eax
  jmp .Ldt_stage_end
+.Ldt_stage_nested:
+ mov rax,[rbx+8]
+ DGET "qword ptr [rax+24]",input
+ mov rbp,rax
+ DGET rbp,parent
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov [rsp+24],rax
+ DGET rbp,key
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdx,rax
+ mov rdi,[rsp+48]
+ mov rsi,[rsp+24]
+ mov rax,[rbx+8]
+ mov rcx,[rax+16]
+ mov r8,r14
+ mov rax,[rbx]
+ mov rax,[rax]
+ mov r9,[rax+24]
+ call pg_nested_call_settle@PLT
+ test eax,eax
+ jnz .Ldt_stage_end
+ jmp .Ldt_stage_outcome
 .Ldt_metadata_add_failed:
  mov rdi,[rsp+24]
  call json_object_put@PLT
@@ -1804,3 +1879,9 @@ pg_durable_tool_bind_hooks:
 
 .section .rodata
 .Ldt_offered_tools: .asciz "offeredTools"
+
+.section .rodata
+.Ldt_nested: .asciz "nested"
+.Ldt_call: .asciz "call"
+.Ldt_parent: .asciz "parent"
+.Ldt_key: .asciz "key"

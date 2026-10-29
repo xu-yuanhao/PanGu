@@ -269,9 +269,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的scheduler.ts runtime memo/read、types.ts TaskRuntime与harness/types.ts HookApi；harness-tasks.test.ts首写获胜/null/属性名和harness-tasks-recovery.test.ts跨phase/接手保留。原有终态replace路径删除memos，复用既有Session事务。
-- 实际调用链：DSO自定义Task → phase-scoped task_access → Session mutation line重读Task → 已有memo返回、缺失时提交首个候选；后续phase/调度器重开读取同一事实。实际Tool/Generation/Compaction hook scope绑定当前Runner，将同一access作为第四参数传给插件；请求前/响应后hooks使用asking Task的memo。getTask通过readOnLine与guarded Storage读取，snapshot入口复用现有DocumentReader；产品绑定fork-aware Entry/commit sequence及Document存储，实际hooks可读取当前/指定Entry时的文档。
-- 验证：产品ASan/UBSan通过扩展任务首写获胜、第二候选返回首值、null与缺失区分、getTask及调度器重开。真实DeepSeek请求前/响应后hooks共享memo、扩展工具/压缩/异步section完整工作流通过；本轮增加hooks当前/历史读取，完整真实DeepSeek复验退出0；Runtime整批与产品构建退出0，候选登记镜像G00与Assembly通过。嵌套调用与完整HookApi尚未勾选。
-- 接口与自审：extensions.registry ABI7，hook poll第四参数为借用pg_task_access；描述符尺寸保持，私有hook scope104字节。task_access采用手写Assembly，公开头注明phase有效期、所有权与状态；memo名字按字节hex映射到PanGu自身Task.memos。新增源码/导出/依赖登记，插件链接开放task_access公开入口。
-- 当前子调用推进：`pg_task_access_create_task`通过当前Runner的guarded commit创建子任务，默认当前conversation并沿显式ownership保存。实际扩展父任务创建owned子任务→持久waiting/allSettled→调度器关闭重开→按归属查回原子任务→完成；第二场景父取消级联子取消，均由产品ASan/UBSan通过。原生产品构建和Assembly通过。此入口服务后续ToolTask嵌套调用，尚未实现NestedCallDoc索引与结果结算。
-- 剩余与下一交付物：文档历史读取已绑定产品fork-aware history provider，新增ASan/UBSan验证配置前后当前/历史值分离及不可见Entry拒绝；完整HookApi的模型目录与更完整调用生命周期检查继续核对。嵌套工具/子任务调用仍需沿ToolTask/TaskRuntime成组接入，保持既有任务、事务与所有权链。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的harness/tool.ts NestedCallDoc/startNestedCall/readCall/settle及nested-tools恢复/所有权用例。复用PanGu现有TaskRunner事务、任务级文档family、owned-child等待/取消与终态退休。
+- 实际调用链：扩展父Task调用pg_nested_call_start → 同事务创建pangu.tool.nested-call索引与owned pangu.tool → 父任务持久waiting → 子ToolTask从input.call读取调用并走既有schema/hooks/intent/执行/恢复 → 结果写回父任务family文档与子终态同批提交 → 父读结果完成并退休文档。同key同call返回原ID，冲突参数拒绝；调度器重开保留索引/归属，父取消先结算子任务。嵌套结果没有普通model tool-result Entry。
+- 验证：产品ASan/UBSan通过真实write效果、重复键复用、参数冲突回滚、调度器关闭重开、父读取结果、单子任务、终态文档退休及父取消后无文件效果。Runtime整批与产品构建通过，候选登记镜像G00/Assembly通过。模型协议未改动；既有正常Tool路径由同产品专项回归。
+- 接口与自审：nested_call.S手写Assembly，nested_call.h公开start/document/settle/read；ToolTask公开布局保持，新增input.kind=nested分支。源码、导出与模块依赖登记，Assembly检查通过；现有前台model Tool事件不消费nested分支，避免把无assistant Entry的子调用当普通模型调用。
+- 剩余与下一交付物：尚需把原生工具执行API的executeTool绑定到该持久调用链、Live.nestedTools进度/事件、自动sequence key和abandonOnRestart策略、取消前等待未完成嵌套admission及结构化结果/参数更新。K09/K10完整嵌套行为未勾选；下一批按执行器作用域与上述用户行为成组接入。

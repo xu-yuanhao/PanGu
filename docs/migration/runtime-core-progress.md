@@ -41,10 +41,9 @@
 
 ## 本批验证与集成状态
 
-- TaskRuntime已提供guarded子任务创建入口；实际父任务完成创建/等待/重开后继续、唯一子任务核对与父取消级联子取消。产品ASan/UBSan及构建通过；ToolTask嵌套索引和结果文档仍未完成。
-- `task_access.S`接入DSO自定义任务的持久memo和getTask；Task/Hook共享asking Task的memos，先写获胜、null与缺失区分，Session事务重读后提交；终态沿原有路径清理memos。
-- Tool/Generation/Compaction的真实hook scope绑定当前Runner，为callback提供phase-scoped access；读取复用DocumentReader与guarded Storage；产品绑定fork-aware Entry/commit sequence及Document存储，hooks可读取当前/历史快照。新增专项核对配置前后值分离和不可见Entry拒绝。
-- 产品ASan/UBSan通过memo争用候选、null、任务读取及调度器重开；真实DeepSeek hooks及已有完整扩展工作流、Runtime整批、产品构建、候选G00/Assembly通过；完整HookApi与嵌套调用仍属待完成范围。
+- nested_call.S把Task-scoped family索引、owned ToolTask和结果结算接成持久调用链；ToolTask直接读取nested input.call，调用现有真实编码工具，结果与子终态同事务写入父文档，父终态退休文档。
+- 产品ASan/UBSan通过实际write、同键复用/参数冲突、调度器重开、结果读取、单子任务、父取消/无文件效果和文档退休。Runtime整批、产品构建和候选G00/Assembly通过。
+- 当前调用者为原生扩展Task；工具执行API内的executeTool绑定、嵌套Live进度及剩余控制语义继续K09/K10。前台普通模型Tool事件暂不展示nested子调用，完整项保持未勾选。
 
 ## 当前接口边界
 

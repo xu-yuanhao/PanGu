@@ -672,7 +672,18 @@ pg_durable_client_output:
  jnz .Ldc_tool_fail
  CGET "qword ptr [rsp]",input
  mov r14,rax
- CGET rax,call_id
+ CGET rax,kind
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldc_tool_model_input
+ mov rdi,rax
+ lea rsi,[rip+.Ldc_nested_kind]
+ call strcmp@PLT
+ test eax,eax
+ jz .Ldc_tool_end
+.Ldc_tool_model_input:
+ CGET r14,call_id
  mov rbp,rax
  mov rdi,rax
  call json_object_get_string@PLT
@@ -2575,3 +2586,6 @@ pg_durable_client_fault_task:
  pop rbx
  pop rbp
  ret
+
+.section .rodata
+.Ldc_nested_kind: .asciz "nested"

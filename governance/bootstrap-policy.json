@@ -658,6 +658,8 @@
     "tools/runtime/test_system_prompt.py": "gate-test",
     "src/runtime/prompt_preparer.S": "native-source",
     "src/runtime/task_access.S": "native-source",
-    "src/runtime/task_access.h": "native-source"
+    "src/runtime/task_access.h": "native-source",
+    "src/runtime/nested_call.S": "native-source",
+    "src/runtime/nested_call.h": "native-source"
   }
 }
