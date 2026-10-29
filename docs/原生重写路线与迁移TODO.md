@@ -143,6 +143,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [ ] 在现有 read/write/edit/bash 服务上补齐上游输入准备、路径/目录、分页/完整文件、UTF-8/二进制/图片、并发同文件操作、超时/取消、截断/溢出文件和错误语义。
 - [x] read默认图片路径接入Durable结果与请求：PNG/JPEG/GIF/WebP头部尺寸、默认inline限制、base64、读取稳定性重试；afterTool保留图片，真实read Task持久结果可投影为模型附件。
+- [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
 - [ ] 完成 edit 的 diff/patch/首行结果与工具结构化结果；将工作区、文件和进程能力作为注入的 ExecutionEnv 服务。已有：真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询。已有诊断文本渲染、bash结构化结果与单条工具消息投影；附件与完整ExecutionEnv待补齐。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
@@ -287,8 +288,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/{read,image,image-processor}.ts` 默认无处理器的图片路径、稳定读取及图片Content结果，接续pi-ai请求映射；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：手写Assembly read在已授权打开的regular fd上识别PNG/JPEG/GIF/WebP、读取尺寸、检查默认2000px/4.5MiB base64限制并编码；fstat核对读取前后大小/mtime，变化时重读一次。工具快照向Durable提供独立Content数组和诊断；afterTool收到完整数组，Entry保留图片，随后请求投影生成image_url。文本分页与内部完整文本snapshot沿原入口。
-- 验证：产品 `--native-tasks --sanitize` 覆盖四种格式及标准base64、尺寸拒绝、真实read Task→afterTool→持久Entry→模型消息投影；原图片分组/用户输入/兼容选项和工具/Schema/取消/控制场景保持。产品构建、Assembly与排除独立claude目录的G00候选镜像通过；Runtime最终回归通过。
-- 接口与自审：pg_read_tool增加owned result指针，公开布局同步为16字节；下一次执行/关闭释放，snapshot返回深拷贝。Host沿现有工具snapshot采纳output，组合层仅增加read分派。实际链路检查修复了旧afterTool准备阶段将图片覆盖为文本的问题。read参数在清理前跨外部调用保存；四格式连续读取用例核对该所有权边界。
-- 剩余与下一交付物：K08整体验收保持未勾选。当前使用Durable默认无处理器行为；可注入图片处理器、按模型inputLimits覆盖限制、非视觉模型附加说明与上游逐条错误文案尚待补齐。下一组沿read的实际消费者完成处理器/模型限制，并继续环境适配；其他提供者协议、Schema差异、异常Task自身Live最终化及异步元数据调度仍在覆盖范围。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `tools/read.ts` imageModel/readImage、`tools/image-processor.ts` 和 `images/index.ts` 的处理器返回值/转换缩放说明；模型目录来自同提交生成器，Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：模型目录与用户模型的inputLimits经models.describe传到read；工具租约取得当前模型元数据和可选Host image.processor，调用手写Assembly配置/图片路径。默认或模型maxWidth/maxHeight/maxBytes约束原图；处理器获原始二进制与同一限制，返回prepared图片，结果生成转换/缩放/坐标映射说明。非视觉模型附加placeholder说明。读取/处理前后fstat核对变化，最多重试一次。
+- 验证：产品 `--native-tasks --sanitize` 通过：既有四格式/持久read/请求投影；可替换处理器收到模型限制、转换/缩放说明、非视觉提示、无处理器尺寸与base64拒绝、无效配置保留旧选项。模型配置专项核对inputLimits深拷贝传递；Runtime整批通过，最后的读取稳定性调整另跑read和产品专项通过。产品构建、Assembly及排除独立claude目录的G00候选镜像通过。
+- 接口与自审：pg_read_tool扩展至48字节，processor函数表借用、limits按值固定；prepared JSON由调用者持有并统一释放，最终snapshot仍深拷贝。新导出pg_read_tool_configure_images已登记；组合层只采纳元数据/服务，不承载图片算法。模型数据保留固定来源，本批新增目录内1166个inputLimits条目。
+- 剩余与下一交付物：K08整体保持未勾选。处理器注入与read消费者已接通；下一组提供成熟编解码库的原生处理器并接入应用组合，覆盖真实解码、EXIF方向与缩放编码。异步环境、提供者协议、Schema差异及异常Task自身Live最终化继续按既有覆盖表推进。

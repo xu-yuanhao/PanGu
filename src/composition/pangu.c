@@ -268,6 +268,12 @@ static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
   if((scope->shared_base&&other->shared_base)||shared_async){pg_extensions_close(&scope->extensions);free(scope);return 1;}
  }
  if(scope->definition&&scope->definition->output_limits&&pg_durable_tool_output_limits(runner,scope->definition->output_limits)){pg_extensions_close(&scope->extensions);free(scope);return 2;}
+ if(scope->shared_base&&!strcmp(name,"read")){
+  json_object *metadata=0;const pg_read_image_processor *images=pg_host_find(&agent_scope,"image.processor");
+  result=durable.model_metadata?durable.model_metadata->describe(durable.model_metadata->context,durable.configuration,&metadata):0;
+  if(!result)result=pg_read_tool_configure_images(&reader,metadata,images);json_object_put(metadata);
+  if(result){pg_extensions_close(&scope->extensions);free(scope);return 2;}
+ }
  if(scope->shared_base)pg_edit_tool_clear(&editor);
  if(scope->definition&&scope->definition->async&&scope->definition->async->open){
   scope->factory=scope->definition->async;

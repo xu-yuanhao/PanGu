@@ -734,6 +734,12 @@ pg_read_tool_open:
  push rbx /* r 跨 open 调用保存于 callee-saved */
  mov rbx, rdi
  mov qword ptr [rbx+PG_RTL_RESULT],0
+ mov qword ptr [rbx+PG_RTL_IMAGES],0
+ mov qword ptr [rbx+PG_RTL_IMAGE_BYTES],4718592
+ mov dword ptr [rbx+PG_RTL_IMAGE_WIDTH],2000
+ mov dword ptr [rbx+PG_RTL_IMAGE_HEIGHT],2000
+ mov dword ptr [rbx+PG_RTL_IMAGE_VISION],1
+ mov dword ptr [rbx+44],0
  mov rdi, rsi
  mov esi, 0xB0000 /* O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW（flags 为第2参） */
  xor eax, eax
@@ -869,6 +875,8 @@ pg_read_tool_snapshot:
  xor r14d,r14d
  xor ebp,ebp
  mov qword ptr [rsp+360],0
+ mov qword ptr [rsp+384],0
+ mov qword ptr [rsp+344],0
  mov edi,r12d
  mov rsi,rsp
  mov edx,32
@@ -881,10 +889,14 @@ pg_read_tool_snapshot:
  call .Lrim_format
  test eax,eax
  jz .Lrim_not_image
+ cmp qword ptr [rbx+PG_RTL_IMAGES],0
+ jne .Lrim_size_ready
  cmp eax,5
  je .Lrim_unsupported
- cmp r13,3538944
- ja .Lrim_unsupported
+ call .Lrim_size_fits
+ test eax,eax
+ jz .Lrim_unsupported
+.Lrim_size_ready:
  mov dword ptr [rsp+336],0
 .Lrim_attempt:
  mov edi,r12d
@@ -893,9 +905,15 @@ pg_read_tool_snapshot:
  test eax,eax
  jnz .Lrim_unsupported
  mov r13,[rsp+32+48]
- cmp r13,3538944
- ja .Lrim_unsupported
+ cmp qword ptr [rbx+PG_RTL_IMAGES],0
+ jne .Lrim_allocate
+ call .Lrim_size_fits
+ test eax,eax
+ jz .Lrim_unsupported
+.Lrim_allocate:
  lea rdi,[r13+1]
+ test rdi,rdi
+ jz .Lrim_unsupported
  call malloc@PLT
  mov r14,rax
  test rax,rax
@@ -934,15 +952,18 @@ pg_read_tool_snapshot:
  call .Lrim_format
  test eax,eax
  jz .Lrim_unsupported
+ mov [rsp+376],eax
+ cmp qword ptr [rbx+PG_RTL_IMAGES],0
+ jne .Lrim_process
  cmp eax,5
  je .Lrim_unsupported
  test edx,edx
  jz .Lrim_unsupported
  test ecx,ecx
  jz .Lrim_unsupported
- cmp edx,2000
+ cmp edx,[rbx+PG_RTL_IMAGE_WIDTH]
  ja .Lrim_unsupported
- cmp ecx,2000
+ cmp ecx,[rbx+PG_RTL_IMAGE_HEIGHT]
  ja .Lrim_unsupported
  lea rdi,[rip+.Lrim_mimes]
  dec eax
@@ -963,6 +984,62 @@ pg_read_tool_snapshot:
  mov rsi,r13
  mov rdx,rbp
  call .Lrim_base64
+ jmp .Lrim_build
+.Lrim_process:
+ lea rdi,[rip+.Lrim_mimes]
+ mov eax,[rsp+376]
+ dec eax
+ movsxd rcx,dword ptr [rdi+rax*4]
+ add rcx,rdi
+ mov rax,[rbx+PG_RTL_IMAGES]
+ mov rdi,[rax]
+ mov rsi,r14
+ mov rdx,r13
+ lea r8,[rbx+PG_RTL_IMAGE_LIMITS]
+ lea r9,[rsp+384]
+ call [rax+8]
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov rdi,[rsp+384]
+ lea rsi,[rip+.Lrim_data]
+ call json_object_object_get@PLT
+ mov [rsp+320],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrim_unsupported
+ mov rdi,[rsp+320]
+ call json_object_get_string_len@PLT
+ cmp rax,[rbx+PG_RTL_IMAGE_BYTES]
+ ja .Lrim_unsupported
+ mov rdi,[rsp+384]
+ lea rsi,[rip+.Lrim_mime]
+ call json_object_object_get@PLT
+ mov [rsp+328],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrim_unsupported
+ mov rdi,[rsp+328]
+ call json_object_get_string@PLT
+ mov r15,rax
+.Lrim_build:
+ mov edi,r12d
+ lea rsi,[rsp+176]
+ call fstat@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
+ mov rax,[rsp+32+48]
+ cmp rax,[rsp+176+48]
+ jne .Lrim_changed
+ mov rax,[rsp+32+88]
+ cmp rax,[rsp+176+88]
+ jne .Lrim_changed
+ mov rax,[rsp+32+96]
+ cmp rax,[rsp+176+96]
+ jne .Lrim_changed
  lea rdi,[rip+.Lrim_success]
  call json_tokener_parse@PLT
  mov [rsp+360],rax
@@ -975,9 +1052,16 @@ pg_read_tool_snapshot:
  xor esi,esi
  call json_object_array_get_idx@PLT
  mov [rsp+368],rax
+ cmp qword ptr [rsp+384],0
+ jne .Lrim_prepared_data
  mov rdi,rbp
  mov esi,[rsp+328]
  call json_object_new_string_len@PLT
+ jmp .Lrim_data_ready
+.Lrim_prepared_data:
+ mov rdi,[rsp+320]
+ call json_object_get@PLT
+.Lrim_data_ready:
  mov rdx,rax
  mov rdi,[rsp+368]
  lea rsi,[rip+.Lrim_data]
@@ -992,12 +1076,130 @@ pg_read_tool_snapshot:
  call json_object_object_add@PLT
  test eax,eax
  jnz .Lrim_unsupported
+ lea rdi,[rsp+344]
+ lea rsi,[rip+.Lrim_note_format]
+ mov rdx,r15
+ lea rcx,[rip+.Lrim_no_note]
+ cmp dword ptr [rbx+PG_RTL_IMAGE_VISION],0
+ jne .Lrim_note_ready
+ lea rcx,[rip+.Lrim_nonvision]
+.Lrim_note_ready:
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lrim_unsupported
+ cmp qword ptr [rsp+384],0
+ je .Lrim_notes_done
+ mov rdi,[rsp+384]
+ lea rsi,[rip+.Lrim_converted]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lrim_resize_note
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrim_unsupported
+ mov rcx,rax
+ mov r12,[rsp+344]
+ mov qword ptr [rsp+344],0
+ lea rdi,[rsp+344]
+ lea rsi,[rip+.Lrim_converted_format]
+ mov rdx,r12
+ mov r8,r15
+ xor eax,eax
+ call asprintf@PLT
+ mov [rsp+376],eax
+ mov rdi,r12
+ call free@PLT
+ cmp dword ptr [rsp+376],0
+ jl .Lrim_unsupported
+.Lrim_resize_note:
+ mov rdi,[rsp+384]
+ lea rsi,[rip+.Lrim_resized]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lrim_notes_done
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lrim_from]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lrim_width]
+ call .Lrim_dimension
+ test rax,rax
+ jz .Lrim_unsupported
+ mov [rsp],rax
+ mov rdi,r15
+ lea rsi,[rip+.Lrim_height]
+ call .Lrim_dimension
+ test rax,rax
+ jz .Lrim_unsupported
+ mov [rsp+8],rax
+ mov rdi,r12
+ lea rsi,[rip+.Lrim_to]
+ call json_object_object_get@PLT
+ mov r15,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lrim_width]
+ call .Lrim_dimension
+ test rax,rax
+ jz .Lrim_unsupported
+ mov [rsp+16],rax
+ mov rdi,r15
+ lea rsi,[rip+.Lrim_height]
+ call .Lrim_dimension
+ test rax,rax
+ jz .Lrim_unsupported
+ mov [rsp+24],rax
+ mov r12,[rsp+344]
+ mov qword ptr [rsp+344],0
+ cvtsi2sd xmm0,qword ptr [rsp]
+ cvtsi2sd xmm1,qword ptr [rsp+16]
+ divsd xmm0,xmm1
+ lea rdi,[rsp+344]
+ lea rsi,[rip+.Lrim_resized_format]
+ mov rdx,r12
+ mov rcx,[rsp]
+ mov r8,[rsp+8]
+ mov r9,[rsp+16]
+ mov rax,[rsp+24]
+ mov [rsp],rax
+ mov eax,1
+ call asprintf@PLT
+ mov [rsp+376],eax
+ mov rdi,r12
+ call free@PLT
+ cmp dword ptr [rsp+376],0
+ jl .Lrim_unsupported
+.Lrim_notes_done:
+ mov rdi,[rsp+344]
+ call json_object_new_string@PLT
+ mov [rsp+368],rax
+ mov rdi,[rsp+360]
+ lea rsi,[rip+.Lrim_diagnostics]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrim_message]
+ mov rdx,[rsp+368]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lrim_unsupported
  mov rax,[rsp+360]
  mov [rbx+PG_RTL_RESULT],rax
  xor eax,eax
  mov [rsp+352],eax
  jmp .Lrim_finish
 .Lrim_changed:
+ mov rdi,[rsp+384]
+ call json_object_put@PLT
+ mov qword ptr [rsp+384],0
+ mov rdi,rbp
+ call free@PLT
+ xor ebp,ebp
  mov rdi,r14
  call free@PLT
  xor r14d,r14d
@@ -1015,6 +1217,10 @@ pg_read_tool_snapshot:
 .Lrim_not_image:
  mov dword ptr [rsp+352],-1
 .Lrim_finish:
+ mov rdi,[rsp+344]
+ call free@PLT
+ mov rdi,[rsp+384]
+ call json_object_put@PLT
  mov rdi,r14
  call free@PLT
  mov rdi,rbp
@@ -1220,7 +1426,7 @@ pg_read_tool_snapshot:
  ret
 .section .rodata
 .Lrim_mimes:
- .long .Lrim_png-.Lrim_mimes,.Lrim_jpeg-.Lrim_mimes,.Lrim_gif-.Lrim_mimes,.Lrim_webp-.Lrim_mimes
+ .long .Lrim_png-.Lrim_mimes,.Lrim_jpeg-.Lrim_mimes,.Lrim_gif-.Lrim_mimes,.Lrim_webp-.Lrim_mimes,.Lrim_bmp-.Lrim_mimes
 .Lrim_png: .asciz "image/png"
 .Lrim_jpeg: .asciz "image/jpeg"
 .Lrim_gif: .asciz "image/gif"
@@ -1231,3 +1437,195 @@ pg_read_tool_snapshot:
 .Lrim_mime: .asciz "mimeType"
 .Lrim_success: .asciz "{\"output\":[{\"type\":\"image\"}],\"diagnostics\":[{\"severity\":\"info\",\"code\":\"image\",\"message\":\"Read image file.\"}]}"
 .Lrim_failure: .asciz "{\"output\":[],\"diagnostics\":[{\"severity\":\"error\",\"code\":\"unsupported_image\",\"message\":\"Image cannot be sent within inline format, size and dimension limits without an image processor, or changed while being read.\"}]}"
+
+.Lrim_bmp: .asciz "image/bmp"
+
+.text
+.Lrim_size_fits:
+ lea rax,[r13+2]
+ cmp rax,r13
+ jb .Lrim_size_no
+ xor edx,edx
+ mov ecx,3
+ div rcx
+ mov r11,rax
+ shr rax,62
+ jnz .Lrim_size_no
+ mov rax,r11
+ shl rax,2
+ cmp rax,[rbx+PG_RTL_IMAGE_BYTES]
+ seta al
+ xor al,1
+ movzx eax,al
+ ret
+.Lrim_size_no:
+ xor eax,eax
+ ret
+
+.text
+.globl pg_read_tool_configure_images
+.type pg_read_tool_configure_images,@function
+pg_read_tool_configure_images:
+ RI_ENTER
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test rbx,rbx
+ jz .Lricfg_bad
+ test r13,r13
+ jz .Lricfg_defaults
+ cmp qword ptr [r13+8],0
+ je .Lricfg_bad
+.Lricfg_defaults:
+ mov qword ptr [rsp],4718592
+ mov dword ptr [rsp+8],2000
+ mov dword ptr [rsp+12],2000
+ mov dword ptr [rsp+16],1
+ mov rdi,r12
+ lea rsi,[rip+.Lricfg_model]
+ call json_object_object_get@PLT
+ test rax,rax
+ cmovnz r12,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lricfg_input]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lricfg_limits
+ mov r14,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lricfg_bad
+ mov dword ptr [rsp+16],0
+ xor r15d,r15d
+.Lricfg_input_each:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp r15,rax
+ jae .Lricfg_limits
+ mov rdi,r14
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lricfg_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lricfg_image]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lricfg_input_next
+ mov dword ptr [rsp+16],1
+.Lricfg_input_next:
+ inc r15
+ jmp .Lricfg_input_each
+.Lricfg_limits:
+ mov rdi,r12
+ lea rsi,[rip+.Lricfg_limits_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lricfg_images]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lricfg_resize]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lricfg_commit
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lricfg_bad
+ xor r14d,r14d
+.Lricfg_limit_each:
+ lea rax,[rip+.Lricfg_keys]
+ movsxd rsi,dword ptr [rax+r14*4]
+ add rsi,rax
+ mov rdi,r12
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lricfg_limit_next
+ mov r15,rax
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lricfg_bad
+ mov rdi,r15
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Lricfg_bad
+ test r14,r14
+ jnz .Lricfg_dimension
+ mov rdx,0x3fffffffffffffff
+ cmp rax,rdx
+ ja .Lricfg_bad
+ mov [rsp],rax
+ jmp .Lricfg_limit_next
+.Lricfg_dimension:
+ mov edx,0xffffffff
+ cmp rax,rdx
+ ja .Lricfg_bad
+ mov [rsp+r14*4+4],eax
+.Lricfg_limit_next:
+ inc r14
+ cmp r14,3
+ jb .Lricfg_limit_each
+.Lricfg_commit:
+ movdqu xmm0,[rsp]
+ movdqu [rbx+PG_RTL_IMAGE_LIMITS],xmm0
+ mov eax,[rsp+16]
+ mov [rbx+PG_RTL_IMAGE_VISION],eax
+ mov [rbx+PG_RTL_IMAGES],r13
+ xor eax,eax
+ RI_LEAVE
+.Lricfg_bad:
+ mov eax,5
+ RI_LEAVE
+.section .rodata
+.Lricfg_model: .asciz "modelInfo"
+.Lricfg_input: .asciz "input"
+.Lricfg_image: .asciz "image"
+.Lricfg_limits_key: .asciz "inputLimits"
+.Lricfg_images: .asciz "images"
+.Lricfg_resize: .asciz "resize"
+.Lricfg_maxbytes: .asciz "maxBytes"
+.Lricfg_width: .asciz "maxWidth"
+.Lricfg_height: .asciz "maxHeight"
+.Lricfg_keys: .long .Lricfg_maxbytes-.Lricfg_keys,.Lricfg_width-.Lricfg_keys,.Lricfg_height-.Lricfg_keys
+
+.section .rodata
+.Lrim_note_format: .asciz "Read image file [%s].%s"
+.Lrim_no_note: .asciz ""
+.Lrim_nonvision: .asciz " The current model does not support images; it sees a placeholder instead."
+.Lrim_diagnostics: .asciz "diagnostics"
+.Lrim_message: .asciz "message"
+
+.text
+.Lrim_dimension:
+ sub rsp,8
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Lrim_dimension_bad
+ mov edx,0xffffffff
+ cmp rax,rdx
+ ja .Lrim_dimension_bad
+ add rsp,8
+ ret
+.Lrim_dimension_bad:
+ xor eax,eax
+ add rsp,8
+ ret
+.section .rodata
+.Lrim_converted: .asciz "convertedFrom"
+.Lrim_resized: .asciz "resized"
+.Lrim_from: .asciz "from"
+.Lrim_to: .asciz "to"
+.Lrim_width: .asciz "width"
+.Lrim_height: .asciz "height"
+.Lrim_converted_format: .asciz "%s Converted from %s to %s."
+.Lrim_resized_format: .asciz "%s Resized from %llux%llu to %llux%llu. Multiply coordinates by %.2f to map them to the original."

@@ -4,7 +4,13 @@
  * C 侧断言与 <fcntl.h>/<sys/stat.h> 真实值一致。 */
 #define PG_RTL_DIRECTORY 0
 #define PG_RTL_RESULT 8
-#define PG_RTL_READ_TOOL_BYTES 16
+#define PG_RTL_IMAGES 16
+#define PG_RTL_IMAGE_LIMITS 24
+#define PG_RTL_IMAGE_BYTES 24
+#define PG_RTL_IMAGE_WIDTH 32
+#define PG_RTL_IMAGE_HEIGHT 36
+#define PG_RTL_IMAGE_VISION 40
+#define PG_RTL_READ_TOOL_BYTES 48
 #define PG_RTL_SCAN_LIMIT 1048576
 #define PG_RTL_PAGE_LINES 2000
 #define PG_RTL_OUTPUT_MAX 4096
@@ -32,6 +38,10 @@
 #define PG_RTL_ASSERT_SIZE(t, v) _Static_assert(sizeof(t) == (v), #t " size drifted")
 PG_RTL_ASSERT_OFF(pg_read_tool, directory, PG_RTL_DIRECTORY);
 PG_RTL_ASSERT_OFF(pg_read_tool, result, PG_RTL_RESULT);
+PG_RTL_ASSERT_OFF(pg_read_tool, images, PG_RTL_IMAGES);
+PG_RTL_ASSERT_OFF(pg_read_tool, image_limits, PG_RTL_IMAGE_LIMITS);
+PG_RTL_ASSERT_OFF(pg_read_tool, vision, PG_RTL_IMAGE_VISION);
+PG_RTL_ASSERT_SIZE(pg_read_image_limits,16);
 PG_RTL_ASSERT_SIZE(pg_read_tool, PG_RTL_READ_TOOL_BYTES);
 _Static_assert(O_RDONLY == PG_RTL_O_RDONLY, "O_RDONLY drifted");
 _Static_assert(O_DIRECTORY == PG_RTL_O_DIRECTORY, "O_DIRECTORY drifted");

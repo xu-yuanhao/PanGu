@@ -510,6 +510,34 @@ pg_models_describe:
  test eax,eax
  jnz .Lm_describe_error
 .Lm_describe_compat:
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lm_input_limits]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lm_input_limits_found
+ mov rdi,[rsp+16]
+ test rdi,rdi
+ jnz .Lm_input_limits_source
+ mov rdi,[rsp+8]
+.Lm_input_limits_source:
+ lea rsi,[rip+.Lm_input_limits]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lm_input_limits_done
+.Lm_input_limits_found:
+ mov r15,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lm_describe_error
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lm_input_limits]
+ mov rdx,r15
+ call .Lm_copy
+ test eax,eax
+ jnz .Lm_describe_error
+.Lm_input_limits_done:
  xor ebp,ebp
 .Lm_compat_each:
  mov rdi,[rsp+8]
@@ -730,3 +758,5 @@ pg_models_compaction_policy:
 .Lm_input_image: .asciz "image"
 
 .Lm_compat: .asciz "compat"
+
+.Lm_input_limits: .asciz "inputLimits"
