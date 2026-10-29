@@ -458,9 +458,10 @@
         "agent.state.local.v0",
         "extensions.local.v0",
         "extension.registry.local.v0",
-        "system.prompt.local.v0"
+        "system.prompt.local.v0",
+        "tool.execution.local.v0"
       ],
-      "role": "Static composition of workspace/process/files, exclusive model/tools leases, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
+      "role": "Static composition of workspace/process/files, model lease and task-owned tool invocation factories, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
         "main",
         "pg_tui_runtime_inputs",
@@ -1773,7 +1774,8 @@
         "pg_durable_tool_observe",
         "pg_durable_tool_observation_release",
         "pg_durable_tool_bind_hooks",
-        "pg_durable_tool_call"
+        "pg_durable_tool_call",
+        "pg_durable_tool_executing"
       ],
       "reference_basis": [
         {
@@ -2500,6 +2502,27 @@
       ],
       "reference_basis": [
         "Pi d5b3de22 harness/tool.ts NestedCallDoc/startNestedCall/settle"
+      ]
+    },
+    {
+      "id": "tool.execution.local.v0",
+      "sources": [
+        "src/runtime/tool_execution.h",
+        "src/runtime/tool_execution.S"
+      ],
+      "dependencies": [
+        "task.access.local.v0",
+        "task.tool.local.v0",
+        "tool.nested.local.v0",
+        "json-c"
+      ],
+      "role": "Call-scoped native ToolExecutionApi with guarded nested admission, memo, automatic/explicit keys and detached durable result continuation",
+      "exports": [
+        "pg_tool_execution_start",
+        "pg_tool_execution_poll"
+      ],
+      "reference_basis": [
+        "Pi d5b3de22 harness/tool.ts ToolExecutionApi/executeTool/checkKey/nestedResult/fallbackResult"
       ]
     }
   ],

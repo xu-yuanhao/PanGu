@@ -44,6 +44,8 @@ typedef struct {
 int pg_durable_tool_init(pg_durable_tool *,const pg_durable_tool_host *);
 /* Borrowed current call, valid through this Tool phase cleanup. NULL before open. */
 const struct json_object *pg_durable_tool_call(const pg_task_runner *);
+/* Effects have started and the invocation has not entered settlement. */
+int pg_durable_tool_executing(const pg_task_runner *);
 /* Binding borrows callback table through all phase and hook cleanup. */
 void pg_durable_tool_bind_hooks(pg_durable_tool *,const pg_durable_tool_hooks *);
 /* Serialized read, no scheduler advancement. 0 transfers owned

@@ -660,6 +660,8 @@
     "src/runtime/task_access.S": "native-source",
     "src/runtime/task_access.h": "native-source",
     "src/runtime/nested_call.S": "native-source",
-    "src/runtime/nested_call.h": "native-source"
+    "src/runtime/nested_call.h": "native-source",
+    "src/runtime/tool_execution.h": "native-source",
+    "src/runtime/tool_execution.S": "native-source"
   }
 }

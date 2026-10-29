@@ -12,6 +12,7 @@
 .section .rodata
 .Lstr_type:       .asciz "type"
 .Lstr_object_val: .asciz "object"
+.Lmsg_unbound: .asciz "tool invocation is not bound"
 .Lmsg_unknown:    .asciz "unknown tool"
 .Lmsg_bad_args:   .asciz "invalid JSON object arguments"
 .Lmsg_validate:   .asciz "tool argument validation failed"
@@ -302,6 +303,12 @@ pg_tool_registry_init:
  je .Linit_bad
  cmp qword ptr [rax+16],0
  je .Linit_bad
+ cmp qword ptr [rax+24],0
+ sete cl
+ cmp qword ptr [rax+32],0
+ sete dl
+ cmp cl,dl
+ jne .Linit_bad
 .Linit_async_valid:
  mov rax, qword ptr [r15 + PG_TL_DEF_SCHEMA]
  mov [rsp+16], rax
@@ -486,6 +493,12 @@ li_execute:
  mov r15, rax
  test r15, r15
  jz .Lexec_unknown
+ mov rax,[r15+PG_TL_DEF_ASYNC]
+ test rax,rax
+ jz .Lexec_bound
+ cmp qword ptr [rax+24],0
+ jne .Lexec_unbound
+.Lexec_bound:
  mov rdi, [rsp]
  mov rsi, [rsp+8]
  call li_parse_object
@@ -537,6 +550,13 @@ li_execute:
  mov rsi,r13
  mov rdx,r14
  lea rcx,[rip+.Lmsg_busy]
+ call li_error
+ jmp .Lexec_out
+.Lexec_unbound:
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,r14
+ lea rcx,[rip+.Lmsg_unbound]
  call li_error
  jmp .Lexec_out
 .Lexec_unknown:
@@ -749,6 +769,12 @@ pg_tool_registry_check_json:
  mov r14,rax
  test rax,rax
  jz .Lcheck_missing
+ mov rax,[r14+PG_TL_DEF_ASYNC]
+ test rax,rax
+ jz .Lcheck_bound
+ cmp qword ptr [rax+24],0
+ jne .Lcheck_missing
+.Lcheck_bound:
  mov rdi,rbx
  lea rsi,[rip+.Lcheck_arguments]
  call json_object_object_get@PLT

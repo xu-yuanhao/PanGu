@@ -369,6 +369,7 @@ pg_durable_tool_init:
  mov r12,[rsi+56]
  test r12,r12
  jz .Ldt_cleanup_end
+ mov dword ptr [r12+4284],0
  mov rax,[r12]
  mov rax,[rax+176]
  test rax,rax
@@ -721,6 +722,12 @@ pg_durable_tool_init:
  xor eax,eax
  jmp .Ldt_stage_end
 .Ldt_stage_nested:
+ DGET "qword ptr [rsp]",data
+ mov rdi,r14
+ mov rsi,rax
+ call .Ldt_nested_metadata
+ test eax,eax
+ jnz .Ldt_stage_end
  mov rax,[rbx+8]
  DGET "qword ptr [rax+24]",input
  mov rbp,rax
@@ -1048,6 +1055,7 @@ pg_durable_tool_init:
  jnz .Ldt_poll_error
  mov dword ptr [r14+4316],1
 .Ldt_after_hooks_done:
+ mov dword ptr [r14+4284],0
  cmp dword ptr [r14+4236],0
  je .Ldt_poll_final
  mov rax,[r14+80]
@@ -1915,3 +1923,68 @@ pg_durable_tool_call:
 .Ldt_call_end:
  ret
 .size pg_durable_tool_call,.-pg_durable_tool_call
+
+.text
+.globl pg_durable_tool_executing
+.type pg_durable_tool_executing,@function
+pg_durable_tool_executing:
+ xor eax,eax
+ test rdi,rdi
+ jz .Ldt_executing_end
+ mov rdx,[rdi+56]
+ test rdx,rdx
+ jz .Ldt_executing_end
+ cmp dword ptr [rdi+84],0
+ jne .Ldt_executing_end
+ cmp dword ptr [rdx+4284],0
+ je .Ldt_executing_end
+ cmp dword ptr [rdx+4264],0
+ jne .Ldt_executing_end
+ mov eax,1
+.Ldt_executing_end:
+ ret
+.size pg_durable_tool_executing,.-pg_durable_tool_executing
+
+.text
+.Ldt_nested_metadata:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ lea rbp,[rip+.Ldt_structured_output]
+.Ldt_nested_metadata_field:
+ mov rdi,r12
+ mov rsi,rbp
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Ldt_nested_metadata_next
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,rbp
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ldt_nested_metadata_bad
+.Ldt_nested_metadata_next:
+ lea rax,[rip+.Ldt_diagnostics]
+ cmp rbp,rax
+ je .Ldt_nested_metadata_ok
+ mov rbp,rax
+ jmp .Ldt_nested_metadata_field
+.Ldt_nested_metadata_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,5
+ jmp .Ldt_nested_metadata_end
+.Ldt_nested_metadata_ok:
+ xor eax,eax
+.Ldt_nested_metadata_end:
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret

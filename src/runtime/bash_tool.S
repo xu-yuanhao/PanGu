@@ -22,7 +22,7 @@
 .Lmax_seconds: .double 2147483.647
 .section .data.rel.ro
 .Lreasons: .quad .Lnormal,.Lcancelled,.Ltimedout,.Lclosed,.Lfailed
-.Lasync: .quad .Lnext,.Lcancel,.Lclose
+.Lasync: .quad .Lnext,.Lcancel,.Lclose,0,0
 .text
 
 .globl pg_bash_tool_init

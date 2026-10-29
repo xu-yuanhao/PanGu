@@ -32,7 +32,7 @@ typedef struct {unsigned kind,reserved;const char *target;void *context;union {i
    pending callback resources before its extension lease closes. */
 typedef struct {unsigned event,reserved;void *context;int (*poll)(void *,const struct json_object *,struct json_object **,const pg_task_access *);void (*cancel)(void *,const struct json_object *);} pg_extension_hook;
 typedef struct {const char *name;const pg_tool_definition *tools;size_t tool_count;const pg_extension_section *sections;size_t section_count;const pg_extension_wrap *wraps;size_t wrap_count;const pg_extension_hook *hooks;size_t hook_count;const pg_task_definition *const *tasks;size_t task_count;} pg_extension;
-#define PG_EXTENSIONS_ABI 7u
+#define PG_EXTENSIONS_ABI 8u
 /* Host extensions.registry. A facade acquire returns an immutable snapshot
    and lease on success (0), none on failure; release drops that lease.
    defaults is an optional stable-name JSON array;

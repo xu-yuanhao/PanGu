@@ -30,7 +30,7 @@ static int execute(void *p,pg_slice args,char *out,size_t cap,size_t *size){work
 static int next(void *p,char *out,size_t cap,size_t *size){worker *x=p;++x->polls;*size=0;pg_process_event e;int rc=pg_process_next(&x->process,&e);assert(rc>=0);if(!rc)return PG_TOOL_WAIT;if(e.kind==PG_PROCESS_OUTPUT){assert(x->size+e.bytes.size<sizeof(x->result)&&e.bytes.size<cap);memcpy(x->result+x->size,e.bytes.data,e.bytes.size);x->size+=e.bytes.size;memcpy(out,e.bytes.data,e.bytes.size);*size=e.bytes.size;return PG_TOOL_OUTPUT;}assert(e.kind==PG_PROCESS_EXIT&&x->size<cap);memcpy(out,x->result,x->size);*size=x->size;return e.reason||e.exit_code?PG_TOOL_ERROR:PG_TOOL_OK;}
 static void cancel(void *p){worker *x=p;++x->cancels;pg_process_cancel(&x->process);}
 static int close_worker(void *p){worker *x=p;++x->closes;if(x->delay){--x->delay;return 1;}if(x->close_fault){x->close_fault=0;return -1;}int rc=pg_process_close(&x->process);if(!rc)x->closed=1;return rc;}
-static const pg_tool_async async={next,cancel,close_worker};
+static const pg_tool_async async={next,cancel,close_worker,0,0};
 static int model_start(void *p,const pg_session *session){(void)p;++model_starts;model_step=0;model_answer=session->messages[session->count-1].role==PG_TOOL_RESULT;if(model_answer){assert(w.closed&&!registry.active&&w.process.pid==-1);}return 0;}
 static int model_next(void *p,pg_model_event *e){(void)p;*e=(pg_model_event){0};if(!model_step++){e->kind=PG_MODEL_TEXT;e->text=s(model_answer?"done":"working");}else if(model_answer)e->kind=PG_MODEL_DONE;else{e->kind=PG_MODEL_CALL;e->text=s("{}");e->call_id=s("job-1");e->tool_name=s("job");}return 0;}
 static void model_noop(void *p){(void)p;}

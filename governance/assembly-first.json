@@ -342,6 +342,10 @@
     "src/runtime/nested_call.S": {
       "role": "assembly-core",
       "reason": "持久嵌套工具索引、owned任务创建和结果文档结算"
+    },
+    "src/runtime/tool_execution.S": {
+      "role": "assembly-core",
+      "reason": "Pi Durable调用级executeTool准入、键序列、memo与持久嵌套结果续接"
     }
   }
 }

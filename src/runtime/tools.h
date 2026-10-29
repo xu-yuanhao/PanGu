@@ -5,10 +5,17 @@
 /* Borrowed immutable strings and contexts must outlive the registry and runs.
    validate checks tool-specific schema semantics; policy is separate from visibility.
    Validators/authorization are side-effect free; callbacks return promptly. */
+struct pg_tool_execution;
 typedef struct {
  int (*next)(void *, char *, size_t, size_t *);
  void (*cancel)(void *);
  int (*close)(void *);
+ /* Optional paired factory: open allocates an invocation context for all tool
+    callbacks, performs no effects, and borrows api until dispose. The Durable
+    Host binds factories before dispatch; an unbound factory cannot execute. Failure owns
+    no context. close drains native work; dispose releases the context once. */
+ int (*open)(void *definition_context,struct pg_tool_execution *api,void **instance);
+ void (*dispose)(void *instance);
 } pg_tool_async;
 typedef struct {
  const char *name, *description, *schema;

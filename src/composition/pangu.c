@@ -14,6 +14,7 @@
 #include "../runtime/conversation_view.h"
 #include "../runtime/request_context.h"
 #include "../runtime/tool_provider.h"
+#include "../runtime/tool_execution.h"
 #include "../runtime/read_tool.h"
 #include "../runtime/write_tool.h"
 #include "../runtime/edit_tool.h"
@@ -75,7 +76,9 @@ typedef struct tool_scope {
  pg_extension_tools dispatch;
  pg_tools executor;
  pg_agent_tools_gate gate;
- const pg_tool_definition *definition;
+ pg_tool_definition *definition;
+ pg_tool_execution execution;
+ const pg_tool_async *factory;pg_tool_async instance_async;void *instance;
  unsigned base,shared_base,draining;
 } tool_scope;
 static struct {
@@ -156,7 +159,7 @@ static int timer_enqueue(void *ctx,pg_timer_job job,void *argument){(void)ctx;if
 static tool_scope *tool_scope_find(uint64_t id){for(tool_scope *scope=durable.tool_scopes;scope;scope=scope->next)if(scope->task_id==id)return scope;return 0;}
 static void tool_scope_drop(tool_scope *scope){
  tool_scope **link=&durable.tool_scopes;while(*link&&*link!=scope)link=&(*link)->next;
- if(*link)*link=scope->next;pg_extensions_close(&scope->extensions);free(scope);
+ if(*link)*link=scope->next;if(scope->instance)scope->factory->dispose(scope->instance);pg_extensions_close(&scope->extensions);free(scope);
 }
 static void foreground(void){
  if(durable.armed&&durable.fire&&monotonic(0)>=durable.deadline){pg_timer_job fire=durable.fire;durable.fire=0;fire(durable.fire_context);}
@@ -259,11 +262,22 @@ static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
  scope->base=pg_extension_tools_uses_base(&scope->dispatch,(pg_slice){name,strlen(name)});scope->shared_base=scope->base;
  for(size_t i=0;i<scope->extensions.tools.count;i++)if(!strcmp(scope->extensions.tools.entries[i].name,name)){scope->definition=&scope->extensions.tools.entries[i];break;}
  if(scope->definition)for(size_t i=0;i<durable.declared_tools->count;i++){const pg_tool_definition *base=&durable.declared_tools->entries[i];if(scope->definition->context==base->context&&scope->definition->execute==base->execute&&scope->definition->async==base->async)scope->shared_base=1;}
+ if(scope->definition&&scope->definition->async&&scope->definition->async->open)scope->shared_base=0;
  for(tool_scope *other=durable.tool_scopes;other;other=other->next){
-  int shared_async=scope->definition&&other->definition&&scope->definition->async&&scope->definition->context==other->definition->context&&scope->definition->async==other->definition->async;
+  int shared_async=scope->definition&&other->definition&&scope->definition->async&&!scope->definition->async->open&&scope->definition->context==other->definition->context&&scope->definition->async==other->definition->async;
   if((scope->shared_base&&other->shared_base)||shared_async){pg_extensions_close(&scope->extensions);free(scope);return 1;}
  }
  if(scope->shared_base)pg_edit_tool_clear(&editor);
+ if(scope->definition&&scope->definition->async&&scope->definition->async->open){
+  scope->factory=scope->definition->async;
+  result=pg_task_access_open(&scope->execution.access,runner,&durable.task_history);
+  scope->execution.tool=&durable.tool.definition;scope->execution.mint=mint;scope->execution.call_id=json_object_get_string(json_object_object_get(call,"id"));
+  if(!result)result=scope->factory->open(scope->definition->context,&scope->execution,&scope->instance);
+  if(result||!scope->instance){if(scope->instance)scope->factory->dispose(scope->instance);pg_extensions_close(&scope->extensions);free(scope);return 2;}
+  scope->instance_async=*scope->factory;scope->instance_async.open=0;scope->instance_async.dispose=0;
+  scope->definition->context=scope->instance;scope->definition->async=&scope->instance_async;scope->base=0;
+  for(size_t i=0;i<scope->allowed.count;i++)if(!strcmp(scope->allowed.entries[i].name,name)){scope->allowed.entries[i].context=scope->instance;scope->allowed.entries[i].async=&scope->instance_async;}
+ }
  scope->executor=pg_extension_tools_service(&scope->dispatch);scope->gate=(pg_agent_tools_gate){scope->executor,&scope->allowed};
  scope->next=durable.tool_scopes;durable.tool_scopes=scope;*out=pg_agent_tools_service(&scope->gate);pg_durable_client_tool(&durable.client,id,0);return 0;
 }
@@ -274,7 +288,7 @@ static int agent_state_configure(void *ctx,uint64_t conversation,const json_obje
 }
 static void tool_release(void *ctx,uint64_t id,const pg_tools *tools){
  (void)ctx;tool_scope *scope=tool_scope_find(id);if(!scope){pg_durable_client_fault(&durable.client);return;}
- int result=tools->close?tools->close(tools->context):0;if(result==1)scope->draining=1;else {tool_scope_drop(scope);if(result)pg_durable_client_fault(&durable.client);}
+ scope->execution.access.runner=0;int result=tools->close?tools->close(tools->context):0;if(result==1)scope->draining=1;else {tool_scope_drop(scope);if(result)pg_durable_client_fault(&durable.client);}
 }
 static int native_tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,struct json_object **out){
  (void)ctx;(void)id;*out=0;
