@@ -387,6 +387,8 @@ pg_durable_tool_init:
  test eax,eax
  jz .Ldt_cleanup_progress_done
  mov rax,[rbx+8]
+ cmp qword ptr [rax+48],0
+ je .Ldt_cleanup_progress_done
  mov rdi,[rax]
  mov rsi,[rbx+16]
  mov edx,6

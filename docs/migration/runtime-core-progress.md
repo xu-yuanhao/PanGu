@@ -15,7 +15,8 @@
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
-| 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT先持久UTF-8尾窗口/丢弃字节再发布，done清除进度，Task/Live保留父调用关系 |
+| 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT发布实时块并合并持久UTF-8窗口/丢弃量，done清除进度，Task/Live保留父调用关系 |
+| 工具输出合并 | `durable_tool.S`：首次快照立即提交，后续按至少100ms及待处理输入字节节流；结束/暂停清理强制刷新，2200行输入在重开中断结果保留200行丢弃计数；实时输出事件逐块发布，上游实际写入字节计量仍待补齐 |
 | 跨块流窗口 | `output_window.S`保存清洗前raw margin及全流计数，head/tail逐块快照与固定Chord的220组流直接一致；Tool已替换旧拼接路径，释放与恢复沿调用级生命周期 |
 | 输出清洗与结果元数据 | `output_window.S`清理流窗口/事件控制字符，2464组上游预算/清洗对照；Tool诊断动态渲染支持7000字节，单调计时duration进入结果/嵌套返回/摘要 |
 | 工具输出预算 | `output_window.S`移植Chord完整行/UTF-8 head/tail；工具定义携带bytes/lines/retain，默认50KiB/2000行/head、bash tail；动态Tool缓冲、70KiB/零预算、累计丢弃/截断诊断和恢复通过 |

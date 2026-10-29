@@ -281,8 +281,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Chord output.ts OutputBuffer.accept/snapshot/tailMargin/lines及output.test.ts逐块快照场景，Durable tool.ts reported.output与publishProgress消费者。继续沿固定Pi/Harness快照完成。
-- 实际调用链：Tool OUTPUT先将完整decoded块加入调用级pg_output_buffer → 清洗前累计bytes/newlines/末尾状态 → snapshot按固定head/tail预算取完整行/UTF-8窗口并清洗副本 → 快照和丢弃量进入原有Tool文档事务 → 发布输出。head固定首窗口后继续累计，tail保留前一字符/换行margin以供下块；原来以已清洗Live窗口重新拼接的实现已删除。调用结束/取消统一释放原始margin，safe重跑从新调用buffer开始。
-- 验证：test_output_window.py直接运行固定Chord OutputBuffer，220组随机多块输入的每次快照逐项比较，覆盖控制字符/嵌入NUL/Unicode、head/tail、零字节/零行、跨块行尾与字节边界；2464组bound/sanitize原有对照保持通过。产品`--native-tasks --sanitize`的Live窗口/丢弃量、输出事件、70KiB/零预算、details/长诊断、重开和取消通过。Runtime整批、真实DeepSeek `--live-agent --sanitize`、产品构建、Assembly与候选镜像G00均通过。
-- 接口与自审：output_window公开64字节decoded-stream状态、32字节owned快照，头文件明确输入借用/快照释放/close；上游字节解码仍由已有stream_decode消费者负责。Tool私有操作扩为352字节，流状态直接内嵌，入流在事务外只执行一次，事务回调只取快照和提交。新导出登记与布局断言更新，产品公共ABI/事件保持；失败分配不发布部分窗口。
-- 剩余与下一交付物：完整工具行为保持未勾选；仍需进度100KiB/s与最小间隔节流/合并、OutputSkip及retainedOutput调用API、完整error/usage/duration摘要、异常Task自身Live最终化、structuredOutput schema与结果控制。下一批沿Tool进度消费者处理节流与最终刷新，集中核对取消/暂停期间的持久状态。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Chord `output.ts` Progress、Durable `tool.ts` publishProgress/run/cleanup及实际工具消费者；Harness保持 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：Tool OUTPUT加入调用级原始流窗口后标记待刷新；首次立即持久化，后续块由前台协作轮询按单调时间合并，间隔至少100ms，并按待刷新输入字节/100KiB每秒延后。正常结束强制刷新；暂停/取消清理在释放原始窗口前通过Session提交剩余快照，再由现有恢复/中断路径读取。实时输出事件仍逐块发布。实现入口为 `durable_tool.S` 的 progress_flush/progress_cleanup_flush、poll与cleanup。
+- 验证：产品 `test_product_resources.py --native-tasks --sanitize` 通过。现有字节/行窗口场景等待实际持久快照再核对原有完整内容；挂起场景在第二块输出后立即关闭Scheduler，回读确认2200行输入的2000行窗口及200行/200字节丢弃量已刷新，重开后的中断结果保留这些事实。产品构建与Assembly检查通过；Runtime整批回归通过；排除独立安装目录 `claude/` 的登记文件候选镜像G00通过。
+- 接口与自审：Tool私有操作384字节，新增单调刷新期限、待处理字节数和dirty标记；公共ABI与文件登记保持。清理时Runner已撤销commit能力，直接Session事务只更新进度文档；失败沿现有报告与Session失败机制处理，可选report为空时安全跳过。测试继续保留原窗口/诊断断言，轮询之间让出1ms以推进真实时钟。
+- 剩余与下一交付物：完整工具行为保持未勾选。进度仍需按上游实际写入的后缀/元数据字节计量，以及统一details/diagnostic的调度语义；现有节流按输入字节计量。随后成组接入OutputSkip、retainedOutput及outputWindow调用API，补齐完整error/usage/duration摘要、异常Task自身Live最终化、structuredOutput schema与结果控制。
