@@ -16,6 +16,7 @@
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
 | 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT先持久UTF-8尾窗口/丢弃字节再发布，done清除进度，Task/Live保留父调用关系 |
+| 嵌套重启策略 | `task_runner.S`/`tool_execution.S`/`durable_tool.S`：unsafe调用子任务重开先放弃、restart向普通后代传播，已启动/未启动分诊断；safe重跑沿原键恢复并先清空进度，产品父子孙任务与无副作用恢复通过 |
 | 工具内嵌套执行 | `tool_execution.S`与调用级工厂：executeTool start/poll、memo、显式/自动键和持久子工具；实际write→read、safe重开复用、结构化返回/诊断、取消及实例释放通过；DSO可通过公开动态符号调用 |
 | 工具调用作用域 | `durable_tool.S`/`extensions.S`与产品组合器：按Task隔离扩展快照/gate/hooks/执行租约，扩展父工具挂起时owned子工具真实写入并回传，父子取消独立释放；共享基础提供者/异步上下文互斥 |
 | Tool hooks | `extensions.S`/`durable_tool.S`：原生beforeTool/afterTool进入意图前与结果提交前，参数与结果按选中扩展顺序传递，拦截/异常、两次校验、pending/取消/重开；工具结果保留最终参数及hook元数据 |

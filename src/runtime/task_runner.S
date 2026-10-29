@@ -2051,6 +2051,14 @@ pg_task_runner_close:
  jnz .Lts_discover_end
  cmp dword ptr [r14+88],0
  jne .Lts_recover_next
+ cmp dword ptr [rbx+68],0
+ je .Lts_recover_state
+ mov rdi,r14
+ call .Ltr_abandon
+ mov ebp,eax
+ test eax,eax
+ jnz .Lts_discover_end
+.Lts_recover_state:
  mov rdi,[r14+24]
  call .Ltr_record_state
  cmp eax,1
@@ -2128,7 +2136,9 @@ pg_task_scheduler_open:
  mov qword ptr [rdi+64],0
  mov dword ptr [rdi+56],1
  mov dword ptr [rdi+60],1
+ mov dword ptr [rdi+68],1
  call .Lts_discover
+ mov dword ptr [rbx+68],0
  mov dword ptr [rbx+56],0
 .Lts_open_return:
  pop rbx
@@ -2878,7 +2888,7 @@ pg_task_scheduler_close:
  push r12
  push r13
  push r14
- sub rsp,208
+ sub rsp,224
  mov rbx,rdi
  pxor xmm0,xmm0
  movdqu [rsp],xmm0
@@ -3028,11 +3038,17 @@ pg_task_scheduler_close:
  call .Ltw_failed
  test eax,eax
  jnz .Ltw_reconcile_descend
+ mov rdi,rsp
+ mov rsi,r13
+ call .Ltw_restart_origin
+ mov [rsp+208],eax
  TGET "qword ptr [r13+16]",abort_requested
  mov rdi,rax
  call json_object_get_boolean@PLT
  test eax,eax
  jz .Ltw_reconcile_mark
+ cmp dword ptr [rsp+208],0
+ jne .Ltw_reconcile_descend
  TGET "qword ptr [r13+16]",abort_reason
  test rax,rax
  jz .Ltw_reconcile_descend
@@ -3053,9 +3069,22 @@ pg_task_scheduler_close:
  call .Ltr_set
  test eax,eax
  jnz .Ltw_reconcile_alloc
+ cmp dword ptr [rsp+208],0
+ je .Ltw_clear_restart_reason
+ lea rdi,[rip+.Ltr_restart_reason]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+184]
+ lea rsi,[rip+.Ltr_abort_reason]
+ mov rdx,rax
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltw_reconcile_alloc
+ jmp .Ltw_reason_ready
+.Ltw_clear_restart_reason:
  mov rdi,[rsp+184]
  lea rsi,[rip+.Ltr_abort_reason]
  call json_object_object_del@PLT
+.Ltw_reason_ready:
  mov rdi,[rsp+64]
  mov rsi,[rsp+184]
  call json_object_array_add@PLT
@@ -3137,7 +3166,7 @@ pg_task_scheduler_close:
  mov rdi,rsp
  call .Ltw_release
  mov eax,ebp
- add rsp,208
+ add rsp,224
  pop r14
  pop r13
  pop r12
@@ -3653,4 +3682,118 @@ pg_task_scheduler_bind_definitions:
  mov [rdi+72],rsi
  xor eax,eax
 .Lts_bind_end:
+ ret
+
+.text
+/* Scheduler-open recovery only, before reserving any phase. */
+.Ltr_abandon:
+ push rbp
+ push rbx
+ sub rsp,24
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ TGET "qword ptr [rbx+24]",abandon_key
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Ltr_abandon_ok
+ TGET "qword ptr [rbx+24]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Ltr_abandon_ok
+ mov rdi,[rbx+24]
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Ltr_abandon_alloc
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_abort_requested]
+ mov rdx,rax
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_abandon_end
+ lea rdi,[rip+.Ltr_restart_reason]
+ call json_object_new_string@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Ltr_abort_reason]
+ mov rdx,rax
+ call .Ltr_set
+ test eax,eax
+ jnz .Ltr_abandon_end
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Ltr_store
+ jmp .Ltr_abandon_end
+.Ltr_abandon_ok:
+ xor eax,eax
+ jmp .Ltr_abandon_end
+.Ltr_abandon_alloc:
+ mov eax,5
+.Ltr_abandon_end:
+ mov ebp,eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,24
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Ltr_abandon_key: .asciz "abandonOnRestart"
+.Ltr_restart_reason: .asciz "restart"
+
+.text
+/* Existing cancellation intent is a boundary for derived owner cascades. */
+.Ltw_restart_origin:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov r14,[rdi+8]
+.Ltw_origin_each:
+ test r12,r12
+ jz .Ltw_origin_done
+ test r14,r14
+ jz .Ltw_origin_request
+ dec r14
+ mov rdi,r12
+ call .Ltw_failed
+ test eax,eax
+ jnz .Ltw_origin_request
+ TGET "qword ptr [r12+16]",abort_requested
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Ltw_origin_parent
+ TGET "qword ptr [r12+16]",abort_reason
+ mov rdi,rax
+ lea rsi,[rip+.Ltr_restart_reason]
+ call .Ltr_equal
+ test eax,eax
+ jz .Ltw_origin_request
+ mov r13d,1
+ jmp .Ltw_origin_done
+.Ltw_origin_parent:
+ mov rdi,rbx
+ mov rsi,[r12+8]
+ call .Ltw_find
+ mov r12,rax
+ jmp .Ltw_origin_each
+.Ltw_origin_request:
+ xor r13d,r13d
+.Ltw_origin_done:
+ mov eax,r13d
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
  ret

@@ -103,7 +103,9 @@ typedef struct {
  const pg_task_resolver *resolver;
 } pg_task_scheduler;
 /* Zeroed caller storage, one scheduler per writable Session. Open discovers
-   and recovers live tasks before any phase executes. Even failed open must be
+   and recovers live tasks before any phase executes. Existing abandonOnRestart
+   tasks are abort-marked with reason restart; derived owner cascades preserve
+   established intent boundaries. Even failed open must be
    closed. Each poll discovers newly committed tasks and gives each live runner
    at most one callback, in ascending task-ID order. Host/definition leases and
    serialization follow runner rules; close scheduler before Session. No other

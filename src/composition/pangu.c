@@ -271,7 +271,7 @@ static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
  if(scope->definition&&scope->definition->async&&scope->definition->async->open){
   scope->factory=scope->definition->async;
   result=pg_task_access_open(&scope->execution.access,runner,&durable.task_history);
-  scope->execution.tool=&durable.tool.definition;scope->execution.mint=mint;scope->execution.call_id=json_object_get_string(json_object_object_get(call,"id"));
+  scope->execution.tool=&durable.tool.definition;scope->execution.resumes=scope->definition->replay_safe;scope->execution.mint=mint;scope->execution.call_id=json_object_get_string(json_object_object_get(call,"id"));
   if(!result)result=scope->factory->open(scope->definition->context,&scope->execution,&scope->instance);
   if(result||!scope->instance){if(scope->instance)scope->factory->dispose(scope->instance);pg_extensions_close(&scope->extensions);free(scope);return 2;}
   scope->instance_async=*scope->factory;scope->instance_async.open=0;scope->instance_async.dispose=0;

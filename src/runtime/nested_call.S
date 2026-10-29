@@ -177,6 +177,7 @@ pg_nested_call_settle:
 .globl pg_nested_call_start
 .type pg_nested_call_start,@function
 pg_nested_call_start:
+ mov r10d,[rsp+8]
  NF 96
  mov rbx,rdi
  mov r12,rsi
@@ -194,6 +195,9 @@ pg_nested_call_start:
  mov [rsp+16],r13
  mov [rsp+24],r14
  mov [rsp+32],rbp
+ mov [rsp+48],r10d
+ cmp r10d,1
+ ja .Ln_start_invalid
  test r13,r13
  jz .Ln_start_invalid
  cmp byte ptr [r13],0
@@ -343,7 +347,18 @@ pg_nested_call_start:
  mov [rsp+24],rax
  test rax,rax
  jz .Ln_stage_bad
- NG rax,ownership
+ cmp dword ptr [rbx+48],0
+ je .Ln_policy_ready
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Ln_abandonOnRestart]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Ln_stage_bad
+.Ln_policy_ready:
+ NG "qword ptr [rsp+24]",ownership
  mov r14,rax
  mov rax,[rbx]
  mov rdi,[rax+16]
@@ -521,3 +536,6 @@ pg_nested_call_peek:
 .section .rodata
 .Ln_id: .asciz "id"
 .Ln_parentCallId: .asciz "parentCallId"
+
+.section .rodata
+.Ln_abandonOnRestart: .asciz "abandonOnRestart"

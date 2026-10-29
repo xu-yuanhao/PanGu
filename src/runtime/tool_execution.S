@@ -219,6 +219,9 @@ pg_tool_execution_start:
  call .Lte_add
  test eax,eax
  jnz .Lte_start_finish
+ mov eax,[rbx+76]
+ xor eax,1
+ mov [rsp],rax
  mov rdi,[rbx]
  mov rsi,[rbx+40]
  mov rdx,r14

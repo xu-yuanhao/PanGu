@@ -850,8 +850,33 @@ pg_durable_tool_init:
  mov r12,[rbx+56]
  mov dword ptr [r12+4252],1
  mov dword ptr [r12+4256],2
+ DGET "qword ptr [rbx+32]",abort_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Ldt_abort_ordinary
+ mov rdi,rax
+ lea rsi,[rip+.Ldt_restart_word]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ldt_abort_ordinary
+ lea rdi,[rip+.Ldt_abandoned_metadata]
+ lea rsi,[rip+.Ldt_abandoned_message]
+ cmp dword ptr [r12+4244],0
+ je .Ldt_abort_restart_metadata
+ lea rdi,[rip+.Ldt_restart_metadata]
+ lea rsi,[rip+.Ldt_restart_message]
+.Ldt_abort_restart_metadata:
+ mov [rsp],rsi
+ call json_tokener_parse@PLT
+ mov [r12+4272],rax
+ mov rdi,r12
+ mov rsi,[rsp]
+ jmp .Ldt_abort_output
+.Ldt_abort_ordinary:
  mov rdi,r12
  lea rsi,[rip+.Ldt_aborted_message]
+.Ldt_abort_output:
  call .Ldt_message_output
  mov rdi,r12
  call .Ldt_finish
@@ -917,6 +942,12 @@ pg_durable_tool_init:
  call rax
  cmp eax,1
  jne .Ldt_poll_interrupted
+ mov rdi,rbx
+ mov rsi,r14
+ lea rdx,[rip+.Ldt_intent_stage]
+ call pg_task_runner_commit_with@PLT
+ test eax,eax
+ jnz .Ldt_poll_error
  jmp .Ldt_poll_execute
 .Ldt_poll_hook_resume:
  cmp dword ptr [r14+4312],0
@@ -2286,3 +2317,11 @@ pg_durable_tool_executing:
 .Ldt_live_task_id: .asciz "taskId"
 .Ldt_live_dropped_bytes: .asciz "droppedBytes"
 .Ldt_live_output_json: .asciz "{}"
+
+.section .rodata
+.Ldt_abort_reason: .asciz "abortReason"
+.Ldt_restart_word: .asciz "restart"
+.Ldt_abandoned_message: .asciz "Tool was not started: its caller ended with a restart"
+.Ldt_restart_message: .asciz "Tool was interrupted by a restart and may have partially run"
+.Ldt_abandoned_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"abandoned\",\"message\":\"Tool was not started: its caller ended with a restart\"}]}"
+.Ldt_restart_metadata: .asciz "{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"interrupted\",\"message\":\"Tool was interrupted by a restart and may have partially run\"}]}"

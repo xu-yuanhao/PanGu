@@ -2,14 +2,15 @@
 #define PANGU_TOOL_EXECUTION_H
 #include "task_access.h"
 /* Call-owned capability, borrowed until the tool instance is disposed. Sequence
-   restarts with an invocation; omitted keys replay by their original call order. */
+   restarts with an invocation; omitted keys replay by their original call order.
+   Host sets resumes from the pinned tool replay policy before opening it. */
 typedef struct pg_tool_execution {
  pg_task_access access;
  const pg_task_definition *tool;
  int (*mint)(void *,uint64_t *);
  const char *call_id;
  uint64_t sequence;
- unsigned memoized,reserved;
+ unsigned memoized,resumes;
 } pg_tool_execution;
 /* 0 admitted, positive task status on failure; key NULL selects the next
    sequence key. Explicit keys are nonempty path segments, excluding __proto__
