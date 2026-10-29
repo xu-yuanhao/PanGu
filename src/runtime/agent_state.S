@@ -296,6 +296,11 @@ pg_agent_state_prepare:
  mov eax,5
  jmp .La_prepare_end
 .La_prepare_ok:
+ mov rdi,[r13]
+ mov rsi,r12
+ call .Lam_prepare
+ test eax,eax
+ jnz .La_prepare_bad
  xor eax,eax
 .La_prepare_end:
  AE 32
@@ -1516,4 +1521,178 @@ pg_agent_conversation_stage:
 .Lacs_invalid:
  mov eax,1
  AE 48
+.section .note.GNU-stack,"",@progbits
+
+.text
+.Lam_install:
+ AF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rdi,rdx
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lam_install_bad
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lam_install_bad
+ xor eax,eax
+ AE 16
+.Lam_install_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,5
+ AE 16
+.Lam_prepare:
+ AF 32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ lea rsi,[rip+.La_model]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lam_thinking
+ mov r13,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lam_bad
+ xor r14d,r14d
+.Lam_model_field:
+ lea rax,[rip+.Lam_sources]
+ mov rsi,[rax+r14*8]
+ mov rdi,r13
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lam_bad
+ mov rdi,[rsp+8]
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lam_bad
+ lea rax,[rip+.Lam_targets]
+ mov rsi,[rax+r14*8]
+ mov rdi,rbx
+ mov rdx,[rsp+8]
+ call .Lam_install
+ test eax,eax
+ jnz .Lam_bad
+ inc r14
+ cmp r14,2
+ jb .Lam_model_field
+.Lam_thinking:
+ mov rdi,r12
+ lea rsi,[rip+.La_thinking]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lam_ok
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lam_bad
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov r14,rax
+ lea rbp,[rip+.Lam_levels]
+.Lam_level:
+ mov rsi,[rbp]
+ test rsi,rsi
+ jz .Lam_bad
+ mov rdi,r14
+ call strcmp@PLT
+ test eax,eax
+ jz .Lam_level_found
+ add rbp,8
+ jmp .Lam_level
+.Lam_level_found:
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov [rsp+16],eax
+ mov rdi,[rbp]
+ call strlen@PLT
+ cmp eax,[rsp+16]
+ jne .Lam_bad
+ mov rdi,rbx
+ lea rsi,[rip+.La_thinking]
+ mov rdx,r13
+ call .Lam_install
+ test eax,eax
+ jnz .Lam_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lam_options]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jnz .Lam_options_ready
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ mov r12,rax
+ test rax,rax
+ jz .Lam_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lam_options]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lam_bad
+ mov qword ptr [rsp],0
+.Lam_options_ready:
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lam_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lam_off]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lam_disable
+ mov rdi,r12
+ lea rsi,[rip+.Lam_effort]
+ mov rdx,r13
+ call .Lam_install
+ test eax,eax
+ jnz .Lam_bad
+ jmp .Lam_ok
+.Lam_disable:
+ mov rdi,r12
+ lea rsi,[rip+.Lam_effort]
+ call json_object_object_del@PLT
+.Lam_ok:
+ xor eax,eax
+ AE 32
+.Lam_bad:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,5
+ AE 32
+.section .rodata
+.Lam_provider: .asciz "provider"
+.Lam_model_id: .asciz "modelId"
+.Lam_model_provider: .asciz "modelProvider"
+.Lam_options: .asciz "options"
+.Lam_effort: .asciz "reasoningEffort"
+.Lam_off: .asciz "off"
+.Lam_minimal: .asciz "minimal"
+.Lam_low: .asciz "low"
+.Lam_medium: .asciz "medium"
+.Lam_high: .asciz "high"
+.Lam_xhigh: .asciz "xhigh"
+.Lam_max: .asciz "max"
+.section .data.rel.ro
+.Lam_sources: .quad .Lam_provider,.Lam_model_id
+.Lam_targets: .quad .Lam_model_provider,.La_model
+.Lam_levels: .quad .Lam_off,.Lam_minimal,.Lam_low,.Lam_medium,.Lam_high,.Lam_xhigh,.Lam_max,0
 .section .note.GNU-stack,"",@progbits

@@ -14,7 +14,9 @@ int pg_agent_state_read(pg_durable_session *,uint64_t,struct json_object **);
    each conversation, before admitting inputs or scheduling recovered work. */
 int pg_agent_state_peek(pg_durable_session *,uint64_t,struct json_object **);
 /* Detached request configuration; appends instructions after resource sections and preserves selection
-   fields for the model/executor consumers. Other provider fields stay native. */
+   fields for the model/executor consumers. ModelRef {provider,modelId} selects
+   modelProvider/model; thinkingLevel maps to options.reasoningEffort, with off
+   removing the override. Endpoint/auth binding stays with the model service. */
 int pg_agent_state_prepare(const struct json_object *,const struct json_object *,struct json_object **);
 /* Fresh/quiescent output. Model selection also applies modelTools; execution
    selection applies tools. Arrays preserve first occurrence and skip missing
