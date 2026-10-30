@@ -2167,7 +2167,13 @@ pg_mimo_uses_anthropic:
  mov [rsp+24],rax
  APCOPY rbp,rax,name,name
  APCOPY rbp,"qword ptr [rsp+24]",description,description
- APCOPY rbp,"qword ptr [rsp+24]",parameters,input_schema
+ APGET "qword ptr [rsp+24]",parameters
+ mov rdi,rbp
+ mov rsi,rax
+ mov rdx,r12
+ call .Lap_tool_schema
+ test eax,eax
+ jnz .Lap_bad
  mov rdi,rbp
  lea rsi,[rip+.Lap_function]
  call json_object_object_del@PLT
@@ -2843,6 +2849,19 @@ pg_mimo_uses_anthropic:
  test eax,eax
  jnz .Lap_provider_bad
 .Lap_provider_metadata:
+ APGET r12,modelInfo
+ APGET rax,compat
+ APGET rax,supportsTemperature
+ test rax,rax
+ jz .Lap_provider_temperature_ready
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lap_provider_temperature_ready
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_temperature]
+ call json_object_object_del@PLT
+.Lap_provider_temperature_ready:
  APGET r13,metadata
  APGET rax,user_id
  mov r14,rax
@@ -3403,3 +3422,78 @@ pg_mimo_uses_anthropic:
 .Lap_empty_name: .asciz ""
 .Lap_caption_format: .asciz "Images from the error result of tool call %s (%s):"
 .Lap_placeholder_json: .asciz "{\"type\":\"text\",\"text\":\"(image attached after the tool results)\"}"
+
+/* Legacy Messages schemas take properties/required; eager streaming defaults
+   on, unless the target's compatibility descriptor disables it. */
+.text
+.Lap_tool_schema:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ lea rdi,[rip+.Lap_legacy_schema]
+ call json_tokener_parse@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lap_schema_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_input_schema]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_schema_bad
+ mov rdi,r14
+ mov rsi,r12
+ lea rdx,[rip+.Lap_properties]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lap_schema_bad
+ mov rdi,r14
+ mov rsi,r12
+ lea rdx,[rip+.Lap_required]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lap_schema_bad
+ APGET r13,modelInfo
+ APGET rax,compat
+ APGET rax,supportsEagerToolInputStreaming
+ test rax,rax
+ jz .Lap_schema_eager
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_schema_ok
+.Lap_schema_eager:
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_eager_input_streaming]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_schema_bad
+.Lap_schema_ok:
+ xor eax,eax
+ jmp .Lap_schema_end
+.Lap_schema_bad:
+ mov eax,1
+.Lap_schema_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lap_supportsTemperature: .asciz "supportsTemperature"
+.Lap_supportsEagerToolInputStreaming: .asciz "supportsEagerToolInputStreaming"
+.Lap_eager_input_streaming: .asciz "eager_input_streaming"
+.Lap_properties: .asciz "properties"
+.Lap_required: .asciz "required"
+.Lap_legacy_schema: .asciz "{\"type\":\"object\",\"properties\":{},\"required\":[]}"

@@ -1686,9 +1686,22 @@ pg_mimo_responses_history:
  mov rbp,rax
  cmp dword ptr [rsp+56],0
  je .Lrh_response_block
+ mov rdi,r12
+ lea rsi,[rip+.Lra_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lah_compat]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lah_allowEmptySignature]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ add eax,eax
+ or eax,[rsp+16]
+ mov edx,eax
  mov rdi,rbp
  mov rsi,[rsp]
- mov edx,[rsp+16]
  call .Lah_block
  test eax,eax
  jnz .Lrh_bad
@@ -2043,7 +2056,7 @@ pg_mimo_config_anthropic:
  call strcmp@PLT
  test eax,eax
  jnz .Lah_bad
- test r13d,r13d
+ test r13d,1
  jz .Lah_ok
  AHGET rbx,redacted
  mov rdi,rax
@@ -2065,6 +2078,16 @@ pg_mimo_config_anthropic:
  AHCOPY r14,rbx,thinkingSignature,signature
  jmp .Lah_ok
 .Lah_unsigned_thinking:
+ test r13d,2
+ jz .Lah_unsigned_text
+ lea rdi,[rip+.Lah_empty_think_json]
+ mov rsi,r12
+ call .Lrh_append
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY rax,rbx,thinking,thinking
+ jmp .Lah_ok
+.Lah_unsigned_text:
  lea rdi,[rip+.Lah_text_json]
  mov rsi,r12
  call .Lrh_append
@@ -2137,3 +2160,8 @@ pg_mimo_config_anthropic:
 
 .section .rodata
 .Lah_toolName: .asciz "toolName"
+
+.section .rodata
+.Lah_compat: .asciz "compat"
+.Lah_allowEmptySignature: .asciz "allowEmptySignature"
+.Lah_empty_think_json: .asciz "{\"type\":\"thinking\",\"signature\":\"\"}"
