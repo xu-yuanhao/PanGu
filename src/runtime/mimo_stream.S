@@ -2026,6 +2026,25 @@ pg_mimo_failure_data:
  mov r14,[rbx+PG_MM_RESPONSE_TERMINAL]
  test r14,r14
  jz .Lrt_failure_absent
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lrt_failure_original
+ mov rdi,r14
+ lea rsi,[rip+.Lrt_friendly_key]
+ call li_get
+ test rax,rax
+ jz .Lrt_failure_original
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [r12+8],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lrt_friendly_key]
+ call li_get
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [r12],rax
+.Lrt_failure_original:
  mov rdi,r14
  lea rsi,[rip+.Lrt_error]
  call li_get
@@ -2048,6 +2067,8 @@ pg_mimo_failure_data:
  mov rdi,rax
  call strlen@PLT
  mov [r13+8],rax
+ cmp qword ptr [r12],0
+ jne .Lrt_failure_end
  mov rdi,r14
  lea rsi,[rip+.Lrt_message]
  call li_get
@@ -5866,3 +5887,6 @@ pg_mimo_base64_encode:
 
 .section .rodata
 .Lbf_exception_key: .asciz ":exception-type"
+
+.section .rodata
+.Lrt_friendly_key: .asciz "panguFriendlyMessage"

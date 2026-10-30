@@ -913,6 +913,8 @@ li_next:
  call json_object_put@PLT
  mov [rbx+PG_MM_RESPONSE_TERMINAL],r13
 .Lnx_bad:
+ mov rdi,rbx
+ call .Lcd_failure
  mov dword ptr [rbx+PG_MM_FAILED],1
  mov eax, 1
 .Lnx_out:
@@ -1439,6 +1441,13 @@ pg_mimo_complete:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  mov rsi,r12
  call .Lmc_calculate
+ mov ebp,eax
+ test eax,eax
+ jnz .Lmu_end
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ mov rsi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ mov rdx,r12
+ call .Lcd_price
  mov ebp,eax
 .Lmu_end:
  mov rdi,[rsp+64]
@@ -5926,3 +5935,380 @@ pg_mimo_complete:
 .Lcr_refused: .asciz "refused"
 .section .data.rel.ro
 .Lcr_transient_pairs: .quad .Lcr_rate,.Lcr_limit,.Lcr_overloaded,.Lcr_empty,.Lcr_service,.Lcr_unavailable,.Lcr_upstream,.Lcr_connect,.Lcr_connection,.Lcr_refused,0,0
+
+.text
+/* Price the completed canonical usage, so durable ledgers consume final cost. */
+.Lcd_price:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_price_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_option]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lcd_tier_wire]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lcd_price_request_tier
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_price_request_tier
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_default]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_price_tier
+ mov rdi,r14
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_price_tier
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_flex]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcd_price_request_tier
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_priority]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_price_tier
+.Lcd_price_request_tier:
+ mov rbp,r14
+.Lcd_price_tier:
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_price_ok
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_flex]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_price_priority
+ movsd xmm0,[rip+.Lcd_half]
+ jmp .Lcd_price_multiplier
+.Lcd_price_priority:
+ mov rdi,r12
+ lea rsi,[rip+.Lcd_tier_priority]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_price_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_price_double
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_tier_gpt55]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_price_double
+ movsd xmm0,[rip+.Lcd_two_half]
+ jmp .Lcd_price_multiplier
+.Lcd_price_double:
+ movsd xmm0,[rip+.Lcd_two]
+.Lcd_price_multiplier:
+ movsd [rsp],xmm0
+ mov rdi,r13
+ lea rsi,[rip+.Lmu_usage]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lmc_cost]
+ call json_object_object_get@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lcd_price_ok
+ xor r12d,r12d
+ pxor xmm0,xmm0
+ movsd [rsp+8],xmm0
+.Lcd_price_component:
+ lea rax,[rip+.Lmc_keys]
+ mov r13,[rax+r12*8]
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_double@PLT
+ mulsd xmm0,[rsp]
+ movsd xmm1,[rsp+8]
+ addsd xmm1,xmm0
+ movsd [rsp+8],xmm1
+ call json_object_new_double@PLT
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lcd_price_end
+ inc r12
+ cmp r12,4
+ jb .Lcd_price_component
+ movsd xmm0,[rsp+8]
+ call json_object_new_double@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lmc_total]
+ mov rdx,rax
+ call .Lmc_set
+ jmp .Lcd_price_end
+.Lcd_price_ok:
+ xor eax,eax
+.Lcd_price_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcd_tier_option: .asciz "serviceTier"
+.Lcd_tier_wire: .asciz "service_tier"
+.Lcd_tier_default: .asciz "default"
+.Lcd_tier_flex: .asciz "flex"
+.Lcd_tier_priority: .asciz "priority"
+.Lcd_tier_gpt55: .asciz "gpt-5.5"
+.p2align 3
+.Lcd_half: .double 0.5
+.Lcd_two: .double 2
+.Lcd_two_half: .double 2.5
+
+.text
+/* Preserve raw structured provider errors while adding the displayed message. */
+.Lcd_failure:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,8
+ mov rdi,rsp
+ rep stosq
+ cmp dword ptr [rbx+PG_MM_FAILED],0
+ jne .Lcd_failure_end
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_failure_end
+ cmp qword ptr [rbx+PG_MM_HTTP],400
+ jb .Lcd_failure_end
+ lea rdi,[rbx+PG_MM_BODY]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jnz .Lcd_failure_root
+ cmp dword ptr [rbx+PG_MM_RETRY_BLOCKED],0
+ je .Lcd_failure_end
+ lea rdi,[rip+.Lcd_failure_empty]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lcd_failure_end
+.Lcd_failure_root:
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ call json_object_put@PLT
+ mov [rbx+PG_MM_RESPONSE_TERMINAL],r12
+ mov rdi,r12
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcd_failure_end
+ cmp dword ptr [rbx+PG_MM_RETRY_BLOCKED],0
+ jne .Lcd_failure_delay
+ mov rdi,r12
+ lea rsi,[rip+.Lcd_failure_error]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lcd_failure_end
+ cmp qword ptr [rbx+PG_MM_HTTP],429
+ je .Lcd_failure_limit
+ mov rdi,r13
+ lea rsi,[rip+.Lcd_failure_code]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcd_failure_code_value
+ mov rdi,r13
+ lea rsi,[rip+.Lcd_failure_type]
+ call json_object_object_get@PLT
+.Lcd_failure_code_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lcd_failure_end
+ xor ebp,ebp
+.Lcd_failure_code_each:
+ lea rax,[rip+.Lcd_limit_codes]
+ mov rsi,[rax+rbp*8]
+ mov rdi,r14
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lcd_failure_limit
+ inc rbp
+ cmp rbp,3
+ jb .Lcd_failure_code_each
+ jmp .Lcd_failure_end
+.Lcd_failure_limit:
+ mov rdi,r13
+ lea rsi,[rip+.Lcd_plan_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_failure_when
+ cmp byte ptr [rax],0
+ je .Lcd_failure_when
+ mov rdi,rax
+ mov rsi,-1
+ call g_utf8_strdown@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lcd_failure_end
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Lcd_plan_format]
+ mov rdx,rax
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_failure_end
+.Lcd_failure_when:
+ mov rdi,r13
+ lea rsi,[rip+.Lcd_reset_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_double@PLT
+ pxor xmm1,xmm1
+ ucomisd xmm0,xmm1
+ je .Lcd_failure_limit_message
+ jp .Lcd_failure_limit_message
+ movsd [rsp+48],xmm0
+ call .Lcr_wall_now
+ cmp rax,-1
+ je .Lcd_failure_limit_message
+ cvtsi2sd xmm1,rax
+ movsd xmm0,[rsp+48]
+ mulsd xmm0,[rip+.Lcr_thousand]
+ subsd xmm0,xmm1
+ divsd xmm0,[rip+.Lcd_minute]
+ pxor xmm1,xmm1
+ maxsd xmm0,xmm1
+ addsd xmm0,[rip+.Lcd_half]
+ cvttsd2si rdx,xmm0
+ test rdx,rdx
+ js .Lcd_failure_limit_message
+ lea rdi,[rsp+24]
+ lea rsi,[rip+.Lcd_when_format]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_failure_end
+.Lcd_failure_limit_message:
+ mov rdx,[rsp+16]
+ test rdx,rdx
+ jnz .Lcd_failure_plan_ready
+ lea rdx,[rip+.Lcd_empty]
+.Lcd_failure_plan_ready:
+ mov rcx,[rsp+24]
+ test rcx,rcx
+ jnz .Lcd_failure_when_ready
+ lea rcx,[rip+.Lcd_empty]
+.Lcd_failure_when_ready:
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lcd_limit_format]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_failure_end
+ jmp .Lcd_failure_install
+.Lcd_failure_delay:
+ mov rdi,rbx
+ call .Lcr_header_delay
+ test rax,rax
+ js .Lcd_failure_end
+ add rax,999
+ xor edx,edx
+ mov ecx,1000
+ div rcx
+ mov r14,rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lcr_max_delay]
+ mov edx,60000
+ call .Lcr_integer
+ test rax,rax
+ js .Lcd_failure_end
+ add rax,999
+ xor edx,edx
+ mov ecx,1000
+ div rcx
+ mov rcx,rax
+ mov rdx,r14
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lcd_delay_format]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_failure_end
+.Lcd_failure_install:
+ mov rdi,[rsp+32]
+ call json_object_new_string@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lcd_friendly_key]
+ mov rdx,rax
+ call .Lmc_set
+.Lcd_failure_end:
+ mov rdi,[rsp+8]
+ call g_free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov rdi,[rsp+32]
+ call free@PLT
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcd_failure_empty: .asciz "{}"
+.Lcd_failure_error: .asciz "error"
+.Lcd_failure_code: .asciz "code"
+.Lcd_failure_type: .asciz "type"
+.Lcd_plan_key: .asciz "plan_type"
+.Lcd_reset_key: .asciz "resets_at"
+.Lcd_plan_format: .asciz " (%s plan)"
+.Lcd_when_format: .asciz " Try again in ~%ld min."
+.Lcd_limit_format: .asciz "You have hit your ChatGPT usage limit%s.%s"
+.Lcd_delay_format: .asciz "Server requested %lds retry delay (max: %lds)"
+.Lcd_friendly_key: .asciz "panguFriendlyMessage"
+.Lcd_limit1: .asciz "usage_limit_reached"
+.Lcd_limit2: .asciz "usage_not_included"
+.Lcd_limit3: .asciz "rate_limit_exceeded"
+.p2align 3
+.Lcd_minute: .double 60000
+.section .data.rel.ro
+.Lcd_limit_codes: .quad .Lcd_limit1,.Lcd_limit2,.Lcd_limit3

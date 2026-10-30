@@ -287,7 +287,7 @@ def cost_differential():
     expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle],input=json.dumps({'function':function,'cases':cases}),text=True))
     with tempfile.TemporaryDirectory(prefix='pangu-cost-parity-') as directory:
         src=Path(directory)/'mimo.S'
-        src.write_text((ROOT/'src/runtime/mimo.S').read_text()+'\n.text\n.globl pg_cost_parity\n.set pg_cost_parity,.Lmc_calculate\n')
+        src.write_text((ROOT/'src/runtime/mimo.S').read_text()+'\n.text\n.globl pg_cost_parity\n.set pg_cost_parity,.Lmc_calculate\n.globl pg_codex_tier_parity\n.set pg_codex_tier_parity,.Lcd_price\n')
         output=Path(directory)/'cost.so'
         libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl','libcrypto', 'glib-2.0', 'libzstd'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-O2','-I'+str(ROOT/'src/runtime'),str(src),*SRC[1:],*libs,'-o',str(output)],check=True)
@@ -302,6 +302,23 @@ def cost_differential():
                 for key,value in wanted.items():
                     assert actual[key]==value if isinstance(value,bool) else math.isclose(actual[key],value,rel_tol=1e-13,abs_tol=1e-15),(case,key,value,actual)
             finally:native.json_object_put(configuration);native.json_object_put(message)
+        codex_source=(ROOT/'references/pi/packages/ai/src/api/openai-codex-responses.ts').read_text()
+        tier_functions=codex_source[codex_source.index('function getServiceTierCostMultiplier('):codex_source.index('function resolveCodexUrl(')]
+        tier_cases=[{'model':{'id':model},'request':request,'response':response,'usage':{'cost':{'input':1.25,'output':2.5,'cacheRead':0.25,'cacheWrite':0.75,'total':4.75}}} for model in ('gpt-5.5','gpt-5.5-mini','gpt-6') for request in (None,'default','flex','priority','auto') for response in (None,'default','flex','priority','auto')]
+        tier_oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const f=new Function(stripTypeScriptTypes(x.function,{mode:'strip'})+';return{resolveCodexServiceTier,applyServiceTierPricing}')();process.stdout.write(JSON.stringify(x.cases.map(c=>{f.applyServiceTierPricing(c.usage,f.resolveCodexServiceTier(c.response??undefined,c.request??undefined),c.model);return c.usage.cost})));"
+        tier_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',tier_oracle],input=json.dumps({'function':tier_functions,'cases':tier_cases}),text=True))
+        native.pg_codex_tier_parity.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p]
+        for case,wanted in zip(tier_cases,tier_expected):
+            cfg=native.json_tokener_parse(json.dumps({'api':'openai-codex-responses','model':case['model']['id'],'options':{'serviceTier':case['request']}}).encode())
+            terminal=native.json_tokener_parse(json.dumps({'service_tier':case['response']}).encode())
+            message=native.json_tokener_parse(json.dumps({'usage':case['usage']}).encode())
+            try:
+                assert not native.pg_codex_tier_parity(cfg,terminal,message)
+                actual=json.loads(native.json_object_to_json_string_ext(message,0))['usage']['cost']
+                assert actual==wanted,(case,actual,wanted)
+            finally:
+                native.json_object_put(cfg);native.json_object_put(terminal);native.json_object_put(message)
+        print(f'PASS: {len(tier_cases)} Codex response/request tier resolution and native prices match fixed Pi functions')
     print(f'PASS: {len(cases)} native cost calculations match fixed Pi tiers, strict thresholds, duplicate ordering, free rates and cache durations')
 
 def sigv4_wire(binary, directory):
