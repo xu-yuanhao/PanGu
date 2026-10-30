@@ -61,6 +61,14 @@ typedef struct {
  int (*rename)(void *,uint64_t,pg_slice);
  void (*release)(struct json_object *);
 } pg_conversation_catalog_ops;
+/* Fork-aware Entry range, inclusive bounds; zero bounds are omitted. Cursor
+   uses the same after/order round-trip as the catalog. Default newest first. */
+typedef struct {uint64_t min_entry,max_entry,after;size_t limit;unsigned order,has_cursor,cursor_order,reserved;} pg_conversation_entry_query;
+typedef struct {
+ void *context;
+ int (*entries)(void *,uint64_t,const pg_conversation_entry_query *,struct json_object **);
+ void (*release)(struct json_object *);
+} pg_conversation_history_ops;
 /* Reset the selected conversation through durable Submission admission.
    NULL handoff starts an empty context; a present slice adds that user message,
    including an empty message. Owns no borrowed text after return. id receives

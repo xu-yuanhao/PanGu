@@ -138,6 +138,7 @@ const pg_conversation_view_ops *pg_tui_runtime_conversation_view(const tui_runti
 const pg_conversation_client_ops *pg_tui_runtime_conversations(const tui_runtime_ops *);
 const pg_conversation_catalog_ops *pg_tui_runtime_conversation_catalog(const tui_runtime_ops *);
 const pg_conversation_actions_ops *pg_tui_runtime_conversation_actions(const tui_runtime_ops *);
+const pg_conversation_history_ops *pg_tui_runtime_conversation_history(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }

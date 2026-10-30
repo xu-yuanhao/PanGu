@@ -479,7 +479,8 @@
         "pg_tui_runtime_conversation_view",
         "pg_tui_runtime_conversations",
         "pg_tui_runtime_conversation_catalog",
-        "pg_tui_runtime_conversation_actions"
+        "pg_tui_runtime_conversation_actions",
+        "pg_tui_runtime_conversation_history"
       ],
       "reference_basis": [
         {
@@ -2388,6 +2389,8 @@
       "exports": [
         "pg_conversation_view_read",
         "pg_conversation_list",
+        "pg_conversation_entries",
+        "pg_conversation_history_service",
         "pg_conversation_info",
         "pg_conversation_rename",
         "pg_conversation_view_service",

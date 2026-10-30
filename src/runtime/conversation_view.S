@@ -807,6 +807,8 @@ pg_conversation_list:
  mov ebp,6
  test eax,eax
  jnz .Lcn_list_release
+ cmp dword ptr [rsp],1
+ je .Lcn_list_page
  xor r14d,r14d
 .Lcn_list_name:
  mov rdi,[rsp+112]
@@ -1095,4 +1097,85 @@ pg_conversation_rename:
  VE 128
 .section .rodata
 .Lcn_name_draft: .asciz "{\"kind\":\"pangu.session-info\"}"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_conversation_history_service
+.type pg_conversation_history_service,@function
+pg_conversation_history_service:
+ mov [rsi],rdi
+ lea rax,[rip+pg_conversation_entries]
+ mov [rsi+8],rax
+ mov rax,qword ptr [rip+json_object_put@GOTPCREL]
+ mov [rsi+16],rax
+ ret
+.globl pg_conversation_entries
+.type pg_conversation_entries,@function
+pg_conversation_entries:
+ VF 176
+ mov rbx,rdi
+ mov r12,rdx
+ mov r13,rcx
+ mov r14,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,22
+ rep stosq
+ mov ebp,4
+ test r13,r13
+ jz .Lcn_list_end
+ mov qword ptr [r13],0
+ test rbx,rbx
+ jz .Lcn_list_end
+ test r14,r14
+ jz .Lcn_list_end
+ mov rax,9007199254740991
+ cmp r14,rax
+ ja .Lcn_list_end
+ mov dword ptr [rsp],1
+ mov dword ptr [rsp+4],2
+ mov qword ptr [rsp+24],64
+ mov qword ptr [rsp+32],1
+ mov [rsp+40],r14
+ test r12,r12
+ jz .Lcn_query_ready
+ cmp dword ptr [r12+44],0
+ jne .Lcn_list_end
+ cmp dword ptr [r12+32],2
+ ja .Lcn_list_end
+ cmp dword ptr [r12+36],1
+ ja .Lcn_list_end
+ cmp dword ptr [r12+40],2
+ ja .Lcn_list_end
+ mov rax,9007199254740991
+ cmp [r12],rax
+ ja .Lcn_list_end
+ cmp [r12+8],rax
+ ja .Lcn_list_end
+ cmp [r12+16],rax
+ ja .Lcn_list_end
+ mov rax,[r12+24]
+ test rax,rax
+ jz .Lcn_list_end
+ mov [rsp+24],rax
+ mov eax,[r12+32]
+ mov [rsp+4],eax
+ mov eax,[r12+36]
+ mov [rsp+8],eax
+ mov eax,[r12+40]
+ mov [rsp+12],eax
+ mov rax,[r12+16]
+ mov [rsp+16],rax
+ mov rax,[r12]
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lce_max
+ or qword ptr [rsp+32],8
+.Lce_max:
+ mov rax,[r12+8]
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lcn_query_ready
+ or qword ptr [rsp+32],16
+ jmp .Lcn_query_ready
 .section .note.GNU-stack,"",@progbits

@@ -262,6 +262,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Submission提交记录接入Client事件：按ID排序、会话过滤、排队/放置/撤回/结算字段直接取PanGu记录，位于任务结束之后、用量之前；产品排序夹具与真实follow-up流程验证。
 - [x] Generation回合开始/结束接入提交事件，completing提前结束后terminal去重，按结束→Submission/用量→开始排列；流式消息以Entry.byTaskId关联，其他任务提交不结束当前消息。
 - [x] Client队列刷新接通启动分页基线与Submission实际提交：入队/撤回/结算后发布完整ID有序队列，内容不变跳过，暂停释放；重开恢复大队列与真实follow-up事件通过。
+- [x] conversation.history提供fork-aware Entry范围/游标分页，默认最新优先、升降序续读与包含边界；与会话目录复用同一原生分页/所有权路径，产品Host及TUI可选入口接通。
 - [ ] 完成只读snapshot、watch/退订、增量消息/工具/任务事件、会话视图、任务图、usage/cost与report/trace上下文。
 - [ ] 为TUI提供公开查询/操作函数表，覆盖会话/模型选择、历史分页、队列、压缩、任务和配置状态。
 - [ ] 验收：观察者初始快照与增量衔接正确，退订/关闭释放；多次重开保留累计用量，TUI显示来自实际Runtime事实。
@@ -303,8 +304,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Scheduler恢复/completing/abort与事务Doc读取；实际产品组合、JSONL及子会话执行链。
-- 实际调用链：已有产品Host在独立seed/resume进程重开同一持久目录。新增`--live-process-conversations`复用现有创建/提交/取消；seed确认提交后直接_exit。Agent/provider读取在已有mutation中复用Doc draft，缺失旧provider身份也在当前事务初始化，避免恢复取消时重复准入只读/写事务。
-- 验证：真实DeepSeek进程退出→新进程JSONL重开→保存子Agent进入请求→子Generation/父等待完成通过；父取消意图跨同样进程边界后子Generation aborted且无模型请求通过。产品Host ASan/UBSan通过；`build_test.py --client`回归、产品构建及Assembly检查通过。
-- 接口与差异：公开函数/布局保持不变；本批修复恢复取消中配置读取违反Session mutation守卫的问题。与此前Scheduler原地重开不同，本次没有共享进程对象。模型正在传输时的取消和完整TUI控件仍按现有覆盖项推进。
-- 下一交付物：继续模型/工具/会话操作联调，集中完成覆盖表中的剩余产品调用链。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable `harness/harness.ts:ConversationImpl.entries`与`types.ts:EntryQuery`；复用现有fork-aware Storage scan和Session readOnLine。
+- 实际调用链：`pg_conversation_entries`将原生范围/游标转成既有Entry查询，与会话目录复用同一页封装及只读生命周期。产品Host导出`conversation.history`，TUI可通过`pg_tui_runtime_conversation_history`取得独立entries/release表；返回拥有所有权的`{items,cursor}`，游标携带after/order。
+- 验证：SQLite/JSONL ASan/UBSan验证302条Entry按17条续读、严格ID顺序、升序范围/包含边界、分叉继承范围、非法limit拒绝与读不写；产品Host服务/可选TUI绑定ASan/UBSan、`build_test.py --client`回归、产品构建及Assembly检查通过；G00在Git登记文件当前快照通过（项目外`claude/`保留），新增导出和服务登记已自审。本批无模型请求。
+- 接口与差异：独立24字节历史服务表和48字节查询，既有Runtime/会话操作表布局不变；原始Entry供TUI现有展示组件消费。界面超缓冲翻页尚需TUI线接入，本批完成Runtime来源。
+- 下一交付物：继续覆盖表中的完整工具/会话/模型操作和TUI联调，逐组补齐实际产品行为。
