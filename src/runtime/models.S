@@ -760,3 +760,226 @@ pg_models_compaction_policy:
 .Lm_compat: .asciz "compat"
 
 .Lm_input_limits: .asciz "inputLimits"
+
+.text
+/* frame: catalog, result, seen, provider, configuration, descriptor. */
+.Lml_add:
+ MF 16
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,[rbx+16]
+ mov rsi,r12
+ lea rdx,[rsp]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lml_add_ok
+ call json_object_new_object@PLT
+ mov [rbx+32],rax
+ test rax,rax
+ jz .Lml_add_bad
+ mov rdi,r12
+ call json_object_new_string@PLT
+ mov rdx,rax
+ mov rdi,[rbx+32]
+ lea rsi,[rip+.Lm_model]
+ call .Lm_set
+ test eax,eax
+ jnz .Lml_add_bad
+ mov rdi,[rbx+24]
+ call json_object_new_string@PLT
+ mov rdx,rax
+ mov rdi,[rbx+32]
+ lea rsi,[rip+.Lm_modelProvider]
+ call .Lm_set
+ test eax,eax
+ jnz .Lml_add_bad
+ mov rdi,[rbx]
+ mov rsi,[rbx+32]
+ lea rdx,[rbx+40]
+ call pg_models_describe
+ test eax,eax
+ jnz .Lml_add_release
+ mov rdi,[rbx+40]
+ call json_object_object_length@PLT
+ test eax,eax
+ jz .Lml_add_release
+ mov rdi,[rbx+8]
+ mov rsi,[rbx+40]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lml_add_bad
+ mov qword ptr [rbx+40],0
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdx,rax
+ mov rdi,[rbx+16]
+ mov rsi,r12
+ call .Lm_set
+ test eax,eax
+ jnz .Lml_add_bad
+.Lml_add_release:
+ mov rdi,[rbx+32]
+ call json_object_put@PLT
+ mov qword ptr [rbx+32],0
+ mov rdi,[rbx+40]
+ call json_object_put@PLT
+ mov qword ptr [rbx+40],0
+.Lml_add_ok:
+ xor eax,eax
+ ME 16
+.Lml_add_bad:
+ mov eax,5
+ ME 16
+.globl pg_models_list
+.type pg_models_list,@function
+pg_models_list:
+ MF 128
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,16
+ rep stosq
+ mov [rsp],rbx
+ test r13,r13
+ jz .Lml_invalid
+ mov qword ptr [r13],0
+ call json_object_new_array@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lml_bad
+ MG rbx,providers
+ mov r14,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lml_success
+ mov rdi,r14
+ call json_object_iter_begin@PLT
+ mov [rsp+48],rax
+ mov rdi,r14
+ call json_object_iter_end@PLT
+ mov [rsp+56],rax
+.Lml_provider:
+ lea rdi,[rsp+48]
+ lea rsi,[rsp+56]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lml_success
+ lea rdi,[rsp+48]
+ call json_object_iter_peek_name@PLT
+ mov [rsp+24],rax
+ test r12,r12
+ jz .Lml_provider_selected
+ mov rdi,rax
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lml_next_provider
+.Lml_provider_selected:
+ lea rdi,[rsp+48]
+ call json_object_iter_peek_value@PLT
+ mov r14,rax
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lml_next_provider
+ call json_object_new_object@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lml_bad
+ mov rdi,r14
+ call json_object_iter_begin@PLT
+ mov [rsp+64],rax
+ mov rdi,r14
+ call json_object_iter_end@PLT
+ mov [rsp+72],rax
+.Lml_builtin:
+ lea rdi,[rsp+64]
+ lea rsi,[rsp+72]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lml_custom_begin
+ lea rdi,[rsp+64]
+ call json_object_iter_peek_value@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lm_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lm_string
+ test rax,rax
+ jz .Lml_builtin_next
+ mov rdi,rsp
+ mov rsi,rax
+ call .Lml_add
+ test eax,eax
+ jnz .Lml_bad
+.Lml_builtin_next:
+ lea rdi,[rsp+64]
+ call json_object_iter_next@PLT
+ jmp .Lml_builtin
+.Lml_custom_begin:
+ MG r14,models
+ mov r15,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lml_provider_end
+ xor ebp,ebp
+.Lml_custom:
+ mov rdi,r15
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Lml_provider_end
+ mov rdi,r15
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lm_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lm_string
+ test rax,rax
+ jz .Lml_bad
+ mov rdi,rsp
+ mov rsi,rax
+ call .Lml_add
+ test eax,eax
+ jnz .Lml_bad
+ inc rbp
+ jmp .Lml_custom
+.Lml_provider_end:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lml_next_provider:
+ lea rdi,[rsp+48]
+ call json_object_iter_next@PLT
+ jmp .Lml_provider
+.Lml_success:
+ mov rax,[rsp+8]
+ mov [r13],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Lml_end
+.Lml_invalid:
+ mov ebp,4
+ jmp .Lml_end
+.Lml_bad:
+ mov ebp,5
+.Lml_end:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov eax,ebp
+ ME 128
+.section .note.GNU-stack,"",@progbits

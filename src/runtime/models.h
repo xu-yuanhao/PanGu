@@ -10,4 +10,8 @@ int pg_models_describe(const struct json_object *,const struct json_object *,str
 /* Owned resolved enabled/reserveTokens/keepRecentTokens/backgroundTokens,
    applying compaction.modelOverrides[provider/model] field by field. */
 int pg_models_compaction_policy(const struct json_object *,struct json_object **);
+/* Owned public descriptors, provider NULL enumerates all registered catalogs.
+   Custom entries override equal built-ins through the same describe path. */
+int pg_models_list(const struct json_object *,const char *provider,struct json_object **);
+typedef struct {void *context;int (*list)(void *,const char *,struct json_object **);void (*release)(struct json_object *);} pg_model_catalog_ops;
 #endif

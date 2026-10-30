@@ -480,7 +480,8 @@
         "pg_tui_runtime_conversations",
         "pg_tui_runtime_conversation_catalog",
         "pg_tui_runtime_conversation_actions",
-        "pg_tui_runtime_conversation_history"
+        "pg_tui_runtime_conversation_history",
+        "pg_tui_runtime_models"
       ],
       "reference_basis": [
         {
@@ -2302,6 +2303,7 @@
       "exports": [
         "pg_models_load",
         "pg_models_describe",
+        "pg_models_list",
         "pg_models_compaction_policy",
         "pg_models_builtin_json"
       ],

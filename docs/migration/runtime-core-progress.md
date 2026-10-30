@@ -51,6 +51,7 @@
 | 任务会话创建 | `task_access.S`/`agent_state.S`：phase能力校验→runner commit_with→Harness原子stage，显式owner/new/fork、配置与init；真实产品任务验证回滚、归属及过期能力拒绝 |
 | 会话创建与前台 | `agent_state.S`/`durable_session.S`/`durable_client.S`：原子默认文档、Agent分叉点/owner继承、agent/init、独立持久UUIDv7与旧会话补建；产品新建/分叉/选择/历史入口，真实DeepSeek在分叉会话写文件；SQLite/JSONL回滚与重开 |
 | 会话模型选择 | `agent_state.S`：ModelRef(provider/modelId)投影为modelProvider/model，thinkingLevel映射reasoningEffort/off清除，null回默认；实际请求编码与真实DeepSeek会话通过 |
+| 模型目录查询 | `models.S`：Host models.catalog/TUI可选list/release，内置/用户自定义模型按ID去重并应用覆盖，只输出公开描述；provider筛选、全目录和私有字段排除通过 |
 | 模型元数据与压缩策略 | `models.S`、`models_data.S`：固定Pi目录、用户models.json元数据/覆盖、端点/provider选择、默认model.metadata与逐字段compaction.modelOverrides；公开值独立持有 |
 | 上下文重置 | `durable_client.S`：conversation.actions/TUI独立reset入口，handoff/空上下文通过现有Submission入队和head切换，保留持久ID用于查询；忙时队列与两后端恢复验证 |
 | 会话目录 | `conversation_view.S`/`durable_client.S`：Host/TUI会话列表/记录/命名，ID顺序/owner筛选/游标分页、独立元数据Entry、Unicode与换行规范、名称观察及分叉/清空隔离；两后端重开 |
