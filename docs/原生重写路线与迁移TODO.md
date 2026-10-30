@@ -321,8 +321,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Bedrock `BEDROCK_ERROR_PREFIXES/formatBedrockError`与服务异常流分派。
-- 实际调用链：`mimo_stream.S`识别AWS exception消息及exception-type头，将五类服务错误按上游前缀附加原始message，保存到既有结构化失败体；模型next锁存失败，Generation通过现有failure接口读取并分类。
-- 验证：模型O0/O2/UBSan、ABI、现有构造失败及协议回放通过；五类真正exception帧核对错误前缀/原始说明、失败终态与无成功完成。Assembly/diff通过。自审核对头长度、临时格式化字符串清理及失败体所有权。
-- 具体缺口：Bedrock请求ID/状态诊断、data-retention提示、显式profile/完整凭据链及ambient profile区域解析、完整分区策略、费用结算、simple token预算及高级选项；其余提供者缺口保持K05覆盖范围，未有对应真实云端凭据验证。
-- 下一交付物：成组补齐提供者诊断元数据、凭据配置与费用结算实际调用链。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`models.ts calculateCost`及Bedrock cache-write-1h费用用例。
+- 实际调用链：`models.S`沿现有模型描述覆盖顺序携带公开cost；`mimo.S`在协议完成消息生成后按usage输入总量选择最高适用tier，计算输入/输出/缓存读取与短/长写入费用，写入usage.cost供既有Generation事务和Usage账本累计。没有价格描述时不生成估计费用，公开ABI保持。
+- 验证：模型O0/O2/UBSan与ABI、现有故障专项通过；Bedrock实际完成消息验证阶梯费率、1h写入、部分/末尾metadata的费用；用户models.json价格加载/覆盖专项通过。产品资源ASan/UBSan、Client集成、构建及Assembly/diff检查通过。自审核对价格描述归属、tier严格阈值与费用JSON释放。
+- 具体缺口：内置价格数据补齐（当前参考生成目录引用的数据文件缺失）、费用计算更完整的上游用例；Bedrock请求ID/状态诊断、data-retention提示、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为继续按K05完整范围覆盖，未有对应真实云端凭据验证。
+- 下一交付物：沿K05完成价格来源与费用差分核对，同时推进提供者诊断/凭据配置的实际消费者。

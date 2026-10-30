@@ -539,6 +539,35 @@ pg_models_describe:
  jnz .Lm_describe_error
 .Lm_input_limits_done:
  xor ebp,ebp
+.Lmc_source:
+ mov rdi,[rsp+8]
+ cmp ebp,1
+ jne .Lmc_override
+ mov rdi,[rsp+64]
+.Lmc_override:
+ cmp ebp,2
+ jne .Lmc_runtime
+ mov rdi,[rsp+16]
+.Lmc_runtime:
+ cmp ebp,3
+ jne .Lmc_get
+ mov rdi,[rsp+24]
+.Lmc_get:
+ lea rsi,[rip+.Lmc_cost]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lmc_next
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lmc_cost]
+ mov rdx,rax
+ call .Lm_copy
+ test eax,eax
+ jnz .Lm_describe_error
+.Lmc_next:
+ inc ebp
+ cmp ebp,4
+ jb .Lmc_source
+ xor ebp,ebp
 .Lm_compat_each:
  mov rdi,[rsp+8]
  cmp ebp,1
@@ -1022,3 +1051,6 @@ pg_models_list:
 .section .data.rel.ro
 .Lm_thinking_fields: .quad .Lm_reasoning_public,.Lm_level_map_public
 .section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lmc_cost: .asciz "cost"

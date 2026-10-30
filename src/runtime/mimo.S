@@ -1281,6 +1281,12 @@ pg_mimo_complete:
  mov rsi,r12
  call pg_mimo_responses_complete
  mov ebp,eax
+ test eax,eax
+ jnz .Lmu_end
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ mov rsi,r12
+ call .Lmc_calculate
+ mov ebp,eax
 .Lmu_end:
  mov rdi,[rsp+64]
  call json_object_put@PLT
@@ -3700,3 +3706,211 @@ pg_mimo_complete:
 
 .section .rodata
 .Lbr_region_chars: .asciz "abcdefghijklmnopqrstuvwxyz0123456789-"
+
+.text
+/* Price metadata is public; canonical usage is finalized before this calculation. */
+.Lmc_calculate:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,128
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ lea rsi,[rip+.Lmu_usage]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lmc_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lmc_cost]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lmc_ok
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lmc_bad
+ xor r14d,r14d
+.Lmc_counts:
+ lea rax,[rip+.Lmc_keys]
+ mov rsi,[rax+r14*8]
+ mov rdi,r12
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_double@PLT
+ movsd [rsp+8+r14*8],xmm0
+ inc r14
+ cmp r14,5
+ jb .Lmc_counts
+ movsd xmm0,[rsp+8]
+ addsd xmm0,[rsp+24]
+ addsd xmm0,[rsp+32]
+ movsd [rsp+56],xmm0
+ movsd xmm0,[rip+.Lmc_negative]
+ movsd [rsp+64],xmm0
+ mov rdi,r13
+ lea rsi,[rip+.Lmc_tiers]
+ call json_object_object_get@PLT
+ mov rbx,rax
+ xor r14d,r14d
+ test rax,rax
+ jz .Lmc_rates
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lmc_bad
+.Lmc_tier:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lmc_rates
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp+72],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lmc_threshold]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_double@PLT
+ ucomisd xmm0,[rsp+64]
+ jbe .Lmc_tier_next
+ movsd xmm1,[rsp+56]
+ ucomisd xmm1,xmm0
+ jbe .Lmc_tier_next
+ movsd [rsp+64],xmm0
+ mov r13,[rsp+72]
+.Lmc_tier_next:
+ inc r14
+ jmp .Lmc_tier
+.Lmc_rates:
+ xor r14d,r14d
+.Lmc_rate:
+ lea rax,[rip+.Lmc_keys]
+ mov rsi,[rax+r14*8]
+ mov rdi,r13
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_double@PLT
+ pxor xmm1,xmm1
+ ucomisd xmm0,xmm1
+ jb .Lmc_bad
+ jp .Lmc_bad
+ movsd [rsp+80+r14*8],xmm0
+ inc r14
+ cmp r14,4
+ jb .Lmc_rate
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lmc_bad
+ pxor xmm0,xmm0
+ movsd [rsp+112],xmm0
+ xor r14d,r14d
+.Lmc_component:
+ movsd xmm0,[rsp+80+r14*8]
+ cmp r14,3
+ je .Lmc_write
+ divsd xmm0,[rip+.Lmc_million]
+ mulsd xmm0,[rsp+8+r14*8]
+ jmp .Lmc_component_ready
+.Lmc_write:
+ movsd xmm1,[rsp+32]
+ subsd xmm1,[rsp+40]
+ mulsd xmm0,xmm1
+ movsd xmm1,[rsp+80]
+ addsd xmm1,xmm1
+ mulsd xmm1,[rsp+40]
+ addsd xmm0,xmm1
+ divsd xmm0,[rip+.Lmc_million]
+.Lmc_component_ready:
+ movsd xmm1,[rsp+112]
+ addsd xmm1,xmm0
+ movsd [rsp+112],xmm1
+ call json_object_new_double@PLT
+ mov rdx,rax
+ lea rax,[rip+.Lmc_keys]
+ mov rsi,[rax+r14*8]
+ mov rdi,[rsp]
+ call .Lmc_set
+ test eax,eax
+ jnz .Lmc_bad
+ inc r14
+ cmp r14,4
+ jb .Lmc_component
+ movsd xmm0,[rsp+112]
+ call json_object_new_double@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lmc_total]
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lmc_bad
+ xor edi,edi
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lmc_reported]
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lmc_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lmc_cost]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lmc_set
+ mov ebp,eax
+ jmp .Lmc_end
+.Lmc_ok:
+ xor ebp,ebp
+ jmp .Lmc_end
+.Lmc_bad:
+ mov ebp,1
+.Lmc_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,128
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lmc_set:
+ push rbx
+ mov rbx,rdx
+ test rdx,rdx
+ jz .Lmc_set_bad
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lmc_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+.Lmc_set_bad:
+ mov eax,1
+.Lmc_set_end:
+ pop rbx
+ ret
+.section .rodata
+.Lmc_cost: .asciz "cost"
+.Lmc_tiers: .asciz "tiers"
+.Lmc_threshold: .asciz "inputTokensAbove"
+.Lmc_total: .asciz "total"
+.Lmc_reported: .asciz "totalFromProvider"
+.Lmc_long: .asciz "cacheWrite1h"
+.p2align 3
+.Lmc_million: .double 1000000
+.Lmc_negative: .double -1
+.section .data.rel.ro
+.Lmc_keys: .quad .Lmu_input,.Lmu_output,.Lmu_cache_read,.Lmu_cache_write_key,.Lmc_long
