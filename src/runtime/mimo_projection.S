@@ -2111,6 +2111,7 @@ pg_mimo_uses_anthropic:
  jz .Lap_bad
  APCOPY rax,rbp,tool_call_id,tool_use_id
  APCOPY "qword ptr [rsp+32]",rbp,isError,is_error
+ APCOPY "qword ptr [rsp+32]",rbp,toolName,toolName
  APGET rbp,content
  mov rdi,rax
  call .Lap_convert_content
@@ -2121,6 +2122,10 @@ pg_mimo_uses_anthropic:
  inc r14
  jmp .Lap_each
 .Lap_messages_done:
+ mov rdi,[rsp]
+ call .Lap_error_images
+ test eax,eax
+ jnz .Lap_bad
  mov rdi,[rsp]
  call .Lap_normalize_messages
  test eax,eax
@@ -3129,3 +3134,272 @@ pg_mimo_uses_anthropic:
 .Lap_user: .asciz "user"
 .Lap_cache_short_json: .asciz "{\"type\":\"ephemeral\"}"
 .Lap_cache_long_json: .asciz "{\"type\":\"ephemeral\",\"ttl\":\"1h\"}"
+
+/* Move error-result images after every tool_result in the same user turn.
+   Three local arrays own the candidate message, image tail and current result. */
+.text
+.Lap_error_images:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ xor r12d,r12d
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+.Lap_ei_message:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lap_ei_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ APGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lap_user]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_ei_next_message
+ APGET "qword ptr [rsp+24]",content
+ mov r13,rax
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_ei_bad
+ call json_object_new_array@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lap_ei_bad
+ xor r14d,r14d
+.Lap_ei_block:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_ei_tail
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ APGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lap_result_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_ei_keep
+ APGET rbp,is_error
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_ei_remove_name
+ APGET rbp,content
+ mov [rsp+32],rax
+ call json_object_new_array@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lap_ei_bad
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+56],0
+.Lap_ei_part:
+ mov rdi,[rsp+32]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lap_ei_result_done
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ APGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lap_image_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_ei_text
+ cmp qword ptr [rsp+48],0
+ jne .Lap_ei_placeholder
+ lea rdi,[rip+.Lap_text_json]
+ mov rsi,[rsp+8]
+ call .Lrp_append
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lap_ei_bad
+ APGET rbp,tool_use_id
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+80],rax
+ APGET rbp,toolName
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lap_ei_name
+ lea rax,[rip+.Lap_empty_name]
+.Lap_ei_name:
+ mov rdi,rax
+ call strlen@PLT
+ mov [rsp+88],rax
+ mov rdi,[rsp+80]
+ call strlen@PLT
+ add rax,[rsp+88]
+ add rax,64
+ mov rdi,rax
+ call malloc@PLT
+ test rax,rax
+ jz .Lap_ei_bad
+ mov [rsp+88],rax
+ APGET rbp,toolName
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lap_ei_caption_name
+ lea rax,[rip+.Lap_empty_name]
+.Lap_ei_caption_name:
+ mov rcx,rax
+ mov rdx,[rsp+80]
+ mov rdi,[rsp+88]
+ lea rsi,[rip+.Lap_caption_format]
+ xor eax,eax
+ call sprintf@PLT
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lap_text]
+ mov rdx,[rsp+88]
+ call li_field
+ mov [rsp+80],eax
+ mov rdi,[rsp+88]
+ call free@PLT
+ cmp dword ptr [rsp+80],0
+ jne .Lap_ei_bad
+ mov qword ptr [rsp+48],1
+.Lap_ei_placeholder:
+ cmp qword ptr [rsp+56],0
+ jne .Lap_ei_move_image
+ lea rdi,[rip+.Lap_placeholder_json]
+ mov rsi,[rsp+16]
+ call .Lrp_append
+ test rax,rax
+ jz .Lap_ei_bad
+ mov qword ptr [rsp+56],1
+.Lap_ei_move_image:
+ mov rdi,[rsp+64]
+ call json_object_get@PLT
+ mov rdi,[rsp+8]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lap_ei_bad
+ jmp .Lap_ei_part_next
+.Lap_ei_text:
+ mov qword ptr [rsp+56],0
+ mov rdi,[rsp+64]
+ call json_object_get@PLT
+ mov rdi,[rsp+16]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lap_ei_bad
+.Lap_ei_part_next:
+ inc qword ptr [rsp+40]
+ jmp .Lap_ei_part
+.Lap_ei_result_done:
+ mov rdi,rbp
+ lea rsi,[rip+.Lap_content]
+ mov rdx,[rsp+16]
+ mov qword ptr [rsp+16],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_ei_bad
+.Lap_ei_remove_name:
+ mov rdi,rbp
+ lea rsi,[rip+.Lap_toolName]
+ call json_object_object_del@PLT
+.Lap_ei_keep:
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lap_ei_bad
+ inc r14
+ jmp .Lap_ei_block
+.Lap_ei_tail:
+ xor r14d,r14d
+.Lap_ei_tail_each:
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_ei_adopt
+ mov rdi,[rsp+8]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lap_ei_bad
+ inc r14
+ jmp .Lap_ei_tail_each
+.Lap_ei_adopt:
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lap_content]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_ei_bad
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+.Lap_ei_next_message:
+ inc r12
+ jmp .Lap_ei_message
+.Lap_ei_ok:
+ xor ebp,ebp
+ jmp .Lap_ei_end
+.Lap_ei_bad:
+ mov ebp,1
+.Lap_ei_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lap_ei_append_owned:
+ push rbx
+ mov rbx,rsi
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lap_ei_append_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Lap_ei_append_end:
+ pop rbx
+ ret
+.section .rodata
+.Lap_toolName: .asciz "toolName"
+.Lap_image_type: .asciz "image"
+.Lap_empty_name: .asciz ""
+.Lap_caption_format: .asciz "Images from the error result of tool call %s (%s):"
+.Lap_placeholder_json: .asciz "{\"type\":\"text\",\"text\":\"(image attached after the tool results)\"}"

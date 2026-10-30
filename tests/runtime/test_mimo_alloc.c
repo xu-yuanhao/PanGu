@@ -63,7 +63,7 @@ static void anthropic_decoder_failures(void){
 }
 
 int main(void){
- for(unsigned protocol=0;protocol<4;protocol++){
+ for(unsigned protocol=0;protocol<5;protocol++){
  struct json_object *canonical=0;
  memset(&session,0,sizeof(session));
  session.system_size=3;memcpy(session.system_prompt,"sys",4);session.count=5;
@@ -73,9 +73,11 @@ int main(void){
  strcpy(session.messages[2].call_id,"one");strcpy(session.messages[2].tool_name,"read");strcpy(session.messages[3].call_id,"one");
  registry.count=1;registry.entries[0].name="read";registry.entries[0].description="read text";registry.entries[0].schema="{\"type\":\"object\"}";provider.tools=&registry;
  provider.configuration=protocol?__real_json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"native-responses\",\"modelProvider\":\"openai\",\"endpoint\":\"https://example.invalid/responses\"}"):0;
- if(protocol==3){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"endpoint\":\"https://example.invalid/messages\",\"options\":{\"toolChoice\":{\"type\":\"tool\",\"name\":\"read\",\"disable_parallel_tool_use\":true},\"metadata\":{\"user_id\":\"native-user\"}},\"modelInfo\":{\"compat\":{\"allowedFallbackModels\":[{\"model\":\"fallback-native\"}]}}}");}
+ if(protocol>=3){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"endpoint\":\"https://example.invalid/messages\",\"options\":{\"toolChoice\":{\"type\":\"tool\",\"name\":\"read\",\"disable_parallel_tool_use\":true},\"metadata\":{\"user_id\":\"native-user\"}},\"modelInfo\":{\"compat\":{\"allowedFallbackModels\":[{\"model\":\"fallback-native\"}]}}}");}
  if(protocol==2){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"openai-responses\",\"model\":\"native-responses\",\"provider\":\"openai\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"saved thought\",\"thinkingSignature\":\"{\\\"type\\\":\\\"reasoning\\\",\\\"id\\\":\\\"rs_saved\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"saved thought\\\"}],\\\"encrypted_content\\\":\\\"cipher-saved\\\"}\"},{\"type\":\"text\",\"text\":\"saved text\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_saved\\\",\\\"phase\\\":\\\"commentary\\\"}\"},{\"type\":\"toolCall\",\"id\":\"call-saved\",\"name\":\"read\",\"arguments\":{},\"responseItemId\":\"fc_saved\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"call-saved\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}]}");assert(canonical);session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
- for(unsigned n=1;n<=(protocol==2?1u:8u);n+=7){
+
+ if(protocol==4){json_object_object_add(json_object_object_get(provider.configuration,"modelInfo"),"input",__real_json_tokener_parse("[\"text\",\"image\"]"));canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"image-fault\",\"name\":\"read\",\"arguments\":{}}]},{\"role\":\"toolResult\",\"toolCallId\":\"image-fault\",\"toolName\":\"read\",\"isError\":true,\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"},{\"type\":\"text\",\"text\":\"error\"}]}]}");session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
+ for(unsigned n=1;n<=(protocol==2||protocol==4?1u:8u);n+=7){
  if(n==8){memset(session.messages,0,sizeof(session.messages));session.count=18;session.messages[0].role=PG_USER;session.messages[1].role=PG_ASSISTANT;for(unsigned j=0;j<n;++j){pg_message *c=&session.messages[2+j],*r=&session.messages[10+j];c->role=PG_TOOL_CALL;c->size=2;strcpy(c->text,"{}");strcpy(c->tool_name,"read");snprintf(c->call_id,sizeof(c->call_id),"id-%u",j);r->role=PG_TOOL_RESULT;r->size=2;strcpy(r->text,"ok");strcpy(r->call_id,c->call_id);}}
  fail_at=0;calls=0;tracked=0;
  int baseline=pg_mimo_encode_request(&provider,&session);if(baseline||live)fprintf(stderr,"projection baseline protocol=%u calls=%u status=%d live=%u\n",protocol,n,baseline,live);assert(!baseline&&provider.request&&!live);free(provider.request);provider.request=0;unsigned total=calls;

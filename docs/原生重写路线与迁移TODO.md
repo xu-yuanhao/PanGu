@@ -315,7 +315,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/anthropic-messages.ts`、`transform-messages.ts`、`simple-options.ts` 与 streaming-tool-arguments 用例；本批沿既有固定快照。
-- 实际调用链：现有模型服务按api/端点选择Messages；共享上下文投影生成system、文本/图片、工具声明/调用/结果，libcurl发送API-key/version头。流块使用自有动态缓冲，关闭时固定canonical内容与最终参数，message_stop后交付工具；Generation/Tool复用现有持久执行链。模型身份一致才重放签名思考，切换模型移除；原生reasoningEffort映射预算/自适应参数；toolChoice字符串/对象、并行开关、metadata.user_id、fallback模型与thinkingDisplay沿上游进入实际请求。cacheRetention映射system/末工具/末用户块断点，兼容项控制一小时TTL与工具缓存；默认环境入口适配为PANGU_CACHE_RETENTION。流用量保存cacheWrite1h和reasoning，省略字段保留先前计数。
-- 验证：模型O0/O2/UBSan、ABI、实际curl入口回放与55个解码生命周期分配失败通过；含工具选择/元数据/fallback的请求1/8工具分别147/392个失败点清理通过。90组独立提示计划、SQLite/JSONL Durable Client和产品资源服务ASan/UBSan通过；产品构建、Assembly与登记快照G00通过，自审确认现有ABI和模块归属保持。Anthropic使用确定性协议回放，没有真实Anthropic凭据。
-- 接口与差异：公开model服务ABI不变，内部模型增加块/用量所有权；请求配置选择和历史投影归请求模块，json-c独立构建保持。K05仍需补齐Anthropic错误结果图片后置、managed effort、native tools、OAuth/网关兼容项及其余协议。
+- 实际调用链：现有模型服务按api/端点选择Messages；共享上下文投影生成system、文本/图片、工具声明/调用/结果，libcurl发送API-key/version头。流块使用自有动态缓冲，关闭时固定canonical内容与最终参数，message_stop后交付工具；Generation/Tool复用现有持久执行链。模型身份一致才重放签名思考，切换模型移除；原生reasoningEffort映射预算/自适应参数；toolChoice字符串/对象、并行开关、metadata.user_id、fallback模型与thinkingDisplay沿上游进入实际请求。cacheRetention映射system/末工具/末用户块断点，兼容项控制一小时TTL与工具缓存；默认环境入口适配为PANGU_CACHE_RETENTION。流用量保存cacheWrite1h和reasoning，省略字段保留先前计数。错误工具结果内图片按连续段替换占位，全部工具结果后追加调用说明与图片；成功结果图片保持原位。
+- 验证：模型O0/O2/UBSan、ABI、实际curl入口回放与55个解码生命周期分配失败通过；含工具选择/元数据/fallback的请求1/8工具分别155/406个失败点清理通过，错误图片请求138个失败点释放通过。90组独立提示计划、SQLite/JSONL Durable Client和产品资源服务ASan/UBSan通过；产品构建、Assembly与登记快照G00通过，自审确认现有ABI和模块归属保持。Anthropic使用确定性协议回放，没有真实Anthropic凭据。
+- 接口与差异：公开model服务ABI不变，内部模型增加块/用量所有权；请求配置选择和历史投影归请求模块，json-c独立构建保持。K05仍需补齐Anthropicmanaged effort、native tools、OAuth/网关兼容项及其余协议。
 - 下一交付物：继续K05完成Messages剩余上游行为，再按覆盖顺序接入Gemini/Vertex；沿同一Generation/Tool消费者验证。

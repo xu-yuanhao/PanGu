@@ -867,6 +867,16 @@ pg_context_messages_model:
  jnz .Lr_project_bad
  .Lri_response_content:
  cmp dword ptr [rsp+180],2
+ jne .Lri_result_name_ready
+ RG "qword ptr [rsp+24]",toolName
+ mov rdx,rax
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lah_toolName]
+ call .Lr_copy
+ test eax,eax
+ jnz .Lr_project_bad
+.Lri_result_name_ready:
+ cmp dword ptr [rsp+180],2
  jne .Lri_result_protocol
  RG "qword ptr [rsp+24]",isError
  mov rdi,rax
@@ -2124,3 +2134,6 @@ pg_mimo_config_anthropic:
 .Lah_think_json: .asciz "{\"type\":\"thinking\"}"
 .Lah_redacted_json: .asciz "{\"type\":\"redacted_thinking\"}"
 .Lah_use_json: .asciz "{\"type\":\"tool_use\"}"
+
+.section .rodata
+.Lah_toolName: .asciz "toolName"
