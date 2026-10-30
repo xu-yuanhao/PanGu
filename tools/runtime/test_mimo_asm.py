@@ -23,6 +23,7 @@ import base64
 import os
 import ssl
 import threading
+import time
 import math
 import hashlib
 import hmac
@@ -331,6 +332,7 @@ def sigv4_wire(binary, directory):
                 for part in (date,region,service,terminator): signing=hmac.new(signing,part.encode(),hashlib.sha256).digest()
                 assert hmac.compare_digest(signature,hmac.new(signing,to_sign.encode(),hashlib.sha256).hexdigest())
                 received.append(True)
+                if 'deadline=1' in self.path: time.sleep(0.2)
                 self.send_response(200)
             except Exception as error:
                 failures.append(type(error).__name__)
@@ -341,14 +343,17 @@ def sigv4_wire(binary, directory):
     tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(cert,key)
     server.socket=tls.wrap_socket(server.socket,server_side=True)
     server.timeout=15
-    worker=threading.Thread(target=server.handle_request,daemon=True);worker.start()
+    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(2)],daemon=True);worker.start()
     env=os.environ.copy()
     for name in ('PANGU_MODEL_API_KEY','AWS_BEARER_TOKEN_BEDROCK','AWS_PROFILE'): env.pop(name,None)
     env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',AWS_ACCESS_KEY_ID='AKID_PANGU_WIRE',AWS_SECRET_ACCESS_KEY='pangu-wire-secret',AWS_SESSION_TOKEN='pangu-wire-session',PANGU_TEST_SIGV4_CA=str(cert),PANGU_TEST_SIGV4_ENDPOINT=f'https://127.0.0.1:{server.server_port}/model/anthropic.claude-test/converse-stream')
     try:
         subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
-        worker.join(2)
         assert received==[True] and not failures,failures
+        env.update(PANGU_TEST_DEADLINE='1',PANGU_TEST_SIGV4_ENDPOINT=env['PANGU_TEST_SIGV4_ENDPOINT']+'?deadline=1')
+        subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
+        worker.join(2)
+        assert received==[True,True] and not failures,failures
     finally: server.server_close()
 
 def main():

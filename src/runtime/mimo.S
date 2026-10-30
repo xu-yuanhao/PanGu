@@ -523,9 +523,13 @@ li_start:
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lst_bad
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Ltm_timeout
+ test edx,edx
+ jnz .Lst_bad
+ mov rdx,rax
  mov rdi, r14
- mov esi, PG_MM_CURLOPT_TIMEOUT
- mov edx, 60
+ mov esi, PG_MM_CURLOPT_TIMEOUT_MS
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax
@@ -985,6 +989,10 @@ pg_mimo_configure:
  mov rdi,[rsp]
  call .Lbe_prepare
  test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Ltm_timeout
+ test edx,edx
  jnz .Lcfg_end
  mov rdi,[rsp]
  lea rsi,[rip+.Lcfg_endpoint]
@@ -3914,3 +3922,47 @@ pg_mimo_complete:
 .Lmc_negative: .double -1
 .section .data.rel.ro
 .Lmc_keys: .quad .Lmu_input,.Lmu_output,.Lmu_cache_read,.Lmu_cache_write_key,.Lmc_long
+
+.text
+/* Positive millisecond request deadline; configuration validation is atomic. */
+.Ltm_timeout:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltm_key]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Ltm_default
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltm_bad
+ mov rdi,r12
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Ltm_bad
+ mov rcx,2147483647
+ cmp rax,rcx
+ ja .Ltm_bad
+ xor edx,edx
+ jmp .Ltm_end
+.Ltm_default:
+ mov eax,60000
+ xor edx,edx
+.Ltm_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Ltm_bad:
+ xor eax,eax
+ mov edx,1
+ jmp .Ltm_end
+.section .rodata
+.Ltm_key: .asciz "timeoutMs"

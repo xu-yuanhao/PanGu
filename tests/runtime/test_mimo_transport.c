@@ -94,10 +94,11 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
         break;
     }
     case CURLOPT_TIMEOUT:
+    case CURLOPT_TIMEOUT_MS:
     case CURLOPT_CONNECTTIMEOUT:
     case CURLOPT_NOSIGNAL: {
         long v = va_arg(ap, long);
-        if (opt == CURLOPT_TIMEOUT) captured_timeout = v;
+        if (opt == CURLOPT_TIMEOUT_MS) captured_timeout = v;
         if (opt == CURLOPT_CONNECTTIMEOUT) captured_connect_timeout = v;
         if (opt == CURLOPT_NOSIGNAL) captured_nosignal = v;
         rc = __real_curl_easy_setopt(h, opt, v);
@@ -223,7 +224,7 @@ static void test_start_setup(void) {
     assert(captured_protocols && !strcmp(captured_protocols, "https"));
     assert(captured_write && captured_write_data == &m);
     assert(captured_headers == m.headers && m.headers);
-    assert(captured_timeout == 60 && captured_connect_timeout == 15 && captured_nosignal == 1);
+    assert(captured_timeout == 60000 && captured_connect_timeout == 15 && captured_nosignal == 1);
     /* 请求体是本次投影生成的 JSON */
     assert(strstr(m.request, "\"messages\"") && strstr(m.request, "\"stream\":true"));
     /* 再次 start：close 先释放上一请求，再生成新请求（同尺寸复用同一地址是正常的） */
@@ -621,7 +622,7 @@ static void test_bedrock_auth(void){
  unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");puts("PASS: Bedrock native SigV4 options, temporary token, Bearer precedence, reserved headers and invalid credentials");
 }
 static int bedrock_sigv4_wire(void){
- const char *endpoint=getenv("PANGU_TEST_SIGV4_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"X-Project\":\"pangu-wire\"}}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);puts("PASS: native Bedrock request signed by actual libcurl and verified by independent TLS receiver");return 0;
+ const char *endpoint=getenv("PANGU_TEST_SIGV4_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"X-Project\":\"pangu-wire\"}}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));unsigned timeout=getenv("PANGU_TEST_DEADLINE")!=0;if(timeout)json_object_object_add(json_object_object_get(cfg,"options"),"timeoutMs",json_object_new_int(50));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start());CURLcode result=curl_easy_perform(m.easy);if(timeout){assert(result==CURLE_OPERATION_TIMEDOUT);model.cancel(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);puts("PASS: actual TLS request deadline expires and cancellation releases transport");return 0;}assert(!result);long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);puts("PASS: native Bedrock request signed by actual libcurl and verified by independent TLS receiver");return 0;
 }
 static uint32_t bedrock_crc(const unsigned char *data,size_t size){uint32_t crc=~0u;while(size--){crc^=*data++;for(unsigned bit=0;bit<8;bit++)crc=(crc>>1)^((0u-(crc&1u))&0xedb88320u);}return ~crc;}
 static void bedrock_u32(unsigned char *out,uint32_t value){out[0]=(unsigned char)(value>>24);out[1]=(unsigned char)(value>>16);out[2]=(unsigned char)(value>>8);out[3]=(unsigned char)value;}
@@ -649,6 +650,11 @@ static void test_bedrock_multimodal(void){
   bedrock_feed("messageStart","{\"role\":\"assistant\"}",0);bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":2,\"delta\":{\"reasoningContent\":{\"text\":\"new plan\",\"signature\":\"opaque-\"}}}",0);bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":2,\"delta\":{\"reasoningContent\":{\"signature\":\"signature\"}}}",0);if(variant==3){assert(strstr(captured_post,"\"redactedContent\":\"AAE=\""));bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":2,\"delta\":{\"reasoningContent\":{\"redactedContent\":\"AAE=\"}}}",0);bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":2,\"delta\":{\"reasoningContent\":{\"redactedContent\":\"/w==\"}}}",0);bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":2,\"delta\":{\"reasoningContent\":{\"signature\":\"ignored-after-redaction\"}}}",0);}bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":4,\"delta\":{\"text\":\"done\"}}",0);bedrock_feed("messageStop","{\"stopReason\":\"end_turn\"}",0);finish_transport();pg_model_event event={0};for(unsigned n=0;n<20;n++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;}assert(event.kind==PG_MODEL_DONE);json_object *assistant=json_tokener_parse("{\"role\":\"assistant\"}");assert(!pg_mimo_complete(&m,assistant));json_object *thinking=json_object_array_get_idx(json_object_object_get(assistant,"content"),0);assert(!strcmp(json_object_get_string(json_object_object_get(thinking,"thinking")),variant==3?"new plan[Reasoning redacted]":"new plan")&&!strcmp(json_object_get_string(json_object_object_get(thinking,"thinkingSignature")),variant==3?"AAH/":"opaque-signature"));json_object *history=0;assert(!pg_mimo_responses_history(assistant,m.configuration,&history));if(variant==3)assert(!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(history,0),"data")),"AAH/"));else assert(strstr(json_object_to_json_string(history),"opaque-signature"));json_object_put(history);if(variant==3){assert(json_object_get_boolean(json_object_object_get(thinking,"redacted")));json_object_array_put_idx(json_object_object_get(context,"messages"),1,json_object_get(assistant));assert(!pg_mimo_encode_request(&m,&session));json_object *again=json_tokener_parse(m.request),*message=json_object_array_get_idx(json_object_object_get(again,"messages"),1),*block=json_object_array_get_idx(json_object_object_get(message,"content"),0);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(block,"reasoningContent"),"redactedContent")),"AAH/"));json_object_put(again);}json_object_put(assistant);model.close(model.context);json_object_put(context);
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock user/tool image bytes, signed and unsigned reasoning policy, split reasoning/signature stream and canonical replay");
+}
+static void test_request_deadline(void){
+ const char *apis[]={"openai-completions","openai-responses","anthropic-messages","google-generative-ai","google-vertex","azure-openai-responses","bedrock-converse-stream"};
+ for(unsigned n=0;n<7;n++){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"model\":\"deadline-unit\",\"endpoint\":\"https://example.invalid/request\",\"options\":{\"timeoutMs\":1234}}");json_object_object_add(cfg,"api",json_object_new_string(apis[n]));assert(!pg_mimo_configure(&m,cfg));setenv("PANGU_MODEL_API_KEY","deadline-unit-key",1);assert(!start()&&captured_timeout==1234);model.cancel(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);json_object_put(cfg);}
+ const char *bad[]={"0","-1","1.5","true","\"1000\"","2147483648"};for(unsigned n=0;n<6;n++){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"model\":\"deadline-unit\",\"endpoint\":\"https://example.invalid/request\"}");assert(!pg_mimo_configure(&m,cfg));json_object *old=m.configuration,*options=json_object_new_object();json_object_object_add(options,"timeoutMs",json_tokener_parse(bad[n]));json_object_object_add(cfg,"options",options);assert(pg_mimo_configure(&m,cfg)&&m.configuration==old);json_object_put(cfg);model.close(model.context);}unsetenv("PANGU_MODEL_API_KEY");puts("PASS: seven-protocol millisecond deadlines, cancellation cleanup and invalid deadline atomic rejection");
 }
 static void test_bedrock_errors(void){
  const char *names[]={"internalServerException","modelStreamErrorException","validationException","throttlingException","serviceUnavailableException"};const char *prefixes[]={"Internal server error","Model stream error","Validation error","Throttling error","Service unavailable"};
@@ -751,6 +757,7 @@ int main(int argc,char **argv) {
     test_bedrock_history_ids();
     test_bedrock_regions();
     test_bedrock_errors();
+    test_request_deadline();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

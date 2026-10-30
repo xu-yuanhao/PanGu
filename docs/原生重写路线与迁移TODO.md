@@ -322,8 +322,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`calculateCost`与Durable模型usage提交/会话账本累计语义。
-- 实际调用链：现有产品Host/资源加载用户models.json价格，真实Generation→模型→原生write工具→后继Generation完成费用计算并事务累计；新增`--live-cost`复用产品资源专项入口，连续执行、关闭重开和总账检查采用实际服务。
-- 验证：`test_product_resources.py --live-cost --sanitize`使用环境注入DeepSeek真实凭据通过；模型费用逐响应独立重算、工具文件内容、会话账本/usage.total一致、两次产品Host关闭重开保持、重开后继续生成新增费用累计均通过，ASan/UBSan通过。使用测试工作区和显式测试价格，费用为配置价格推算值，非提供者账单。源码diff核对通过。
-- 具体缺口：Bedrock请求ID/状态诊断、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
-- 下一交付物：沿K05成组完成提供者诊断元数据与凭据配置的实际消费者，继续各协议完整行为覆盖。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的StreamOptions.timeoutMs及OpenAI/Anthropic请求超时传递；原生curl生命周期沿现有模型服务。
+- 实际调用链：`PANGU_MODEL_OPTIONS.timeoutMs`沿产品资源/Generation配置传入`mimo.S`，候选配置验证为正整数毫秒后设置CURLOPT_TIMEOUT_MS；无效配置保留旧值。取消/关闭复用现有传输释放；超时错误沿既有curl错误与Generation分类路径，服务ABI保持。
+- 验证：模型O0/O2/UBSan、ABI与既有协议专项通过；七协议配置/取消清理、无效类型/范围和原子拒绝通过。本地TLS接收端实际延迟响应，50ms请求期限返回CURLE_OPERATION_TIMEDOUT，取消后传输资源释放；同入口SigV4独立验签保持。产品资源ASan/UBSan、构建和Assembly/diff检查通过。
+- 具体缺口：提供者SDK默认超时与流空闲超时的完整差异（当前默认原生请求期限60秒）；Bedrock请求ID/状态诊断、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
+- 下一交付物：沿K05成组补齐提供者诊断、凭据配置与超时/重试语义，接入实际Generation消费者。
