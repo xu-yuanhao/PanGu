@@ -16,6 +16,7 @@
 | 指定任务取消 | `task_graph.S`：Host task.control/TUI独立入口保存abort意图，重复无写入，Scheduler沿owned子会话收束；产品父取消/调度器重开/子Generation aborted通过 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | 最终工具参数与恢复 | `mimo_stream.S` / `durable_tool.S`：字符串控制字符/转义修复、空白对象、argumentsError原文、效果前错误结算；416组固定Pi差分、存储无写入、NUL文本与真实DeepSeek纠错重试通过 |
+| 提供者请求头 | `mimo.S`：五协议共用大小写无关的模型/连接/请求头合并，后层覆盖、null移除、空值与默认头替换；实际curl入口、追加失败清理和产品资源ASan/UBSan通过 |
 | Google/Vertex | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：Content/Part、函数/图片往返、思考签名、原始停止与用量，动态14 KiB事件、Gemini图片路由、schema与思考参数；curl回放与SQLite/JSONL重开通过，完整认证/提供者兼容项见K05 |
 | Anthropic Messages | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：API-key/version、system/图片/工具组、签名思考、动态块与最终参数、message_stop、增量缓存计数及cacheWrite1h/reasoning、缓存断点与保留策略、错误工具图片后置；canonical历史模型隔离、预算/自适应编码、实际模型服务回放与SQLite/JSONL消息重开投影通过；高级提供者选项见K05 |
 | Responses请求与恢复 | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：请求/流、图片结果、稀疏工具槽与终态；最终item、签名、加密补齐、模型/提供者切换及后继请求；调用完成屏障、长度终态与结构化失败分类；SQLite/JSONL恢复重放和内存失败路径通过，K05继续补齐高级协议行为 |

@@ -121,6 +121,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Google Generative/Vertex基础模型链接入同一服务：Content/Part请求、systemInstruction、图片与函数声明/结果、文本/思考流、唯一工具ID、原始停止原因及用量；同模型base64签名重放、Gemini 3函数结果图片与旧模型后置图片、const转enum、严格工具/选择模式和思考参数接通。显式端点与Google API-key/Vertex Bearer通过实际curl回放；原生事件正文动态借用，14 KiB单响应块与SQLite/JSONL重开通过。Google/Vertex其余认证和提供者兼容项继续按下项覆盖。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [x] Google/Vertex端点与显式认证接入产品配置链：Google默认/代理、Vertex API-key/global/regional/project collection路径由模型汇编组合；产品读取`PANGU_MODEL_API`、`PANGU_MODEL_BASE_URL`及现有options，沿资源/Generation准备进入同一提供者。配置失败保留旧值；传输回放、配置故障与产品ASan/UBSan专项通过。
+- [x] 五协议公共请求头接入实际传输：按Pi `utils/headers.ts`大小写无关合并modelInfo/连接/options三层，后层覆盖、null移除、空值及默认头替换；非法名称/CRLF/NUL拒绝，新增节点分配失败清理。模型O0/O2/UBSan、真实curl入口回放和产品ASan/UBSan专项通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -317,8 +318,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/google-vertex.ts` 中客户端创建、baseUrl与project/location解析，及前批Google共享请求/流实现；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`pangu.c`读取公开协议/基础地址和现有options，经资源服务、Generation请求准备传入模型提供者；`mimo.S`在配置副本上组合Google/Vertex端点、解析项目/区域、选择API-key或已注入Bearer，失败保留旧配置。显式endpoint优先。产品环境胶水为C，端点/认证策略为手写Assembly。凭据只通过环境注入。
-- 验证：前批模型O0/O2/UBSan、实际curl入口的七组端点/认证回放和配置分配失败专项通过；本批`test_product_resources.py --sanitize`验证四组产品协议/base/options配置经过真实Host、资源和Generation准备到提供者，原有资源刷新/失败保留专项通过；产品构建、Assembly及diff检查通过。自审核对既有ABI、依赖和文件登记均保持。
-- 具体缺口：ADC/访问令牌刷新、提供者自定义头/重试/输入变换、完整模型思考映射及其余协议；Messages的managed effort、native tools、OAuth/网关完整覆盖仍保留。Google/Vertex当前为确定性协议与配置验证，没有对应真实凭据。
-- 下一交付物：沿K05补齐提供者公共请求选项与实际消费者，再推进Bedrock/Azure等协议，按完整协议行为组集成。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `utils/headers.ts`、Google/Vertex客户端创建及OpenAI/Anthropic请求头消费；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`mimo.S`在生成认证/协议/beta/会话头后，按模型元数据、连接和请求options合并显式头，替换同名默认头并交给同一curl请求。Assembly实现大小写归一、优先级、null移除与生命周期；现有`PANGU_MODEL_OPTIONS.headers`可直接进入产品请求，无新增ABI或文件。
+- 验证：`test_mimo_asm.py`的O0/O2/UBSan与ABI检查通过；五协议实际curl入口验证覆盖/移除/空值、默认头替换、非法输入及每个slist追加失败的清理，现有协议/严格schema/流场景保持；`test_product_resources.py --sanitize`产品配置与资源专项通过；Assembly与diff检查通过。自审核对临时JSON与链表归属、失败关闭和既有接口一致。
+- 具体缺口：ADC/访问令牌刷新、提供者重试/输入变换、完整模型思考映射及其余协议；Messages的managed effort、native tools、OAuth/网关完整覆盖仍保留。Google/Vertex当前为确定性协议与配置验证，没有对应真实凭据。
+- 下一交付物：沿K05继续提供者请求/错误语义与Bedrock/Azure协议，按完整协议行为组接入实际模型服务。

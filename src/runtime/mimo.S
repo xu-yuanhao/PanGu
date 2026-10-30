@@ -388,6 +388,10 @@ li_start:
  call .Lanthropic_affinity
  test eax,eax
  jnz .Lst_bad
+ mov rdi,rbx
+ call .Lprovider_headers
+ test eax,eax
+ jnz .Lst_bad
  call curl_easy_init@PLT
  mov r14, rax
  mov qword ptr [rbx + PG_MM_EASY], r14
@@ -2027,3 +2031,243 @@ pg_mimo_complete:
 
 .section .rodata
 .Lge_bearer: .asciz "bearer"
+
+/* Merge explicit provider headers case-insensitively before the transport owns them. */
+.text
+.Lprovider_headers:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,12
+ mov rdi,rsp
+ rep stosq
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lph_bad
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+24],rax
+ xor r12d,r12d
+.Lph_layer:
+ mov rdi,[rsp+8+r12*8]
+ test rdi,rdi
+ jz .Lph_layer_next
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lph_bad
+ mov rdi,[rsp+8+r12*8]
+ call json_object_iter_begin@PLT
+ mov [rsp+32],rax
+ mov rdi,[rsp+8+r12*8]
+ call json_object_iter_end@PLT
+ mov [rsp+40],rax
+.Lph_each:
+ lea rdi,[rsp+32]
+ lea rsi,[rsp+40]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lph_layer_next
+ lea rdi,[rsp+32]
+ call json_object_iter_peek_name@PLT
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lph_bad
+ mov r13,rax
+ cmp byte ptr [r13],0
+ je .Lph_bad
+.Lph_name:
+ movzx ebp,byte ptr [r13]
+ test ebp,ebp
+ jz .Lph_value
+ cmp ebp,65
+ jb .Lph_name_check
+ cmp ebp,90
+ ja .Lph_name_check
+ add ebp,32
+ mov [r13],bpl
+.Lph_name_check:
+ lea rdi,[rip+.Lph_tokens]
+ mov esi,ebp
+ call strchr@PLT
+ test rax,rax
+ jz .Lph_bad
+ inc r13
+ jmp .Lph_name
+.Lph_value:
+ lea rdi,[rsp+32]
+ call json_object_iter_peek_value@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lph_delete
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lph_bad
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov ebp,eax
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov r13,rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp rax,rbp
+ jne .Lph_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lph_newlines]
+ call strpbrk@PLT
+ test rax,rax
+ jnz .Lph_bad
+ mov rdi,r14
+ call json_object_get@PLT
+ mov [rsp+64],rax
+ mov rdi,[rsp]
+ mov rsi,[rsp+48]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lph_bad
+ mov qword ptr [rsp+64],0
+ jmp .Lph_next
+.Lph_delete:
+ mov rdi,[rsp]
+ mov rsi,[rsp+48]
+ call json_object_object_del@PLT
+.Lph_next:
+ mov rdi,[rsp+48]
+ call free@PLT
+ mov qword ptr [rsp+48],0
+ lea rdi,[rsp+32]
+ call json_object_iter_next@PLT
+ jmp .Lph_each
+.Lph_layer_next:
+ inc r12
+ cmp r12,3
+ jb .Lph_layer
+ mov rdi,[rsp]
+ call json_object_iter_begin@PLT
+ mov [rsp+32],rax
+ mov rdi,[rsp]
+ call json_object_iter_end@PLT
+ mov [rsp+40],rax
+.Lph_emit:
+ lea rdi,[rsp+32]
+ lea rsi,[rsp+40]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lph_ok
+ lea rdi,[rsp+32]
+ call json_object_iter_peek_name@PLT
+ mov r12,rax
+ mov rdi,rax
+ call strlen@PLT
+ mov rbp,rax
+ lea rdi,[rsp+32]
+ call json_object_iter_peek_value@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ lea rsi,[rip+.Lph_format]
+ cmp byte ptr [r14],0
+ jne .Lph_format_ready
+ lea rsi,[rip+.Lph_empty]
+.Lph_format_ready:
+ lea rdi,[rsp+56]
+ mov rdx,r12
+ mov rcx,r14
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lph_bad
+ lea r13,[rbx+PG_MM_HEADERS]
+.Lph_remove:
+ mov r14,[r13]
+ test r14,r14
+ jz .Lph_append
+ mov rdi,[r14]
+ mov rsi,r12
+ mov rdx,rbp
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lph_remove_next
+ mov rax,[r14]
+ mov al,[rax+rbp]
+ cmp al,58
+ je .Lph_unlink
+ cmp al,59
+ jne .Lph_remove_next
+.Lph_unlink:
+ mov rax,[r14+8]
+ mov [r13],rax
+ mov qword ptr [r14+8],0
+ mov rdi,r14
+ call curl_slist_free_all@PLT
+ jmp .Lph_remove
+.Lph_remove_next:
+ lea r13,[r14+8]
+ jmp .Lph_remove
+.Lph_append:
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp+56]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lph_bad
+ mov [rbx+PG_MM_HEADERS],rax
+ mov rdi,[rsp+56]
+ call free@PLT
+ mov qword ptr [rsp+56],0
+ lea rdi,[rsp+32]
+ call json_object_iter_next@PLT
+ jmp .Lph_emit
+.Lph_ok:
+ xor ebp,ebp
+ jmp .Lph_cleanup
+.Lph_bad:
+ mov ebp,1
+.Lph_cleanup:
+ mov rdi,[rsp+48]
+ call free@PLT
+ mov rdi,[rsp+56]
+ call free@PLT
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lph_tokens: .asciz "abcdefghijklmnopqrstuvwxyz0123456789!#$%&'*+-.^_`|~"
+.Lph_newlines: .asciz "\r\n"
+.Lph_format: .asciz "%s: %s"
+.Lph_empty: .asciz "%s;"

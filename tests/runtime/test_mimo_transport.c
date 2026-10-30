@@ -598,6 +598,25 @@ static void test_google_endpoint_config(void){
  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
 }
+static void test_provider_headers(void){
+ const char *apis[]={"openai-completions","openai-responses","anthropic-messages","google-generative-ai","google-vertex"};
+ for(unsigned protocol=0;protocol<5;protocol++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();
+  char source[2048];snprintf(source,sizeof(source),"{\"api\":\"%s\",\"model\":\"header-model\",\"endpoint\":\"https://example.invalid/stream\",\"modelInfo\":{\"headers\":{\"X-Route\":\"model\",\"X-Removed\":\"model\"}},\"headers\":{\"x-ROUTE\":\"root\",\"x-removed\":null},\"options\":{\"headers\":{\"X-Route\":\"request\",\"X-Empty\":\"\",\"Content-Type\":\"application/custom+json\"}}}",apis[protocol]);
+  json_object *cfg=json_tokener_parse(source);assert(cfg&&!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","header-unit-key",1);assert(!start());
+  unsigned route=0,empty=0,type=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){assert(!strstr(h->data,"removed")&&!strstr(h->data,"model")&&!strstr(h->data,"root"));route+=!strcmp(h->data,"x-route: request");empty+=!strcmp(h->data,"x-empty;");type+=!strcmp(h->data,"content-type: application/custom+json");assert(strcmp(h->data,"Content-Type: application/json"));}assert(route==1&&empty==1&&type==1);model.close(model.context);
+  unsigned append_count=(unsigned)slist_calls;
+  for(unsigned fault=1;fault<=append_count;fault++){
+   reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();cfg=json_tokener_parse(source);assert(cfg&&!pg_mimo_configure(&m,cfg));json_object_put(cfg);slist_fail_at=(int)fault;assert(start());model.close(model.context);assert(!m.headers&&!m.easy&&!m.multi);
+  }
+
+ }
+ const char *invalid[]={"{\"bad:name\":\"value\"}","{\"x-test\":\"a\\r\\nb\"}","{\"x-test\":42}","{\"x-test\":\"a\\u0000b\"}","[]"};
+ for(unsigned n=0;n<sizeof(invalid)/sizeof(*invalid);n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"model\":\"header-model\",\"endpoint\":\"https://example.invalid/chat/completions\"}");json_object_object_add(cfg,"headers",json_tokener_parse(invalid[n]));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(start());model.close(model.context);assert(!m.headers&&!m.easy&&!m.multi);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: five-protocol provider headers merge by case, layer precedence, null removal, empty value, default replacement and invalid-input cleanup");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -622,6 +641,7 @@ int main(void) {
     test_anthropic_strict_retry();
     test_google_transport();
     test_google_endpoint_config();
+    test_provider_headers();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
