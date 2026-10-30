@@ -862,6 +862,29 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-33
  .Lserialize:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbp_sampling_ready
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.LbpK_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_toolChoice]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbp_sampling_ready
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_none]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbp_sampling_ready
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lbd_tools]
+ call json_object_object_del@PLT
+.Lbp_sampling_ready:
  mov rdi,[rsp]
  mov rsi,[rbx+PG_MM_CONFIGURATION]
  call .Lsampling_admit
@@ -3584,6 +3607,10 @@ pg_mimo_uses_anthropic:
  call pg_mimo_config_google
  test eax,eax
  jnz .Lap_schema_preserve
+ mov rdi,r13
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lap_schema_preserve
  APGET rbx,strict
  mov rdi,rax
  call json_object_get_boolean@PLT
@@ -3600,6 +3627,10 @@ pg_mimo_uses_anthropic:
  jnz .Lap_schema_bad
  mov rdi,r13
  call pg_mimo_config_google
+ test eax,eax
+ jnz .Lap_schema_ok
+ mov rdi,r13
+ call pg_mimo_config_bedrock@PLT
  test eax,eax
  jnz .Lap_schema_ok
  APGET r12,properties
@@ -3699,6 +3730,10 @@ pg_mimo_uses_anthropic:
  jnz .Loc_ok
  mov rdi,r12
  call pg_mimo_uses_google
+ test eax,eax
+ jnz .Loc_ok
+ mov rdi,[r12+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
  test eax,eax
  jnz .Loc_ok
  mov rdi,r12
@@ -6792,6 +6827,11 @@ pg_mimo_uses_google:
  call .Lbc_options
  test eax,eax
  jnz .Lbd_bad
+ mov rdi,rbx
+ mov rsi,[rsp+48]
+ call .Lbp_options
+ test eax,eax
+ jnz .Lbd_bad
  xor ebp,ebp
  jmp .Lbd_end
 .Lbd_bad:
@@ -7715,20 +7755,28 @@ pg_mimo_uses_google:
  .asciz "opus-4-7"
  .byte 3
  .asciz "opus-4-8"
- .byte 3
+ .byte 67
  .asciz "opus-5"
  .byte 1
  .asciz "sonnet-4-6"
- .byte 3
+ .byte 67
  .asciz "sonnet-5"
- .byte 3
+ .byte 67
  .asciz "haiku-5"
- .byte 3
+ .byte 67
  .asciz "fable-5"
  .byte 4
  .asciz "gpt-oss"
  .byte 8
  .asciz "gpt-"
+ .byte 32
+ .asciz "claude"
+ .byte 64
+ .asciz "-4-"
+ .byte 64
+ .asciz "claude-3-7-sonnet"
+ .byte 64
+ .asciz "claude-3-5-haiku"
  .byte 0
 .Lbc_levels: .asciz "minimal","low","medium","high","xhigh","max"
 .p2align 3
@@ -7775,3 +7823,257 @@ pg_mimo_uses_google:
 .section .rodata
 .Lbd_redacted_type: .asciz "redacted_thinking"
 .Lbd_redactedContent: .asciz "redactedContent"
+
+.macro BPGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.LbpK_\key]
+ call json_object_object_get@PLT
+.endm
+.macro BPSET obj,key,value
+ mov rdi,\obj
+ lea rsi,[rip+.LbpK_\key]
+ mov rdx,\value
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbp_bad
+.endm
+.text
+.Lbp_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ BPGET r12,options
+ mov r13,rax
+ BPGET rbx,toolConfig
+ mov r14,rax
+ test rax,rax
+ jz .Lbp_metadata
+ BPGET r13,toolChoice
+ mov rbp,rax
+ test rax,rax
+ jz .Lbp_metadata
+ mov rdi,rax
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lbp_named
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbp_metadata
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_none]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbp_none
+ mov rdi,rbp
+ lea rsi,[rip+.LbpK_auto]
+ call strcmp@PLT
+ lea rdi,[rip+.LbpJ_auto]
+ test eax,eax
+ jz .Lbp_choice
+ mov rdi,rbp
+ lea rsi,[rip+.LbpK_any]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbp_metadata
+ lea rdi,[rip+.LbpJ_any]
+.Lbp_choice:
+ call json_tokener_parse@PLT
+ BPSET r14,toolChoice,rax
+ jmp .Lbp_metadata
+.Lbp_named:
+ BPGET rbp,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbp_metadata
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_tool]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbp_metadata
+ lea rdi,[rip+.LbpJ_named]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbp_bad
+ BPGET rax,tool
+ mov rdi,rax
+ mov rsi,rbp
+ lea rdx,[rip+.LbpK_name]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbp_bad
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ BPSET r14,toolChoice,rdx
+ jmp .Lbp_metadata
+.Lbp_none:
+ mov rdi,rbx
+ lea rsi,[rip+.LbpK_toolConfig]
+ call json_object_object_del@PLT
+.Lbp_metadata:
+ mov rdi,rbx
+ mov rsi,r13
+ lea rdx,[rip+.LbpK_requestMetadata]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbp_bad
+ BPGET r13,cacheRetention
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lbp_retention
+ lea rdi,[rip+.Lap_cache_env]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lbp_environment_retention
+ lea rax,[rip+.LbpK_short]
+ jmp .Lbp_retention
+.Lbp_environment_retention:
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_long]
+ call strcmp@PLT
+ lea rax,[rip+.LbpK_long]
+ test eax,eax
+ jz .Lbp_retention
+ lea rax,[rip+.LbpK_short]
+.Lbp_retention:
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_none]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbp_ok
+ mov rdi,r12
+ call .Lbc_family
+ test edx,edx
+ jnz .Lbp_bad
+ test eax,32
+ jz .Lbp_force
+ test eax,64
+ jz .Lbp_ok
+ jmp .Lbp_cache
+.Lbp_force:
+ lea rdi,[rip+.LbpK_force_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lbp_ok
+ cmp byte ptr [rax],49
+ jne .Lbp_ok
+ cmp byte ptr [rax+1],0
+ jne .Lbp_ok
+.Lbp_cache:
+ lea r14,[rip+.LbpJ_short]
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.LbpK_long]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbp_system_cache
+ lea r14,[rip+.LbpJ_long]
+.Lbp_system_cache:
+ BPGET rbx,system
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lbp_user_cache
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lbp_user_cache
+ mov rdi,r14
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbp_bad
+ mov rdi,[rsp+24]
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lbp_bad
+ mov qword ptr [rsp],0
+.Lbp_user_cache:
+ BPGET rbx,messages
+ mov r12,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lbp_ok
+ mov rdi,r12
+ lea rsi,[rax-1]
+ call json_object_array_get_idx@PLT
+ mov r12,rax
+ BPGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbp_ok
+ mov rdi,rax
+ lea rsi,[rip+.LbpK_user]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbp_ok
+ BPGET r12,content
+ mov r12,rax
+ mov rdi,r14
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbp_bad
+ mov rdi,r12
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lbp_bad
+ mov qword ptr [rsp],0
+.Lbp_ok:
+ xor ebp,ebp
+ jmp .Lbp_end
+.Lbp_bad:
+ mov ebp,1
+.Lbp_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.LbpK_options: .asciz "options"
+.LbpK_toolChoice: .asciz "toolChoice"
+.LbpK_toolConfig: .asciz "toolConfig"
+.LbpK_none: .asciz "none"
+.LbpK_auto: .asciz "auto"
+.LbpK_any: .asciz "any"
+.LbpK_tool: .asciz "tool"
+.LbpK_type: .asciz "type"
+.LbpK_name: .asciz "name"
+.LbpK_requestMetadata: .asciz "requestMetadata"
+.LbpK_cacheRetention: .asciz "cacheRetention"
+.LbpK_short: .asciz "short"
+.LbpK_long: .asciz "long"
+.LbpK_system: .asciz "system"
+.LbpK_messages: .asciz "messages"
+.LbpK_role: .asciz "role"
+.LbpK_user: .asciz "user"
+.LbpK_content: .asciz "content"
+.LbpK_force_env: .asciz "AWS_BEDROCK_FORCE_CACHE"
+.LbpJ_auto: .asciz "{\"auto\":{}}"
+.LbpJ_any: .asciz "{\"any\":{}}"
+.LbpJ_named: .asciz "{\"tool\":{}}"
+.LbpJ_short: .asciz "{\"cachePoint\":{\"type\":\"default\"}}"
+.LbpJ_long: .asciz "{\"cachePoint\":{\"type\":\"default\",\"ttl\":\"1h\"}}"

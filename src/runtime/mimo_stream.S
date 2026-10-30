@@ -3517,6 +3517,19 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lgo_complete_usage_done:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbt_complete_usage_done
+ ANGET r12,usage
+ mov rdi,rax
+ mov rsi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ lea rdx,[rip+.LbtK_totalTokens]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lbt_complete_usage_done:
  mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
  test rdi,rdi
  jz .Lan_complete_diagnostics_done
@@ -5221,7 +5234,10 @@ pg_mimo_anthropic_clear:
 .Lbt_metadata:
  BTGET "qword ptr [rsp+8]",usage
  mov [rsp+24],rax
- call json_object_new_object@PLT
+ test rax,rax
+ jz .Lbt_ok
+ lea rdi,[rip+.LbtJ_usage_zero]
+ call json_tokener_parse@PLT
  mov [rsp+16],rax
  test rax,rax
  jz .Lbt_bad
@@ -5232,6 +5248,99 @@ pg_mimo_anthropic_clear:
  mov rdi,rbx
  mov rsi,[rsp+16]
  call .Lan_update_usage_object
+ test eax,eax
+ jnz .Lbt_bad
+ mov qword ptr [rsp+40],0
+ BTGET "qword ptr [rsp+24]",cacheDetails
+ mov r14,rax
+ xor r12d,r12d
+ test rax,rax
+ jz .Lbt_cache_write_done
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbt_bad
+.Lbt_cache_write_each:
+ mov rdi,r14
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lbt_cache_write_done
+ mov rdi,r14
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
+ BTGET rax,ttl
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbt_cache_write_next
+ mov rdi,rax
+ lea rsi,[rip+.LbtK_one_hour]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbt_cache_write_next
+ BTGET "qword ptr [rsp+32]",inputTokens
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lbt_bad
+ add [rsp+40],rax
+ jo .Lbt_bad
+.Lbt_cache_write_next:
+ inc r12
+ jmp .Lbt_cache_write_each
+.Lbt_cache_write_done:
+ mov rdi,[rsp+40]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lan_cacheWrite1h]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lan_cacheWrite1h]
+ call json_object_object_get@PLT
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rip+.Lan_cacheWrite1h]
+ call .Lan_optional_counter
+ test eax,eax
+ jnz .Lbt_bad
+ BTGET "qword ptr [rsp+24]",totalTokens
+ mov [rsp+32],rax
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ jnz .Lbt_total_reported
+ BTGET "qword ptr [rsp+16]",input_tokens
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov [rsp+40],rax
+ BTGET "qword ptr [rsp+16]",output_tokens
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ add rax,[rsp+40]
+ jo .Lbt_bad
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ jmp .Lbt_total_owned
+.Lbt_total_reported:
+ mov rdi,[rsp+32]
+ call json_object_get@PLT
+.Lbt_total_owned:
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.LbtK_totalTokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lbt_bad
+ BTGET "qword ptr [rsp+16]",totalTokens
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rip+.LbtK_totalTokens]
+ call .Lan_optional_counter
  test eax,eax
  jnz .Lbt_bad
  jmp .Lbt_ok
@@ -5646,3 +5755,10 @@ pg_mimo_base64_encode:
 
 .section .rodata
 .LbtK_redacted: .asciz "redacted"
+
+.section .rodata
+.LbtK_totalTokens: .asciz "totalTokens"
+.LbtK_cacheDetails: .asciz "cacheDetails"
+.LbtK_ttl: .asciz "ttl"
+.LbtK_one_hour: .asciz "1h"
+.LbtJ_usage_zero: .asciz "{\"input_tokens\":0,\"output_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0}"

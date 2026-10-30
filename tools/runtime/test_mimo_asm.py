@@ -143,6 +143,7 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
  pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);
  json_object *cfg=json_tokener_parse(protocol==2?"{\"api\":\"anthropic-messages\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true}}}":protocol==1?"{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}":"{\"api\":\"openai-completions\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/chat/completions\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}");
  if(protocol>=3){json_object_put(cfg);cfg=json_tokener_parse(protocol==3?"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}":"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}");}
+ if(protocol==5){json_object_put(cfg);cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-opus-4-8\",\"endpoint\":\"https://example.invalid/model/test/converse-stream\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}");}
  int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(rc)abort();pg_tool_options options={.max_bytes=51200,.max_lines=2000,.constrained_sampling=required?"{\"type\":\"json_schema\",\"strict\":\"require\"}":"{\"type\":\"json_schema\",\"strict\":\"prefer\"}"};pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema=schema,.options=&options}},.count=1};pg_mimo_bind_tools(m,&registry);s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);*out=rc?0:strdup(m->request);model.close(m);free(s);free(m);return rc;
 }
 """
@@ -152,9 +153,9 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
         subprocess.run([CC,'-shared','-fPIC','-D_POSIX_C_SOURCE=200809L','-O2','-I'+str(ROOT),str(source),*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.schema_request.argtypes=[C.c_char_p,C.c_uint,C.c_uint,C.POINTER(C.c_void_p)];native.schema_request.restype=C.c_int;native.free.argtypes=[C.c_void_p]
         count=0
-        for protocol in range(5):
+        for protocol in range(6):
             for index,schema in enumerate(cases):
-                wanted=expected[2 if protocol>=3 else protocol==2][index]
+                wanted=expected[2 if protocol in (3,4) else protocol==2][index]
                 if protocol==2 and wanted is not None:wanted={**wanted,'properties':wanted.get('properties',{})}
                 for required in range(2):
                     out=C.c_void_p();rc=native.schema_request(json.dumps(schema).encode(),protocol,required,C.byref(out));count+=1
@@ -162,16 +163,17 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
                     else:
                         assert not rc and out.value,(protocol,index,schema)
                         wire=json.loads(C.string_at(out));native.free(out)
-                        tool=wire['tools'][0];tool=tool['functionDeclarations'][0] if protocol>=3 else tool['function'] if protocol==0 else tool
-                        strict=wire.get('toolConfig',{}).get('functionCallingConfig',{}).get('mode')=='VALIDATED' if protocol>=3 else tool.get('strict') is True
+                        tool=wire['toolConfig']['tools'][0]['toolSpec'] if protocol==5 else wire['tools'][0];tool=tool['functionDeclarations'][0] if protocol in (3,4) else tool['function'] if protocol==0 else tool
+                        strict=wire.get('toolConfig',{}).get('functionCallingConfig',{}).get('mode')=='VALIDATED' if protocol in (3,4) else tool.get('strict') is True
                         if wanted is not None:
                             assert strict,(protocol,index,tool)
-                            actual=tool['parametersJsonSchema' if protocol>=3 else 'input_schema' if protocol==2 else 'parameters']
+                            actual=tool['inputSchema']['json'] if protocol==5 else tool['parametersJsonSchema' if protocol in (3,4) else 'input_schema' if protocol==2 else 'parameters']
                             assert actual==wanted,(protocol,index,schema,actual,wanted)
                         else:
                             assert not strict,(protocol,index,tool)
-                            if protocol>=3:assert tool['parametersJsonSchema']==expected[3][index],(protocol,index,tool)
-    print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses, Anthropic, Google and Vertex')
+                            if protocol in (3,4):assert tool['parametersJsonSchema']==expected[3][index],(protocol,index,tool)
+                            if protocol==5:assert tool['inputSchema']['json']==schema,(protocol,index,tool)
+    print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses, Anthropic, Google, Vertex and Bedrock')
 
 def bedrock_thinking_differential():
     source=ROOT/'references/pi/packages/ai/src/api/bedrock-converse-stream.ts'
@@ -194,10 +196,11 @@ import {stripTypeScriptTypes} from 'node:module';
 const getProviderEnvValue=(name,env)=>env?.[name];
 const source=readFileSync(process.argv[1],'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace(/^export /gm,'');
 const code=stripTypeScriptTypes(source,{mode:'strip'});
-const evaluate=new Function('getProviderEnvValue',code+';return buildAdditionalModelRequestFields;');
+const prefix="const CachePointType={DEFAULT:'default'}, CacheTTL={ONE_HOUR:'1h'}; const sanitizeSurrogates=s=>s; const resolveJsonSchemaStrictSampling=()=>false; const getJsonSchemaToolParameters=t=>t.parameters;";
+const evaluate=new Function('getProviderEnvValue',prefix+code+';return {thinking:buildAdditionalModelRequestFields,system:buildSystemPrompt,tools:convertToolConfig};');
 const build=evaluate(getProviderEnvValue);
 const cases=JSON.parse(readFileSync(0,'utf8'));
-process.stdout.write(JSON.stringify(cases.map(x=>build(x.model,x.options)??null)));
+process.stdout.write(JSON.stringify(cases.map(x=>process.argv[2]==='policies'?{system:build.system('sys',x.model,x.options.cacheRetention,x.options.env),tools:build.tools([{name:'check',description:'Check',parameters:{type:'object',properties:{value:{type:'string'}},additionalProperties:false}}],x.options.toolChoice,false)??null}:build.thinking(x.model,x.options)??null)));
 """
     expected=json.loads(subprocess.run(['node','--input-type=module','-e',oracle,str(source)],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
     bridge=r"""
@@ -207,7 +210,7 @@ process.stdout.write(JSON.stringify(cases.map(x=>build(x.model,x.options)??null)
 #include <stdlib.h>
 #include <string.h>
 int emit_configuration(const char *source,char **out){
- pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);json_object *cfg=json_tokener_parse(source);*out=0;int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(!rc){s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);if(!rc)*out=strdup(m->request);}model.close(m);free(s);free(m);return rc;
+ pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);json_object *cfg=json_tokener_parse(source);*out=0;int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(!rc){pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema="{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"additionalProperties\":false}"}},.count=1};pg_mimo_bind_tools(m,&registry);s->system_size=3;memcpy(s->system_prompt,"sys",3);s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);if(!rc)*out=strdup(m->request);}model.close(m);free(s);free(m);return rc;
 }
 void release_configuration(char *value){free(value);}
 """
@@ -226,6 +229,25 @@ void release_configuration(char *value){free(value);}
                 actual=json.loads(C.string_at(result));native.release_configuration(result)
                 assert actual.get('additionalModelRequestFields')==wanted,(case,wanted,actual.get('additionalModelRequestFields'))
                 assert 'thinking' not in actual and 'output_config' not in actual
+        policy_models=models+[{'id':name,'name':name,'reasoning':False} for name in ('anthropic.claude-3-7-sonnet','anthropic.claude-3-5-haiku','anthropic.claude-3-5-sonnet')]
+        policies=[{'model':model,'options':{'cacheRetention':retention,'toolChoice':choice,'env':{'AWS_BEDROCK_FORCE_CACHE':'1'} if force else {}}} for model in policy_models for retention in ('short','long','none') for choice in (None,'auto','any','none',{'type':'tool','name':'check'}) for force in (False,True)]
+        wanted_policies=json.loads(subprocess.run(['node','--input-type=module','-e',oracle,str(source),'policies'],input=json.dumps(policies),text=True,capture_output=True,check=True).stdout)
+        previous_force=os.environ.get('AWS_BEDROCK_FORCE_CACHE')
+        try:
+            for case,wanted in zip(policies,wanted_policies):
+                force=case['options']['env'].get('AWS_BEDROCK_FORCE_CACHE')
+                if force: os.environ['AWS_BEDROCK_FORCE_CACHE']=force
+                else: os.environ.pop('AWS_BEDROCK_FORCE_CACHE',None)
+                cfg={'api':'bedrock-converse-stream','model':case['model']['id'],'modelInfo':case['model'],'endpoint':'https://example.invalid/model/test/converse-stream','sessionId':'pangu-cache-policy','options':dict(case['options'],requestMetadata={'project':'pangu'})}
+                result=C.c_void_p();status=native.emit_configuration(json.dumps(cfg).encode(),C.byref(result));assert not status,case
+                actual=json.loads(C.string_at(result));native.release_configuration(result)
+                assert actual.get('system')==wanted['system'] and actual.get('toolConfig')==wanted['tools'],(case,wanted,actual)
+                cache=[x for x in wanted['system'] if 'cachePoint' in x]
+                assert actual['messages'][-1]['content']==[{'text':'hi'}]+cache,(case,actual)
+                assert 'prompt_cache_key' not in actual and actual['requestMetadata']=={'project':'pangu'}
+        finally:
+            if previous_force is None: os.environ.pop('AWS_BEDROCK_FORCE_CACHE',None)
+            else: os.environ['AWS_BEDROCK_FORCE_CACHE']=previous_force
         samples=['','AAE=','AAE','/w==','A','A=','A===','!!!!','YR==','YQ==',' YQ==\n','Y\tQ','Y\vQ','YWJj\x00','YQ==more','====','ĀAAA']
         samples += [base64.b64encode(bytes(range(n))).decode() for n in range(1,10)]
         samples += [base64.b64encode(bytes(range(256))*40).decode()]
@@ -244,7 +266,7 @@ void release_configuration(char *value){free(value);}
                 assert not status
                 encoded=native.pg_mimo_base64_encode(decoded,length);assert encoded and native.json_object_get_string(encoded).decode()==wanted
                 native.json_object_put(encoded);native.release_configuration(decoded)
-    print(f'PASS: {len(cases)} Bedrock thinking configurations match fixed Pi model-family, effort, budget, mapping and GovCloud behavior, including native thinking selection; {len(samples)} opaque codec cases match atob/btoa')
+    print(f'PASS: {len(cases)} Bedrock thinking configurations match fixed Pi model-family, effort, budget, mapping and GovCloud behavior, including native thinking selection; {len(policies)} tool/cache policies match Pi; {len(samples)} opaque codec cases match atob/btoa')
 
 def sigv4_wire(binary, directory):
     cert=Path(directory)/'sigv4-cert.pem'

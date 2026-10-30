@@ -649,6 +649,16 @@ static void test_bedrock_multimodal(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock user/tool image bytes, signed and unsigned reasoning policy, split reasoning/signature stream and canonical replay");
 }
+static void test_bedrock_policies(void){
+ for(unsigned none=0;none<2;none++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-opus-4-8\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}},\"options\":{}}");json_object_object_add(json_object_object_get(cfg,"options"),"toolChoice",json_object_new_string(none?"none":"any"));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);pg_tool_options strict={.constrained_sampling="{\"type\":\"json_schema\",\"strict\":\"require\"}"};pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema="{\"type\":\"object\",\"$ref\":\"unsupported\"}",.options=&strict}},.count=1};pg_mimo_bind_tools(&m,&registry);setenv("PANGU_MODEL_API_KEY","bedrock-policy-unit",1);if(none){assert(!start()&&!strstr(captured_post,"toolConfig"));}else assert(start());model.close(model.context);
+ }
+ for(unsigned variant=0;variant<5;variant++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-opus-4-8\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start());bedrock_feed("messageStart","{\"role\":\"assistant\"}",0);
+  json_object *metadata=json_tokener_parse("{\"usage\":{\"inputTokens\":100,\"outputTokens\":5,\"totalTokens\":1000105,\"cacheReadInputTokens\":10,\"cacheWriteInputTokens\":1000000,\"cacheDetails\":[{\"ttl\":\"1h\",\"inputTokens\":150000},{\"ttl\":\"5m\",\"inputTokens\":600000},{\"ttl\":\"1h\",\"inputTokens\":250000}]}}");json_object *usage=json_object_object_get(metadata,"usage");if(variant==2)json_object_object_del(usage,"totalTokens");if(variant==4)json_object_object_add(usage,"cacheDetails",json_object_new_object());bedrock_feed("metadata",json_object_to_json_string_ext(metadata,JSON_C_TO_STRING_PLAIN),0);json_object_put(metadata);bedrock_feed("messageStop","{\"stopReason\":\"end_turn\"}",0);if(variant==1)bedrock_feed("metadata","{\"usage\":{\"outputTokens\":7}}",0);if(variant==3)bedrock_feed("metadata","{}",0);finish_transport();pg_model_event event={0};int status=0;for(unsigned n=0;n<12;n++){status=nxt(&event);if(status||event.kind==PG_MODEL_DONE)break;}if(variant==4){assert(status);model.close(model.context);continue;}assert(!status&&event.kind==PG_MODEL_DONE);json_object *assistant=json_tokener_parse("{\"role\":\"assistant\"}");assert(!pg_mimo_complete(&m,assistant));usage=json_object_object_get(assistant,"usage");assert(json_object_get_int64(json_object_object_get(usage,"input"))==(variant==1?0:100)&&json_object_get_int64(json_object_object_get(usage,"output"))==(variant==1?7:5)&&json_object_get_int64(json_object_object_get(usage,"cacheRead"))==(variant==1?0:10)&&json_object_get_int64(json_object_object_get(usage,"cacheWrite"))==(variant==1?0:1000000)&&json_object_get_int64(json_object_object_get(usage,"cacheWrite1h"))==(variant==1?0:400000)&&json_object_get_int64(json_object_object_get(usage,"totalTokens"))==(variant==1?7:variant==2?105:1000105));json_object_put(assistant);model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock none omits strict-invalid declarations; reported/fallback totals, 1h writes, missing/partial/trailing usage and malformed metadata");
+}
 static void test_azure_configuration(void){
  const char *bases[]={" https://r.openai.azure.com/ ","https://r.cognitiveservices.azure.com/openai/","https://r.services.ai.azure.com/openai/v1/responses?old=yes","https://proxy.invalid/v1?api-version=old&custom=true&api-version=old2","https://r.openai.azure.com/custom/path/"};
  const char *expected[]={"https://r.openai.azure.com/openai/v1/responses?api-version=v1","https://r.cognitiveservices.azure.com/openai/v1/responses?api-version=v1","https://r.services.ai.azure.com/openai/v1/responses?api-version=v1","https://proxy.invalid/v1/responses?custom=true&api-version=v1","https://r.openai.azure.com/custom/path/responses?api-version=v1"};
@@ -708,6 +718,7 @@ int main(int argc,char **argv) {
     test_bedrock_transport();
     test_bedrock_auth();
     test_bedrock_multimodal();
+    test_bedrock_policies();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
