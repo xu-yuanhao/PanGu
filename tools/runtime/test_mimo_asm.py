@@ -19,6 +19,7 @@ import subprocess
 import sys
 import ctypes as C
 import json
+import base64
 import os
 import ssl
 import threading
@@ -54,8 +55,8 @@ ALLOC_WRAPS = ['-Wl,--wrap=' + name for name in ('json_object_deep_copy', 'json_
 
 
 def flags(opt, extra=()):
-    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c', 'libcurl'], text=True).split()
-    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c', 'libcurl'], text=True).split()
+    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c', 'libcurl', 'libcrypto'], text=True).split()
+    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c', 'libcurl', 'libcrypto'], text=True).split()
     return ['-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra',
             '-Wno-cast-function-type', opt, '-I' + str(ROOT / 'src/runtime'),
             '-I' + str(ROOT), *cflags, *extra, *libs]
@@ -92,7 +93,7 @@ process.stdout.write(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(s=>{c
         _fields_=[('data',C.c_void_p),('size',C.c_size_t)]
     with tempfile.TemporaryDirectory(prefix='pangu-arguments-parity-') as directory:
         output=Path(directory)/'arguments.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-O2',*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.pg_mimo_arguments_parse.argtypes=[Slice,C.POINTER(C.c_void_p)];native.pg_mimo_arguments_parse.restype=C.c_int
         native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
@@ -147,7 +148,7 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
 """
     with tempfile.TemporaryDirectory(prefix='pangu-strict-parity-') as directory:
         source=Path(directory)/'bridge.c';source.write_text(bridge);output=Path(directory)/'strict.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-D_POSIX_C_SOURCE=200809L','-O2','-I'+str(ROOT),str(source),*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.schema_request.argtypes=[C.c_char_p,C.c_uint,C.c_uint,C.POINTER(C.c_void_p)];native.schema_request.restype=C.c_int;native.free.argtypes=[C.c_void_p]
         count=0
@@ -171,6 +172,79 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
                             assert not strict,(protocol,index,tool)
                             if protocol>=3:assert tool['parametersJsonSchema']==expected[3][index],(protocol,index,tool)
     print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses, Anthropic, Google and Vertex')
+
+def bedrock_thinking_differential():
+    source=ROOT/'references/pi/packages/ai/src/api/bedrock-converse-stream.ts'
+    models=[
+        {'id':name,'name':name,'reasoning':True}
+        for name in ('anthropic.claude-sonnet-4-5','us.anthropic.claude-opus-4-6','anthropic.claude-opus-4-7','anthropic.claude-opus-4-8','anthropic.claude-opus-5','anthropic.claude-sonnet-4-6','anthropic.claude-sonnet-5','anthropic.claude-haiku-5','anthropic.claude-fable-5','openai.gpt-oss-120b','openai.gpt-5.6','qwen.qwen3','us-gov.anthropic.claude-opus-4-8','arn:aws-us-gov:bedrock:us-gov-west-1:123:inference-profile/anthropic.claude-opus-4-8')
+    ]
+    models += [{'id':'arn:aws:bedrock:us-west-2:123:application-inference-profile/example','name':'Claude Opus_4.8','reasoning':True},{'id':'anthropic.claude-opus-4-8','reasoning':False}]
+    cases=[]
+    for model in models:
+        for level in ('minimal','low','medium','high','xhigh','max'):
+            for extra in ({},{'thinkingBudgets':{'low':3333,'high':5555},'interleavedThinking':False,'thinkingDisplay':'omitted'},{'region':'us-gov-west-1','thinkingDisplay':'omitted'}):
+                for mapped in (False,True):
+                    descriptor=dict(model)
+                    if mapped: descriptor['thinkingLevelMap']={'minimal':'medium','xhigh':'low','max':'max'}
+                    cases.append({'model':descriptor,'options':dict(extra,reasoning=level)})
+    oracle=r"""
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+const getProviderEnvValue=(name,env)=>env?.[name];
+const source=readFileSync(process.argv[1],'utf8').replace(/^import\b[\s\S]*?;\s*/gm,'').replace(/^export /gm,'');
+const code=stripTypeScriptTypes(source,{mode:'strip'});
+const evaluate=new Function('getProviderEnvValue',code+';return buildAdditionalModelRequestFields;');
+const build=evaluate(getProviderEnvValue);
+const cases=JSON.parse(readFileSync(0,'utf8'));
+process.stdout.write(JSON.stringify(cases.map(x=>build(x.model,x.options)??null)));
+"""
+    expected=json.loads(subprocess.run(['node','--input-type=module','-e',oracle,str(source)],input=json.dumps(cases),text=True,capture_output=True,check=True).stdout)
+    bridge=r"""
+#define _POSIX_C_SOURCE 200809L
+#include "src/runtime/mimo.h"
+#include <json-c/json.h>
+#include <stdlib.h>
+#include <string.h>
+int emit_configuration(const char *source,char **out){
+ pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);json_object *cfg=json_tokener_parse(source);*out=0;int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(!rc){s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);if(!rc)*out=strdup(m->request);}model.close(m);free(s);free(m);return rc;
+}
+void release_configuration(char *value){free(value);}
+"""
+    with tempfile.TemporaryDirectory(prefix='pangu-bedrock-thinking-') as directory:
+        adapter=Path(directory)/'adapter.c';adapter.write_text(bridge)
+        output=Path(directory)/'model.so'
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto'],text=True).split()
+        subprocess.run([CC,'-shared','-fPIC','-O2','-I'+str(ROOT),str(adapter),*SRC,*libs,'-o',str(output)],check=True)
+        native=C.CDLL(str(output));native.emit_configuration.argtypes=[C.c_char_p,C.POINTER(C.c_void_p)];native.emit_configuration.restype=C.c_int;native.release_configuration.argtypes=[C.c_void_p]
+        for case,wanted in zip(cases,expected):
+            model=case['model']
+            alias=dict(case['options']);alias['reasoningEffort']=alias.pop('reasoning')
+            for options in (case['options'],alias):
+                cfg={'api':'bedrock-converse-stream','model':model['id'],'endpoint':'https://example.invalid/model/test/converse-stream','modelInfo':model,'options':options}
+                result=C.c_void_p();status=native.emit_configuration(json.dumps(cfg).encode(),C.byref(result));assert not status,case
+                actual=json.loads(C.string_at(result));native.release_configuration(result)
+                assert actual.get('additionalModelRequestFields')==wanted,(case,wanted,actual.get('additionalModelRequestFields'))
+                assert 'thinking' not in actual and 'output_config' not in actual
+        samples=['','AAE=','AAE','/w==','A','A=','A===','!!!!','YR==','YQ==',' YQ==\n','Y\tQ','Y\vQ','YWJj\x00','YQ==more','====','ĀAAA']
+        samples += [base64.b64encode(bytes(range(n))).decode() for n in range(1,10)]
+        samples += [base64.b64encode(bytes(range(256))*40).decode()]
+        codec_oracle="import {readFileSync} from 'node:fs';process.stdout.write(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(s=>{try{return btoa(atob(s))}catch{return null}})));"
+        normalized=json.loads(subprocess.check_output(['node','--input-type=module','-e',codec_oracle],input=json.dumps(samples),text=True))
+        native.json_tokener_parse.argtypes=[C.c_char_p];native.json_tokener_parse.restype=C.c_void_p
+        native.json_object_get_string.argtypes=[C.c_void_p];native.json_object_get_string.restype=C.c_char_p
+        native.json_object_put.argtypes=[C.c_void_p]
+        native.pg_mimo_base64_decode.argtypes=[C.c_void_p,C.POINTER(C.c_void_p),C.POINTER(C.c_size_t)];native.pg_mimo_base64_decode.restype=C.c_int
+        native.pg_mimo_base64_encode.argtypes=[C.c_void_p,C.c_size_t];native.pg_mimo_base64_encode.restype=C.c_void_p
+        for sample,wanted in zip(samples,normalized):
+            value=native.json_tokener_parse(json.dumps(sample).encode());decoded=C.c_void_p();length=C.c_size_t()
+            status=native.pg_mimo_base64_decode(value,C.byref(decoded),C.byref(length));native.json_object_put(value)
+            if wanted is None: assert status==1 and not decoded.value
+            else:
+                assert not status
+                encoded=native.pg_mimo_base64_encode(decoded,length);assert encoded and native.json_object_get_string(encoded).decode()==wanted
+                native.json_object_put(encoded);native.release_configuration(decoded)
+    print(f'PASS: {len(cases)} Bedrock thinking configurations match fixed Pi model-family, effort, budget, mapping and GovCloud behavior, including native thinking selection; {len(samples)} opaque codec cases match atob/btoa')
 
 def sigv4_wire(binary, directory):
     cert=Path(directory)/'sigv4-cert.pem'
@@ -263,6 +337,7 @@ def main():
         return 1
     arguments_differential()
     strict_schema_differential()
+    bedrock_thinking_differential()
     print('ALL MIMO ASM RUNS PASSED')
     return 0
 

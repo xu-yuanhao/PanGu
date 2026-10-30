@@ -2351,6 +2351,10 @@ pg_mimo_uses_anthropic:
  call pg_mimo_config_google
  test eax,eax
  jnz .Lap_success_ready
+ mov rdi,r12
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lap_success_ready
  mov rdi,rbx
  mov rsi,r12
  call .Lap_cache_options
@@ -6625,6 +6629,24 @@ pg_mimo_uses_google:
  call .Lbd_blocks
  test eax,eax
  jnz .Lbd_bad
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_content]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .Lbd_message_kept
+ mov rdi,r12
+ mov rsi,r13
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Lbd_bad
+ jmp .Lbd_message_each
+.Lbd_message_kept:
  inc r13
  jmp .Lbd_message_each
 .Lbd_tools_flow:
@@ -6765,6 +6787,11 @@ pg_mimo_uses_google:
  mov rdi,rbx
  lea rsi,[rip+.Lbd_tool_choice]
  call json_object_object_del@PLT
+ mov rdi,rbx
+ mov rsi,[rsp+48]
+ call .Lbc_options
+ test eax,eax
+ jnz .Lbd_bad
  xor ebp,ebp
  jmp .Lbd_end
 .Lbd_bad:
@@ -6793,6 +6820,8 @@ pg_mimo_uses_google:
  mov [rsp+24],rsi
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+32],0
+ mov qword ptr [rsp+48],0
  xor r12d,r12d
 .Lbd_block_each:
  mov rdi,rbx
@@ -6837,6 +6866,11 @@ pg_mimo_uses_google:
  call strcmp@PLT
  test eax,eax
  jz .Lbd_block_image
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_redacted_type]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_redacted
  jmp .Lbd_blocks_bad
 .Lbd_block_text:
  mov rdi,r13
@@ -6981,7 +7015,69 @@ pg_mimo_uses_google:
  mov r13,[rsp+8]
  lea r14,[rip+.Lbd_image]
  jmp .Lbd_wrap_owned
+.Lbd_block_redacted:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_data]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rsp+32]
+ lea rdx,[rsp+40]
+ call pg_mimo_base64_decode@PLT
+ cmp eax,2
+ je .Lbd_blocks_bad
+ test eax,eax
+ jnz .Lbd_drop_block
+ cmp qword ptr [rsp+40],0
+ je .Lbd_drop_block
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+40]
+ call pg_mimo_base64_encode@PLT
+ mov [rsp+48],rax
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov qword ptr [rsp+32],0
+ cmp qword ptr [rsp+48],0
+ je .Lbd_blocks_bad
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_redactedContent]
+ mov rdx,[rsp+48]
+ mov qword ptr [rsp+48],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov r13,[rsp+8]
+ lea r14,[rip+.Lbd_reasoningContent]
+ jmp .Lbd_wrap_owned
+.Lbd_drop_block:
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov qword ptr [rsp+32],0
+ mov rdi,rbx
+ mov rsi,r12
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ jmp .Lbd_block_each
 .Lbd_block_thinking:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_thinking]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov ebp,eax
+ mov rdi,[rsp+16]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov esi,ebp
+ call pg_context_blank@PLT
+ test eax,eax
+ jnz .Lbd_drop_block
  mov rdi,r13
  mov rsi,r13
  lea rdx,[rip+.Lbd_thinking]
@@ -7081,6 +7177,10 @@ pg_mimo_uses_google:
 .Lbd_blocks_bad:
  mov ebp,1
 .Lbd_blocks_end:
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov rdi,[rsp+8]
@@ -7205,3 +7305,473 @@ pg_mimo_uses_google:
 .Lbd_format_webp: .asciz "webp"
 
 .Lbd_name: .asciz "name"
+
+.macro BCGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.LbcK_\key]
+ call json_object_object_get@PLT
+.endm
+.macro BCSET obj,key,value
+ mov rdi,\obj
+ lea rsi,[rip+.LbcK_\key]
+ mov rdx,\value
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbc_bad
+.endm
+.text
+/* Flags are derived from upstream's normalized model ID and display-name candidates. */
+.Lbc_family:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov dword ptr [rsp+24],0
+ BCGET rbx,model
+ mov r12,rax
+ BCGET rbx,modelInfo
+ BCGET rax,name
+ mov r13,rax
+ xor ebp,ebp
+.Lbc_candidate:
+ mov rdi,r12
+ test ebp,ebp
+ jz .Lbc_candidate_value
+ mov rdi,r13
+.Lbc_candidate_value:
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbc_candidate_next
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbc_family_bad
+ mov rdi,rax
+ mov rsi,rax
+ xor ecx,ecx
+.Lbc_normalize:
+ movzx edx,byte ptr [rsi]
+ inc rsi
+ test edx,edx
+ jz .Lbc_normalized
+ cmp edx,95
+ je .Lbc_separator
+ cmp edx,46
+ je .Lbc_separator
+ cmp edx,58
+ je .Lbc_separator
+ cmp edx,32
+ je .Lbc_separator
+ cmp edx,9
+ jb .Lbc_copy_char
+ cmp edx,13
+ ja .Lbc_copy_char
+.Lbc_separator:
+ test ecx,ecx
+ jnz .Lbc_normalize
+ mov edx,45
+ mov ecx,1
+ jmp .Lbc_store_char
+.Lbc_copy_char:
+ xor ecx,ecx
+.Lbc_store_char:
+ mov [rdi],dl
+ inc rdi
+ jmp .Lbc_normalize
+.Lbc_normalized:
+ mov byte ptr [rdi],0
+ lea r14,[rip+.Lbc_patterns]
+.Lbc_pattern:
+ movzx eax,byte ptr [r14]
+ test eax,eax
+ jz .Lbc_pattern_done
+ mov [rsp+16],eax
+ mov rdi,[rsp]
+ lea rsi,[r14+1]
+ call strcasestr@PLT
+ test rax,rax
+ jz .Lbc_pattern_next
+ mov eax,[rsp+16]
+ or [rsp+24],eax
+.Lbc_pattern_next:
+ lea rdi,[r14+1]
+ call strlen@PLT
+ lea r14,[r14+rax+2]
+ jmp .Lbc_pattern
+.Lbc_pattern_done:
+ test ebp,ebp
+ jnz .Lbc_candidate_free
+ mov rdi,[rsp]
+ lea rsi,[rip+.LbcK_gov_model]
+ mov edx,7
+ call strncasecmp@PLT
+ test eax,eax
+ jz .Lbc_model_gov
+ mov rdi,[rsp]
+ lea rsi,[rip+.LbcK_gov_arn]
+ mov edx,15
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lbc_candidate_free
+.Lbc_model_gov:
+ or dword ptr [rsp+24],16
+.Lbc_candidate_free:
+ mov rdi,[rsp]
+ call free@PLT
+ mov qword ptr [rsp],0
+.Lbc_candidate_next:
+ inc ebp
+ cmp ebp,2
+ jb .Lbc_candidate
+ BCGET rbx,options
+ BCGET rax,region
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbc_region_environment
+ cmp byte ptr [rax],0
+ jne .Lbc_region_check
+.Lbc_region_environment:
+ lea rdi,[rip+.LbcK_region_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lbc_region_default
+ cmp byte ptr [rax],0
+ jne .Lbc_region_check
+.Lbc_region_default:
+ lea rdi,[rip+.LbcK_region_default_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lbc_family_ok
+.Lbc_region_check:
+ mov rdi,rax
+ lea rsi,[rip+.LbcK_gov_region]
+ mov edx,7
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lbc_family_ok
+ or dword ptr [rsp+24],16
+.Lbc_family_ok:
+ mov eax,[rsp+24]
+ xor edx,edx
+ jmp .Lbc_family_end
+.Lbc_family_bad:
+ xor eax,eax
+ mov edx,1
+.Lbc_family_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lbc_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ BCGET r12,options
+ mov [rsp+16],rax
+ BCGET r12,modelInfo
+ mov [rsp+24],rax
+ BCGET rax,reasoning
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lbc_ok
+ BCGET "qword ptr [rsp+16]",reasoning
+ test rax,rax
+ jnz .Lbc_level_value
+ BCGET "qword ptr [rsp+16]",reasoningEffort
+.Lbc_level_value:
+ mov [rsp+32],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lbc_ok
+ mov rdi,rax
+ lea rsi,[rip+.LbcK_off]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbc_ok
+ lea r14,[rip+.Lbc_levels]
+ xor r13d,r13d
+.Lbc_level:
+ mov rdi,[rsp+40]
+ mov rsi,r14
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbc_level_ready
+ mov rdi,r14
+ call strlen@PLT
+ lea r14,[r14+rax+1]
+ inc r13
+ cmp r13,6
+ jb .Lbc_level
+ jmp .Lbc_bad
+.Lbc_level_ready:
+ mov [rsp+48],r13
+ mov rdi,r12
+ call .Lbc_family
+ test edx,edx
+ jnz .Lbc_bad
+ mov [rsp+56],eax
+ mov rdi,r12
+ call .Lbd_claude
+ test eax,eax
+ jz .Lbc_openai
+ test dword ptr [rsp+56],1
+ jnz .Lbc_adaptive
+ lea rdi,[rip+.LbcJ_budget]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbc_bad
+ BCGET rax,thinking
+ mov [rsp+8],rax
+ lea rsi,[rip+.LbcK_high]
+ cmp r13,4
+ jae .Lbc_budget_key
+ mov rsi,[rsp+40]
+.Lbc_budget_key:
+ mov [rsp+72],rsi
+ BCGET "qword ptr [rsp+16]",thinkingBudgets
+ mov rdi,rax
+ mov rsi,[rsp+72]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lbc_budget_default
+ mov rdi,rax
+ call json_object_get@PLT
+ jmp .Lbc_budget_set
+.Lbc_budget_default:
+ lea rax,[rip+.Lbc_budgets]
+ mov rdi,[rax+r13*8]
+ call json_object_new_int64@PLT
+.Lbc_budget_set:
+ BCSET "qword ptr [rsp+8]",budget_tokens,rax
+ BCGET "qword ptr [rsp+16]",interleavedThinking
+ test rax,rax
+ jz .Lbc_interleaved
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lbc_display
+.Lbc_interleaved:
+ lea rdi,[rip+.LbcJ_interleaved]
+ call json_tokener_parse@PLT
+ BCSET "qword ptr [rsp]",anthropic_beta,rax
+ jmp .Lbc_display
+.Lbc_adaptive:
+ lea rdi,[rip+.LbcJ_adaptive]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbc_bad
+ BCGET rax,thinking
+ mov [rsp+8],rax
+ test dword ptr [rsp+56],2
+ jz .Lbc_adaptive_effort
+ test dword ptr [rsp+56],16
+ jnz .Lbc_adaptive_effort
+ lea rdi,[rip+.LbcJ_binding]
+ call json_tokener_parse@PLT
+ BCSET "qword ptr [rsp+8]",block_binding,rax
+ lea rdi,[rip+.LbcJ_binding_beta]
+ call json_tokener_parse@PLT
+ BCSET "qword ptr [rsp]",anthropic_beta,rax
+.Lbc_adaptive_effort:
+ mov ebp,1
+ cmp r13,4
+ jne .Lbc_mapped_effort
+ test dword ptr [rsp+56],2
+ jz .Lbc_mapped_effort
+ lea rdi,[rip+.LbcK_xhigh]
+ jmp .Lbc_effort_string
+.Lbc_mapped_effort:
+ BCGET "qword ptr [rsp+24]",thinkingLevelMap
+ mov rdi,rax
+ mov rsi,[rsp+40]
+ call json_object_object_get@PLT
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbc_effort_default
+ mov rdi,r14
+ call json_object_get@PLT
+ jmp .Lbc_effort_set
+.Lbc_effort_default:
+ lea rdi,[rip+.LbcK_low]
+ cmp r13,2
+ jb .Lbc_effort_string
+ lea rdi,[rip+.LbcK_medium]
+ je .Lbc_effort_string
+ lea rdi,[rip+.LbcK_high]
+ cmp ebp,1
+ je .Lbc_effort_string
+ cmp r13,4
+ jne .Lbc_gpt_max
+ lea rdi,[rip+.LbcK_xhigh]
+ jmp .Lbc_effort_string
+.Lbc_gpt_max:
+ cmp r13,5
+ jne .Lbc_effort_string
+ lea rdi,[rip+.LbcK_max]
+.Lbc_effort_string:
+ call json_object_new_string@PLT
+.Lbc_effort_set:
+ mov r14,rax
+ mov rax,[rsp]
+ lea rsi,[rip+.LbcK_reasoning]
+ cmp ebp,1
+ jne .Lbc_effort_object
+ lea rsi,[rip+.LbcK_output_config]
+.Lbc_effort_object:
+ mov rdi,rax
+ call json_object_object_get@PLT
+ BCSET rax,effort,r14
+ cmp ebp,1
+ jne .Lbc_adopt
+.Lbc_display:
+ test dword ptr [rsp+56],16
+ jnz .Lbc_adopt
+ BCGET "qword ptr [rsp+16]",thinkingDisplay
+ test rax,rax
+ jz .Lbc_display_default
+ mov rdi,rax
+ call json_object_get@PLT
+ jmp .Lbc_display_set
+.Lbc_display_default:
+ lea rdi,[rip+.LbcK_summarized]
+ call json_object_new_string@PLT
+.Lbc_display_set:
+ BCSET "qword ptr [rsp+8]",display,rax
+ jmp .Lbc_adopt
+.Lbc_openai:
+ test dword ptr [rsp+56],4
+ jnz .Lbc_oss
+ test dword ptr [rsp+56],8
+ jz .Lbc_ok
+ lea rdi,[rip+.LbcJ_gpt]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbc_bad
+ xor ebp,ebp
+ jmp .Lbc_mapped_effort
+.Lbc_oss:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbc_bad
+ lea rdi,[rip+.LbcK_low]
+ cmp r13,2
+ jb .Lbc_oss_effort
+ lea rdi,[rip+.LbcK_medium]
+ je .Lbc_oss_effort
+ lea rdi,[rip+.LbcK_high]
+.Lbc_oss_effort:
+ call json_object_new_string@PLT
+ BCSET "qword ptr [rsp]",reasoning_effort,rax
+.Lbc_adopt:
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ BCSET rbx,additionalModelRequestFields,rdx
+.Lbc_ok:
+ xor ebp,ebp
+ jmp .Lbc_end
+.Lbc_bad:
+ mov ebp,1
+.Lbc_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbc_patterns:
+ .byte 1
+ .asciz "opus-4-6"
+ .byte 3
+ .asciz "opus-4-7"
+ .byte 3
+ .asciz "opus-4-8"
+ .byte 3
+ .asciz "opus-5"
+ .byte 1
+ .asciz "sonnet-4-6"
+ .byte 3
+ .asciz "sonnet-5"
+ .byte 3
+ .asciz "haiku-5"
+ .byte 3
+ .asciz "fable-5"
+ .byte 4
+ .asciz "gpt-oss"
+ .byte 8
+ .asciz "gpt-"
+ .byte 0
+.Lbc_levels: .asciz "minimal","low","medium","high","xhigh","max"
+.p2align 3
+.Lbc_budgets: .quad 1024,2048,8192,16384,16384,16384
+.LbcK_model: .asciz "model"
+.LbcK_modelInfo: .asciz "modelInfo"
+.LbcK_name: .asciz "name"
+.LbcK_options: .asciz "options"
+.LbcK_region: .asciz "region"
+.LbcK_reasoning: .asciz "reasoning"
+.LbcK_reasoningEffort: .asciz "reasoningEffort"
+.LbcK_off: .asciz "off"
+.LbcK_high: .asciz "high"
+.LbcK_thinking: .asciz "thinking"
+.LbcK_thinkingBudgets: .asciz "thinkingBudgets"
+.LbcK_budget_tokens: .asciz "budget_tokens"
+.LbcK_interleavedThinking: .asciz "interleavedThinking"
+.LbcK_anthropic_beta: .asciz "anthropic_beta"
+.LbcK_block_binding: .asciz "block_binding"
+.LbcK_thinkingLevelMap: .asciz "thinkingLevelMap"
+.LbcK_output_config: .asciz "output_config"
+.LbcK_effort: .asciz "effort"
+.LbcK_low: .asciz "low"
+.LbcK_medium: .asciz "medium"
+.LbcK_xhigh: .asciz "xhigh"
+.LbcK_max: .asciz "max"
+.LbcK_thinkingDisplay: .asciz "thinkingDisplay"
+.LbcK_summarized: .asciz "summarized"
+.LbcK_display: .asciz "display"
+.LbcK_reasoning_effort: .asciz "reasoning_effort"
+.LbcK_additionalModelRequestFields: .asciz "additionalModelRequestFields"
+.LbcK_gov_model: .asciz "us-gov-"
+.LbcK_gov_arn: .asciz "arn-aws-us-gov-"
+.LbcK_gov_region: .asciz "us-gov-"
+.LbcK_region_env: .asciz "AWS_REGION"
+.LbcK_region_default_env: .asciz "AWS_DEFAULT_REGION"
+.LbcJ_budget: .asciz "{\"thinking\":{\"type\":\"enabled\",\"budget_tokens\":0}}"
+.LbcJ_adaptive: .asciz "{\"thinking\":{\"type\":\"adaptive\"},\"output_config\":{}}"
+.LbcJ_gpt: .asciz "{\"reasoning\":{}}"
+.LbcJ_binding: .asciz "{\"prefix_mismatch_behavior\":\"drop_block\"}"
+.LbcJ_binding_beta: .asciz "[\"thinking-binding-controls-2026-08-01\"]"
+.LbcJ_interleaved: .asciz "[\"interleaved-thinking-2025-05-14\"]"
+
+.section .rodata
+.Lbd_redacted_type: .asciz "redacted_thinking"
+.Lbd_redactedContent: .asciz "redactedContent"

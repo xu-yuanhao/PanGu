@@ -2846,7 +2846,7 @@ pg_mimo_anthropic_clear:
  jnz .Lan_bad
  mov rdi,[r14+16]
  lea rsi,[rip+.Lan_redacted]
- mov edx,19
+ mov edx,20
  call printbuf_memappend@PLT
  test eax,eax
  js .Lan_bad
@@ -2908,7 +2908,14 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jz .Lan_tool_delta_find
  cmp dword ptr [r14+8],2
+ je .Lbb_reasoning_delta
+ cmp dword ptr [r14+8],4
  jne .Lan_bad
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lan_bad
+.Lbb_reasoning_delta:
  mov rdi,[rsp+80]
  lea rsi,[rip+.Lan_thinking_delta]
  call strcmp@PLT
@@ -2918,6 +2925,8 @@ pg_mimo_anthropic_clear:
  mov rdi,[r14+16]
  jmp .Lan_append_delta
 .Lan_signature_delta:
+ cmp dword ptr [r14+8],4
+ je .Lan_ok
  mov rdi,[rsp+80]
  lea rsi,[rip+.Lan_signature_delta_type]
  call strcmp@PLT
@@ -3012,10 +3021,23 @@ pg_mimo_anthropic_clear:
  cmp dword ptr [rax+8],0
  je .Lan_block_closed
 .Lan_block_signature:
+ cmp dword ptr [r14+8],4
+ jne .Lbb_signature_text
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbb_signature_text
+ mov rax,[r14+24]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call pg_mimo_base64_encode
+ jmp .Lbb_signature_ready
+.Lbb_signature_text:
  mov rax,[r14+24]
  mov rdi,[rax]
  mov esi,[rax+8]
  call json_object_new_string_len@PLT
+.Lbb_signature_ready:
  mov rdi,[r14+32]
  lea rsi,[rip+.Lan_thinkingSignature]
  cmp dword ptr [r14+8],1
@@ -5039,7 +5061,8 @@ pg_mimo_anthropic_clear:
  mov [rsp+24],rax
  BTGET rax,redactedContent
  test rax,rax
- jnz .Lbt_bad
+ jnz .Lbt_redacted
+.Lbt_normal_reasoning:
  mov rdi,rbx
  mov rsi,[rsp+8]
  mov rdx,r13
@@ -5080,6 +5103,78 @@ pg_mimo_anthropic_clear:
  BTGET "qword ptr [rsp+16]",delta
  BTCOPY rax,"qword ptr [rsp+24]",signature,signature
  jmp .Lbt_emit
+.Lbt_redacted:
+ mov rdi,rax
+ lea rsi,[rsp+176]
+ lea rdx,[rsp+184]
+ call pg_mimo_base64_decode
+ test eax,eax
+ jnz .Lbt_bad
+ cmp qword ptr [rsp+184],0
+ je .Lbt_normal_reasoning
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov rdx,r13
+ lea rcx,[rip+.LbtJ_start_thinking]
+ call .Lbt_ensure_text
+ test eax,eax
+ jnz .Lbt_bad
+ BTGET "qword ptr [rsp+8]",contentBlockIndex
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ xor ecx,ecx
+.Lbt_redacted_find:
+ cmp rcx,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lbt_bad
+ imul r14,rcx,40
+ add r14,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp [r14],rax
+ je .Lbt_redacted_slot
+ inc rcx
+ jmp .Lbt_redacted_find
+.Lbt_redacted_slot:
+ cmp dword ptr [r14+12],0
+ jne .Lbt_bad
+ BTGET "qword ptr [rsp+24]",text
+ test rax,rax
+ jz .Lbt_redacted_transition
+ mov rsi,rax
+ mov rdi,[r14+16]
+ call .Lan_append
+ test eax,eax
+ jnz .Lbt_bad
+.Lbt_redacted_transition:
+ cmp dword ptr [r14+8],4
+ je .Lbt_redacted_append
+ cmp dword ptr [r14+8],2
+ jne .Lbt_bad
+ mov dword ptr [r14+8],4
+ mov rax,[r14+24]
+ mov dword ptr [rax+8],0
+ mov rax,[rax]
+ mov byte ptr [rax],0
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,[r14+32]
+ lea rsi,[rip+.LbtK_redacted]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[r14+16]
+ lea rsi,[rip+.Lan_redacted]
+ mov edx,20
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lbt_bad
+.Lbt_redacted_append:
+ mov rdi,[r14+24]
+ mov rsi,[rsp+176]
+ mov rdx,[rsp+184]
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lbt_bad
+ jmp .Lbt_ok
 .Lbt_input:
  mov [rsp+24],rax
  lea rdi,[rip+.LbtJ_input]
@@ -5158,6 +5253,8 @@ pg_mimo_anthropic_clear:
 .Lbt_bad:
  mov ebp,1
 .Lbt_cleanup:
+ mov rdi,[rsp+176]
+ call free@PLT
  mov rdi,[rsp]
  call json_tokener_free@PLT
  mov rdi,[rsp+8]
@@ -5353,3 +5450,199 @@ pg_mimo_anthropic_clear:
 
 .section .rodata
 .LbtK_redactedContent: .asciz "redactedContent"
+
+.text
+/* Decode atob-compatible JSON Base64 into caller-owned bytes. 1 invalid, 2 allocation failure. */
+.globl pg_mimo_base64_decode
+.type pg_mimo_base64_decode,@function
+pg_mimo_base64_decode:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [r12],0
+ mov qword ptr [r13],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbb_invalid
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ cmp eax,2147483643
+ ja .Lbb_invalid
+ mov [rsp+16],rax
+ lea rdi,[rax+4]
+ call malloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbb_native
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ mov rbx,rax
+ xor r14d,r14d
+ xor ebp,ebp
+ xor ecx,ecx
+.Lbb_clean:
+ cmp rcx,[rsp+16]
+ jae .Lbb_padding
+ movzx eax,byte ptr [rbx+rcx]
+ inc rcx
+ cmp eax,32
+ je .Lbb_clean
+ cmp eax,9
+ je .Lbb_clean
+ cmp eax,10
+ je .Lbb_clean
+ cmp eax,12
+ je .Lbb_clean
+ cmp eax,13
+ je .Lbb_clean
+ cmp eax,61
+ je .Lbb_equal
+ test ebp,ebp
+ jnz .Lbb_invalid
+ cmp eax,65
+ jb .Lbb_lower
+ cmp eax,90
+ jbe .Lbb_store
+.Lbb_lower:
+ cmp eax,97
+ jb .Lbb_digit
+ cmp eax,122
+ jbe .Lbb_store
+.Lbb_digit:
+ cmp eax,48
+ jb .Lbb_symbol
+ cmp eax,57
+ jbe .Lbb_store
+.Lbb_symbol:
+ cmp eax,43
+ je .Lbb_store
+ cmp eax,47
+ jne .Lbb_invalid
+ jmp .Lbb_store
+.Lbb_equal:
+ inc ebp
+ cmp ebp,2
+ ja .Lbb_invalid
+.Lbb_store:
+ mov rdx,[rsp]
+ mov [rdx+r14],al
+ inc r14
+ jmp .Lbb_clean
+.Lbb_padding:
+ mov eax,r14d
+ and eax,3
+ test ebp,ebp
+ jz .Lbb_unpadded
+ test eax,eax
+ jnz .Lbb_invalid
+ jmp .Lbb_decode
+.Lbb_unpadded:
+ cmp eax,1
+ je .Lbb_invalid
+ test eax,eax
+ jz .Lbb_decode
+ mov rdx,[rsp]
+.Lbb_pad:
+ mov byte ptr [rdx+r14],61
+ inc r14
+ inc ebp
+ test r14d,3
+ jnz .Lbb_pad
+.Lbb_decode:
+ mov rax,[rsp]
+ mov byte ptr [rax+r14],0
+ lea rdi,[r14+1]
+ call malloc@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lbb_native
+ mov rdi,rax
+ mov rsi,[rsp]
+ mov edx,r14d
+ call EVP_DecodeBlock@PLT
+ test eax,eax
+ js .Lbb_invalid
+ sub eax,ebp
+ js .Lbb_invalid
+ mov [r13],rax
+ mov rax,[rsp+8]
+ mov [r12],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Lbb_end
+.Lbb_invalid:
+ mov ebp,1
+ jmp .Lbb_end
+.Lbb_native:
+ mov ebp,2
+.Lbb_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_base64_decode,.-pg_mimo_base64_decode
+.globl pg_mimo_base64_encode
+.type pg_mimo_base64_encode,@function
+pg_mimo_base64_encode:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ cmp rsi,1610612733
+ ja .Lbb_encode_bad
+ lea rax,[rsi+2]
+ xor edx,edx
+ mov ecx,3
+ div rcx
+ lea rdi,[rax*4+1]
+ call malloc@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lbb_encode_bad
+ mov rdi,rax
+ mov rsi,rbx
+ mov edx,r12d
+ call EVP_EncodeBlock@PLT
+ test eax,eax
+ js .Lbb_encode_release
+ mov rdi,r13
+ mov esi,eax
+ call json_object_new_string_len@PLT
+ mov rbx,rax
+ jmp .Lbb_encode_free
+.Lbb_encode_release:
+ xor ebx,ebx
+.Lbb_encode_free:
+ mov rdi,r13
+ call free@PLT
+ mov rax,rbx
+ jmp .Lbb_encode_end
+.Lbb_encode_bad:
+ xor eax,eax
+.Lbb_encode_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_mimo_base64_encode,.-pg_mimo_base64_encode
+
+.section .rodata
+.LbtK_redacted: .asciz "redacted"
