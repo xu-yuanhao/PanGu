@@ -234,6 +234,18 @@
           "tests_to_read": [
             "packages/ai/test/streaming-tool-arguments.test.ts"
           ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/api/constrained-sampling.ts",
+            "packages/ai/src/api/anthropic-messages.ts"
+          ],
+          "semantics": "detached recursive strict JSON-schema conversion, nullable optional properties, required ordering, unsupported-schema prefer fallback versus require rejection; Anthropic provider keyword subset",
+          "tests_to_read": [
+            "packages/ai/test/anthropic-strict-tool-fallback.test.ts"
+          ]
         }
       ]
     },

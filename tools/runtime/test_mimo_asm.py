@@ -98,6 +98,65 @@ process.stdout.write(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(s=>{c
     print(f'PASS: {len(cases)} finished tool arguments match fixed Pi values/error classification')
 
 
+def strict_schema_differential():
+    """Exercise the actual encoder against fixed Pi constrained sampling."""
+    cases=[{'type':'object'}, {'type':'object','properties':{}}, {'type':'string'}, True]
+    leaves=[{'type':'string'},{'type':'number'},{'type':'boolean'},{'type':'null'}, {'type':['string','null']},{'enum':['a',None]},{'const':None},{'anyOf':[{'type':'string'},{'type':'null'}]}, {'type':'array','items':{'type':'string'}}, {'type':'object','properties':{'x':{'type':'string'}}}, {'type':'string','format':'uuid'},{'type':'string','format':'unsupported'}, {'type':'number','minimum':0}]
+    cases += [{'type':'object','properties':{'value':x,'required':{'type':'string'}},'required':['required']} for x in leaves]
+    for key in ['$ref','$defs','definitions','allOf','oneOf','patternProperties','dependentSchemas','dependencies','unevaluatedProperties','propertyNames','contains','prefixItems','not','if','then','else','minimum','maximum','exclusiveMinimum','exclusiveMaximum','multipleOf','maxItems','uniqueItems','minContains','maxContains','minProperties','maxProperties']:
+        cases.append({'type':'object','properties':{'x':{'type':'string',key:None}}})
+    cases += [{'type':'object','properties':{'x':{'type':'array','minItems':n,'items':{'type':'string'}}}} for n in [-1,0,1,2,1.0,True,None]]
+    cases += [{'type':'object','properties':{'x':False}}, {'type':'object','required':['missing']}, {'type':'object','required':[1]}, {'type':'object','properties':[]}, {'type':'object','additionalProperties':True}, {'type':'object','additionalProperties':None}, {'type':'object','properties':{'x':{'anyOf':[]}}}, {'type':'object','properties':{'x':{'anyOf':[{'type':'object'}]}}}, {'type':'object','properties':{'x':{'type':'array','items':[]}}}]
+    rng=random.Random(918)
+    for _ in range(90):
+        props={f'p{i}':rng.choice(leaves) for i in range(rng.randrange(1,6))}
+        cases.append({'type':'object','properties':props,'required':rng.sample(list(props),rng.randrange(len(props)+1))})
+    oracle=r"""
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';
+const base=readFileSync(process.argv[1],'utf8').replace(/^import.*$/mg,'');
+const provider=readFileSync(process.argv[2],'utf8');
+const check=provider.slice(provider.indexOf('const ANTHROPIC_STRICT_UNSUPPORTED_KEYWORDS'),provider.indexOf('\nfunction convertTools('));
+const text=stripTypeScriptTypes(base+'\n'+check+'\nexport {isAnthropicStrictUnsupportedKeyword};',{mode:'strip'});
+const lib=await import('data:text/javascript;base64,'+Buffer.from(text).toString('base64'));
+const cases=JSON.parse(readFileSync(0,'utf8'));
+console.log(JSON.stringify([false,true].map(a=>cases.map(s=>{try{return lib.makeStrictJsonSchema(s,a?lib.isAnthropicStrictUnsupportedKeyword:undefined)}catch{return null}}))));
+"""
+    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle,str(ROOT/'references/pi/packages/ai/src/api/constrained-sampling.ts'),str(ROOT/'references/pi/packages/ai/src/api/anthropic-messages.ts')],input=json.dumps(cases).encode()))
+    bridge=r"""
+#include "src/runtime/mimo.h"
+#include <json-c/json.h>
+#include <stdlib.h>
+#include <string.h>
+int schema_request(const char *schema,unsigned protocol,unsigned required,char **out){
+ pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);
+ json_object *cfg=json_tokener_parse(protocol==2?"{\"api\":\"anthropic-messages\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true}}}":protocol==1?"{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}":"{\"api\":\"openai-completions\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/chat/completions\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}");
+ int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(rc)abort();pg_tool_options options={.max_bytes=51200,.max_lines=2000,.constrained_sampling=required?"{\"type\":\"json_schema\",\"strict\":\"require\"}":"{\"type\":\"json_schema\",\"strict\":\"prefer\"}"};pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema=schema,.options=&options}},.count=1};pg_mimo_bind_tools(m,&registry);s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);*out=rc?0:strdup(m->request);model.close(m);free(s);free(m);return rc;
+}
+"""
+    with tempfile.TemporaryDirectory(prefix='pangu-strict-parity-') as directory:
+        source=Path(directory)/'bridge.c';source.write_text(bridge);output=Path(directory)/'strict.so'
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl'],text=True).split()
+        subprocess.run([CC,'-shared','-fPIC','-D_POSIX_C_SOURCE=200809L','-O2','-I'+str(ROOT),str(source),*SRC,*libs,'-o',str(output)],check=True)
+        native=C.CDLL(str(output));native.schema_request.argtypes=[C.c_char_p,C.c_uint,C.c_uint,C.POINTER(C.c_void_p)];native.schema_request.restype=C.c_int;native.free.argtypes=[C.c_void_p]
+        count=0
+        for protocol in range(3):
+            for index,schema in enumerate(cases):
+                wanted=expected[protocol==2][index]
+                if protocol==2 and wanted is not None:wanted={**wanted,'properties':wanted.get('properties',{})}
+                for required in range(2):
+                    out=C.c_void_p();rc=native.schema_request(json.dumps(schema).encode(),protocol,required,C.byref(out));count+=1
+                    if wanted is None and required:assert rc and not out.value,(protocol,index,schema)
+                    else:
+                        assert not rc and out.value,(protocol,index,schema)
+                        wire=json.loads(C.string_at(out));native.free(out)
+                        tool=wire['tools'][0];tool=tool['function'] if protocol==0 else tool
+                        if wanted is not None:
+                            assert tool.get('strict') is True,(protocol,index,tool)
+                            actual=tool['input_schema' if protocol==2 else 'parameters']
+                            assert actual==wanted,(protocol,index,schema,actual,wanted)
+                        else:assert not tool.get('strict'),(protocol,index,tool)
+    print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses and Anthropic')
+
 def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix='pangu-mimo-asm-') as tmp:
@@ -138,6 +197,7 @@ def main():
         print(f'{failures} test runs failed')
         return 1
     arguments_differential()
+    strict_schema_differential()
     print('ALL MIMO ASM RUNS PASSED')
     return 0
 

@@ -837,6 +837,7 @@ pg_mimo_encode_request:
  and qword ptr [rsp + 104],-33
  .Lserialize:
  mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
  call .Lsampling_admit
  test eax,eax
  jnz .Linvalid
@@ -2196,6 +2197,7 @@ pg_mimo_uses_anthropic:
  mov [rsp+24],rax
  APCOPY rbp,rax,name,name
  APCOPY rbp,"qword ptr [rsp+24]",description,description
+ APCOPY rbp,"qword ptr [rsp+24]",strict,strict
  APGET "qword ptr [rsp+24]",parameters
  mov rdi,rbp
  mov rsi,rax
@@ -3464,6 +3466,31 @@ pg_mimo_uses_anthropic:
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
+ APGET rbx,strict
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_schema_legacy
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_input_schema]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_schema_bad
+ APGET r12,properties
+ test rax,rax
+ jnz .Lap_schema_compat
+ call json_object_new_object@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lap_properties]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_schema_bad
+ jmp .Lap_schema_compat
+.Lap_schema_legacy:
  lea rdi,[rip+.Lap_legacy_schema]
  call json_tokener_parse@PLT
  mov r14,rax
@@ -3489,6 +3516,7 @@ pg_mimo_uses_anthropic:
  call .Lrp_copy
  test eax,eax
  jnz .Lap_schema_bad
+ .Lap_schema_compat:
  APGET r13,modelInfo
  APGET rax,compat
  APGET rax,supportsEagerToolInputStreaming
@@ -3742,6 +3770,11 @@ pg_mimo_uses_anthropic:
  push r12
  push r13
  push r14
+ sub rsp,48
+ mov [rsp],rsi
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+32],0
  APGET rdi,tools
  mov rbx,rax
  xor r12d,r12d
@@ -3796,21 +3829,88 @@ pg_mimo_uses_anthropic:
  call json_object_get_string@PLT
  test rax,rax
  jz .Lsampling_bad
+ mov [rsp+24],rax
  mov rdi,rax
  lea rsi,[rip+.Lsampling_require]
  call strcmp@PLT
  test eax,eax
- jz .Lsampling_bad
- mov rdi,r14
- lea rsi,[rip+.Lsampling_strict]
- call json_object_object_get@PLT
- mov rdi,rax
- call json_object_get_string@PLT
- mov rdi,rax
+ sete al
+ movzx eax,al
+ mov [rsp+40],eax
+ test eax,eax
+ jnz .Lsampling_policy
+ mov rdi,[rsp+24]
  lea rsi,[rip+.Lsampling_prefer]
  call strcmp@PLT
  test eax,eax
  jnz .Lsampling_bad
+.Lsampling_policy:
+ mov rdi,[rsp]
+ call pg_mimo_config_anthropic
+ mov [rsp+16],eax
+ APGET "qword ptr [rsp]",modelInfo
+ APGET rax,compat
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_supportsMode]
+ cmp dword ptr [rsp+16],0
+ je .Lsampling_support_key
+ lea rsi,[rip+.Lsampling_supportsTools]
+.Lsampling_support_key:
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lsampling_unsupported
+ APGET r13,parameters
+ mov rdi,rax
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lsampling_bad
+ mov rdi,[rsp+8]
+ mov esi,[rsp+16]
+ xor edx,edx
+ call .Lst_node
+ cmp eax,2
+ je .Lsampling_bad
+ test eax,eax
+ jnz .Lsampling_clone_unsupported
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lst_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsampling_clone_unsupported
+ mov rdi,rax
+ lea rsi,[rip+.Lst_object_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsampling_clone_unsupported
+ mov rdi,r13
+ lea rsi,[rip+.Lap_parameters]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lsampling_bad
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lsampling_strict]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lsampling_bad
+ jmp .Lsampling_remove
+.Lsampling_clone_unsupported:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+.Lsampling_unsupported:
+ cmp dword ptr [rsp+40],0
+ jne .Lsampling_bad
 .Lsampling_remove:
  mov rdi,r13
  lea rsi,[rip+.Lsampling_key]
@@ -3819,11 +3919,15 @@ pg_mimo_uses_anthropic:
  inc r12
  jmp .Lsampling_each
 .Lsampling_ok:
- xor eax,eax
+ xor ebp,ebp
  jmp .Lsampling_end
 .Lsampling_bad:
- mov eax,1
+ mov ebp,1
 .Lsampling_end:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
  pop r14
  pop r13
  pop r12
@@ -3838,3 +3942,652 @@ pg_mimo_uses_anthropic:
 
 .section .rodata
 .Lsampling_prefer: .asciz "prefer"
+
+.macro SNGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lst_\key]
+ call json_object_object_get@PLT
+.endm
+/* Mutate a detached schema. 0 success, 1 unsupported schema, 2 native failure. */
+.text
+.Lst_node:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13d,edx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ cmp edx,128
+ jae .Lst_native_bad
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ lea r14,[rip+.Lst_unsupported_keys]
+ xor ebp,ebp
+.Lst_check_key:
+ mov rsi,[r14+rbp*8]
+ test rsi,rsi
+ jz .Lst_provider_keys
+ mov rdi,rbx
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_unsupported
+ inc ebp
+ jmp .Lst_check_key
+.Lst_provider_keys:
+ test r12d,r12d
+ jz .Lst_union
+ lea r14,[rip+.Lst_anthropic_keys]
+ xor ebp,ebp
+.Lst_anthropic_key:
+ mov rsi,[r14+rbp*8]
+ test rsi,rsi
+ jz .Lst_anthropic_min
+ mov rdi,rbx
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_unsupported
+ inc ebp
+ jmp .Lst_anthropic_key
+.Lst_anthropic_min:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_minItems]
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_anthropic_format
+ mov rdi,[rsp+80]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lst_min_number
+ mov rdi,[rsp+80]
+ mov esi,2
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+.Lst_min_number:
+ mov rdi,[rsp+80]
+ call json_object_get_double@PLT
+ pxor xmm1,xmm1
+ ucomisd xmm0,xmm1
+ jp .Lst_unsupported
+ je .Lst_anthropic_format
+ ucomisd xmm0,qword ptr [rip+.Lst_one]
+ jne .Lst_unsupported
+.Lst_anthropic_format:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_format]
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_union
+ mov rdi,[rsp+80]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ mov rdi,[rsp+80]
+ call json_object_get_string@PLT
+ mov [rsp+88],rax
+ lea r14,[rip+.Lst_formats]
+ xor ebp,ebp
+.Lst_format_each:
+ mov rsi,[r14+rbp*8]
+ test rsi,rsi
+ jz .Lst_unsupported
+ mov rdi,[rsp+88]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lst_union
+ inc ebp
+ jmp .Lst_format_each
+.Lst_union:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_anyOf]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_items
+ mov rdi,[rsp+24]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ mov rdi,[rsp+24]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lst_unsupported
+ xor r14d,r14d
+.Lst_variant:
+ mov rdi,[rsp+24]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lst_items
+ mov rdi,[rsp+24]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,rax
+ call .Lst_structured
+ test eax,eax
+ jnz .Lst_unsupported
+ mov rdi,rbp
+ mov esi,r12d
+ lea edx,[r13+1]
+ call .Lst_node
+ test eax,eax
+ jnz .Lst_child_bad
+ inc r14
+ jmp .Lst_variant
+.Lst_items:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_items_key]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_object
+ mov rdi,[rsp+24]
+ mov esi,r12d
+ lea edx,[r13+1]
+ call .Lst_node
+ test eax,eax
+ jnz .Lst_child_bad
+.Lst_object:
+ SNGET rbx,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lst_not_object
+ mov rdi,rax
+ lea rsi,[rip+.Lst_object_type]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lst_object_rules
+.Lst_not_object:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_properties]
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_unsupported
+ jmp .Lst_success
+.Lst_object_rules:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_additionalProperties]
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_properties_begin
+ mov rdi,[rsp+80]
+ mov esi,1
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ mov rdi,[rsp+80]
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lst_unsupported
+.Lst_properties_begin:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_properties]
+ lea rdx,[rsp+32]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_properties_absent
+ mov rdi,[rsp+32]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ jmp .Lst_required_begin
+.Lst_properties_absent:
+ mov qword ptr [rsp+32],0
+.Lst_required_begin:
+ call json_object_new_object@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lst_native_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_required]
+ lea rdx,[rsp+40]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_required_absent
+ mov rdi,[rsp+40]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ xor r14d,r14d
+.Lst_required_validate:
+ mov rdi,[rsp+40]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lst_iter_begin
+ mov rdi,[rsp+40]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov [rsp+88],rax
+ cmp qword ptr [rsp+32],0
+ je .Lst_unsupported
+ mov rdi,[rsp+32]
+ mov rsi,rax
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_unsupported
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[rsp+16]
+ mov rsi,[rsp+88]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lst_native_bad
+ inc r14
+ jmp .Lst_required_validate
+.Lst_required_absent:
+ mov qword ptr [rsp+40],0
+.Lst_iter_begin:
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lst_native_bad
+ cmp qword ptr [rsp+32],0
+ je .Lst_publish
+ mov rdi,[rsp+32]
+ call json_object_iter_begin@PLT
+ mov [rsp+48],rax
+ mov rdi,[rsp+32]
+ call json_object_iter_end@PLT
+ mov [rsp+56],rax
+.Lst_property:
+ lea rdi,[rsp+48]
+ lea rsi,[rsp+56]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lst_publish
+ lea rdi,[rsp+48]
+ call json_object_iter_peek_name@PLT
+ mov [rsp+64],rax
+ lea rdi,[rsp+48]
+ call json_object_iter_peek_value@PLT
+ mov r14,rax
+ mov rdi,rax
+ mov esi,r12d
+ lea edx,[r13+1]
+ call .Lst_node
+ test eax,eax
+ jnz .Lst_child_bad
+ mov rdi,[rsp+16]
+ mov rsi,[rsp+64]
+ lea rdx,[rsp+80]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_property_name
+.Lst_optional:
+ mov rdi,r14
+ mov esi,r13d
+ call .Lst_allows_null
+ test eax,eax
+ jnz .Lst_property_name
+ lea rdi,[rip+.Lst_optional_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lst_native_bad
+ SNGET rax,anyOf
+ mov rbp,rax
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,rbp
+ xor esi,esi
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jz .Lst_optional_adopt
+ mov rdi,r14
+ call json_object_put@PLT
+ jmp .Lst_native_bad
+.Lst_optional_adopt:
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+64]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lst_native_bad
+.Lst_property_name:
+ mov rdi,[rsp+64]
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lst_native_bad
+ mov rdi,[rsp]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lst_native_bad
+ lea rdi,[rsp+48]
+ call json_object_iter_next@PLT
+ jmp .Lst_property
+.Lst_publish:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_required]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lst_native_bad
+ xor edi,edi
+ call json_object_new_boolean@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_additionalProperties]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lst_native_bad
+.Lst_success:
+ xor ebp,ebp
+ jmp .Lst_end
+.Lst_child_bad:
+ mov ebp,eax
+ jmp .Lst_end
+.Lst_unsupported:
+ mov ebp,1
+ jmp .Lst_end
+.Lst_native_bad:
+ mov ebp,2
+.Lst_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Structured anyOf branches are outside Pi's strict schema subset. */
+.Lst_structured:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_properties]
+ sub rsp,16
+ lea rdx,[rsp]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_structured_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_items_key]
+ lea rdx,[rsp]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lst_structured_yes
+ SNGET rbx,type
+ mov r12,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lst_structured_array
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call .Lst_structured_name
+ jmp .Lst_structured_end
+.Lst_structured_array:
+ xor r13d,r13d
+.Lst_structured_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lst_structured_no
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call .Lst_structured_name
+ test eax,eax
+ jnz .Lst_structured_yes
+ inc r13
+ jmp .Lst_structured_each
+.Lst_structured_yes:
+ mov eax,1
+ jmp .Lst_structured_end
+.Lst_structured_no:
+ xor eax,eax
+.Lst_structured_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lst_structured_name:
+ test rdi,rdi
+ jz .Lst_name_no
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Lst_object_type]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lst_name_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_array_type]
+ call strcmp@PLT
+ test eax,eax
+ setz al
+ movzx eax,al
+ pop rbx
+ ret
+.Lst_name_yes:
+ mov eax,1
+ pop rbx
+ ret
+.Lst_name_no:
+ xor eax,eax
+ ret
+/* schemaAllowsNull: explicit type, const/enum null or a nullable anyOf. */
+.Lst_allows_null:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r13d,esi
+ cmp esi,128
+ jae .Lst_null_no
+ SNGET rbx,type
+ mov r12,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_null_type
+ xor r13d,r13d
+.Lst_null_types:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lst_null_values
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lst_null_types_next
+ mov rdi,rax
+ lea rsi,[rip+.Lst_null_type_name]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lst_null_yes
+.Lst_null_types_next:
+ inc r13
+ jmp .Lst_null_types
+.Lst_null_type:
+ mov rdi,r12
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lst_null_values
+ mov rdi,rax
+ lea rsi,[rip+.Lst_null_type_name]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lst_null_yes
+.Lst_null_values:
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_const]
+ lea rdx,[rsp]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lst_null_enum
+ cmp qword ptr [rsp],0
+ je .Lst_null_yes
+.Lst_null_enum:
+ SNGET rbx,enum
+ mov r12,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_null_union
+ xor r13d,r13d
+.Lst_null_enum_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lst_null_union
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ test rax,rax
+ jz .Lst_null_yes
+ inc r13
+ jmp .Lst_null_enum_each
+.Lst_null_union:
+ SNGET rbx,anyOf
+ mov r12,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lst_null_no
+ xor r13d,r13d
+.Lst_null_union_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lst_null_no
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov esi,1
+ call .Lst_allows_null
+ test eax,eax
+ jnz .Lst_null_yes
+ inc r13
+ jmp .Lst_null_union_each
+.Lst_null_yes:
+ mov eax,1
+ jmp .Lst_null_end
+.Lst_null_no:
+ xor eax,eax
+.Lst_null_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.section .rodata
+.Lap_strict: .asciz "strict"
+.Lsampling_supportsMode: .asciz "supportsStrictMode"
+.Lsampling_supportsTools: .asciz "supportsStrictTools"
+.Lst_badkey_0: .asciz "$ref"
+.Lst_badkey_1: .asciz "$defs"
+.Lst_badkey_2: .asciz "definitions"
+.Lst_badkey_3: .asciz "allOf"
+.Lst_badkey_4: .asciz "oneOf"
+.Lst_badkey_5: .asciz "patternProperties"
+.Lst_badkey_6: .asciz "dependentSchemas"
+.Lst_badkey_7: .asciz "dependencies"
+.Lst_badkey_8: .asciz "unevaluatedProperties"
+.Lst_badkey_9: .asciz "propertyNames"
+.Lst_badkey_10: .asciz "contains"
+.Lst_badkey_11: .asciz "prefixItems"
+.Lst_badkey_12: .asciz "not"
+.Lst_badkey_13: .asciz "if"
+.Lst_badkey_14: .asciz "then"
+.Lst_badkey_15: .asciz "else"
+.Lst_anthrokey_0: .asciz "minimum"
+.Lst_anthrokey_1: .asciz "maximum"
+.Lst_anthrokey_2: .asciz "exclusiveMinimum"
+.Lst_anthrokey_3: .asciz "exclusiveMaximum"
+.Lst_anthrokey_4: .asciz "multipleOf"
+.Lst_anthrokey_5: .asciz "maxItems"
+.Lst_anthrokey_6: .asciz "uniqueItems"
+.Lst_anthrokey_7: .asciz "minContains"
+.Lst_anthrokey_8: .asciz "maxContains"
+.Lst_anthrokey_9: .asciz "minProperties"
+.Lst_anthrokey_10: .asciz "maxProperties"
+.Lst_format_0: .asciz "date-time"
+.Lst_format_1: .asciz "time"
+.Lst_format_2: .asciz "date"
+.Lst_format_3: .asciz "duration"
+.Lst_format_4: .asciz "email"
+.Lst_format_5: .asciz "hostname"
+.Lst_format_6: .asciz "uri"
+.Lst_format_7: .asciz "ipv4"
+.Lst_format_8: .asciz "ipv6"
+.Lst_format_9: .asciz "uuid"
+.Lst_type: .asciz "type"
+.Lst_anyOf: .asciz "anyOf"
+.Lst_items_key: .asciz "items"
+.Lst_properties: .asciz "properties"
+.Lst_required: .asciz "required"
+.Lst_additionalProperties: .asciz "additionalProperties"
+.Lst_object_type: .asciz "object"
+.Lst_array_type: .asciz "array"
+.Lst_const: .asciz "const"
+.Lst_enum: .asciz "enum"
+.Lst_null_type_name: .asciz "null"
+.Lst_minItems: .asciz "minItems"
+.Lst_format: .asciz "format"
+.Lst_optional_json: .asciz "{\"anyOf\":[null,{\"type\":\"null\"}]}"
+.section .data.rel.ro
+.Lst_unsupported_keys: .quad .Lst_badkey_0,.Lst_badkey_1,.Lst_badkey_2,.Lst_badkey_3,.Lst_badkey_4,.Lst_badkey_5,.Lst_badkey_6,.Lst_badkey_7,.Lst_badkey_8,.Lst_badkey_9,.Lst_badkey_10,.Lst_badkey_11,.Lst_badkey_12,.Lst_badkey_13,.Lst_badkey_14,.Lst_badkey_15,0
+.Lst_anthropic_keys: .quad .Lst_anthrokey_0,.Lst_anthrokey_1,.Lst_anthrokey_2,.Lst_anthrokey_3,.Lst_anthrokey_4,.Lst_anthrokey_5,.Lst_anthrokey_6,.Lst_anthrokey_7,.Lst_anthrokey_8,.Lst_anthrokey_9,.Lst_anthrokey_10,0
+.Lst_formats: .quad .Lst_format_0,.Lst_format_1,.Lst_format_2,.Lst_format_3,.Lst_format_4,.Lst_format_5,.Lst_format_6,.Lst_format_7,.Lst_format_8,.Lst_format_9,0
+
+.section .rodata
+.balign 8
+.Lst_one: .double 1.0
