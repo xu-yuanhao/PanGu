@@ -62,6 +62,7 @@ pg_mimo_bind_tools:
  push r12
  sub rsp,8
  mov rbx,rdi
+ call pg_mimo_anthropic_clear
  xor r12d,r12d
 .Lclear_arg_loop:
  mov rdi,[rbx+PG_MM_ARGUMENT_OVERFLOW+r12*8]
@@ -312,13 +313,22 @@ li_start:
  test eax, eax
  jnz .Lst_bad
  /* auth = "Authorization: Bearer " + key + NUL（总长 < 512） */
- lea rdi, [rsp]
- lea rsi, [rip + .Lstr_auth_prefix]
- mov edx, PG_MM_AUTH_PREFIX_LEN
+ lea r14,[rip+.Lstr_auth_prefix]
+ mov r15d,PG_MM_AUTH_PREFIX_LEN
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lauth_prefix_ready
+ lea r14,[rip+.Lanthropic_key]
+ mov r15d,11
+.Lauth_prefix_ready:
+ lea rdi,[rsp]
+ mov rsi,r14
+ mov rdx,r15
  call memcpy@PLT
  mov rdi, r13
  call strlen@PLT
- lea rdi, [rsp + PG_MM_AUTH_PREFIX_LEN]
+ lea rdi, [rsp + r15]
  mov rsi, r13
  lea rdx, [rax + 1]
  call memcpy@PLT
@@ -336,6 +346,18 @@ li_start:
  jz .Lst_bad
  mov r13, rax
  mov qword ptr [rbx + PG_MM_HEADERS], r13
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lauth_headers_ready
+ mov rdi,r13
+ lea rsi,[rip+.Lanthropic_version]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lst_bad
+ mov r13,rax
+ mov [rbx+PG_MM_HEADERS],rax
+.Lauth_headers_ready:
  call curl_easy_init@PLT
  mov r14, rax
  mov qword ptr [rbx + PG_MM_EASY], r14
@@ -651,7 +673,12 @@ li_next:
  mov rdi,rbx
  call pg_mimo_uses_responses@PLT
  test eax,eax
+ jnz .Lready_prepared_arguments
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
  jz .Lready_chat_arguments
+.Lready_prepared_arguments:
  mov rdi,rbx
  mov esi,r13d
  call pg_mimo_prepare_arguments@PLT
@@ -1109,3 +1136,7 @@ pg_mimo_complete:
 .Lmu_thinking: .asciz "thinking"
 .Lmu_content: .asciz "content"
 .Lmu_thinking_json: .asciz "{\"type\":\"thinking\",\"thinkingSignature\":\"reasoning_content\"}"
+
+.section .rodata
+.Lanthropic_key: .asciz "x-api-key: "
+.Lanthropic_version: .asciz "anthropic-version: 2023-06-01"

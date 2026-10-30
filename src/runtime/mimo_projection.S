@@ -815,7 +815,18 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
  and qword ptr [rsp + 104],-33
-.Lserialize:
+ .Lserialize:
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lserialize_openai
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lap_request
+ test eax,eax
+ jnz .Linvalid
+ jmp .Lserialize_ready
+.Lserialize_openai:
  mov rdi,rbx
  call pg_mimo_uses_responses
  test eax,eax
@@ -1467,62 +1478,7 @@ pg_mimo_uses_responses:
  mov rdi,[rdi+PG_MM_CONFIGURATION]
  jmp pg_mimo_config_responses
 .size pg_mimo_uses_responses,.-pg_mimo_uses_responses
-.globl pg_mimo_config_responses
-.type pg_mimo_config_responses,@function
-pg_mimo_config_responses:
- push rbx
- mov rbx,rdi
- mov rdi,rbx
- lea rsi,[rip+.Lrp_api]
- call json_object_object_get@PLT
- test rax,rax
- jnz .Lrp_api_value
- mov rdi,rbx
- lea rsi,[rip+.Lrp_info]
- call json_object_object_get@PLT
- mov rdi,rax
- lea rsi,[rip+.Lrp_api]
- call json_object_object_get@PLT
- test rax,rax
- jnz .Lrp_api_value
- mov rdi,rbx
- lea rsi,[rip+.Lrp_endpoint]
- call json_object_object_get@PLT
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jnz .Lrp_endpoint_value
- lea rdi,[rip+.Lrp_env]
- call getenv@PLT
- test rax,rax
- jz .Lrp_no
-.Lrp_endpoint_value:
- mov rdi,rax
- lea rsi,[rip+.Lrp_suffix]
- call strstr@PLT
- test rax,rax
- setne al
- movzx eax,al
- pop rbx
- ret
-.Lrp_api_value:
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrp_no
- mov rdi,rax
- lea rsi,[rip+.Lrp_responses]
- call strcmp@PLT
- test eax,eax
- sete al
- movzx eax,al
- pop rbx
- ret
-.Lrp_no:
- xor eax,eax
- pop rbx
- ret
-.size pg_mimo_config_responses,.-pg_mimo_config_responses
+
 
 /* Copy a field to another key, retaining its JSON owner. Missing is optional. */
 .Lrp_copy:
@@ -1976,271 +1932,14 @@ pg_mimo_config_responses:
  ret
 
 .text
-.macro RHGET obj,key
- mov rdi,\obj
- lea rsi,[rip+.Lrh_\key]
- call json_object_object_get@PLT
-.endm
-.macro RHCOPY dst,src,from,to
- mov rdi,\dst
- mov rsi,\src
- lea rdx,[rip+.Lrh_\from]
- lea rcx,[rip+.Lrh_\to]
- call .Lrp_copy
- test eax,eax
- jnz .Lrh_bad
-.endm
-/* Canonical content keeps signatures beside their blocks. Reconstruct the
-   provider items only for the current request, respecting model identity. */
-.globl pg_mimo_responses_history
-.type pg_mimo_responses_history,@function
-pg_mimo_responses_history:
- push rbp
- push rbx
- push r12
- push r13
- push r14
- sub rsp,64
- mov rbx,rdi
- mov r12,rsi
- mov rdi,rsp
- xor eax,eax
- mov ecx,8
- rep stosq
- mov [rsp+8],rdx
- mov qword ptr [rdx],0
- RHGET rbx,content
- mov r13,rax
- mov rdi,rax
- mov esi,5
- call json_object_is_type@PLT
- test eax,eax
- jz .Lrh_bad
- RHGET rbx,model
- mov [rsp+24],rax
- RHGET r12,model
- mov rdi,rax
- mov rsi,[rsp+24]
- call json_object_equal@PLT
- test eax,eax
- jz .Lrh_identity_ready
- RHGET rbx,provider
- mov [rsp+24],rax
- test rax,rax
- jz .Lrh_identity_ready
- RHGET r12,modelProvider
- test rax,rax
- jnz .Lrh_provider_ready
- RHGET r12,modelInfo
- RHGET rax,provider
- test rax,rax
- jz .Lrh_identity_ready
-.Lrh_provider_ready:
- mov rdi,rax
- mov rsi,[rsp+24]
- call json_object_equal@PLT
- test eax,eax
- jz .Lrh_identity_ready
- RHGET rbx,api
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_identity_ready
- mov rdi,rax
- lea rsi,[rip+.Lrp_responses]
- call strcmp@PLT
- test eax,eax
- sete al
- movzx eax,al
- mov [rsp+16],eax
-.Lrh_identity_ready:
- call json_object_new_array@PLT
- mov [rsp],rax
- test rax,rax
- jz .Lrh_bad
- xor r14d,r14d
-.Lrh_each:
- mov rdi,r13
- call json_object_array_length@PLT
- cmp r14,rax
- jae .Lrh_publish
- mov rdi,r13
- mov rsi,r14
- call json_object_array_get_idx@PLT
- mov rbp,rax
- RHGET rbp,type
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_bad
- mov [rsp+24],rax
- mov rdi,rax
- lea rsi,[rip+.Lrh_thinking]
- call strcmp@PLT
- test eax,eax
- jz .Lrh_think
- mov rdi,[rsp+24]
- lea rsi,[rip+.Lrh_toolCall]
- call strcmp@PLT
- test eax,eax
- jz .Lrh_tool
- mov rdi,[rsp+24]
- lea rsi,[rip+.Lrh_text]
- call strcmp@PLT
- test eax,eax
- jnz .Lrh_bad
- lea rdi,[rip+.Lrh_text_json]
- mov rsi,[rsp]
- call .Lrp_append
- mov [rsp+32],rax
- test rax,rax
- jz .Lrh_bad
- RHGET rax,content
- mov rdi,rax
- xor esi,esi
- call json_object_array_get_idx@PLT
- mov [rsp+40],rax
- RHCOPY "qword ptr [rsp+40]",rbp,text,text
- cmp dword ptr [rsp+16],0
- je .Lrh_next
- RHGET rbp,textSignature
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_next
- cmp byte ptr [rax],'{'
- jne .Lrh_next
- mov rdi,rax
- call json_tokener_parse@PLT
- mov [rsp+48],rax
- test rax,rax
- jz .Lrh_bad
- RHCOPY "qword ptr [rsp+32]","qword ptr [rsp+48]",id,id
- RHCOPY "qword ptr [rsp+32]","qword ptr [rsp+48]",phase,phase
- jmp .Lrh_next
-.Lrh_think:
- cmp dword ptr [rsp+16],0
- je .Lrh_next
- RHGET rbp,thinkingSignature
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_next
- cmp byte ptr [rax],'{'
- jne .Lrh_next
- mov rdi,rax
- call json_tokener_parse@PLT
- mov [rsp+48],rax
- test rax,rax
- jz .Lrh_bad
- RHGET rax,type
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_bad
- mov rdi,rax
- lea rsi,[rip+.Lrh_reasoning]
- call strcmp@PLT
- test eax,eax
- jnz .Lrh_bad
- mov rdi,[rsp]
- mov rsi,[rsp+48]
- call json_object_array_add@PLT
- test eax,eax
- jnz .Lrh_bad
- mov qword ptr [rsp+48],0
- jmp .Lrh_next
-.Lrh_tool:
- lea rdi,[rip+.Lrp_call_json]
- mov rsi,[rsp]
- call .Lrp_append
- mov [rsp+32],rax
- test rax,rax
- jz .Lrh_bad
- RHCOPY "qword ptr [rsp+32]",rbp,id,call_id
- RHCOPY "qword ptr [rsp+32]",rbp,name,name
- RHGET rbp,arguments
- mov rdi,rax
- xor esi,esi
- call json_object_to_json_string_ext@PLT
- test rax,rax
- jz .Lrh_bad
- mov rdi,[rsp+32]
- lea rsi,[rip+.Lrh_arguments]
- mov rdx,rax
- call li_field
- test eax,eax
- jnz .Lrh_bad
- cmp dword ptr [rsp+16],0
- je .Lrh_next
- RHGET rbp,responseItemId
- mov rdi,rax
- call json_object_get_string@PLT
- test rax,rax
- jz .Lrh_namespace_handler
- mov rdi,rax
- lea rsi,[rip+.Lrh_fc]
- mov edx,3
- call strncmp@PLT
- test eax,eax
- jnz .Lrh_namespace_handler
- RHCOPY "qword ptr [rsp+32]",rbp,responseItemId,id
-.Lrh_namespace_handler:
- RHCOPY "qword ptr [rsp+32]",rbp,namespace,namespace
-.Lrh_next:
- mov rdi,[rsp+48]
- call json_object_put@PLT
- mov qword ptr [rsp+48],0
- inc r14
- jmp .Lrh_each
-.Lrh_publish:
- mov rax,[rsp]
- mov rdx,[rsp+8]
- mov [rdx],rax
- mov qword ptr [rsp],0
- xor ebp,ebp
- jmp .Lrh_cleanup
-.Lrh_bad:
- mov ebp,1
-.Lrh_cleanup:
- mov rdi,[rsp]
- call json_object_put@PLT
- mov rdi,[rsp+48]
- call json_object_put@PLT
- mov eax,ebp
- add rsp,64
- pop r14
- pop r13
- pop r12
- pop rbx
- pop rbp
- ret
-.size pg_mimo_responses_history,.-pg_mimo_responses_history
-.section .rodata
-.Lrh_content: .asciz "content"
-.Lrh_model: .asciz "model"
-.Lrh_provider: .asciz "provider"
-.Lrh_modelProvider: .asciz "modelProvider"
-.Lrh_api: .asciz "api"
-.Lrh_type: .asciz "type"
-.Lrh_text: .asciz "text"
-.Lrh_thinking: .asciz "thinking"
-.Lrh_reasoning: .asciz "reasoning"
-.Lrh_toolCall: .asciz "toolCall"
-.Lrh_textSignature: .asciz "textSignature"
-.Lrh_thinkingSignature: .asciz "thinkingSignature"
-.Lrh_id: .asciz "id"
-.Lrh_phase: .asciz "phase"
-.Lrh_call_id: .asciz "call_id"
-.Lrh_name: .asciz "name"
-.Lrh_arguments: .asciz "arguments"
-.Lrh_responseItemId: .asciz "responseItemId"
-.Lrh_namespace: .asciz "namespace"
-.Lrh_fc: .asciz "fc_"
-.Lrh_text_json: .asciz "{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"annotations\":[]}]}"
 
 .section .rodata
 .Lrp_responsesOutput: .asciz "responsesOutput"
 
-.section .rodata
-.Lrh_modelInfo: .asciz "modelInfo"
+.text
+.globl pg_mimo_uses_anthropic
+.type pg_mimo_uses_anthropic,@function
+pg_mimo_uses_anthropic:
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ jmp pg_mimo_config_anthropic
+.size pg_mimo_uses_anthropic,.-pg_mimo_uses_anthropic

@@ -5,6 +5,8 @@
 #include <curl/curl.h>
 struct json_object;
 typedef struct { char arguments[PG_TEXT_LIMIT],id[PG_ID_LIMIT],name[PG_ID_LIMIT]; } pg_mimo_call_storage;
+struct printbuf;
+typedef struct {uint64_t index;unsigned kind,closed;struct printbuf *text,*signature;struct json_object *item;} pg_mimo_anthropic_block;
 typedef struct {
  CURL *easy; CURLM *multi; struct curl_slist *headers;
  char body[131072], text[PG_TEXT_LIMIT], arguments[PG_TEXT_LIMIT], id[PG_ID_LIMIT], name[PG_ID_LIMIT];
@@ -25,6 +27,8 @@ typedef struct {
  struct json_object *response_terminal; /* owned terminal envelope */
  unsigned response_closed; /* completed function-call slots */
  struct json_object *prepared_arguments[PG_TOOL_BATCH_LIMIT];
+ pg_mimo_anthropic_block *anthropic_blocks;size_t anthropic_count,anthropic_capacity;
+ struct json_object *anthropic_usage;
 } pg_mimo;
 /* OpenAI Chat Completions / Responses SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -50,6 +54,9 @@ void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 int pg_mimo_encode_request(pg_mimo *, const pg_session *);
 int pg_mimo_uses_responses(const pg_mimo *);
 int pg_mimo_config_responses(const struct json_object *);
+int pg_mimo_config_anthropic(const struct json_object *);
+int pg_mimo_uses_anthropic(const pg_mimo *);
+void pg_mimo_anthropic_clear(pg_mimo *);
 /* Internal final-item/canonical replay adapters; history returns an owned array.
    Native call_id and provider responseItemId remain separate identities. */
 int pg_mimo_responses_complete(const pg_mimo *,struct json_object *);

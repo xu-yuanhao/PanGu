@@ -112,7 +112,11 @@
 #define PG_MM_RESPONSE_TERMINAL 173824
 #define PG_MM_RESPONSE_CLOSED 173832
 #define PG_MM_PREPARED_ARGUMENTS 173840
-#define PG_MM_BYTES 173904
+#define PG_MM_ANTHROPIC_BLOCKS 173904
+#define PG_MM_ANTHROPIC_COUNT 173912
+#define PG_MM_ANTHROPIC_CAPACITY 173920
+#define PG_MM_ANTHROPIC_USAGE 173928
+#define PG_MM_BYTES 173936
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -236,6 +240,11 @@ PG_MM_ASSERT_OFF(pg_mimo, response_identity, PG_MM_RESPONSE_ID);
 PG_MM_ASSERT_OFF(pg_mimo, response_terminal, PG_MM_RESPONSE_TERMINAL);
 PG_MM_ASSERT_OFF(pg_mimo, response_closed, PG_MM_RESPONSE_CLOSED);
 PG_MM_ASSERT_OFF(pg_mimo, prepared_arguments, PG_MM_PREPARED_ARGUMENTS);
+PG_MM_ASSERT_OFF(pg_mimo, anthropic_blocks, PG_MM_ANTHROPIC_BLOCKS);
+PG_MM_ASSERT_OFF(pg_mimo, anthropic_count, PG_MM_ANTHROPIC_COUNT);
+PG_MM_ASSERT_OFF(pg_mimo, anthropic_capacity, PG_MM_ANTHROPIC_CAPACITY);
+PG_MM_ASSERT_OFF(pg_mimo, anthropic_usage, PG_MM_ANTHROPIC_USAGE);
+_Static_assert(sizeof(pg_mimo_anthropic_block)==40&&offsetof(pg_mimo_anthropic_block,text)==16&&offsetof(pg_mimo_anthropic_block,item)==32,"Anthropic block ABI");
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
 _Static_assert(CURLE_COULDNT_RESOLVE_PROXY==5 && CURLE_COULDNT_RESOLVE_HOST==6 && CURLE_COULDNT_CONNECT==7 && CURLE_HTTP2==16 && CURLE_PARTIAL_FILE==18 && CURLE_OPERATION_TIMEDOUT==28 && CURLE_GOT_NOTHING==52 && CURLE_SEND_ERROR==55 && CURLE_RECV_ERROR==56 && CURLE_HTTP2_STREAM==92,"native retry CURL mapping");
 PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);
