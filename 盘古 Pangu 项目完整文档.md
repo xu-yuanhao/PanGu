@@ -16,7 +16,7 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 模型连接通过`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`及显式`PANGU_MODEL_ENDPOINT`配置；`PANGU_MODEL_API`选择参考协议，Google/Vertex可由提供者组合默认端点，`PANGU_MODEL_BASE_URL`设置其代理基础地址。`PANGU_MODEL_OPTIONS`传入JSON对象；Vertex的`authMode`为`api-key`或`bearer`，Bearer模式使用已注入访问令牌，并从options或Google环境变量解析project/location。
 
-Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`及可选`AWS_SESSION_TOKEN`；`PANGU_MODEL_API_KEY`显式Bearer优先。区域通过options.region或AWS区域环境配置，签名由libcurl完成，凭据不写入会话。
+Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`及可选`AWS_SESSION_TOKEN`；`PANGU_MODEL_API_KEY`显式Bearer优先。共享凭据从`AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE`或`~/.aws/config`、`~/.aws/credentials`读取，`options.profile`显式选择profile，环境密钥优先于环境`AWS_PROFILE`的静态密钥。区域通过options.region、AWS区域环境或profile配置，签名由libcurl完成，凭据不写入会话。
 
 图片处理由可替换的`image.processor`服务提供：汇编负责处理策略，系统libvips通过C桥接完成编解码。构建用`pkg-config vips`取得该动态依赖。
 

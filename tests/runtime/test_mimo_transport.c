@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* 可控 curl 替身：perform/getinfo/info_read/add_handle/init 按脚本演出，
  * setopt 记录并转发真实 libcurl（校验变参 ABI 被真实现接受），
@@ -629,6 +630,31 @@ static void test_bedrock_auth(void){
  const char *bad[]={"", "bad\r\nsecret"};for(unsigned n=0;n<2;n++){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"test\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("AWS_SECRET_ACCESS_KEY",bad[n],1);assert(start());model.close(model.context);assert(!m.easy&&!m.headers&&!m.configuration);}
  unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");puts("PASS: Bedrock native SigV4 options, temporary token, Bearer precedence, reserved headers and invalid credentials");
 }
+static void test_bedrock_profiles(void){
+ char directory[]="/tmp/pangu-aws-profile-XXXXXX",config[256],credentials[256];assert(mkdtemp(directory));
+ snprintf(config,sizeof(config),"%s/config",directory);snprintf(credentials,sizeof(credentials),"%s/credentials",directory);
+ FILE *file=fopen(config,"w");assert(file);fputs("[default]\nregion=us-east-2\n[profile PanGu]\nregion=eu-west-1\naws_access_key_id=CONFIG_ACCESS\naws_secret_access_key=config-secret\n[profile Role]\nregion=eu-central-1\nrole_arn=arn:aws:iam::123:role/test\n",file);assert(!fclose(file));
+ file=fopen(credentials,"w");assert(file);fputs("[default]\naws_access_key_id=DEFAULT_ACCESS\naws_secret_access_key=default-secret\n[PanGu]\naws_access_key_id=PROFILE_ACCESS\naws_secret_access_key=profile-secret\naws_session_token=profile-token\n",file);assert(!fclose(file));
+ setenv("AWS_CONFIG_FILE",config,1);setenv("AWS_SHARED_CREDENTIALS_FILE",credentials,1);
+ unsetenv("PANGU_MODEL_API_KEY");unsetenv("AWS_BEARER_TOKEN_BEDROCK");unsetenv("AWS_REGION");unsetenv("AWS_DEFAULT_REGION");
+ for(unsigned scenario=0;scenario<8;scenario++){
+  unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");
+  if(scenario==1||scenario==2||scenario==3){setenv("AWS_PROFILE","PanGu",1);if(scenario!=3){setenv("AWS_ACCESS_KEY_ID","ENV_ACCESS",1);setenv("AWS_SECRET_ACCESS_KEY","env-secret",1);}}
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{}}");
+  if(scenario==1||scenario>=4)json_object_object_add(json_object_object_get(cfg,"options"),"profile",json_object_new_string(scenario==5?"pangu":scenario==6?"Role":scenario==7?"Missing":"PanGu"));
+  assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);
+  if(scenario>=5){assert(start());}else{
+   assert(!start());const char *expected=scenario==0?"DEFAULT_ACCESS:default-secret":scenario==2?"ENV_ACCESS:env-secret":"PROFILE_ACCESS:profile-secret";
+   assert(!strcmp(captured_userpwd,expected));assert(!strcmp(captured_sigv4,scenario==0?"aws:amz:us-east-2:bedrock":"aws:amz:eu-west-1:bedrock"));
+   assert(strstr(captured_url,scenario==0?"bedrock-runtime.us-east-2.amazonaws.com":"bedrock-runtime.eu-west-1.amazonaws.com"));
+   unsigned tokens=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)tokens+=!strcmp(h->data,"X-Amz-Security-Token: profile-token");assert(tokens==(scenario!=0&&scenario!=2));
+   const char *public_config=json_object_to_json_string(m.configuration);assert(!strstr(public_config,"PROFILE_ACCESS")&&!strstr(public_config,"profile-secret")&&!strstr(public_config,"profile-token")&&!strstr(public_config,"env-secret"));
+  }
+  model.close(model.context);assert(!m.easy&&!m.headers&&!m.configuration);
+ }
+ unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");unsetenv("AWS_CONFIG_FILE");unsetenv("AWS_SHARED_CREDENTIALS_FILE");assert(!unlink(config)&&!unlink(credentials)&&!rmdir(directory));
+ puts("PASS: shared AWS profiles, case-sensitive selection, config/credentials precedence, ambient keys, profile regions and missing/role refusal");
+}
 static int bedrock_sigv4_wire(void){
  const char *endpoint=getenv("PANGU_TEST_SIGV4_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"X-Project\":\"pangu-wire\"}}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));unsigned timeout=getenv("PANGU_TEST_DEADLINE")!=0;if(timeout)json_object_object_add(json_object_object_get(cfg,"options"),"timeoutMs",json_object_new_int(50));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start());CURLcode result=curl_easy_perform(m.easy);if(timeout){assert(result==CURLE_OPERATION_TIMEDOUT);model.cancel(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);puts("PASS: actual TLS request deadline expires and cancellation releases transport");return 0;}assert(!result&&!strcmp(m.response_request_id,"wire-public-request-id"));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);puts("PASS: native Bedrock request signed by actual libcurl and verified by independent TLS receiver");return 0;
 }
@@ -768,6 +794,7 @@ int main(int argc,char **argv) {
     test_azure_configuration();
     test_bedrock_transport();
     test_bedrock_auth();
+    test_bedrock_profiles();
     test_bedrock_multimodal();
     test_bedrock_policies();
     test_bedrock_history_ids();

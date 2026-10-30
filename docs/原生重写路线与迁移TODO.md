@@ -125,6 +125,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Azure Responses基础链复用现有Responses编码/流：资源名/baseUrl与API版本组合端点，Azure域名路径规范化、代理查询保留、API版本替换；部署名映射按最后值优先并允许显式覆盖，最终部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
 - [x] Bedrock Converse文本/工具基础链接入同一模型服务：区域/代理端点、Bearer/环境SigV4与临时令牌、system/messages/inference/toolSpec投影、旧调用/结果重放；AWS二进制事件帧校验后复用内容块状态机，处理文本、调用、推理/签名与redacted字节、补齐关闭、停止和基础用量，预算/adaptive/effort配置按模型族转换；用户/工具图片、Claude错误图片路由和同模型签名重放接通SQLite/JSONL重开。模型专项、分配失败及产品配置链通过；完整认证、图片/推理和高级行为按下项继续覆盖。
 - [x] Bedrock工具选择/缓存/用量接通：none跳过声明与严格准入，auto/any/指定工具、完整schema、模型族缓存点/retention及请求标签沿同一请求链；metadata保留原始总量与1h写入计数，缺省/部分/末尾用量按上游结算。固定Pi策略对照与传输专项通过。
+- [x] Bedrock静态共享profile接入实际签名：默认/显式/环境profile、config与credentials、环境密钥优先级、profile区域及临时令牌；实际curl回放与ASan/UBSan通过。
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -322,10 +323,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock响应头request-id回退与`appendBedrockFailureDiagnostic/normalizeDiagnosticValue`，以及Durable失败assistant提交路径。
-- 实际调用链：`mimo.S`通过实际curl header回调采集公开请求ID，忽略其他响应头，trim后最多200字节，超限丢弃；每个HTTP响应/start/close重置。Generation在失败时也调用既有complete回调，提供者保留原始errorMessage/stopReason并补充requestId/timestamp诊断，再与HTTP/传输事实同事务提交。服务ABI保持；内部模型布局追加定长身份缓冲并同步静态断言，complete契约明确覆盖请求启动失败。
-- 验证：模型O0/O2/UBSan、ABI与七个诊断构造失败点清理通过；头名称大小写/空白/超限/新响应/关闭检查，真实本地TLS头采集及SigV4/超时检查通过。SQLite/JSONL失败assistant核对请求ID、HTTP/传输事实，退避重开与取消保持；Client和产品资源ASan/UBSan、产品构建与Assembly/diff通过。自审核对响应头借用期、内部布局、回调清理与提交顺序。
-- 具体缺口：错误类别/状态诊断整合与非ASCII请求ID长度的完整参考规则；Bedrock profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
-- 下一交付物：成组补齐提供者凭据配置和完整错误/响应元数据，继续Generation实际消费者与协议覆盖。
-
-当前开发快照：`mimo.S` 已接入 GLib GKeyFile 读取 AWS 共享 config/credentials，汇编处理 profile 选择、环境凭据优先级和 SigV4 接线；构建入口同步链接 glib-2.0。现有模型 O0/O2/UBSan 与协议差异专项通过；profile 专属优先级、文件错误和清理用例仍待补齐，本批凭据链保持进行中。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/bedrock-converse-stream.ts` 凭据优先级、区域和端点选择，以及 `test/bedrock-credentials.test.ts`。已核对Pi/Harness远端HEAD有更新，本批沿固定快照完成。
+- 实际调用链：产品启动允许Bedrock由模型提供者解析凭据；`mimo.S`复用GLib GKeyFile读取共享config/credentials，手写汇编选择默认/指定profile、合并静态密钥、环境优先级、区域及临时令牌，再进入既有libcurl SigV4请求。凭据独立持有，覆盖和最终释放前清零；公开配置保持无凭据值。主文档与实际构建依赖一致。
+- 验证：模型O0/O2/UBSan及现有Pi协议差分通过；新增共享profile整组传输回放覆盖大小写、显式profile覆盖环境密钥、环境profile与环境密钥组合、文件优先级、区域/签名、临时令牌、缺失profile和角色配置拒绝，ASan/UBSan通过；产品资源/Generation配置链ASan/UBSan与产品构建通过；产品PTY默认`.pangu`创建/重开、空闲、损坏/截断与终端恢复通过。Assembly/diff核对通过。自审核对新增字符串清理路径、启动预检及公开配置隔离。
+- 具体缺口：Bedrock完整凭据链的scoped env、角色/进程/SSO及工作负载凭据，分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
+- 下一交付物：沿固定Pi的提供者配置和认证调用者成组补齐K05，接入Generation实际消费者并保持现有协议与持久恢复行为。

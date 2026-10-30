@@ -4237,6 +4237,21 @@ pg_mimo_complete:
 .Lhd_names: .quad .Lhd_amzn,.Lhd_openai,.Lhd_anthropic,0
 
 .text
+.Lapf_string_free:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lapf_string_done
+ call strlen@PLT
+ mov rdi,rbx
+ mov rdx,rax
+ xor esi,esi
+ call memset@PLT
+ mov rdi,rbx
+ call g_free@PLT
+.Lapf_string_done:
+ pop rbx
+ ret
 /* Private owned strings: access, secret, token, region; never part of request JSON. */
 .Lapf_free:
  push rbx
@@ -4250,13 +4265,7 @@ pg_mimo_complete:
  mov rdi,[rbx+r12*8]
  test rdi,rdi
  jz .Lapf_free_next
- call strlen@PLT
- mov rdi,[rbx+r12*8]
- mov rdx,rax
- xor esi,esi
- call memset@PLT
- mov rdi,[rbx+r12*8]
- call g_free@PLT
+ call .Lapf_string_free
 .Lapf_free_next:
  inc r12
  cmp r12,4
@@ -4418,7 +4427,7 @@ pg_mimo_complete:
  mov r14,rax
  mov rax,[rsp]
  mov rdi,[rax+r13*8]
- call g_free@PLT
+ call .Lapf_string_free
  mov rax,[rsp]
  mov [rax+r13*8],r14
 .Lapf_value_next:
@@ -4479,7 +4488,7 @@ pg_mimo_complete:
 .Lapf_env_replace:
  mov rax,[rsp]
  mov rdi,[rax+r13*8]
- call g_free@PLT
+ call .Lapf_string_free
  mov rax,[rsp]
  mov [rax+r13*8],rbp
  inc r13
