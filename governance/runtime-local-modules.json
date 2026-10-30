@@ -818,7 +818,7 @@
         "json-c",
         "system libc"
       ],
-      "role": "handwritten cooperative bash adapter; borrowed ExecutionEnv service, validated prepared command/cwd/environment and timeout, separate stream decoding, 3072-byte/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
+      "role": "handwritten cooperative bash adapter; borrowed ExecutionEnv service, validated prepared command/cwd/environment and timeout, separate stream decoding, 50-KiB/2000-line UTF-8 tail and private raw spill with 16 MiB capture ceiling; unsafe replay",
       "exports": [
         "pg_bash_tool_init",
         "pg_bash_tool_definition",
@@ -832,7 +832,7 @@
             "packages/durable/src/tools/bash.ts",
             "packages/durable/src/env/node.ts"
           ],
-          "semantics": "validateTimeout/runCommand; streamed output with retained tail, raw spill, nonzero/timeout/cancel errors; native bounded transcript and capture quota differ, explicit minimal environment instead of inherited credentials",
+          "semantics": "validateTimeout/runCommand; streamed output with retained tail, raw spill, nonzero/timeout/cancel errors; native callback previews are bounded, durable snapshots retain 50 KiB; capture quota differs, explicit minimal environment instead of inherited credentials",
           "tests_to_read": [
             "packages/durable/test/tools.test.ts",
             "packages/durable/test/env-node.test.ts",

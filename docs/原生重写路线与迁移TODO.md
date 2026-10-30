@@ -151,6 +151,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] read按模型inputLimits与视觉能力运行，支持注入image.processor；prepared结果保留转换、缩放和坐标映射说明，配置失败不替换现有选项。
 - [x] 原生图片处理器接入应用：真实解码、八种EXIF转正、Lanczos缩放、PNG/JPEG候选与质量梯度、字节预算降采样、BMP转换及损坏图片拒绝；实际read持久结果覆盖缩放/坐标说明。
 - [x] 完成 edit 的 diff/patch/首行结果与工具结构化结果。真实参数随tool_started事件送至TUI；结果Entry原子保存参数、明确状态、details和diagnostics；edit提供diff/patch/firstChangedLine；TUI桥接提供独立的持久工具结果查询；bash结构化结果与诊断已投影。
+- [x] Bash采用50 KiB/2000行UTF-8尾部预算，完整保留结果通过snapshot进入Tool Entry、重开和动态模型请求；超过预算保留完整原始输出文件。60 KB字节回读、预算内10 KB无溢出、Unicode、取消/超时及真实DeepSeek调用→长输出→回答通过。
 - [x] 将工作区、文件和进程能力组合为注入的 ExecutionEnv 宿主服务。BashPrepare式回调可在启动前调整命令、工作目录和显式环境；拒绝调用时不创建输出文件也不启动进程。
 - [ ] 验收：固定工具语料与上游实际函数比较，核对文件字节、目录、命令退出及清理；真实模型完成 read→edit→write→bash→回读。
 
@@ -308,8 +309,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的thinkingLevelMap、off字符串及off:null分支；现有models目录覆盖链。
-- 实际调用链：公开model metadata保留reasoning/thinkingLevelMap，按modelOverrides→custom→builtin选取，输出独立副本。OpenAI编码在格式分支前应用级别字符串映射，关闭映射可生成effort；DeepSeek/OpenRouter的off:null省略专用关闭字段。Zai/Qwen开关继续取原请求的启用状态。
-- 验证：模型O0/O2/UBSan编码/传输/ABI/分配专项通过；实际请求核对high/off映射和两种格式off:null省略，产品Host ASan/UBSan验证custom公开元数据与私有字段隔离。产品构建与Assembly检查通过。本轮无模型请求。
-- 接口与差异：无新增文件/公开ABI；本批补齐现有模型兼容参数组的数据传递，其他协议/格式仍由K05覆盖。目录公开值与原始模型配置独立持有。
-- 下一交付物：将后续工作集中到下一组完整协议/工具/资源消费者，避免继续拆分单个配置字段批次。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `tools/bash.ts`、`env/node.ts` 和 `tools.test.ts` 的bash输出/溢出/超时用例。已fetch核对Pi/Harness上游变化，本批保持固定快照。
+- 实际调用链：`bash_tool.S`保留50 KiB/2000行UTF-8尾部；snapshot同时提供完整内容块、structuredOutput及诊断，Durable Tool原子提交，再经动态上下文进入模型请求。回调预览遵循调用者容量，完整持久结果独立持有。超过预算的完整原始字节保留在私有临时文件。
+- 验证：Bash UBSan专项通过；`build_test.py --client` 的Session/工具/调度/恢复ASan+UBSan通过，覆盖SQLite/JSONL的50 KiB结果与实际请求编码；`test_product_resources.py --sanitize --live-agent` 使用真实DeepSeek完成Bash长输出与回答，核对模型实际收到完整尾部、结构化结果及60018字节原始文件。产品构建、Assembly和登记检查通过。真实测试中的元数据通知先排空，再断言独立注入事件。
+- 接口与差异：`pg_bash_tool`调用者所有存储随公开头同步增大；无新增文件、服务或TUI私有接口。原生16 MiB捕获上限、同步磁盘IO和显式环境保持既有行为；K08其他行为仍按覆盖表完成。
+- 下一交付物：推进K05下一组完整模型协议的请求、流事件和Generation调用链，按协议组织实现与回放。

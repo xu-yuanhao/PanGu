@@ -4,13 +4,14 @@
 #include "process.h"
 #include "execution_env.h"
 #include "stream_decode.h"
-#define PG_BASH_RETAIN 3072
+#define PG_BASH_RETAIN 51200
 #define PG_BASH_CAPTURE_LIMIT (16u*1024u*1024u)
 /* Serialized owner; ExecutionEnv and its services remain borrowed for the
    whole operation. Commands are not sandboxed by this tool.
-   Retains a UTF-8 tail <=3072 bytes/2000 lines, spills raw combined output to
+   Retains a UTF-8 tail <=50 KiB/2000 lines, spills raw combined output to
    a private temporary file. 16 MiB capture limit cancels with a partial-file
-   error. Final result fits the current 4096-byte transcript slot.
+   error. The result snapshot owns the complete retained output; callback previews
+   fit the caller-provided buffer.
    Regular-file spill IO is bounded per poll, but is not asynchronous disk IO. */
 typedef struct {
  const pg_execution_env *environment;

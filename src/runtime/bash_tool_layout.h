@@ -13,9 +13,9 @@
 #define PG_BH_DECODER 64
 #define PG_BH_PENDING 120
 #define PG_BH_TAIL 12416
-#define PG_BH_PATH 15488
-#define PG_BH_BYTES 15552
-#define PG_BH_RETAIN 3072
+#define PG_BH_PATH 63616
+#define PG_BH_BYTES 63680
+#define PG_BH_RETAIN 51200
 #define PG_BH_LIMIT 16777216
 #ifndef __ASSEMBLER__
 #include "bash_tool.h"

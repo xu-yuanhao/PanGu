@@ -4,7 +4,7 @@
 .intel_syntax noprefix
 .section .rodata
 .Lname: .asciz "bash"
-.Ldescription: .asciz "Execute a bash command in the configured working directory (not a sandbox). Streams stdout/stderr and returns their UTF-8 tail, up to 3072 bytes/2000 lines. Truncated output has a private raw output file. Capture over 16 MiB cancels with a partial-file error. Optional timeout in seconds, no default. Commands may have side effects and interrupted commands are not automatically replayed."
+.Ldescription: .asciz "Execute a bash command in the configured working directory (not a sandbox). Streams stdout/stderr and returns their UTF-8 tail, up to 50 KiB/2000 lines. Truncated output has a private raw output file. Capture over 16 MiB cancels with a partial-file error. Optional timeout in seconds, no default. Commands may have side effects and interrupted commands are not automatically replayed."
 .Lschema: .asciz "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"timeout\":{\"type\":\"number\",\"exclusiveMinimum\":0,\"maximum\":2147483.647}},\"required\":[\"command\"],\"additionalProperties\":false}"
 .Lcommand: .asciz "command"
 .Ltimeout: .asciz "timeout"
@@ -730,13 +730,30 @@ pg_bash_tool_init:
  add r15,rax
 .Lfinal_done:
  mov rdx,[rbx+PG_BH_TAIL_N]
- lea rax,[r15+rdx]
- cmp rax,r13
- jae .Lnext_invalid
- lea rdi,[r12+r15]
  lea rsi,[rbx+PG_BH_TAIL]
+ mov rax,r13
+ sub rax,r15
+ dec rax
+ cmp rdx,rax
+ jbe .Lfinal_copy
+ sub rdx,rax
+ add rsi,rdx
+ mov rdx,rax
+.Lfinal_scalar:
+ test rdx,rdx
+ jz .Lfinal_copy
+ mov al,[rsi]
+ and al,0xc0
+ cmp al,0x80
+ jne .Lfinal_copy
+ inc rsi
+ dec rdx
+ jmp .Lfinal_scalar
+.Lfinal_copy:
+ mov [rsp+56],rdx
+ lea rdi,[r12+r15]
  call memcpy@PLT
- add r15,[rbx+PG_BH_TAIL_N]
+ add r15,[rsp+56]
  mov byte ptr [r12+r15],0
  mov [r14],r15
  mov dword ptr [rbx+PG_BH_STAGE],5
@@ -907,6 +924,24 @@ pg_bash_tool_snapshot:
  call json_object_new_string_len@PLT
  mov rdi,r14
  lea rsi,[rip+.Lbhs_output]
+ mov rdx,rax
+ call .Lbhs_set
+ test eax,eax
+ jnz .Lbhs_end
+ mov rdi,r12
+ lea rsi,[rip+.Lbhs_output]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+120],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lbhs_output]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp+120]
+ lea rsi,[rip+.Lbhs_text]
  mov rdx,rax
  call .Lbhs_set
  test eax,eax
@@ -1100,9 +1135,10 @@ pg_bash_tool_snapshot:
  pop rbx
  ret
 .section .rodata
-.Lbhs_json: .asciz "{\"structuredOutput\":{\"output\":\"\",\"truncated\":false,\"exitCode\":0},\"diagnostics\":[]}"
+.Lbhs_json: .asciz "{\"output\":[{\"type\":\"text\",\"text\":\"\"}],\"structuredOutput\":{\"output\":\"\",\"truncated\":false,\"exitCode\":0},\"diagnostics\":[]}"
 .Lbhs_structured: .asciz "structuredOutput"
 .Lbhs_output: .asciz "output"
+.Lbhs_text: .asciz "text"
 .Lbhs_truncated: .asciz "truncated"
 .Lbhs_exit: .asciz "exitCode"
 .Lbhs_path: .asciz "fullOutputPath"

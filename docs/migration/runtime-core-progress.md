@@ -20,6 +20,7 @@
 | 工具输出合并 | `tool_live.S`以a或t+a提交文本增量，Tool按实际原生Op payload与100KiB/s、至少100ms安排后续刷新；同步details/diagnostic确认后共用暂停期限。模型/嵌套10KB追加及Unicode滚动、零变化零提交、取消重开通过；统一异步元数据调度仍待补齐 |
 | 跨块流窗口 | `output_window.S`保存清洗前raw margin及全流计数，head/tail逐块快照与固定Chord的220组流直接一致；Tool已替换旧拼接路径，释放与恢复沿调用级生命周期 |
 | 输出清洗与结果元数据 | `output_window.S`清理流窗口/事件控制字符，2464组上游预算/清洗对照；Tool诊断动态渲染支持7000字节，单调计时duration进入结果/嵌套返回/摘要 |
+| Bash长输出链 | `bash_tool.S`：50 KiB/2000行UTF-8尾部、完整snapshot内容/结构化结果/原始溢出文件；SQLite/JSONL持久结果与动态模型请求、真实DeepSeek执行60018字节命令输出并继续回答通过 |
 | 工具输出预算 | `output_window.S`移植Chord完整行/UTF-8 head/tail；工具定义携带bytes/lines/retain，默认50KiB/2000行/head、bash tail；动态Tool缓冲、70KiB/零预算、累计丢弃/截断诊断和恢复通过 |
 | 工具结果控制 | `durable_tool.S`/`durable_generation.S`/`agent_state.S`：control随模型工具receipt提交，工具轮次合并addTools、最后handoff和全体terminate；工具选择、reset新head和final/postTools队列边界同事务，真实DeepSeek写入后直接结束，SQLite/JSONL增量配置回滚/重开通过 |
 | 工具图片请求映射 | `request_context.S`/`mimo_projection.S`：文本与图片分开，连续工具图片按顺序合为后置user/image_url消息，模型input配置控制附图，纯图片使用明确占位；实际编码专项通过，目录能力/用户图片及提供者兼容项仍待补齐 |
