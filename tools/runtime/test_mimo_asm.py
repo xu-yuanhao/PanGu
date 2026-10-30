@@ -51,14 +51,14 @@ CURL_WRAPS = ['-Wl,--wrap=' + n for n in (
     'curl_easy_init', 'curl_easy_setopt', 'curl_easy_getinfo',
     'curl_easy_cleanup', 'curl_multi_init', 'curl_multi_perform',
     'curl_multi_info_read', 'curl_multi_add_handle', 'curl_multi_cleanup',
-    'curl_slist_free_all', 'curl_slist_append', 'json_tokener_new')]
+    'curl_slist_free_all', 'curl_slist_append', 'json_tokener_new', 'ZSTD_compress')]
 
 ALLOC_WRAPS = ['-Wl,--wrap=' + name for name in ('json_object_deep_copy', 'json_object_new_object', 'json_object_new_array', 'json_object_new_string', 'json_object_new_string_len', 'json_object_new_boolean', 'json_object_new_int', 'json_object_object_add', 'json_object_array_add', 'json_tokener_parse', 'json_object_to_json_string_ext', 'strdup')]
 
 
 def flags(opt, extra=()):
-    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
-    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
+    cflags = subprocess.check_output(['pkg-config', '--cflags', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0', 'libzstd'], text=True).split()
+    libs = subprocess.check_output(['pkg-config', '--libs', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0', 'libzstd'], text=True).split()
     return ['-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra',
             '-Wno-cast-function-type', opt, '-I' + str(ROOT / 'src/runtime'),
             '-I' + str(ROOT), *cflags, *extra, *libs]
@@ -95,7 +95,7 @@ process.stdout.write(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(s=>{c
         _fields_=[('data',C.c_void_p),('size',C.c_size_t)]
     with tempfile.TemporaryDirectory(prefix='pangu-arguments-parity-') as directory:
         output=Path(directory)/'arguments.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0', 'libzstd'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-O2',*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.pg_mimo_arguments_parse.argtypes=[Slice,C.POINTER(C.c_void_p)];native.pg_mimo_arguments_parse.restype=C.c_int
         native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
@@ -151,7 +151,7 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
 """
     with tempfile.TemporaryDirectory(prefix='pangu-strict-parity-') as directory:
         source=Path(directory)/'bridge.c';source.write_text(bridge);output=Path(directory)/'strict.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0', 'libzstd'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-D_POSIX_C_SOURCE=200809L','-O2','-I'+str(ROOT),str(source),*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.schema_request.argtypes=[C.c_char_p,C.c_uint,C.c_uint,C.POINTER(C.c_void_p)];native.schema_request.restype=C.c_int;native.free.argtypes=[C.c_void_p]
         count=0
@@ -219,7 +219,7 @@ void release_configuration(char *value){free(value);}
     with tempfile.TemporaryDirectory(prefix='pangu-bedrock-thinking-') as directory:
         adapter=Path(directory)/'adapter.c';adapter.write_text(bridge)
         output=Path(directory)/'model.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl', 'libcrypto', 'glib-2.0', 'libzstd'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-O2','-I'+str(ROOT),str(adapter),*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.emit_configuration.argtypes=[C.c_char_p,C.POINTER(C.c_void_p)];native.emit_configuration.restype=C.c_int;native.release_configuration.argtypes=[C.c_void_p]
         for case,wanted in zip(cases,expected):
@@ -289,7 +289,7 @@ def cost_differential():
         src=Path(directory)/'mimo.S'
         src.write_text((ROOT/'src/runtime/mimo.S').read_text()+'\n.text\n.globl pg_cost_parity\n.set pg_cost_parity,.Lmc_calculate\n')
         output=Path(directory)/'cost.so'
-        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl','libcrypto', 'glib-2.0'],text=True).split()
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl','libcrypto', 'glib-2.0', 'libzstd'],text=True).split()
         subprocess.run([CC,'-shared','-fPIC','-O2','-I'+str(ROOT/'src/runtime'),str(src),*SRC[1:],*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.json_tokener_parse.argtypes=[C.c_char_p];native.json_tokener_parse.restype=C.c_void_p
         native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
@@ -362,6 +362,43 @@ def sigv4_wire(binary, directory):
         assert received==[True,True,True] and not failures,failures
     finally: server.server_close()
 
+def codex_compressed_wire(binary, directory):
+    failures=[]
+    received=[]
+    codec=C.CDLL('libzstd.so.1')
+    codec.ZSTD_getFrameContentSize.argtypes=[C.c_void_p,C.c_size_t];codec.ZSTD_getFrameContentSize.restype=C.c_ulonglong
+    codec.ZSTD_decompress.argtypes=[C.c_void_p,C.c_size_t,C.c_void_p,C.c_size_t];codec.ZSTD_decompress.restype=C.c_size_t
+    class Receiver(BaseHTTPRequestHandler):
+        def log_message(self,*args): pass
+        def do_POST(self):
+            try:
+                raw=self.rfile.read(int(self.headers['Content-Length']))
+                assert self.headers['Content-Encoding']=='zstd' and b'\x00' in raw
+                size=codec.ZSTD_getFrameContentSize(raw,len(raw));assert size<1024*1024
+                plain=C.create_string_buffer(size)
+                assert codec.ZSTD_decompress(plain,size,raw,len(raw))==size
+                body=json.loads(plain.raw)
+                assert body['model']=='codex-wire' and body['store'] is False and body['stream'] is True
+                assert body['instructions'] and body['input'] and 'max_output_tokens' not in body
+                assert body['prompt_cache_key']=='wire-codex-session'
+                assert self.headers['session-id']==self.headers['x-client-request-id']=='wire-codex-session'
+                assert self.headers['chatgpt-account-id']=='pangu-test-account' and self.headers['originator']=='pangu'
+                received.append(True);self.send_response(200)
+            except Exception as error:
+                failures.append(type(error).__name__);self.send_response(400)
+            self.send_header('Content-Length','0');self.end_headers()
+    server=HTTPServer(('127.0.0.1',0),Receiver)
+    tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(Path(directory)/'sigv4-cert.pem',Path(directory)/'sigv4-key.pem')
+    server.socket=tls.wrap_socket(server.socket,server_side=True);server.timeout=15
+    worker=threading.Thread(target=server.handle_request,daemon=True);worker.start()
+    env=os.environ.copy()
+    payload=base64.b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-test-account'}}).encode()).decode()
+    env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',PANGU_MODEL_API_KEY='e30.'+payload+'.signature',PANGU_TEST_SIGV4_CA=str(Path(directory)/'sigv4-cert.pem'),PANGU_TEST_CODEX_ENDPOINT=f'https://127.0.0.1:{server.server_port}/codex/responses')
+    try:
+        subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20);worker.join(2)
+        assert received==[True] and not failures,failures
+    finally: server.server_close()
+
 def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix='pangu-mimo-asm-') as tmp:
@@ -391,6 +428,7 @@ def main():
                         failures += 1
                     elif name=='transport' and label=='-O2':
                         sigv4_wire(out,tmp)
+                        codex_compressed_wire(out,tmp)
         # 核对模型模块导入/导出清单。
         for src in SRC:
             obj = str(Path(tmp) / (Path(src).stem + '-audit.o'))

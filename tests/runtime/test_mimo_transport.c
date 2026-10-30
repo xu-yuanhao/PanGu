@@ -2,6 +2,7 @@
 #include "../../src/runtime/mimo.h"
 #include "../../src/runtime/mimo_layout.h"
 #include <curl/curl.h>
+#include <zstd.h>
 #include <assert.h>
 #include <inttypes.h>
 #include <math.h>
@@ -16,6 +17,9 @@
  * setopt 记录并转发真实 libcurl（校验变参 ABI 被真实现接受），
  * cleanup 计数用于验证 close 的释放恰好一次；显式签名验收使用本地 TLS。 */
 
+static int zstd_fail;
+extern size_t __real_ZSTD_compress(void *,size_t,const void *,size_t,int);
+size_t __wrap_ZSTD_compress(void *out,size_t capacity,const void *source,size_t size,int level){return zstd_fail?(size_t)-1:__real_ZSTD_compress(out,capacity,source,size,level);}
 extern CURL *__real_curl_easy_init(void);
 extern CURLcode __real_curl_easy_setopt(CURL *, CURLoption, ...);
 extern CURLcode __real_curl_easy_getinfo(CURL *,CURLINFO,...);
@@ -35,6 +39,8 @@ static size_t (*captured_write)(char *, size_t, size_t, void *);
 static void *captured_write_data;
 static size_t (*captured_header)(char *,size_t,size_t,void *);
 static void *captured_header_data;
+static char *captured_decoded;
+static long captured_post_size = -1;
 static const char *captured_url, *captured_post, *captured_protocols;
 static struct curl_slist *captured_headers;
 static char captured_sigv4[128],captured_userpwd[256];
@@ -77,6 +83,7 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
     case CURLOPT_POSTFIELDS: {
         const char *v = va_arg(ap, const char *);
         captured_post = v;
+        if(captured_post_size>=0){unsigned long long size=ZSTD_getFrameContentSize(v,(size_t)captured_post_size);assert(size!=ZSTD_CONTENTSIZE_ERROR&&size!=ZSTD_CONTENTSIZE_UNKNOWN&&size<16*1024*1024);captured_decoded=malloc((size_t)size+1);assert(captured_decoded);assert(ZSTD_decompress(captured_decoded,(size_t)size,v,(size_t)captured_post_size)==size);captured_decoded[size]=0;captured_post=captured_decoded;}
         rc = __real_curl_easy_setopt(h, opt, v);
         break;
     }
@@ -104,12 +111,14 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
         rc = __real_curl_easy_setopt(h, opt, v);
         break;
     }
+    case CURLOPT_POSTFIELDSIZE:
     case CURLOPT_HTTP_VERSION:
     case CURLOPT_TIMEOUT:
     case CURLOPT_TIMEOUT_MS:
     case CURLOPT_CONNECTTIMEOUT:
     case CURLOPT_NOSIGNAL: {
         long v = va_arg(ap, long);
+        if (opt == CURLOPT_POSTFIELDSIZE) captured_post_size = v;
         if (opt == CURLOPT_HTTP_VERSION) captured_http_version = v;
         if (opt == CURLOPT_TIMEOUT_MS) captured_timeout = v;
         if (opt == CURLOPT_CONNECTTIMEOUT) captured_connect_timeout = v;
@@ -196,6 +205,7 @@ static void reset_script(void) {
     captured_write_data = NULL;
     captured_url = captured_post = captured_protocols = NULL;
     captured_headers = NULL;captured_sigv4[0]=captured_userpwd[0]=0;
+    zstd_fail=0;free(captured_decoded);captured_decoded=NULL;captured_post_size=-1;
     captured_http_version = -1;
     captured_timeout = captured_connect_timeout = captured_nosignal = -1;
 }
@@ -525,18 +535,31 @@ static void test_saved_connection(void){
 static void test_responses_transport(void){
  for(unsigned azure=0;azure<3;azure++){
  for(unsigned scenario=0;scenario<5;scenario++){
-  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *configuration=json_tokener_parse(azure==2?"{\"model\":\"native-responses\",\"api\":\"openai-codex-responses\"}":azure==1?"{\"model\":\"native-responses\",\"api\":\"azure-openai-responses\",\"options\":{\"azureResourceName\":\"pangu-resource\",\"azureDeploymentName\":\"deployed-model\"}}":"{\"model\":\"native-responses\",\"api\":\"openai-responses\",\"endpoint\":\"https://provider.invalid/v1/responses\"}");if(azure==2){json_object *options=json_tokener_parse("{\"sessionId\":\"pangu-session-identity\",\"serviceTier\":\"priority\",\"textVerbosity\":\"high\",\"reasoningEffort\":\"low\",\"reasoningSummary\":\"detailed\"}");json_object_object_add(options,"cacheRetention",json_object_new_string(scenario==2?"none":"long"));if(scenario==4)json_object_object_add(options,"sessionId",json_object_new_string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));if(scenario>=1&&scenario<=3){json_object_object_del(options,"reasoningEffort");json_object_object_add(configuration,"modelInfo",json_tokener_parse(scenario==2?"{\"reasoning\":true,\"thinkingLevelMap\":{\"off\":null}}":scenario==3?"{\"reasoning\":true,\"thinkingLevelMap\":{\"off\":\"medium\"}}":"{\"reasoning\":true}"));}json_object_object_add(options,"headers",json_tokener_parse("{\"Session-ID\":\"caller-value\",\"X-Client-Request-ID\":\"caller-value\"}"));json_object_object_add(configuration,"options",options);}assert(!pg_mimo_configure(&m,configuration));json_object_put(configuration);setenv("PANGU_MODEL_API_KEY",azure==2?"e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature":"responses-transport-unit-key",1);assert(!start()&&strstr(captured_post,"\"input\"")&&!strstr(captured_post,"\"messages\"")&&!strcmp(captured_url,azure==2?"https://chatgpt.com/backend-api/codex/responses":azure==1?"https://pangu-resource.openai.azure.com/openai/v1/responses?api-version=v1":"https://provider.invalid/v1/responses"));if(azure==1){unsigned keys=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){keys+=!strcmp(h->data,"api-key: responses-transport-unit-key");assert(!strstr(h->data,"Authorization:"));}assert(keys==1&&strstr(captured_post,"deployed-model"));}if(azure==2){assert(strstr(captured_post,"instructions")&&strstr(captured_post,"reasoning.encrypted_content")&&!strstr(captured_post,"max_output_tokens"));unsigned accounts=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)accounts+=!strcmp(h->data,"chatgpt-account-id: pangu-test-account");assert(accounts==1);json_object *body=json_tokener_parse(captured_post);assert(body&&!json_object_object_get(body,"prompt_cache_retention")&&!strcmp(json_object_get_string(json_object_object_get(body,"service_tier")),"priority")&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(body,"text"),"verbosity")),"high"));unsigned session_headers=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)session_headers+=!strcmp(h->data,scenario==4?"session-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"session-id: pangu-session-identity")||!strcmp(h->data,scenario==4?"x-client-request-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"x-client-request-id: pangu-session-identity");unsigned caller_headers=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)caller_headers+=strstr(h->data,"caller-value")!=0;assert(caller_headers==(scenario==2?2:0));assert(session_headers==(scenario==2?0:2));assert((json_object_object_get(body,"prompt_cache_key")!=0)==(scenario!=2));json_object *reason=json_object_object_get(body,"reasoning");if(scenario==2)assert(!reason);else if(scenario==1||scenario==3)assert(reason&&!strcmp(json_object_get_string(json_object_object_get(reason,"effort")),scenario==1?"none":"medium"));json_object_put(body);}pg_model_event event={0};
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *configuration=json_tokener_parse(azure==2?"{\"model\":\"native-responses\",\"api\":\"openai-codex-responses\"}":azure==1?"{\"model\":\"native-responses\",\"api\":\"azure-openai-responses\",\"options\":{\"azureResourceName\":\"pangu-resource\",\"azureDeploymentName\":\"deployed-model\"}}":"{\"model\":\"native-responses\",\"api\":\"openai-responses\",\"endpoint\":\"https://provider.invalid/v1/responses\"}");if(azure==2){json_object *options=json_tokener_parse("{\"sessionId\":\"pangu-session-identity\",\"serviceTier\":\"priority\",\"textVerbosity\":\"high\",\"reasoningEffort\":\"low\",\"reasoningSummary\":\"detailed\"}");json_object_object_add(options,"cacheRetention",json_object_new_string(scenario==2?"none":"long"));if(scenario==4)json_object_object_add(options,"sessionId",json_object_new_string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));if(scenario>=1&&scenario<=3){json_object_object_del(options,"reasoningEffort");json_object_object_add(configuration,"modelInfo",json_tokener_parse(scenario==2?"{\"reasoning\":true,\"thinkingLevelMap\":{\"off\":null}}":scenario==3?"{\"reasoning\":true,\"thinkingLevelMap\":{\"off\":\"medium\"}}":"{\"reasoning\":true}"));}json_object_object_add(options,"headers",json_tokener_parse("{\"Session-ID\":\"caller-value\",\"X-Client-Request-ID\":\"caller-value\"}"));json_object_object_add(configuration,"options",options);}assert(!pg_mimo_configure(&m,configuration));json_object_put(configuration);setenv("PANGU_MODEL_API_KEY",azure==2?"e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature":"responses-transport-unit-key",1);assert(!start()&&strstr(captured_post,"\"input\"")&&!strstr(captured_post,"\"messages\"")&&!strcmp(captured_url,azure==2?"https://chatgpt.com/backend-api/codex/responses":azure==1?"https://pangu-resource.openai.azure.com/openai/v1/responses?api-version=v1":"https://provider.invalid/v1/responses"));if(azure==1){unsigned keys=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){keys+=!strcmp(h->data,"api-key: responses-transport-unit-key");assert(!strstr(h->data,"Authorization:"));}assert(keys==1&&strstr(captured_post,"deployed-model"));}if(azure==2){assert(m.wire_request&&m.wire_size==(size_t)captured_post_size&&!strcmp(captured_post,m.request));assert(strstr(captured_post,"instructions")&&strstr(captured_post,"reasoning.encrypted_content")&&!strstr(captured_post,"max_output_tokens"));unsigned accounts=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)accounts+=!strcmp(h->data,"chatgpt-account-id: pangu-test-account");assert(accounts==1);json_object *body=json_tokener_parse(captured_post);assert(body&&!json_object_object_get(body,"prompt_cache_retention")&&!strcmp(json_object_get_string(json_object_object_get(body,"service_tier")),"priority")&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(body,"text"),"verbosity")),"high"));unsigned session_headers=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)session_headers+=!strcmp(h->data,scenario==4?"session-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"session-id: pangu-session-identity")||!strcmp(h->data,scenario==4?"x-client-request-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"x-client-request-id: pangu-session-identity");unsigned caller_headers=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)caller_headers+=strstr(h->data,"caller-value")!=0;assert(caller_headers==(scenario==2?2:0));assert(session_headers==(scenario==2?0:2));assert((json_object_object_get(body,"prompt_cache_key")!=0)==(scenario!=2));json_object *reason=json_object_object_get(body,"reasoning");if(scenario==2)assert(!reason);else if(scenario==1||scenario==3)assert(reason&&!strcmp(json_object_get_string(json_object_object_get(reason,"effort")),scenario==1?"none":"medium"));json_object_put(body);}pg_model_event event={0};
   feed("event: response.created\r\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_test\"}}\r\n\r\n");
   feed("data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"delta\":\"he");for(unsigned i=0;i<4;i++)assert(!nxt(&event));feed("llo\"}\n");assert(!nxt(&event)&&event.kind==PG_MODEL_TEXT&&event.text.size==5&&!memcmp(event.text.data,"hello",5));
   if(scenario==1||scenario==4){feed("data: {\"type\":\"response.output_item.added\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"call_id\":\"call-r\",\"name\":\"read\",\"arguments\":\"\"}}\n");feed("data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":4,\"arguments\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}\n");if(scenario==1)feed("data: {\"type\":\"response.output_item.done\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"id\":\"fc_r\",\"call_id\":\"call-r\",\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}}\n");}
   if(scenario<2||scenario==4)feed("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{\"input_tokens\":3,\"output_tokens\":2,\"total_tokens\":5}}}\n\n");
   if(scenario==3)feed("data: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"message\":\"provider failure\"}}}\n");
-  finish_transport();int status=0;for(unsigned i=0;i<12;i++){status=nxt(&event);if(status||event.kind!=PG_MODEL_WAIT)break;}if(scenario<2){assert(!status&&event.kind==(scenario?PG_MODEL_CALL:PG_MODEL_DONE)&&m.saw_done);if(scenario)assert(event.text.size==19&&!memcmp(event.text.data,"{\"path\":\"file.txt\"}",19));}else assert(status==1&&!m.saw_done);if(scenario<2){json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),azure==2?"openai-codex-responses":azure==1?"azure-openai-responses":"openai-responses"));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"model")),"native-responses"));json_object_put(assistant);}model.close(model.context);assert(!m.request&&!m.easy&&!m.configuration);
+  finish_transport();int status=0;for(unsigned i=0;i<12;i++){status=nxt(&event);if(status||event.kind!=PG_MODEL_WAIT)break;}if(scenario<2){assert(!status&&event.kind==(scenario?PG_MODEL_CALL:PG_MODEL_DONE)&&m.saw_done);if(scenario)assert(event.text.size==19&&!memcmp(event.text.data,"{\"path\":\"file.txt\"}",19));}else assert(status==1&&!m.saw_done);if(scenario<2){json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),azure==2?"openai-codex-responses":azure==1?"azure-openai-responses":"openai-responses"));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"model")),"native-responses"));json_object_put(assistant);}model.close(model.context);assert(!m.request&&!m.easy&&!m.configuration&&!m.wire_request&&!m.wire_size);
  }
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Responses actual model-service curl replay, split SSE/CRLF, text/tool terminal, early EOF and provider failure");
 }
 
+static int codex_compressed_wire(void){
+ const char *endpoint=getenv("PANGU_TEST_CODEX_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-wire\",\"options\":{\"sessionId\":\"wire-codex-session\"}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&m.wire_request&&m.wire_size);assert(!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);assert(!m.wire_request&&!m.wire_size);free(captured_decoded);captured_decoded=NULL;puts("PASS: Codex binary Zstd body, declared byte length and request identity verified by actual TLS receiver");return 0;
+}
+static void test_codex_compression_failures(void){
+ unsigned setopts=0,headers=0;
+ for(unsigned mode=0;mode<4;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-test\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);
+  if(mode==1)zstd_fail=1;if(mode==2)slist_fail_at=(int)headers;if(mode==3)setopt_fail_at=(int)setopts;
+  int status=start();if(mode>=2)assert(status);else{assert(!status);if(!mode){assert(m.wire_request);setopts=(unsigned)setopt_calls;headers=(unsigned)slist_calls;}else{assert(!m.wire_request&&!m.wire_size&&captured_post_size==-1);for(const struct curl_slist *h=captured_headers;h;h=h->next)assert(!strstr(h->data,"content-encoding"));}}
+  model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.request&&!m.wire_request&&!m.wire_size);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex compression fallback, header/setopt failure and binary request ownership cleanup");
+}
 static void test_codex_auth_failures(void){
  const char *tokens[]={"invalid","a.e30=.b","a.!!!!.b","a.e30=.b.extra"};
  for(unsigned i=0;i<4;i++){
@@ -815,6 +838,7 @@ static void test_provider_headers(void){
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: five-protocol provider headers merge by case, layer precedence, null removal, empty value, default replacement and invalid-input cleanup");
 }
 int main(int argc,char **argv) {
+    if(argc==2&&!strcmp(argv[1],"--codex-wire"))return codex_compressed_wire();
     if(argc==2&&!strcmp(argv[1],"--sigv4-wire"))return bedrock_sigv4_wire();
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -832,6 +856,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_codex_compression_failures();
     test_responses_arguments();
     test_anthropic_transport();
     test_anthropic_beta_headers();

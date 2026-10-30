@@ -147,7 +147,8 @@
         "system libc",
         "tools.registry.local.v0",
         "libcrypto (caller-buffer Base64 codec)",
-        "glib-2.0 (shared AWS profile INI parsing)"
+        "glib-2.0 (shared AWS profile INI parsing)",
+        "libzstd (Codex SSE request compression)"
       ],
       "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
       "exports": [
@@ -2851,6 +2852,14 @@
     "full G01/G02 certification"
   ],
   "local_provider_dependencies": [
+    {
+      "name": "libzstd",
+      "version": "1.5.7",
+      "source": "system pkg-config libzstd; zstd.h public ABI",
+      "license": "BSD-3-Clause OR GPL-2.0-only",
+      "purpose": "Codex SSE level-3 Zstd request compression with plain-JSON fallback",
+      "impact": "hosted Codex transport only; Assembly owns binary request lifetime and curl byte length"
+    },
     {
       "name": "glib-2.0",
       "version": "2.90.1",

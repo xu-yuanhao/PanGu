@@ -32,6 +32,7 @@ typedef struct {
  unsigned strict_retry;struct json_object *strict_diagnostics;
  struct json_object *google_text; /* owned event slice, borrowed until next Google decode/close */
  char response_request_id[201]; /* public header value, reset at each HTTP response/start */
+ void *wire_request;size_t wire_size; /* owned until curl cleanup; request remains plain JSON */
 } pg_mimo;
 /* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint

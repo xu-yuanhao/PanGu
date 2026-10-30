@@ -151,6 +151,10 @@ li_close:
  call curl_slist_free_all@PLT
  mov rdi, qword ptr [rbx + PG_MM_REQUEST]
  call free@PLT
+ mov rdi,[rbx+PG_MM_WIRE_REQUEST]
+ call free@PLT
+ mov qword ptr [rbx+PG_MM_WIRE_REQUEST],0
+ mov qword ptr [rbx+PG_MM_WIRE_SIZE],0
  mov qword ptr [rbx + PG_MM_EASY], 0
  mov qword ptr [rbx + PG_MM_MULTI], 0
  mov qword ptr [rbx + PG_MM_HEADERS], 0
@@ -559,6 +563,10 @@ li_start:
  test eax,eax
  jnz .Lst_bad
 .Lst_http_version_ready:
+ mov rdi,rbx
+ call .Lcd_compress
+ test eax,eax
+ jnz .Lst_bad
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_HTTPHEADER
  mov rdx,[rbx+PG_MM_HEADERS]
@@ -566,9 +574,22 @@ li_start:
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lst_bad
- mov rdi, r14
- mov esi, PG_MM_CURLOPT_POSTFIELDS
- mov rdx, qword ptr [rbx + PG_MM_REQUEST]
+ cmp qword ptr [rbx+PG_MM_WIRE_REQUEST],0
+ je .Lcd_plain_post
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_POSTFIELDSIZE
+ mov rdx,[rbx+PG_MM_WIRE_SIZE]
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdx,[rbx+PG_MM_WIRE_REQUEST]
+ jmp .Lcd_post_ready
+.Lcd_plain_post:
+ mov rdx,[rbx+PG_MM_REQUEST]
+.Lcd_post_ready:
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_POSTFIELDS
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax
@@ -5244,7 +5265,7 @@ pg_mimo_complete:
  test eax,eax
  jz .Lcd_reserved_yes
  inc r12
- cmp r12,5
+ cmp r12,6
  jb .Lcd_reserved_each
  xor eax,eax
  jmp .Lcd_reserved_end
@@ -5261,8 +5282,9 @@ pg_mimo_complete:
 .Lcd_beta_key: .asciz "openai-beta"
 .Lcd_accept_key: .asciz "accept"
 .Lcd_content_key: .asciz "content-type"
+.Lcd_encoding_key: .asciz "content-encoding"
 .section .data.rel.ro
-.Lcd_reserved_keys: .quad .Lcd_auth_key,.Lcd_account_key,.Lcd_beta_key,.Lcd_accept_key,.Lcd_content_key
+.Lcd_reserved_keys: .quad .Lcd_auth_key,.Lcd_account_key,.Lcd_beta_key,.Lcd_accept_key,.Lcd_content_key,.Lcd_encoding_key
 
 .text
 /* Owned bounded session identity; absent identity and disabled cache return NULL. */
@@ -5344,3 +5366,65 @@ pg_mimo_complete:
 .Lcd_session_lengths: .quad 10,19
 .section .data.rel.ro
 .Lcd_session_names: .quad .Lcd_session_name,.Lcd_request_name
+
+.text
+.Lcd_compress:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ xor r14d,r14d
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_compress_ok
+ mov rdi,[rbx+PG_MM_REQUEST]
+ call strlen@PLT
+ mov r12,rax
+ mov rdi,rax
+ call ZSTD_compressBound@PLT
+ mov r13,rax
+ mov rdi,rax
+ call malloc@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lcd_compress_ok
+ mov rdi,r14
+ mov rsi,r13
+ mov rdx,[rbx+PG_MM_REQUEST]
+ mov rcx,r12
+ mov r8d,3
+ call ZSTD_compress@PLT
+ mov r12,rax
+ mov rdi,rax
+ call ZSTD_isError@PLT
+ test eax,eax
+ jnz .Lcd_compress_fallback
+ mov [rbx+PG_MM_WIRE_REQUEST],r14
+ mov [rbx+PG_MM_WIRE_SIZE],r12
+ mov rdi,[rbx+PG_MM_HEADERS]
+ lea rsi,[rip+.Lcd_encoding]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lcd_compress_bad
+ mov [rbx+PG_MM_HEADERS],rax
+.Lcd_compress_ok:
+ xor eax,eax
+ jmp .Lcd_compress_end
+.Lcd_compress_fallback:
+ mov rdi,r14
+ call free@PLT
+ jmp .Lcd_compress_ok
+.Lcd_compress_bad:
+ mov eax,1
+.Lcd_compress_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcd_encoding: .asciz "content-encoding: zstd"
