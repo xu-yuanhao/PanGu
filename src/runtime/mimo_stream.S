@@ -5813,6 +5813,14 @@ pg_mimo_base64_encode:
  mov rbp,rax
  test rax,rax
  jz .Lbf_end
+ mov rdi,rbp
+ lea rsi,[rip+.Lbf_retention_match]
+ call strcasestr@PLT
+ lea r8,[rip+.Lbf_empty]
+ test rax,rax
+ jz .Lbf_hint_ready
+ lea r8,[rip+.Lbf_retention_hint]
+.Lbf_hint_ready:
  lea rax,[rip+.Lbf_prefixes]
  mov rdx,[rax+r14*8]
  lea rdi,[rsp]
@@ -5851,7 +5859,10 @@ pg_mimo_base64_encode:
 .Lbf_validation_text: .asciz "Validation error"
 .Lbf_throttling_text: .asciz "Throttling error"
 .Lbf_unavailable_text: .asciz "Service unavailable"
-.Lbf_format: .asciz "%s: %s"
+.Lbf_format: .asciz "%s: %s%s"
+.Lbf_empty: .asciz ""
+.Lbf_retention_match: .asciz "data retention mode"
+.Lbf_retention_hint: .asciz " See https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html for supported data retention modes."
 
 .section .rodata
 .Lbf_exception_key: .asciz ":exception-type"
