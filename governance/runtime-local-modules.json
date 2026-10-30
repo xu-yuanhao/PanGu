@@ -277,7 +277,7 @@
           "paths": [
             "packages/ai/src/api/bedrock-converse-stream.ts"
           ],
-          "semantics": "Converse text/tool request projection and grouped tool results; message/content-block events, block flush, raw stop reason and metadata through the shared model lifecycle; regional runtime endpoint with injected bearer credential; environment access credentials and session token, explicit/ambient Bearer precedence, reserved signing header filtering, libcurl SigV4 binding",
+          "semantics": "Converse text/tool request projection and grouped tool results; message/content-block events, block flush, raw stop reason and metadata through the shared model lifecycle; regional runtime endpoint with injected bearer credential; environment access credentials and session token, explicit/ambient Bearer precedence, reserved signing header filtering, libcurl SigV4 binding; user/tool image format and base64 bytes, Claude error-image routing, reasoning/signature deltas, same-model signed/unsigned replay on durable reopen",
           "tests_to_read": [
             "packages/ai/test/bedrock-convert-messages.test.ts",
             "packages/ai/test/bedrock-raw-stop-reason.test.ts",

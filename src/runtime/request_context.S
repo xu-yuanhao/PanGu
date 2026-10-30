@@ -389,7 +389,14 @@ pg_context_messages_model:
  mov rdi,[rsp+160]
  call pg_mimo_config_google
  test eax,eax
+ jnz .Lri_google_protocol
+ mov rdi,[rsp+160]
+ call pg_mimo_config_bedrock
+ test eax,eax
  jz .Lri_protocol_ready
+ mov dword ptr [rsp+180],2
+ jmp .Lri_protocol_ready
+.Lri_google_protocol:
  mov dword ptr [rsp+180],3
 .Lri_protocol_ready:
  call json_object_new_array@PLT
@@ -1668,7 +1675,14 @@ pg_mimo_responses_history:
  mov rdi,r12
  call pg_mimo_config_google
  test eax,eax
+ jnz .Lgh_google_mode
+ mov rdi,r12
+ call pg_mimo_config_bedrock
+ test eax,eax
  jz .Lgh_mode_ready
+ mov dword ptr [rsp+56],3
+ jmp .Lgh_mode_ready
+.Lgh_google_mode:
  mov dword ptr [rsp+56],2
 .Lgh_mode_ready:
  RHGET rbx,content
@@ -1728,6 +1742,9 @@ pg_mimo_responses_history:
  mov qword ptr [rsp+48],0
  jmp .Lrh_identity_api
 .Lrh_identity_other:
+ lea rsi,[rip+.Lbr_api]
+ cmp dword ptr [rsp+56],3
+ je .Lrh_identity_api
  lea rsi,[rip+.Lra_responses]
  cmp dword ptr [rsp+56],2
  jne .Lrh_identity_api
@@ -1776,6 +1793,10 @@ pg_mimo_responses_history:
  call json_object_get_boolean@PLT
  add eax,eax
  or eax,[rsp+16]
+ cmp dword ptr [rsp+56],3
+ jne .Lgh_not_bedrock_policy
+ or eax,2
+.Lgh_not_bedrock_policy:
  cmp dword ptr [rsp+56],2
  jne .Lgh_policy_ready
  or eax,6

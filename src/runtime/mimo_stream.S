@@ -4997,12 +4997,16 @@ pg_mimo_anthropic_clear:
  BTGET "qword ptr [rsp+24]",toolUse
  test rax,rax
  jnz .Lbt_input
- jmp .Lbt_bad
+ BTGET "qword ptr [rsp+24]",reasoningContent
+ test rax,rax
+ jz .Lbt_bad
+ jmp .Lbt_reasoning
 .Lbt_text:
  mov [rsp+40],rax
  mov rdi,rbx
  mov rsi,[rsp+8]
  mov rdx,r13
+ lea rcx,[rip+.LbtJ_start_text]
  call .Lbt_ensure_text
  test eax,eax
  jnz .Lbt_bad
@@ -5031,6 +5035,51 @@ pg_mimo_anthropic_clear:
  mov [r13+8],rax
  mov dword ptr [r13],PG_MM_KIND_TEXT
  jmp .Lbt_ok
+.Lbt_reasoning:
+ mov [rsp+24],rax
+ BTGET rax,redactedContent
+ test rax,rax
+ jnz .Lbt_bad
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov rdx,r13
+ lea rcx,[rip+.LbtJ_start_thinking]
+ call .Lbt_ensure_text
+ test eax,eax
+ jnz .Lbt_bad
+ BTGET "qword ptr [rsp+24]",text
+ test rax,rax
+ jz .Lbt_reasoning_signature
+ lea rdi,[rip+.LbtJ_thinking]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ BTGET "qword ptr [rsp+16]",delta
+ BTCOPY rax,"qword ptr [rsp+24]",text,thinking
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lbt_reasoning_signature:
+ BTGET "qword ptr [rsp+24]",signature
+ test rax,rax
+ jz .Lbt_ok
+ lea rdi,[rip+.LbtJ_signature]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ BTGET "qword ptr [rsp+16]",delta
+ BTCOPY rax,"qword ptr [rsp+24]",signature,signature
+ jmp .Lbt_emit
 .Lbt_input:
  mov [rsp+24],rax
  lea rdi,[rip+.LbtJ_input]
@@ -5134,6 +5183,7 @@ pg_mimo_anthropic_clear:
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
+ mov r14,rcx
  mov qword ptr [rsp],0
  BTGET r12,contentBlockIndex
  mov rdi,rax
@@ -5149,7 +5199,7 @@ pg_mimo_anthropic_clear:
  inc rcx
  jmp .Lbt_ensure_find
 .Lbt_ensure_create:
- lea rdi,[rip+.LbtJ_start_text]
+ mov rdi,r14
  call json_tokener_parse@PLT
  mov [rsp],rax
  test rax,rax
@@ -5292,3 +5342,14 @@ pg_mimo_anthropic_clear:
 
 .section .rodata
 .LbtK_context_limit: .asciz "model_context_window_exceeded"
+
+.section .rodata
+.LbtK_reasoningContent: .asciz "reasoningContent"
+.LbtK_thinking: .asciz "thinking"
+.LbtK_signature: .asciz "signature"
+.LbtJ_start_thinking: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}"
+.LbtJ_thinking: .asciz "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\"}}"
+.LbtJ_signature: .asciz "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"signature_delta\"}}"
+
+.section .rodata
+.LbtK_redactedContent: .asciz "redactedContent"

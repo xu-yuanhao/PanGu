@@ -123,7 +123,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Google/Vertex端点与显式认证接入产品配置链：Google默认/代理、Vertex API-key/global/regional/project collection路径由模型汇编组合；产品读取`PANGU_MODEL_API`、`PANGU_MODEL_BASE_URL`及现有options，沿资源/Generation准备进入同一提供者。配置失败保留旧值；传输回放、配置故障与产品ASan/UBSan专项通过。
 - [x] 五协议公共请求头接入实际传输：按Pi `utils/headers.ts`大小写无关合并modelInfo/连接/options三层，后层覆盖、null移除、空值及默认头替换；非法名称/CRLF/NUL拒绝，新增节点分配失败清理。模型O0/O2/UBSan、真实curl入口回放和产品ASan/UBSan专项通过。
 - [x] Azure Responses基础链复用现有Responses编码/流：资源名/baseUrl与API版本组合端点，Azure域名路径规范化、代理查询保留、API版本替换；部署名映射按最后值优先并允许显式覆盖，最终部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
-- [x] Bedrock Converse文本/工具基础链接入同一模型服务：区域/代理端点、Bearer/环境SigV4与临时令牌、system/messages/inference/toolSpec投影、旧调用/结果重放；AWS二进制事件帧校验后复用内容块状态机，处理文本、调用、补齐关闭、停止和基础用量。模型专项、分配失败及产品配置链通过；完整认证、图片/推理和高级行为按下项继续覆盖。
+- [x] Bedrock Converse文本/工具基础链接入同一模型服务：区域/代理端点、Bearer/环境SigV4与临时令牌、system/messages/inference/toolSpec投影、旧调用/结果重放；AWS二进制事件帧校验后复用内容块状态机，处理文本、调用、推理/签名、补齐关闭、停止和基础用量；用户/工具图片、Claude错误图片路由和同模型签名重放接通SQLite/JSONL重开。模型专项、分配失败及产品配置链通过；完整认证、图片/推理和高级行为按下项继续覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -320,8 +320,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock凭据选择、`getConfiguredBedrockCredentials`、`isReservedHeader`及`bedrock-credentials`/`bedrock-custom-headers`用例；签名使用[libcurl SigV4](https://curl.se/libcurl/c/CURLOPT_AWS_SIGV4.html)。Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`mimo.S`选择PanGu显式Bearer、AWS Bearer或环境访问密钥；临时令牌进入传输头，Assembly调用libcurl签名并清理临时凭据字符串，配置/会话仅保存公开字段。Bedrock自定义头按上游跳过保留鉴权头，产品启动可使用AWS环境凭据，复用既有Generation/模型调用链。
-- 验证：模型O0/O2/UBSan及ABI、Bearer优先级/2048字节令牌、环境密钥与ambient profile、非法凭据、全部新增curl选项和头追加失败清理通过。本地TLS接收端独立重算实际libcurl请求的规范化摘要、作用域与HMAC，核对临时令牌及业务头；未调用AWS云端。产品资源ASan/UBSan、构建、启动凭据检查/PTY、Assembly和本地登记G00通过。自审核对凭据不落JSON、动态Bearer/签名字符串所有权、保留头和失败关闭路径。
-- 具体缺口：Bedrock显式profile/完整凭据链、ARN/标准端点优先级、图片、推理/签名、工具选择/ID规范化、缓存/完整用量与高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
-- 下一交付物：沿K05成组完成Bedrock多模态/推理请求、流与持久历史重放，并接着覆盖提供者配置与高级语义。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock `convertMessages/createImageBlock/handleContentBlockDelta/supportsThinkingSignature`、共享`transform-messages.ts`及`bedrock-convert-messages`用例。Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`mimo_projection.S`将用户/工具图片转为Converse format/source.bytes，Claude错误图片后置、非Claude保留工具内图片；`mimo_stream.S`接收推理文本与分段签名，复用动态块与完成消息；`request_context.S`按Bedrock协议/模型身份投影持久历史。Claude有效签名重放，无签名降为文本；非Claude的reasoningText省略签名，异模型思考按上游移除。
+- 验证：模型O0/O2/UBSan、ABI及新增多模态构造/插入失败逐点清理通过；实际curl入口核对PNG/JPEG字节、三种签名策略、错误图片路由与分段思考/签名流。SQLite/JSONL完成二进制帧解码→canonical提交→关闭重开→请求重建，签名/正文/图片保持；Client集成、产品资源ASan/UBSan、构建、Assembly和登记核对通过。自审核对临时图片/推理容器所有权、协议身份和共享上下文路径。
+- 具体缺口：Bedrock redacted加密推理块（当前拒绝）、完整推理请求参数、显式profile/凭据链、ARN/标准端点优先级、工具选择/ID规范化、缓存/完整用量与高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
+- 下一交付物：沿K05完成Bedrock完整推理配置与加密推理往返，结合其工具/缓存/用量策略成组补齐提供者语义。

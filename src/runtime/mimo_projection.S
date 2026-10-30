@@ -2229,10 +2229,20 @@ pg_mimo_uses_anthropic:
  call pg_mimo_config_google
  test eax,eax
  jnz .Lap_google_messages_done
+ mov rdi,r12
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbd_split_error_images
+ mov rdi,r12
+ call .Lbd_claude
+ test eax,eax
+ jz .Lbd_error_images_ready
+.Lbd_split_error_images:
  mov rdi,[rsp]
  call .Lap_error_images
  test eax,eax
  jnz .Lap_bad
+.Lbd_error_images_ready:
  mov rdi,[rsp]
  call .Lap_normalize_messages
  test eax,eax
@@ -6611,6 +6621,7 @@ pg_mimo_uses_google:
  lea rsi,[rip+.Lbd_content]
  call json_object_object_get@PLT
  mov rdi,rax
+ mov rsi,[rsp+48]
  call .Lbd_blocks
  test eax,eax
  jnz .Lbd_bad
@@ -6779,6 +6790,7 @@ pg_mimo_uses_google:
  push r14
  sub rsp,64
  mov rbx,rdi
+ mov [rsp+24],rsi
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
  xor r12d,r12d
@@ -6820,6 +6832,11 @@ pg_mimo_uses_google:
  call strcmp@PLT
  test eax,eax
  jz .Lbd_block_thinking
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_image]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_image
  jmp .Lbd_blocks_bad
 .Lbd_block_text:
  mov rdi,r13
@@ -6847,6 +6864,7 @@ pg_mimo_uses_google:
  lea rsi,[rip+.Lbd_content]
  call json_object_object_get@PLT
  mov rdi,rax
+ mov rsi,[rsp+24]
  call .Lbd_blocks
  test eax,eax
  jnz .Lbd_blocks_bad
@@ -6885,6 +6903,84 @@ pg_mimo_uses_google:
  call json_object_object_del@PLT
  lea r14,[rip+.Lbd_toolResult]
  jmp .Lbd_block_wrap
+.Lbd_block_image:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_source]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_media_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_mime_image_jpeg]
+ call strcmp@PLT
+ lea r14,[rip+.Lbd_format_jpeg]
+ test eax,eax
+ jz .Lbd_image_format
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_mime_image_jpg]
+ call strcmp@PLT
+ lea r14,[rip+.Lbd_format_jpeg]
+ test eax,eax
+ jz .Lbd_image_format
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_mime_image_png]
+ call strcmp@PLT
+ lea r14,[rip+.Lbd_format_png]
+ test eax,eax
+ jz .Lbd_image_format
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_mime_image_gif]
+ call strcmp@PLT
+ lea r14,[rip+.Lbd_format_gif]
+ test eax,eax
+ jz .Lbd_image_format
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_mime_image_webp]
+ call strcmp@PLT
+ lea r14,[rip+.Lbd_format_webp]
+ test eax,eax
+ jz .Lbd_image_format
+ jmp .Lbd_blocks_bad
+.Lbd_image_format:
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,r14
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lbd_format]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ lea rdx,[rip+.Lbd_data]
+ lea rcx,[rip+.Lbd_bytes]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lbd_source]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov r13,[rsp+8]
+ lea r14,[rip+.Lbd_image]
+ jmp .Lbd_wrap_owned
 .Lbd_block_thinking:
  mov rdi,r13
  mov rsi,r13
@@ -6896,6 +6992,38 @@ pg_mimo_uses_google:
  mov rdi,r13
  lea rsi,[rip+.Lbd_thinking]
  call json_object_object_del@PLT
+ mov rdi,[rsp+24]
+ call .Lbd_claude
+ test eax,eax
+ jz .Lbd_thinking_unsigned
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_signature]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbd_thinking_as_text
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov ebp,eax
+ mov rdi,[rsp+16]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov esi,ebp
+ call pg_context_blank@PLT
+ test eax,eax
+ jnz .Lbd_thinking_as_text
+ jmp .Lbd_thinking_wrap
+.Lbd_thinking_unsigned:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_signature]
+ call json_object_object_del@PLT
+ jmp .Lbd_thinking_wrap
+.Lbd_thinking_as_text:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_signature]
+ call json_object_object_del@PLT
+ jmp .Lbd_block_text
+.Lbd_thinking_wrap:
  call json_object_new_object@PLT
  mov [rsp+8],rax
  test rax,rax
@@ -7002,3 +7130,78 @@ pg_mimo_uses_google:
 .Lbd_topP: .asciz "topP"
 .Lbd_top_p: .asciz "top_p"
 .Lbd_type: .asciz "type"
+
+.text
+.Lbd_claude:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ lea rsi,[rip+.Lbd_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lbd_claude_name
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_anthropic_dot]
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lbd_claude_yes
+ mov rdi,r12
+ lea rsi,[rip+.Lbd_anthropic_slash]
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lbd_claude_yes
+.Lbd_claude_name:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_name]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbd_claude_no
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_claude_name_key]
+ call strcasestr@PLT
+ test rax,rax
+ setne al
+ movzx eax,al
+ jmp .Lbd_claude_end
+.Lbd_claude_yes:
+ mov eax,1
+ jmp .Lbd_claude_end
+.Lbd_claude_no:
+ xor eax,eax
+.Lbd_claude_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lbd_image: .asciz "image"
+.Lbd_source: .asciz "source"
+.Lbd_bytes: .asciz "bytes"
+.Lbd_data: .asciz "data"
+.Lbd_format: .asciz "format"
+.Lbd_media_type: .asciz "media_type"
+.Lbd_signature: .asciz "signature"
+.Lbd_modelInfo: .asciz "modelInfo"
+.Lbd_anthropic_dot: .asciz "anthropic.claude"
+.Lbd_anthropic_slash: .asciz "anthropic/claude"
+.Lbd_claude_name_key: .asciz "claude"
+.Lbd_mime_image_jpeg: .asciz "image/jpeg"
+.Lbd_mime_image_jpg: .asciz "image/jpg"
+.Lbd_mime_image_png: .asciz "image/png"
+.Lbd_mime_image_gif: .asciz "image/gif"
+.Lbd_mime_image_webp: .asciz "image/webp"
+.Lbd_format_jpeg: .asciz "jpeg"
+.Lbd_format_png: .asciz "png"
+.Lbd_format_gif: .asciz "gif"
+.Lbd_format_webp: .asciz "webp"
+
+.Lbd_name: .asciz "name"
