@@ -122,7 +122,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [x] Google/Vertex端点与显式认证接入产品配置链：Google默认/代理、Vertex API-key/global/regional/project collection路径由模型汇编组合；产品读取`PANGU_MODEL_API`、`PANGU_MODEL_BASE_URL`及现有options，沿资源/Generation准备进入同一提供者。配置失败保留旧值；传输回放、配置故障与产品ASan/UBSan专项通过。
 - [x] 五协议公共请求头接入实际传输：按Pi `utils/headers.ts`大小写无关合并modelInfo/连接/options三层，后层覆盖、null移除、空值及默认头替换；非法名称/CRLF/NUL拒绝，新增节点分配失败清理。模型O0/O2/UBSan、真实curl入口回放和产品ASan/UBSan专项通过。
-- [x] Azure Responses基础链复用现有Responses编码/流：资源名或完整baseUrl与API版本组合端点，显式部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
+- [x] Azure Responses基础链复用现有Responses编码/流：资源名/baseUrl与API版本组合端点，Azure域名路径规范化、代理查询保留、API版本替换；部署名映射按最后值优先并允许显式覆盖，最终部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -319,8 +319,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/azure-openai-{config,responses}.ts`，共享Responses转换/流解析；Azure SDK的请求路径与api-key绑定用于核对原生REST适配。Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`mimo.S`在配置副本解析Azure资源名/基础地址/API版本，采用显式部署名和api-key鉴权；`mimo_projection.S`复用Responses转换，仅覆盖线上请求model；`mimo_stream.S`保留原模型与Azure协议身份，`request_context.S`按实际协议隔离签名历史。产品沿现有API/options环境、资源和Generation准备进入同一提供者，公开ABI保持。
-- 验证：模型O0/O2/UBSan与ABI专项通过；OpenAI/Azure共用文本/工具终态、错误/EOF回放，验证Azure端点、部署名、鉴权和canonical身份；配置构造失败逐点验证旧值保留与清理。产品资源ASan/UBSan验证新增Azure配置及原有Google/Vertex/资源流程，Assembly与diff检查通过。自审核对请求model与持久模型身份分离、配置临时所有权和共享流入口。
-- 具体缺口：Azure部署名环境映射表、Azure域名路径规范化、模型与提供者高级选项；Bedrock协议；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Azure和Google当前为确定性协议与配置验证，没有对应真实凭据。
-- 下一交付物：沿K05补齐Azure配置/高级选项差异与Bedrock请求、鉴权及二进制事件流，保持共享请求/流状态机与实际消费者接线。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/azure-openai-config.ts`、`azure-openai-base-url.test.ts` 与Azure Responses客户端；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`mimo.S`的Azure配置副本解析显式部署与环境映射，按上游最后值/显式优先规则决定请求部署名；使用现有libcurl URL API解析地址，Assembly处理Azure域名/路径规范化、空白修整、代理路径/查询保留及API版本替换。配置结果由既有产品资源/Generation链消费，不新增公开ABI或文件。
+- 验证：模型O0/O2/UBSan与ABI、实际curl入口回放通过，覆盖三类Azure域名、根/旧响应路径、代理路径/查询、空白选项回落、重复映射、显式覆盖、版本与无效URL保留旧配置；现有流/工具/配置故障专项保持。产品资源ASan/UBSan专项通过；Assembly与diff检查通过。自审核对配置副本、URL对象/字符串所有权和失败保留。
+- 具体缺口：Azure模型/提供者高级选项、Bedrock协议；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Azure和Google当前为确定性协议与配置验证，没有对应真实凭据。
+- 下一交付物：沿K05推进Bedrock请求、鉴权及二进制事件流，按完整协议行为组接入现有Generation/Tool消费者。

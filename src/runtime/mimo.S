@@ -2341,9 +2341,18 @@ pg_mimo_complete:
  mov rdi,rax
  call json_object_get_string@PLT
  test rax,rax
- jz .Laz_endpoint
+ jz .Laz_map_select
  cmp byte ptr [rax],0
- je .Laz_endpoint
+ jne .Laz_deployment_selected
+.Laz_map_select:
+ mov rdi,rbx
+ call .Laz_map_deployment
+ mov [rsp+32],rax
+ test edx,edx
+ jnz .Laz_bad
+ test rax,rax
+ jz .Laz_endpoint
+.Laz_deployment_selected:
  mov rdi,rax
  call json_object_new_string@PLT
  test rax,rax
@@ -2366,10 +2375,16 @@ pg_mimo_complete:
  lea rsi,[rip+.Laz_base]
  lea rdx,[rip+.Laz_base_env]
  call .Lge_option
+ mov rdi,rax
+ call .Laz_nonblank
  test rax,rax
- jz .Laz_resource
- cmp byte ptr [rax],0
- jne .Laz_copy_base
+ jnz .Laz_copy_base
+ lea rdi,[rip+.Laz_base_env]
+ call getenv@PLT
+ mov rdi,rax
+ call .Laz_nonblank
+ test rax,rax
+ jnz .Laz_copy_base
 .Laz_resource:
  mov rdi,rbx
  lea rsi,[rip+.Laz_resource_name]
@@ -2413,9 +2428,11 @@ pg_mimo_complete:
  jz .Laz_bad
 .Laz_base_ready:
  mov rdi,[rsp]
+ call .Laz_trim_space
+ mov r13,rax
+ mov rdi,rax
  call strlen@PLT
  mov r12,rax
- mov r13,[rsp]
 .Laz_trim:
  test r12,r12
  jz .Laz_bad
@@ -2443,14 +2460,14 @@ pg_mimo_complete:
  mov [rsp+8],rax
  test rax,rax
  jz .Laz_bad
- lea rdi,[rsp+16]
- lea rsi,[rip+.Laz_endpoint_format]
- mov rdx,r13
- mov rcx,rax
- xor eax,eax
- call asprintf@PLT
- test eax,eax
- js .Laz_bad
+ mov rdi,r13
+ mov rsi,rax
+ call .Laz_route
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Laz_bad
+ mov rdi,rax
+ call strlen@PLT
  cmp eax,2048
  jae .Laz_bad
  mov rdi,[rsp+16]
@@ -2472,6 +2489,8 @@ pg_mimo_complete:
 .Laz_bad:
  mov ebp,1
 .Laz_end:
+ mov rdi,[rsp+32]
+ call free@PLT
  mov rdi,[rsp]
  call free@PLT
  mov rdi,[rsp+8]
@@ -2503,3 +2522,426 @@ pg_mimo_complete:
 .Laz_endpoint_format: .asciz "%s/responses?api-version=%s"
 
 .Laz_api_keyname: .asciz "api"
+
+.text
+/* In-place ASCII trim for URL/config strings; returned pointer is borrowed. */
+.Laz_trim_space:
+ mov rax,rdi
+.Laz_space_head:
+ movzx edx,byte ptr [rax]
+ cmp edx,32
+ je .Laz_space_advance
+ cmp edx,9
+ jb .Laz_space_tail
+ cmp edx,13
+ ja .Laz_space_tail
+.Laz_space_advance:
+ inc rax
+ jmp .Laz_space_head
+.Laz_space_tail:
+ mov rcx,rax
+.Laz_space_end:
+ cmp byte ptr [rcx],0
+ je .Laz_space_back
+ inc rcx
+ jmp .Laz_space_end
+.Laz_space_back:
+ cmp rcx,rax
+ je .Laz_space_done
+ movzx edx,byte ptr [rcx-1]
+ cmp edx,32
+ je .Laz_space_cut
+ cmp edx,9
+ jb .Laz_space_done
+ cmp edx,13
+ ja .Laz_space_done
+.Laz_space_cut:
+ dec rcx
+ mov byte ptr [rcx],0
+ jmp .Laz_space_back
+.Laz_space_done:
+ ret
+.Laz_suffix:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ call strlen@PLT
+ mov r13,rax
+ mov rdi,r12
+ call strlen@PLT
+ cmp r13,rax
+ jb .Laz_suffix_no
+ sub r13,rax
+ lea rdi,[rbx+r13]
+ mov rsi,r12
+ call strcasecmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ jmp .Laz_suffix_end
+.Laz_suffix_no:
+ xor eax,eax
+.Laz_suffix_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* libcurl owns URL syntax; Assembly owns the Azure path and query policy. */
+.Laz_route:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov r12,rdi
+ mov r13,rsi
+ xor eax,eax
+ mov ecx,8
+ mov rdi,rsp
+ rep stosq
+ call curl_url@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Laz_route_end
+ mov rdi,rax
+ xor esi,esi
+ mov rdx,r12
+ xor ecx,ecx
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,5
+ lea rdx,[rsp+8]
+ xor ecx,ecx
+ call curl_url_get@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,7
+ lea rdx,[rsp+16]
+ xor ecx,ecx
+ call curl_url_get@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Laz_host_openai]
+ call .Laz_suffix
+ test eax,eax
+ jnz .Laz_route_host
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Laz_host_cognitive]
+ call .Laz_suffix
+ test eax,eax
+ jnz .Laz_route_host
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Laz_host_ai]
+ call .Laz_suffix
+ test eax,eax
+ jz .Laz_route_path
+.Laz_route_host:
+ mov rdi,[rsp+16]
+ call strlen@PLT
+ mov rbx,[rsp+16]
+.Laz_route_trim:
+ test rax,rax
+ jz .Laz_route_normalize
+ cmp byte ptr [rbx+rax-1],47
+ jne .Laz_route_path_test
+ dec rax
+ mov byte ptr [rbx+rax],0
+ jmp .Laz_route_trim
+.Laz_route_path_test:
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_openai_path]
+ call strcmp@PLT
+ test eax,eax
+ jz .Laz_route_normalize
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_responses_path]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Laz_route_path
+.Laz_route_normalize:
+ mov rdi,[rsp+16]
+ call curl_free@PLT
+ lea rdi,[rip+.Laz_v1_path]
+ call strdup@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,8
+ xor edx,edx
+ xor ecx,ecx
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Laz_route_end
+.Laz_route_path:
+ mov rdi,[rsp+16]
+ call strlen@PLT
+ mov rbx,[rsp+16]
+.Laz_route_path_trim:
+ test rax,rax
+ jz .Laz_route_join
+ cmp byte ptr [rbx+rax-1],47
+ jne .Laz_route_join
+ dec rax
+ mov byte ptr [rbx+rax],0
+ jmp .Laz_route_path_trim
+.Laz_route_join:
+ lea rdi,[rsp+24]
+ lea rsi,[rip+.Laz_path_format]
+ mov rdx,rbx
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,7
+ mov rdx,[rsp+24]
+ xor ecx,ecx
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,8
+ lea rdx,[rsp+56]
+ xor ecx,ecx
+ call curl_url_get@PLT
+ test eax,eax
+ jnz .Laz_route_query_ready
+ mov rbx,[rsp+56]
+.Laz_route_query_each:
+ cmp byte ptr [rbx],0
+ je .Laz_route_query_set
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_query_key]
+ mov edx,12
+ call strncmp@PLT
+ test eax,eax
+ jnz .Laz_route_query_next
+ mov rdi,rbx
+ mov esi,38
+ call strchr@PLT
+ test rax,rax
+ jz .Laz_route_query_last
+ lea r14,[rax+1]
+ mov rdi,r14
+ call strlen@PLT
+ mov rdi,rbx
+ mov rsi,r14
+ lea rdx,[rax+1]
+ call memmove@PLT
+ jmp .Laz_route_query_each
+.Laz_route_query_last:
+ mov byte ptr [rbx],0
+ cmp rbx,[rsp+56]
+ je .Laz_route_query_set
+ mov byte ptr [rbx-1],0
+ jmp .Laz_route_query_set
+.Laz_route_query_next:
+ mov rdi,rbx
+ mov esi,38
+ call strchr@PLT
+ test rax,rax
+ jz .Laz_route_query_set
+ lea rbx,[rax+1]
+ jmp .Laz_route_query_each
+.Laz_route_query_set:
+ mov rdi,[rsp]
+ mov esi,8
+ mov rdx,[rsp+56]
+ xor ecx,ecx
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Laz_route_end
+.Laz_route_query_ready:
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Laz_query_format]
+ mov rdx,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Laz_route_end
+ mov rdi,[rsp]
+ mov esi,8
+ mov rdx,[rsp+32]
+ mov ecx,256
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp]
+ xor esi,esi
+ lea rdx,[rsp+40]
+ xor ecx,ecx
+ call curl_url_get@PLT
+ test eax,eax
+ jnz .Laz_route_end
+ mov rdi,[rsp+40]
+ call strdup@PLT
+ mov [rsp+48],rax
+.Laz_route_end:
+ mov rdi,[rsp+56]
+ call curl_free@PLT
+ mov rdi,[rsp]
+ call curl_url_cleanup@PLT
+ mov rdi,[rsp+8]
+ call curl_free@PLT
+ mov rdi,[rsp+16]
+ call curl_free@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov rdi,[rsp+40]
+ call curl_free@PLT
+ mov rax,[rsp+48]
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Laz_host_openai: .asciz ".openai.azure.com"
+.Laz_host_cognitive: .asciz ".cognitiveservices.azure.com"
+.Laz_host_ai: .asciz ".ai.azure.com"
+.Laz_openai_path: .asciz "/openai"
+.Laz_responses_path: .asciz "/openai/v1/responses"
+.Laz_v1_path: .asciz "/openai/v1"
+.Laz_path_format: .asciz "%s/responses"
+.Laz_query_format: .asciz "api-version=%s"
+
+.text
+.Laz_map_deployment:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ xor eax,eax
+ mov [rsp],rax
+ mov [rsp+8],rax
+ mov [rsp+16],rax
+ lea rdi,[rip+.Laz_map_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Laz_map_ok
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Laz_map_bad
+ mov r14,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+.Laz_map_entry:
+ mov rdi,r14
+ mov esi,44
+ call strchr@PLT
+ xor r13d,r13d
+ test rax,rax
+ jz .Laz_map_pair
+ mov byte ptr [rax],0
+ lea r13,[rax+1]
+.Laz_map_pair:
+ mov rdi,r14
+ call .Laz_trim_space
+ mov r14,rax
+ mov rdi,rax
+ mov esi,61
+ call strchr@PLT
+ test rax,rax
+ jz .Laz_map_next
+ mov byte ptr [rax],0
+ lea rbp,[rax+1]
+ cmp byte ptr [r14],0
+ je .Laz_map_next
+ cmp byte ptr [rbp],0
+ je .Laz_map_next
+ mov rdi,rbp
+ mov esi,61
+ call strchr@PLT
+ test rax,rax
+ jz .Laz_map_trim_key
+ mov byte ptr [rax],0
+.Laz_map_trim_key:
+ mov rdi,r14
+ call .Laz_trim_space
+ mov rdi,rax
+ mov rsi,r12
+ call strcmp@PLT
+ test eax,eax
+ jnz .Laz_map_next
+ mov rdi,rbp
+ call .Laz_trim_space
+ mov [rsp+8],rax
+.Laz_map_next:
+ mov r14,r13
+ test r14,r14
+ jnz .Laz_map_entry
+ mov rdi,[rsp+8]
+ test rdi,rdi
+ jz .Laz_map_ok
+ cmp byte ptr [rdi],0
+ je .Laz_map_ok
+ call strdup@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Laz_map_bad
+.Laz_map_ok:
+ xor ebp,ebp
+ jmp .Laz_map_end
+.Laz_map_bad:
+ mov ebp,1
+.Laz_map_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rax,[rsp+16]
+ mov edx,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Laz_map_env: .asciz "AZURE_OPENAI_DEPLOYMENT_NAME_MAP"
+
+.text
+.Laz_nonblank:
+ mov rax,rdi
+ test rax,rax
+ jz .Laz_nonblank_end
+.Laz_nonblank_next:
+ movzx edx,byte ptr [rax]
+ test edx,edx
+ jz .Laz_nonblank_empty
+ cmp edx,32
+ je .Laz_nonblank_advance
+ cmp edx,9
+ jb .Laz_nonblank_end
+ cmp edx,13
+ ja .Laz_nonblank_end
+.Laz_nonblank_advance:
+ inc rax
+ jmp .Laz_nonblank_next
+.Laz_nonblank_empty:
+ xor eax,eax
+.Laz_nonblank_end:
+ ret
+
+.section .rodata
+.Laz_query_key: .asciz "api-version="

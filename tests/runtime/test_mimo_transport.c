@@ -600,6 +600,16 @@ static void test_google_endpoint_config(void){
  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
 }
+static void test_azure_configuration(void){
+ const char *bases[]={" https://r.openai.azure.com/ ","https://r.cognitiveservices.azure.com/openai/","https://r.services.ai.azure.com/openai/v1/responses?old=yes","https://proxy.invalid/v1?api-version=old&custom=true&api-version=old2","https://r.openai.azure.com/custom/path/"};
+ const char *expected[]={"https://r.openai.azure.com/openai/v1/responses?api-version=v1","https://r.cognitiveservices.azure.com/openai/v1/responses?api-version=v1","https://r.services.ai.azure.com/openai/v1/responses?api-version=v1","https://proxy.invalid/v1/responses?custom=true&api-version=v1","https://r.openai.azure.com/custom/path/responses?api-version=v1"};
+ for(unsigned n=0;n<5;n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"azure-openai-responses\",\"model\":\"logical-model\"}");if(!n)json_object_object_add(cfg,"options",json_tokener_parse("{\"azureBaseUrl\":\" \\t \"}"));setenv("AZURE_OPENAI_BASE_URL",bases[n],1);setenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAP","invalid,other=unused, logical-model = first ,logical-model= final-deployment=ignored",1);assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","azure-config-key",1);assert(!start()&&!strcmp(captured_url,expected[n])&&strstr(captured_post,"final-deployment"));model.close(model.context);
+ }
+ unsetenv("AZURE_OPENAI_BASE_URL");unsetenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAP");
+ reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"azure-openai-responses\",\"model\":\"logical-model\",\"options\":{\"azureResourceName\":\"pangu\",\"azureApiVersion\":\"2025-01-preview\",\"azureDeploymentName\":\"explicit\"}}");setenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAP","logical-model=mapped",1);assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(strstr(json_object_get_string(json_object_object_get(m.configuration,"endpoint")),"api-version=2025-01-preview")&&!strcmp(json_object_get_string(json_object_object_get(m.configuration,"azureDeploymentName")),"explicit"));json_object *old=m.configuration;cfg=json_tokener_parse("{\"api\":\"azure-openai-responses\",\"model\":\"logical-model\",\"baseUrl\":\"not-a-url\"}");assert(pg_mimo_configure(&m,cfg)&&m.configuration==old);json_object_put(cfg);model.close(model.context);unsetenv("AZURE_OPENAI_DEPLOYMENT_NAME_MAP");unsetenv("PANGU_MODEL_API_KEY");
+ puts("PASS: Azure upstream root/path/query normalization, proxy preservation, deployment map last-wins, explicit override, API version and failed-config retention");
+}
 static void test_provider_headers(void){
  const char *apis[]={"openai-completions","openai-responses","anthropic-messages","google-generative-ai","google-vertex"};
  for(unsigned protocol=0;protocol<5;protocol++){
@@ -644,6 +654,7 @@ int main(void) {
     test_google_transport();
     test_google_endpoint_config();
     test_provider_headers();
+    test_azure_configuration();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
