@@ -334,6 +334,15 @@ pg_mimo_decode_line:
  pop rdi
  test eax,eax
  jnz .Lrs_decode
+ push rdi
+ push rsi
+ push rdx
+ call pg_mimo_uses_anthropic
+ pop rdx
+ pop rsi
+ pop rdi
+ test eax,eax
+ jnz .Lrs_decode
 .Lchat_decode:
  push rbx
  push r12
@@ -869,6 +878,17 @@ pg_mimo_decode_line:
  mov [rsp+56],rax
  test rax,rax
  jz .Lrs_bad
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lrs_openai_event
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ mov ebp,eax
+ jmp .Lrs_cleanup
+.Lrs_openai_event:
  lea rdi,[rip+.Lrs_base]
  call json_tokener_parse@PLT
  mov [rsp+8],rax
@@ -1465,7 +1485,17 @@ pg_mimo_responses_complete:
  mov rdi,rbx
  call pg_mimo_uses_responses@PLT
  test eax,eax
+ jnz .Lrc_responses
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
  jz .Lrc_ok
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Lan_complete
+ mov ebp,eax
+ jmp .Lrc_cleanup
+.Lrc_responses:
  test r12,r12
  jz .Lrc_metadata
  call json_object_new_array@PLT
@@ -2449,3 +2479,892 @@ pg_mimo_prepare_arguments:
 .size pg_mimo_prepare_arguments,.-pg_mimo_prepare_arguments
 
 .set PA_ERROR_BYTES, .Lpa_error_end-.Lpa_error
+
+/* Pi anthropic-messages.ts: ordered open blocks, final argument parsing and
+   message_stop barrier. Each block owns two printbufs and a canonical item. */
+.macro ANGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lan_\key]
+ call li_get
+.endm
+.macro ANCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lan_\from]
+ lea rcx,[rip+.Lan_\to]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_bad
+.endm
+.text
+.globl pg_mimo_anthropic_clear
+.type pg_mimo_anthropic_clear,@function
+pg_mimo_anthropic_clear:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ xor r12d,r12d
+.Lan_clear_each:
+ cmp r12,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lan_clear_done
+ imul r13,r12,40
+ add r13,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ mov rdi,[r13+16]
+ call printbuf_free@PLT
+ mov rdi,[r13+24]
+ call printbuf_free@PLT
+ mov rdi,[r13+32]
+ call json_object_put@PLT
+ inc r12
+ jmp .Lan_clear_each
+.Lan_clear_done:
+ mov rdi,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ call free@PLT
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ call json_object_put@PLT
+ mov qword ptr [rbx+PG_MM_ANTHROPIC_BLOCKS],0
+ mov qword ptr [rbx+PG_MM_ANTHROPIC_COUNT],0
+ mov qword ptr [rbx+PG_MM_ANTHROPIC_CAPACITY],0
+ mov qword ptr [rbx+PG_MM_ANTHROPIC_USAGE],0
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_mimo_anthropic_clear,.-pg_mimo_anthropic_clear
+/* Append a JSON string with explicit length; printbuf grows with the stream. */
+.Lan_append:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lan_append_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov [rsp],eax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rdi,rbx
+ mov rsi,rax
+ mov edx,[rsp]
+ call printbuf_memappend@PLT
+ test eax,eax
+ setl al
+ movzx eax,al
+ jmp .Lan_append_end
+.Lan_append_bad:
+ mov eax,1
+.Lan_append_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* event frame: normalized Chat root/choice/delta, incoming block, slot and
+   temporary owner. Only normalized text/tool deltas enter the common decoder. */
+.Lan_event:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,12
+ rep stosq
+ ANGET r12,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+80],rax
+ test rax,rax
+ jz .Lan_bad
+ lea r14,[rip+.Lan_events]
+ xor ebp,ebp
+.Lan_find_event:
+ mov rsi,[r14+rbp*8]
+ test rsi,rsi
+ jz .Lan_ok
+ mov rdi,[rsp+80]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_dispatch
+ inc ebp
+ jmp .Lan_find_event
+.Lan_dispatch:
+ cmp ebp,6
+ je .Lan_error
+ cmp ebp,5
+ je .Lan_message_stop
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ jne .Lan_bad
+ lea rdi,[rip+.Lrs_base]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lan_bad
+ ANGET rax,choices
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+8],rax
+ ANGET rax,delta
+ mov [rsp+16],rax
+ cmp ebp,0
+ je .Lan_message_start
+ cmp ebp,4
+ je .Lan_message_delta
+ ANGET r12,index
+ mov [rsp+88],rax
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lan_bad
+ mov rdi,[rsp+88]
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lan_bad
+ mov [rsp+24],rax
+ xor r14d,r14d
+.Lan_find_block:
+ cmp r14,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lan_missing_block
+ imul rcx,r14,40
+ add rcx,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp [rcx],rax
+ je .Lan_found_block
+ inc r14
+ jmp .Lan_find_block
+.Lan_missing_block:
+ cmp ebp,1
+ jne .Lan_bad
+ mov rax,[rbx+PG_MM_ANTHROPIC_COUNT]
+ cmp rax,[rbx+PG_MM_ANTHROPIC_CAPACITY]
+ jb .Lan_allocate_block
+ lea rsi,[rax+8]
+ mov [rsp+72],rsi
+ imul rsi,rsi,40
+ mov rdi,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ call realloc@PLT
+ test rax,rax
+ jz .Lan_bad
+ mov [rbx+PG_MM_ANTHROPIC_BLOCKS],rax
+ mov rax,[rsp+72]
+ mov [rbx+PG_MM_ANTHROPIC_CAPACITY],rax
+.Lan_allocate_block:
+ imul r14,[rbx+PG_MM_ANTHROPIC_COUNT],40
+ add r14,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ mov rdi,r14
+ xor esi,esi
+ mov edx,40
+ call memset@PLT
+ inc qword ptr [rbx+PG_MM_ANTHROPIC_COUNT]
+ mov rax,[rsp+24]
+ mov [r14],rax
+ call printbuf_new@PLT
+ mov [r14+16],rax
+ test rax,rax
+ jz .Lan_bad
+ call printbuf_new@PLT
+ mov [r14+24],rax
+ test rax,rax
+ jz .Lan_bad
+ ANGET r12,content_block
+ mov [rsp+32],rax
+ ANGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+80],rax
+ test rax,rax
+ jz .Lan_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lan_text]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_start_text
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_start_thinking
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_redacted_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_start_redacted
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_tool_use]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_bad
+ mov dword ptr [r14+8],3
+ mov eax,[rbx+PG_MM_CALL_COUNT]
+ cmp eax,PG_MM_CALL_LIMIT
+ jae .Lan_bad
+ mov rcx,[rsp+24]
+ mov [rbx+PG_MM_RESPONSE_INDEX+rax*8],rcx
+ mov [rsp+48],rax
+ lea rdi,[rip+.Lrc_tool_json]
+ call json_tokener_parse@PLT
+ mov [r14+32],rax
+ test rax,rax
+ jz .Lan_bad
+ ANCOPY rax,"qword ptr [rsp+32]",id,id
+ ANCOPY "qword ptr [r14+32]","qword ptr [rsp+32]",name,name
+ jmp .Lan_tool_delta
+.Lan_start_text:
+ mov dword ptr [r14+8],1
+ lea rdi,[rip+.Lrc_text_json]
+ call json_tokener_parse@PLT
+ mov [r14+32],rax
+ test rax,rax
+ jz .Lan_bad
+ ANGET "qword ptr [rsp+32]",text
+ mov [rsp+56],rax
+ jmp .Lan_text_delta
+.Lan_start_thinking:
+ mov dword ptr [r14+8],2
+ lea rdi,[rip+.Lrc_think_json]
+ call json_tokener_parse@PLT
+ mov [r14+32],rax
+ test rax,rax
+ jz .Lan_bad
+ ANGET "qword ptr [rsp+32]",signature
+ test rax,rax
+ jz .Lan_initial_thinking
+ mov rdi,[r14+24]
+ mov rsi,rax
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+.Lan_initial_thinking:
+ ANGET "qword ptr [rsp+32]",thinking
+ test rax,rax
+ jz .Lan_ok
+ mov rdi,[r14+16]
+ mov rsi,rax
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+ jmp .Lan_ok
+.Lan_start_redacted:
+ mov dword ptr [r14+8],4
+ lea rdi,[rip+.Lan_redacted_json]
+ call json_tokener_parse@PLT
+ mov [r14+32],rax
+ test rax,rax
+ jz .Lan_bad
+ ANGET "qword ptr [rsp+32]",data
+ mov rdi,[r14+24]
+ mov rsi,rax
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+ mov rdi,[r14+16]
+ lea rsi,[rip+.Lan_redacted]
+ mov edx,19
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lan_bad
+ jmp .Lan_ok
+.Lan_found_block:
+ mov r14,rcx
+ cmp ebp,1
+ je .Lan_bad
+ cmp dword ptr [r14+12],0
+ jne .Lan_bad
+ cmp ebp,3
+ je .Lan_block_stop
+ ANGET r12,delta
+ mov [rsp+32],rax
+ ANGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+80],rax
+ test rax,rax
+ jz .Lan_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lan_text_delta_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_other_delta
+ cmp dword ptr [r14+8],1
+ jne .Lan_bad
+ ANGET "qword ptr [rsp+32]",text
+ mov [rsp+56],rax
+.Lan_text_delta:
+ cmp qword ptr [rsp+56],0
+ je .Lan_ok
+ mov rdi,[r14+16]
+ mov rsi,[rsp+56]
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+ mov rdi,[rsp+56]
+ call json_object_get@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lstr_content]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+ jmp .Lan_emit
+.Lan_other_delta:
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_input_json_delta]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_tool_delta_find
+ cmp dword ptr [r14+8],2
+ jne .Lan_bad
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_thinking_delta]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_signature_delta
+ ANGET "qword ptr [rsp+32]",thinking
+ mov rdi,[r14+16]
+ jmp .Lan_append_delta
+.Lan_signature_delta:
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_signature_delta_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_ok
+ ANGET "qword ptr [rsp+32]",signature
+ mov rdi,[r14+24]
+.Lan_append_delta:
+ mov rsi,rax
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+ jmp .Lan_ok
+.Lan_tool_delta_find:
+ cmp dword ptr [r14+8],3
+ jne .Lan_bad
+ xor ecx,ecx
+ mov rax,[r14]
+.Lan_tool_slot:
+ cmp ecx,[rbx+PG_MM_CALL_COUNT]
+ jae .Lan_bad
+ cmp [rbx+PG_MM_RESPONSE_INDEX+rcx*8],rax
+ je .Lan_tool_slot_found
+ inc ecx
+ jmp .Lan_tool_slot
+.Lan_tool_slot_found:
+ mov [rsp+48],rcx
+ ANGET "qword ptr [rsp+32]",partial_json
+ mov [rsp+56],rax
+ mov rdi,[r14+16]
+ mov rsi,rax
+ call .Lan_append
+ test eax,eax
+ jnz .Lan_bad
+.Lan_tool_delta:
+ lea rdi,[rip+.Lrs_calls_json]
+ call json_tokener_parse@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lan_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ mov rdi,[rsp+48]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+64]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+ cmp ebp,1
+ jne .Lan_tool_arguments_delta
+ ANCOPY "qword ptr [rsp+64]","qword ptr [rsp+32]",id,id
+ ANGET "qword ptr [rsp+64]",function
+ ANCOPY rax,"qword ptr [rsp+32]",name,name
+ jmp .Lan_tool_attach
+.Lan_tool_arguments_delta:
+ ANGET "qword ptr [rsp+64]",function
+ mov [rsp+64],rax
+ ANCOPY rax,"qword ptr [rsp+32]",partial_json,arguments
+.Lan_tool_attach:
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lan_tool_calls]
+ mov rdx,[rsp+40]
+ mov qword ptr [rsp+40],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+ jmp .Lan_emit
+.Lan_block_stop:
+ cmp dword ptr [r14+8],3
+ je .Lan_finish_tool
+ mov rax,[r14+16]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ lea rsi,[rip+.Lan_text]
+ cmp dword ptr [r14+8],1
+ je .Lan_finish_text_key
+ lea rsi,[rip+.Lan_thinking]
+.Lan_finish_text_key:
+ mov rdi,[r14+32]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+ cmp dword ptr [r14+8],1
+ je .Lan_block_closed
+ mov rax,[r14+24]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ mov rdi,[r14+32]
+ lea rsi,[rip+.Lan_thinkingSignature]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+ jmp .Lan_block_closed
+.Lan_finish_tool:
+ mov rax,[r14+16]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ lea rdx,[rsp+40]
+ call pg_mimo_arguments_parse
+ test eax,eax
+ jnz .Lan_bad
+ ANCOPY "qword ptr [r14+32]","qword ptr [rsp+40]",arguments,arguments
+ ANCOPY "qword ptr [r14+32]","qword ptr [rsp+40]",argumentsError,argumentsError
+.Lan_block_closed:
+ mov dword ptr [r14+12],1
+ jmp .Lan_ok
+.Lan_message_start:
+ cmp qword ptr [rbx+PG_MM_RESPONSE_ID],0
+ jne .Lan_bad
+ ANGET r12,message
+ mov [rsp+32],rax
+ ANGET rax,id
+ test rax,rax
+ jz .Lan_bad
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rbx+PG_MM_RESPONSE_ID],rax
+ ANGET "qword ptr [rsp+32]",usage
+ jmp .Lan_update_usage
+.Lan_message_delta:
+ ANGET r12,delta
+ mov [rsp+32],rax
+ ANGET rax,stop_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lan_delta_usage
+ mov [rsp+80],rax
+ mov rdi,rbx
+ mov rsi,[rsp+32]
+ call .Lrt_save
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_max_tokens]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_length
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_tool_use]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_finish_calls
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_end_turn]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_finish_stop
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_stop_sequence]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_finish_stop
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lan_pause_turn]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_error
+.Lan_finish_stop:
+ lea rdi,[rip+.Lstr_stop]
+ jmp .Lan_finish_value
+.Lan_finish_calls:
+ lea rdi,[rip+.Lstr_reason_calls]
+ jmp .Lan_finish_value
+.Lan_length:
+ /* A truncated tool must remain non-executable. */
+ mov dword ptr [rbx+PG_MM_FINISH_REASON],3
+ jmp .Lan_delta_usage
+.Lan_finish_value:
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lstr_finish_reason]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_bad
+.Lan_delta_usage:
+ ANGET r12,usage
+.Lan_update_usage:
+ mov rdi,rbx
+ mov rsi,rax
+ call .Lan_update_usage_object
+ test eax,eax
+ jnz .Lan_bad
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],3
+ je .Lan_ok
+ jmp .Lan_emit
+.Lan_message_stop:
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ je .Lan_bad
+ xor r14d,r14d
+.Lan_all_closed:
+ cmp r14,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lan_stopped
+ imul rax,r14,40
+ add rax,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp dword ptr [rax+12],0
+ je .Lan_bad
+ inc r14
+ jmp .Lan_all_closed
+.Lan_stopped:
+ mov dword ptr [rbx+PG_MM_SAW_DONE],1
+ jmp .Lan_ok
+.Lan_error:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lrt_save
+ jmp .Lan_bad
+.Lan_emit:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lchat_object
+ test eax,eax
+ jnz .Lan_bad
+.Lan_ok:
+ xor ebp,ebp
+ jmp .Lan_cleanup
+.Lan_bad:
+ mov ebp,1
+.Lan_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+/* Merge only reported counters, then expose the common usage representation.
+   Anthropic input_tokens excludes cache reads and writes. */
+.Lan_update_usage_object:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+56],0
+ cmp qword ptr [rbx+PG_MM_ANTHROPIC_USAGE],0
+ jne .Lan_usage_merge
+ call json_object_new_object@PLT
+ mov [rbx+PG_MM_ANTHROPIC_USAGE],rax
+ test rax,rax
+ jz .Lan_usage_bad
+.Lan_usage_merge:
+ xor r13d,r13d
+ lea r14,[rip+.Lan_usage_keys]
+.Lan_usage_each:
+ cmp r13,4
+ jae .Lan_usage_build
+ mov rdi,r12
+ mov rsi,[r14+r13*8]
+ call li_get
+ test rax,rax
+ jz .Lan_usage_saved
+ mov [rsp+48],rax
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lan_usage_bad
+ mov rdi,[rsp+48]
+ call json_object_get_int64@PLT
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lan_usage_bad
+ mov rdi,[rsp+48]
+ call json_object_get@PLT
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ mov rsi,[r14+r13*8]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_usage_bad
+.Lan_usage_saved:
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ mov rsi,[r14+r13*8]
+ call li_get
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov [rsp+r13*8],rax
+ inc r13
+ jmp .Lan_usage_each
+.Lan_usage_build:
+ lea rdi,[rip+.Lan_usage_json]
+ call json_tokener_parse@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lan_usage_bad
+ mov rdi,[rsp]
+ add rdi,[rsp+16]
+ jc .Lan_usage_bad
+ add rdi,[rsp+24]
+ jc .Lan_usage_bad
+ mov rax,9007199254740991
+ cmp rdi,rax
+ ja .Lan_usage_bad
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrs_prompt_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_usage_bad
+ mov rdi,[rsp+8]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrs_completion_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_usage_bad
+ RSGET "qword ptr [rsp+56]",prompt_tokens_details
+ mov rbp,rax
+ mov rdi,[rsp+16]
+ call json_object_new_int64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_cached_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_usage_bad
+ mov rdi,[rsp+24]
+ call json_object_new_int64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_cache_write_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_usage_bad
+ mov rdi,[rbx+PG_MM_USAGE]
+ call json_object_put@PLT
+ mov rax,[rsp+56]
+ mov [rbx+PG_MM_USAGE],rax
+ mov qword ptr [rsp+56],0
+ xor ebp,ebp
+ jmp .Lan_usage_end
+.Lan_usage_bad:
+ mov ebp,1
+.Lan_usage_end:
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Final canonical content is detached from the decoder before persistence. */
+.Lan_complete:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lan_complete_bad
+ xor r13d,r13d
+.Lan_complete_each:
+ cmp r13,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lan_complete_adopt
+ imul r14,r13,40
+ add r14,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp dword ptr [r14+12],0
+ je .Lan_complete_bad
+ mov rdi,[r14+32]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov qword ptr [rsp+8],0
+ inc r13
+ jmp .Lan_complete_each
+.Lan_complete_adopt:
+ mov rdi,r12
+ lea rsi,[rip+.Lrc_content]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov r14,[rbx+PG_MM_CONFIGURATION]
+ mov rdi,r12
+ mov rsi,r14
+ lea rdx,[rip+.Lrc_model]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,r12
+ mov rsi,r14
+ lea rdx,[rip+.Lrc_modelProvider]
+ lea rcx,[rip+.Lrc_provider]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+ ANGET r12,provider
+ test rax,rax
+ jnz .Lan_complete_api
+ RCGET r14,modelInfo
+ mov rsi,rax
+ mov rdi,r12
+ lea rdx,[rip+.Lrc_provider]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lan_complete_api:
+ lea rdi,[rip+.Lan_api_value]
+ call json_object_new_string@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lrc_api]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,r12
+ mov rsi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ lea rdx,[rip+.Lan_stop_reason]
+ lea rcx,[rip+.Lrt_raw_stop]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
+ test rdi,rdi
+ jz .Lan_complete_ok
+ call json_object_get@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lrc_responseId]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lan_complete_ok:
+ xor ebp,ebp
+ jmp .Lan_complete_end
+.Lan_complete_bad:
+ mov ebp,1
+.Lan_complete_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lan_type: .asciz "type"
+.Lan_index: .asciz "index"
+.Lan_content_block: .asciz "content_block"
+.Lan_delta: .asciz "delta"
+.Lan_text: .asciz "text"
+.Lan_thinking: .asciz "thinking"
+.Lan_redacted_thinking: .asciz "redacted_thinking"
+.Lan_tool_use: .asciz "tool_use"
+.Lan_signature: .asciz "signature"
+.Lan_data: .asciz "data"
+.Lan_id: .asciz "id"
+.Lan_name: .asciz "name"
+.Lan_function: .asciz "function"
+.Lan_arguments: .asciz "arguments"
+.Lan_argumentsError: .asciz "argumentsError"
+.Lan_partial_json: .asciz "partial_json"
+.Lan_tool_calls: .asciz "tool_calls"
+.Lan_text_delta_type: .asciz "text_delta"
+.Lan_input_json_delta: .asciz "input_json_delta"
+.Lan_thinking_delta: .asciz "thinking_delta"
+.Lan_signature_delta_type: .asciz "signature_delta"
+.Lan_thinkingSignature: .asciz "thinkingSignature"
+.Lan_provider: .asciz "provider"
+.Lan_message: .asciz "message"
+.Lan_usage: .asciz "usage"
+.Lan_stop_reason: .asciz "stop_reason"
+.Lan_max_tokens: .asciz "max_tokens"
+.Lan_end_turn: .asciz "end_turn"
+.Lan_stop_sequence: .asciz "stop_sequence"
+.Lan_pause_turn: .asciz "pause_turn"
+.Lan_api_value: .asciz "anthropic-messages"
+.Lan_redacted: .asciz "[Reasoning redacted]"
+.Lan_redacted_json: .asciz "{\"type\":\"thinking\",\"redacted\":true}"
+.Lan_usage_json: .asciz "{\"prompt_tokens_details\":{}}"
+.Lan_cached_tokens: .asciz "cached_tokens"
+.Lan_cache_write_tokens: .asciz "cache_write_tokens"
+.Lan_input_tokens: .asciz "input_tokens"
+.Lan_output_tokens: .asciz "output_tokens"
+.Lan_cache_read_input_tokens: .asciz "cache_read_input_tokens"
+.Lan_cache_creation_input_tokens: .asciz "cache_creation_input_tokens"
+.Lan_start: .asciz "message_start"
+.Lan_block_start: .asciz "content_block_start"
+.Lan_block_delta: .asciz "content_block_delta"
+.Lan_evt_block_stop: .asciz "content_block_stop"
+.Lan_message_delta_type: .asciz "message_delta"
+.Lan_message_stop_type: .asciz "message_stop"
+.Lan_error_type: .asciz "error"
+.section .data.rel.ro
+.Lan_events: .quad .Lan_start,.Lan_block_start,.Lan_block_delta,.Lan_evt_block_stop,.Lan_message_delta_type,.Lan_message_stop_type,.Lan_error_type,0
+.Lan_usage_keys: .quad .Lan_input_tokens,.Lan_output_tokens,.Lan_cache_read_input_tokens,.Lan_cache_creation_input_tokens
+.section .rodata
+.Lan_choices: .asciz "choices"

@@ -147,7 +147,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable OpenAI Chat Completions/Responses projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts",
+      "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -167,7 +167,10 @@
         "pg_context_project",
         "pg_context_messages",
         "pg_context_blank",
-        "pg_context_messages_model"
+        "pg_context_messages_model",
+        "pg_mimo_uses_anthropic",
+        "pg_mimo_config_anthropic",
+        "pg_mimo_anthropic_clear"
       ],
       "reference_basis": [
         {
@@ -217,6 +220,19 @@
           "tests_to_read": [
             "packages/ai/test/openai-completions-tool-choice.test.ts",
             "packages/durable/test/harness-tools.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/api/anthropic-messages.ts",
+            "packages/ai/src/api/transform-messages.ts",
+            "packages/ai/src/api/simple-options.ts"
+          ],
+          "semantics": "Messages request blocks and tool groups, API-key/version headers, ordered text/thinking/signature/tool blocks, final argument parsing, incremental cache usage and message_stop settlement; model-scoped canonical history replay",
+          "tests_to_read": [
+            "packages/ai/test/streaming-tool-arguments.test.ts"
           ]
         }
       ]

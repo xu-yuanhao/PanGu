@@ -378,6 +378,13 @@ pg_context_messages_model:
  mov rdi,r15
  call pg_mimo_config_responses@PLT
  mov [rsp+180],eax
+ test eax,eax
+ jnz .Lri_protocol_ready
+ mov rdi,[rsp+160]
+ call pg_mimo_config_anthropic
+ add eax,eax
+ mov [rsp+180],eax
+.Lri_protocol_ready:
  call json_object_new_array@PLT
  mov [rsp],rax
  test rax,rax
@@ -486,6 +493,10 @@ pg_context_messages_model:
  jnz .Lr_project_bad
  mov rdi,[rsp+40]
  lea rsi,[rip+.Lri_responsesOutput]
+ cmp dword ptr [rsp+180],2
+ jne .Lri_history_key
+ lea rsi,[rip+.Lah_wire]
+.Lri_history_key:
  mov rdx,[rsp+56]
  mov qword ptr [rsp+56],0
  call .Lr_set
@@ -557,6 +568,14 @@ pg_context_messages_model:
  jz .Lri_regular_thinking
  mov rdi,rax
  lea rsi,[rip+.Lri_responses_api]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lr_project_block_next
+ RG "qword ptr [rsp+24]",api
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lra_responses]
  call strcmp@PLT
  test eax,eax
  jz .Lr_project_block_next
@@ -847,6 +866,20 @@ pg_context_messages_model:
  test eax,eax
  jnz .Lr_project_bad
  .Lri_response_content:
+ cmp dword ptr [rsp+180],2
+ jne .Lri_result_protocol
+ RG "qword ptr [rsp+24]",isError
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov edi,eax
+ call json_object_new_boolean@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lah_isError]
+ mov rdx,rax
+ call .Lr_set
+ test eax,eax
+ jnz .Lr_project_bad
+.Lri_result_protocol:
  cmp dword ptr [rsp+180],0
  je .Lr_project_append
  cmp dword ptr [rsp+176],0
@@ -1575,6 +1608,9 @@ pg_mimo_responses_history:
  rep stosq
  mov [rsp+8],rdx
  mov qword ptr [rdx],0
+ mov rdi,r12
+ call pg_mimo_config_anthropic
+ mov [rsp+56],eax
  RHGET rbx,content
  mov r13,rax
  mov rdi,rax
@@ -1614,6 +1650,10 @@ pg_mimo_responses_history:
  jz .Lrh_identity_ready
  mov rdi,rax
  lea rsi,[rip+.Lrp_responses]
+ cmp dword ptr [rsp+56],0
+ je .Lrh_identity_api
+ lea rsi,[rip+.Lra_responses]
+.Lrh_identity_api:
  call strcmp@PLT
  test eax,eax
  sete al
@@ -1634,6 +1674,16 @@ pg_mimo_responses_history:
  mov rsi,r14
  call json_object_array_get_idx@PLT
  mov rbp,rax
+ cmp dword ptr [rsp+56],0
+ je .Lrh_response_block
+ mov rdi,rbp
+ mov rsi,[rsp]
+ mov edx,[rsp+16]
+ call .Lah_block
+ test eax,eax
+ jnz .Lrh_bad
+ jmp .Lrh_next
+.Lrh_response_block:
  RHGET rbp,type
  mov rdi,rax
  call json_object_get_string@PLT
@@ -1935,3 +1985,142 @@ pg_mimo_config_anthropic:
 .Lra_env: .asciz "PANGU_MODEL_ENDPOINT"
 .Lra_suffix: .asciz "/messages"
 .Lra_responses: .asciz "anthropic-messages"
+
+/* Same-model thinking remains signed; foreign thinking is removed by the
+   transform-messages rule. Appended wire blocks are detached from history. */
+.macro AHGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lah_\key]
+ call json_object_object_get@PLT
+.endm
+.macro AHCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lah_\from]
+ lea rcx,[rip+.Lah_\to]
+ call .Lrh_copy
+ test eax,eax
+ jnz .Lah_bad
+.endm
+.text
+.Lah_block:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,edx
+ AHGET rbx,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lah_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lah_text]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lah_text_block
+ mov rdi,rbp
+ lea rsi,[rip+.Lah_toolCall]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lah_tool
+ mov rdi,rbp
+ lea rsi,[rip+.Lah_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lah_bad
+ test r13d,r13d
+ jz .Lah_ok
+ AHGET rbx,redacted
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lah_redacted_block
+ AHGET rbx,thinkingSignature
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lah_unsigned_thinking
+ lea rdi,[rip+.Lah_think_json]
+ mov rsi,r12
+ call .Lrh_append
+ mov r14,rax
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY r14,rbx,thinking,thinking
+ AHCOPY r14,rbx,thinkingSignature,signature
+ jmp .Lah_ok
+.Lah_unsigned_thinking:
+ lea rdi,[rip+.Lah_text_json]
+ mov rsi,r12
+ call .Lrh_append
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY rax,rbx,thinking,text
+ jmp .Lah_ok
+.Lah_redacted_block:
+ lea rdi,[rip+.Lah_redacted_json]
+ mov rsi,r12
+ call .Lrh_append
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY rax,rbx,thinkingSignature,data
+ jmp .Lah_ok
+.Lah_text_block:
+ AHGET rbx,text
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lah_ok
+ lea rdi,[rip+.Lah_text_json]
+ mov rsi,r12
+ call .Lrh_append
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY rax,rbx,text,text
+ jmp .Lah_ok
+.Lah_tool:
+ lea rdi,[rip+.Lah_use_json]
+ mov rsi,r12
+ call .Lrh_append
+ mov r14,rax
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY r14,rbx,id,id
+ AHCOPY r14,rbx,name,name
+ AHCOPY r14,rbx,arguments,input
+.Lah_ok:
+ xor eax,eax
+ jmp .Lah_end
+.Lah_bad:
+ mov eax,1
+.Lah_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lah_wire: .asciz "anthropicContent"
+.Lah_isError: .asciz "isError"
+.Lah_type: .asciz "type"
+.Lah_text: .asciz "text"
+.Lah_toolCall: .asciz "toolCall"
+.Lah_thinking: .asciz "thinking"
+.Lah_thinkingSignature: .asciz "thinkingSignature"
+.Lah_signature: .asciz "signature"
+.Lah_redacted: .asciz "redacted"
+.Lah_data: .asciz "data"
+.Lah_id: .asciz "id"
+.Lah_name: .asciz "name"
+.Lah_arguments: .asciz "arguments"
+.Lah_input: .asciz "input"
+.Lah_text_json: .asciz "{\"type\":\"text\"}"
+.Lah_think_json: .asciz "{\"type\":\"thinking\"}"
+.Lah_redacted_json: .asciz "{\"type\":\"redacted_thinking\"}"
+.Lah_use_json: .asciz "{\"type\":\"tool_use\"}"

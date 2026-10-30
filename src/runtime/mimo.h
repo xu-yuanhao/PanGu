@@ -30,7 +30,7 @@ typedef struct {
  pg_mimo_anthropic_block *anthropic_blocks;size_t anthropic_count,anthropic_capacity;
  struct json_object *anthropic_usage;
 } pg_mimo;
-/* OpenAI Chat Completions / Responses SSE transport. Explicit PANGU_MODEL_ENDPOINT,
+/* OpenAI Chat Completions / Responses and Anthropic Messages SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
    requires its explicit key. Default MiMo connection reads MIMO_API_KEY/MODEL.
    Environment stays immutable throughout active requests. Initialize
@@ -57,7 +57,7 @@ int pg_mimo_config_responses(const struct json_object *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
 void pg_mimo_anthropic_clear(pg_mimo *);
-/* Internal final-item/canonical replay adapters; history returns an owned array.
+/* Internal protocol-selected final-item/canonical replay adapters; history returns an owned array.
    Native call_id and provider responseItemId remain separate identities. */
 int pg_mimo_responses_complete(const pg_mimo *,struct json_object *);
 int pg_mimo_responses_history(const struct json_object *,const struct json_object *,struct json_object **);

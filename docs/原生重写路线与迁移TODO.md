@@ -116,6 +116,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Responses最终item按输出槽保存，正文/思考采用done事实，终态补齐加密思考；canonical消息保存textSignature、thinkingSignature及独立responseItemId。provider/model/api一致时重放，切换模型/提供者移除相应签名和item身份；SQLite/JSONL重开、真实请求投影、跨协议投影、乱序done、分配失败与ASan/UBSan通过。
 - [x] Responses终态结算与失败接通产品：全部function item.done确认后交付调用，已关闭槽忽略迟到参数；incomplete保留长度终态与rawStopReason。结构化提供者message/error body进入既有重试和上下文超限分类；并行部分完成、实际模型服务拒绝未完成调用、HTTP 200错误分类、关闭释放及O0/O2/ABI/ASan/UBSan通过。
 - [x] Responses最终参数接通修复、错误元数据与Tool结算：空白为{}，修复字符串控制字符/非法转义，失败保留原文并生成argumentsError；模型调用先交付准备后的对象，complete保存最终元数据，Tool在效果前返回错误。416组固定Pi源码差分、构造失败释放、SQLite/JSONL无写入副作用与NUL错误文本、真实DeepSeek错误后重试写入通过。
+- [x] Anthropic Messages基础链接入原生模型服务：system/文本/图片、签名思考、tool_use/tool_result分组、工具声明及API-key/version头；有序块关闭后解析最终参数，message_stop确认流终态，输入/缓存用量按增量合并。实际模型服务回放覆盖文本/工具、错误参数、长度终态、结构化错误与提前EOF；canonical历史按模型身份重放思考，预算/自适应思考编码及分配失败清理通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -313,8 +314,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `utils/json-parse.ts`（repairJson/parseToolCallArguments）、`streaming-json.ts`最终参数、`validation.ts`参数错误优先校验，及Responses partial-json-cleanup用例。
-- 实际调用链：`pg_mimo_arguments_parse`严格解析最终对象，按上游修复字符串字面量；失败生成空对象和带原文的argumentsError。Responses模型调用借用自有准备结果，`complete`将最终对象/错误写进canonical ToolCall，Durable Tool在意图/执行前生成错误结果并经原链保存、反馈。错误内容按显式长度组合，保留NUL后的正文；缓存随模型关闭释放。
-- 验证：416组输入直接运行固定Pi parseToolCallArguments比较值与错误判定，全部一致。模型O0/O2/UBSan、ABI、传输、构造/插入失败释放通过；实际CALL与complete元数据一致。`build_test.py --client`的SQLite/JSONL场景用本可写文件的合法参数加argumentsError，确认无写入且错误结果保留NUL后内容；产品Host ASan/UBSan通过。真实DeepSeek在一次完成回调参数错误注入后收到Tool错误，首次未写文件，随后重新调用write并完成回答。Responses本身使用流回放验证。
-- 接口与差异：复用模型模块、json-c和现有Tool结果链；新增内部参数解析/准备入口及模型自有缓存，公开model服务ABI保持，原生参数与UTF-8预算继续适用。Responses消费者在工具分派前调用complete保留错误元数据；产品Generation沿现有完成回调执行该顺序。
-- 下一交付物：按K05推进下一组完整协议与其实际消费者；高级工具、提供者兼容选项及认证仍按覆盖表完成。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/anthropic-messages.ts`、`transform-messages.ts`、`simple-options.ts` 与 streaming-tool-arguments 用例；本批沿既有固定快照。
+- 实际调用链：现有模型服务按api/端点选择Messages；共享上下文投影生成system、文本/图片、工具声明/调用/结果，libcurl发送API-key/version头。流块使用自有动态缓冲，关闭时固定canonical内容与最终参数，message_stop后交付工具；Generation/Tool复用现有持久执行链。模型身份一致才重放签名思考，切换模型移除；原生reasoningEffort映射预算/自适应参数。
+- 验证：模型O0/O2/UBSan、ABI、实际curl入口回放与55个解码生命周期分配失败通过；请求1/8工具分别133/377个失败点清理通过。90组独立提示计划、SQLite/JSONL Durable Client和产品资源服务ASan/UBSan通过；产品构建、Assembly与登记快照G00通过，自审确认现有ABI和模块归属保持。Anthropic使用确定性协议回放，没有真实Anthropic凭据。
+- 接口与差异：公开model服务ABI不变，内部模型增加块/用量所有权；请求配置选择和历史投影归请求模块，json-c独立构建保持。K05仍需补齐Anthropic错误结果图片后置、cache retention/TTL细分、managed effort、tool choice/native tools、OAuth/网关兼容项及其余协议。
+- 下一交付物：继续K05完成Messages剩余上游行为，再按覆盖顺序接入Gemini/Vertex；沿同一Generation/Tool消费者验证。

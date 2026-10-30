@@ -66,7 +66,50 @@ static void responses_settlement(void){
  }
  puts("PASS: Responses completed-call barrier, parallel partial close, late delta isolation, incomplete raw stop and structured provider failure");
 }
+
+static void anthropic(void){
+ pg_model model=pg_mimo_model(&m);
+ json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"modelProvider\":\"anthropic\",\"endpoint\":\"https://example.invalid/v1/messages\",\"options\":{\"maxTokens\":128},\"input\":[\"text\",\"image\"]}");
+ assert(!pg_mimo_configure(&m,cfg));
+ const char *frames[]={
+ "event: message_start",
+ "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg-anthropic\",\"usage\":{\"input_tokens\":10,\"output_tokens\":1,\"cache_read_input_tokens\":5,\"cache_creation_input_tokens\":3}}}",
+ "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"plan\"}}",
+ "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\" first\"}}",
+ "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"opaque-anthropic\"}}",
+ "data: {\"type\":\"content_block_stop\",\"index\":0}",
+ "data: {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}",
+ "data: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello世界\"}}",
+ "data: {\"type\":\"content_block_stop\",\"index\":2}",
+ "data: {\"type\":\"content_block_start\",\"index\":7,\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-anth\",\"name\":\"echo\",\"input\":{}}}",
+ "data: {\"type\":\"content_block_delta\",\"index\":7,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"x\\\":\"}}",
+ "data: {\"type\":\"content_block_delta\",\"index\":7,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"1}\"}}",
+ "data: {\"type\":\"content_block_stop\",\"index\":7}",
+ "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":8}}",
+ "data: {\"type\":\"message_stop\"}"
+ };
+ for(size_t i=0;i<sizeof(frames)/sizeof(*frames);i++){int rc=line(frames[i]);if(rc)fprintf(stderr,"Anthropic frame %zu rejected\n",i);assert(!rc);if(i==7)assert(e.kind==PG_MODEL_TEXT&&e.text.size==11);if(i==13)assert(!m.saw_done);}
+ assert(m.saw_done&&m.finish_reason==2&&m.call_count==1&&!strcmp(m.arguments,"{\"x\":1}"));
+ json_object *assistant=json_tokener_parse("{\"role\":\"assistant\",\"content\":[]}");assert(!pg_mimo_complete(&m,assistant));json_object *content=json_object_object_get(assistant,"content"),*usage=json_object_object_get(assistant,"usage");
+ assert(json_object_array_length(content)==3&&!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),"anthropic-messages"));
+ assert(!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(content,0),"thinkingSignature")),"opaque-anthropic")&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(content,0),"thinking")),"plan first"));
+ assert(json_object_get_int(json_object_object_get(usage,"input"))==10&&json_object_get_int(json_object_object_get(usage,"output"))==8&&json_object_get_int(json_object_object_get(usage,"cacheRead"))==5&&json_object_get_int(json_object_object_get(usage,"cacheWrite"))==3&&json_object_get_int(json_object_object_get(usage,"totalTokens"))==26);
+ assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"rawStopReason")),"tool_use"));
+ json_object *ctx=json_tokener_parse("{\"systemPrompt\":\"PanGu\",\"messages\":[]}");json_object *messages=json_object_object_get(ctx,"messages");assert(!json_object_array_add(messages,assistant));assert(!json_object_array_add(messages,json_tokener_parse("{\"role\":\"toolResult\",\"toolCallId\":\"tool-anth\",\"toolName\":\"echo\",\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"retry\"}]}")));assert(!json_object_array_add(messages,json_tokener_parse("{\"role\":\"user\",\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"aGVsbG8=\"}]}")));
+ static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=ctx;
+ pg_tool_registry tools={.entries={{.name="echo",.description="Echo",.schema="{\"type\":\"object\"}"}},.count=1};pg_mimo_bind_tools(&m,&tools);
+ for(unsigned foreign=0;foreign<2;foreign++){
+  json_object_object_add(cfg,"model",json_object_new_string(foreign?"other":"claude-test"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*rows=json_object_object_get(wire,"messages");assert(json_object_array_length(rows)==3&&json_object_get_int(json_object_object_get(wire,"max_tokens"))==128&&!json_object_object_get(wire,"stream_options"));assert(json_object_object_get(json_object_array_get_idx(json_object_object_get(wire,"tools"),0),"input_schema"));json_object *blocks=json_object_object_get(json_object_array_get_idx(rows,0),"content");assert(json_object_array_length(blocks)==(foreign?2u:3u));if(!foreign)assert(!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(blocks,0),"signature")),"opaque-anthropic"));json_object *result=json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(rows,1),"content"),0);assert(json_object_get_boolean(json_object_object_get(result,"is_error")));json_object *image=json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(rows,2),"content"),0);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(image,"source"),"media_type")),"image/png"));json_object_put(wire);
+ }
+
+ json_object_object_add(cfg,"modelInfo",json_tokener_parse("{\"maxTokens\":32768}"));json_object_object_add(cfg,"options",json_tokener_parse("{\"maxTokens\":4096,\"reasoningEffort\":\"low\"}"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));json_object *budget_wire=json_tokener_parse(m.request),*thinking=json_object_object_get(budget_wire,"thinking");assert(json_object_get_int(json_object_object_get(budget_wire,"max_tokens"))==6144&&json_object_get_int(json_object_object_get(thinking,"budget_tokens"))==2048);json_object_put(budget_wire);
+ json_object_object_add(cfg,"modelInfo",json_tokener_parse("{\"maxTokens\":32768,\"compat\":{\"forceAdaptiveThinking\":true}}"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));budget_wire=json_tokener_parse(m.request);assert(!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(budget_wire,"thinking"),"type")),"adaptive")&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(budget_wire,"output_config"),"effort")),"low"));json_object_put(budget_wire);
+ json_object_put(ctx);json_object_put(cfg);model.close(model.context);assert(!m.anthropic_blocks&&!m.anthropic_usage);
+ puts("PASS: Anthropic Messages text/thinking/signature/tool stream, final canonical history, model isolation, images and cache accounting");
+}
 int main(void){
+ anthropic();
+ m=(pg_mimo){0};
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"世界\"},\"finish_reason\":null}]}"));assert(e.text.size==6);

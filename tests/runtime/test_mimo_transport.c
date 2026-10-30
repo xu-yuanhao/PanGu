@@ -521,6 +521,24 @@ static void test_responses_arguments(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Responses repaired/invalid/empty final arguments travel through model CALL, completion metadata and owned cleanup");
 }
+
+static void test_anthropic_transport(void){
+ for(unsigned scenario=0;scenario<7;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"endpoint\":\"https://example.invalid/v1/messages\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","anthropic-transport-unit-key",1);assert(!start());
+  unsigned auth=0,version=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){auth+=!strcmp(h->data,"x-api-key: anthropic-transport-unit-key");version+=!strcmp(h->data,"anthropic-version: 2023-06-01");assert(!strstr(h->data,"Authorization:"));}assert(auth==1&&version==1&&strstr(captured_post,"\"messages\"")&&!strstr(captured_post,"stream_options"));
+  feed("event: message_start\r\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg-unit\",\"usage\":{\"input_tokens\":4}}}\r\n\r\n");
+  if(scenario==0){feed("data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n");feed("data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n");}
+  else if(scenario!=4){feed("data: {\"type\":\"content_block_start\",\"index\":9,\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-unit\",\"name\":\"read\",\"input\":{}}}\n");feed(scenario==2?"data: {\"type\":\"content_block_delta\",\"index\":9,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{bad\"}}\n":"data: {\"type\":\"content_block_delta\",\"index\":9,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}}\n");}
+  if(scenario<3||scenario==6)feed(scenario?"data: {\"type\":\"content_block_stop\",\"index\":9}\n":"data: {\"type\":\"content_block_stop\",\"index\":0}\n");
+  if(scenario==4)feed("data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"provider busy\"}}\n");
+  else if(scenario!=5){feed(scenario==6?"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"},\"usage\":{\"output_tokens\":2}}\n":scenario?"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":2}}\n":"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2}}\n");feed("data: {\"type\":\"message_stop\"}\n");}
+  finish_transport();pg_model_event event={0};int status=0;unsigned texts=0;for(unsigned n=0;n<12;n++){status=nxt(&event);if(status)break;if(event.kind==PG_MODEL_TEXT){texts++;continue;}if(event.kind!=PG_MODEL_WAIT)break;}
+  if(scenario<3||scenario==6){assert(!status&&m.saw_done&&event.kind==(scenario&&scenario!=6?PG_MODEL_CALL:PG_MODEL_DONE));if(!scenario)assert(texts==1);if(scenario==6)assert(m.finish_reason==3);json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant));if(scenario==2){json_object *call=json_object_array_get_idx(json_object_object_get(assistant,"content"),0);assert(json_object_object_get(call,"argumentsError")&&event.text.size==2&&!memcmp(event.text.data,"{}",2));}json_object_put(assistant);}
+  else{assert(status&&!m.saw_done);if(scenario==4){pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body)&&strstr(message.data,"provider busy")&&strstr(body.data,"overloaded_error"));}}
+  model.close(model.context);assert(!m.anthropic_blocks&&!m.anthropic_usage&&!m.headers&&!m.request);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic model-service replay with API-key/version headers, text/tool/errors, invalid arguments, max_tokens and early EOF");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -538,6 +556,7 @@ int main(void) {
     test_saved_connection();
     test_responses_transport();
     test_responses_arguments();
+    test_anthropic_transport();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

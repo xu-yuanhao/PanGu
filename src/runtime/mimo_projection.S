@@ -1943,3 +1943,814 @@ pg_mimo_uses_anthropic:
  mov rdi,[rdi+PG_MM_CONFIGURATION]
  jmp pg_mimo_config_anthropic
 .size pg_mimo_uses_anthropic,.-pg_mimo_uses_anthropic
+
+.macro APGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lap_\key]
+ call json_object_object_get@PLT
+.endm
+.macro APCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lap_\from]
+ lea rcx,[rip+.Lap_\to]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lap_bad
+.endm
+/* Convert the shared conversation projection to Messages wire blocks. The
+   request root owns all appended objects; only the pending arrays are local. */
+.text
+.Lap_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ APGET rbx,messages
+ mov r13,rax
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_bad
+ call json_object_new_array@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lap_bad
+ xor r14d,r14d
+.Lap_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_messages_done
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ APGET rbp,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lap_bad
+ mov [rsp+24],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_system]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_system_row
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lap_tool]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_tool_row
+ mov qword ptr [rsp+16],0
+ lea rdi,[rip+.Lap_message_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lap_bad
+ APCOPY rax,rbp,role,role
+ APGET rbp,anthropicContent
+ test rax,rax
+ jz .Lap_regular
+ mov rdi,rax
+ call json_object_get@PLT
+ jmp .Lap_attach_content
+.Lap_regular:
+ APGET rbp,content
+ mov rdi,rax
+ call .Lap_convert_content
+ test rax,rax
+ jz .Lap_bad
+ mov [rsp+40],rax
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lap_content]
+ mov rdx,rax
+ mov qword ptr [rsp+40],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+ APGET rbp,tool_calls
+ mov [rsp+48],rax
+ mov qword ptr [rsp+56],0
+.Lap_calls:
+ mov rdi,[rsp+48]
+ test rdi,rdi
+ jz .Lap_next
+ call json_object_array_length@PLT
+ cmp [rsp+56],rax
+ jae .Lap_next
+ mov rdi,[rsp+48]
+ mov rsi,[rsp+56]
+ call json_object_array_get_idx@PLT
+ mov [rsp+64],rax
+ APGET "qword ptr [rsp+32]",content
+ mov rsi,rax
+ lea rdi,[rip+.Lap_use_json]
+ call .Lrp_append
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lap_bad
+ APCOPY rax,"qword ptr [rsp+64]",id,id
+ APGET "qword ptr [rsp+64]",function
+ mov [rsp+64],rax
+ APCOPY "qword ptr [rsp+72]",rax,name,name
+ APGET "qword ptr [rsp+64]",arguments
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call json_tokener_parse@PLT
+ mov rdi,[rsp+72]
+ lea rsi,[rip+.Lap_input]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+ inc qword ptr [rsp+56]
+ jmp .Lap_calls
+.Lap_attach_content:
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lap_content]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+ jmp .Lap_next
+.Lap_system_row:
+ lea rdi,[rip+.Lap_text_json]
+ mov rsi,[rsp+8]
+ call .Lrp_append
+ test rax,rax
+ jz .Lap_bad
+ APCOPY rax,rbp,content,text
+ jmp .Lap_next
+.Lap_tool_row:
+ cmp qword ptr [rsp+16],0
+ jne .Lap_tool_group
+ lea rdi,[rip+.Lap_user_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ test rax,rax
+ jz .Lap_bad
+ APGET rax,content
+ mov [rsp+16],rax
+.Lap_tool_group:
+ lea rdi,[rip+.Lap_result_json]
+ mov rsi,[rsp+16]
+ call .Lrp_append
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lap_bad
+ APCOPY rax,rbp,tool_call_id,tool_use_id
+ APCOPY "qword ptr [rsp+32]",rbp,isError,is_error
+ APGET rbp,content
+ mov rdi,rax
+ call .Lap_convert_content
+ test rax,rax
+ jz .Lap_bad
+ jmp .Lap_attach_content
+.Lap_next:
+ inc r14
+ jmp .Lap_each
+.Lap_messages_done:
+ mov rdi,[rsp]
+ call .Lap_normalize_messages
+ test eax,eax
+ jnz .Lap_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_messages]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lap_tools_begin
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_system]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+.Lap_tools_begin:
+ APGET rbx,tools
+ mov r13,rax
+ test rax,rax
+ jz .Lap_options_begin
+ xor r14d,r14d
+.Lap_tool_def:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_options_begin
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ APGET rbp,function
+ mov [rsp+24],rax
+ APCOPY rbp,rax,name,name
+ APCOPY rbp,"qword ptr [rsp+24]",description,description
+ APCOPY rbp,"qword ptr [rsp+24]",parameters,input_schema
+ mov rdi,rbp
+ lea rsi,[rip+.Lap_function]
+ call json_object_object_del@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lap_type]
+ call json_object_object_del@PLT
+ inc r14
+ jmp .Lap_tool_def
+.Lap_options_begin:
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_stream_options]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_reasoning_effort]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_max_completion_tokens]
+ call json_object_object_del@PLT
+ APGET r12,options
+ mov r13,rax
+ APGET rax,maxTokens
+ test rax,rax
+ jnz .Lap_max_ready
+ APGET r12,modelInfo
+ APGET rax,maxTokens
+ test rax,rax
+ jz .Lap_success
+.Lap_max_ready:
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_max_tokens]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_bad
+.Lap_success:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lap_thinking_options
+ test eax,eax
+ jnz .Lap_bad
+ xor ebp,ebp
+ jmp .Lap_cleanup
+.Lap_bad:
+ mov ebp,1
+.Lap_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Owned array of text/image blocks from shared Chat content. */
+.Lap_convert_content:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ call json_object_new_array@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lap_content_end
+ test rbx,rbx
+ jz .Lap_content_ok
+ mov rdi,rbx
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_content_array
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lap_content_ok
+ lea rdi,[rip+.Lap_text_json]
+ mov rsi,r12
+ call .Lrp_append
+ mov r13,rax
+ test rax,rax
+ jz .Lap_content_bad
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lap_content_ok
+ mov rdi,rbx
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lap_text]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_content_bad
+ jmp .Lap_content_ok
+.Lap_content_array:
+ mov rdi,rbx
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_content_bad
+ xor r13d,r13d
+.Lap_content_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lap_content_ok
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ APGET r14,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lap_content_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lap_text]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_image
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,r12
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lap_content_next
+ mov rdi,r14
+ call json_object_put@PLT
+ jmp .Lap_content_bad
+.Lap_image:
+ APGET r14,image_url
+ APGET rax,url
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lap_content_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lap_data_prefix]
+ mov edx,5
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lap_content_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lap_base64]
+ call strstr@PLT
+ test rax,rax
+ jz .Lap_content_bad
+ mov rbp,rax
+ lea rdi,[rip+.Lap_image_json]
+ mov rsi,r12
+ call .Lrp_append
+ test rax,rax
+ jz .Lap_content_bad
+ APGET rax,source
+ mov [rsp],rax
+ lea rdi,[r14+5]
+ mov rsi,rbp
+ sub rsi,rdi
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_media_type]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_content_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_data]
+ lea rdx,[rbp+8]
+ call li_field
+ test eax,eax
+ jnz .Lap_content_bad
+.Lap_content_next:
+ inc r13
+ jmp .Lap_content_each
+.Lap_content_bad:
+ mov rdi,r12
+ call json_object_put@PLT
+ xor r12d,r12d
+.Lap_content_ok:
+ mov rax,r12
+.Lap_content_end:
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lap_messages: .asciz "messages"
+.Lap_system: .asciz "system"
+.Lap_role: .asciz "role"
+.Lap_content: .asciz "content"
+.Lap_type: .asciz "type"
+.Lap_text: .asciz "text"
+.Lap_tool: .asciz "tool"
+.Lap_tool_calls: .asciz "tool_calls"
+.Lap_function: .asciz "function"
+.Lap_arguments: .asciz "arguments"
+.Lap_id: .asciz "id"
+.Lap_name: .asciz "name"
+.Lap_input: .asciz "input"
+.Lap_tools: .asciz "tools"
+.Lap_description: .asciz "description"
+.Lap_parameters: .asciz "parameters"
+.Lap_input_schema: .asciz "input_schema"
+.Lap_tool_call_id: .asciz "tool_call_id"
+.Lap_tool_use_id: .asciz "tool_use_id"
+.Lap_isError: .asciz "isError"
+.Lap_is_error: .asciz "is_error"
+.Lap_anthropicContent: .asciz "anthropicContent"
+.Lap_stream_options: .asciz "stream_options"
+.Lap_reasoning_effort: .asciz "reasoning_effort"
+.Lap_max_completion_tokens: .asciz "max_completion_tokens"
+.Lap_options: .asciz "options"
+.Lap_maxTokens: .asciz "maxTokens"
+.Lap_modelInfo: .asciz "modelInfo"
+.Lap_max_tokens: .asciz "max_tokens"
+.Lap_image_url: .asciz "image_url"
+.Lap_url: .asciz "url"
+.Lap_source: .asciz "source"
+.Lap_media_type: .asciz "media_type"
+.Lap_data: .asciz "data"
+.Lap_data_prefix: .asciz "data:"
+.Lap_base64: .asciz ";base64,"
+.Lap_image_json: .asciz "{\"type\":\"image\",\"source\":{\"type\":\"base64\"}}"
+.Lap_text_json: .asciz "{\"type\":\"text\",\"text\":\"\"}"
+.Lap_message_json: .asciz "{}"
+.Lap_user_json: .asciz "{\"role\":\"user\",\"content\":[]}"
+.Lap_use_json: .asciz "{\"type\":\"tool_use\"}"
+.Lap_result_json: .asciz "{\"type\":\"tool_result\",\"is_error\":false}"
+
+.text
+/* Anthropic's wire ID restriction applies symmetrically to uses and results. */
+.Lap_normalize_messages:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,96
+ mov rbx,rdi
+ xor r12d,r12d
+.Lap_norm_message:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lap_norm_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ APGET rax,content
+ mov r13,rax
+ xor r14d,r14d
+.Lap_norm_block:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_norm_next_message
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ APGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lap_norm_next
+ mov [rsp+80],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_use_type]
+ call strcmp@PLT
+ lea rcx,[rip+.Lap_id]
+ test eax,eax
+ jz .Lap_norm_key
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.Lap_result_type]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_norm_next
+ lea rcx,[rip+.Lap_tool_use_id]
+.Lap_norm_key:
+ mov [rsp+72],rcx
+ mov rdi,rbp
+ mov rsi,rcx
+ call json_object_object_get@PLT
+ mov [rsp+80],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lap_norm_bad
+ mov edx,64
+ cmp eax,edx
+ cmova eax,edx
+ mov [rsp+88],eax
+ mov rdi,[rsp+80]
+ call json_object_get_string@PLT
+ xor ecx,ecx
+.Lap_norm_char:
+ movzx edx,byte ptr [rax+rcx]
+ cmp dl,'a'
+ jb .Lap_norm_upper
+ cmp dl,'z'
+ jbe .Lap_norm_store
+.Lap_norm_upper:
+ cmp dl,'A'
+ jb .Lap_norm_digit
+ cmp dl,'Z'
+ jbe .Lap_norm_store
+.Lap_norm_digit:
+ cmp dl,'0'
+ jb .Lap_norm_other
+ cmp dl,'9'
+ jbe .Lap_norm_store
+.Lap_norm_other:
+ cmp dl,'-'
+ je .Lap_norm_store
+ mov dl,'_'
+.Lap_norm_store:
+ mov [rsp+rcx],dl
+ inc ecx
+ cmp ecx,[rsp+88]
+ jb .Lap_norm_char
+ mov rdi,rsp
+ mov esi,ecx
+ call json_object_new_string_len@PLT
+ mov rdi,rbp
+ mov rsi,[rsp+72]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_norm_bad
+.Lap_norm_next:
+ inc r14
+ jmp .Lap_norm_block
+.Lap_norm_next_message:
+ inc r12
+ jmp .Lap_norm_message
+.Lap_norm_ok:
+ xor eax,eax
+ jmp .Lap_norm_end
+.Lap_norm_bad:
+ mov eax,1
+.Lap_norm_end:
+ add rsp,96
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Native reasoningEffort maps to Pi's simple-options budgets. Direct provider
+   options retain their budget/adaptive meaning. */
+.Lap_thinking_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+24],0
+ APGET r12,options
+ mov r13,rax
+ APGET rax,reasoningEffort
+ mov [rsp+8],rax
+ APGET r13,thinkingEnabled
+ test rax,rax
+ jz .Lap_thinking_effort
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_thinking_disabled
+ jmp .Lap_thinking_enabled
+.Lap_thinking_effort:
+ cmp qword ptr [rsp+8],0
+ je .Lap_thinking_disabled
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lap_off]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_thinking_disabled
+.Lap_thinking_enabled:
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_temperature]
+ call json_object_object_del@PLT
+ APGET r12,modelInfo
+ APGET rax,compat
+ APGET rax,forceAdaptiveThinking
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lap_thinking_adaptive
+ lea rdi,[rip+.Lap_thinking_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_thinking_bad
+ mov r14d,1024
+ cmp qword ptr [rsp+8],0
+ je .Lap_thinking_budget
+ mov r14d,16384
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_minimal]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_budget_minimal
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lap_low]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_budget_low
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lap_medium]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_thinking_budget
+ mov r14d,8192
+ jmp .Lap_thinking_budget
+.Lap_budget_minimal:
+ mov r14d,1024
+ jmp .Lap_thinking_budget
+.Lap_budget_low:
+ mov r14d,2048
+.Lap_thinking_budget:
+ APGET r13,thinkingBudgetTokens
+ test rax,rax
+ jz .Lap_thinking_cap
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Lap_thinking_bad
+ mov r14,rax
+.Lap_thinking_cap:
+ APGET rbx,max_tokens
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov rbp,rax
+ APGET r12,modelInfo
+ APGET rax,maxTokens
+ test rax,rax
+ jz .Lap_thinking_cap_known
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov rbp,rax
+.Lap_thinking_cap_known:
+ APGET r13,maxTokens
+ test rax,rax
+ jz .Lap_thinking_adjusted
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ add rax,r14
+ jc .Lap_thinking_bad
+ cmp rax,rbp
+ cmovb rbp,rax
+.Lap_thinking_adjusted:
+ mov rax,rbp
+ sub rax,1024
+ xor ecx,ecx
+ test rax,rax
+ cmovs rax,rcx
+ cmp r14,rax
+ cmova r14,rax
+ test r14,r14
+ jz .Lap_thinking_bad
+ mov rdi,rbp
+ call json_object_new_int64@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_max_tokens]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+ mov rdi,r14
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_budget_tokens]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+ jmp .Lap_thinking_adopt
+.Lap_thinking_adaptive:
+ lea rdi,[rip+.Lap_adaptive_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_thinking_bad
+ APGET r13,effort
+ test rax,rax
+ jnz .Lap_thinking_effort_value
+ mov rax,[rsp+8]
+ test rax,rax
+ jz .Lap_thinking_adopt
+.Lap_thinking_effort_value:
+ mov [rsp+16],rax
+ lea rdi,[rip+.Lap_empty_json]
+ call json_tokener_parse@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lap_thinking_bad
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lap_effort]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_output_config]
+ mov rdx,[rsp+24]
+ mov qword ptr [rsp+24],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+ jmp .Lap_thinking_adopt
+.Lap_thinking_disabled:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ lea rdi,[rip+.Lap_disabled_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_thinking_bad
+.Lap_thinking_adopt:
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_thinking]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+ xor ebp,ebp
+ jmp .Lap_thinking_end
+.Lap_thinking_bad:
+ mov ebp,1
+.Lap_thinking_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lap_use_type: .asciz "tool_use"
+.Lap_result_type: .asciz "tool_result"
+.Lap_thinking: .asciz "thinking"
+.Lap_reasoningEffort: .asciz "reasoningEffort"
+.Lap_thinkingEnabled: .asciz "thinkingEnabled"
+.Lap_thinkingBudgetTokens: .asciz "thinkingBudgetTokens"
+.Lap_compat: .asciz "compat"
+.Lap_forceAdaptiveThinking: .asciz "forceAdaptiveThinking"
+.Lap_effort: .asciz "effort"
+.Lap_output_config: .asciz "output_config"
+.Lap_temperature: .asciz "temperature"
+.Lap_budget_tokens: .asciz "budget_tokens"
+.Lap_off: .asciz "off"
+.Lap_minimal: .asciz "minimal"
+.Lap_low: .asciz "low"
+.Lap_medium: .asciz "medium"
+.Lap_thinking_json: .asciz "{\"type\":\"enabled\",\"display\":\"summarized\"}"
+.Lap_adaptive_json: .asciz "{\"type\":\"adaptive\",\"display\":\"summarized\"}"
+.Lap_disabled_json: .asciz "{\"type\":\"disabled\"}"
+.Lap_empty_json: .asciz "{}"
