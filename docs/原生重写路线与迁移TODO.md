@@ -321,8 +321,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock `normalizeToolCallId/convertMessages`及`transform-messages.ts`的跨模型调用/结果ID映射；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`request_context.S`仅在Bedrock异模型历史的临时工具块标记ID转换；`mimo_projection.S`先建立原ID→线上ID映射，再统一更新工具结果。ASCII限制/UTF-16替换/64字符上限沿上游，跳过Anthropic通用ID转换；同模型ID和持久原记录保持。内部标记在发送前移除，公开ABI及依赖保持。
-- 验证：模型O0/O2/UBSan、ABI与原有构造失败检查通过；实际编码核对标点、中文、非BMP、长度边界、同模型保留、成对结果和源对象隔离。Client集成、产品资源ASan/UBSan及Assembly/diff检查通过。自审核对临时映射与JSON所有权、两遍映射顺序和协议分派。
-- 具体缺口：Bedrock显式profile/凭据链、ARN/标准端点优先级、模型定价/费用结算、simple入口token预算及高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
-- 下一交付物：沿K05成组补齐Bedrock端点/区域、错误与凭据配置，再继续模型费用结算的实际消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock区域解析、`getStandardBedrockEndpointRegion/shouldUseExplicitBedrockEndpoint`及`bedrock-endpoint-resolution.test.ts`。Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`mimo.S`在配置副本固定bedrockRegion，按ARN优先、显式/环境区域、标准端点推导、默认区域选择签名区域；存在配置区域时标准目录端点让位给区域生成地址，自定义代理路径保留。标准/FIPS/中国域名由libcurl解析host后识别。URL组合与SigV4消费同一固定公开区域，凭据仍仅在传输层。
+- 验证：模型O0/O2/UBSan、ABI及配置构造失败清理专项通过；实际curl入口核对标准/FIPS端点、区域覆盖、代理保留和普通/GovCloud ARN的URL与签名参数。产品资源ASan/UBSan、Client集成、Assembly与diff检查通过。自审核对配置副本隔离、URL对象归属、区域固定和失败保留。
+- 具体缺口：Bedrock显式profile/完整凭据链及ambient profile区域解析、中国/GovCloud端点分区完整策略、模型定价/费用结算、simple入口token预算及高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
+- 下一交付物：沿K05成组完成Bedrock错误/诊断与凭据配置的实际消费，继续模型费用结算。

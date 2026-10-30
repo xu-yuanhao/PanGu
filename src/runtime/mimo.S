@@ -3076,6 +3076,10 @@ pg_mimo_complete:
  test eax,eax
  jz .Lbe_ok
  mov rdi,rbx
+ call .Lbr_resolve
+ test eax,eax
+ jnz .Lbe_bad
+ mov rdi,rbx
  lea rsi,[rip+.Lcfg_endpoint]
  call json_object_object_get@PLT
  test rax,rax
@@ -3104,16 +3108,10 @@ pg_mimo_complete:
  jmp .Lbe_model
 .Lbe_region:
  mov rdi,rbx
- lea rsi,[rip+.Lbe_region_key]
- lea rdx,[rip+.Lbe_region_env]
- call .Lge_option
- test rax,rax
- jnz .Lbe_region_ready
- lea rdi,[rip+.Lbe_default_region_env]
- call getenv@PLT
- test rax,rax
- jnz .Lbe_region_ready
- lea rax,[rip+.Lbe_region_default]
+ lea rsi,[rip+.Lbr_region]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
 .Lbe_region_ready:
  lea rdi,[rsp]
  lea rsi,[rip+.Lbe_base_format]
@@ -3282,16 +3280,10 @@ pg_mimo_complete:
  test eax,eax
  jnz .Lbe_sign_bad
  mov rdi,[rbx+PG_MM_CONFIGURATION]
- lea rsi,[rip+.Lbe_region_key]
- lea rdx,[rip+.Lbe_region_env]
- call .Lge_option
- test rax,rax
- jnz .Lbe_sign_region
- lea rdi,[rip+.Lbe_default_region_env]
- call getenv@PLT
- test rax,rax
- jnz .Lbe_sign_region
- lea rax,[rip+.Lbe_region_default]
+ lea rsi,[rip+.Lbr_region]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
 .Lbe_sign_region:
  mov r13,rax
  mov rdi,rax
@@ -3443,3 +3435,268 @@ pg_mimo_complete:
  ret
 .section .rodata
 .Lbe_bearer_format: .asciz "Authorization: Bearer %s"
+
+.text
+/* Owned standard-runtime endpoint region, NULL for a custom endpoint. */
+.Lbr_endpoint_region:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,32
+ mov r12,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ test rdi,rdi
+ jz .Lbr_host_end
+ call curl_url@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbr_host_end
+ mov rdi,rax
+ xor esi,esi
+ mov rdx,r12
+ xor ecx,ecx
+ call curl_url_set@PLT
+ test eax,eax
+ jnz .Lbr_host_end
+ mov rdi,[rsp]
+ mov esi,5
+ lea rdx,[rsp+8]
+ xor ecx,ecx
+ call curl_url_get@PLT
+ test eax,eax
+ jnz .Lbr_host_end
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lbr_runtime]
+ mov edx,16
+ call strncasecmp@PLT
+ mov rbx,[rsp+8]
+ test eax,eax
+ jnz .Lbr_host_fips
+ add rbx,16
+ jmp .Lbr_host_region
+.Lbr_host_fips:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbr_fips]
+ mov edx,21
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lbr_host_end
+ add rbx,21
+.Lbr_host_region:
+ mov rdi,rbx
+ mov esi,46
+ call strchr@PLT
+ test rax,rax
+ jz .Lbr_host_end
+ mov [rsp+16],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lbr_aws_suffix]
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lbr_host_copy
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lbr_cn_suffix]
+ call strcasecmp@PLT
+ test eax,eax
+ jnz .Lbr_host_end
+.Lbr_host_copy:
+ mov rsi,[rsp+16]
+ sub rsi,rbx
+ test rsi,rsi
+ jz .Lbr_host_end
+ mov [rsp+24],rsi
+ mov rdi,rbx
+ lea rsi,[rip+.Lbr_region_chars]
+ call strspn@PLT
+ cmp rax,[rsp+24]
+ jne .Lbr_host_end
+ mov rdi,rbx
+ mov rsi,[rsp+24]
+ call strndup@PLT
+ mov rbp,rax
+.Lbr_host_end:
+ mov rdi,[rsp+8]
+ call curl_free@PLT
+ mov rdi,[rsp]
+ call curl_url_cleanup@PLT
+ mov rax,rbp
+ add rsp,32
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* One fixed public region feeds endpoint and signing for the lifetime of a request config. */
+.Lbr_resolve:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,8
+ mov rdi,rsp
+ rep stosq
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lbr_base_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+.Lbr_base_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+8],rax
+ mov rdi,rax
+ call .Lbr_endpoint_region
+ mov [rsp+16],rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lbe_region_key]
+ lea rdx,[rip+.Lbe_region_env]
+ call .Lge_option
+ test rax,rax
+ jz .Lbr_environment_default
+ cmp byte ptr [rax],0
+ jne .Lbr_configured
+.Lbr_environment_default:
+ lea rdi,[rip+.Lbe_default_region_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lbr_configured
+ cmp byte ptr [rax],0
+ jne .Lbr_configured
+ xor eax,eax
+.Lbr_configured:
+ mov [rsp+24],rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lbr_arn_prefix]
+ mov edx,7
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lbr_select_region
+ lea r13,[r12+7]
+ cmp byte ptr [r13],58
+ je .Lbr_arn_partition
+ cmp byte ptr [r13],45
+ jne .Lbr_select_region
+ mov rdi,r13
+ mov esi,58
+ call strchr@PLT
+ test rax,rax
+ jz .Lbr_select_region
+ mov r13,rax
+.Lbr_arn_partition:
+ lea rdi,[r13+1]
+ lea rsi,[rip+.Lbr_arn_service]
+ mov edx,8
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lbr_select_region
+ add r13,9
+ mov rdi,r13
+ mov esi,58
+ call strchr@PLT
+ test rax,rax
+ jz .Lbr_select_region
+ sub rax,r13
+ test rax,rax
+ jz .Lbr_select_region
+ mov rdi,r13
+ mov rsi,rax
+ call strndup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbr_bad
+ jmp .Lbr_store
+.Lbr_select_region:
+ mov rax,[rsp+24]
+ test rax,rax
+ jnz .Lbr_copy_region
+ mov rax,[rsp+16]
+ test rax,rax
+ jnz .Lbr_copy_region
+ lea rax,[rip+.Lbe_region_default]
+.Lbr_copy_region:
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbr_bad
+.Lbr_store:
+ mov rdi,[rsp]
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lbr_bad
+ mov rdi,[rsp]
+ call json_object_new_string@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbr_region]
+ mov rdx,rax
+ test rdx,rdx
+ jz .Lbr_bad
+ mov [rsp+32],rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lbr_bad
+ mov qword ptr [rsp+32],0
+ cmp qword ptr [rsp+16],0
+ je .Lbr_ok
+ cmp qword ptr [rsp+24],0
+ je .Lbr_ok
+ /* A configured region supersedes the built-in standard endpoint. */
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lbr_ok
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_del@PLT
+.Lbr_ok:
+ xor ebp,ebp
+ jmp .Lbr_end
+.Lbr_bad:
+ mov ebp,1
+.Lbr_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbr_region: .asciz "bedrockRegion"
+.Lbr_runtime: .asciz "bedrock-runtime."
+.Lbr_fips: .asciz "bedrock-runtime-fips."
+.Lbr_aws_suffix: .asciz ".amazonaws.com"
+.Lbr_cn_suffix: .asciz ".amazonaws.com.cn"
+.Lbr_arn_prefix: .asciz "arn:aws"
+.Lbr_arn_service: .asciz "bedrock:"
+
+.section .rodata
+.Lbr_region_chars: .asciz "abcdefghijklmnopqrstuvwxyz0123456789-"

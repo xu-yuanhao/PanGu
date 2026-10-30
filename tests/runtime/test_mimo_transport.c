@@ -649,6 +649,22 @@ static void test_bedrock_multimodal(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock user/tool image bytes, signed and unsigned reasoning policy, split reasoning/signature stream and canonical replay");
 }
+static void test_bedrock_regions(void){
+ const char *sources[]={
+ "{\"baseUrl\":\"https://bedrock-runtime.eu-central-1.amazonaws.com\"}",
+ "{\"baseUrl\":\"https://bedrock-runtime.eu-central-1.amazonaws.com\",\"options\":{\"region\":\"us-west-2\"}}",
+ "{\"baseUrl\":\"https://bedrock-vpc.example.com/proxy\",\"options\":{\"region\":\"ap-south-1\"}}",
+ "{\"baseUrl\":\"https://bedrock-runtime-fips.us-gov-west-1.amazonaws.com\"}",
+ "{\"model\":\"arn:aws:bedrock:us-west-2:123:application-inference-profile/abc\",\"options\":{\"region\":\"us-east-1\"}}",
+ "{\"model\":\"arn:aws-us-gov:bedrock:us-gov-west-1:123:application-inference-profile/abc\",\"options\":{\"region\":\"us-east-1\"}}"};
+ const char *regions[]={"eu-central-1","us-west-2","ap-south-1","us-gov-west-1","us-west-2","us-gov-west-1"};
+ const char *bases[]={"https://bedrock-runtime.eu-central-1.amazonaws.com/","https://bedrock-runtime.us-west-2.amazonaws.com/","https://bedrock-vpc.example.com/proxy/","https://bedrock-runtime-fips.us-gov-west-1.amazonaws.com/","https://bedrock-runtime.us-west-2.amazonaws.com/","https://bedrock-runtime.us-gov-west-1.amazonaws.com/"};
+ unsetenv("PANGU_MODEL_API_KEY");unsetenv("AWS_BEARER_TOKEN_BEDROCK");unsetenv("AWS_REGION");unsetenv("AWS_DEFAULT_REGION");setenv("AWS_ACCESS_KEY_ID","region-unit-access",1);setenv("AWS_SECRET_ACCESS_KEY","region-unit-secret",1);
+ for(unsigned n=0;n<6;n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse(sources[n]);json_object_object_add(cfg,"api",json_object_new_string("bedrock-converse-stream"));if(!json_object_object_get(cfg,"model"))json_object_object_add(cfg,"model",json_object_new_string("anthropic.claude-test"));assert(!pg_mimo_configure(&m,cfg)&&!json_object_object_get(cfg,"bedrockRegion"));json_object_put(cfg);assert(!start()&&!strncmp(captured_url,bases[n],strlen(bases[n])));char signature[128];snprintf(signature,sizeof(signature),"aws:amz:%s:bedrock",regions[n]);assert(!strcmp(signature,captured_sigv4));model.close(model.context);
+ }
+ unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");puts("PASS: Bedrock standard/FIPS endpoint region, configured region override, custom proxy and partition ARN use the same region in URL and SigV4");
+}
 static void test_bedrock_history_ids(void){
  const char *ids[]={"call|native:1","汉字😀/call","abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-long-id"};
  const char *normalized[]={"call_native_1","_____call","abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-l"};
@@ -728,6 +744,7 @@ int main(int argc,char **argv) {
     test_bedrock_multimodal();
     test_bedrock_policies();
     test_bedrock_history_ids();
+    test_bedrock_regions();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
