@@ -3759,6 +3759,10 @@ pg_mimo_uses_anthropic:
  call json_object_get_string@PLT
  test rax,rax
  jnz .Loc_retention
+ mov rdi,r12
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Loc_retention_ready
  lea rdi,[rip+.Lap_cache_env]
  call getenv@PLT
  test rax,rax
@@ -3812,6 +3816,10 @@ pg_mimo_uses_anthropic:
  call json_object_get_boolean@PLT
  mov ebp,eax
 .Loc_long_ready:
+ mov rdi,r12
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Loc_key
  cmp qword ptr [rsp],2
  jne .Loc_key
  test ebp,ebp
@@ -3843,6 +3851,10 @@ pg_mimo_uses_anthropic:
 .Loc_key:
  cmp qword ptr [rsp],1
  jne .Loc_key_enabled
+ mov rdi,r12
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Loc_ok
  cmp dword ptr [rsp+24],0
  je .Loc_ok
  APGET r13,supportsExplicitPromptCacheMode
@@ -8314,6 +8326,7 @@ pg_mimo_uses_google:
  push r12
  push r13
  push r14
+ sub rsp,16
  mov rbx,rdi
  mov r12,rsi
  mov rdi,rsi
@@ -8422,6 +8435,7 @@ pg_mimo_uses_google:
  jb .Lcd_default_each
  mov rdi,rbp
  call json_object_put@PLT
+ mov rbp,r12
  mov rdi,r12
  lea rsi,[rip+.Lcd_options]
  call json_object_object_get@PLT
@@ -8448,7 +8462,7 @@ pg_mimo_uses_google:
  call json_object_object_get@PLT
  mov r13,rax
  test rax,rax
- jz .Lcd_request_ok
+ jz .Lcd_default_reasoning
  mov rdi,rax
  lea rsi,[rip+.Lcd_summary]
  lea rdx,[rip+.Lcd_auto]
@@ -8461,6 +8475,51 @@ pg_mimo_uses_google:
  lea rcx,[rip+.Lcd_summary]
  call .Lrp_copy
  jmp .Lcd_request_end
+.Lcd_default_reasoning:
+ mov rdi,rbp
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_reasoning]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lcd_request_ok
+ mov rdi,rbp
+ lea rsi,[rip+.Lct_level_map]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lct_off]
+ lea rdx,[rsp]
+ mov qword ptr [rsp],0
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lcd_default_reasoning_build
+ cmp qword ptr [rsp],0
+ je .Lcd_request_ok
+.Lcd_default_reasoning_build:
+ lea rdi,[rip+.Lcd_default_reason_json]
+ call json_tokener_parse@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lcd_request_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_reasoning]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lcd_request_bad
+ cmp qword ptr [rsp],0
+ je .Lcd_request_ok
+ mov rdi,[rsp]
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lrp_effort]
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lcd_request_end
 .Lcd_defaults_bad:
  mov rdi,rbp
  call json_object_put@PLT
@@ -8470,6 +8529,7 @@ pg_mimo_uses_google:
 .Lcd_request_ok:
  xor eax,eax
 .Lcd_request_end:
+ add rsp,16
  pop r14
  pop r13
  pop r12
@@ -8501,3 +8561,6 @@ pg_mimo_uses_google:
 .Lcd_summary_option: .asciz "reasoningSummary"
 .Lcd_summary: .asciz "summary"
 .Lcd_auto: .asciz "auto"
+
+.section .rodata
+.Lcd_default_reason_json: .asciz "{\"effort\":\"none\"}"

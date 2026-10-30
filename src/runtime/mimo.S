@@ -5131,8 +5131,70 @@ pg_mimo_complete:
  inc r14
  cmp r14,2
  jb .Lcd_header_each
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcd_session_key
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lcd_session_ready
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lcd_headers_cleanup
+ xor r14d,r14d
+.Lcd_session_each:
+ mov rdi,[rsp+40]
+ call free@PLT
+ mov qword ptr [rsp+40],0
+ lea rax,[rip+.Lcd_session_formats]
+ mov rsi,[rax+r14*8]
+ lea rdi,[rsp+40]
+ mov rdx,[rsp+48]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_headers_cleanup
+ lea r13,[rbx+PG_MM_HEADERS]
+.Lcd_session_remove:
+ mov r12,[r13]
+ test r12,r12
+ jz .Lcd_session_append
+ mov rdi,[r12]
+ lea rax,[rip+.Lcd_session_names]
+ mov rsi,[rax+r14*8]
+ lea rax,[rip+.Lcd_session_lengths]
+ mov rdx,[rax+r14*8]
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lcd_session_keep
+ lea rax,[rip+.Lcd_session_lengths]
+ mov rdx,[rax+r14*8]
+ mov rax,[r12]
+ cmp byte ptr [rax+rdx],58
+ jne .Lcd_session_keep
+ mov rax,[r12+8]
+ mov [r13],rax
+ mov qword ptr [r12+8],0
+ mov rdi,r12
+ call curl_slist_free_all@PLT
+ jmp .Lcd_session_remove
+.Lcd_session_keep:
+ lea r13,[r12+8]
+ jmp .Lcd_session_remove
+.Lcd_session_append:
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp+40]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov [rbx+PG_MM_HEADERS],rax
+ inc r14
+ cmp r14,2
+ jb .Lcd_session_each
+.Lcd_session_ready:
  xor ebp,ebp
 .Lcd_headers_cleanup:
+ mov rdi,[rsp+48]
+ call free@PLT
  mov rdi,[rsp]
  call json_object_put@PLT
  mov rdi,[rsp+8]
@@ -5201,3 +5263,84 @@ pg_mimo_complete:
 .Lcd_content_key: .asciz "content-type"
 .section .data.rel.ro
 .Lcd_reserved_keys: .quad .Lcd_auth_key,.Lcd_account_key,.Lcd_beta_key,.Lcd_accept_key,.Lcd_content_key
+
+.text
+/* Owned bounded session identity; absent identity and disabled cache return NULL. */
+.Lcd_session_key:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_retention_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_session_lookup
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_none]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcd_session_absent
+.Lcd_session_lookup:
+ mov rdi,r12
+ lea rsi,[rip+.Laffinity_sessionId]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcd_session_value
+ mov rdi,rbx
+ lea rsi,[rip+.Laffinity_sessionId]
+ call json_object_object_get@PLT
+.Lcd_session_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_session_absent
+ mov rbx,rax
+ xor r12d,r12d
+ xor r13d,r13d
+.Lcd_session_char:
+ movzx eax,byte ptr [rbx+r12]
+ test al,al
+ jz .Lcd_session_copy
+ and eax,192
+ cmp eax,128
+ je .Lcd_session_next
+ cmp r13,64
+ jae .Lcd_session_copy
+ inc r13
+.Lcd_session_next:
+ inc r12
+ jmp .Lcd_session_char
+.Lcd_session_copy:
+ test r12,r12
+ jz .Lcd_session_absent
+ mov rdi,rbx
+ mov rsi,r12
+ call strndup@PLT
+ jmp .Lcd_session_return
+.Lcd_session_absent:
+ xor eax,eax
+.Lcd_session_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lcd_session_format: .asciz "session-id: %s"
+.Lcd_request_format: .asciz "x-client-request-id: %s"
+.Lcd_retention_key: .asciz "cacheRetention"
+.Lcd_none: .asciz "none"
+.section .data.rel.ro
+.Lcd_session_formats: .quad .Lcd_session_format,.Lcd_request_format
+
+.section .rodata
+.Lcd_session_name: .asciz "session-id"
+.Lcd_request_name: .asciz "x-client-request-id"
+.Lcd_session_lengths: .quad 10,19
+.section .data.rel.ro
+.Lcd_session_names: .quad .Lcd_session_name,.Lcd_request_name
