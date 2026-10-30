@@ -2202,6 +2202,11 @@ pg_mimo_uses_anthropic:
 .Lap_success:
  mov rdi,rbx
  mov rsi,r12
+ call .Lap_provider_options
+ test eax,eax
+ jnz .Lap_bad
+ mov rdi,rbx
+ mov rsi,r12
  call .Lap_thinking_options
  test eax,eax
  jnz .Lap_bad
@@ -2708,7 +2713,20 @@ pg_mimo_uses_anthropic:
  mov [rsp],rax
  test rax,rax
  jz .Lap_thinking_bad
+ jmp .Lap_display_ready
 .Lap_thinking_adopt:
+ APGET r13,thinkingDisplay
+ test rax,rax
+ jz .Lap_display_ready
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_display]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_thinking_bad
+.Lap_display_ready:
  mov rdi,rbx
  lea rsi,[rip+.Lap_thinking]
  mov rdx,[rsp]
@@ -2754,3 +2772,175 @@ pg_mimo_uses_anthropic:
 .Lap_adaptive_json: .asciz "{\"type\":\"adaptive\",\"display\":\"summarized\"}"
 .Lap_disabled_json: .asciz "{\"type\":\"disabled\"}"
 .Lap_empty_json: .asciz "{}"
+
+/* Provider options follow buildParams: strings become typed tool choices,
+   object choices retain disable_parallel_tool_use; metadata exposes user_id. */
+.text
+.Lap_provider_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ APGET r12,options
+ mov r13,rax
+ APGET rax,toolChoice
+ mov r14,rax
+ test rax,rax
+ jz .Lap_provider_metadata
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_provider_choice_object
+ lea rdi,[rip+.Lap_empty_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_provider_bad
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_type]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_provider_bad
+ jmp .Lap_provider_choice_adopt
+.Lap_provider_choice_object:
+ mov rdi,r14
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_provider_bad
+ mov rdi,r14
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lap_provider_bad
+.Lap_provider_choice_adopt:
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_tool_choice]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_provider_bad
+.Lap_provider_metadata:
+ APGET r13,metadata
+ APGET rax,user_id
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_provider_display
+ lea rdi,[rip+.Lap_empty_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_provider_bad
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lap_user_id]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_provider_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_metadata]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_provider_bad
+.Lap_provider_display:
+ /* Fallbacks carry model identity only, as in the upstream request. */
+ APGET r12,modelInfo
+ APGET rax,compat
+ APGET rax,allowedFallbackModels
+ mov r13,rax
+ test rax,rax
+ jz .Lap_provider_ok
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lap_provider_bad
+ mov rdi,r13
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lap_provider_ok
+ call json_object_new_array@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lap_provider_bad
+ xor r14d,r14d
+.Lap_provider_fallback:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lap_provider_fallback_adopt
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ lea rdi,[rip+.Lap_empty_json]
+ mov rsi,[rsp+8]
+ call .Lrp_append
+ test rax,rax
+ jz .Lap_provider_bad
+ mov rdi,rax
+ mov rsi,rbp
+ lea rdx,[rip+.Lap_model]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lap_provider_bad
+ inc r14
+ jmp .Lap_provider_fallback
+.Lap_provider_fallback_adopt:
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_fallbacks]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lap_provider_bad
+.Lap_provider_ok:
+ xor ebp,ebp
+ jmp .Lap_provider_end
+.Lap_provider_bad:
+ mov ebp,1
+.Lap_provider_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lap_toolChoice: .asciz "toolChoice"
+.Lap_tool_choice: .asciz "tool_choice"
+.Lap_metadata: .asciz "metadata"
+.Lap_user_id: .asciz "user_id"
+.Lap_allowedFallbackModels: .asciz "allowedFallbackModels"
+.Lap_fallbacks: .asciz "fallbacks"
+.Lap_model: .asciz "model"
+
+.section .rodata
+.Lap_thinkingDisplay: .asciz "thinkingDisplay"
+.Lap_display: .asciz "display"
