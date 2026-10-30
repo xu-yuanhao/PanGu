@@ -33,7 +33,7 @@ def build(output):
     subprocess.run(['/usr/bin/clang-23', '-D_GNU_SOURCE', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
                     '-x', 'c', '-fsyntax-only', '-include', str(ROOT / 'src/runtime/process_layout.h'),
                     '/dev/null'], check=True)
-    flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'json-c', 'libutf8proc', 'sqlite3', 'libgit2', 'yaml-0.1', 'libpcre2-8', 'vips'], text=True).split()
+    flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'glib-2.0', 'json-c', 'libutf8proc', 'sqlite3', 'libgit2', 'yaml-0.1', 'libpcre2-8', 'vips'], text=True).split()
     subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                     '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                     *PLUGIN_EXPORTS,

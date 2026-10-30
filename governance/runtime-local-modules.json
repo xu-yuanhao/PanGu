@@ -146,7 +146,8 @@
         "json-c",
         "system libc",
         "tools.registry.local.v0",
-        "libcrypto (caller-buffer Base64 codec)"
+        "libcrypto (caller-buffer Base64 codec)",
+        "glib-2.0 (shared AWS profile INI parsing)"
       ],
       "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
       "exports": [
@@ -2849,6 +2850,14 @@
     "full G01/G02 certification"
   ],
   "local_provider_dependencies": [
+    {
+      "name": "glib-2.0",
+      "version": "2.90.1",
+      "source": "system pkg-config glib-2.0",
+      "license": "LGPL-2.1-or-later",
+      "purpose": "GKeyFile parsing for native Bedrock shared AWS config and credentials profiles",
+      "impact": "hosted provider profile loading; Assembly owns selection, precedence and credential lifetime"
+    },
     {
       "name": "libcurl",
       "version": "8.23.0",

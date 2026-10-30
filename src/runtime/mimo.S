@@ -3284,18 +3284,15 @@ pg_mimo_complete:
  mov rdi,rsp
  rep stosq
  mov rdi,[rbx+PG_MM_CONFIGURATION]
- lea rsi,[rip+.Lbeta_options]
- call json_object_object_get@PLT
- mov rdi,rax
- lea rsi,[rip+.Lbe_profile_key]
- call json_object_object_get@PLT
+ call .Lapf_load
+ mov [rsp+24],rax
  test rax,rax
- jnz .Lbe_sign_bad
-.Lbe_sign_credentials:
- lea rdi,[rip+.Lbe_access_env]
- call getenv@PLT
- mov r13,rax
- mov rdi,rax
+ jz .Lbe_sign_bad
+ cmp dword ptr [rax+32],0
+ jne .Lbe_sign_bad
+ mov r13,[rax]
+ mov r14,[rax+8]
+ mov rdi,r13
  call .Lbe_credential
  test eax,eax
  jnz .Lbe_sign_bad
@@ -3304,10 +3301,7 @@ pg_mimo_complete:
  call strchr@PLT
  test rax,rax
  jnz .Lbe_sign_bad
- lea rdi,[rip+.Lbe_secret_env]
- call getenv@PLT
- mov r14,rax
- mov rdi,rax
+ mov rdi,r14
  call .Lbe_credential
  test eax,eax
  jnz .Lbe_sign_bad
@@ -3351,8 +3345,8 @@ pg_mimo_complete:
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lbe_sign_bad
- lea rdi,[rip+.Lbe_token_env]
- call getenv@PLT
+ mov rax,[rsp+24]
+ mov rax,[rax+16]
  mov r13,rax
  test rax,rax
  jz .Lbe_sign_ok
@@ -3390,6 +3384,8 @@ pg_mimo_complete:
  xor esi,esi
  call memset@PLT
 .Lbe_sign_free:
+ mov rdi,[rsp+24]
+ call .Lapf_free
  mov rdi,[rsp]
  call free@PLT
  mov rdi,[rsp+8]
@@ -3673,7 +3669,23 @@ pg_mimo_complete:
  mov rax,[rsp+24]
  test rax,rax
  jnz .Lbr_copy_region
+ lea rdi,[rip+.Lapf_profile_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lapf_standard_region
+ cmp byte ptr [rax],0
+ jne .Lapf_resolve_profile_region
+.Lapf_standard_region:
  mov rax,[rsp+16]
+ test rax,rax
+ jnz .Lbr_copy_region
+.Lapf_resolve_profile_region:
+ mov rdi,rbx
+ call .Lapf_load
+ test rax,rax
+ jz .Lbr_bad
+ mov [rsp+40],rax
+ mov rax,[rax+24]
  test rax,rax
  jnz .Lbr_copy_region
  lea rax,[rip+.Lbe_region_default]
@@ -3703,7 +3715,14 @@ pg_mimo_complete:
  cmp qword ptr [rsp+16],0
  je .Lbr_ok
  cmp qword ptr [rsp+24],0
+ jne .Lapf_region_overrides_catalog
+ lea rdi,[rip+.Lapf_profile_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lbr_ok
+ cmp byte ptr [rax],0
  je .Lbr_ok
+.Lapf_region_overrides_catalog:
  /* A configured region supersedes the built-in standard endpoint. */
  mov rdi,rbx
  lea rsi,[rip+.Lge_baseUrl]
@@ -3722,6 +3741,8 @@ pg_mimo_complete:
 .Lbr_bad:
  mov ebp,1
 .Lbr_end:
+ mov rdi,[rsp+40]
+ call .Lapf_free
  mov rdi,[rsp]
  call free@PLT
  mov rdi,[rsp+16]
@@ -4214,3 +4235,305 @@ pg_mimo_complete:
 .Lhd_thousand: .double 1000
 .section .data.rel.ro
 .Lhd_names: .quad .Lhd_amzn,.Lhd_openai,.Lhd_anthropic,0
+
+.text
+/* Private owned strings: access, secret, token, region; never part of request JSON. */
+.Lapf_free:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lapf_free_done
+ xor r12d,r12d
+.Lapf_free_each:
+ mov rdi,[rbx+r12*8]
+ test rdi,rdi
+ jz .Lapf_free_next
+ call strlen@PLT
+ mov rdi,[rbx+r12*8]
+ mov rdx,rax
+ xor esi,esi
+ call memset@PLT
+ mov rdi,[rbx+r12*8]
+ call g_free@PLT
+.Lapf_free_next:
+ inc r12
+ cmp r12,4
+ jb .Lapf_free_each
+ mov rdi,rbx
+ call free@PLT
+.Lapf_free_done:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Files use GLib's INI parser; explicit profile wins ambient credentials. */
+.Lapf_load:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,10
+ mov rdi,rsp
+ rep stosq
+ mov edi,1
+ mov esi,40
+ call calloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lapf_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbe_profile_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lapf_ambient_profile
+ cmp byte ptr [rax],0
+ je .Lapf_ambient_profile
+ mov dword ptr [rsp+48],1
+ jmp .Lapf_profile_ready
+.Lapf_ambient_profile:
+ lea rdi,[rip+.Lapf_profile_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lapf_default_profile
+ cmp byte ptr [rax],0
+ jne .Lapf_profile_ready
+.Lapf_default_profile:
+ lea rax,[rip+.Lapf_default]
+.Lapf_profile_ready:
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lapf_bad
+ xor r12d,r12d
+.Lapf_file:
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lapf_default]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lapf_plain_section
+ test r12d,r12d
+ jnz .Lapf_plain_section
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Lapf_section_format]
+ mov rdx,[rsp+8]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lapf_bad
+ jmp .Lapf_file_path
+.Lapf_plain_section:
+ mov rdi,[rsp+8]
+ call strdup@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lapf_bad
+.Lapf_file_path:
+ lea rdi,[rip+.Lapf_config_env]
+ test r12d,r12d
+ jz .Lapf_path_env
+ lea rdi,[rip+.Lapf_credentials_env]
+.Lapf_path_env:
+ call getenv@PLT
+ test rax,rax
+ jz .Lapf_home
+ cmp byte ptr [rax],0
+ je .Lapf_home
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lapf_bad
+ jmp .Lapf_parse
+.Lapf_home:
+ lea rdi,[rip+.Lapf_home_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lapf_file_next
+ lea rcx,[rip+.Lapf_config_file]
+ test r12d,r12d
+ jz .Lapf_home_path
+ lea rcx,[rip+.Lapf_credentials_file]
+.Lapf_home_path:
+ lea rdi,[rsp+24]
+ lea rsi,[rip+.Lapf_path_format]
+ mov rdx,rax
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lapf_bad
+.Lapf_parse:
+ call g_key_file_new@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lapf_bad
+ mov rdi,rax
+ mov rsi,[rsp+24]
+ xor edx,edx
+ xor ecx,ecx
+ call g_key_file_load_from_file@PLT
+ test eax,eax
+ jz .Lapf_file_next
+ /* Roles/process/SSO need their own provider rather than accidental static fallback. */
+ xor r13d,r13d
+.Lapf_unsupported:
+ lea rax,[rip+.Lapf_unsupported_keys]
+ mov rdx,[rax+r13*8]
+ test rdx,rdx
+ jz .Lapf_values
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+16]
+ xor ecx,ecx
+ call g_key_file_get_value@PLT
+ test rax,rax
+ jz .Lapf_unsupported_next
+ mov rdi,rax
+ call g_free@PLT
+ mov dword ptr [rsp+52],1
+.Lapf_unsupported_next:
+ inc r13
+ jmp .Lapf_unsupported
+.Lapf_values:
+ xor r13d,r13d
+.Lapf_value:
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+16]
+ lea rax,[rip+.Lapf_keys]
+ mov rdx,[rax+r13*8]
+ xor ecx,ecx
+ call g_key_file_get_value@PLT
+ test rax,rax
+ jz .Lapf_value_next
+ mov r14,rax
+ mov rax,[rsp]
+ mov rdi,[rax+r13*8]
+ call g_free@PLT
+ mov rax,[rsp]
+ mov [rax+r13*8],r14
+.Lapf_value_next:
+ inc r13
+ cmp r13,4
+ jb .Lapf_value
+.Lapf_file_next:
+ mov rdi,[rsp+32]
+ test rdi,rdi
+ jz .Lapf_file_free
+ call g_key_file_unref@PLT
+ mov qword ptr [rsp+32],0
+.Lapf_file_free:
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov qword ptr [rsp+16],0
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov qword ptr [rsp+24],0
+ inc r12
+ cmp r12,2
+ jb .Lapf_file
+ cmp dword ptr [rsp+48],0
+ jne .Lapf_explicit
+ lea rdi,[rip+.Lbe_access_env]
+ call getenv@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lapf_explicit
+ cmp byte ptr [rax],0
+ je .Lapf_explicit
+ lea rdi,[rip+.Lbe_secret_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lapf_explicit
+ cmp byte ptr [rax],0
+ je .Lapf_explicit
+ mov r14,rax
+ xor r13d,r13d
+.Lapf_env_value:
+ mov rdi,[rsp+40]
+ test r13d,r13d
+ jz .Lapf_env_copy
+ mov rdi,r14
+ cmp r13d,1
+ je .Lapf_env_copy
+ lea rdi,[rip+.Lbe_token_env]
+ call getenv@PLT
+ mov rdi,rax
+.Lapf_env_copy:
+ xor ebp,ebp
+ test rdi,rdi
+ jz .Lapf_env_replace
+ call g_strdup@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lapf_bad
+.Lapf_env_replace:
+ mov rax,[rsp]
+ mov rdi,[rax+r13*8]
+ call g_free@PLT
+ mov rax,[rsp]
+ mov [rax+r13*8],rbp
+ inc r13
+ cmp r13,3
+ jb .Lapf_env_value
+ mov dword ptr [rsp+52],0
+.Lapf_explicit:
+ mov rbx,[rsp]
+ mov eax,[rsp+52]
+ mov [rbx+32],eax
+ mov qword ptr [rsp],0
+ jmp .Lapf_end
+.Lapf_bad:
+ xor ebx,ebx
+.Lapf_end:
+ mov rdi,[rsp]
+ call .Lapf_free
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov rdi,[rsp+32]
+ test rdi,rdi
+ jz .Lapf_end_ready
+ call g_key_file_unref@PLT
+.Lapf_end_ready:
+ mov rax,rbx
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lapf_profile_env: .asciz "AWS_PROFILE"
+.Lapf_config_env: .asciz "AWS_CONFIG_FILE"
+.Lapf_credentials_env: .asciz "AWS_SHARED_CREDENTIALS_FILE"
+.Lapf_home_env: .asciz "HOME"
+.Lapf_default: .asciz "default"
+.Lapf_section_format: .asciz "profile %s"
+.Lapf_path_format: .asciz "%s/.aws/%s"
+.Lapf_config_file: .asciz "config"
+.Lapf_credentials_file: .asciz "credentials"
+.Lapf_access: .asciz "aws_access_key_id"
+.Lapf_secret: .asciz "aws_secret_access_key"
+.Lapf_token: .asciz "aws_session_token"
+.Lapf_region: .asciz "region"
+.Lapf_role: .asciz "role_arn"
+.Lapf_process: .asciz "credential_process"
+.Lapf_sso: .asciz "sso_session"
+.Lapf_web: .asciz "web_identity_token_file"
+.section .data.rel.ro
+.Lapf_keys: .quad .Lapf_access,.Lapf_secret,.Lapf_token,.Lapf_region
+.Lapf_unsupported_keys: .quad .Lapf_role,.Lapf_process,.Lapf_sso,.Lapf_web,0

@@ -26,7 +26,7 @@ def main():
         DURABLE_SOURCES.extend(compile_inputs([implementation('src/runtime/json_schema_bridge')],directory,['-fsanitize=undefined','-fno-sanitize-recover=all']))
         if '--conversations' in sys.argv or '--client' in sys.argv:
             output=str(Path(directory)/'test-conversations')
-            flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc','sqlite3','libcurl', 'libcrypto'],text=True).split()
+            flags=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libutf8proc','sqlite3','libcurl', 'libcrypto', 'glib-2.0'],text=True).split()
             subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',
                             '-fsanitize=address,undefined','-fno-sanitize-recover=all',*DURABLE_SOURCES,
                             str(ROOT/'tests/runtime/test_durable_storage.c'),*flags,'-o',output],check=True)
@@ -39,7 +39,7 @@ def main():
             if not (os.environ.get('PANGU_MODEL_API_KEY') or os.environ.get('MIMO_API_KEY')):
                 raise SystemExit('Model API key required in the environment')
             output = str(Path(directory) / 'live-durable-generation')
-            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl', 'libcrypto'], text=True).split()
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             *DURABLE_SOURCES, str(ROOT / 'tests/runtime/test_durable_storage.c'), *flags, '-o', output], check=True)
             subprocess.run([output, '--live-owned-compaction-race' if '--live-owned-compaction-race' in sys.argv else '--live-compaction-race' if '--live-compaction-race' in sys.argv else '--live-compaction-retry' if '--live-compaction-retry' in sys.argv else '--live-background-compaction' if '--live-background-compaction' in sys.argv else '--live-overflow-compaction' if '--live-overflow-compaction' in sys.argv else '--live-auto-compaction' if '--live-auto-compaction' in sys.argv else '--live-compaction' if '--live-compaction' in sys.argv else '--live-inputs' if '--live-inputs' in sys.argv else '--live-sequential' if '--live-sequential' in sys.argv else '--live-deferred' if '--live-deferred' in sys.argv else '--live-partial' if '--live-partial' in sys.argv else '--live-generation'], check=True, timeout=350)
@@ -48,7 +48,7 @@ def main():
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; environment only')
             output = str(Path(directory) / 'live-model-batch')
-            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'json-c', 'libutf8proc'], text=True).split()
+            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'glib-2.0', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', '-O2',
                             *MODEL_SOURCES, implementation('src/runtime/agent'), implementation('src/runtime/session'), implementation('src/runtime/submissions'), implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'), implementation('src/runtime/write_tool'), implementation('src/runtime/edit_text'), implementation('src/runtime/edit_diff'), implementation('src/runtime/edit_tool'),
                             str(ROOT / 'tests/runtime/live_mimo_batch.c'), *model_flags, '-o', output], check=True)
@@ -57,7 +57,7 @@ def main():
         if any(flag in sys.argv for flag in ('--live', '--live-session', '--live-journal', '--live-resume', '--live-submission')):
             if not os.environ.get('MIMO_API_KEY'):
                 raise SystemExit('MIMO_API_KEY is required; never put credentials in source or arguments')
-            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'json-c', 'libutf8proc'], text=True).split()
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'glib-2.0', 'json-c', 'libutf8proc'], text=True).split()
             output = str(Path(directory) / 'live-mimo')
             live_source = 'live_journal.c' if '--live-journal' in sys.argv or '--live-resume' in sys.argv or '--live-submission' in sys.argv else ('live_session.c' if '--live-session' in sys.argv else 'live_mimo.c')
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
@@ -84,7 +84,7 @@ def main():
             native_paths.append(library)
         for mode in ('-O0', '-O2'):
             sqlite_test = str(Path(directory) / 'test-record-sqlite')
-            sqlite_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl', 'libcrypto'], text=True).split()
+            sqlite_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'sqlite3', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in ['documents', 'records', 'record_memory', 'delta', 'record_sqlite']],
@@ -146,7 +146,7 @@ def main():
                             *delta_flags, '-o', delta_test], check=True)
             subprocess.run([delta_test], check=True, timeout=15)
             prompt_test = str(Path(directory) / 'test-prompt')
-            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libgit2', 'libcurl', 'libcrypto', 'libutf8proc'], text=True).split()
+            prompt_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libgit2', 'libcurl', 'libcrypto', 'glib-2.0', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in ('prompt', 'prompt_posix', 'tools', 'tool_path', 'tool_path_posix', 'read_tool')],
@@ -155,14 +155,14 @@ def main():
                             *prompt_flags, '-o', prompt_test], check=True)
             subprocess.run([prompt_test], check=True, timeout=15)
             skills_test = str(Path(directory) / 'test-skills')
-            skills_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libcurl', 'libcrypto'], text=True).split()
+            skills_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'), implementation('src/runtime/resource_select'), implementation('src/runtime/resource_match_posix'), *PATH_SOURCES,
                             str(ROOT / 'tests/runtime/test_skills.c'), *skills_flags, '-o', skills_test], check=True)
             subprocess.run([skills_test], check=True, timeout=15)
             templates_test = str(Path(directory) / 'test-templates')
-            templates_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl', 'libcrypto'], text=True).split()
+            templates_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             implementation('src/runtime/skills'), implementation('src/runtime/skills_posix'), implementation('src/runtime/resource_select'), implementation('src/runtime/resource_match_posix'), *PATH_SOURCES, implementation('src/runtime/prompt_templates'),
@@ -170,7 +170,7 @@ def main():
             subprocess.run([templates_test], check=True, timeout=15)
             subprocess.run([sys.executable, '-B', str(ROOT / 'tools/runtime/test_prompt_templates.py'), '--binary', templates_test], check=True, timeout=30)
             settings_test = str(Path(directory) / 'test-settings')
-            settings_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl', 'libcrypto'], text=True).split()
+            settings_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'yaml-0.1', 'libpcre2-8', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *[implementation('src/runtime/' + name) for name in ('settings', 'models', 'models_data', 'skills', 'skills_posix', 'prompt_templates', 'tool_path', 'tool_path_posix', 'resource_select', 'resource_match_posix')],
@@ -188,7 +188,7 @@ def main():
                             *[implementation('src/runtime/' + name) for name in ('resources', 'skills', 'skills_posix', 'prompt_templates', 'resource_select', 'resource_match_posix', 'tool_path', 'tool_path_posix')],
                             str(ROOT / 'tests/runtime/test_resources.c'), '-Wl,--wrap=json_object_object_add', *templates_flags, '-o', resources_test], check=True)
             subprocess.run([resources_test], check=True, timeout=15)
-            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'json-c', 'libutf8proc'], text=True).split()
+            model_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'glib-2.0', 'json-c', 'libutf8proc'], text=True).split()
             for name, sources, wraps in [
                 ('asm', ['test_mimo_asm.c', 'mimo_abi.S'], ABI_WRAPS),
                 ('transport', ['test_mimo_transport.c', 'mimo_abi.S'], ABI_WRAPS + CURL_WRAPS),
@@ -237,14 +237,14 @@ def main():
                             implementation('src/runtime/agent'), str(ROOT / 'tests/runtime/test_session_commit.c'), '-o', session_test], check=True)
             subprocess.run([session_test], check=True, timeout=10)
             write_test = str(Path(directory) / 'test-write-tool')
-            write_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libcrypto', 'libutf8proc'], text=True).split()
+            write_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/tools'),
                             *PATH_SOURCES, implementation('src/runtime/write_tool'), str(ROOT / 'tests/runtime/test_write_tool.c'),
                             '-Wl,--wrap=write,--wrap=ftruncate,--wrap=fsync', *write_flags, '-o', write_test], check=True)
             subprocess.run([write_test], check=True, timeout=10)
             edit_test = str(Path(directory) / 'test-edit-text')
-            edit_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'libcurl', 'libcrypto'], text=True).split()
+            edit_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libutf8proc', 'libcurl', 'libcrypto', 'glib-2.0'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all', implementation('src/runtime/edit_text'),
                             str(ROOT / 'tests/runtime/test_edit_text.c'), '-Wl,--wrap=calloc,--wrap=utf8proc_map',
@@ -303,7 +303,7 @@ def main():
                             str(ROOT / 'tests/runtime/test_async_tools.c'), *write_flags, '-o', async_test], check=True)
             subprocess.run([async_test], check=True, timeout=20)
             tools_asm_test = str(Path(directory) / 'test-tools-asm')
-            tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libcrypto', 'libutf8proc'], text=True).split()
+            tool_flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'json-c', 'libcurl', 'libcrypto', 'glib-2.0', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11', '-Wall', '-Wextra', '-Werror',
                             '-pedantic', '-Wno-cast-function-type', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             '-I' + str(ROOT / 'src/runtime'), implementation('src/runtime/tools'), *PATH_SOURCES, implementation('src/runtime/read_tool'),
@@ -314,7 +314,7 @@ def main():
                             '-pedantic', mode, '-fsanitize=undefined', '-fno-sanitize-recover=all',
                             *SOURCES, '-o', output], check=True)
             subprocess.run([output], check=True, timeout=10)
-            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'json-c', 'libutf8proc'], text=True).split()
+            flags = subprocess.check_output(['pkg-config', '--cflags', '--libs', 'libcurl', 'libcrypto', 'glib-2.0', 'json-c', 'libutf8proc'], text=True).split()
             subprocess.run(['/usr/bin/clang-23', '-D_POSIX_C_SOURCE=200809L', '-std=c11',
                             '-Wall', '-Wextra', '-Werror', '-pedantic', mode,
                             '-fsanitize=undefined', '-fno-sanitize-recover=all',

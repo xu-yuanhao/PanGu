@@ -327,3 +327,5 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - 验证：模型O0/O2/UBSan、ABI与七个诊断构造失败点清理通过；头名称大小写/空白/超限/新响应/关闭检查，真实本地TLS头采集及SigV4/超时检查通过。SQLite/JSONL失败assistant核对请求ID、HTTP/传输事实，退避重开与取消保持；Client和产品资源ASan/UBSan、产品构建与Assembly/diff通过。自审核对响应头借用期、内部布局、回调清理与提交顺序。
 - 具体缺口：错误类别/状态诊断整合与非ASCII请求ID长度的完整参考规则；Bedrock profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
 - 下一交付物：成组补齐提供者凭据配置和完整错误/响应元数据，继续Generation实际消费者与协议覆盖。
+
+当前开发快照：`mimo.S` 已接入 GLib GKeyFile 读取 AWS 共享 config/credentials，汇编处理 profile 选择、环境凭据优先级和 SigV4 接线；构建入口同步链接 glib-2.0。现有模型 O0/O2/UBSan 与协议差异专项通过；profile 专属优先级、文件错误和清理用例仍待补齐，本批凭据链保持进行中。
