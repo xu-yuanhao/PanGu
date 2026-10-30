@@ -321,8 +321,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`models.ts calculateCost`及Bedrock cache-write-1h费用用例。
-- 实际调用链：`models.S`沿现有模型描述覆盖顺序携带公开cost；`mimo.S`在协议完成消息生成后按usage输入总量选择最高适用tier，计算输入/输出/缓存读取与短/长写入费用，写入usage.cost供既有Generation事务和Usage账本累计。没有价格描述时不生成估计费用，公开ABI保持。
-- 验证：模型O0/O2/UBSan与ABI、现有故障专项通过；Bedrock实际完成消息验证阶梯费率、1h写入、部分/末尾metadata的费用；用户models.json价格加载/覆盖专项通过。产品资源ASan/UBSan、Client集成、构建及Assembly/diff检查通过。自审核对价格描述归属、tier严格阈值与费用JSON释放。
-- 具体缺口：内置价格数据补齐（当前参考生成目录引用的数据文件缺失）、费用计算更完整的上游用例；Bedrock请求ID/状态诊断、data-retention提示、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为继续按K05完整范围覆盖，未有对应真实云端凭据验证。
-- 下一交付物：沿K05完成价格来源与费用差分核对，同时推进提供者诊断/凭据配置的实际消费者。
+- 来源：固定Pi生成器完整目录SHA256 `75cc19e68ae915aeeace9442d16b4cbf37c1705d2ab19d51ec6dd65ef7d7320a`，与`models_data.S`原记录一致；Pi提交`d5b3de22d0e24a3e9c38a9410d3329b099717283`。
+- 实际调用链：1593个内置模型加入同一快照的cost描述，经models.describe和Generation配置进入统一usage费用计算；用户models.json保留覆盖顺序。原目录字段逐项比对一致，价格为固定参考快照。
+- 验证：完整源摘要及1593项原字段匹配；模型描述/用户价格覆盖专项、产品资源ASan/UBSan、产品构建、Assembly与diff检查通过。自审核对生成数据来源、公开价格字段和既有加载链。
+- 具体缺口：费用计算更完整的Pi差分用例；Bedrock请求ID/状态诊断、data-retention提示、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
+- 下一交付物：沿K05成组核对价格阶梯/费用边界及账本恢复，同时继续提供者诊断和凭据配置。
