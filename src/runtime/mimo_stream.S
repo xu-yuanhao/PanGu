@@ -617,6 +617,11 @@ pg_mimo_decode_line:
  call json_object_is_type@PLT
  test eax, eax
  jz .Ldl_failed
+ mov rdi,rbx
+ mov rsi,[rsp+56]
+ call .Lchat_stop_data
+ test eax,eax
+ jnz .Ldl_failed
  mov rdi,qword ptr [rsp + 56]
  call json_object_get_string_len@PLT
  mov [rsp + 72],eax
@@ -1489,7 +1494,16 @@ pg_mimo_responses_complete:
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
- jz .Lrc_ok
+ jnz .Lrc_anthropic
+ mov rdi,[rsp+8]
+ mov rsi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ lea rdx,[rip+.Lstr_finish_reason]
+ lea rcx,[rip+.Lrt_raw_stop]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lrc_bad
+ jmp .Lrc_ok
+.Lrc_anthropic:
  mov rdi,rbx
  mov rsi,[rsp+8]
  call .Lan_complete
@@ -3582,3 +3596,102 @@ pg_mimo_anthropic_clear:
 .Lan_sensitive_message: .asciz "Provider stopped with: sensitive"
 .Lan_unknown_format: .asciz "Unhandled stop reason: %s"
 .Lan_error_json: .asciz "{\"error\":{}}"
+
+/* Chat finish reasons remain available in successful canonical messages and
+   failed provider bodies; Durable can retain the original provider cause. */
+.text
+.Lchat_stop_data:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ xor r14d,r14d
+ mov rdi,rbx
+ call pg_mimo_uses_responses
+ test eax,eax
+ jnz .Lchat_stop_skip
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jnz .Lchat_stop_skip
+ lea rdi,[rip+.Lan_error_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lchat_stop_bad
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lstr_finish_reason]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lchat_stop_bad
+ call printbuf_new@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lchat_stop_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lchat_finish_prefix]
+ mov edx,24
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lchat_stop_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov [rsp+8],eax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rdi,r14
+ mov rsi,rax
+ mov edx,[rsp+8]
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lchat_stop_bad
+ ANGET "qword ptr [rsp]",error_key
+ mov r13,rax
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lrt_raw_stop]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lchat_stop_bad
+ mov rdi,[r14]
+ mov esi,[r14+8]
+ call json_object_new_string_len@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lrt_message]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lchat_stop_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lrt_save
+.Lchat_stop_skip:
+ xor ebp,ebp
+ jmp .Lchat_stop_end
+.Lchat_stop_bad:
+ mov ebp,1
+.Lchat_stop_end:
+ mov rdi,r14
+ call printbuf_free@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lchat_finish_prefix: .asciz "Provider finish_reason: "

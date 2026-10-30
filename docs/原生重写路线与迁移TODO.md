@@ -316,7 +316,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/{anthropic-messages,transform-messages,simple-options,constrained-sampling}.ts` 与 streaming-tool-arguments、anthropic-sse-parsing、strict-tool-fallback 用例。
-- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置。
-- 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
+- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置；Chat成功消息保存原始停止原因，content_filter/network_error等失败携带明确错误及原始原因。
+- 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；Chat原始停止/错误与固定Pi raw-stop用例一致；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
 - 具体缺口：Messages的managed effort、constrainedSampling声明/严格转换/失败回退、native tools、OAuth和网关完整覆盖，以及后续协议。现有`pg_tool_definition`及提示目录只传名称/说明/schema；严格模式需将声明元数据、插件快照、模型请求和恢复一起贯通。
 - 下一交付物：按K05继续成组完成提供者行为；严格工具从上述声明调用链实施，其他协议按覆盖表顺序移植。接口或构建调整随同一批集成。

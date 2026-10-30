@@ -140,10 +140,19 @@ static void openai_cache(void){
  }
  puts("PASS: OpenAI Chat/Responses PanGu cache identity, 64 Unicode characters, retention and explicit cache mode");
 }
+
+static void chat_raw_stops(void){
+ const char *reasons[]={"stop","end","length","content_filter","network_error"};
+ for(unsigned n=0;n<5;n++){
+  pg_model model=pg_mimo_model(&m);char frame[256];snprintf(frame,sizeof(frame),"data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"%s\"}]}",reasons[n]);int status=line(frame);if(n<3){assert(!status&&!line("data: [DONE]"));json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant)&&!strcmp(json_object_get_string(json_object_object_get(assistant,"rawStopReason")),reasons[n]));json_object_put(assistant);}else{assert(status&&!m.saw_done);pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body));char expected[96];snprintf(expected,sizeof(expected),"Provider finish_reason: %s",reasons[n]);assert(message.size==strlen(expected)&&!memcmp(message.data,expected,message.size)&&strstr(body.data,reasons[n]));}model.close(model.context);
+ }
+ puts("PASS: Chat successful raw stop reasons and content_filter/network_error provider failures");
+}
 int main(void){
  anthropic();
  anthropic_failures();
  openai_cache();
+ chat_raw_stops();
  m=(pg_mimo){0};
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);
