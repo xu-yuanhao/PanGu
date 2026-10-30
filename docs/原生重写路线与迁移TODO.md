@@ -128,6 +128,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Bedrock自定义代理传输接入：skip-auth代理签名、Bearer/临时凭据隔离、强制HTTP/1.1和精确环境开关；实际TLS签名/HTTP版本、失败清理与ASan/UBSan通过。
 - [x] Bedrock静态共享profile接入实际签名：默认/显式/环境profile、config与credentials、环境密钥优先级、profile区域及临时令牌；实际curl回放与ASan/UBSan通过。
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
+- [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -324,8 +325,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/bedrock-converse-stream.ts` 客户端配置、skipAuth、force HTTP1和region分支，及 `test/bedrock-credentials.test.ts`。本批沿固定快照。
-- 实际调用链：`mimo.S`接入环境`AWS_BEDROCK_SKIP_AUTH=1`，优先于Bearer和静态/临时凭据，沿参考使用代理签名密钥进入既有libcurl SigV4；`AWS_BEDROCK_FORCE_HTTP1=1`直接设置同一请求的HTTP版本。配置/签名失败沿原有关闭清理。共享profile区域与上游对齐：显式profile本身保持默认区域，环境profile才进入共享配置区域解析，ARN/显式区域/固定端点优先级保持。
-- 验证：模型O0/O2/UBSan与既有协议差分通过；代理优先级、精确环境开关、curl设置失败和释放回放通过；独立TLS接收端验证普通与代理模式真实SigV4 HMAC、临时令牌隔离、HTTP/1.1和超时。区域修正后同一传输专项ASan/UBSan和TLS场景复验通过。产品构建通过；Assembly/diff核对通过。自审核对私有分支、借用字符串、变参常量和关闭路径，未扩展公共服务ABI。
-- 具体缺口：Bedrock完整凭据链的scoped env、角色/进程/SSO及工作负载凭据，分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
-- 下一交付物：沿固定Pi的提供者配置和认证调用者成组补齐K05，接入Generation实际消费者并保持现有协议与持久恢复行为。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `providers/github-copilot.ts`、`api/github-copilot-headers.ts`，以及Chat/Responses/Anthropic客户端创建入口和调用者。本批复用已核对快照。
+- 实际调用链：同一模型提供者按`modelProvider`或`modelInfo.provider`识别github-copilot；汇编组合默认/自定义基础端点，保留显式endpoint；请求前读取借用canonical上下文或既有消息，推导发起者和历史用户/工具图片。公共请求头合并在模型头后加入动态头，再应用连接/options覆盖。Anthropic Copilot使用Bearer与参考默认头；编码/流/Generation接线沿已有三协议。
+- 验证：模型O0/O2/UBSan与既有协议差分通过；三协议18组实际curl请求覆盖user/agent、历史图片、legacy输入、提供者隔离、头覆盖和默认端点，最终传输ASan/UBSan通过。新增三协议配置构造失败用例核对旧配置保留与候选释放；产品构建、Assembly/diff通过。自审核对借用消息、JSON插入所有权、头覆盖顺序、端点构造和Bearer选择；公共服务ABI不变。
+- 具体缺口：Copilot OAuth/令牌更新与其余网关特例；Codex专用协议；各协议剩余认证与高级行为按K05保留，Bedrock完整凭据链与高级选项仍在其中。
+- 下一交付物：继续Codex/Copilot网关实际模型执行链，复用现有Responses编码/流与Generation持久状态，成组完成参考协议行为。

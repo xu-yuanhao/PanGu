@@ -403,6 +403,10 @@ li_start:
  mov r15d,9
  jmp .Lauth_prefix_ready
 .Lauth_nonazure:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcp_is
+ test eax,eax
+ jnz .Lauth_prefix_ready
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
@@ -446,6 +450,24 @@ li_start:
  jz .Lst_bad
  mov r13,rax
  mov [rbx+PG_MM_HEADERS],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcp_is
+ test eax,eax
+ jz .Lauth_headers_ready
+ mov rdi,r13
+ lea rsi,[rip+.Lcp_accept]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lst_bad
+ mov r13,rax
+ mov [rbx+PG_MM_HEADERS],rax
+ mov rdi,r13
+ lea rsi,[rip+.Lcp_browser]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lst_bad
+ mov r13,rax
+ mov [rbx+PG_MM_HEADERS],rax
 .Lauth_headers_ready:
  mov rdi,rbx
  call .Lanthropic_beta_headers
@@ -456,6 +478,7 @@ li_start:
  test eax,eax
  jnz .Lst_bad
  mov rdi,rbx
+ mov rsi,r12
  call .Lprovider_headers
  test eax,eax
  jnz .Lst_bad
@@ -1028,6 +1051,10 @@ pg_mimo_configure:
  jnz .Lcfg_end
  mov rdi,[rsp]
  call .Lbe_prepare
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Lcp_prepare
  test eax,eax
  jnz .Lcfg_end
  mov rdi,[rsp]
@@ -2220,10 +2247,12 @@ pg_mimo_complete:
  push r14
  sub rsp,96
  mov rbx,rdi
+ mov r14,rsi
  xor eax,eax
  mov ecx,12
  mov rdi,rsp
  rep stosq
+ mov [rsp+80],r14
  call json_object_new_object@PLT
  mov [rsp],rax
  test rax,rax
@@ -2352,6 +2381,15 @@ pg_mimo_complete:
  call json_object_iter_next@PLT
  jmp .Lph_each
 .Lph_layer_next:
+ test r12d,r12d
+ jnz .Lcp_layer_done
+ mov rdi,rbx
+ mov rsi,[rsp+80]
+ mov rdx,[rsp]
+ call .Lcp_headers
+ test eax,eax
+ jnz .Lph_bad
+.Lcp_layer_done:
  inc r12
  cmp r12,3
  jb .Lph_layer
@@ -4605,3 +4643,314 @@ pg_mimo_complete:
 .section .data.rel.ro
 .Lapf_keys: .quad .Lapf_access,.Lapf_secret,.Lapf_token,.Lapf_region
 .Lapf_unsupported_keys: .quad .Lapf_role,.Lapf_process,.Lapf_sso,.Lapf_web,0
+
+.text
+.Lcp_is:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Laffinity_provider]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcp_provider_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_provider]
+ call json_object_object_get@PLT
+.Lcp_provider_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcp_is_done
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_name]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+.Lcp_is_done:
+ pop rbx
+ ret
+.Lcp_put:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rdx
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lcp_put_bad
+ mov r13,rax
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lcp_put_done
+ mov rdi,r13
+ call json_object_put@PLT
+.Lcp_put_bad:
+ mov eax,1
+.Lcp_put_done:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* Canonical transcript is borrowed for this request; dynamic headers own copies. */
+.Lcp_headers:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rsi
+ mov rbp,rdx
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ call .Lcp_is
+ test eax,eax
+ jz .Lcp_headers_ok
+ mov r12,[rbx+PG_MM_SES_COUNT]
+ test r12,r12
+ jz .Lcp_emit
+ cmp dword ptr [rbx+PG_MM_MSG_ROLE],PG_MM_ROLE_CONTEXT_VIEW
+ jne .Lcp_legacy
+ mov rdi,[rbx+PG_MM_MSG_TEXT]
+ lea rsi,[rip+.Lcp_messages]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov r12,rax
+ xor r13d,r13d
+.Lcp_row:
+ cmp r13,r12
+ jae .Lcp_emit
+ mov rdi,[rsp+16]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_role]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcp_row_next
+ mov [rsp+32],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_user]
+ call strcmp@PLT
+ mov dword ptr [rsp],eax
+ test eax,eax
+ jz .Lcp_content
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcp_tool_result]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcp_row_next
+.Lcp_content:
+ mov rdi,r14
+ lea rsi,[rip+.Lcp_content_key]
+ call json_object_object_get@PLT
+ mov [rsp+24],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcp_row_next
+ mov rdi,[rsp+24]
+ call json_object_array_length@PLT
+ mov r14,rax
+ mov qword ptr [rsp+40],0
+.Lcp_block:
+ cmp [rsp+40],r14
+ jae .Lcp_row_next
+ mov rdi,[rsp+24]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcp_block_next
+ mov rdi,rax
+ lea rsi,[rip+.Lcp_image]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcp_block_next
+ mov dword ptr [rsp+8],1
+.Lcp_block_next:
+ inc qword ptr [rsp+40]
+ jmp .Lcp_block
+.Lcp_row_next:
+ inc r13
+ jmp .Lcp_row
+.Lcp_legacy:
+ dec r12
+ imul r12,PG_MM_MSG_BYTES
+ mov eax,[rbx+r12+PG_MM_MSG_ROLE]
+ cmp eax,PG_MM_ROLE_USER
+ je .Lcp_emit
+ cmp eax,PG_MM_ROLE_USER_VIEW
+ je .Lcp_emit
+ mov dword ptr [rsp],1
+.Lcp_emit:
+ lea rdx,[rip+.Lcp_user]
+ cmp dword ptr [rsp],0
+ je .Lcp_initiator
+ lea rdx,[rip+.Lcp_agent]
+.Lcp_initiator:
+ mov rdi,rbp
+ lea rsi,[rip+.Lcp_initiator_key]
+ call .Lcp_put
+ test eax,eax
+ jnz .Lcp_headers_end
+ mov rdi,rbp
+ lea rsi,[rip+.Lcp_intent_key]
+ lea rdx,[rip+.Lcp_intent]
+ call .Lcp_put
+ test eax,eax
+ jnz .Lcp_headers_end
+ cmp dword ptr [rsp+8],0
+ je .Lcp_headers_ok
+ mov rdi,rbp
+ lea rsi,[rip+.Lcp_vision_key]
+ lea rdx,[rip+.Lcp_true]
+ call .Lcp_put
+ jmp .Lcp_headers_end
+.Lcp_headers_ok:
+ xor eax,eax
+.Lcp_headers_end:
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcp_accept: .asciz "accept: application/json"
+.Lcp_browser: .asciz "anthropic-dangerous-direct-browser-access: true"
+.Lcp_name: .asciz "github-copilot"
+.Lcp_provider: .asciz "provider"
+.Lcp_messages: .asciz "messages"
+.Lcp_role: .asciz "role"
+.Lcp_user: .asciz "user"
+.Lcp_agent: .asciz "agent"
+.Lcp_tool_result: .asciz "toolResult"
+.Lcp_content_key: .asciz "content"
+.Lcp_type: .asciz "type"
+.Lcp_image: .asciz "image"
+.Lcp_initiator_key: .asciz "x-initiator"
+.Lcp_intent_key: .asciz "openai-intent"
+.Lcp_intent: .asciz "conversation-edits"
+.Lcp_vision_key: .asciz "copilot-vision-request"
+.Lcp_true: .asciz "true"
+
+.text
+.Lcp_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ call .Lcp_is
+ test eax,eax
+ jz .Lcp_prepare_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcp_prepare_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcp_base_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+.Lcp_base_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ test rax,rax
+ jnz .Lcp_base_ready
+ lea r12,[rip+.Lcp_base]
+.Lcp_base_ready:
+ mov rdi,r12
+ call strlen@PLT
+ mov rbp,rax
+.Lcp_base_trim:
+ test rbp,rbp
+ jz .Lcp_prepare_bad
+ cmp byte ptr [r12+rbp-1],47
+ jne .Lcp_base_path
+ dec rbp
+ jmp .Lcp_base_trim
+.Lcp_base_path:
+ lea r13,[rip+.Lcp_chat_path]
+ mov rdi,rbx
+ call pg_mimo_config_responses@PLT
+ test eax,eax
+ jz .Lcp_anthropic_path
+ lea r13,[rip+.Lcp_responses_path]
+ jmp .Lcp_url
+.Lcp_anthropic_path:
+ mov rdi,rbx
+ call pg_mimo_config_anthropic@PLT
+ test eax,eax
+ jz .Lcp_url
+ lea r13,[rip+.Lcp_messages_path]
+.Lcp_url:
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lcp_url_format]
+ mov edx,ebp
+ mov rcx,r12
+ mov r8,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcp_prepare_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ mov rdx,[rsp]
+ call .Lcp_put
+ mov r14d,eax
+ jmp .Lcp_prepare_end
+.Lcp_prepare_bad:
+ mov r14d,1
+ jmp .Lcp_prepare_end
+.Lcp_prepare_ok:
+ xor r14d,r14d
+.Lcp_prepare_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,r14d
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcp_base: .asciz "https://api.individual.githubcopilot.com"
+.Lcp_chat_path: .asciz "/chat/completions"
+.Lcp_responses_path: .asciz "/responses"
+.Lcp_messages_path: .asciz "/v1/messages"
+.Lcp_url_format: .asciz "%.*s%s"

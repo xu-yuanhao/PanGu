@@ -18,6 +18,8 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`及可选`AWS_SESSION_TOKEN`；`PANGU_MODEL_API_KEY`显式Bearer优先。共享凭据从`AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE`或`~/.aws/config`、`~/.aws/credentials`读取，`options.profile`显式选择profile，环境密钥优先于环境`AWS_PROFILE`的静态密钥。区域遵循参考的ARN、options.region、AWS区域环境及环境profile解析顺序；默认`us-east-1`。自定义代理可用`AWS_BEDROCK_SKIP_AUTH=1`采用参考的代理签名凭据，`AWS_BEDROCK_FORCE_HTTP1=1`指定HTTP/1.1。签名由libcurl完成，凭据不写入会话。
 
+Copilot模型使用`github-copilot`提供者身份与显式`PANGU_MODEL_API_KEY`令牌，Chat、Responses和Anthropic共用现有模型服务；默认端点按协议组合，发起者和图片请求头从实际会话推导。
+
 图片处理由可替换的`image.processor`服务提供：汇编负责处理策略，系统libvips通过C桥接完成编解码。构建用`pkg-config vips`取得该动态依赖。
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。

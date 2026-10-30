@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 /* 可控 curl 替身：perform/getinfo/info_read/add_handle/init 按脚本演出，
@@ -621,6 +622,27 @@ static void test_google_endpoint_config(void){
  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
 }
+static void test_copilot_gateway(void){
+ const char *apis[]={"openai-completions","openai-responses","anthropic-messages"};
+ for(unsigned api=0;api<3;api++)for(unsigned scenario=0;scenario<6;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();
+  json_object *cfg=json_tokener_parse("{\"model\":\"copilot-unit\",\"endpoint\":\"https://copilot.invalid/request\",\"modelInfo\":{\"provider\":\"github-copilot\",\"headers\":{\"X-Initiator\":\"model-value\"}}}");json_object_object_add(cfg,"api",json_object_new_string(apis[api]));
+  if(scenario==4)json_object_object_add(cfg,"options",json_tokener_parse("{\"headers\":{\"X-Initiator\":\"explicit-value\",\"Copilot-Vision-Request\":null}}"));
+  if(scenario==5)json_object_object_add(json_object_object_get(cfg,"modelInfo"),"provider",json_object_new_string("other"));
+  if(scenario==3)json_object_object_del(cfg,"endpoint");
+  assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","copilot-test-token",1);
+  json_object *context=json_tokener_parse(scenario==1?"{\"messages\":[{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"continue\"}]}]}":scenario==2||scenario==4?"{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"aGk=\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"seen\"}]}]}":"{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}]}");
+  if(scenario!=3){session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=context;}
+  assert(!start());if(scenario==3)assert(!strcmp(captured_url,api==0?"https://api.individual.githubcopilot.com/chat/completions":api==1?"https://api.individual.githubcopilot.com/responses":"https://api.individual.githubcopilot.com/v1/messages"));unsigned initiator=0,intent=0,vision=0,bearer=0,api_key=0;
+  for(const struct curl_slist *h=captured_headers;h;h=h->next){
+   if(!strncasecmp(h->data,"x-initiator:",12)){initiator++;assert(strstr(h->data,scenario==4?"explicit-value":scenario==5?"model-value":scenario==1||scenario==2?"agent":"user"));}
+   intent+=!strcasecmp(h->data,"openai-intent: conversation-edits");vision+=!strcasecmp(h->data,"copilot-vision-request: true");bearer+=!strcmp(h->data,"Authorization: Bearer copilot-test-token");api_key+=!strncmp(h->data,"x-api-key:",10);
+  }
+  assert(initiator==1&&intent==(scenario!=5)&&vision==(scenario==2));if(api==2&&scenario!=5)assert(bearer==1&&!api_key);
+  model.close(model.context);json_object_put(context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Copilot Chat/Responses/Anthropic initiator, transcript vision, legacy input, model/options precedence and Anthropic Bearer authentication");
+}
 static void test_bedrock_auth(void){
  unsetenv("PANGU_MODEL_API_KEY");setenv("AWS_PROFILE","ambient-unit-profile",1);setenv("AWS_ACCESS_KEY_ID","AKID_PANGU_UNIT",1);setenv("AWS_SECRET_ACCESS_KEY","pangu-unit-secret",1);setenv("AWS_SESSION_TOKEN","pangu-unit-session",1);
  char long_token[2049];memset(long_token,'t',2048);long_token[2048]=0;unsigned iam_calls=0;
@@ -813,6 +835,7 @@ int main(int argc,char **argv) {
     test_provider_headers();
     test_azure_configuration();
     test_bedrock_transport();
+    test_copilot_gateway();
     test_bedrock_auth();
     test_bedrock_profiles();
     test_bedrock_proxy_modes();
