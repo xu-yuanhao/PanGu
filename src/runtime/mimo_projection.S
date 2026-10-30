@@ -1097,6 +1097,9 @@ pg_mimo_apply_options:
  mov rdi,rbx
  mov rsi,r12
  call .Lcompat_usage
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcompat_thinking
  mov ebp,eax
  jmp .Lopts_end
 .Lopts_bad:
@@ -1172,4 +1175,202 @@ pg_mimo_apply_options:
 .Lcompat_model_info: .asciz "modelInfo"
 .Lcompat_key: .asciz "compat"
 .Lcompat_usage_key: .asciz "supportsUsageInStreaming"
+.section .note.GNU-stack,"",@progbits
+
+.text
+/* Resolve provider-specific thinking framing after ordinary option encoding. */
+.Lcompat_thinking:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov ebp,1
+ test rbx,rbx
+ jz .Lct_done
+ lea rsi,[rip+.Lct_format]
+ call .Lcompat_get
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jnz .Lct_explicit
+ xor ebp,ebp
+ mov rdi,rbx
+ lea rsi,[rip+.Lct_endpoint]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lct_framing
+ mov rdi,rax
+ lea rsi,[rip+.Lct_deepseek_host]
+ call strstr@PLT
+ test rax,rax
+ jnz .Lct_deepseek_mode
+ mov rdi,r14
+ lea rsi,[rip+.Lct_mimo_host]
+ call strstr@PLT
+ test rax,rax
+ jz .Lct_framing
+.Lct_deepseek_mode:
+ mov ebp,1
+ jmp .Lct_framing
+.Lct_explicit:
+ xor ebp,ebp
+ lea r13,[rip+.Lct_formats]
+.Lct_format_each:
+ mov rsi,[r13]
+ test rsi,rsi
+ jz .Lct_framing
+ mov rdi,r14
+ call strcmp@PLT
+ inc ebp
+ test eax,eax
+ jz .Lct_framing
+ add r13,8
+ cmp ebp,4
+ jb .Lct_format_each
+ xor ebp,ebp
+.Lct_framing:
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_reasoning_effort_wire]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov r13,rax
+ cmp ebp,1
+ je .Lct_effort_support
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_thinking_key]
+ call json_object_object_del@PLT
+ test ebp,ebp
+ jz .Lct_effort_support
+ cmp ebp,2
+ je .Lct_zai
+ cmp ebp,3
+ je .Lct_qwen
+ /* OpenRouter uses reasoning.effort and no top-level reasoning_effort. */
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lct_bad
+ test r13,r13
+ jz .Lct_none
+ mov rdi,r13
+ call json_object_get@PLT
+ jmp .Lct_router_effort
+.Lct_none:
+ lea rdi,[rip+.Lct_none_text]
+ call json_object_new_string@PLT
+.Lct_router_effort:
+ mov rdx,rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lct_effort]
+ call .Lct_set
+ test eax,eax
+ jnz .Lct_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_reasoning_effort_wire]
+ call json_object_object_del@PLT
+ lea r14,[rip+.Lct_reasoning]
+ jmp .Lct_install
+.Lct_zai:
+ lea rdi,[rip+.Lct_zai_off]
+ test r13,r13
+ jz .Lct_zai_parse
+ lea rdi,[rip+.Lct_zai_on]
+.Lct_zai_parse:
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ lea r14,[rip+.Lopts_thinking_key]
+ jmp .Lct_install
+.Lct_qwen:
+ xor edi,edi
+ test r13,r13
+ setnz dil
+ call json_object_new_boolean@PLT
+ mov [rsp+8],rax
+ lea r14,[rip+.Lct_enable]
+.Lct_install:
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ mov rdi,r12
+ mov rsi,r14
+ call .Lct_set
+ test eax,eax
+ jnz .Lct_bad
+.Lct_effort_support:
+ mov rdi,rbx
+ lea rsi,[rip+.Lct_supports_effort]
+ call .Lcompat_get
+ test rax,rax
+ jz .Lct_done
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lct_done
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_reasoning_effort_wire]
+ call json_object_object_del@PLT
+.Lct_done:
+ xor ebp,ebp
+ jmp .Lct_end
+.Lct_bad:
+ mov ebp,1
+.Lct_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lct_set:
+ test rdx,rdx
+ jz .Lct_set_bad
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lct_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Lct_set_end:
+ pop rbx
+ ret
+.Lct_set_bad:
+ mov eax,1
+ ret
+.section .rodata
+.Lct_format: .asciz "thinkingFormat"
+.Lct_endpoint: .asciz "endpoint"
+.Lct_deepseek_host: .asciz "deepseek.com"
+.Lct_mimo_host: .asciz "xiaomimimo.com"
+.Lct_deepseek: .asciz "deepseek"
+.Lct_zai_format: .asciz "zai"
+.Lct_qwen_format: .asciz "qwen"
+.Lct_router_format: .asciz "openrouter"
+.Lct_reasoning: .asciz "reasoning"
+.Lct_effort: .asciz "effort"
+.Lct_none_text: .asciz "none"
+.Lct_enable: .asciz "enable_thinking"
+.Lct_supports_effort: .asciz "supportsReasoningEffort"
+.Lct_zai_on: .asciz "{\"type\":\"enabled\",\"clear_thinking\":false}"
+.Lct_zai_off: .asciz "{\"type\":\"disabled\"}"
+.section .data.rel.ro
+.Lct_formats: .quad .Lct_deepseek,.Lct_zai_format,.Lct_qwen_format,.Lct_router_format,0
 .section .note.GNU-stack,"",@progbits

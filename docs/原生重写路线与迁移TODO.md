@@ -111,7 +111,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 默认model.metadata接通原生内置聊天模型元数据、用户agent目录models.json的容量/输出覆盖与自定义模型元数据；按provider/model或endpoint/model选择，只输出公开字段。默认prepare按canonical provider/model逐字段应用compaction.modelOverrides，刷新、隔离所有权和真实自动/后台压缩通过。
 - [x] models.catalog/TUI可选入口提供公开模型目录，支持provider筛选、内置/用户models.json同名覆盖去重，复用describe输出能力/容量，结果排除私有认证；与已有Agent模型选择共同提供模型面板Runtime入口。
-- [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；实际编码与模型传输/ABI专项通过。
+- [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；思考参数按DeepSeek/Zai/Qwen/OpenRouter格式和supportsReasoningEffort映射，普通端点不带提供商专用thinking字段；实际编码与模型传输/ABI专项通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -306,8 +306,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的模型compat、stream_options与maxTokensField；复用已有公开modelInfo和原生请求编码器。
-- 实际调用链：模型metadata已由产品prepare进入配置，OpenAI编码器现在读取其compat：supportsUsageInStreaming关闭时删除stream_options；未显式指定options.maxTokensField时采用模型默认字段。显式请求设置保留优先级，已支持的max_tokens/max_completion_tokens共用原校验。
-- 验证：`test_mimo_asm.py`的O0/O2/UBSan编码/协议/传输/ABI/分配失败专项通过，新增实际请求断言验证关闭用量、模型字段与显式覆盖；产品构建及Assembly检查通过。本轮无模型请求。
-- 接口与差异：无新增文件/公开ABI，使用现有模型compat数据。其余OpenAI兼容字段及其他对话协议仍在K05覆盖范围内。
-- 下一交付物：沿K05/K08/K11继续成组补齐实际协议、工具和扩展能力。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的thinkingFormat分支、supportsReasoningEffort及DeepSeek端点识别；复用已传入的modelInfo.compat。
+- 实际调用链：OpenAI编码器在普通options后按选定格式构造thinking/type、Zai clear_thinking、Qwen enable_thinking或OpenRouter reasoning.effort；off使用各自关闭表达，supportsReasoningEffort=false移除顶层effort。普通端点清除旧专用thinking字段，DeepSeek/MiMo端点保持对应格式；未配置连接的旧MiMo入口保留现有默认。
+- 验证：模型编码/传输/ABI/分配失败的O0/O2/UBSan专项通过，覆盖四种格式开关、普通端点和禁用顶层effort。产品构建/Assembly通过；真实DeepSeek `--live-process-conversations`通过新进程恢复子Generation/父等待，以及持久父取消跨进程后子aborted且不请求模型。
+- 接口与差异：公开ABI/文件清单不变；本批接通现有compat数据，没有添加模型配置入口。thinkingLevelMap、其他兼容格式及协议仍在K05剩余范围。
+- 下一交付物：继续按K05/K08/K11的实际产品调用链成组推进。
