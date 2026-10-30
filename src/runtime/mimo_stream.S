@@ -2603,8 +2603,11 @@ pg_mimo_anthropic_clear:
  je .Lan_error
  cmp ebp,5
  je .Lan_message_stop
+ cmp ebp,4
+ je .Lan_dispatch_delta
  cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
  jne .Lan_bad
+ .Lan_dispatch_delta:
  lea rdi,[rip+.Lrs_base]
  call json_tokener_parse@PLT
  mov [rsp],rax
@@ -2962,6 +2965,8 @@ pg_mimo_anthropic_clear:
  ANGET "qword ptr [rsp+32]",usage
  jmp .Lan_update_usage
 .Lan_message_delta:
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ jne .Lan_delta_usage
  ANGET r12,delta
  mov [rsp+32],rax
  ANGET rax,stop_reason
@@ -3024,8 +3029,8 @@ pg_mimo_anthropic_clear:
  call .Lan_update_usage_object
  test eax,eax
  jnz .Lan_bad
- cmp dword ptr [rbx+PG_MM_FINISH_REASON],3
- je .Lan_ok
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ jne .Lan_ok
  jmp .Lan_emit
 .Lan_message_stop:
  cmp dword ptr [rbx+PG_MM_FINISH_REASON],0

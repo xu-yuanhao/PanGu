@@ -86,6 +86,7 @@ static void anthropic(void){
  "data: {\"type\":\"content_block_delta\",\"index\":7,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"1}\"}}",
  "data: {\"type\":\"content_block_stop\",\"index\":7}",
  "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":8}}",
+ "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":8}}",
  "data: {\"type\":\"message_stop\"}"
  };
  for(size_t i=0;i<sizeof(frames)/sizeof(*frames);i++){int rc=line(frames[i]);if(rc)fprintf(stderr,"Anthropic frame %zu rejected\n",i);assert(!rc);if(i==7)assert(e.kind==PG_MODEL_TEXT&&e.text.size==11);if(i==13)assert(!m.saw_done);}
