@@ -254,6 +254,7 @@ li_start:
  push r14
  push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
  sub rsp, 544
+ mov qword ptr [rsp+512],0
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* s */
  call .Ltransport_close               /* 保留已绑定请求配置 */
@@ -279,6 +280,20 @@ li_start:
  test rax,rax
  jnz .Lst_key_ready
  mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lst_nonaws_key
+ lea rdi,[rip+.Lbe_bearer_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lst_aws_iam
+ cmp byte ptr [rax],0
+ jne .Lst_key_ready
+.Lst_aws_iam:
+ mov qword ptr [rsp+512],1
+ jmp .Lst_encode
+.Lst_nonaws_key:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
  test rdi,rdi
  jz .Lst_check_environment_endpoint
  lea rsi,[rip+.Lcfg_endpoint]
@@ -303,7 +318,17 @@ li_start:
  jz .Lst_bad
 .Lst_key_ready:
  mov r13, rax                         /* key */
- mov rdi, rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lst_standard_key
+ mov rdi,r13
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lst_bad
+ jmp .Lst_encode
+.Lst_standard_key:
+ mov rdi,r13
  call strlen@PLT
  test rax,rax
  jz .Lst_bad
@@ -319,11 +344,29 @@ li_start:
  call strchr@PLT
  test rax, rax
  jnz .Lst_bad
+.Lst_encode:
  mov rdi, rbx
  mov rsi, r12
  call pg_mimo_encode_request
  test eax, eax
  jnz .Lst_bad
+ cmp qword ptr [rsp+512],0
+ je .Lst_bearer_header
+ xor r13d,r13d
+ jmp .Lauth_content_type
+.Lst_bearer_header:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lst_standard_bearer
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lbe_bearer_header
+ test eax,eax
+ jnz .Lst_bad
+ mov r13,[rbx+PG_MM_HEADERS]
+ jmp .Lauth_content_type
+.Lst_standard_bearer:
  /* auth = "Authorization: Bearer " + key + NUL（总长 < 512） */
  lea r14,[rip+.Lstr_auth_prefix]
  mov r15d,PG_MM_AUTH_PREFIX_LEN
@@ -374,6 +417,7 @@ li_start:
  mov qword ptr [rbx + PG_MM_HEADERS], rax
  test rax,rax
  jz .Lst_bad
+.Lauth_content_type:
  mov rdi, r13
  lea rsi, [rip + .Lstr_content_type]
  call curl_slist_append@PLT
@@ -443,9 +487,17 @@ li_start:
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lst_bad
+ cmp qword ptr [rsp+512],0
+ je .Lst_signed_ready
+ mov rdi,rbx
+ mov rsi,r14
+ call .Lbe_sign
+ test eax,eax
+ jnz .Lst_bad
+.Lst_signed_ready:
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_HTTPHEADER
- mov rdx, r13
+ mov rdx,[rbx+PG_MM_HEADERS]
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax
@@ -2122,6 +2174,14 @@ pg_mimo_complete:
  lea rsi,[rip+.Lbeta_headers]
  call json_object_object_get@PLT
  mov [rsp+24],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ mov [rsp+72],eax
+ test eax,eax
+ jz .Lph_sources_ready
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+.Lph_sources_ready:
  xor r12d,r12d
 .Lph_layer:
  mov rdi,[rsp+8+r12*8]
@@ -2238,7 +2298,17 @@ pg_mimo_complete:
  lea rdi,[rsp+32]
  call json_object_iter_peek_name@PLT
  mov r12,rax
- mov rdi,rax
+ cmp dword ptr [rsp+72],0
+ je .Lph_emit_name
+ mov rdi,r12
+ call .Lbe_reserved_header
+ test eax,eax
+ jz .Lph_emit_name
+ lea rdi,[rsp+32]
+ call json_object_iter_next@PLT
+ jmp .Lph_emit
+.Lph_emit_name:
+ mov rdi,r12
  call strlen@PLT
  mov rbp,rax
  lea rdi,[rsp+32]
@@ -3129,3 +3199,247 @@ pg_mimo_complete:
 .Lbe_region_default: .asciz "us-east-1"
 .Lbe_base_format: .asciz "https://bedrock-runtime.%s.amazonaws.com"
 .Lbe_endpoint_format: .asciz "%s/model/%s/converse-stream"
+
+.text
+/* Shared environment credential validation before crossing the libcurl boundary. */
+.Lbe_credential:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lbe_credential_bad
+ call strlen@PLT
+ test rax,rax
+ jz .Lbe_credential_bad
+ cmp rax,8192
+ ja .Lbe_credential_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lph_newlines]
+ call strpbrk@PLT
+ test rax,rax
+ setne al
+ movzx eax,al
+ pop rbx
+ ret
+.Lbe_credential_bad:
+ mov eax,1
+ pop rbx
+ ret
+/* libcurl copies USERPWD/SIGV4 strings; temporary credentials never enter JSON. */
+.Lbe_sign:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ xor eax,eax
+ mov ecx,6
+ mov rdi,rsp
+ rep stosq
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbe_profile_key]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lbe_sign_bad
+.Lbe_sign_credentials:
+ lea rdi,[rip+.Lbe_access_env]
+ call getenv@PLT
+ mov r13,rax
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lbe_sign_bad
+ mov rdi,r13
+ mov esi,58
+ call strchr@PLT
+ test rax,rax
+ jnz .Lbe_sign_bad
+ lea rdi,[rip+.Lbe_secret_env]
+ call getenv@PLT
+ mov r14,rax
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lbe_sign_bad
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lbe_userpwd_format]
+ mov rdx,r13
+ mov rcx,r14
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_sign_bad
+ mov rdi,r12
+ mov esi,PG_MM_CURLOPT_USERPWD
+ mov rdx,[rsp]
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lbe_sign_bad
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbe_region_key]
+ lea rdx,[rip+.Lbe_region_env]
+ call .Lge_option
+ test rax,rax
+ jnz .Lbe_sign_region
+ lea rdi,[rip+.Lbe_default_region_env]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lbe_sign_region
+ lea rax,[rip+.Lbe_region_default]
+.Lbe_sign_region:
+ mov r13,rax
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lbe_sign_bad
+ lea rdi,[rsp+8]
+ lea rsi,[rip+.Lbe_sig_format]
+ mov rdx,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_sign_bad
+ mov rdi,r12
+ mov esi,PG_MM_CURLOPT_AWS_SIGV4
+ mov rdx,[rsp+8]
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lbe_sign_bad
+ lea rdi,[rip+.Lbe_token_env]
+ call getenv@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lbe_sign_ok
+ cmp byte ptr [rax],0
+ je .Lbe_sign_ok
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lbe_sign_bad
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Lbe_token_format]
+ mov rdx,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_sign_bad
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp+16]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lbe_sign_bad
+ mov [rbx+PG_MM_HEADERS],rax
+.Lbe_sign_ok:
+ xor ebp,ebp
+ jmp .Lbe_sign_end
+.Lbe_sign_bad:
+ mov ebp,1
+.Lbe_sign_end:
+ mov rdi,[rsp]
+ test rdi,rdi
+ jz .Lbe_sign_free
+ call strlen@PLT
+ mov rdi,[rsp]
+ mov rdx,rax
+ xor esi,esi
+ call memset@PLT
+.Lbe_sign_free:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbe_bearer_env: .asciz "AWS_BEARER_TOKEN_BEDROCK"
+.Lbe_access_env: .asciz "AWS_ACCESS_KEY_ID"
+.Lbe_secret_env: .asciz "AWS_SECRET_ACCESS_KEY"
+.Lbe_token_env: .asciz "AWS_SESSION_TOKEN"
+.Lbe_profile_key: .asciz "profile"
+.Lbe_userpwd_format: .asciz "%s:%s"
+.Lbe_sig_format: .asciz "aws:amz:%s:bedrock"
+.Lbe_token_format: .asciz "X-Amz-Security-Token: %s"
+
+.text
+.Lbe_reserved_header:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Lbe_authorization_key]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbe_reserved_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lbe_host_key]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbe_reserved_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lbe_amz_prefix]
+ mov edx,6
+ call strncmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.Lbe_reserved_yes:
+ mov eax,1
+ pop rbx
+ ret
+.section .rodata
+.Lbe_authorization_key: .asciz "authorization"
+.Lbe_host_key: .asciz "host"
+.Lbe_amz_prefix: .asciz "x-amz-"
+
+.text
+.Lbe_bearer_header:
+ push rbp
+ push rbx
+ push r12
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lbe_bearer_format]
+ mov rdx,r12
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_bearer_bad
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lbe_bearer_bad
+ mov [rbx+PG_MM_HEADERS],rax
+ xor ebp,ebp
+ jmp .Lbe_bearer_end
+.Lbe_bearer_bad:
+ mov ebp,1
+.Lbe_bearer_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbe_bearer_format: .asciz "Authorization: Bearer %s"

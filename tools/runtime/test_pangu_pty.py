@@ -729,7 +729,12 @@ def main():
         root=Path(directory);binary=args.binary or build(root/'pangu')
         offline={k:v for k,v in os.environ.items() if not k.startswith(('PANGU_', 'MIMO_'))}
         missing=subprocess.run([str(binary)],env=offline,capture_output=True,timeout=5)
-        assert missing.returncode==2 and b'Model API key is required' in missing.stderr
+        assert missing.returncode==2 and b'Model credentials are required' in missing.stderr
+        for credentials in ({'AWS_BEARER_TOKEN_BEDROCK':'startup-unit-token'},{'AWS_ACCESS_KEY_ID':'startup-unit-access','AWS_SECRET_ACCESS_KEY':'startup-unit-secret'}):
+            probe={k:v for k,v in offline.items() if not k.startswith('AWS_')}
+            probe.update(PANGU_MODEL_API='bedrock-converse-stream',PANGU_MODEL_NAME='startup-unit-model',**credentials)
+            accepted=subprocess.run([str(binary)],env=probe,capture_output=True,timeout=5)
+            assert accepted.returncode==2 and b'interactive terminal' in accepted.stderr
         offline.update(PANGU_MODEL_ENDPOINT='http://127.0.0.1:1/chat/completions',PANGU_MODEL_NAME='offline',PANGU_MODEL_API_KEY='offline-placeholder')
         terminal_exit(binary,root,offline)
         if args.live or args.live_persistent or args.live_crash or args.live_config_recovery or args.live_thinking or args.live_resources or args.live_plugin or args.live_paths or args.live_skills or args.live_templates or args.live_settings:

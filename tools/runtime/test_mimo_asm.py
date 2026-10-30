@@ -8,7 +8,7 @@ C test code where it links):
 - test_mimo_asm (ABI/boundary suite) linked with mimo_abi.S and --wrap
   interposition that trashes caller-saved registers after every wrapped
   external call and asserts stack alignment at each call site;
-- test_mimo_transport (scripted curl stand-in via --wrap, no network);
+- test_mimo_transport (scripted curl replay plus a local TLS SigV4 verification);
 - test_mimo_alloc (constructor/insertion/serialization rejection ownership).
 
 All artifacts go to a TemporaryDirectory under /tmp and are removed on exit.
@@ -19,6 +19,14 @@ import subprocess
 import sys
 import ctypes as C
 import json
+import os
+import ssl
+import threading
+import hashlib
+import hmac
+import re
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlsplit
 import random
 import tempfile
 
@@ -164,6 +172,54 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
                             if protocol>=3:assert tool['parametersJsonSchema']==expected[3][index],(protocol,index,tool)
     print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses, Anthropic, Google and Vertex')
 
+def sigv4_wire(binary, directory):
+    cert=Path(directory)/'sigv4-cert.pem'
+    key=Path(directory)/'sigv4-key.pem'
+    subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(cert),'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    failures=[]
+    received=[]
+    class Receiver(BaseHTTPRequestHandler):
+        def log_message(self,*args): pass
+        def do_POST(self):
+            try:
+                body=self.rfile.read(int(self.headers['Content-Length']))
+                auth=self.headers['Authorization']
+                match=re.search(r'Credential=([^, ]+).*SignedHeaders=([^, ]+).*Signature=([0-9a-f]+)',auth)
+                assert auth.startswith('AWS4-HMAC-SHA256 ') and match
+                credential,signed,signature=match.groups()
+                access,date,region,service,terminator=credential.split('/')
+                assert (access,region,service,terminator)==('AKID_PANGU_WIRE','us-west-2','bedrock','aws4_request')
+                assert self.headers['X-Amz-Security-Token']=='pangu-wire-session'
+                assert self.headers['X-Project']=='pangu-wire'
+                headers=''.join(name+':'+ ' '.join(self.headers[name].split())+'\n' for name in signed.split(';'))
+                target=urlsplit(self.path)
+                canonical='\n'.join(('POST',target.path,target.query,headers,signed,hashlib.sha256(body).hexdigest()))
+                scope='/'.join((date,region,service,terminator))
+                to_sign='\n'.join(('AWS4-HMAC-SHA256',self.headers['X-Amz-Date'],scope,hashlib.sha256(canonical.encode()).hexdigest()))
+                signing=b'AWS4pangu-wire-secret'
+                for part in (date,region,service,terminator): signing=hmac.new(signing,part.encode(),hashlib.sha256).digest()
+                assert hmac.compare_digest(signature,hmac.new(signing,to_sign.encode(),hashlib.sha256).hexdigest())
+                received.append(True)
+                self.send_response(200)
+            except Exception as error:
+                failures.append(type(error).__name__)
+                self.send_response(403)
+            self.send_header('Content-Length','0')
+            self.end_headers()
+    server=HTTPServer(('127.0.0.1',0),Receiver)
+    tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(cert,key)
+    server.socket=tls.wrap_socket(server.socket,server_side=True)
+    server.timeout=15
+    worker=threading.Thread(target=server.handle_request,daemon=True);worker.start()
+    env=os.environ.copy()
+    for name in ('PANGU_MODEL_API_KEY','AWS_BEARER_TOKEN_BEDROCK','AWS_PROFILE'): env.pop(name,None)
+    env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',AWS_ACCESS_KEY_ID='AKID_PANGU_WIRE',AWS_SECRET_ACCESS_KEY='pangu-wire-secret',AWS_SESSION_TOKEN='pangu-wire-session',PANGU_TEST_SIGV4_CA=str(cert),PANGU_TEST_SIGV4_ENDPOINT=f'https://127.0.0.1:{server.server_port}/model/anthropic.claude-test/converse-stream')
+    try:
+        subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
+        worker.join(2)
+        assert received==[True] and not failures,failures
+    finally: server.server_close()
+
 def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix='pangu-mimo-asm-') as tmp:
@@ -191,6 +247,8 @@ def main():
                     print(f'== mimo-{name} {label}: rc={r.returncode}')
                     if r.returncode != 0:
                         failures += 1
+                    elif name=='transport' and label=='-O2':
+                        sigv4_wire(out,tmp)
         # 核对模型模块导入/导出清单。
         for src in SRC:
             obj = str(Path(tmp) / (Path(src).stem + '-audit.o'))

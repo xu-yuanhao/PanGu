@@ -11,10 +11,11 @@
 
 /* 可控 curl 替身：perform/getinfo/info_read/add_handle/init 按脚本演出，
  * setopt 记录并转发真实 libcurl（校验变参 ABI 被真实现接受），
- * cleanup 计数用于验证 close 的释放恰好一次。无任何真实网络请求。 */
+ * cleanup 计数用于验证 close 的释放恰好一次；显式签名验收使用本地 TLS。 */
 
 extern CURL *__real_curl_easy_init(void);
 extern CURLcode __real_curl_easy_setopt(CURL *, CURLoption, ...);
+extern CURLcode __real_curl_easy_getinfo(CURL *,CURLINFO,...);
 extern void __real_curl_easy_cleanup(CURL *);
 extern CURLM *__real_curl_multi_init(void);
 extern CURLMcode __real_curl_multi_cleanup(CURLM *);
@@ -31,6 +32,7 @@ static size_t (*captured_write)(char *, size_t, size_t, void *);
 static void *captured_write_data;
 static const char *captured_url, *captured_post, *captured_protocols;
 static struct curl_slist *captured_headers;
+static char captured_sigv4[128],captured_userpwd[256];
 static long captured_timeout = -1, captured_connect_timeout = -1, captured_nosignal = -1;
 static int token_fail_at,token_calls;
 struct json_tokener *__real_json_tokener_new(void);
@@ -39,7 +41,7 @@ static int setopt_errors,setopt_fail_at,setopt_calls,getinfo_fail,slist_fail_at,
 struct curl_slist *__wrap_curl_slist_append(struct curl_slist *list,const char *text){++slist_calls;return slist_fail_at==slist_calls?NULL:__real_curl_slist_append(list,text);}
 
 
-CURL *__wrap_curl_easy_init(void) { return script_easy_fail ? NULL : __real_curl_easy_init(); }
+CURL *__wrap_curl_easy_init(void) { CURL *easy=script_easy_fail?NULL:__real_curl_easy_init();const char *ca=getenv("PANGU_TEST_SIGV4_CA");if(easy&&ca)assert(!__real_curl_easy_setopt(easy,CURLOPT_CAINFO,ca));return easy; }
 
 CURLM *__wrap_curl_multi_init(void) { return script_multi_fail ? NULL : __real_curl_multi_init(); }
 
@@ -50,6 +52,10 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
     va_start(ap, opt);
     CURLcode rc = CURLE_OK;
     switch (opt) {
+    case CURLOPT_AWS_SIGV4:
+    case CURLOPT_USERPWD: {
+        const char *v=va_arg(ap,const char *);char *out=opt==CURLOPT_AWS_SIGV4?captured_sigv4:captured_userpwd;size_t size=opt==CURLOPT_AWS_SIGV4?sizeof(captured_sigv4):sizeof(captured_userpwd);assert(strlen(v)<size);strcpy(out,v);rc=__real_curl_easy_setopt(h,opt,v);break;
+    }
     case CURLOPT_URL: {
         const char *v = va_arg(ap, const char *);
         captured_url = v;
@@ -174,7 +180,7 @@ static void reset_script(void) {
     captured_write = NULL;
     captured_write_data = NULL;
     captured_url = captured_post = captured_protocols = NULL;
-    captured_headers = NULL;
+    captured_headers = NULL;captured_sigv4[0]=captured_userpwd[0]=0;
     captured_timeout = captured_connect_timeout = captured_nosignal = -1;
 }
 
@@ -600,6 +606,22 @@ static void test_google_endpoint_config(void){
  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
 }
+static void test_bedrock_auth(void){
+ unsetenv("PANGU_MODEL_API_KEY");setenv("AWS_PROFILE","ambient-unit-profile",1);setenv("AWS_ACCESS_KEY_ID","AKID_PANGU_UNIT",1);setenv("AWS_SECRET_ACCESS_KEY","pangu-unit-secret",1);setenv("AWS_SESSION_TOKEN","pangu-unit-session",1);
+ char long_token[2049];memset(long_token,'t',2048);long_token[2048]=0;unsigned iam_calls=0;
+ for(unsigned mode=0;mode<4;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"Authorization\":\"untrusted\",\"Host\":\"untrusted\",\"X-Amz-Date\":\"untrusted\",\"X-Project\":\"pangu\"}}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);
+  if(mode==0){unsetenv("AWS_BEARER_TOKEN_BEDROCK");unsetenv("PANGU_MODEL_API_KEY");}else if(mode==1)setenv("AWS_BEARER_TOKEN_BEDROCK","aws-unit-bearer",1);else if(mode==2)setenv("PANGU_MODEL_API_KEY","pangu-unit-bearer",1);else{unsetenv("PANGU_MODEL_API_KEY");setenv("AWS_BEARER_TOKEN_BEDROCK",long_token,1);}
+  assert(!start());unsigned auth=0,token=0,project=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){assert(!strstr(h->data,"untrusted"));auth+=mode==3?(!strncmp(h->data,"Authorization: Bearer ",22)&&strlen(h->data)==2070):!strcmp(h->data,mode==2?"Authorization: Bearer pangu-unit-bearer":"Authorization: Bearer aws-unit-bearer");token+=!strcmp(h->data,"X-Amz-Security-Token: pangu-unit-session");project+=!strcmp(h->data,"x-project: pangu");}assert(project==1);if(!mode)assert(!auth&&token==1&&!strcmp(captured_sigv4,"aws:amz:us-west-2:bedrock")&&!strcmp(captured_userpwd,"AKID_PANGU_UNIT:pangu-unit-secret"));else assert(auth==1&&!token&&!captured_sigv4[0]);if(!mode)iam_calls=(unsigned)setopt_calls;model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");unsetenv("AWS_BEARER_TOKEN_BEDROCK");
+ for(unsigned fault=1;fault<=iam_calls+2;fault++){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"test\",\"options\":{\"region\":\"us-west-2\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);if(fault<=iam_calls)setopt_fail_at=(int)fault;else slist_fail_at=(int)(fault-iam_calls);assert(start());model.close(model.context);assert(!m.easy&&!m.headers&&!m.configuration);}
+ const char *bad[]={"", "bad\r\nsecret"};for(unsigned n=0;n<2;n++){reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"test\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("AWS_SECRET_ACCESS_KEY",bad[n],1);assert(start());model.close(model.context);assert(!m.easy&&!m.headers&&!m.configuration);}
+ unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");puts("PASS: Bedrock native SigV4 options, temporary token, Bearer precedence, reserved headers and invalid credentials");
+}
+static int bedrock_sigv4_wire(void){
+ const char *endpoint=getenv("PANGU_TEST_SIGV4_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"X-Project\":\"pangu-wire\"}}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);puts("PASS: native Bedrock request signed by actual libcurl and verified by independent TLS receiver");return 0;
+}
 static uint32_t bedrock_crc(const unsigned char *data,size_t size){uint32_t crc=~0u;while(size--){crc^=*data++;for(unsigned bit=0;bit<8;bit++)crc=(crc>>1)^((0u-(crc&1u))&0xedb88320u);}return ~crc;}
 static void bedrock_u32(unsigned char *out,uint32_t value){out[0]=(unsigned char)(value>>24);out[1]=(unsigned char)(value>>16);out[2]=(unsigned char)(value>>8);out[3]=(unsigned char)value;}
 static void bedrock_feed(const char *type,const char *payload,unsigned corrupt){
@@ -648,7 +670,8 @@ static void test_provider_headers(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: five-protocol provider headers merge by case, layer precedence, null removal, empty value, default replacement and invalid-input cleanup");
 }
-int main(void) {
+int main(int argc,char **argv) {
+    if(argc==2&&!strcmp(argv[1],"--sigv4-wire"))return bedrock_sigv4_wire();
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
     test_bound_tools_survive_request_cleanup();
@@ -675,6 +698,7 @@ int main(void) {
     test_provider_headers();
     test_azure_configuration();
     test_bedrock_transport();
+    test_bedrock_auth();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

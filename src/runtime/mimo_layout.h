@@ -131,6 +131,8 @@
 #define PG_MM_TO_JSON_PLAIN 0
 
 /* libcurl 公开常量（<curl/curl.h> CURLOPTTYPE_LONG/OBJECTPOINT/FUNCTIONPOINT 展开） */
+#define PG_MM_CURLOPT_USERPWD 10005
+#define PG_MM_CURLOPT_AWS_SIGV4 10305
 #define PG_MM_CURLOPT_TIMEOUT 13
 #define PG_MM_CURLOPT_CONNECTTIMEOUT 78
 #define PG_MM_CURLOPT_NOSIGNAL 99
@@ -278,6 +280,8 @@ _Static_assert(json_type_null == PG_MM_JSON_NULL && json_type_int == PG_MM_JSON_
                json_type_string == PG_MM_JSON_STRING, "json_type drifted");
 _Static_assert(json_tokener_success == PG_MM_TOKENER_SUCCESS, "tokener success drifted");
 _Static_assert(JSON_C_TO_STRING_PLAIN == PG_MM_TO_JSON_PLAIN, "plain serialization drifted");
+_Static_assert(CURLOPT_USERPWD == PG_MM_CURLOPT_USERPWD, "CURLOPT_USERPWD drifted");
+_Static_assert(CURLOPT_AWS_SIGV4 == PG_MM_CURLOPT_AWS_SIGV4, "CURLOPT_AWS_SIGV4 drifted");
 _Static_assert(CURLOPT_TIMEOUT == PG_MM_CURLOPT_TIMEOUT, "CURLOPT_TIMEOUT drifted");
 _Static_assert(CURLOPT_CONNECTTIMEOUT == PG_MM_CURLOPT_CONNECTTIMEOUT, "CURLOPT_CONNECTTIMEOUT drifted");
 _Static_assert(CURLOPT_NOSIGNAL == PG_MM_CURLOPT_NOSIGNAL, "CURLOPT_NOSIGNAL drifted");
