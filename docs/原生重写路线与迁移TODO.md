@@ -184,7 +184,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] executeTool在缺少存储结果时按真实Task outcome返回faulted/orphaned及具体原因，客户端也发布失败结束。模型工具父调用接通结算清理，Live按完整后代树移除并保留无关分支；注入终态记录、实际write/read和跨级清理通过。
 - [x] 工具执行API接通details/diagnostic持久进度：输入复制、details null、诊断形状校验、快照观察、最终结果fallback/诊断顺序与中断恢复。模型/嵌套工具共用Live槽及进度提交，Generation响应结算清理上一轮模型工具槽；模型直接调用和子调用专项通过。
 - [x] 输出预算采用Chord完整行/UTF-8 head/tail算法，现有4096字节缓冲接通2000行进度和最终结果预算；累计droppedBytes/droppedLines、最终截断诊断和中断恢复诊断进入实际工具链。2408组固定上游源码对照、持续输出及最终/中断专项通过。
-- [x] 工具定义携带固定output_limits并随选择/wrap/phase快照保留；默认50KiB/2000行/head，bash显式tail；Tool缓冲按预算分配，配置70KiB和零预算、旧4KiB-tail恢复/取消及非法配置拒绝通过。完整工具/注册表/扩展/模型声明布局同步迁移。
+- [x] 工具定义携带固定options输出预算并随选择/wrap/phase快照保留；默认50KiB/2000行/head，bash显式tail；Tool缓冲按预算分配，配置70KiB和零预算、旧4KiB-tail恢复/取消及非法配置拒绝通过。完整工具/注册表/扩展/模型声明布局同步迁移。
 - [x] Chord流文本清洗接入Live窗口和输出事件，保留制表/换行及普通Unicode；诊断渲染按实际长度分配，7000字节诊断进入最终模型文本。单调时钟durationMs写入结果/嵌套返回/摘要，2464组固定上游对照和产品场景通过。
 - [x] 原生流buffer保留清洗前原始margin、累计字节/换行与末尾状态；head在窗口固定后只计数，tail快照保留上游所需的前一字符/换行。Tool已原位替换旧窗口拼接；220组逐块快照直接对照、实际大输出/清洗/恢复/取消通过。
 - [x] 工具调用API接入output、retainedOutput和outputWindow：报告与异步OUTPUT共用调用级buffer/节流/事件，owned快照含尚未刷新的输出，tail接受OutputSkip并保留全流计数；head拒绝skip，执行前/释放后拒绝访问。固定Chord 260组多块快照对照、实际工具/中断/清洗/跳过输出、原生ABI和真实模型工作流通过。最终OK/ERROR可显式省略output并采用报告窗口，显式空输出保持独立；afterTool改写文本时去掉原窗口截断提示。工具返回后撤销执行API，duration在返回时固定，200ms后置hook等待不计入执行时间。省略输出且窗口为空时保存空Content；嵌套默认程序值在诊断渲染之外由实际输出确定。失败Live摘要优先拼接error诊断，否则取输出，最多500 UTF-16单元并保留原生UTF-8字符边界；成功或空错误省略error字段。
@@ -316,7 +316,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/{anthropic-messages,transform-messages,simple-options,constrained-sampling}.ts` 与 streaming-tool-arguments、anthropic-sse-parsing、strict-tool-fallback 用例。
-- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置；Chat成功消息保存原始停止原因，content_filter/network_error等失败携带明确错误及原始原因。
-- 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；Chat原始停止/错误与固定Pi raw-stop用例一致；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
-- 具体缺口：Messages的managed effort、constrainedSampling声明/严格转换/失败回退、native tools、OAuth和网关完整覆盖，以及后续协议。现有`pg_tool_definition`及提示目录只传名称/说明/schema；严格模式需将声明元数据、插件快照、模型请求和恢复一起贯通。
+- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持；工具定义尺寸保持，统一选项描述携带采样声明，extensions ABI11/tools.provider ABI5同步更新。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置；Chat成功消息保存原始停止原因，content_filter/network_error等失败携带明确错误及原始原因。
+- 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；Chat原始停止/错误与固定Pi raw-stop用例一致；工具选项迁移后模型失败清理、产品资源ASan/UBSan、Durable双后端及产品构建通过，提示目录含采样声明，require在发送前拒绝；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
+- 具体缺口：Messages的managed effort、constrainedSampling声明/严格转换/失败回退、native tools、OAuth和网关完整覆盖，以及后续协议。`pg_tool_options.constrained_sampling`已随定义、扩展快照和提示目录传递，模型普通采样对prefer回退并在发送前拒绝require；严格转换及其提供者失败回退仍需完成。
 - 下一交付物：按K05继续成组完成提供者行为；严格工具从上述声明调用链实施，其他协议按覆盖表顺序移植。接口或构建调整随同一批集成。

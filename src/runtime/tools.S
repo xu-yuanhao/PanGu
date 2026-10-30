@@ -310,7 +310,7 @@ pg_tool_registry_init:
  cmp cl,dl
  jne .Linit_bad
 .Linit_async_valid:
- mov rax,[r15+PG_TL_DEF_OUTPUT_LIMITS]
+ mov rax,[r15+PG_TL_DEF_OPTIONS]
  test rax,rax
  jz .Linit_limits_valid
  cmp qword ptr [rax],2147483646

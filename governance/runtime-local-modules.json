@@ -250,7 +250,7 @@
         "json-c",
         "system libc"
       ],
-      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe; optional async next/cancel/close, one active operation retained until released, transient progress distinct from final result",
+      "role": "handwritten bounded immutable registry; decoded object schema type matches exactly; complete JSON validation then per-tool validator/policy/execute; pure immutable replay policy query, unknown/default unsafe; optional async next/cancel/close, one active operation retained until released, transient progress distinct from final result; immutable pg_tool_options carries output budget/result schema and borrowed constrainedSampling JSON, with registry/definition sizes preserved",
       "exports": [
         "pg_tool_registry_init",
         "pg_tool_registry_service",
@@ -2524,7 +2524,7 @@
         "task.provider.local.v0",
         "task.access.local.v0"
       ],
-      "role": "Pi Registry snapshot selection, ordered tool/section composition, wraps and Generation/Tool/Compaction phase hooks with native scoped leases",
+      "role": "Pi Registry snapshot selection, ordered tool/section composition, wraps and Generation/Tool/Compaction phase hooks with native scoped leases; extensions ABI11 and tool-provider ABI5 publish the unified tool options descriptor; metadata is copied into persistent prompt declarations",
       "exports": [
         "pg_extensions_resolve",
         "pg_extensions_prepare",

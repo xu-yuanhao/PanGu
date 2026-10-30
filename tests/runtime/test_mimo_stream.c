@@ -148,11 +148,20 @@ static void chat_raw_stops(void){
  }
  puts("PASS: Chat successful raw stop reasons and content_filter/network_error provider failures");
 }
+
+static void tool_sampling_declarations(void){
+ static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;session.messages[0].size=2;strcpy(session.messages[0].text,"hi");
+ for(unsigned policy=0;policy<3;policy++){
+  pg_model model=pg_mimo_model(&m);pg_tool_options options={.max_bytes=51200,.max_lines=2000,.constrained_sampling=policy==0?"false":policy==1?"{\"type\":\"json_schema\",\"strict\":\"prefer\"}":"{\"type\":\"json_schema\",\"strict\":\"require\"}"};pg_tool_registry registry={.entries={{.name="echo",.description="Echo",.schema="{\"type\":\"object\"}",.options=&options}},.count=1};pg_mimo_bind_tools(&m,&registry);int status=pg_mimo_encode_request(&m,&session);assert(!!status==(policy==2));if(!status)assert(m.request&&!strstr(m.request,"constrainedSampling"));else assert(!m.request);model.close(model.context);
+ }
+ puts("PASS: native tool sampling descriptor ordinary/prefer fallback and require rejection before model transmission");
+}
 int main(void){
  anthropic();
  anthropic_failures();
  openai_cache();
  chat_raw_stops();
+ tool_sampling_declarations();
  m=(pg_mimo){0};
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);

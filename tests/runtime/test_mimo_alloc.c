@@ -41,6 +41,7 @@ int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **ou
 static pg_session session;
 static pg_mimo provider;
 static pg_tool_registry registry;
+static const pg_tool_options sampling_options={.max_bytes=51200,.max_lines=2000,.constrained_sampling="{\"type\":\"json_schema\",\"strict\":\"prefer\"}"};
 
 static void anthropic_decoder_failures(void){
  const char *frames[]={
@@ -71,7 +72,7 @@ int main(void){
  const pg_role roles[]={PG_USER,PG_ASSISTANT,PG_TOOL_CALL,PG_TOOL_RESULT,PG_ASSISTANT};
  for(unsigned i=0;i<5;++i){session.messages[i].role=roles[i];session.messages[i].size=strlen(texts[i]);strcpy(session.messages[i].text,texts[i]);}
  strcpy(session.messages[2].call_id,"one");strcpy(session.messages[2].tool_name,"read");strcpy(session.messages[3].call_id,"one");
- registry.count=1;registry.entries[0].name="read";registry.entries[0].description="read text";registry.entries[0].schema="{\"type\":\"object\"}";provider.tools=&registry;
+ registry.count=1;registry.entries[0].name="read";registry.entries[0].description="read text";registry.entries[0].schema="{\"type\":\"object\"}";registry.entries[0].options=protocol>=3?&sampling_options:0;provider.tools=&registry;
  provider.configuration=protocol?__real_json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"native-responses\",\"modelProvider\":\"openai\",\"endpoint\":\"https://example.invalid/responses\"}"):0;
  if(protocol>=3){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"endpoint\":\"https://example.invalid/messages\",\"options\":{\"toolChoice\":{\"type\":\"tool\",\"name\":\"read\",\"disable_parallel_tool_use\":true},\"metadata\":{\"user_id\":\"native-user\"}},\"modelInfo\":{\"compat\":{\"allowedFallbackModels\":[{\"model\":\"fallback-native\"}]}}}");}
  if(protocol==2){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"openai-responses\",\"model\":\"native-responses\",\"provider\":\"openai\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"saved thought\",\"thinkingSignature\":\"{\\\"type\\\":\\\"reasoning\\\",\\\"id\\\":\\\"rs_saved\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"saved thought\\\"}],\\\"encrypted_content\\\":\\\"cipher-saved\\\"}\"},{\"type\":\"text\",\"text\":\"saved text\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_saved\\\",\\\"phase\\\":\\\"commentary\\\"}\"},{\"type\":\"toolCall\",\"id\":\"call-saved\",\"name\":\"read\",\"arguments\":{},\"responseItemId\":\"fc_saved\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"call-saved\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}]}");assert(canonical);session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}

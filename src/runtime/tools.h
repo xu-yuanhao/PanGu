@@ -8,7 +8,9 @@
 /* Borrowed immutable strings and contexts must outlive the registry and runs.
    validate checks tool-specific schema semantics; policy is separate from visibility.
    Validators/authorization are side-effect free; callbacks return promptly. */
-typedef struct {size_t max_bytes,max_lines;unsigned tail,reserved;const char *structured_output_schema;} pg_tool_output_limits;
+typedef struct {size_t max_bytes,max_lines;unsigned tail,reserved;const char *structured_output_schema;const char *constrained_sampling;} pg_tool_options;
+/* constrained_sampling is optional Pi constrainedSampling JSON; the descriptor
+   and both schema strings outlive every registry/snapshot borrowing them. */
 struct pg_tool_execution;
 typedef struct {
  int (*next)(void *, char *, size_t, size_t *);
@@ -29,7 +31,7 @@ typedef struct {
  int (*execute)(void *, pg_slice, char *, size_t, size_t *);
  unsigned replay_safe; /* 0=unsafe (default), 1=safe; immutable during a run. */
  const pg_tool_async *async; /* NULL means execute completes synchronously. */
- const pg_tool_output_limits *output_limits; /* NULL: 50 KiB, 2000 lines, head. Borrowed immutable. */
+ const pg_tool_options *options; /* Borrowed immutable; NULL: default output budget and ordinary sampling. */
 } pg_tool_definition;
 typedef struct {
  pg_tool_definition entries[PG_TOOL_LIMIT]; size_t count;

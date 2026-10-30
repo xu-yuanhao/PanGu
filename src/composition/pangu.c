@@ -304,7 +304,7 @@ static int tool_acquire(void *ctx,uint64_t id,pg_tools *out){
   int shared_async=scope->definition&&other->definition&&scope->definition->async&&!scope->definition->async->open&&scope->definition->context==other->definition->context&&scope->definition->async==other->definition->async;
   if((scope->shared_base&&other->shared_base)||shared_async){pg_extensions_close(&scope->extensions);free(scope);return 1;}
  }
- if(scope->definition&&scope->definition->output_limits&&pg_durable_tool_output_limits(runner,scope->definition->output_limits)){pg_extensions_close(&scope->extensions);free(scope);return 2;}
+ if(scope->definition&&scope->definition->options&&pg_durable_tool_output_limits(runner,scope->definition->options)){pg_extensions_close(&scope->extensions);free(scope);return 2;}
  if(scope->shared_base&&!strcmp(name,"read")){
   json_object *metadata=0;const pg_read_image_processor *images=pg_host_find(&agent_scope,"image.processor");
   result=durable.model_metadata?durable.model_metadata->describe(durable.model_metadata->context,durable.configuration,&metadata):0;
@@ -350,7 +350,7 @@ static int tool_snapshot(void *ctx,uint64_t id,const struct json_object *call,st
  return selected->snapshot?selected->snapshot(selected->context,id,call,out):0;
 }
 static const char *tool_schema(void *ctx,uint64_t id,const struct json_object *call){
- (void)ctx;(void)call;tool_scope *scope=tool_scope_find(id);return scope&&scope->definition&&scope->definition->output_limits?scope->definition->output_limits->structured_output_schema:0;
+ (void)ctx;(void)call;tool_scope *scope=tool_scope_find(id);return scope&&scope->definition&&scope->definition->options?scope->definition->options->structured_output_schema:0;
 }
 static void tool_contract_report(void *ctx,uint64_t id,const char *message){(void)ctx;fprintf(stderr,"PanGu tool %llu contract: %s\n",(unsigned long long)id,message);}
 static void tool_progress(void *ctx,uint64_t id,pg_slice text){(void)ctx;(void)id;pg_durable_client_output(&durable.client,id,text);}

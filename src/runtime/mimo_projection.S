@@ -792,6 +792,26 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
  and qword ptr [rsp + 104],-513
+ mov rax,[rsp+40]
+ mov rax,[rax+72]
+ test rax,rax
+ jz .Lsampling_ready
+ mov rdi,[rax+32]
+ test rdi,rdi
+ jz .Lsampling_ready
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Linvalid
+ mov [rsp+96],rax
+ or qword ptr [rsp+104],512
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lsampling_key]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Linvalid
+ and qword ptr [rsp+104],-513
+.Lsampling_ready:
  mov rdx, qword ptr [rsp + 32]
  mov rdi, qword ptr [rsp + 24]
  lea rsi, [rip + .Lstr_function]
@@ -816,6 +836,10 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-33
  .Lserialize:
+ mov rdi,[rsp]
+ call .Lsampling_admit
+ test eax,eax
+ jnz .Linvalid
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
@@ -3708,3 +3732,109 @@ pg_mimo_uses_anthropic:
 .Lap_supportsExplicitPromptCacheMode: .asciz "supportsExplicitPromptCacheMode"
 .section .rodata
 .Lap_endpoint: .asciz "endpoint"
+
+/* Ordinary sampling preserves prefer fallback; required constrained sampling
+   must be fulfilled before transmission. */
+.text
+.Lsampling_admit:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ APGET rdi,tools
+ mov rbx,rax
+ xor r12d,r12d
+.Lsampling_each:
+ test rbx,rbx
+ jz .Lsampling_ok
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lsampling_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ APGET rax,function
+ mov r13,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_key]
+ call json_object_object_get@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lsampling_next
+ mov rdi,rax
+ mov esi,1
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lsampling_object
+ mov rdi,r14
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lsampling_bad
+ jmp .Lsampling_remove
+.Lsampling_object:
+ mov rdi,r14
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lsampling_bad
+ APGET r14,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsampling_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_json_schema]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsampling_remove
+ mov rdi,r14
+ lea rsi,[rip+.Lsampling_strict]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsampling_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_require]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lsampling_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lsampling_strict]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_prefer]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsampling_bad
+.Lsampling_remove:
+ mov rdi,r13
+ lea rsi,[rip+.Lsampling_key]
+ call json_object_object_del@PLT
+.Lsampling_next:
+ inc r12
+ jmp .Lsampling_each
+.Lsampling_ok:
+ xor eax,eax
+ jmp .Lsampling_end
+.Lsampling_bad:
+ mov eax,1
+.Lsampling_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lsampling_key: .asciz "constrainedSampling"
+.Lsampling_strict: .asciz "strict"
+.Lsampling_require: .asciz "require"
+.Lsampling_json_schema: .asciz "json_schema"
+
+.section .rodata
+.Lsampling_prefer: .asciz "prefer"

@@ -52,7 +52,7 @@ const struct json_object *pg_durable_tool_call(const pg_task_runner *);
 /* Effects have started and the invocation has not entered settlement. */
 int pg_durable_tool_executing(const pg_task_runner *);
 /* Host pins limits during acquire, before effects; buffer is owned by phase. */
-int pg_durable_tool_output_limits(pg_task_runner *,const pg_tool_output_limits *);
+int pg_durable_tool_output_limits(pg_task_runner *,const pg_tool_options *);
 typedef struct {size_t max_bytes,max_lines;double min_interval_ms;uint64_t bytes_per_second;} pg_tool_output_window;
 /* Executing call only. Complete decoded UTF-8 chunk is borrowed for the call;
    skipped describes omitted output directly before it, permitted for tail only.

@@ -14,5 +14,5 @@ typedef struct {
  int (*snapshot)(void *,uint64_t,const struct json_object *,struct json_object **);
  const char *identity;
 } pg_tool_provider;
-#define PG_TOOL_PROVIDER_ABI 4u
+#define PG_TOOL_PROVIDER_ABI 5u
 #endif

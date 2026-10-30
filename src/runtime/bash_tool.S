@@ -883,7 +883,7 @@ pg_bash_tool_definition:
  lea rax,[rip+.Lasync]
  mov [rdi+PG_TL_DEF_ASYNC],rax
  lea rax,[rip+.Lbash_output_limits]
- mov [rdi+PG_TL_DEF_OUTPUT_LIMITS],rax
+ mov [rdi+PG_TL_DEF_OPTIONS],rax
  mov rax,rdi
  ret
 .size pg_bash_tool_definition,.-pg_bash_tool_definition
@@ -1167,6 +1167,6 @@ pg_bash_tool_snapshot:
 .balign 8
 .Lbash_output_limits: .quad 51200,2000
  .long 1,0
- .quad .Lbash_structured_schema
+ .quad .Lbash_structured_schema,0
 .section .rodata
 .Lbash_structured_schema: .asciz "{\"type\":\"object\",\"properties\":{\"output\":{\"type\":\"string\"},\"truncated\":{\"type\":\"boolean\"},\"fullOutputPath\":{\"type\":\"string\"},\"exitCode\":{\"type\":\"number\"}},\"required\":[\"output\",\"truncated\",\"exitCode\"]}"

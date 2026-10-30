@@ -861,6 +861,26 @@ pg_prompt_tools:
  call json_object_object_add@PLT
  test eax,eax
  jnz .Lp_catalog_bad
+ mov rax,[rbp+72]
+ test rax,rax
+ jz .Lp_sampling_ready
+ mov rdi,[rax+32]
+ test rdi,rdi
+ jz .Lp_sampling_ready
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lp_catalog_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lp_sampling]
+ mov rdx,rax
+ mov [rsp+8],rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lp_sampling_ready
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ jmp .Lp_catalog_bad
+.Lp_sampling_ready:
  mov rdi,r13
  mov rsi,[rsp]
  call json_object_array_add@PLT
@@ -995,3 +1015,5 @@ pg_prompt_configure:
 .Lp_promptPlan: .asciz "promptPlan"
 .Lp_instructions_open: .asciz "<instructions>\n"
 .Lp_instructions_close: .asciz "\n</instructions>"
+.section .rodata
+.Lp_sampling: .asciz "constrainedSampling"

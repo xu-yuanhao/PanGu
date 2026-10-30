@@ -23,7 +23,7 @@
 #define PG_TL_DEF_EXECUTE 48
 #define PG_TL_DEF_REPLAY_SAFE 56
 #define PG_TL_DEF_ASYNC 64
-#define PG_TL_DEF_OUTPUT_LIMITS 72
+#define PG_TL_DEF_OPTIONS 72
 #define PG_TL_DEF_BYTES 80
 
 /* pg_tool_registry（tools.h） */
@@ -69,8 +69,10 @@ PG_TL_ASSERT_OFF(pg_tool_definition, authorize, PG_TL_DEF_AUTHORIZE);
 PG_TL_ASSERT_OFF(pg_tool_definition, execute, PG_TL_DEF_EXECUTE);
 PG_TL_ASSERT_OFF(pg_tool_definition, replay_safe, PG_TL_DEF_REPLAY_SAFE);
 PG_TL_ASSERT_OFF(pg_tool_definition, async, PG_TL_DEF_ASYNC);
-PG_TL_ASSERT_OFF(pg_tool_definition, output_limits, PG_TL_DEF_OUTPUT_LIMITS);
+PG_TL_ASSERT_OFF(pg_tool_definition, options, PG_TL_DEF_OPTIONS);
 PG_TL_ASSERT_SIZE(pg_tool_definition, PG_TL_DEF_BYTES);
+PG_TL_ASSERT_SIZE(pg_tool_options, 40);
+PG_TL_ASSERT_OFF(pg_tool_options, constrained_sampling, 32);
 PG_TL_ASSERT_OFF(pg_tool_registry, entries, PG_TL_REG_ENTRIES);
 PG_TL_ASSERT_OFF(pg_tool_registry, count, PG_TL_REG_COUNT);
 PG_TL_ASSERT_OFF(pg_tool_registry, active, PG_TL_REG_ACTIVE);
