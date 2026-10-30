@@ -1,5 +1,6 @@
 """Exercise the actual product composition resource service; --live uses a model."""
 from pathlib import Path
+import os
 import argparse
 import subprocess
 import tempfile
@@ -27,6 +28,19 @@ def main():
         sanitize=['-fsanitize=address,undefined','-fno-sanitize-recover=all'] if args.sanitize else []
         sources=compile_inputs([name for name in SOURCES if name!='src/composition/pangu.c'],directory,sanitize)
         subprocess.run(['/usr/bin/clang-23','-D_POSIX_C_SOURCE=200809L','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',*sanitize,*PLUGIN_EXPORTS,*sources,str(ROOT/'tests/runtime/test_product_resources.c'),*flags,'-ldl','-o',str(output)],check=True)
+        if not any((args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
+            for api,base,options in (
+                ('google-generative-ai',None,'{}'),
+                ('google-generative-ai','https://proxy.invalid/v1beta','{}'),
+                ('google-vertex',None,'{"authMode":"api-key"}'),
+                ('google-vertex',None,'{"project":"pangu","location":"global"}'),
+            ):
+                env=os.environ.copy()
+                for key in ('PANGU_MODEL_ENDPOINT','PANGU_MODEL_BASE_URL'):
+                    env.pop(key,None)
+                env.update(PANGU_MODEL_API=api,PANGU_MODEL_NAME='gemini-3-flash',PANGU_MODEL_API_KEY='configuration-placeholder',PANGU_MODEL_OPTIONS=options)
+                if base: env['PANGU_MODEL_BASE_URL']=base
+                subprocess.run([str(output),'--model-configuration'],env=env,check=True,timeout=30)
         library=Path(directory)/'tasks.so'
         if args.native_tasks or args.live_extensions:
             subprocess.run(['/usr/bin/clang-23','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-fPIC','-shared',*sanitize,'-DPG_TASK_FIXTURE',str(ROOT/'tests/runtime/product_plugin_fixture.c'),*flags,'-o',str(library)],check=True)

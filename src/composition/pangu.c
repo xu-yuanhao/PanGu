@@ -417,9 +417,10 @@ static int agent_start(void *ctx,pg_host *scope,size_t owner){
  pg_read_tool *root=pg_host_get(scope,owner,"workspace");if(!root)return 1;
  const pg_tool_registry *declared=toolset->catalog;if(!declared)return 1;durable.declared_tools=declared;
  resource_sources.files=files;resource_sources.root=root;resource_sources.declared=declared;
- const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
+ const char *model=getenv("PANGU_MODEL_NAME"),*endpoint=getenv("PANGU_MODEL_ENDPOINT"),*api=getenv("PANGU_MODEL_API"),*base=getenv("PANGU_MODEL_BASE_URL");if(!model)model=getenv("MIMO_MODEL");if(!model)model="mimo-v2.6-pro";if(!endpoint&&!api)endpoint="https://token-plan-cn.xiaomimimo.com/v1/chat/completions";
  durable.configuration=json_object_new_object();if(!durable.configuration)return 1;
- if(json_object_object_add(durable.configuration,"model",json_object_new_string(model))||json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
+ if(json_object_object_add(durable.configuration,"model",json_object_new_string(model))||(endpoint&&json_object_object_add(durable.configuration,"endpoint",json_object_new_string(endpoint)))||json_object_object_add(durable.configuration,"workspace",json_object_new_string(application.path)))return 1;
+ if((api&&json_object_object_add(durable.configuration,"api",json_object_new_string(api)))||(base&&json_object_object_add(durable.configuration,"baseUrl",json_object_new_string(base))))return 1;
  const char *execution=getenv("PANGU_TOOL_EXECUTION");if(execution){if(strcmp(execution,"parallel")&&strcmp(execution,"sequential"))return 1;if(json_object_object_add(durable.configuration,"toolExecution",json_object_new_string(execution)))return 1;}
  const char *options=getenv("PANGU_MODEL_OPTIONS");if(options){
   size_t size=strlen(options);if(size>=4096)return 1;struct json_tokener *parser=json_tokener_new();if(!parser)return 1;
@@ -471,9 +472,10 @@ static const pg_plugin plugins[]={
  {"storage",0,0,0,storage_exports,1,storage_start,storage_stop},
 };
 int main(int argc,char **argv){
- pg_client_startup startup={0};int parsed=pg_client_startup_parse(argc,argv,&startup);if(parsed||startup.help){fputs("Usage: pangu [workspace-directory] [--session-dir directory] [--session-id id]\nSet PANGU_MODEL_ENDPOINT, PANGU_MODEL_NAME, PANGU_MODEL_API_KEY. Default storage: workspace/.pangu. Ctrl-C cancels; Ctrl-D exits and preserves pending work.\n",parsed?stderr:stdout);return parsed;}if(startup.version){puts("PanGu native development");return 0;}startup_conversation=startup.conversation;
- const char *endpoint=getenv("PANGU_MODEL_ENDPOINT"),*key=getenv("PANGU_MODEL_API_KEY"),*model=getenv("PANGU_MODEL_NAME");
- if(endpoint&&(!*endpoint||!model||!*model)){fputs("Custom model connection requires endpoint and model.\n",stderr);return 2;}if(!key&&!endpoint)key=getenv("MIMO_API_KEY");if(!key||!*key){fputs("Model API key is required in the environment.\n",stderr);return 2;}
+ pg_client_startup startup={0};int parsed=pg_client_startup_parse(argc,argv,&startup);if(parsed||startup.help){fputs("Usage: pangu [workspace-directory] [--session-dir directory] [--session-id id]\nSet PANGU_MODEL_NAME and PANGU_MODEL_API_KEY; select PANGU_MODEL_API or PANGU_MODEL_ENDPOINT. PANGU_MODEL_BASE_URL overrides the provider base URL. Default storage: workspace/.pangu. Ctrl-C cancels; Ctrl-D exits and preserves pending work.\n",parsed?stderr:stdout);return parsed;}if(startup.version){puts("PanGu native development");return 0;}startup_conversation=startup.conversation;
+ const char *endpoint=getenv("PANGU_MODEL_ENDPOINT"),*key=getenv("PANGU_MODEL_API_KEY"),*model=getenv("PANGU_MODEL_NAME"),*api=getenv("PANGU_MODEL_API");
+ if(api&&(!*api||!model||!*model)){fputs("Model API selection requires an API name and model.\n",stderr);return 2;}
+ if(endpoint&&(!*endpoint||!model||!*model)){fputs("Custom model connection requires endpoint and model.\n",stderr);return 2;}if(!key&&!endpoint&&!api)key=getenv("MIMO_API_KEY");if(!key||!*key){fputs("Model API key is required in the environment.\n",stderr);return 2;}
  if(!isatty(0)||!isatty(1)){fputs("PanGu requires an interactive terminal.\n",stderr);return 2;}if(curl_global_init(CURL_GLOBAL_DEFAULT))return 2;
  int rc=2;char *workspace=realpath(startup.workspace,0),*directory=0;if(!workspace)goto cleanup;application.path=workspace;
  const char *selected=startup.session_directory?startup.session_directory:getenv("PANGU_SESSION_DIR");if(selected){directory=strdup(selected);}else{size_t n=strlen(workspace)+8;directory=malloc(n);if(directory)snprintf(directory,n,"%s/.pangu",workspace);}if(!directory)goto cleanup;application.session_directory=directory;

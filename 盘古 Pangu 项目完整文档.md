@@ -14,6 +14,8 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 默认模型元数据服务使用固定Pi生成器产出的聊天目录；用户agent目录的`models.json`可定义模型容量和输出上限。用户/项目`settings.json`中的`compaction.modelOverrides["provider/model"]`逐字段覆盖压缩策略；配置刷新沿既有资源服务采纳，公开模型描述保存身份、协议、容量和输入内容能力。
 
+模型连接通过`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`及显式`PANGU_MODEL_ENDPOINT`配置；`PANGU_MODEL_API`选择参考协议，Google/Vertex可由提供者组合默认端点，`PANGU_MODEL_BASE_URL`设置其代理基础地址。`PANGU_MODEL_OPTIONS`传入JSON对象；Vertex的`authMode`为`api-key`或`bearer`，Bearer模式使用已注入访问令牌，并从options或Google环境变量解析project/location。
+
 图片处理由可替换的`image.processor`服务提供：汇编负责处理策略，系统libvips通过C桥接完成编解码。构建用`pkg-config vips`取得该动态依赖。
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。
