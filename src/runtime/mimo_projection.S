@@ -938,7 +938,14 @@ pg_mimo_apply_options:
  lea rdx,[rsp+8]
  call json_object_object_get_ex@PLT
  test eax,eax
+ jnz .Lopts_max_field_ready
+ mov rdi,rbx
+ lea rsi,[rip+.Lopts_max_field]
+ call .Lcompat_get
+ mov [rsp+8],rax
+ test rax,rax
  jz .Lopts_maximum
+.Lopts_max_field_ready:
  mov rdi,[rsp+8]
  mov esi,6
  call json_object_is_type@PLT
@@ -1087,7 +1094,10 @@ pg_mimo_apply_options:
  jnz .Lopts_bad
  mov qword ptr [rsp+16],0
 .Lopts_success:
- xor ebp,ebp
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lcompat_usage
+ mov ebp,eax
  jmp .Lopts_end
 .Lopts_bad:
  mov ebp,1
@@ -1124,3 +1134,42 @@ pg_mimo_apply_options:
 
 .section .rodata
 .Lopts_reasoning_effort_wire: .asciz "reasoning_effort"
+
+.text
+/* Borrow public compatibility metadata from the selected model descriptor. */
+.Lcompat_get:
+ push rbx
+ mov rbx,rsi
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcompat_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,rbx
+ call json_object_object_get@PLT
+ pop rbx
+ ret
+.Lcompat_usage:
+ push rbx
+ mov rbx,rsi
+ lea rsi,[rip+.Lcompat_usage_key]
+ call .Lcompat_get
+ test rax,rax
+ jz .Lcompat_usage_ok
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lcompat_usage_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lopts_stream_options]
+ call json_object_object_del@PLT
+.Lcompat_usage_ok:
+ xor eax,eax
+ pop rbx
+ ret
+.section .rodata
+.Lcompat_model_info: .asciz "modelInfo"
+.Lcompat_key: .asciz "compat"
+.Lcompat_usage_key: .asciz "supportsUsageInStreaming"
+.section .note.GNU-stack,"",@progbits

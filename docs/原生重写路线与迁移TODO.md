@@ -111,6 +111,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 默认model.metadata接通原生内置聊天模型元数据、用户agent目录models.json的容量/输出覆盖与自定义模型元数据；按provider/model或endpoint/model选择，只输出公开字段。默认prepare按canonical provider/model逐字段应用compaction.modelOverrides，刷新、隔离所有权和真实自动/后台压缩通过。
 - [x] models.catalog/TUI可选入口提供公开模型目录，支持provider筛选、内置/用户models.json同名覆盖去重，复用describe输出能力/容量，结果排除私有认证；与已有Agent模型选择共同提供模型面板Runtime入口。
+- [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；实际编码与模型传输/ABI专项通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -305,8 +306,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `models.ts:getModels/getProviders`与已有用户models.json/公开metadata解析；沿现有原生目录加载和资源刷新。
-- 实际调用链：`pg_models_list`枚举当前provider目录，内置与custom模型通过同一describe合并覆盖，按provider内ID去重；单项无法解析时跳过，保留可用项。产品Host提供`models.catalog`，TUI通过`pg_tui_runtime_models`取得list/release表，后续选定模型写入既有agent.state。
-- 验证：产品Host ASan/UBSan通过provider筛选、未知provider空列表、全目录超过100项、自定义与内置同名仅一项且覆盖生效、私有API Key/headers排除以及可选TUI绑定；产品构建及Assembly检查通过；G00在Git登记文件当前快照通过（项目外`claude/`保留），新增导出/服务登记已自审。本轮无模型请求。
-- 接口与差异：独立24字节目录操作表，已有Runtime/模型提供者ABI不变；返回拥有所有权的公开描述数组。资源刷新后从当前快照读取；模型选择界面由TUI线消费，跨协议/提供者连接仍按K05完成。
-- 下一交付物：继续覆盖表中的协议/工具/会话完整操作与实际TUI联调。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的模型compat、stream_options与maxTokensField；复用已有公开modelInfo和原生请求编码器。
+- 实际调用链：模型metadata已由产品prepare进入配置，OpenAI编码器现在读取其compat：supportsUsageInStreaming关闭时删除stream_options；未显式指定options.maxTokensField时采用模型默认字段。显式请求设置保留优先级，已支持的max_tokens/max_completion_tokens共用原校验。
+- 验证：`test_mimo_asm.py`的O0/O2/UBSan编码/协议/传输/ABI/分配失败专项通过，新增实际请求断言验证关闭用量、模型字段与显式覆盖；产品构建及Assembly检查通过。本轮无模型请求。
+- 接口与差异：无新增文件/公开ABI，使用现有模型compat数据。其余OpenAI兼容字段及其他对话协议仍在K05覆盖范围内。
+- 下一交付物：沿K05/K08/K11继续成组补齐实际协议、工具和扩展能力。

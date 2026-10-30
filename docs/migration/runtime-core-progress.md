@@ -58,6 +58,7 @@
 | 历史分页 | `conversation_view.S`：Host conversation.history/TUI可选入口，fork-aware Entry范围、升降序游标与独立页所有权；复用会话目录的页包装，302条/分叉/两后端通过 |
 | 会话视图 | `conversation_view.S`：conversation.view Host/TUI只读入口，统一会话/原始有效Entry/已有Live与UsageDoc/queued Submission，readOnLine保护与分页、重开 |
 | 会话用量 | `usage.S`：pangu.usage按models/tools累计，Generation/工具结果/摘要尝试同批提交；响应模型身份优先，计数及已报告cost、可选reasoning/cacheWrite1h，Host usage读取与重开 |
+| 模型兼容参数 | `mimo_projection.S`：读取modelInfo.compat流式用量开关和输出字段默认，显式options优先；编码/传输/ABI专项通过 |
 | 模型传输 | `mimo.S`、`mimo_projection.S`、`mimo_stream.S`：OpenAI-compatible SSE、工具批次、增量内容、取消和显式连接注入；参数缓冲清理保留工具注册表，连续请求携带当前声明 |
 | 资源选择 | `resource_select.S`：作用域`!`/`+`/`-`规则、文件/SKILL父目录变体、常见glob/brace/range、显式与项目优先；筛选先于名称去重，排除路径不由自动发现重新启用 |
 | 资源生命周期 | `resources.S`：Host resources服务、整体候选采纳/失败保留、空闲刷新、独立版本快照与前台展开；可选TUI资源操作表已提供 |
