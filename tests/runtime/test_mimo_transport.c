@@ -512,6 +512,15 @@ static void test_responses_transport(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Responses actual model-service curl replay, split SSE/CRLF, text/tool terminal, early EOF and provider failure");
 }
+
+static void test_responses_arguments(void){
+ const char *arguments[]={"{\"path\":\"a\\q\"}","{\"path\":\"file\",\"mode\":.5}",""};
+ for(unsigned i=0;i<3;i++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","unit-key",1);assert(!start());
+  feed("data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_args\",\"call_id\":\"args\",\"name\":\"read\",\"arguments\":\"\"}}\n");json_object *done=json_tokener_parse("{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_args\",\"call_id\":\"args\",\"name\":\"read\"}}");json_object_object_add(json_object_object_get(done,"item"),"arguments",json_object_new_string(arguments[i]));const char *json=json_object_to_json_string_ext(done,JSON_C_TO_STRING_PLAIN);size_t size=strlen(json);char *frame=calloc(1,size+8);assert(frame);memcpy(frame,"data: ",6);memcpy(frame+6,json,size);frame[size+6]='\n';feed(frame);free(frame);json_object_put(done);feed("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n");finish_transport();pg_model_event event={0};for(unsigned n=0;n<10;n++){assert(!nxt(&event));if(event.kind!=PG_MODEL_WAIT)break;}assert(event.kind==PG_MODEL_CALL&&m.prepared_arguments[0]);json_object *prepared=json_tokener_parse(event.text.data),*assistant=json_tokener_parse("{\"content\":[]}");assert(prepared&&!pg_mimo_complete(&m,assistant));json_object *call=json_object_array_get_idx(json_object_object_get(assistant,"content"),0);assert(json_object_equal(prepared,json_object_object_get(call,"arguments")));if(i==1)assert(json_object_object_get(call,"argumentsError")&&!json_object_object_length(prepared));else assert(!json_object_object_get(call,"argumentsError"));if(i==0)assert(!strcmp(json_object_get_string(json_object_object_get(prepared,"path")),"a\\q"));json_object_put(prepared);json_object_put(assistant);model.close(model.context);assert(!m.prepared_arguments[0]);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Responses repaired/invalid/empty final arguments travel through model CALL, completion metadata and owned cleanup");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -528,6 +537,7 @@ int main(void) {
     test_injected_connection();
     test_saved_connection();
     test_responses_transport();
+    test_responses_arguments();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

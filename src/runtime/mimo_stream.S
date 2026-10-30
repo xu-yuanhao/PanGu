@@ -1641,18 +1641,20 @@ pg_mimo_responses_complete:
  RCCOPY rbp,r14,id,responseItemId
  RCCOPY rbp,r14,namespace,namespace
  RCGET r14,arguments
+ mov [rsp+24],rax
  mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [rsp+32],rax
+ mov rdi,[rsp+24]
  call json_object_get_string@PLT
- test rax,rax
- jz .Lrc_bad
  mov rdi,rax
- call json_tokener_parse@PLT
- mov rdi,rbp
- lea rsi,[rip+.Lrc_arguments]
- mov rdx,rax
- call .Lrs_set
+ mov rsi,[rsp+32]
+ lea rdx,[rsp+16]
+ call pg_mimo_arguments_parse
  test eax,eax
  jnz .Lrc_bad
+ RCCOPY rbp,"qword ptr [rsp+16]",arguments,arguments
+ RCCOPY rbp,"qword ptr [rsp+16]",argumentsError,argumentsError
 .Lrc_next_release:
  mov rdi,[rsp+16]
  call json_object_put@PLT
@@ -2086,3 +2088,364 @@ pg_mimo_failure_data:
 .Lrt_raw_stop: .asciz "rawStopReason"
 .Lrt_incomplete: .asciz "incomplete"
 .Lrt_reason_format: .asciz "%s.%s"
+
+.text
+/* Strict finished-object parse. rdx: 0 value, 1 syntax/type, 2 allocation. */
+.Lpa_object:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ call json_tokener_new@PLT
+ test rax,rax
+ jz .Lpa_object_alloc
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,17
+ call json_tokener_set_flags@PLT
+ mov rdi,[rsp]
+ mov rsi,rbx
+ mov edx,r12d
+ call json_tokener_parse_ex@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_tokener_get_error@PLT
+ test eax,eax
+ jnz .Lpa_object_bad
+ mov rdi,[rsp]
+ call json_tokener_get_parse_end@PLT
+ cmp rax,r12
+ jne .Lpa_object_bad
+ mov rdi,[rsp+8]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lpa_object_bad
+ mov r13,[rsp+8]
+ mov rdi,[rsp]
+ call json_tokener_free@PLT
+ mov rax,r13
+ xor edx,edx
+ jmp .Lpa_object_end
+.Lpa_object_bad:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_tokener_free@PLT
+ xor eax,eax
+ mov edx,1
+ jmp .Lpa_object_end
+.Lpa_object_alloc:
+ xor eax,eax
+ mov edx,2
+.Lpa_object_end:
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+/* Pi repairJson/parseToolCallArguments: repair string literals only; a finished
+   malformed object becomes an empty argument object with the original error. */
+.globl pg_mimo_arguments_parse
+.type pg_mimo_arguments_parse,@function
+pg_mimo_arguments_parse:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,56
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,7
+ rep stosq
+ mov [rsp],rdx
+ test rdx,rdx
+ jz .Lpa_bad
+ mov qword ptr [rdx],0
+ cmp r12,PG_TL_ARGUMENT_LIMIT
+ jae .Lpa_bad
+ test r12,r12
+ jz .Lpa_empty
+ test rbx,rbx
+ jz .Lpa_bad
+ mov rdi,rbx
+ mov rsi,r12
+ call pg_context_blank@PLT
+ test eax,eax
+ jnz .Lpa_empty
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lpa_object
+ mov [rsp+16],rax
+ test edx,edx
+ jz .Lpa_envelope
+ cmp edx,2
+ je .Lpa_bad
+ lea rdi,[r12+r12*2]
+ add rdi,rdi
+ inc rdi
+ call malloc@PLT
+ mov [rsp+24],rax
+ mov r13,rax
+ test rax,rax
+ jz .Lpa_bad
+ xor r14d,r14d
+ xor r15d,r15d
+ xor ebp,ebp
+.Lpa_repair:
+ cmp r14,r12
+ jae .Lpa_repaired
+ movzx eax,byte ptr [rbx+r14]
+ test ebp,ebp
+ jz .Lpa_copy
+ cmp eax,92
+ je .Lpa_escape
+ cmp eax,32
+ jb .Lpa_control
+.Lpa_copy:
+ mov [r13+r15],al
+ inc r15
+ cmp eax,34
+ jne .Lpa_advance
+ xor ebp,1
+.Lpa_advance:
+ inc r14
+ jmp .Lpa_repair
+.Lpa_escape:
+ lea rcx,[r14+1]
+ cmp rcx,r12
+ jae .Lpa_bad_escape
+ movzx eax,byte ptr [rbx+rcx]
+ cmp eax,'u'
+ je .Lpa_unicode
+ cmp eax,34
+ je .Lpa_valid_escape
+ cmp eax,92
+ je .Lpa_valid_escape
+ cmp eax,'/'
+ je .Lpa_valid_escape
+ cmp eax,'b'
+ je .Lpa_valid_escape
+ cmp eax,'f'
+ je .Lpa_valid_escape
+ cmp eax,'n'
+ je .Lpa_valid_escape
+ cmp eax,'r'
+ je .Lpa_valid_escape
+ cmp eax,'t'
+ je .Lpa_valid_escape
+ jmp .Lpa_bad_escape
+.Lpa_valid_escape:
+ mov byte ptr [r13+r15],92
+ mov [r13+r15+1],al
+ add r15,2
+ add r14,2
+ jmp .Lpa_repair
+.Lpa_unicode:
+ lea rcx,[r14+5]
+ cmp rcx,r12
+ jae .Lpa_bad_escape
+ mov ecx,2
+.Lpa_hex_check:
+ lea r8,[r14+rcx]
+ movzx eax,byte ptr [rbx+r8]
+ cmp eax,'0'
+ jb .Lpa_bad_escape
+ cmp eax,'9'
+ jbe .Lpa_hex_next
+ or eax,32
+ cmp eax,'a'
+ jb .Lpa_bad_escape
+ cmp eax,'f'
+ ja .Lpa_bad_escape
+.Lpa_hex_next:
+ inc ecx
+ cmp ecx,6
+ jb .Lpa_hex_check
+ mov eax,[rbx+r14]
+ mov [r13+r15],eax
+ mov ax,[rbx+r14+4]
+ mov [r13+r15+4],ax
+ add r15,6
+ add r14,6
+ jmp .Lpa_repair
+.Lpa_bad_escape:
+ mov word ptr [r13+r15],0x5c5c
+ add r15,2
+ jmp .Lpa_advance
+.Lpa_control:
+ mov dword ptr [r13+r15],0x3030755c
+ lea r8,[rip+.Lpa_hex]
+ mov ecx,eax
+ shr ecx,4
+ mov dl,[r8+rcx]
+ mov [r13+r15+4],dl
+ and eax,15
+ mov dl,[r8+rax]
+ mov [r13+r15+5],dl
+ add r15,6
+ jmp .Lpa_advance
+.Lpa_repaired:
+ mov byte ptr [r13+r15],0
+ mov rdi,r13
+ mov rsi,r15
+ call .Lpa_object
+ mov [rsp+16],rax
+ cmp edx,2
+ je .Lpa_bad
+ test edx,edx
+ jz .Lpa_envelope
+ mov dword ptr [rsp+48],1
+ jmp .Lpa_envelope
+.Lpa_empty:
+ mov qword ptr [rsp+16],0
+.Lpa_envelope:
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov qword ptr [rsp+24],0
+ lea rdi,[rip+.Lpa_json]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lpa_bad
+ cmp qword ptr [rsp+16],0
+ je .Lpa_error_field
+ mov rdi,rax
+ lea rsi,[rip+.Lrs_arguments]
+ mov rdx,[rsp+16]
+ mov qword ptr [rsp+16],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lpa_bad
+.Lpa_error_field:
+ cmp dword ptr [rsp+48],0
+ je .Lpa_success
+ lea rdi,[r12+PA_ERROR_BYTES+1]
+ call malloc@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lpa_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lpa_error]
+ mov edx,OFFSET PA_ERROR_BYTES
+ call memcpy@PLT
+ mov rdi,[rsp+24]
+ add rdi,OFFSET PA_ERROR_BYTES
+ mov rsi,rbx
+ mov rdx,r12
+ call memcpy@PLT
+ mov rdi,[rsp+24]
+ lea rsi,[r12+PA_ERROR_BYTES]
+ call json_object_new_string_len@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lpa_argumentsError]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lpa_bad
+.Lpa_success:
+ mov rax,[rsp+8]
+ mov rdx,[rsp]
+ mov [rdx],rax
+ mov qword ptr [rsp+8],0
+ xor ebp,ebp
+ jmp .Lpa_cleanup
+.Lpa_bad:
+ mov ebp,1
+.Lpa_cleanup:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov eax,ebp
+ add rsp,56
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_arguments_parse,.-pg_mimo_arguments_parse
+.section .rodata
+.Lpa_hex: .ascii "0123456789abcdef"
+.Lpa_json: .asciz "{\"arguments\":{}}"
+.Lpa_argumentsError: .asciz "argumentsError"
+.Lpa_error: .ascii "Invalid JSON tool arguments\n\nReceived arguments:\n"
+.Lpa_error_end:
+
+.section .rodata
+.Lrc_argumentsError: .asciz "argumentsError"
+
+.text
+.globl pg_mimo_prepare_arguments
+.type pg_mimo_prepare_arguments,@function
+pg_mimo_prepare_arguments:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12d,esi
+ mov qword ptr [rsp],0
+ cmp esi,PG_MM_CALL_LIMIT
+ jae .Lpr_bad
+ mov rax,r12
+ PG_MM_CALL_SLOT r13,rax
+ mov rdi,[rbx+PG_MM_ARGUMENT_OVERFLOW+r12*8]
+ test rdi,rdi
+ cmovz rdi,r13
+ mov rsi,[rbx+PG_MM_ARGUMENT_LENGTH+r12*8]
+ mov rdx,rsp
+ call pg_mimo_arguments_parse
+ test eax,eax
+ jnz .Lpr_bad
+ mov rdi,[rbx+PG_MM_PREPARED_ARGUMENTS+r12*8]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+PG_MM_PREPARED_ARGUMENTS+r12*8],rax
+ mov qword ptr [rsp],0
+ mov rdi,rax
+ lea rsi,[rip+.Lrs_arguments]
+ call li_get
+ mov rdi,rax
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lpr_bad
+ imul r12,r12,PG_MM_CALL_BYTES
+ lea r13,[rbx+PG_MM_CALLS+r12]
+ mov [r13],rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp rax,PG_TL_ARGUMENT_LIMIT
+ jae .Lpr_bad
+ mov [r13+8],rax
+ xor eax,eax
+ jmp .Lpr_end
+.Lpr_bad:
+ mov eax,1
+.Lpr_end:
+ mov [rsp+8],eax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,[rsp+8]
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_mimo_prepare_arguments,.-pg_mimo_prepare_arguments
+
+.set PA_ERROR_BYTES, .Lpa_error_end-.Lpa_error

@@ -69,6 +69,9 @@ pg_mimo_bind_tools:
  mov qword ptr [rbx+PG_MM_ARGUMENT_LENGTH+r12*8],0
  mov qword ptr [rbx+PG_MM_ARGUMENT_CAPACITY+r12*8],0
  call free@PLT
+ mov rdi,[rbx+PG_MM_PREPARED_ARGUMENTS+r12*8]
+ mov qword ptr [rbx+PG_MM_PREPARED_ARGUMENTS+r12*8],0
+ call json_object_put@PLT
  inc r12d
  cmp r12d,PG_MM_CALL_LIMIT
  jb .Lclear_arg_loop
@@ -645,6 +648,17 @@ li_next:
  test rax,rax
  jz .Lready_bad
  mov [r15+40],rax
+ mov rdi,rbx
+ call pg_mimo_uses_responses@PLT
+ test eax,eax
+ jz .Lready_chat_arguments
+ mov rdi,rbx
+ mov esi,r13d
+ call pg_mimo_prepare_arguments@PLT
+ test eax,eax
+ jnz .Lready_bad
+ jmp .Lready_next
+.Lready_chat_arguments:
  call json_tokener_new@PLT
  test rax,rax
  jz .Lready_bad
@@ -690,6 +704,7 @@ li_next:
  mov rdi,[rsp]
  call json_tokener_free@PLT
  mov qword ptr [rsp],0
+.Lready_next:
  inc r13
  mov eax,[rbx+PG_MM_CALL_COUNT]
  cmp r13,rax

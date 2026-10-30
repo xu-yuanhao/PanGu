@@ -60,5 +60,7 @@ int main(void){
  for(unsigned i=1;i<=total;++i){fail_at=i;calls=0;tracked=0;assert(pg_mimo_encode_request(&provider,&session)&&!provider.request);if(live)fprintf(stderr,"projection failure protocol=%u index=%u calls=%u live=%u\n",protocol,i,calls,live);assert(calls>=i&&!live);}
  printf("PASS: %u-call projection: %u allocation/insertion/serialization failures release JSON ownership\n",n,total);
  }json_object_put(canonical);json_object_put(provider.configuration);provider.configuration=0;
- }return 0;
+ }
+ const char *finished[]={"{\"x\":1}","{\"x\":\"a\\q\"}","{broken"};for(unsigned c=0;c<3;c++){struct json_object *value=0;fail_at=0;calls=tracked=0;assert(!pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value));unsigned total=calls;json_object_put(value);assert(!live);for(unsigned i=1;i<=total;i++){fail_at=i;calls=tracked=0;value=0;assert(pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value)&&!value&&!live);}printf("PASS: final arguments case %u: %u constructor/insertion failures release ownership\n",c,total);}
+ return 0;
 }

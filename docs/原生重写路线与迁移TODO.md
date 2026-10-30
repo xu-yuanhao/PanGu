@@ -115,6 +115,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] OpenAI Responses基础请求/流接入同一模型服务：按api/modelInfo.api或端点选择，投影input、扁平函数声明/调用/结果、图片结果、max_output_tokens与reasoning；解析文本/思考、稀疏工具索引、最终参数替换、用量及完成/长度/失败终态。实际curl服务回放覆盖跨块/CRLF、工具调用、提前EOF和失败；O0/O2/UBSan、ABI及分配失败检查通过。完整Responses行为仍按下项覆盖。
 - [x] Responses最终item按输出槽保存，正文/思考采用done事实，终态补齐加密思考；canonical消息保存textSignature、thinkingSignature及独立responseItemId。provider/model/api一致时重放，切换模型/提供者移除相应签名和item身份；SQLite/JSONL重开、真实请求投影、跨协议投影、乱序done、分配失败与ASan/UBSan通过。
 - [x] Responses终态结算与失败接通产品：全部function item.done确认后交付调用，已关闭槽忽略迟到参数；incomplete保留长度终态与rawStopReason。结构化提供者message/error body进入既有重试和上下文超限分类；并行部分完成、实际模型服务拒绝未完成调用、HTTP 200错误分类、关闭释放及O0/O2/ABI/ASan/UBSan通过。
+- [x] Responses最终参数接通修复、错误元数据与Tool结算：空白为{}，修复字符串控制字符/非法转义，失败保留原文并生成argumentsError；模型调用先交付准备后的对象，complete保存最终元数据，Tool在效果前返回错误。416组固定Pi源码差分、构造失败释放、SQLite/JSONL无写入副作用与NUL错误文本、真实DeepSeek错误后重试写入通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -312,8 +313,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `processResponsesStream`未完成工具集合、终态映射与`openai-responses-terminal-event.test.ts`；沿用现有Generation错误结算与重试调用者。
-- 实际调用链：Responses function item.done更新调用完成位；普通完成验证全部槽后才由模型服务交付CALL/BATCH。长度终态经独立路径保存usage/rawStopReason，已关闭槽忽略后续参数增量。`pg_mimo_failure_data`从自有终态提取错误文本/分类数据，`native_model_failure`接入既有重试和上下文超限判断；分类使用错误对象，排除无关输出文本。
-- 验证：模型O0/O2/UBSan、ABI、传输与分配专项通过；ASan/UBSan覆盖单/并行未完成拒绝、迟到参数、长度原因为独立终态、结构化错误和关闭释放。实际curl模型服务回放确认未完成调用不会交付；产品Host ASan/UBSan确认HTTP 200上下文超限/限流仍保留实际原因并正确分类。`build_test.py --client`及产品构建通过。Responses仍使用确定性回放。
-- 接口与差异：模型实例新增自有终态JSON与调用完成位，start/close统一清理，公开model服务ABI保持。K05继续覆盖参数修复/argumentsError、高级工具及协议/网关选项。
-- 下一交付物：完成模型最终参数解析到工具校验/错误回报的整条调用链，随后推进下一协议。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `utils/json-parse.ts`（repairJson/parseToolCallArguments）、`streaming-json.ts`最终参数、`validation.ts`参数错误优先校验，及Responses partial-json-cleanup用例。
+- 实际调用链：`pg_mimo_arguments_parse`严格解析最终对象，按上游修复字符串字面量；失败生成空对象和带原文的argumentsError。Responses模型调用借用自有准备结果，`complete`将最终对象/错误写进canonical ToolCall，Durable Tool在意图/执行前生成错误结果并经原链保存、反馈。错误内容按显式长度组合，保留NUL后的正文；缓存随模型关闭释放。
+- 验证：416组输入直接运行固定Pi parseToolCallArguments比较值与错误判定，全部一致。模型O0/O2/UBSan、ABI、传输、构造/插入失败释放通过；实际CALL与complete元数据一致。`build_test.py --client`的SQLite/JSONL场景用本可写文件的合法参数加argumentsError，确认无写入且错误结果保留NUL后内容；产品Host ASan/UBSan通过。真实DeepSeek在一次完成回调参数错误注入后收到Tool错误，首次未写文件，随后重新调用write并完成回答。Responses本身使用流回放验证。
+- 接口与差异：复用模型模块、json-c和现有Tool结果链；新增内部参数解析/准备入口及模型自有缓存，公开model服务ABI保持，原生参数与UTF-8预算继续适用。Responses消费者在工具分派前调用complete保留错误元数据；产品Generation沿现有完成回调执行该顺序。
+- 下一交付物：按K05推进下一组完整协议与其实际消费者；高级工具、提供者兼容选项及认证仍按覆盖表完成。

@@ -24,6 +24,7 @@ typedef struct {
  struct json_object *response_output,*response_identity; /* owned final item slots/id */
  struct json_object *response_terminal; /* owned terminal envelope */
  unsigned response_closed; /* completed function-call slots */
+ struct json_object *prepared_arguments[PG_TOOL_BATCH_LIMIT];
 } pg_mimo;
 /* OpenAI Chat Completions / Responses SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -39,7 +40,9 @@ pg_model pg_mimo_model(pg_mimo *);
 int pg_mimo_configure(pg_mimo *,const struct json_object *);
 /* Complete a private assistant JSON before close with stopReason and reported
    token usage (input/output/cacheRead/cacheWrite/reasoning/totalTokens).
-   Absent provider usage stays absent; this API reports token counts only. */
+   Absent provider usage stays absent; this API reports token counts only.
+   Responses consumers complete before tool dispatch to retain final
+   argumentsError metadata alongside the prepared argument object. */
 int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 /* Bind the same immutable registry used by the executor before starting runs. */
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
@@ -53,6 +56,9 @@ int pg_mimo_responses_complete(const pg_mimo *,struct json_object *);
 int pg_mimo_responses_history(const struct json_object *,const struct json_object *,struct json_object **);
 /* Borrowed structured failure text/body, valid through close or the next start. */
 int pg_mimo_failure_data(const pg_mimo *,pg_slice *,pg_slice *);
+/* Owned {arguments, argumentsError?}; raw input stays borrowed. */
+int pg_mimo_arguments_parse(pg_slice,struct json_object **);
+int pg_mimo_prepare_arguments(pg_mimo *,unsigned);
 /* Internal decoder: one complete SSE line; api/modelInfo.api selects protocol,
    with a /responses endpoint fallback. No network operations. */
 int pg_mimo_decode_line(pg_mimo *, const char *, pg_model_event *);

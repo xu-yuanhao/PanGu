@@ -17,6 +17,9 @@ This is a task-local driver, not the product build.
 from pathlib import Path
 import subprocess
 import sys
+import ctypes as C
+import json
+import random
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,6 +61,43 @@ def run(cmd):
         sys.exit(r.returncode)
 
 
+def arguments_differential():
+    """Compare finished argument values/errors with the fixed Pi implementation."""
+    cases=['', ' ', '\ufeff', '{}', '[]', 'null', 'true', '1', '{"x":.5}', '{"x":1,}', '{"x":1} junk', '\ufeff{}']
+    cases += ['{"s":"a'+chr(c)+'b"}' for c in range(32)]
+    cases += ['{"s":"a'+chr(92)+escape+'b"}' for escape in ['q','d','x','u12','uZZZZ','u0000','u0041','uD83D'+chr(92)+'uDE00','n','t','"',chr(92)]]
+    rng=random.Random(311)
+    pieces=['a','中','🙂',chr(92),'"','\n','\r','\t',chr(0)]
+    for _ in range(120):
+        value={'text':''.join(rng.choice(pieces) for _ in range(rng.randrange(30))), 'items':[1,True,None,{'key':'value'}]}
+        encoded=json.dumps(value,ensure_ascii=False)
+        cases.extend([encoded,encoded.replace('\\n','\n'),encoded[:-1]])
+    oracle=r"""
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+const source=readFileSync(process.argv[1],'utf8').replace(/^import.*$/mg,'');
+const native=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source,{mode:'strip'})).toString('base64'));
+process.stdout.write(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(s=>{const x=native.parseToolCallArguments(s);return {arguments:x.arguments,error:!!x.argumentsError}})));
+"""
+    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle,str(ROOT/'references/pi/packages/ai/src/utils/json-parse.ts')],input=json.dumps(cases).encode()))
+    class Slice(C.Structure):
+        _fields_=[('data',C.c_void_p),('size',C.c_size_t)]
+    with tempfile.TemporaryDirectory(prefix='pangu-arguments-parity-') as directory:
+        output=Path(directory)/'arguments.so'
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl'],text=True).split()
+        subprocess.run([CC,'-shared','-fPIC','-O2',*SRC,*libs,'-o',str(output)],check=True)
+        native=C.CDLL(str(output));native.pg_mimo_arguments_parse.argtypes=[Slice,C.POINTER(C.c_void_p)];native.pg_mimo_arguments_parse.restype=C.c_int
+        native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
+        native.json_object_put.argtypes=[C.c_void_p]
+        for i,(source,wanted) in enumerate(zip(cases,expected)):
+            raw=source.encode();buffer=C.create_string_buffer(raw);result=C.c_void_p()
+            assert native.pg_mimo_arguments_parse(Slice(C.addressof(buffer),len(raw)),C.byref(result))==0,(i,source)
+            actual=json.loads(native.json_object_to_json_string_ext(result,0));native.json_object_put(result)
+            assert actual['arguments']==wanted['arguments'] and bool(actual.get('argumentsError'))==wanted['error'],(i,source,wanted,actual)
+            if wanted['error']: assert actual['argumentsError'].endswith('Received arguments:\n'+source)
+    print(f'PASS: {len(cases)} finished tool arguments match fixed Pi values/error classification')
+
+
 def main():
     failures = 0
     with tempfile.TemporaryDirectory(prefix='pangu-mimo-asm-') as tmp:
@@ -85,7 +125,7 @@ def main():
                     print(f'== mimo-{name} {label}: rc={r.returncode}')
                     if r.returncode != 0:
                         failures += 1
-        # 对象导入/导出清单：导出恰为四个公开函数，导入仅 json-c/libcurl/libc
+        # 核对模型模块导入/导出清单。
         for src in SRC:
             obj = str(Path(tmp) / (Path(src).stem + '-audit.o'))
             run([CC, '-D_POSIX_C_SOURCE=200809L', '-std=c11',
@@ -97,6 +137,7 @@ def main():
     if failures:
         print(f'{failures} test runs failed')
         return 1
+    arguments_differential()
     print('ALL MIMO ASM RUNS PASSED')
     return 0
 

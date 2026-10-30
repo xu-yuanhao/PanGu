@@ -1066,6 +1066,12 @@ pg_durable_tool_init:
  test eax,eax
  jnz .Ldt_poll_unavailable
  mov dword ptr [r14+148],1
+ mov rdi,r14
+ call .Ldt_argument_error
+ cmp eax,1
+ je .Ldt_poll_hook_blocked
+ test eax,eax
+ jnz .Ldt_poll_error
  cmp dword ptr [r14+156],0
  je .Ldt_poll_before_hooks
  mov dword ptr [r14+224],1
@@ -4319,3 +4325,115 @@ pg_durable_tool_progress_recorded:
 .section .rodata
 .Ldc_image_word: .asciz "image"
 .Ldc_mime: .asciz "mimeType"
+
+.text
+/* A parser error is a tool result, before hooks or executable intent. */
+.Ldt_argument_error:
+ push rbx
+ push r12
+ push r13
+ sub rsp,32
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ DGET "qword ptr [rbx+16]",argumentsError
+ mov r12,rax
+ test rax,rax
+ jz .Lda_none
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lda_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lda_none
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lda_format]
+ mov rdx,[rbx+88]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lda_bad
+ call printbuf_new@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lda_bad
+ mov rdi,[rsp]
+ call strlen@PLT
+ mov edx,eax
+ mov rdi,[rsp+24]
+ mov rsi,[rsp]
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lda_bad
+ mov rdi,r12
+ call json_object_get_string_len@PLT
+ mov r13d,eax
+ mov rdi,r12
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov rdi,[rsp+24]
+ mov edx,r13d
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lda_bad
+ mov rax,[rsp+24]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lda_bad
+ lea rdi,[rip+.Lda_content]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lda_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ mov rdi,r13
+ lea rsi,[rip+.Ldt_text]
+ mov rdx,[rsp+16]
+ mov qword ptr [rsp+16],0
+ call .Ldt_set
+ test eax,eax
+ jnz .Lda_bad
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Ldt_content_accept
+ test eax,eax
+ jnz .Lda_bad
+ mov dword ptr [rbx+144],1
+ mov dword ptr [rbx+164],1
+ mov r12d,1
+ jmp .Lda_end
+.Lda_none:
+ xor r12d,r12d
+ jmp .Lda_end
+.Lda_bad:
+ mov r12d,5
+.Lda_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+24]
+ call printbuf_free@PLT
+ mov eax,r12d
+ add rsp,32
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Ldt_argumentsError: .asciz "argumentsError"
+.Lda_format: .asciz "Invalid arguments for tool \"%s\": "
+.Lda_content: .asciz "[{\"type\":\"text\",\"text\":\"\"}]"
