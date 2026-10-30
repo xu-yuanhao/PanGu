@@ -3118,6 +3118,14 @@ pg_durable_context_order:
  call .Lgg_set
  test eax,eax
  jnz .Lgg_failure_error
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ call [rax+40]
+ mov rdi,[r14+24]
+ lea rsi,[r14+224]
+ call .Lgd_failure_facts
+ test eax,eax
+ jnz .Lgg_failure_error
  /* Resolve current policy; the next prepare obtains fresh request settings. */
  GGET "qword ptr [rbx+32]",conversation_id
  mov rdi,rax
@@ -6012,3 +6020,121 @@ pg_durable_generation_bind_prepare:
 .Lgg_control_completed: .asciz "completed"
 .Lgg_controls_json: .asciz "{\"terminate\":true,\"addTools\":[]}"
 .Lgg_control_reset_json: .asciz "{\"kind\":\"pangu.reset\",\"head\":\"self\",\"model\":[{\"role\":\"user\",\"content\":\"\",\"timestamp\":0}]}"
+
+.text
+/* Persist observed native transport facts with the same error assistant transaction. */
+.Lgd_failure_facts:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ movsd [rsp+16],xmm0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov eax,[rsi+20]
+ or eax,[rsi+24]
+ jz .Lgd_ok
+ lea rdi,[rip+.Lgd_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgd_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ movsd xmm0,[rsp+16]
+ call json_object_new_double@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lgd_timestamp]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgd_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lgd_details]
+ call json_object_object_get@PLT
+ mov r14,rax
+ cmp dword ptr [r12+20],0
+ je .Lgd_transport
+ mov edi,[r12+20]
+ call json_object_new_uint64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgd_status]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgd_bad
+.Lgd_transport:
+ cmp dword ptr [r12+24],0
+ je .Lgd_attach
+ mov edi,[r12+24]
+ call json_object_new_uint64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lgd_transport_error]
+ mov rdx,rax
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgd_bad
+.Lgd_attach:
+ mov rdi,rbx
+ lea rsi,[rip+.Lgd_diagnostics]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lgd_replace
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgd_bad
+ mov rdi,[rsp]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp+8],rax
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jnz .Lgd_bad
+ mov qword ptr [rsp+8],0
+ jmp .Lgd_ok
+.Lgd_replace:
+ mov rdi,rbx
+ lea rsi,[rip+.Lgd_diagnostics]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lgg_set
+ test eax,eax
+ jnz .Lgd_bad
+.Lgd_ok:
+ xor ebp,ebp
+ jmp .Lgd_end
+.Lgd_bad:
+ mov ebp,1
+.Lgd_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lgd_json: .asciz "[{\"type\":\"provider_response_failure\",\"details\":{}}]"
+.Lgd_timestamp: .asciz "timestamp"
+.Lgd_details: .asciz "details"
+.Lgd_status: .asciz "status"
+.Lgd_transport_error: .asciz "transportError"
+.Lgd_diagnostics: .asciz "diagnostics"
