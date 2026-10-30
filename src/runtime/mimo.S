@@ -1274,7 +1274,8 @@ pg_mimo_complete:
  mov rbp,rax
  test rax,rax
  jz .Lbeta_bad
- mov rdi,rax
+ xor r14d,r14d
+ mov rdi,rbp
  lea rsi,[rip+.Lbeta_thinking]
  call json_object_object_get@PLT
  mov rdi,rax
@@ -1282,18 +1283,13 @@ pg_mimo_complete:
  call json_object_object_get@PLT
  mov rdi,rax
  call json_object_get_string@PLT
- mov r14d,1
  test rax,rax
- jz .Lbeta_default_release
+ jz .Lbeta_tools
  mov rdi,rax
  lea rsi,[rip+.Lbeta_enabled]
  call strcmp@PLT
- mov r14d,eax
-.Lbeta_default_release:
- mov rdi,rbp
- call json_object_put@PLT
- test r14,r14
- jnz .Lbeta_ok
+ test eax,eax
+ jnz .Lbeta_tools
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  lea rsi,[rip+.Lbeta_options]
  call json_object_object_get@PLT
@@ -1301,14 +1297,54 @@ pg_mimo_complete:
  lea rsi,[rip+.Lbeta_interleaved]
  call json_object_object_get@PLT
  test rax,rax
- jz .Lbeta_default_send
+ jz .Lbeta_thinking_on
  mov rdi,rax
  call json_object_get_boolean@PLT
  test eax,eax
+ jz .Lbeta_tools
+.Lbeta_thinking_on:
+ or r14d,1
+.Lbeta_tools:
+ mov rdi,rbp
+ lea rsi,[rip+.Lbeta_tools_key]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lbeta_fallbacks
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lbeta_fallbacks
+ mov rdi,r13
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_eager]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jnz .Lbeta_fallbacks
+ or r14d,2
+.Lbeta_fallbacks:
+ mov rdi,rbp
+ lea rsi,[rip+.Lbeta_fallbacks_key]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lbeta_default_release
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lbeta_default_release
+ or r14d,4
+.Lbeta_default_release:
+ mov rdi,rbp
+ call json_object_put@PLT
+ test r14d,r14d
  jz .Lbeta_ok
-.Lbeta_default_send:
+ lea rax,[rip+.Lbeta_feature_headers]
+ mov rsi,[rax+r14*8]
  mov rdi,[rbx+PG_MM_HEADERS]
- lea rsi,[rip+.Lbeta_default_header]
  jmp .Lbeta_send
 .Lbeta_append:
  mov rdi,[rbx+PG_MM_HEADERS]
@@ -1344,4 +1380,18 @@ pg_mimo_complete:
 .Lbeta_type: .asciz "type"
 .Lbeta_enabled: .asciz "enabled"
 .Lbeta_interleaved: .asciz "interleavedThinking"
-.Lbeta_default_header: .asciz "anthropic-beta: interleaved-thinking-2025-05-14"
+
+.section .rodata
+.Lbeta_tools_key: .asciz "tools"
+.Lbeta_eager: .asciz "eager_input_streaming"
+.Lbeta_fallbacks_key: .asciz "fallbacks"
+.Lbeta_features_1: .asciz "anthropic-beta: interleaved-thinking-2025-05-14"
+.Lbeta_features_2: .asciz "anthropic-beta: fine-grained-tool-streaming-2025-05-14"
+.Lbeta_features_3: .asciz "anthropic-beta: interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
+.Lbeta_features_4: .asciz "anthropic-beta: server-side-fallback-2026-07-01"
+.Lbeta_features_5: .asciz "anthropic-beta: interleaved-thinking-2025-05-14,server-side-fallback-2026-07-01"
+.Lbeta_features_6: .asciz "anthropic-beta: fine-grained-tool-streaming-2025-05-14,server-side-fallback-2026-07-01"
+.Lbeta_features_7: .asciz "anthropic-beta: interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14,server-side-fallback-2026-07-01"
+
+.section .data.rel.ro
+.Lbeta_feature_headers: .quad 0,.Lbeta_features_1,.Lbeta_features_2,.Lbeta_features_3,.Lbeta_features_4,.Lbeta_features_5,.Lbeta_features_6,.Lbeta_features_7

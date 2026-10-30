@@ -547,6 +547,13 @@ static void test_anthropic_beta_headers(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic thinking beta header, case-insensitive option override, null/off suppression and header-injection rejection");
 }
+
+static void test_anthropic_feature_headers(void){
+ for(unsigned bits=0;bits<8;bits++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"maxTokens\":32768,\"compat\":{}}}");json_object *info=json_object_object_get(cfg,"modelInfo"),*compat=json_object_object_get(info,"compat");json_object_object_add(compat,"supportsEagerToolInputStreaming",json_object_new_boolean(!(bits&2)));if(bits&4)json_object_object_add(compat,"allowedFallbackModels",json_tokener_parse("[{\"model\":\"fallback\"}]"));if(bits&1)json_object_object_add(cfg,"options",json_tokener_parse("{\"reasoningEffort\":\"low\",\"maxTokens\":4096}"));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);pg_tool_registry registry={.entries={{.name="read",.description="Read",.schema="{\"type\":\"object\"}"}},.count=1};pg_mimo_bind_tools(&m,&registry);setenv("PANGU_MODEL_API_KEY","features-unit-key",1);assert(!start());unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){if(strncmp(h->data,"anthropic-beta:",15))continue;found++;assert(!!strstr(h->data,"interleaved-thinking")==!!(bits&1)&&!!strstr(h->data,"fine-grained-tool-streaming")==!!(bits&2)&&!!strstr(h->data,"server-side-fallback")==!!(bits&4));}assert(found==!!bits);model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic combined thinking/fine-grained-tool/fallback beta features match encoded request");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -566,6 +573,7 @@ int main(void) {
     test_responses_arguments();
     test_anthropic_transport();
     test_anthropic_beta_headers();
+    test_anthropic_feature_headers();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
