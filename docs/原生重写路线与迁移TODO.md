@@ -251,6 +251,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `harness/{view,events,task-graph,usage,telemetry}.ts`、`session/`；`harness-view`、`harness-events`、`harness-task-graph`、`session-watches`、`spec-usage` 测试。
 
 - [x] UsageDoc接入Generation响应、工具结果可选usage和摘要尝试的同批事务；按模型/工具累计计数及已报告cost，可选reasoning/cacheWrite1h保留，Host usage服务读取PanGu会话账本；两后端累计/回滚/重开与真实摘要/生成用量通过。
+- [x] 按 Durable `Harness.usage()` / `addUsageState` 接入跨会话 `usage.total`：汇总各会话自身已提交模型/工具账本，通过 Host 与 TUI 公共接口读取；产品 ASan/UBSan 专项及 Assembly、登记检查通过。
 - [x] Live/usage只读快照提供Host observation服务与可选TUI绑定：无调度/写入、缺省空状态、压缩终态、存储重开累计用量及解绑边界通过。
 - [x] Host/TUI observation提供拉取式状态观察：初始快照、已提交Live/usage变化合并、无变化跳过、返回值隔离及幂等退订；两后端用量事务与实际压缩开始/结束通过。
 - [x] Durable Client在提交发布后按账本实际变化排队PG_USAGE_CHANGED；缓存读取不访问Storage，动态事件节点保留完整JSON，退订/暂停释放基线。真实摘要/生成用量事件及16 KiB队列所有权通过。

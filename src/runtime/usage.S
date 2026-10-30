@@ -654,3 +654,236 @@ pg_live_peek:
  call json_object_deep_copy@PLT
 .Lu_live_peek_end:
  UE 64
+
+.text
+/* Merge one models/tools map into an owned map using existing counter rules. */
+.Lut_bucket:
+ UF 64
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov rdi,r12
+ call json_object_iter_begin@PLT
+ mov [rsp+16],rax
+ mov rdi,r12
+ call json_object_iter_end@PLT
+ mov [rsp+24],rax
+.Lut_each:
+ lea rdi,[rsp+16]
+ lea rsi,[rsp+24]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lut_bucket_ok
+ lea rdi,[rsp+16]
+ call json_object_iter_peek_name@PLT
+ mov r13,rax
+ lea rdi,[rsp+16]
+ call json_object_iter_peek_value@PLT
+ mov r14,rax
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lut_existing
+ mov rdi,r14
+ lea rsi,[rsp]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lut_bucket_bad
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,[rsp]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lut_bucket_bad
+ mov qword ptr [rsp],0
+ jmp .Lut_next
+.Lut_existing:
+ mov [rsp+32],rax
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lu_counters]
+ call .Lu_add
+ test eax,eax
+ jnz .Lut_bucket_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lu_cost]
+ call json_object_object_get@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lut_next
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lu_cost]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lut_cost_add
+ mov rdi,[rsp+40]
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lut_bucket_bad
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lu_cost]
+ mov rdx,[rsp+8]
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lut_bucket_bad
+ mov qword ptr [rsp+8],0
+ jmp .Lut_next
+.Lut_cost_add:
+ mov rdi,rax
+ mov rsi,[rsp+40]
+ lea rdx,[rip+.Lu_costs]
+ call .Lu_add
+ test eax,eax
+ jnz .Lut_bucket_bad
+.Lut_next:
+ lea rdi,[rsp+16]
+ call json_object_iter_next@PLT
+ jmp .Lut_each
+.Lut_bucket_ok:
+ xor ebp,ebp
+ jmp .Lut_bucket_end
+.Lut_bucket_bad:
+ mov ebp,5
+.Lut_bucket_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ UE 64
+.globl pg_usage_total_service
+.type pg_usage_total_service,@function
+pg_usage_total_service:
+ mov [rsi],rdi
+ lea rax,[rip+pg_usage_total_read]
+ mov [rsi+8],rax
+ mov rax,qword ptr [rip+json_object_put@GOTPCREL]
+ mov [rsi+16],rax
+ ret
+.globl pg_usage_total_read
+.type pg_usage_total_read,@function
+pg_usage_total_read:
+ UF 208
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,26
+ rep stosq
+ mov ebp,4
+ test r12,r12
+ jz .Lut_read_end
+ mov qword ptr [r12],0
+ test rbx,rbx
+ jz .Lut_read_end
+ lea rdi,[rip+.Lu_empty]
+ call json_tokener_parse@PLT
+ mov [rsp+144],rax
+ mov ebp,5
+ test rax,rax
+ jz .Lut_read_end
+ mov dword ptr [rsp+4],1
+ mov qword ptr [rsp+24],256
+.Lut_page:
+ lea rdi,[rsp+176]
+ mov rsi,[rbx]
+ call pg_durable_read_on_line_begin@PLT
+ mov ebp,3
+ test eax,eax
+ jnz .Lut_read_end
+ mov rax,[rbx+8]
+ mov rdi,[rax]
+ mov rsi,rsp
+ lea rdx,[rsp+112]
+ call [rax+16]
+ mov [rsp+200],eax
+ lea rdi,[rsp+176]
+ call pg_durable_read_on_line_end@PLT
+ mov ebp,6
+ cmp dword ptr [rsp+200],0
+ jne .Lut_read_end
+ xor r13d,r13d
+.Lut_conversation:
+ mov rdi,[rsp+112]
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lut_page_end
+ mov rdi,[rsp+112]
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lut_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov rsi,rax
+ mov rdi,[rbx]
+ lea rdx,[rsp+152]
+ call pg_usage_read
+ mov ebp,eax
+ test eax,eax
+ jnz .Lut_read_end
+ xor r14d,r14d
+.Lut_bucket_each:
+ lea rax,[rip+.Lut_buckets]
+ mov rsi,[rax+r14*8]
+ mov rdi,[rsp+152]
+ call json_object_object_get@PLT
+ mov [rsp+160],rax
+ lea rax,[rip+.Lut_buckets]
+ mov rsi,[rax+r14*8]
+ mov rdi,[rsp+144]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,[rsp+160]
+ call .Lut_bucket
+ mov ebp,eax
+ test eax,eax
+ jnz .Lut_read_end
+ inc r14
+ cmp r14,2
+ jb .Lut_bucket_each
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov qword ptr [rsp+152],0
+ inc r13
+ jmp .Lut_conversation
+.Lut_page_end:
+ cmp dword ptr [rsp+132],0
+ je .Lut_success
+ mov rax,[rsp+120]
+ mov ebp,6
+ cmp rax,[rsp+16]
+ jbe .Lut_read_end
+ mov [rsp+16],rax
+ mov dword ptr [rsp+8],1
+ mov dword ptr [rsp+12],1
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov qword ptr [rsp+112],0
+ jmp .Lut_page
+.Lut_success:
+ mov rax,[rsp+144]
+ mov [r12],rax
+ mov qword ptr [rsp+144],0
+ xor ebp,ebp
+.Lut_read_end:
+ mov rdi,[rsp+112]
+ call json_object_put@PLT
+ mov rdi,[rsp+144]
+ call json_object_put@PLT
+ mov rdi,[rsp+152]
+ call json_object_put@PLT
+ mov eax,ebp
+ UE 208
+.section .rodata
+.Lut_id: .asciz "id"
+.Lut_tools: .asciz "tools"
+.section .data.rel.ro
+.Lut_buckets: .quad .Lu_models,.Lut_tools
+.section .note.GNU-stack,"",@progbits

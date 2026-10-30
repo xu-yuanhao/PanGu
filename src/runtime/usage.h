@@ -28,4 +28,10 @@ void pg_agent_watch_close(pg_agent_watch *);
 typedef struct {void *context;int (*snapshot)(void *,uint64_t,struct json_object **);void (*release)(struct json_object *);
  int (*watch)(void *,uint64_t,pg_agent_watch *);int (*next)(pg_agent_watch *,struct json_object **);void (*close)(pg_agent_watch *);} pg_observation_ops;
 void pg_observation_service(pg_durable_session *,pg_observation_ops *);
+typedef struct {pg_durable_session *session;const pg_task_runner_host *host;} pg_usage_total_binding;
+/* Detached sum of each conversation's own committed ledger; forks do not
+   copy spend. Reads each snapshot without scheduling Task work or writes. */
+int pg_usage_total_read(pg_usage_total_binding *,struct json_object **);
+typedef struct {void *context;int (*read)(void *,struct json_object **);void (*release)(struct json_object *);} pg_usage_total_ops;
+void pg_usage_total_service(pg_usage_total_binding *,pg_usage_total_ops *);
 #endif

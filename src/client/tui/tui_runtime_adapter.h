@@ -133,6 +133,7 @@ const tui_compaction_ops *pg_tui_runtime_compaction(const tui_runtime_ops *);
 /* Optional committed Live/usage snapshot; ownership follows pg_observation_ops.
    The binding expires when the bridge detaches. */
 const pg_observation_ops *pg_tui_runtime_observation(const tui_runtime_ops *);
+const pg_usage_total_ops *pg_tui_runtime_usage_total(const tui_runtime_ops *);
 const pg_task_graph_ops *pg_tui_runtime_task_graph(const tui_runtime_ops *);
 const pg_task_control_ops *pg_tui_runtime_task_control(const tui_runtime_ops *);
 const pg_conversation_view_ops *pg_tui_runtime_conversation_view(const tui_runtime_ops *);
