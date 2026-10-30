@@ -362,6 +362,10 @@ li_start:
  call .Lanthropic_beta_headers
  test eax,eax
  jnz .Lst_bad
+ mov rdi,rbx
+ call .Lanthropic_affinity
+ test eax,eax
+ jnz .Lst_bad
  call curl_easy_init@PLT
  mov r14, rax
  mov qword ptr [rbx + PG_MM_EASY], r14
@@ -1395,3 +1399,202 @@ pg_mimo_complete:
 
 .section .data.rel.ro
 .Lbeta_feature_headers: .quad 0,.Lbeta_features_1,.Lbeta_features_2,.Lbeta_features_3,.Lbeta_features_4,.Lbeta_features_5,.Lbeta_features_6,.Lbeta_features_7
+
+/* PanGu's committed provider session identity supplies cache affinity. */
+.text
+.Lanthropic_affinity:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Laffinity_ok
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_retention]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Laffinity_retention_value
+ lea rdi,[rip+.Laffinity_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Laffinity_identity
+.Laffinity_retention_value:
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_none]
+ call strcmp@PLT
+ test eax,eax
+ jz .Laffinity_ok
+.Laffinity_identity:
+ mov rdi,r12
+ lea rsi,[rip+.Laffinity_sessionId]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Laffinity_identity_found
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Laffinity_sessionId]
+ call json_object_object_get@PLT
+.Laffinity_identity_found:
+ mov r13,rax
+ test rax,rax
+ jz .Laffinity_ok
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Laffinity_bad
+ mov rdi,r13
+ call json_object_get_string_len@PLT
+ mov [rsp+8],eax
+ test eax,eax
+ jz .Laffinity_ok
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov r13,rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp eax,[rsp+8]
+ jne .Laffinity_bad
+ mov rdi,r13
+ mov esi,13
+ call strchr@PLT
+ test rax,rax
+ jnz .Laffinity_bad
+ mov rdi,r13
+ mov esi,10
+ call strchr@PLT
+ test rax,rax
+ jnz .Laffinity_bad
+ xor r14d,r14d
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Laffinity_provider]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laffinity_endpoint
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_openrouter]
+ call strcmp@PLT
+ test eax,eax
+ sete r14b
+.Laffinity_endpoint:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Laffinity_endpoint_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laffinity_compat
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_domain]
+ call strstr@PLT
+ test rax,rax
+ jz .Laffinity_compat
+ mov r14d,1
+.Laffinity_compat:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_compat_key]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_send]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Laffinity_default
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Laffinity_ok
+ jmp .Laffinity_format
+.Laffinity_default:
+ test r14d,r14d
+ jz .Laffinity_ok
+.Laffinity_format:
+ mov rdi,rbp
+ lea rsi,[rip+.Laffinity_format_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laffinity_format_ready
+ mov rdi,rax
+ lea rsi,[rip+.Laffinity_openrouter]
+ call strcmp@PLT
+ test eax,eax
+ sete r14b
+.Laffinity_format_ready:
+ lea rbp,[rip+.Laffinity_native_prefix]
+ test r14d,r14d
+ jz .Laffinity_prefix
+ lea rbp,[rip+.Laffinity_router_prefix]
+.Laffinity_prefix:
+ mov rdi,rbp
+ call strlen@PLT
+ mov [rsp+16],rax
+ mov edi,[rsp+8]
+ add rdi,rax
+ inc rdi
+ call malloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Laffinity_bad
+ mov rdi,rax
+ mov rsi,rbp
+ mov rdx,[rsp+16]
+ call memcpy@PLT
+ mov rdi,[rsp]
+ add rdi,[rsp+16]
+ mov rsi,r13
+ mov edx,[rsp+8]
+ inc rdx
+ call memcpy@PLT
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Laffinity_bad
+ mov [rbx+PG_MM_HEADERS],rax
+.Laffinity_ok:
+ xor ebp,ebp
+ jmp .Laffinity_end
+.Laffinity_bad:
+ mov ebp,1
+.Laffinity_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Laffinity_retention: .asciz "cacheRetention"
+.Laffinity_env: .asciz "PANGU_CACHE_RETENTION"
+.Laffinity_none: .asciz "none"
+.Laffinity_sessionId: .asciz "sessionId"
+.Laffinity_provider: .asciz "modelProvider"
+.Laffinity_openrouter: .asciz "openrouter"
+.Laffinity_domain: .asciz "openrouter.ai"
+.Laffinity_endpoint_key: .asciz "endpoint"
+.Laffinity_compat_key: .asciz "compat"
+.Laffinity_send: .asciz "sendSessionAffinityHeaders"
+.Laffinity_format_key: .asciz "sessionAffinityFormat"
+.Laffinity_native_prefix: .asciz "x-session-affinity: "
+.Laffinity_router_prefix: .asciz "x-session-id: "

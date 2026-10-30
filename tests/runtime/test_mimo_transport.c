@@ -554,6 +554,13 @@ static void test_anthropic_feature_headers(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic combined thinking/fine-grained-tool/fallback beta features match encoded request");
 }
+
+static void test_anthropic_affinity(void){
+ for(unsigned scenario=0;scenario<6;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\",\"sessionId\":\"pangu-persisted-session\",\"modelInfo\":{\"compat\":{}}}");json_object *compat=json_object_object_get(json_object_object_get(cfg,"modelInfo"),"compat");if(scenario==0||scenario==3)json_object_object_add(cfg,"modelProvider",json_object_new_string("openrouter"));if(scenario==1||scenario==2||scenario==4||scenario==5)json_object_object_add(compat,"sendSessionAffinityHeaders",json_object_new_boolean(1));if(scenario==2)json_object_object_add(compat,"sessionAffinityFormat",json_object_new_string("openrouter"));if(scenario==3)json_object_object_add(compat,"sendSessionAffinityHeaders",json_object_new_boolean(0));if(scenario==4)json_object_object_add(cfg,"options",json_tokener_parse("{\"cacheRetention\":\"none\"}"));if(scenario==5)json_object_object_add(cfg,"sessionId",json_object_new_string("bad\r\nInjected: header"));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","affinity-unit-key",1);int status=start();if(scenario==5)assert(status);else{assert(!status);unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){if(!strstr(h->data,"pangu-persisted-session"))continue;found++;assert(!strncmp(h->data,scenario==1?"x-session-affinity: ":"x-session-id: ",scenario==1?20:14));}assert(found==(scenario<3?1u:0u));}model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: PanGu Anthropic session affinity, OpenRouter/native formats, cache-off and explicit disable, injection rejection");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -574,6 +581,7 @@ int main(void) {
     test_anthropic_transport();
     test_anthropic_beta_headers();
     test_anthropic_feature_headers();
+    test_anthropic_affinity();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
