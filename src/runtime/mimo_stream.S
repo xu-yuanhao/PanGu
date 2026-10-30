@@ -4838,6 +4838,8 @@ pg_mimo_anthropic_clear:
  mov [rsp+88],rdx
  cmp qword ptr [rsp+64],13
  je .Lbt_message_header
+ cmp qword ptr [rsp+64],15
+ je .Lbf_exception_header
  cmp qword ptr [rsp+64],11
  jne .Lbt_header_next
  lea rdi,[rbp+1]
@@ -4846,6 +4848,15 @@ pg_mimo_anthropic_clear:
  call memcmp@PLT
  test eax,eax
  jnz .Lbt_header_next
+ jmp .Lbf_copy_event_name
+.Lbf_exception_header:
+ lea rdi,[rbp+1]
+ lea rsi,[rip+.Lbf_exception_key]
+ mov edx,15
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lbt_header_next
+.Lbf_copy_event_name:
  cmp dword ptr [rsp+104],0
  jne .Lbt_bad
  mov dword ptr [rsp+104],1
@@ -4954,6 +4965,9 @@ pg_mimo_anthropic_clear:
  jz .Lbt_bad
  cmp dword ptr [rsp+108],1
  je .Lbt_dispatch
+ lea rdi,[rsp+112]
+ mov rsi,[rsp+8]
+ call .Lbf_error
  mov rdi,rbx
  mov rsi,[rsp+8]
  call .Lrt_save
@@ -4989,6 +5003,9 @@ pg_mimo_anthropic_clear:
  call strcmp@PLT
  test eax,eax
  jz .Lbt_metadata
+ lea rdi,[rsp+112]
+ mov rsi,[rsp+8]
+ call .Lbf_error
  mov rdi,rbx
  mov rsi,[rsp+8]
  call .Lrt_save
@@ -5762,3 +5779,79 @@ pg_mimo_base64_encode:
 .LbtK_ttl: .asciz "ttl"
 .LbtK_one_hour: .asciz "1h"
 .LbtJ_usage_zero: .asciz "{\"input_tokens\":0,\"output_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0}"
+
+.text
+/* Stable service prefixes feed the shared retry/context-error classifier. */
+.Lbf_error:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ lea r13,[rip+.Lbf_names]
+ xor r14d,r14d
+.Lbf_find:
+ mov rsi,[r13+r14*8]
+ test rsi,rsi
+ jz .Lbf_end
+ mov rdi,rbx
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbf_found
+ inc r14
+ jmp .Lbf_find
+.Lbf_found:
+ mov rdi,r12
+ lea rsi,[rip+.Lan_message]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lbf_end
+ lea rax,[rip+.Lbf_prefixes]
+ mov rdx,[rax+r14*8]
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lbf_format]
+ mov rcx,rbp
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbf_end
+ mov rdi,[rsp]
+ call json_object_new_string@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lan_message]
+ mov rdx,rax
+ call .Lrs_set
+.Lbf_end:
+ mov rdi,[rsp]
+ call free@PLT
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbf_names: .quad .Lbf_internal,.Lbf_stream,.Lbf_validation,.Lbf_throttling,.Lbf_unavailable,0
+.Lbf_prefixes: .quad .Lbf_internal_text,.Lbf_stream_text,.Lbf_validation_text,.Lbf_throttling_text,.Lbf_unavailable_text
+.Lbf_internal: .asciz "internalServerException"
+.Lbf_stream: .asciz "modelStreamErrorException"
+.Lbf_validation: .asciz "validationException"
+.Lbf_throttling: .asciz "throttlingException"
+.Lbf_unavailable: .asciz "serviceUnavailableException"
+.Lbf_internal_text: .asciz "Internal server error"
+.Lbf_stream_text: .asciz "Model stream error"
+.Lbf_validation_text: .asciz "Validation error"
+.Lbf_throttling_text: .asciz "Throttling error"
+.Lbf_unavailable_text: .asciz "Service unavailable"
+.Lbf_format: .asciz "%s: %s"
+
+.section .rodata
+.Lbf_exception_key: .asciz ":exception-type"
