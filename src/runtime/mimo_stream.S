@@ -3133,6 +3133,22 @@ pg_mimo_anthropic_clear:
  inc r13
  jmp .Lan_usage_each
 .Lan_usage_build:
+ ANGET r12,cache_creation
+ ANGET rax,ephemeral_1h_input_tokens
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rip+.Lan_cacheWrite1h]
+ call .Lan_optional_counter
+ test eax,eax
+ jnz .Lan_usage_bad
+ ANGET r12,output_tokens_details
+ ANGET rax,thinking_tokens
+ mov rdi,rbx
+ mov rsi,rax
+ lea rdx,[rip+.Lan_reasoning]
+ call .Lan_optional_counter
+ test eax,eax
+ jnz .Lan_usage_bad
  lea rdi,[rip+.Lan_usage_json]
  call json_tokener_parse@PLT
  mov [rsp+56],rax
@@ -3298,6 +3314,25 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lan_complete_ok:
+ ANGET r12,usage
+ mov r14,rax
+ test rax,rax
+ jz .Lan_complete_usage_done
+ mov rdi,r14
+ mov rsi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ lea rdx,[rip+.Lan_cacheWrite1h]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,r14
+ mov rsi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ lea rdx,[rip+.Lan_reasoning]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lan_complete_usage_done:
  xor ebp,ebp
  jmp .Lan_complete_end
 .Lan_complete_bad:
@@ -3368,3 +3403,49 @@ pg_mimo_anthropic_clear:
 .Lan_usage_keys: .quad .Lan_input_tokens,.Lan_output_tokens,.Lan_cache_read_input_tokens,.Lan_cache_creation_input_tokens
 .section .rodata
 .Lan_choices: .asciz "choices"
+
+.text
+/* Missing optional usage does not erase previously reported values. */
+.Lan_optional_counter:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ test rsi,rsi
+ jz .Lan_counter_ok
+ mov rdi,rsi
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lan_counter_bad
+ mov rdi,r12
+ call json_object_get_int64@PLT
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lan_counter_bad
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ mov rsi,r13
+ mov rdx,rax
+ call .Lrs_set
+ jmp .Lan_counter_end
+.Lan_counter_ok:
+ xor eax,eax
+ jmp .Lan_counter_end
+.Lan_counter_bad:
+ mov eax,1
+.Lan_counter_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lan_cache_creation: .asciz "cache_creation"
+.Lan_ephemeral_1h_input_tokens: .asciz "ephemeral_1h_input_tokens"
+.Lan_output_tokens_details: .asciz "output_tokens_details"
+.Lan_thinking_tokens: .asciz "thinking_tokens"
+.Lan_cacheWrite1h: .asciz "cacheWrite1h"
+.Lan_reasoning: .asciz "reasoning"

@@ -2202,6 +2202,11 @@ pg_mimo_uses_anthropic:
 .Lap_success:
  mov rdi,rbx
  mov rsi,r12
+ call .Lap_cache_options
+ test eax,eax
+ jnz .Lap_bad
+ mov rdi,rbx
+ mov rsi,r12
  call .Lap_provider_options
  test eax,eax
  jnz .Lap_bad
@@ -2944,3 +2949,183 @@ pg_mimo_uses_anthropic:
 .section .rodata
 .Lap_thinkingDisplay: .asciz "thinkingDisplay"
 .Lap_display: .asciz "display"
+
+/* Upstream cache breakpoints: system blocks, last tool, last user block. */
+.text
+.Lap_cache_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ APGET r12,modelInfo
+ APGET rax,compat
+ mov r13,rax
+ APGET r12,options
+ APGET rax,cacheRetention
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lap_cache_retention
+ lea rdi,[rip+.Lap_cache_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lap_cache_short
+.Lap_cache_retention:
+ mov [rsp+8],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_none]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lap_cache_ok
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lap_long]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_cache_short
+ APGET r13,supportsLongCacheRetention
+ test rax,rax
+ jz .Lap_cache_long
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_cache_short
+.Lap_cache_long:
+ lea rdi,[rip+.Lap_cache_long_json]
+ jmp .Lap_cache_create
+.Lap_cache_short:
+ lea rdi,[rip+.Lap_cache_short_json]
+.Lap_cache_create:
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lap_cache_bad
+ APGET rbx,system
+ mov r14,rax
+ xor ebp,ebp
+.Lap_cache_system:
+ mov rdi,r14
+ test rdi,rdi
+ jz .Lap_cache_tools
+ call json_object_array_length@PLT
+ cmp rbp,rax
+ jae .Lap_cache_tools
+ mov rdi,r14
+ mov rsi,rbp
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,[rsp]
+ call .Lap_cache_attach
+ test eax,eax
+ jnz .Lap_cache_bad
+ inc rbp
+ jmp .Lap_cache_system
+.Lap_cache_tools:
+ APGET r13,supportsCacheControlOnTools
+ test rax,rax
+ jz .Lap_cache_last_tool
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lap_cache_message
+.Lap_cache_last_tool:
+ APGET rbx,tools
+ mov rdi,rax
+ mov rsi,[rsp]
+ call .Lap_cache_last
+ test eax,eax
+ jnz .Lap_cache_bad
+.Lap_cache_message:
+ APGET rbx,messages
+ mov r14,rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lap_cache_ok
+ mov rdi,r14
+ lea rsi,[rax-1]
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ APGET rax,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lap_cache_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lap_user]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lap_cache_ok
+ APGET r14,content
+ mov rdi,rax
+ mov rsi,[rsp]
+ call .Lap_cache_last
+ test eax,eax
+ jnz .Lap_cache_bad
+.Lap_cache_ok:
+ xor ebp,ebp
+ jmp .Lap_cache_end
+.Lap_cache_bad:
+ mov ebp,1
+.Lap_cache_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lap_cache_last:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ test rdi,rdi
+ jz .Lap_cache_last_empty
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lap_cache_last_empty
+ mov rdi,rbx
+ lea rsi,[rax-1]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call .Lap_cache_attach
+ jmp .Lap_cache_last_end
+.Lap_cache_last_empty:
+ xor eax,eax
+.Lap_cache_last_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.Lap_cache_attach:
+ push rbx
+ mov rbx,rdi
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lap_cache_control]
+ mov rdx,rax
+ call .Lrp_set
+ pop rbx
+ ret
+.section .rodata
+.Lap_cacheRetention: .asciz "cacheRetention"
+.Lap_supportsLongCacheRetention: .asciz "supportsLongCacheRetention"
+.Lap_supportsCacheControlOnTools: .asciz "supportsCacheControlOnTools"
+.Lap_cache_control: .asciz "cache_control"
+.Lap_cache_env: .asciz "PANGU_CACHE_RETENTION"
+.Lap_none: .asciz "none"
+.Lap_long: .asciz "long"
+.Lap_user: .asciz "user"
+.Lap_cache_short_json: .asciz "{\"type\":\"ephemeral\"}"
+.Lap_cache_long_json: .asciz "{\"type\":\"ephemeral\",\"ttl\":\"1h\"}"

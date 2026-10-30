@@ -16,7 +16,7 @@
 | 指定任务取消 | `task_graph.S`：Host task.control/TUI独立入口保存abort意图，重复无写入，Scheduler沿owned子会话收束；产品父取消/调度器重开/子Generation aborted通过 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
 | 最终工具参数与恢复 | `mimo_stream.S` / `durable_tool.S`：字符串控制字符/转义修复、空白对象、argumentsError原文、效果前错误结算；416组固定Pi差分、存储无写入、NUL文本与真实DeepSeek纠错重试通过 |
-| Anthropic Messages | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：API-key/version、system/图片/工具组、签名思考、动态块与最终参数、message_stop、增量缓存计数；canonical历史模型隔离、预算/自适应编码和实际模型服务回放通过；高级提供者选项见K05 |
+| Anthropic Messages | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：API-key/version、system/图片/工具组、签名思考、动态块与最终参数、message_stop、增量缓存计数及cacheWrite1h/reasoning、缓存断点与保留策略；canonical历史模型隔离、预算/自适应编码和实际模型服务回放通过；高级提供者选项见K05 |
 | Responses请求与恢复 | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：请求/流、图片结果、稀疏工具槽与终态；最终item、签名、加密补齐、模型/提供者切换及后继请求；调用完成屏障、长度终态与结构化失败分类；SQLite/JSONL恢复重放和内存失败路径通过，K05继续补齐高级协议行为 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
 | 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT发布实时块并合并持久UTF-8窗口/丢弃量，done清除进度，Task/Live保留父调用关系 |
