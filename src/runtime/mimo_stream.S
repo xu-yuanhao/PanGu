@@ -3357,6 +3357,22 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lan_complete_usage_done:
+ mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
+ test rdi,rdi
+ jz .Lan_complete_diagnostics_done
+ lea rsi,[rsp+8]
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lan_complete_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lan_diagnostics]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lan_complete_diagnostics_done:
  xor ebp,ebp
  jmp .Lan_complete_end
 .Lan_complete_bad:
@@ -3695,3 +3711,6 @@ pg_mimo_anthropic_clear:
  ret
 .section .rodata
 .Lchat_finish_prefix: .asciz "Provider finish_reason: "
+
+.section .rodata
+.Lan_diagnostics: .asciz "diagnostics"

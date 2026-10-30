@@ -29,6 +29,7 @@ typedef struct {
  struct json_object *prepared_arguments[PG_TOOL_BATCH_LIMIT];
  pg_mimo_anthropic_block *anthropic_blocks;size_t anthropic_count,anthropic_capacity;
  struct json_object *anthropic_usage;
+ unsigned strict_retry;struct json_object *strict_diagnostics;
 } pg_mimo;
 /* OpenAI Chat Completions / Responses and Anthropic Messages SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -57,6 +58,7 @@ int pg_mimo_config_responses(const struct json_object *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
 void pg_mimo_anthropic_clear(pg_mimo *);
+int pg_mimo_anthropic_strict_retry(pg_mimo *);
 /* Internal protocol-selected final-item/canonical replay adapters; history returns an owned array.
    Native call_id and provider responseItemId remain separate identities. */
 int pg_mimo_responses_complete(const pg_mimo *,struct json_object *);

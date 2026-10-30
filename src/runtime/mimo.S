@@ -63,6 +63,10 @@ pg_mimo_bind_tools:
  sub rsp,8
  mov rbx,rdi
  call pg_mimo_anthropic_clear
+ mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
+ mov qword ptr [rbx+PG_MM_STRICT_DIAGNOSTICS],0
+ mov dword ptr [rbx+PG_MM_STRICT_RETRY],0
+ call json_object_put@PLT
  xor r12d,r12d
 .Lclear_arg_loop:
  mov rdi,[rbx+PG_MM_ARGUMENT_OVERFLOW+r12*8]
@@ -538,8 +542,37 @@ li_next:
  cmp ecx,PG_MM_CURLE_OK
  jne .Lnx_bad                         /* 传输错误不得伪造成功 */
  cmp qword ptr [rbx + PG_MM_HTTP], 200
- jne .Lnx_bad
+ jne .Lnx_strict_retry
  mov dword ptr [rbx + PG_MM_TRANSPORT_DONE], 1
+ jmp .Lnx_lines
+.Lnx_strict_retry:
+ mov rdi,rbx
+ call pg_mimo_anthropic_strict_retry
+ test eax,eax
+ jnz .Lnx_bad
+ mov rdi,[rbx+PG_MM_MULTI]
+ mov rsi,[rbx+PG_MM_EASY]
+ call curl_multi_remove_handle@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ mov rdi,[rbx+PG_MM_EASY]
+ mov esi,PG_MM_CURLOPT_POSTFIELDS
+ mov rdx,[rbx+PG_MM_REQUEST]
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ mov rdi,[rbx+PG_MM_MULTI]
+ mov rsi,[rbx+PG_MM_EASY]
+ call curl_multi_add_handle@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ mov qword ptr [rbx+PG_MM_USED],0
+ mov qword ptr [rbx+PG_MM_CONSUMED],0
+ mov byte ptr [rbx+PG_MM_BODY],0
+ mov qword ptr [rbx+PG_MM_HTTP],0
+ mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
+ jmp .Lnx_wait
 .Lnx_lines:
  mov r14, qword ptr [rbx + PG_MM_CONSUMED]
  cmp r14, qword ptr [rbx + PG_MM_USED]

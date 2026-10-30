@@ -63,6 +63,14 @@ static void anthropic_decoder_failures(void){
  printf("PASS: Anthropic final tool lifecycle: %u allocation/insertion failures release ownership\n",total);
 }
 
+
+static void strict_retry_failures(void){
+ unsigned total=0;
+ for(unsigned fault=0;fault<=total;fault++){
+  fail_at=0;calls=tracked=0;pg_model model=pg_mimo_model(&provider);provider.configuration=__real_json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true}}}");session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;session.messages[0].size=2;strcpy(session.messages[0].text,"hi");registry.count=1;registry.entries[0].name="read";registry.entries[0].description="Read";registry.entries[0].schema="{\"type\":\"object\",\"properties\":{\"optional\":{\"type\":\"string\"}}}";registry.entries[0].options=&sampling_options;provider.tools=&registry;assert(!pg_mimo_encode_request(&provider,&session)&&!live);provider.http=400;strcpy(provider.body,"{\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The compiled grammar is too large\"}}");calls=tracked=0;fail_at=fault;int status=pg_mimo_anthropic_strict_retry(&provider);if(!fault){assert(!status);total=calls;}else assert(status&&calls>=fault);model.close(model.context);if(live)fprintf(stderr,"strict retry fault %u leaks %u owners\n",fault,live);assert(!live);
+ }
+ printf("PASS: strict retry request/diagnostic: %u allocation/insertion failures release ownership\n",total);
+}
 int main(void){
  for(unsigned protocol=0;protocol<5;protocol++){
  struct json_object *canonical=0;
@@ -89,5 +97,6 @@ int main(void){
  }
  const char *finished[]={"{\"x\":1}","{\"x\":\"a\\q\"}","{broken"};for(unsigned c=0;c<3;c++){struct json_object *value=0;fail_at=0;calls=tracked=0;assert(!pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value));unsigned total=calls;json_object_put(value);assert(!live);for(unsigned i=1;i<=total;i++){fail_at=i;calls=tracked=0;value=0;assert(pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value)&&!value&&!live);}printf("PASS: final arguments case %u: %u constructor/insertion failures release ownership\n",c,total);}
  anthropic_decoder_failures();
+ strict_retry_failures();
  return 0;
 }

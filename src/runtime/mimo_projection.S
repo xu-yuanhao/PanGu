@@ -4591,3 +4591,262 @@ pg_mimo_uses_anthropic:
 .section .rodata
 .balign 8
 .Lst_one: .double 1.0
+
+/* Anthropic retries one rejected strict-prefer request, never a started stream.
+   Required tools keep their converted schemas. The registry is phase-borrowed. */
+.globl pg_mimo_anthropic_strict_retry
+.type pg_mimo_anthropic_strict_retry,@function
+.text
+pg_mimo_anthropic_strict_retry:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ cmp qword ptr [rbx+PG_MM_HTTP],400
+ jne .Lsr_bad
+ cmp dword ptr [rbx+PG_MM_STRICT_RETRY],0
+ jne .Lsr_bad
+ cmp qword ptr [rbx+PG_MM_RESPONSE_ID],0
+ jne .Lsr_bad
+ mov rdi,rbx
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lsr_bad
+ lea rdi,[rbx+PG_MM_BODY]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lsr_bad
+ APGET rax,error
+ mov [rsp+24],rax
+ APGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsr_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lsr_invalid_request]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsr_bad
+ APGET "qword ptr [rsp+24]",message
+ mov [rsp+32],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lsr_bad
+ xor r12d,r12d
+ lea r13,[rip+.Lsr_limits]
+.Lsr_match:
+ mov rsi,[r13+r12*8]
+ test rsi,rsi
+ jz .Lsr_bad
+ mov rdi,r14
+ call strstr@PLT
+ test rax,rax
+ jnz .Lsr_request
+ inc r12
+ jmp .Lsr_match
+.Lsr_request:
+ mov rdi,[rbx+PG_MM_REQUEST]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lsr_bad
+ APGET rax,tools
+ mov r12,rax
+ test rax,rax
+ jz .Lsr_bad
+ xor r13d,r13d
+.Lsr_tool:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lsr_publish
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ APGET rax,strict
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lsr_next
+ APGET r14,name
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+40],rax
+ mov qword ptr [rsp+48],0
+.Lsr_find:
+ mov rbp,[rbx+PG_MM_TOOLS]
+ test rbp,rbp
+ jz .Lsr_bad
+ mov rax,[rsp+48]
+ cmp rax,[rbp+PG_MM_REG_COUNT]
+ jae .Lsr_next
+ imul rax,rax,PG_MM_DEF_BYTES
+ add rbp,rax
+ mov rdi,[rbp+PG_MM_DEF_NAME]
+ mov rsi,[rsp+40]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lsr_definition
+ inc qword ptr [rsp+48]
+ jmp .Lsr_find
+.Lsr_definition:
+ mov rax,[rbp+72]
+ test rax,rax
+ jz .Lsr_next
+ mov rdi,[rax+32]
+ test rdi,rdi
+ jz .Lsr_next
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lsr_bad
+ APGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsr_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_json_schema]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsr_release_next
+ APGET "qword ptr [rsp+16]",strict
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsr_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lsampling_prefer]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lsr_release_next
+ mov rdi,[rbp+PG_MM_DEF_SCHEMA]
+ call json_tokener_parse@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lsr_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lap_strict]
+ call json_object_object_del@PLT
+ mov rdi,r14
+ mov rsi,[rsp+56]
+ mov rdx,[rbx+PG_MM_CONFIGURATION]
+ call .Lap_tool_schema
+ test eax,eax
+ jnz .Lsr_bad
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov qword ptr [rsp+56],0
+ inc qword ptr [rsp+64]
+.Lsr_release_next:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lsr_next:
+ inc r13
+ jmp .Lsr_tool
+.Lsr_publish:
+ cmp qword ptr [rsp+64],0
+ je .Lsr_bad
+ mov rdi,[rsp+8]
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lsr_bad
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp+72],rax
+ test rax,rax
+ jz .Lsr_bad
+ lea rdi,[rip+.Lsr_diagnostic]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lsr_bad
+ mov [rbx+PG_MM_STRICT_DIAGNOSTICS],rax
+ mov rdi,r12
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ # Timestamp storage reuses two scratch counters after tool traversal.
+ lea rdi,[rsp+40]
+ xor esi,esi
+ call gettimeofday@PLT
+ test eax,eax
+ jnz .Lsr_bad
+ mov rax,[rsp+48]
+ xor edx,edx
+ mov ecx,1000
+ div rcx
+ imul rdi,[rsp+40],1000
+ add rdi,rax
+ call json_object_new_int64@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lsr_timestamp]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lsr_bad
+ APGET r14,error
+ mov rdi,rax
+ mov rsi,[rsp+24]
+ lea rdx,[rip+.Lap_message]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lsr_bad
+ mov rdi,[rbx+PG_MM_REQUEST]
+ call free@PLT
+ mov rax,[rsp+72]
+ mov [rbx+PG_MM_REQUEST],rax
+ mov qword ptr [rsp+72],0
+ mov dword ptr [rbx+PG_MM_STRICT_RETRY],1
+ xor ebp,ebp
+ jmp .Lsr_end
+.Lsr_bad:
+ mov ebp,1
+.Lsr_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp+72]
+ call free@PLT
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_anthropic_strict_retry,.-pg_mimo_anthropic_strict_retry
+.section .rodata
+.Lap_error: .asciz "error"
+.Lap_message: .asciz "message"
+.Lsr_invalid_request: .asciz "invalid_request_error"
+.Lsr_limit_grammar: .asciz "The compiled grammar is too large"
+.Lsr_limit_count: .asciz "Too many strict tools ("
+.Lsr_limit_unions: .asciz "Schemas contains too many parameters with union types ("
+.Lsr_diagnostic: .asciz "[{\"type\":\"anthropic_strict_tools_fallback\",\"error\":{},\"details\":{\"reason\":\"strict_tool_limits_exceeded\"}}]"
+.section .data.rel.ro
+.Lsr_limits: .quad .Lsr_limit_grammar,.Lsr_limit_count,.Lsr_limit_unions,0
+
+.section .rodata
+.Lsr_timestamp: .asciz "timestamp"

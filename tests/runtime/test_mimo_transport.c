@@ -561,6 +561,19 @@ static void test_anthropic_affinity(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: PanGu Anthropic session affinity, OpenRouter/native formats, cache-off and explicit disable, injection rejection");
 }
+
+static void test_anthropic_strict_retry(void){
+ const char *limits[]={"The compiled grammar is too large","Too many strict tools (32).","Schemas contains too many parameters with union types (100)."};
+ for(unsigned scenario=0;scenario<9;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true}}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);pg_tool_options preferred={.max_bytes=51200,.max_lines=2000,.constrained_sampling="{\"type\":\"json_schema\",\"strict\":\"prefer\"}"},required=preferred;required.constrained_sampling="{\"type\":\"json_schema\",\"strict\":\"require\"}";pg_tool_registry registry={.entries={{.name="prefer",.description="Prefer",.schema="{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}}}",.options=scenario==6?&required:&preferred},{.name="required",.description="Required",.schema="{\"type\":\"object\",\"properties\":{\"y\":{\"type\":\"string\"}}}",.options=&required}},.count=2};pg_mimo_bind_tools(&m,&registry);setenv("PANGU_MODEL_API_KEY","strict-retry-unit-key",1);assert(!start());json_object *initial=json_tokener_parse(captured_post),*initial_tools=json_object_object_get(initial,"tools");assert(json_object_get_boolean(json_object_object_get(json_object_array_get_idx(initial_tools,0),"strict")));json_object_put(initial);
+  if(scenario==8){pg_model_event started={0};assert(!pg_mimo_decode_line(&m,"data: {\"type\":\"message_start\",\"message\":{\"id\":\"already-started\",\"usage\":{}}}",&started));}char body[512];snprintf(body,sizeof(body),"{\"type\":\"error\",\"error\":{\"type\":\"%s\",\"message\":\"%s\"}}",scenario==4?"authentication_error":"invalid_request_error",scenario==3?"unrelated invalid request":limits[scenario<3?scenario:0]);script_http=scenario==5?429:400;feed(body);finish_transport();pg_model_event event={0};int status=nxt(&event);
+  if(scenario<3||scenario==7){assert(!status&&event.kind==PG_MODEL_WAIT&&m.strict_retry==1&&m.strict_diagnostics);json_object *retry=json_tokener_parse(captured_post),*tools=json_object_object_get(retry,"tools"),*first=json_object_array_get_idx(tools,0),*second=json_object_array_get_idx(tools,1);assert(!json_object_object_get(first,"strict")&&json_object_get_boolean(json_object_object_get(second,"strict")));json_object *schema=json_object_object_get(first,"input_schema");assert(!json_object_object_get(schema,"additionalProperties")&&json_object_array_length(json_object_object_get(schema,"required"))==0);json_object_put(retry);
+   if(scenario==7){script_http=400;feed(body);finish_transport();assert(nxt(&event)&&m.strict_retry==1);}
+   else{script_http=200;script_running=1;feed("data: {\"type\":\"message_start\",\"message\":{\"id\":\"after-fallback\",\"usage\":{\"input_tokens\":1}}}\n");feed("data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n");feed("data: {\"type\":\"message_stop\"}\n");finish_transport();for(unsigned n=0;n<10;n++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;}assert(event.kind==PG_MODEL_DONE);json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant));json_object *diagnostic=json_object_array_get_idx(json_object_object_get(assistant,"diagnostics"),0);assert(diagnostic&&!strcmp(json_object_get_string(json_object_object_get(diagnostic,"type")),"anthropic_strict_tools_fallback")&&json_object_get_int64(json_object_object_get(diagnostic,"timestamp"))>0);json_object_put(assistant);if(scenario==0){script_running=1;assert(!start()&&!m.strict_retry&&!m.strict_diagnostics);json_object *fresh=json_tokener_parse(captured_post);assert(json_object_get_boolean(json_object_object_get(json_object_array_get_idx(json_object_object_get(fresh,"tools"),0),"strict")));json_object_put(fresh);}}
+  }else assert(status&&!m.strict_retry);model.close(model.context);assert(!m.strict_diagnostics&&!m.strict_retry);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic rejected strict-prefer request retries once, restores original schema, preserves required tools and emits diagnostic; unrelated/status/auth/required-only errors never downgrade");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -582,6 +595,7 @@ int main(void) {
     test_anthropic_beta_headers();
     test_anthropic_feature_headers();
     test_anthropic_affinity();
+    test_anthropic_strict_retry();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;
