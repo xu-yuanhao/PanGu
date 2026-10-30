@@ -321,8 +321,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock `convertToolConfig`、`supportsPromptCaching/buildSystemPrompt/convertMessages`、`handleMetadata`及`bedrock-cache-write-1h-cost`用例；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`mimo_projection.S`生成auto/any/指定工具选择，none在严格schema准入前移除声明；Bedrock保留完整schema，按模型族/强制选项与retention在system和末尾user追加缓存点，requestMetadata进入现有请求。`mimo_stream.S`将完整/部分metadata按上游缺省值结算，保留报告或回退totalTokens及1h写入计数，完成消息进入既有Generation/Usage事务。公开ABI与依赖保持。
-- 验证：模型O0/O2/UBSan、ABI与构造失败专项通过；1800组六协议严格schema、576组推理配置和570组工具/缓存策略对照固定Pi函数。实际curl入口验证none跳过无效必需schema、报告/回退总量、分时缓存写入、缺失/部分/末尾metadata及错误形状；产品资源ASan/UBSan、Client集成、构建与Assembly检查随本批核对。自审核对JSON归属、缓存断点位置、原生命名空间和用量提交路径。
-- 具体缺口：Bedrock显式profile/凭据链、ARN/标准端点优先级、工具ID规范化、模型定价/费用结算、simple入口token预算及高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
-- 下一交付物：沿K05补齐Bedrock工具ID、端点与错误语义，继续提供者配置/凭据链和模型费用结算的实际消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock `normalizeToolCallId/convertMessages`及`transform-messages.ts`的跨模型调用/结果ID映射；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`request_context.S`仅在Bedrock异模型历史的临时工具块标记ID转换；`mimo_projection.S`先建立原ID→线上ID映射，再统一更新工具结果。ASCII限制/UTF-16替换/64字符上限沿上游，跳过Anthropic通用ID转换；同模型ID和持久原记录保持。内部标记在发送前移除，公开ABI及依赖保持。
+- 验证：模型O0/O2/UBSan、ABI与原有构造失败检查通过；实际编码核对标点、中文、非BMP、长度边界、同模型保留、成对结果和源对象隔离。Client集成、产品资源ASan/UBSan及Assembly/diff检查通过。自审核对临时映射与JSON所有权、两遍映射顺序和协议分派。
+- 具体缺口：Bedrock显式profile/凭据链、ARN/标准端点优先级、模型定价/费用结算、simple入口token预算及高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google没有对应真实云端凭据验证。
+- 下一交付物：沿K05成组补齐Bedrock端点/区域、错误与凭据配置，再继续模型费用结算的实际消费者。

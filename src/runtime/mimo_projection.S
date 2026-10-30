@@ -2266,6 +2266,10 @@ pg_mimo_uses_anthropic:
  test eax,eax
  jnz .Lap_bad
 .Lbd_error_images_ready:
+ mov rdi,r12
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lap_google_root
  mov rdi,[rsp]
  call .Lap_normalize_messages
  test eax,eax
@@ -6617,7 +6621,10 @@ pg_mimo_uses_google:
  mov [rsp+48],rsi
  mov qword ptr [rsp],0
  mov qword ptr [rsp+8],0
-
+ mov rdi,rbx
+ call .Lbi_ids
+ test eax,eax
+ jnz .Lbd_bad
  mov rdi,rbx
  lea rsi,[rip+.Lbd_system]
  call json_object_object_get@PLT
@@ -8077,3 +8084,220 @@ pg_mimo_uses_google:
 .LbpJ_named: .asciz "{\"tool\":{}}"
 .LbpJ_short: .asciz "{\"cachePoint\":{\"type\":\"default\"}}"
 .LbpJ_long: .asciz "{\"cachePoint\":{\"type\":\"default\",\"ttl\":\"1h\"}}"
+
+.text
+/* Normalize UTF-16 units exactly as the upstream non-Unicode regexp, capped at 64. */
+.Lbi_normalize:
+ push rbx
+ sub rsp,80
+ mov rbx,rdi
+ call json_object_get_string_len@PLT
+ mov [rsp+72],rax
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ mov rsi,rax
+ mov r8,[rsp+72]
+ add r8,rsi
+ xor ecx,ecx
+.Lbi_byte:
+ cmp rsi,r8
+ jae .Lbi_ready
+ cmp ecx,64
+ jae .Lbi_ready
+ movzx eax,byte ptr [rsi]
+ inc rsi
+ cmp eax,128
+ jae .Lbi_unicode
+ cmp eax,65
+ jb .Lbi_lower
+ cmp eax,90
+ jbe .Lbi_store
+.Lbi_lower:
+ cmp eax,97
+ jb .Lbi_digit
+ cmp eax,122
+ jbe .Lbi_store
+.Lbi_digit:
+ cmp eax,48
+ jb .Lbi_symbol
+ cmp eax,57
+ jbe .Lbi_store
+.Lbi_symbol:
+ cmp eax,45
+ je .Lbi_store
+ cmp eax,95
+ je .Lbi_store
+ mov eax,95
+ jmp .Lbi_store
+.Lbi_unicode:
+ mov edx,1
+ cmp eax,240
+ jb .Lbi_skip_utf8
+ mov edx,2
+.Lbi_skip_utf8:
+ cmp rsi,r8
+ jae .Lbi_unicode_store
+ mov al,[rsi]
+ and al,0xc0
+ cmp al,0x80
+ jne .Lbi_unicode_store
+ inc rsi
+ jmp .Lbi_skip_utf8
+.Lbi_unicode_store:
+ mov byte ptr [rsp+rcx],95
+ inc ecx
+ dec edx
+ jz .Lbi_byte
+ cmp ecx,64
+ jb .Lbi_unicode_store
+ jmp .Lbi_ready
+.Lbi_store:
+ mov [rsp+rcx],al
+ inc ecx
+ jmp .Lbi_byte
+.Lbi_ready:
+ mov rdi,rsp
+ mov esi,ecx
+ call json_object_new_string_len@PLT
+ add rsp,80
+ pop rbx
+ ret
+/* First collect original-to-wire IDs, then apply the same map to result blocks. */
+.Lbi_ids:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,8
+ mov rdi,rsp
+ rep stosq
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbi_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_messages]
+ call json_object_object_get@PLT
+ mov r12,rax
+ xor r13d,r13d
+.Lbi_message:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lbi_pass_done
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_content]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ xor r14d,r14d
+.Lbi_block:
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lbi_next_message
+ mov rdi,[rsp+8]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbx,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lbi_foreign]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lbi_result
+ cmp dword ptr [rsp+32],0
+ jne .Lbi_next
+ mov rdi,rbx
+ lea rsi,[rip+.Lbi_foreign]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_id]
+ call json_object_object_get@PLT
+ mov [rsp+16],rax
+ mov rdi,rax
+ call .Lbi_normalize
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lbi_bad
+ mov rdi,[rsp+16]
+ call json_object_get_string@PLT
+ mov rbp,rax
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rbp
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbi_bad
+ mov rdx,[rsp+24]
+ mov qword ptr [rsp+24],0
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_id]
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbi_bad
+ jmp .Lbi_next
+.Lbi_result:
+ cmp dword ptr [rsp+32],0
+ je .Lbi_next
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_tool_use_id]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbi_next
+ mov rdi,[rsp]
+ mov rsi,rax
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lbi_next
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_tool_use_id]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbi_bad
+.Lbi_next:
+ inc r14
+ jmp .Lbi_block
+.Lbi_next_message:
+ inc r13
+ jmp .Lbi_message
+.Lbi_pass_done:
+ inc dword ptr [rsp+32]
+ cmp dword ptr [rsp+32],2
+ jae .Lbi_ok
+ xor r13d,r13d
+ jmp .Lbi_message
+.Lbi_ok:
+ xor ebp,ebp
+ jmp .Lbi_end
+.Lbi_bad:
+ mov ebp,1
+.Lbi_end:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbi_foreign: .asciz "panguForeignToolId"

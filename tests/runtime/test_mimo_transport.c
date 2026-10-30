@@ -649,6 +649,14 @@ static void test_bedrock_multimodal(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock user/tool image bytes, signed and unsigned reasoning policy, split reasoning/signature stream and canonical replay");
 }
+static void test_bedrock_history_ids(void){
+ const char *ids[]={"call|native:1","汉字😀/call","abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-long-id"};
+ const char *normalized[]={"call_native_1","_____call","abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-l"};
+ for(unsigned same=0;same<2;same++)for(unsigned n=0;n<3;n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"modelProvider\":\"bedrock\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);json_object *context=json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"bedrock-converse-stream\",\"provider\":\"bedrock\",\"content\":[{\"type\":\"toolCall\",\"name\":\"read\",\"arguments\":{}}]},{\"role\":\"toolResult\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}]}");json_object *messages=json_object_object_get(context,"messages"),*assistant=json_object_array_get_idx(messages,0),*call=json_object_array_get_idx(json_object_object_get(assistant,"content"),0),*result=json_object_array_get_idx(messages,1);json_object_object_add(assistant,"model",json_object_new_string(same?"anthropic.claude-test":"foreign-model"));json_object_object_add(call,"id",json_object_new_string(ids[n]));json_object_object_add(result,"toolCallId",json_object_new_string(ids[n]));session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=context;assert(!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*rows=json_object_object_get(wire,"messages"),*use=json_object_object_get(json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(rows,0),"content"),0),"toolUse"),*reply=json_object_object_get(json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(rows,1),"content"),0),"toolResult");const char *wanted=same?ids[n]:normalized[n];assert(!strcmp(json_object_get_string(json_object_object_get(use,"toolUseId")),wanted)&&!strcmp(json_object_get_string(json_object_object_get(reply,"toolUseId")),wanted));assert(!strstr(m.request,"panguForeignToolId")&&!strcmp(json_object_get_string(json_object_object_get(call,"id")),ids[n])&&!strcmp(json_object_get_string(json_object_object_get(result,"toolCallId")),ids[n]));json_object_put(wire);json_object_put(context);model.close(model.context);
+ }
+ puts("PASS: Bedrock foreign tool/result IDs normalize together by UTF-16 units and 64-character limit; same-model IDs and stored context remain unchanged");
+}
 static void test_bedrock_policies(void){
  for(unsigned none=0;none<2;none++){
   reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-opus-4-8\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}},\"options\":{}}");json_object_object_add(json_object_object_get(cfg,"options"),"toolChoice",json_object_new_string(none?"none":"any"));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);pg_tool_options strict={.constrained_sampling="{\"type\":\"json_schema\",\"strict\":\"require\"}"};pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema="{\"type\":\"object\",\"$ref\":\"unsupported\"}",.options=&strict}},.count=1};pg_mimo_bind_tools(&m,&registry);setenv("PANGU_MODEL_API_KEY","bedrock-policy-unit",1);if(none){assert(!start()&&!strstr(captured_post,"toolConfig"));}else assert(start());model.close(model.context);
@@ -719,6 +727,7 @@ int main(int argc,char **argv) {
     test_bedrock_auth();
     test_bedrock_multimodal();
     test_bedrock_policies();
+    test_bedrock_history_ids();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

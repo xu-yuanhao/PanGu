@@ -1795,7 +1795,7 @@ pg_mimo_responses_history:
  or eax,[rsp+16]
  cmp dword ptr [rsp+56],3
  jne .Lgh_not_bedrock_policy
- or eax,2
+ or eax,10
 .Lgh_not_bedrock_policy:
  cmp dword ptr [rsp+56],2
  jne .Lgh_policy_ready
@@ -2287,6 +2287,19 @@ pg_mimo_config_anthropic:
  AHCOPY r14,rbx,id,id
  AHCOPY r14,rbx,name,name
  AHCOPY r14,rbx,arguments,input
+ test r13d,8
+ jz .Lbi_tool_marked
+ test r13d,1
+ jnz .Lbi_tool_marked
+ mov edi,1
+ call json_object_new_boolean@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lbi_foreign]
+ mov rdx,rax
+ call .Lr_set
+ test eax,eax
+ jnz .Lah_bad
+.Lbi_tool_marked:
  test r13d,4
  jz .Lah_ok
  test r13d,1
@@ -2584,3 +2597,6 @@ pg_mimo_config_bedrock:
 .size pg_mimo_config_bedrock,.-pg_mimo_config_bedrock
 .section .rodata
 .Lbr_api: .asciz "bedrock-converse-stream"
+
+.section .rodata
+.Lbi_foreign: .asciz "panguForeignToolId"
