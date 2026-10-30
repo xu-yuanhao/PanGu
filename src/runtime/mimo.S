@@ -78,6 +78,10 @@ pg_mimo_bind_tools:
  mov rdi,[rbx+PG_MM_RESPONSE_ID]
  mov qword ptr [rbx+PG_MM_RESPONSE_ID],0
  call json_object_put@PLT
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ mov qword ptr [rbx+PG_MM_RESPONSE_TERMINAL],0
+ mov dword ptr [rbx+PG_MM_RESPONSE_CLOSED],0
+ call json_object_put@PLT
  /* Preserve the request metadata and registry between the two buffers. */
  lea rdi,[rbx+PG_MM_ARGUMENTS]
  xor esi,esi

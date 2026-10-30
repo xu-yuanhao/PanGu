@@ -914,6 +914,14 @@ pg_mimo_decode_line:
  je .Lrs_terminal
  cmp ebp,9
  je .Lrs_terminal
+ RSGET "qword ptr [rsp]",response
+ test rax,rax
+ jnz .Lrs_failure_terminal
+ mov rax,[rsp]
+.Lrs_failure_terminal:
+ mov rdi,rbx
+ mov rsi,rax
+ call .Lrt_save
  jmp .Lrs_bad
 .Lrs_text_handler:
  RSCOPY "qword ptr [rsp+24]","qword ptr [rsp]",delta,content
@@ -972,7 +980,16 @@ pg_mimo_decode_line:
  cmp r14d,PG_MM_CALL_LIMIT
  jae .Lrs_bad
  mov [rbx+PG_MM_RESPONSE_INDEX+r14*8],rax
-.Lrs_slot_ready:
+ .Lrs_slot_ready:
+ cmp ebp,5
+ je .Lrt_closed_delta
+ cmp ebp,6
+ jne .Lrt_slot_open
+.Lrt_closed_delta:
+ mov eax,[rbx+PG_MM_RESPONSE_CLOSED]
+ bt eax,r14d
+ jc .Lrs_ok
+.Lrt_slot_open:
  mov [rsp+64],r14
  lea rdi,[rip+.Lrs_calls_json]
  call json_tokener_parse@PLT
@@ -1056,6 +1073,9 @@ pg_mimo_decode_line:
  jz .Lrs_bad
  mov rdi,rbx
  mov rsi,r12
+ call .Lrt_save
+ mov rdi,rbx
+ mov rsi,r12
  call .Lrc_capture_terminal
  test eax,eax
  jnz .Lrs_bad
@@ -1099,6 +1119,15 @@ pg_mimo_decode_line:
  jnz .Lrs_bad
  lea r14,[rip+.Lstr_length]
 .Lrs_finish_field:
+ cmp ebp,9
+ je .Lrt_finish_ready
+ mov ecx,[rbx+PG_MM_CALL_COUNT]
+ mov eax,1
+ shl eax,cl
+ dec eax
+ cmp eax,[rbx+PG_MM_RESPONSE_CLOSED]
+ jne .Lrs_bad
+.Lrt_finish_ready:
  mov rdi,r14
  call json_object_new_string@PLT
  test rax,rax
@@ -1111,12 +1140,31 @@ pg_mimo_decode_line:
  jnz .Lrs_bad
  mov qword ptr [rsp+72],1
 .Lrs_emit:
+ cmp ebp,9
+ jne .Lrt_emit_common
+ /* Keep incomplete calls out of the executable terminal path. */
+ call json_object_new_array@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lrs_choices]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ mov dword ptr [rbx+PG_MM_FINISH_REASON],3
+.Lrt_emit_common:
  mov rdi,rbx
  mov rsi,[rsp+8]
  mov rdx,r13
  call .Lchat_object
  test eax,eax
  jnz .Lrs_bad
+ cmp ebp,7
+ jne .Lrt_emitted
+ mov ecx,[rsp+64]
+ mov eax,1
+ shl eax,cl
+ or [rbx+PG_MM_RESPONSE_CLOSED],eax
+.Lrt_emitted:
  cmp qword ptr [rsp+72],0
  je .Lrs_ok
  mov dword ptr [rbx+PG_MM_SAW_DONE],1
@@ -1638,6 +1686,11 @@ pg_mimo_responses_complete:
  call .Lrs_set
  test eax,eax
  jnz .Lrc_bad
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Lrt_stop_data
+ test eax,eax
+ jnz .Lrc_bad
  mov rdi,[rbx+PG_MM_RESPONSE_ID]
  test rdi,rdi
  jz .Lrc_ok
@@ -1831,3 +1884,205 @@ pg_mimo_responses_complete:
 .section .rodata
 .Lrc_index: .asciz "index"
 .Lrc_item: .asciz "item"
+
+.text
+.Lrt_save:
+ push rbx
+ mov rbx,rdi
+ mov rdi,rsi
+ call json_object_get@PLT
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ mov [rbx+PG_MM_RESPONSE_TERMINAL],rax
+ call json_object_put@PLT
+ pop rbx
+ ret
+.globl pg_mimo_failure_data
+.type pg_mimo_failure_data,@function
+pg_mimo_failure_data:
+ test rdi,rdi
+ jz .Lrt_failure_invalid
+ test rsi,rsi
+ jz .Lrt_failure_invalid
+ test rdx,rdx
+ jz .Lrt_failure_invalid
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor ebp,ebp
+ mov qword ptr [rsi],0
+ mov qword ptr [rsi+8],0
+ mov qword ptr [rdx],0
+ mov qword ptr [rdx+8],0
+ mov r14,[rbx+PG_MM_RESPONSE_TERMINAL]
+ test r14,r14
+ jz .Lrt_failure_absent
+ mov rdi,r14
+ lea rsi,[rip+.Lrt_error]
+ call li_get
+ test rax,rax
+ jnz .Lrt_failure_payload
+ mov rdi,r14
+ lea rsi,[rip+.Lrs_incomplete_details]
+ call li_get
+ test rax,rax
+ jz .Lrt_failure_serialize
+.Lrt_failure_payload:
+ mov r14,rax
+.Lrt_failure_serialize:
+ mov rdi,r14
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lrt_failure_absent
+ mov [r13],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [r13+8],rax
+ mov rdi,r14
+ lea rsi,[rip+.Lrt_message]
+ call li_get
+ test rax,rax
+ jnz .Lrt_failure_string
+ mov rdi,r14
+ lea rsi,[rip+.Lrs_reason]
+ call li_get
+ test rax,rax
+ jnz .Lrt_failure_string
+ /* A completed response cannot authorize a still-open function call. */
+ mov ecx,[rbx+PG_MM_CALL_COUNT]
+ test ecx,ecx
+ jz .Lrt_failure_end
+ mov eax,1
+ shl eax,cl
+ dec eax
+ cmp eax,[rbx+PG_MM_RESPONSE_CLOSED]
+ je .Lrt_failure_end
+ lea rax,[rip+.Lrt_unfinished]
+ mov [r12],rax
+ mov [r13],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov [r12+8],rax
+ mov [r13+8],rax
+ jmp .Lrt_failure_end
+.Lrt_failure_string:
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrt_failure_end
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov [r12],rax
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov [r12+8],rax
+ jmp .Lrt_failure_end
+.Lrt_failure_absent:
+ mov ebp,1
+.Lrt_failure_end:
+ mov eax,ebp
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lrt_failure_invalid:
+ mov eax,1
+ ret
+.size pg_mimo_failure_data,.-pg_mimo_failure_data
+.section .rodata
+.Lrt_error: .asciz "error"
+.Lrt_message: .asciz "message"
+.Lrt_unfinished: .asciz "OpenAI Responses stream completed with an unfinished tool call"
+
+.text
+.Lrt_stop_data:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,[rdi+PG_MM_RESPONSE_TERMINAL]
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ test rbx,rbx
+ jz .Lrt_stop_end
+ mov rdi,r12
+ mov rsi,rbx
+ lea rdx,[rip+.Lrt_status]
+ lea rcx,[rip+.Lrt_raw_stop]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lrt_stop_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrt_status]
+ call li_get
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lrt_stop_end
+ mov rdi,rax
+ lea rsi,[rip+.Lrt_incomplete]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrt_stop_end
+ mov rdi,rbx
+ lea rsi,[rip+.Lrs_incomplete_details]
+ call li_get
+ mov rdi,rax
+ lea rsi,[rip+.Lrs_reason]
+ call li_get
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrt_stop_end
+ mov rcx,rax
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lrt_reason_format]
+ mov rdx,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lrt_stop_bad
+ mov rdi,[rsp]
+ call json_object_new_string@PLT
+ mov r14,rax
+ mov rdi,[rsp]
+ call free@PLT
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ lea rsi,[rip+.Lrt_raw_stop]
+ mov rdx,r14
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrt_stop_bad
+ jmp .Lrt_stop_end
+.Lrt_stop_bad:
+ mov ebp,1
+.Lrt_stop_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lrt_status: .asciz "status"
+.Lrt_raw_stop: .asciz "rawStopReason"
+.Lrt_incomplete: .asciz "incomplete"
+.Lrt_reason_format: .asciz "%s.%s"

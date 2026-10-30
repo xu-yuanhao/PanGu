@@ -18,6 +18,7 @@ static void responses(void){
  assert(!line("data: {\"type\":\"response.output_item.added\",\"output_index\":2,\"item\":{\"type\":\"function_call\",\"call_id\":\"call-a\",\"name\":\"echo\",\"arguments\":\"\"}}"));
  assert(!line("data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":2,\"delta\":\"{bad\"}"));
  assert(!line("data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":2,\"arguments\":\"{}\"}"));assert(!strcmp(m.arguments,"{}"));
+ assert(!line("data: {\"type\":\"response.output_item.done\",\"output_index\":2,\"item\":{\"type\":\"function_call\",\"id\":\"fc_a\",\"call_id\":\"call-a\",\"name\":\"echo\",\"arguments\":\"{}\"}}"));
  assert(!line("data: {\"type\":\"response.output_item.done\",\"output_index\":7,\"item\":{\"type\":\"function_call\",\"call_id\":\"call-b\",\"name\":\"echo\",\"arguments\":\"{}\"}}"));assert(m.call_count==2&&!strcmp(m.extra[0].id,"call-b"));
  assert(!line("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{\"input_tokens\":20,\"output_tokens\":8,\"total_tokens\":28,\"input_tokens_details\":{\"cached_tokens\":5},\"output_tokens_details\":{\"reasoning_tokens\":3}}}}")&&m.finish_reason==2&&m.saw_done);
 
@@ -51,6 +52,20 @@ static void responses_final_roundtrip(void){
  for(unsigned invalid=0;invalid<2;invalid++){model=pg_mimo_model(&m);json_object *bad_cfg=json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\"}");assert(!pg_mimo_configure(&m,bad_cfg));json_object_put(bad_cfg);assert(!line(invalid?"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"reasoning\",\"summary\":\"bad\"}}":"data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"content\":\"bad\"}}"));assert(!line("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}"));json_object *bad_assistant=json_tokener_parse("{\"content\":[]}");assert(pg_mimo_complete(&m,bad_assistant));json_object_put(bad_assistant);model.close(model.context);}
  puts("PASS: authoritative final items/encrypted thinking -> serialized canonical content -> same-model replay, model switch and Chat Completions projection");
 }
+
+static void responses_settlement(void){
+ for(unsigned scenario=0;scenario<5;scenario++){
+  pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);
+  assert(!line("data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_one\",\"call_id\":\"one\",\"name\":\"echo\",\"arguments\":\"\"}}"));assert(!line("data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"arguments\":\"{}\"}"));
+  if(scenario==1||scenario==2){assert(!line("data: {\"type\":\"response.output_item.added\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"id\":\"fc_two\",\"call_id\":\"two\",\"name\":\"echo\",\"arguments\":\"{}\"}}"));assert(!line("data: {\"type\":\"response.output_item.done\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"id\":\"fc_two\",\"call_id\":\"two\",\"name\":\"echo\",\"arguments\":\"{}\"}}"));}
+  if(scenario==2){assert(!line("data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"fc_one\",\"call_id\":\"one\",\"name\":\"echo\",\"arguments\":\"{}\"}}"));assert(!line("data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"delta\":\"ignored late delta\"}")&&!strcmp(m.arguments,"{}"));}
+  if(scenario<3){int status=line("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}");if(scenario==2)assert(!status&&m.saw_done&&m.response_closed==3);else{assert(status&&!m.saw_done&&!m.finish_reason);pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body)&&message.size&&strstr(message.data,"unfinished tool call")&&strstr(body.data,"completed"));}}
+  else if(scenario==3){assert(!line("data: {\"type\":\"response.incomplete\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}"));json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant)&&m.finish_reason==3&&!strcmp(json_object_get_string(json_object_object_get(assistant,"rawStopReason")),"incomplete.max_output_tokens"));json_object_put(assistant);}
+  else{assert(line("data: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"code\":\"context_length_exceeded\",\"message\":\"maximum context length is 100 tokens\"}}}"));pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body)&&!strcmp(message.data,"maximum context length is 100 tokens")&&strstr(body.data,"context_length_exceeded"));}
+  model.close(model.context);assert(!m.response_terminal&&!m.response_closed);
+ }
+ puts("PASS: Responses completed-call barrier, parallel partial close, late delta isolation, incomplete raw stop and structured provider failure");
+}
 int main(void){
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);
@@ -69,6 +84,6 @@ int main(void){
  assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\u0000\"}}]}}]}"));
  const char *indices[]={"-1","8","4294967296","9223372036854775807","0.5","true","\"1\""};
  for(size_t i=0;i<sizeof(indices)/sizeof(*indices);++i){m=(pg_mimo){0};char text[512];snprintf(text,sizeof(text),"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":%s}]}}]}",indices[i]);assert(line(text));}
- responses();responses_final_roundtrip();
+ responses();responses_final_roundtrip();responses_settlement();
  puts("PASS: incremental text, UTF-8, split tool arguments, terminal protocol, malformed/truncated and capacity rejection");return 0;
 }

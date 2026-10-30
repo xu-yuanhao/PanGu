@@ -22,6 +22,8 @@ typedef struct {
  size_t argument_length[PG_TOOL_BATCH_LIMIT],argument_capacity[PG_TOOL_BATCH_LIMIT];
  uint64_t response_indices[PG_TOOL_BATCH_LIMIT]; /* output_index to dense call slot */
  struct json_object *response_output,*response_identity; /* owned final item slots/id */
+ struct json_object *response_terminal; /* owned terminal envelope */
+ unsigned response_closed; /* completed function-call slots */
 } pg_mimo;
 /* OpenAI Chat Completions / Responses SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -49,6 +51,8 @@ int pg_mimo_config_responses(const struct json_object *);
    Native call_id and provider responseItemId remain separate identities. */
 int pg_mimo_responses_complete(const pg_mimo *,struct json_object *);
 int pg_mimo_responses_history(const struct json_object *,const struct json_object *,struct json_object **);
+/* Borrowed structured failure text/body, valid through close or the next start. */
+int pg_mimo_failure_data(const pg_mimo *,pg_slice *,pg_slice *);
 /* Internal decoder: one complete SSE line; api/modelInfo.api selects protocol,
    with a /responses endpoint fallback. No network operations. */
 int pg_mimo_decode_line(pg_mimo *, const char *, pg_model_event *);

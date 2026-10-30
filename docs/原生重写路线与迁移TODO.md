@@ -114,6 +114,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；思考参数按DeepSeek/Zai/Qwen/OpenRouter格式和supportsReasoningEffort映射，普通端点不带提供商专用thinking字段；公开reasoning/thinkingLevelMap贯通目录、覆盖和请求，支持级别/关闭映射及off:null省略；实际编码与模型传输/ABI专项通过。
 - [x] OpenAI Responses基础请求/流接入同一模型服务：按api/modelInfo.api或端点选择，投影input、扁平函数声明/调用/结果、图片结果、max_output_tokens与reasoning；解析文本/思考、稀疏工具索引、最终参数替换、用量及完成/长度/失败终态。实际curl服务回放覆盖跨块/CRLF、工具调用、提前EOF和失败；O0/O2/UBSan、ABI及分配失败检查通过。完整Responses行为仍按下项覆盖。
 - [x] Responses最终item按输出槽保存，正文/思考采用done事实，终态补齐加密思考；canonical消息保存textSignature、thinkingSignature及独立responseItemId。provider/model/api一致时重放，切换模型/提供者移除相应签名和item身份；SQLite/JSONL重开、真实请求投影、跨协议投影、乱序done、分配失败与ASan/UBSan通过。
+- [x] Responses终态结算与失败接通产品：全部function item.done确认后交付调用，已关闭槽忽略迟到参数；incomplete保留长度终态与rawStopReason。结构化提供者message/error body进入既有重试和上下文超限分类；并行部分完成、实际模型服务拒绝未完成调用、HTTP 200错误分类、关闭释放及O0/O2/ABI/ASan/UBSan通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -311,8 +312,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `openai-responses-shared.ts` 中item完成、encrypted backfill与消息转换，`transform-messages.ts`的模型身份规则；terminal-event、Azure reasoning-replay与工具结果用例。
-- 实际调用链：SSE的done item按output_index保存→`pg_mimo_complete`提交最终canonical内容/签名→Durable Entry/原生存储→`pg_mimo_responses_history`重建后继请求。终态仅补齐已有思考的加密字段，保留done正文/摘要与调用身份。Native call_id与responseItemId分开存放；公开provider/model/api一致才携带相应签名、item ID及namespace。跨协议投影保留正文和工具关系。
-- 验证：模型O0/O2/UBSan、ABI、传输及分配失败专项通过；新增canonical路径的失败检查修复了消息数组替换失败时的引用泄漏。最终item、乱序done、空summary加密补齐、序列化后重放、模型/提供者切换、错误形状ASan/UBSan通过。`build_test.py --client`覆盖SQLite/JSONL存储重开后再次编码签名；真实DeepSeek独立进程恢复与流中父取消/子任务收束通过。Responses使用确定性流回放；产品构建通过。
-- 接口与差异：模型实例追加自有最终item槽与响应身份，公开model服务ABI保持；缓存随start/close释放。K05的高级工具、未完成调用修复、协议兼容选项和网关/认证覆盖继续由原有范围跟踪。
-- 下一交付物：将下一组集中到K05的完整协议/消费者，优先完成剩余Responses工具/兼容行为，再推进Anthropic Messages。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `processResponsesStream`未完成工具集合、终态映射与`openai-responses-terminal-event.test.ts`；沿用现有Generation错误结算与重试调用者。
+- 实际调用链：Responses function item.done更新调用完成位；普通完成验证全部槽后才由模型服务交付CALL/BATCH。长度终态经独立路径保存usage/rawStopReason，已关闭槽忽略后续参数增量。`pg_mimo_failure_data`从自有终态提取错误文本/分类数据，`native_model_failure`接入既有重试和上下文超限判断；分类使用错误对象，排除无关输出文本。
+- 验证：模型O0/O2/UBSan、ABI、传输与分配专项通过；ASan/UBSan覆盖单/并行未完成拒绝、迟到参数、长度原因为独立终态、结构化错误和关闭释放。实际curl模型服务回放确认未完成调用不会交付；产品Host ASan/UBSan确认HTTP 200上下文超限/限流仍保留实际原因并正确分类。`build_test.py --client`及产品构建通过。Responses仍使用确定性回放。
+- 接口与差异：模型实例新增自有终态JSON与调用完成位，start/close统一清理，公开model服务ABI保持。K05继续覆盖参数修复/argumentsError、高级工具及协议/网关选项。
+- 下一交付物：完成模型最终参数解析到工具校验/错误回报的整条调用链，随后推进下一协议。

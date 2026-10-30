@@ -159,6 +159,7 @@
         "pg_mimo_config_responses",
         "pg_mimo_responses_complete",
         "pg_mimo_responses_history",
+        "pg_mimo_failure_data",
         "pg_context_append",
         "pg_context_text",
         "pg_context_project",
