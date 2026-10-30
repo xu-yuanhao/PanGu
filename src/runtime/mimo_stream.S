@@ -3002,7 +3002,12 @@ pg_mimo_anthropic_clear:
  lea rsi,[rip+.Lan_pause_turn]
  call strcmp@PLT
  test eax,eax
- jnz .Lan_error
+ jz .Lan_finish_stop
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp+32]
+ call .Lan_stop_failure
+ jmp .Lan_bad
 .Lan_finish_stop:
  lea rdi,[rip+.Lstr_stop]
  jmp .Lan_finish_value
@@ -3454,3 +3459,126 @@ pg_mimo_anthropic_clear:
 .Lan_thinking_tokens: .asciz "thinking_tokens"
 .Lan_cacheWrite1h: .asciz "cacheWrite1h"
 .Lan_reasoning: .asciz "reasoning"
+
+/* Preserve stop details in the provider failure body, and expose the same
+   user-facing explanation as Anthropic mapStopReason. */
+.text
+.Lan_stop_failure:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ ANGET r13,stop_reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lan_refusal_reason]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_stop_sensitive
+ ANGET r13,stop_details
+ ANGET rax,explanation
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lan_stop_refusal_default
+ mov rdi,rbp
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lan_stop_refusal_default
+ mov rdi,rbp
+ call json_object_get@PLT
+ jmp .Lan_stop_message
+.Lan_stop_refusal_default:
+ lea rdi,[rip+.Lan_refusal_message]
+ call json_object_new_string@PLT
+ jmp .Lan_stop_message
+.Lan_stop_sensitive:
+ mov rdi,r14
+ lea rsi,[rip+.Lan_sensitive_reason]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lan_stop_unknown
+ lea rdi,[rip+.Lan_sensitive_message]
+ call json_object_new_string@PLT
+ jmp .Lan_stop_message
+.Lan_stop_unknown:
+ mov rdi,r14
+ call strlen@PLT
+ lea rdi,[rax+32]
+ call malloc@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lan_stop_failure_end
+ mov rdi,rax
+ lea rsi,[rip+.Lan_unknown_format]
+ mov rdx,r14
+ xor eax,eax
+ call sprintf@PLT
+ mov rdi,rbp
+ call json_object_new_string@PLT
+ mov [rsp+8],rax
+ mov rdi,rbp
+ call free@PLT
+ mov rax,[rsp+8]
+.Lan_stop_message:
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lan_stop_failure_end
+ lea rdi,[rip+.Lan_error_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lan_stop_release_message
+ ANGET rax,error_key
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rip+.Lan_delta]
+ lea rcx,[rip+.Lan_providerDelta]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lan_stop_release_message
+ ANGET "qword ptr [rsp]",error_key
+ mov rdi,rax
+ lea rsi,[rip+.Lan_message]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_stop_release_message
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lrt_save
+.Lan_stop_release_message:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+.Lan_stop_failure_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lan_error_key: .asciz "error"
+.Lan_providerDelta: .asciz "providerDelta"
+.Lan_refusal_reason: .asciz "refusal"
+.Lan_sensitive_reason: .asciz "sensitive"
+.Lan_stop_details: .asciz "stop_details"
+.Lan_explanation: .asciz "explanation"
+.Lan_refusal_message: .asciz "The model refused to complete the request"
+.Lan_sensitive_message: .asciz "Provider stopped with: sensitive"
+.Lan_unknown_format: .asciz "Unhandled stop reason: %s"
+.Lan_error_json: .asciz "{\"error\":{}}"

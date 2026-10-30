@@ -125,8 +125,17 @@ static void anthropic(void){
  json_object_put(ctx);json_object_put(cfg);model.close(model.context);assert(!m.anthropic_blocks&&!m.anthropic_usage);
  puts("PASS: Anthropic Messages text/thinking/signature/tool stream, final canonical history, model isolation, images and cache accounting");
 }
+
+static void anthropic_failures(void){
+ const char *reasons[]={"refusal","refusal","sensitive","unknown-provider-stop"};const char *messages[]={"Provider refusal explanation","The model refused to complete the request","Provider stopped with: sensitive","Unhandled stop reason: unknown-provider-stop"};
+ for(unsigned n=0;n<4;n++){
+  pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!line("data: {\"type\":\"message_start\",\"message\":{\"id\":\"refused\",\"usage\":{\"input_tokens\":1}}}"));char frame[1024];snprintf(frame,sizeof(frame),"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"%s\"%s}}",reasons[n],n==0?",\"stop_details\":{\"type\":\"refusal\",\"explanation\":\"Provider refusal explanation\"}":"");assert(line(frame)&&!m.saw_done&&!m.finish_reason);pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body)&&!strcmp(message.data,messages[n])&&strstr(body.data,reasons[n]));if(n==0)assert(strstr(body.data,"stop_details"));model.close(model.context);
+ }
+ puts("PASS: Anthropic refusal explanation/default, sensitive and unknown stop reasons preserve provider details");
+}
 int main(void){
  anthropic();
+ anthropic_failures();
  m=(pg_mimo){0};
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);
