@@ -539,6 +539,14 @@ static void test_anthropic_transport(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic model-service replay with API-key/version headers, text/tool/errors, invalid arguments, max_tokens and early EOF");
 }
+
+static void test_anthropic_beta_headers(void){
+ const char *options[]={"{\"reasoningEffort\":\"low\",\"maxTokens\":4096}","{\"reasoningEffort\":\"low\",\"headers\":{\"AnThRoPiC-BeTa\":\"custom-feature\"}}","{\"reasoningEffort\":\"low\",\"headers\":{\"anthropic-beta\":null}}","{\"reasoningEffort\":\"low\",\"interleavedThinking\":false}","{\"headers\":{\"anthropic-beta\":\"injected\\r\\nAuthorization: unwanted\"}}"};
+ for(unsigned scenario=0;scenario<5;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"maxTokens\":32768}}");json_object_object_add(cfg,"options",json_tokener_parse(options[scenario]));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","beta-unit-key",1);int status=start();if(scenario==4)assert(status);else{assert(!status);unsigned beta=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){if(!strncmp(h->data,"anthropic-beta:",15)){beta++;assert(strstr(h->data,scenario==1?"custom-feature":"interleaved-thinking-2025-05-14"));}}assert(beta==(scenario<2?1u:0u));}model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic thinking beta header, case-insensitive option override, null/off suppression and header-injection rejection");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -557,6 +565,7 @@ int main(void) {
     test_responses_transport();
     test_responses_arguments();
     test_anthropic_transport();
+    test_anthropic_beta_headers();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

@@ -245,6 +245,7 @@ PG_MM_ASSERT_OFF(pg_mimo, anthropic_count, PG_MM_ANTHROPIC_COUNT);
 PG_MM_ASSERT_OFF(pg_mimo, anthropic_capacity, PG_MM_ANTHROPIC_CAPACITY);
 PG_MM_ASSERT_OFF(pg_mimo, anthropic_usage, PG_MM_ANTHROPIC_USAGE);
 _Static_assert(sizeof(pg_mimo_anthropic_block)==40&&offsetof(pg_mimo_anthropic_block,text)==16&&offsetof(pg_mimo_anthropic_block,item)==32,"Anthropic block ABI");
+_Static_assert(sizeof(struct json_object_iterator)==sizeof(void *),"json-c public iterator ABI");
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
 _Static_assert(CURLE_COULDNT_RESOLVE_PROXY==5 && CURLE_COULDNT_RESOLVE_HOST==6 && CURLE_COULDNT_CONNECT==7 && CURLE_HTTP2==16 && CURLE_PARTIAL_FILE==18 && CURLE_OPERATION_TIMEDOUT==28 && CURLE_GOT_NOTHING==52 && CURLE_SEND_ERROR==55 && CURLE_RECV_ERROR==56 && CURLE_HTTP2_STREAM==92,"native retry CURL mapping");
 PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);

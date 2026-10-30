@@ -358,6 +358,10 @@ li_start:
  mov r13,rax
  mov [rbx+PG_MM_HEADERS],rax
 .Lauth_headers_ready:
+ mov rdi,rbx
+ call .Lanthropic_beta_headers
+ test eax,eax
+ jnz .Lst_bad
  call curl_easy_init@PLT
  mov r14, rax
  mov qword ptr [rbx + PG_MM_EASY], r14
@@ -1140,3 +1144,204 @@ pg_mimo_complete:
 .section .rodata
 .Lanthropic_key: .asciz "x-api-key: "
 .Lanthropic_version: .asciz "anthropic-version: 2023-06-01"
+
+/* Explicit beta header overrides generated features. Null/empty disables it;
+   options headers take precedence over model headers, matching getBetaFeatures. */
+.text
+.Lanthropic_beta_headers:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+24],0
+ mov qword ptr [rsp+32],0
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jz .Lbeta_ok
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+40],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+48],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_headers]
+ call json_object_object_get@PLT
+ mov [rsp+56],rax
+ xor r12d,r12d
+.Lbeta_layer:
+ mov rdi,[rsp+40+r12*8]
+ test rdi,rdi
+ jz .Lbeta_next_layer
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbeta_bad
+ mov rdi,[rsp+40+r12*8]
+ call json_object_iter_begin@PLT
+ mov [rsp+24],rax
+ mov rdi,[rsp+40+r12*8]
+ call json_object_iter_end@PLT
+ mov [rsp+32],rax
+.Lbeta_each:
+ lea rdi,[rsp+24]
+ lea rsi,[rsp+32]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lbeta_next_layer
+ lea rdi,[rsp+24]
+ call json_object_iter_peek_name@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_name]
+ call strcasecmp@PLT
+ test eax,eax
+ jnz .Lbeta_next
+ lea rdi,[rsp+24]
+ call json_object_iter_peek_value@PLT
+ mov [rsp+8],rax
+ mov qword ptr [rsp+16],1
+.Lbeta_next:
+ lea rdi,[rsp+24]
+ call json_object_iter_next@PLT
+ jmp .Lbeta_each
+.Lbeta_next_layer:
+ inc r12
+ cmp r12,3
+ jb .Lbeta_layer
+ cmp qword ptr [rsp+16],0
+ je .Lbeta_default
+ mov rdi,[rsp+8]
+ test rdi,rdi
+ jz .Lbeta_ok
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbeta_bad
+ mov rdi,[rsp+8]
+ call json_object_get_string_len@PLT
+ mov r13d,eax
+ mov rdi,[rsp+8]
+ call json_object_get_string@PLT
+ mov r14,rax
+ mov rdi,rax
+ call strlen@PLT
+ cmp rax,r13
+ jne .Lbeta_bad
+ test r13,r13
+ jz .Lbeta_ok
+ mov rdi,r14
+ mov esi,13
+ call strchr@PLT
+ test rax,rax
+ jnz .Lbeta_bad
+ mov rdi,r14
+ mov esi,10
+ call strchr@PLT
+ test rax,rax
+ jnz .Lbeta_bad
+ lea rdi,[r13+17]
+ call malloc@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbeta_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_prefix]
+ mov edx,16
+ call memcpy@PLT
+ mov rdi,[rsp]
+ add rdi,16
+ mov rsi,r14
+ lea rdx,[r13+1]
+ call memcpy@PLT
+ jmp .Lbeta_append
+.Lbeta_default:
+ mov rdi,[rbx+PG_MM_REQUEST]
+ call json_tokener_parse@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lbeta_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_thinking]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14d,1
+ test rax,rax
+ jz .Lbeta_default_release
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_enabled]
+ call strcmp@PLT
+ mov r14d,eax
+.Lbeta_default_release:
+ mov rdi,rbp
+ call json_object_put@PLT
+ test r14,r14
+ jnz .Lbeta_ok
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbeta_interleaved]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lbeta_default_send
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lbeta_ok
+.Lbeta_default_send:
+ mov rdi,[rbx+PG_MM_HEADERS]
+ lea rsi,[rip+.Lbeta_default_header]
+ jmp .Lbeta_send
+.Lbeta_append:
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp]
+.Lbeta_send:
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lbeta_bad
+ mov [rbx+PG_MM_HEADERS],rax
+.Lbeta_ok:
+ xor ebp,ebp
+ jmp .Lbeta_end
+.Lbeta_bad:
+ mov ebp,1
+.Lbeta_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbeta_modelInfo: .asciz "modelInfo"
+.Lbeta_options: .asciz "options"
+.Lbeta_headers: .asciz "headers"
+.Lbeta_name: .asciz "anthropic-beta"
+.Lbeta_prefix: .asciz "anthropic-beta: "
+.Lbeta_thinking: .asciz "thinking"
+.Lbeta_type: .asciz "type"
+.Lbeta_enabled: .asciz "enabled"
+.Lbeta_interleaved: .asciz "interleavedThinking"
+.Lbeta_default_header: .asciz "anthropic-beta: interleaved-thinking-2025-05-14"
