@@ -133,9 +133,17 @@ static void anthropic_failures(void){
  }
  puts("PASS: Anthropic refusal explanation/default, sensitive and unknown stop reasons preserve provider details");
 }
+
+static void openai_cache(void){
+ for(unsigned protocol=0;protocol<2;protocol++)for(unsigned mode=0;mode<4;mode++){
+  pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse(protocol?"{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\",\"modelInfo\":{\"compat\":{}}}":"{\"api\":\"openai-completions\",\"model\":\"test\",\"endpoint\":\"https://api.openai.com/v1/chat/completions\",\"modelInfo\":{\"compat\":{\"supportsLongCacheRetention\":true}}}");json_object *compat=json_object_object_get(json_object_object_get(cfg,"modelInfo"),"compat");if(mode==3)json_object_object_add(compat,"supportsExplicitPromptCacheMode",json_object_new_boolean(1));json_object_object_add(cfg,"options",json_tokener_parse(mode==0?"{\"cacheRetention\":\"none\"}":mode==1?"{\"cacheRetention\":\"short\"}":"{\"cacheRetention\":\"long\"}"));char identity[281];for(unsigned n=0;n<70;n++)memcpy(identity+n*4,"🙂",4);identity[sizeof(identity)-1]=0;json_object_object_add(cfg,"sessionId",json_object_new_string_len(identity,280));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;strcpy(session.messages[0].text,"hi");session.messages[0].size=2;assert(!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*key=json_object_object_get(wire,"prompt_cache_key");assert(!!key==!!mode);if(key)assert(json_object_get_string_len(key)==256);if(mode>=2){if(protocol&&mode==3){assert(json_object_object_get(wire,"prompt_cache_options")&&!json_object_object_get(wire,"prompt_cache_retention"));}else assert(!strcmp(json_object_get_string(json_object_object_get(wire,"prompt_cache_retention")),"24h"));}json_object_put(wire);model.close(model.context);
+ }
+ puts("PASS: OpenAI Chat/Responses PanGu cache identity, 64 Unicode characters, retention and explicit cache mode");
+}
 int main(void){
  anthropic();
  anthropic_failures();
+ openai_cache();
  m=(pg_mimo){0};
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);

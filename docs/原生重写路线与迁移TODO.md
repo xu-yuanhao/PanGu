@@ -117,6 +117,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Responses终态结算与失败接通产品：全部function item.done确认后交付调用，已关闭槽忽略迟到参数；incomplete保留长度终态与rawStopReason。结构化提供者message/error body进入既有重试和上下文超限分类；并行部分完成、实际模型服务拒绝未完成调用、HTTP 200错误分类、关闭释放及O0/O2/ABI/ASan/UBSan通过。
 - [x] Responses最终参数接通修复、错误元数据与Tool结算：空白为{}，修复字符串控制字符/非法转义，失败保留原文并生成argumentsError；模型调用先交付准备后的对象，complete保存最终元数据，Tool在效果前返回错误。416组固定Pi源码差分、构造失败释放、SQLite/JSONL无写入副作用与NUL错误文本、真实DeepSeek错误后重试写入通过。
 - [x] Anthropic Messages基础链接入原生模型服务：system/文本/图片、签名思考、tool_use/tool_result分组、工具声明及API-key/version头；有序块关闭后解析最终参数，message_stop确认流终态，输入/缓存用量按增量合并。实际模型服务回放覆盖文本/工具、错误参数、长度终态、结构化错误与提前EOF；canonical历史按模型身份重放思考，预算/自适应思考编码及分配失败清理通过。
+- [x] PanGu会话身份接通OpenAI Chat/Responses请求缓存：按上游选择prompt_cache_key、按64个Unicode字符截取，短/长/关闭及Responses显式缓存模式映射；模型O0/O2/UBSan、传输与所有权专项通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -315,7 +316,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 ## 核心交接区
 
 - 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/{anthropic-messages,transform-messages,simple-options,constrained-sampling}.ts` 与 streaming-tool-arguments、anthropic-sse-parsing、strict-tool-fallback 用例。
-- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持。
+- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置。
 - 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
 - 具体缺口：Messages的managed effort、constrainedSampling声明/严格转换/失败回退、native tools、OAuth和网关完整覆盖，以及后续协议。现有`pg_tool_definition`及提示目录只传名称/说明/schema；严格模式需将声明元数据、插件快照、模型请求和恢复一起贯通。
 - 下一交付物：按K05继续成组完成提供者行为；严格工具从上述声明调用链实施，其他协议按覆盖表顺序移植。接口或构建调整随同一批集成。

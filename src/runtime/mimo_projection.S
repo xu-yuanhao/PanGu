@@ -836,6 +836,11 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
 .Lserialize_ready:
+ mov rdi,[rsp]
+ mov rsi,rbx
+ call .Loc_cache
+ test eax,eax
+ jnz .Linvalid
  mov rdi, qword ptr [rsp]
  mov esi, PG_MM_TO_JSON_PLAIN
  call json_object_to_json_string_ext@PLT
@@ -3497,3 +3502,209 @@ pg_mimo_uses_anthropic:
 .Lap_properties: .asciz "properties"
 .Lap_required: .asciz "required"
 .Lap_legacy_schema: .asciz "{\"type\":\"object\",\"properties\":{},\"required\":[]}"
+
+/* Pi OpenAI prompt cache: the identity is PanGu's committed sessionId;
+   clamp by Unicode characters rather than UTF-8 bytes. */
+.text
+.Loc_cache:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov rdi,r12
+ call pg_mimo_uses_anthropic
+ test eax,eax
+ jnz .Loc_ok
+ mov rdi,r12
+ call pg_mimo_uses_responses
+ mov [rsp+24],eax
+ mov r12,[r12+PG_MM_CONFIGURATION]
+ APGET r12,modelInfo
+ APGET rax,compat
+ mov r13,rax
+ APGET r12,options
+ mov r14,rax
+ APGET rax,cacheRetention
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Loc_retention
+ lea rdi,[rip+.Lap_cache_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Loc_retention_ready
+.Loc_retention:
+ mov [rsp+32],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_none]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Loc_check_long
+ mov qword ptr [rsp],1
+ jmp .Loc_retention_ready
+.Loc_check_long:
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lap_long]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Loc_retention_ready
+ mov qword ptr [rsp],2
+.Loc_retention_ready:
+ mov ebp,[rsp+24]
+ test ebp,ebp
+ jnz .Loc_response_long
+ APGET r12,endpoint
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Loc_chat_long
+ mov rdi,rax
+ lea rsi,[rip+.Loc_openai_domain]
+ call strstr@PLT
+ test rax,rax
+ jz .Loc_chat_long
+ mov qword ptr [rsp+8],1
+.Loc_chat_long:
+ APGET r13,supportsLongCacheRetention
+ test rax,rax
+ jz .Loc_long_ready
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov ebp,eax
+ jmp .Loc_long_ready
+.Loc_response_long:
+ mov qword ptr [rsp+8],1
+ mov ebp,1
+ APGET r13,supportsLongCacheRetention
+ test rax,rax
+ jz .Loc_long_ready
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ mov ebp,eax
+.Loc_long_ready:
+ cmp qword ptr [rsp],2
+ jne .Loc_key
+ test ebp,ebp
+ jz .Loc_key
+ mov qword ptr [rsp+8],1
+ APGET r13,supportsExplicitPromptCacheMode
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Loc_long_retention
+ cmp dword ptr [rsp+24],0
+ je .Loc_long_retention
+ lea rdi,[rip+.Loc_ttl_json]
+ call json_tokener_parse@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Loc_prompt_cache_options]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Loc_bad
+ jmp .Loc_key
+.Loc_long_retention:
+ mov rdi,rbx
+ lea rsi,[rip+.Loc_prompt_cache_retention]
+ lea rdx,[rip+.Loc_24h]
+ call li_field
+ test eax,eax
+ jnz .Loc_bad
+.Loc_key:
+ cmp qword ptr [rsp],1
+ jne .Loc_key_enabled
+ cmp dword ptr [rsp+24],0
+ je .Loc_ok
+ APGET r13,supportsExplicitPromptCacheMode
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Loc_ok
+ lea rdi,[rip+.Loc_explicit_json]
+ call json_tokener_parse@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Loc_prompt_cache_options]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Loc_bad
+ jmp .Loc_ok
+.Loc_key_enabled:
+ cmp qword ptr [rsp+8],0
+ je .Loc_ok
+ APGET r14,sessionId
+ test rax,rax
+ jnz .Loc_identity
+ APGET r12,sessionId
+.Loc_identity:
+ test rax,rax
+ jz .Loc_ok
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Loc_bad
+ mov rdi,r14
+ call json_object_get_string_len@PLT
+ mov [rsp+40],eax
+ mov rdi,r14
+ call json_object_get_string@PLT
+ mov rdi,rax
+ xor ecx,ecx
+ xor esi,esi
+.Loc_char:
+ cmp ecx,[rsp+40]
+ jae .Loc_publish
+ movzx edx,byte ptr [rdi+rcx]
+ and edx,192
+ cmp edx,128
+ je .Loc_char_next
+ cmp esi,64
+ jae .Loc_publish
+ inc esi
+.Loc_char_next:
+ inc ecx
+ jmp .Loc_char
+.Loc_publish:
+ mov esi,ecx
+ call json_object_new_string_len@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Loc_prompt_cache_key]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Loc_bad
+.Loc_ok:
+ xor ebp,ebp
+ jmp .Loc_end
+.Loc_bad:
+ mov ebp,1
+.Loc_end:
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Loc_openai_domain: .asciz "api.openai.com"
+.Loc_prompt_cache_key: .asciz "prompt_cache_key"
+.Loc_prompt_cache_retention: .asciz "prompt_cache_retention"
+.Loc_prompt_cache_options: .asciz "prompt_cache_options"
+.Loc_24h: .asciz "24h"
+.Loc_ttl_json: .asciz "{\"ttl\":\"30m\"}"
+.Loc_explicit_json: .asciz "{\"mode\":\"explicit\"}"
+.Lap_sessionId: .asciz "sessionId"
+.Lap_supportsExplicitPromptCacheMode: .asciz "supportsExplicitPromptCacheMode"
+.section .rodata
+.Lap_endpoint: .asciz "endpoint"
