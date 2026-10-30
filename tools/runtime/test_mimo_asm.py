@@ -23,6 +23,7 @@ import base64
 import os
 import ssl
 import threading
+import math
 import hashlib
 import hmac
 import re
@@ -268,6 +269,40 @@ void release_configuration(char *value){free(value);}
                 native.json_object_put(encoded);native.release_configuration(decoded)
     print(f'PASS: {len(cases)} Bedrock thinking configurations match fixed Pi model-family, effort, budget, mapping and GovCloud behavior, including native thinking selection; {len(policies)} tool/cache policies match Pi; {len(samples)} opaque codec cases match atob/btoa')
 
+def cost_differential():
+    source=(ROOT/'references/pi/packages/ai/src/models.ts').read_text()
+    start=source.index('export function calculateCost(')
+    function=source[start:source.index('\nconst EXTENDED_THINKING_LEVELS',start)]
+    prices=[{'input':3,'output':15,'cacheRead':0.3,'cacheWrite':3.75},{'input':0,'output':0,'cacheRead':0,'cacheWrite':0}]
+    tiers=[{'inputTokensAbove':limit,'input':rate,'output':rate*5,'cacheRead':rate/10,'cacheWrite':rate*1.25} for limit,rate in ((200,9),(100,6),(100,99),(0,4))]
+    prices += [dict(prices[0],tiers=tiers),dict(prices[0],tiers=list(reversed(tiers)))]
+    cases=[]
+    for price in prices:
+        for total in (0,1,99,100,101,199,200,201,1000000):
+            for cache in (0,total//3,total):
+                for long_write in (0,cache//2,cache):
+                    cases.append({'model':{'cost':price},'usage':{'input':total-cache,'output':17,'cacheRead':0,'cacheWrite':cache,'cacheWrite1h':long_write,'cost':{}}})
+    oracle="import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const build=new Function(stripTypeScriptTypes(x.function.replace('export ',''),{mode:'strip'})+';return calculateCost')();process.stdout.write(JSON.stringify(x.cases.map(c=>build(c.model,c.usage))));"
+    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle],input=json.dumps({'function':function,'cases':cases}),text=True))
+    with tempfile.TemporaryDirectory(prefix='pangu-cost-parity-') as directory:
+        src=Path(directory)/'mimo.S'
+        src.write_text((ROOT/'src/runtime/mimo.S').read_text()+'\n.text\n.globl pg_cost_parity\n.set pg_cost_parity,.Lmc_calculate\n')
+        output=Path(directory)/'cost.so'
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl','libcrypto'],text=True).split()
+        subprocess.run([CC,'-shared','-fPIC','-O2','-I'+str(ROOT/'src/runtime'),str(src),*SRC[1:],*libs,'-o',str(output)],check=True)
+        native=C.CDLL(str(output));native.json_tokener_parse.argtypes=[C.c_char_p];native.json_tokener_parse.restype=C.c_void_p
+        native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
+        native.json_object_put.argtypes=[C.c_void_p];native.pg_cost_parity.argtypes=[C.c_void_p,C.c_void_p]
+        for case,wanted in zip(cases,expected):
+            configuration=native.json_tokener_parse(json.dumps({'modelInfo':case['model']}).encode());message=native.json_tokener_parse(json.dumps({'usage':case['usage']}).encode())
+            try:
+                assert not native.pg_cost_parity(configuration,message)
+                actual=json.loads(native.json_object_to_json_string_ext(message,0))['usage']['cost']
+                for key,value in wanted.items():
+                    assert actual[key]==value if isinstance(value,bool) else math.isclose(actual[key],value,rel_tol=1e-13,abs_tol=1e-15),(case,key,value,actual)
+            finally:native.json_object_put(configuration);native.json_object_put(message)
+    print(f'PASS: {len(cases)} native cost calculations match fixed Pi tiers, strict thresholds, duplicate ordering, free rates and cache durations')
+
 def sigv4_wire(binary, directory):
     cert=Path(directory)/'sigv4-cert.pem'
     key=Path(directory)/'sigv4-key.pem'
@@ -360,6 +395,7 @@ def main():
     arguments_differential()
     strict_schema_differential()
     bedrock_thinking_differential()
+    cost_differential()
     print('ALL MIMO ASM RUNS PASSED')
     return 0
 
