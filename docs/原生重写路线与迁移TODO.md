@@ -202,7 +202,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 任务能力接口通过runner受保护事务创建/分叉会话，复用Harness默认文档/配置/init；产品Host真实任务验证owner归属、分叉配置、init失败整体回滚与过期能力拒绝。
 - [x] task access通过runner受保护事务向子会话提交Submission，确认后返回receipt，复用现有requestId去重、Entry/任务准入与状态查询。
 - [x] task.control与TUI可选入口支持指定任务持久取消；重复取消不重复提交，父取消沿owned子会话级联，调度器重开后子Generation aborted与父终态收束通过产品Host专项。
-- [x] 产品独立seed/resume进程验证owned子会话与Generation持久恢复：直接退出后重读JSONL、保存配置进入真实DeepSeek请求、父等待完成；持久父取消跨进程恢复后子Generation aborted且不发模型请求。
+- [x] 产品独立seed/resume进程验证owned子会话与Generation持久恢复：直接退出后重读JSONL、保存配置进入真实DeepSeek请求、父等待完成；真实子模型流已开始时持久父取消并退出，新进程恢复后子Generation aborted且不再发模型请求。
 - [ ] 完成 requestId去重、输入/写入submission、wait/settlement、steer/follow-up队列与忙时策略。
 - [x] 会话Agent的ModelRef与thinkingLevel进入实际准备配置：provider/modelId映射modelProvider/model，思考级别映射reasoningEffort，off清除参数；配置准入拒绝错误ModelRef/空身份/NUL/未知级别且保留原配置，恢复默认配置、实际请求编码及产品Host专项通过。
 - [ ] 完成多个conversation、查询/命名、fork/clone、reset/handoff、父子任务、嵌套工具、所有权与级联取消；每个conversation保存独立provider身份。
@@ -306,8 +306,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的thinkingFormat分支、supportsReasoningEffort及DeepSeek端点识别；复用已传入的modelInfo.compat。
-- 实际调用链：OpenAI编码器在普通options后按选定格式构造thinking/type、Zai clear_thinking、Qwen enable_thinking或OpenRouter reasoning.effort；off使用各自关闭表达，supportsReasoningEffort=false移除顶层effort。普通端点清除旧专用thinking字段，DeepSeek/MiMo端点保持对应格式；未配置连接的旧MiMo入口保留现有默认。
-- 验证：模型编码/传输/ABI/分配失败的O0/O2/UBSan专项通过，覆盖四种格式开关、普通端点和禁用顶层effort。产品构建/Assembly通过；真实DeepSeek `--live-process-conversations`通过新进程恢复子Generation/父等待，以及持久父取消跨进程后子aborted且不请求模型。
-- 接口与差异：公开ABI/文件清单不变；本批接通现有compat数据，没有添加模型配置入口。thinkingLevelMap、其他兼容格式及协议仍在K05剩余范围。
-- 下一交付物：继续按K05/K08/K11的实际产品调用链成组推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Scheduler普通所有权取消、Generation abort与已持久取消意图恢复；沿已有产品seed/resume工作流。
+- 实际调用链：复用任务拥有分叉会话→Submission→Generation→真实模型流。在cancel场景中先等到HTTP 200且实际收到流字节，再提交父Task取消并直接_exit；独立resume进程重读JSONL，沿现有Scheduler级联和Generation abort完成子/父收束。
+- 验证：`test_product_resources.py --live-process-conversations`实际通过普通子会话恢复/真实回答/父等待，以及已开始流传输的父取消跨进程恢复；恢复后子Generation terminal/aborted，未发生新的模型完成回调。本批扩展同一产品工作流，无产品代码/接口改动。
+- 接口与差异：前一批只验证模型开始前的取消，本次覆盖收到真实流数据后的中断边界。仅使用临时工作区、现有模型凭据和当前产品构建；保留已验证路径，不增加另一套运行实现。
+- 下一交付物：继续K05/K08/K11剩余产品能力，避免连续停留在验证与辅助层。
