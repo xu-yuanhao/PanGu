@@ -10,6 +10,7 @@ from schema_dependency import compile_inputs
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live',action='store_true')
+    parser.add_argument('--live-cost',action='store_true')
     parser.add_argument('--live-agent',action='store_true')
     parser.add_argument('--live-conversations',action='store_true')
     parser.add_argument('--live-process-conversations',action='store_true')
@@ -28,7 +29,7 @@ def main():
         sanitize=['-fsanitize=address,undefined','-fno-sanitize-recover=all'] if args.sanitize else []
         sources=compile_inputs([name for name in SOURCES if name!='src/composition/pangu.c'],directory,sanitize)
         subprocess.run(['/usr/bin/clang-23','-D_POSIX_C_SOURCE=200809L','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',*sanitize,*PLUGIN_EXPORTS,*sources,str(ROOT/'tests/runtime/test_product_resources.c'),*flags,'-ldl','-o',str(output)],check=True)
-        if not any((args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
+        if not any((args.live_cost,args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
             for api,base,options in (
                 ('google-generative-ai',None,'{}'),
                 ('google-generative-ai','https://proxy.invalid/v1beta','{}'),
@@ -53,6 +54,6 @@ def main():
                 for stage in ('seed','resume'):
                     subprocess.run([str(output),'--nested-process-'+stage+suffix,str(workspace)],check=True,timeout=120)
             return
-        subprocess.run([str(output),*(['--live-extensions',str(library)] if args.live_extensions else ['--live-agent'] if args.live_agent else ['--live-conversations'] if args.live_conversations else ['--native-tasks',str(library)] if args.native_tasks else ['--compaction-hooks'] if args.compaction_hooks else ['--live-dynamic-context'] if args.live_dynamic_context else ['--live-background-compaction'] if args.live_background_compaction else ['--live-auto-compaction'] if args.live_auto_compaction else ['--live-compaction'] if args.live_compaction else ['--live'] if args.live else [])],check=True,timeout=330)
+        subprocess.run([str(output),*(['--live-cost'] if args.live_cost else ['--live-extensions',str(library)] if args.live_extensions else ['--live-agent'] if args.live_agent else ['--live-conversations'] if args.live_conversations else ['--native-tasks',str(library)] if args.native_tasks else ['--compaction-hooks'] if args.compaction_hooks else ['--live-dynamic-context'] if args.live_dynamic_context else ['--live-background-compaction'] if args.live_background_compaction else ['--live-auto-compaction'] if args.live_auto_compaction else ['--live-compaction'] if args.live_compaction else ['--live'] if args.live else [])],check=True,timeout=330)
 if __name__=='__main__':
     main()

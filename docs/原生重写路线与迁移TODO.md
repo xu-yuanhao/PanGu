@@ -125,6 +125,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Azure Responses基础链复用现有Responses编码/流：资源名/baseUrl与API版本组合端点，Azure域名路径规范化、代理查询保留、API版本替换；部署名映射按最后值优先并允许显式覆盖，最终部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
 - [x] Bedrock Converse文本/工具基础链接入同一模型服务：区域/代理端点、Bearer/环境SigV4与临时令牌、system/messages/inference/toolSpec投影、旧调用/结果重放；AWS二进制事件帧校验后复用内容块状态机，处理文本、调用、推理/签名与redacted字节、补齐关闭、停止和基础用量，预算/adaptive/effort配置按模型族转换；用户/工具图片、Claude错误图片路由和同模型签名重放接通SQLite/JSONL重开。模型专项、分配失败及产品配置链通过；完整认证、图片/推理和高级行为按下项继续覆盖。
 - [x] Bedrock工具选择/缓存/用量接通：none跳过声明与严格准入，auto/any/指定工具、完整schema、模型族缓存点/retention及请求标签沿同一请求链；metadata保留原始总量与1h写入计数，缺省/部分/末尾用量按上游结算。固定Pi策略对照与传输专项通过。
+- [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -321,8 +322,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock `formatBedrockError`与data-retention说明规则。
-- 实际调用链：Bedrock exception帧经`mimo_stream.S`统一保留错误前缀/原始详情；匹配数据保留模式错误时附加同一官方说明链接，现有failure接口交给Generation分类。普通异常保持原输出，公开ABI不变。
-- 验证：模型O0/O2/UBSan、ABI及原有协议/故障专项通过；五类异常各覆盖普通与大小写混合data-retention消息，检查提示链接、原始说明、失败终态；Assembly/diff通过。费用324组Pi对照及其余既有专项保持。
-- 具体缺口：费用账本恢复完整工作流；Bedrock请求ID/状态诊断、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
-- 下一交付物：沿K05成组完成提供者诊断元数据与凭据配置的实际消费者，并在集成中核对费用累计/恢复。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的`calculateCost`与Durable模型usage提交/会话账本累计语义。
+- 实际调用链：现有产品Host/资源加载用户models.json价格，真实Generation→模型→原生write工具→后继Generation完成费用计算并事务累计；新增`--live-cost`复用产品资源专项入口，连续执行、关闭重开和总账检查采用实际服务。
+- 验证：`test_product_resources.py --live-cost --sanitize`使用环境注入DeepSeek真实凭据通过；模型费用逐响应独立重算、工具文件内容、会话账本/usage.total一致、两次产品Host关闭重开保持、重开后继续生成新增费用累计均通过，ASan/UBSan通过。使用测试工作区和显式测试价格，费用为配置价格推算值，非提供者账单。源码diff核对通过。
+- 具体缺口：Bedrock请求ID/状态诊断、profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
+- 下一交付物：沿K05成组完成提供者诊断元数据与凭据配置的实际消费者，继续各协议完整行为覆盖。
