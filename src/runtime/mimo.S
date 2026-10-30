@@ -337,6 +337,14 @@ li_start:
  mov r15d,16
  jmp .Lauth_prefix_ready
 .Lauth_anthropic_prefix:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Laz_is
+ test eax,eax
+ jz .Lauth_nonazure
+ lea r14,[rip+.Laz_key]
+ mov r15d,9
+ jmp .Lauth_prefix_ready
+.Lauth_nonazure:
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
@@ -878,6 +886,10 @@ pg_mimo_configure:
  jnz .Lcfg_end
  mov rdi,[rsp]
  call .Lge_prepare
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Laz_prepare
  test eax,eax
  jnz .Lcfg_end
  mov rdi,[rsp]
@@ -2271,3 +2283,223 @@ pg_mimo_complete:
 .Lph_newlines: .asciz "\r\n"
 .Lph_format: .asciz "%s: %s"
 .Lph_empty: .asciz "%s;"
+
+.text
+.Laz_is:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Laz_api_keyname]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Laz_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Laz_api_keyname]
+ call json_object_object_get@PLT
+.Laz_api_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laz_no
+ mov rdi,rax
+ lea rsi,[rip+.Laz_api]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.Laz_no:
+ xor eax,eax
+ pop rbx
+ ret
+/* Resolve public Azure connection fields on the detached configuration. */
+.Laz_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,6
+ mov rdi,rsp
+ rep stosq
+ mov rdi,rbx
+ call .Laz_is
+ test eax,eax
+ jz .Laz_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Laz_deployment]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laz_endpoint
+ cmp byte ptr [rax],0
+ je .Laz_endpoint
+ mov rdi,rax
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Laz_bad
+ mov [rsp+24],rax
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_deployment]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Laz_bad
+ mov qword ptr [rsp+24],0
+.Laz_endpoint:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Laz_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_base]
+ lea rdx,[rip+.Laz_base_env]
+ call .Lge_option
+ test rax,rax
+ jz .Laz_resource
+ cmp byte ptr [rax],0
+ jne .Laz_copy_base
+.Laz_resource:
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_resource_name]
+ lea rdx,[rip+.Laz_resource_env]
+ call .Lge_option
+ test rax,rax
+ jz .Laz_model_base
+ cmp byte ptr [rax],0
+ je .Laz_model_base
+ mov rcx,rax
+ lea rdi,[rsp]
+ lea rsi,[rip+.Laz_resource_format]
+ mov rdx,rcx
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Laz_bad
+ jmp .Laz_base_ready
+.Laz_model_base:
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Laz_base_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+.Laz_base_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Laz_bad
+.Laz_copy_base:
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Laz_bad
+.Laz_base_ready:
+ mov rdi,[rsp]
+ call strlen@PLT
+ mov r12,rax
+ mov r13,[rsp]
+.Laz_trim:
+ test r12,r12
+ jz .Laz_bad
+ cmp byte ptr [r13+r12-1],47
+ jne .Laz_version
+ dec r12
+ mov byte ptr [r13+r12],0
+ jmp .Laz_trim
+.Laz_version:
+ mov rdi,rbx
+ lea rsi,[rip+.Laz_version_option]
+ lea rdx,[rip+.Laz_version_env]
+ call .Lge_option
+ test rax,rax
+ jz .Laz_default_version
+ cmp byte ptr [rax],0
+ jne .Laz_escape_version
+.Laz_default_version:
+ lea rax,[rip+.Laz_v1]
+.Laz_escape_version:
+ xor edi,edi
+ mov rsi,rax
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Laz_bad
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Laz_endpoint_format]
+ mov rdx,r13
+ mov rcx,rax
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Laz_bad
+ cmp eax,2048
+ jae .Laz_bad
+ mov rdi,[rsp+16]
+ mov esi,eax
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Laz_bad
+ mov [rsp+24],rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Laz_bad
+ mov qword ptr [rsp+24],0
+.Laz_ok:
+ xor ebp,ebp
+ jmp .Laz_end
+.Laz_bad:
+ mov ebp,1
+.Laz_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call curl_free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Laz_api: .asciz "azure-openai-responses"
+.Laz_key: .asciz "api-key: "
+.Laz_deployment: .asciz "azureDeploymentName"
+.Laz_base: .asciz "azureBaseUrl"
+.Laz_base_env: .asciz "AZURE_OPENAI_BASE_URL"
+.Laz_resource_name: .asciz "azureResourceName"
+.Laz_resource_env: .asciz "AZURE_OPENAI_RESOURCE_NAME"
+.Laz_version_option: .asciz "azureApiVersion"
+.Laz_version_env: .asciz "AZURE_OPENAI_API_VERSION"
+.Laz_v1: .asciz "v1"
+.Laz_resource_format: .asciz "https://%s.openai.azure.com/openai/v1"
+.Laz_endpoint_format: .asciz "%s/responses?api-version=%s"
+
+.Laz_api_keyname: .asciz "api"

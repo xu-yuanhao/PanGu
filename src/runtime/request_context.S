@@ -1606,10 +1606,20 @@ pg_mimo_config_responses:
  jz .Lrp_no
  mov rdi,rax
  lea rsi,[rip+.Lrp_responses]
+ mov rbx,rdi
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrp_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_azure]
  call strcmp@PLT
  test eax,eax
  sete al
  movzx eax,al
+ pop rbx
+ ret
+.Lrp_yes:
+ mov eax,1
  pop rbx
  ret
 .Lrp_no:
@@ -1701,7 +1711,23 @@ pg_mimo_responses_history:
  mov rdi,rax
  lea rsi,[rip+.Lrp_responses]
  cmp dword ptr [rsp+56],0
- je .Lrh_identity_api
+ jne .Lrh_identity_other
+ mov [rsp+48],rdi
+ RHGET r12,api
+ test rax,rax
+ jnz .Lrh_requested_api
+ RHGET r12,modelInfo
+ RHGET rax,api
+.Lrh_requested_api:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ lea rsi,[rip+.Lrp_responses]
+ test rax,rax
+ cmovnz rsi,rax
+ mov rdi,[rsp+48]
+ mov qword ptr [rsp+48],0
+ jmp .Lrh_identity_api
+.Lrh_identity_other:
  lea rsi,[rip+.Lra_responses]
  cmp dword ptr [rsp+56],2
  jne .Lrh_identity_api
@@ -2497,3 +2523,6 @@ pg_google_requires_id:
 .Lgid_gpt: .asciz "gpt-oss-"
 .Lgid_live: .asciz "gemini-live-"
 .Lgid_gemini_name: .asciz "gemini-"
+
+.section .rodata
+.Lrp_azure: .asciz "azure-openai-responses"

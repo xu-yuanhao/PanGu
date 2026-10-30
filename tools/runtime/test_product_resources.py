@@ -34,6 +34,7 @@ def main():
                 ('google-generative-ai','https://proxy.invalid/v1beta','{}'),
                 ('google-vertex',None,'{"authMode":"api-key"}'),
                 ('google-vertex',None,'{"project":"pangu","location":"global"}'),
+                ('azure-openai-responses',None,'{"azureResourceName":"pangu","azureDeploymentName":"pangu-deployment"}'),
             ):
                 env=os.environ.copy()
                 for key in ('PANGU_MODEL_ENDPOINT','PANGU_MODEL_BASE_URL'):

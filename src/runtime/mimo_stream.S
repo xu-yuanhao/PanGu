@@ -1753,7 +1753,23 @@ pg_mimo_responses_complete:
  mov r14,rax
  RCCOPY "qword ptr [rsp+8]",r14,provider,provider
 .Lrc_api_metadata:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lrc_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lrc_configured_api
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lrc_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrc_api]
+ call json_object_object_get@PLT
+.Lrc_configured_api:
+ mov rdi,rax
+ call json_object_get_string@PLT
  lea rdi,[rip+.Lrc_api_value]
+ test rax,rax
+ cmovnz rdi,rax
  call json_object_new_string@PLT
  mov rdi,[rsp+8]
  lea rsi,[rip+.Lrc_api]

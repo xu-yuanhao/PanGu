@@ -899,6 +899,7 @@ pg_mimo_encode_request:
  test eax,eax
  jz .Lserialize_ready
  mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
  call .Lrp_request
  test eax,eax
  jnz .Linvalid
@@ -1630,8 +1631,9 @@ pg_mimo_uses_responses:
  push r12
  push r13
  push r14
- sub rsp,64
+ sub rsp,80
  mov rbx,rdi
+ mov [rsp+64],rsi
  RPGET rbx,messages
  mov r12,rax
  call json_object_new_array@PLT
@@ -1917,6 +1919,19 @@ pg_mimo_uses_responses:
  test eax,eax
  jnz .Lrp_bad
 .Lrp_clean:
+ mov rax,[rsp+64]
+ RPGET rax,azureDeploymentName
+ test rax,rax
+ jz .Lrp_deployment_ready
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_model_field]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lrp_bad
+.Lrp_deployment_ready:
  RPDEL rbx,messages
  RPDEL rbx,stream_options
  RPDEL rbx,max_tokens
@@ -1935,7 +1950,7 @@ pg_mimo_uses_responses:
 .Lrp_bad:
  mov eax,1
 .Lrp_end:
- add rsp,64
+ add rsp,80
  pop r14
  pop r13
  pop r12
@@ -6519,3 +6534,7 @@ pg_mimo_uses_google:
 .Lgt_level_values: .quad .Lgt_MINIMAL,.Lgt_LOW,.Lgt_MEDIUM,.Lgt_HIGH
 .section .rodata
 .Lg_modelInfo: .asciz "modelInfo"
+
+.section .rodata
+.Lrp_model_field: .asciz "model"
+.Lrp_azureDeploymentName: .asciz "azureDeploymentName"
