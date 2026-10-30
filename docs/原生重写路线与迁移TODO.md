@@ -111,7 +111,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 - [x] 默认model.metadata接通原生内置聊天模型元数据、用户agent目录models.json的容量/输出覆盖与自定义模型元数据；按provider/model或endpoint/model选择，只输出公开字段。默认prepare按canonical provider/model逐字段应用compaction.modelOverrides，刷新、隔离所有权和真实自动/后台压缩通过。
 - [x] models.catalog/TUI可选入口提供公开模型目录，支持provider筛选、内置/用户models.json同名覆盖去重，复用describe输出能力/容量，结果排除私有认证；与已有Agent模型选择共同提供模型面板Runtime入口。
-- [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；思考参数按DeepSeek/Zai/Qwen/OpenRouter格式和supportsReasoningEffort映射，普通端点不带提供商专用thinking字段；实际编码与模型传输/ABI专项通过。
+- [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；思考参数按DeepSeek/Zai/Qwen/OpenRouter格式和supportsReasoningEffort映射，普通端点不带提供商专用thinking字段；公开reasoning/thinkingLevelMap贯通目录、覆盖和请求，支持级别/关闭映射及off:null省略；实际编码与模型传输/ABI专项通过。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -307,8 +307,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Coding Agent `cli/args.ts`的session-dir/session-id/help/version入口，结合PanGu自己的持久目录与Conversation ID。
-- 实际调用链：`pg_client_startup_parse`以手写Assembly解析工作区、目录和安全整数会话ID；产品启动直接校验/预载指定Agent并将Client绑定到该会话，启动历史同样读取它。--session-dir优先于PANGU_SESSION_DIR，未给会话ID使用根会话；help/version在凭据和TTY初始化前返回。
-- 验证：两后端会话专项ASan/UBSan通过参数/默认值/缺值/非法ID与未知参数；实际产品help/version及错误参数退出码通过。产品Host ASan/UBSan、构建、Assembly检查通过；真实DeepSeek独立resume进程直接绑定保存的子会话，完成恢复回答/父等待和实际流中父取消跨进程恢复。G00按Git登记文件当前快照核对。
-- 接口与差异：新增32字节只读启动配置及解析导出，argv文本借用至退出；既有Runtime主表不变。PanGu session-id是自己存储中的Conversation ID，所有状态读取自己的JSONL。其余基础参数仍按K14来源范围完成。
-- 下一交付物：继续协议/工具/资源服务和实际TUI操作联调，按覆盖表成组推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` pi-ai `api/openai-completions.ts`的thinkingLevelMap、off字符串及off:null分支；现有models目录覆盖链。
+- 实际调用链：公开model metadata保留reasoning/thinkingLevelMap，按modelOverrides→custom→builtin选取，输出独立副本。OpenAI编码在格式分支前应用级别字符串映射，关闭映射可生成effort；DeepSeek/OpenRouter的off:null省略专用关闭字段。Zai/Qwen开关继续取原请求的启用状态。
+- 验证：模型O0/O2/UBSan编码/传输/ABI/分配专项通过；实际请求核对high/off映射和两种格式off:null省略，产品Host ASan/UBSan验证custom公开元数据与私有字段隔离。产品构建与Assembly检查通过。本轮无模型请求。
+- 接口与差异：无新增文件/公开ABI；本批补齐现有模型兼容参数组的数据传递，其他协议/格式仍由K05覆盖。目录公开值与原始模型配置独立持有。
+- 下一交付物：将后续工作集中到下一组完整协议/工具/资源消费者，避免继续拆分单个配置字段批次。

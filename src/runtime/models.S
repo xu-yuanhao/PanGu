@@ -583,6 +583,38 @@ pg_models_describe:
  inc ebp
  cmp ebp,4
  jb .Lm_compat_each
+ xor ebp,ebp
+.Lm_thinking_field:
+ lea rax,[rip+.Lm_thinking_fields]
+ mov rsi,[rax+rbp*8]
+ mov rdi,[rsp+24]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lm_thinking_copy
+ lea rax,[rip+.Lm_thinking_fields]
+ mov rsi,[rax+rbp*8]
+ mov rdi,[rsp+16]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lm_thinking_copy
+ lea rax,[rip+.Lm_thinking_fields]
+ mov rsi,[rax+rbp*8]
+ mov rdi,[rsp+8]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lm_thinking_next
+.Lm_thinking_copy:
+ mov rdx,rax
+ lea rax,[rip+.Lm_thinking_fields]
+ mov rsi,[rax+rbp*8]
+ mov rdi,[rsp]
+ call .Lm_copy
+ test eax,eax
+ jnz .Lm_describe_error
+.Lm_thinking_next:
+ inc ebp
+ cmp ebp,2
+ jb .Lm_thinking_field
  jmp .Lm_describe_success
 .Lm_describe_next:
  lea rdi,[rsp+112]
@@ -982,4 +1014,11 @@ pg_models_list:
  call json_object_put@PLT
  mov eax,ebp
  ME 128
+.section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lm_reasoning_public: .asciz "reasoning"
+.Lm_level_map_public: .asciz "thinkingLevelMap"
+.section .data.rel.ro
+.Lm_thinking_fields: .quad .Lm_reasoning_public,.Lm_level_map_public
 .section .note.GNU-stack,"",@progbits

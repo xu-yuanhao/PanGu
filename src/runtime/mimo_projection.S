@@ -1246,8 +1246,71 @@ pg_mimo_apply_options:
  call json_object_get@PLT
  mov [rsp],rax
  mov r13,rax
+ mov qword ptr [rsp+16],0
+ test rax,rax
+ setnz byte ptr [rsp+16]
+ mov qword ptr [rsp+24],0
+ mov rdi,rbx
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lct_level_map]
+ call json_object_object_get@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lct_mapping_ready
+ lea rsi,[rip+.Lct_off]
+ test r13,r13
+ jz .Lct_lookup_map
+ mov rdi,r13
+ call json_object_get_string@PLT
+ mov rsi,rax
+.Lct_lookup_map:
+ mov rdi,r14
+ lea rdx,[rsp+8]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lct_mapping_ready
+ mov rax,[rsp+8]
+ mov qword ptr [rsp+8],0
+ test rax,rax
+ jnz .Lct_map_string
+ cmp qword ptr [rsp+16],0
+ jne .Lct_mapping_ready
+ mov qword ptr [rsp+24],1
+ jmp .Lct_mapping_ready
+.Lct_map_string:
+ mov r14,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lct_mapping_ready
+ mov rdi,r14
+ call json_object_get@PLT
+ mov r14,rax
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov [rsp],r14
+ mov r13,r14
+ mov rdi,r13
+ call json_object_get@PLT
+ mov rdx,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_reasoning_effort_wire]
+ call .Lct_set
+ test eax,eax
+ jnz .Lct_bad
+.Lct_mapping_ready:
  cmp ebp,1
+ jne .Lct_non_deepseek
+ cmp qword ptr [rsp+24],0
  je .Lct_effort_support
+ mov rdi,r12
+ lea rsi,[rip+.Lopts_thinking_key]
+ call json_object_object_del@PLT
+ jmp .Lct_effort_support
+.Lct_non_deepseek:
  mov rdi,r12
  lea rsi,[rip+.Lopts_thinking_key]
  call json_object_object_del@PLT
@@ -1258,6 +1321,8 @@ pg_mimo_apply_options:
  cmp ebp,3
  je .Lct_qwen
  /* OpenRouter uses reasoning.effort and no top-level reasoning_effort. */
+ cmp qword ptr [rsp+24],0
+ jne .Lct_effort_support
  call json_object_new_object@PLT
  mov [rsp+8],rax
  test rax,rax
@@ -1284,8 +1349,8 @@ pg_mimo_apply_options:
  jmp .Lct_install
 .Lct_zai:
  lea rdi,[rip+.Lct_zai_off]
- test r13,r13
- jz .Lct_zai_parse
+ cmp qword ptr [rsp+16],0
+ je .Lct_zai_parse
  lea rdi,[rip+.Lct_zai_on]
 .Lct_zai_parse:
  call json_tokener_parse@PLT
@@ -1294,8 +1359,8 @@ pg_mimo_apply_options:
  jmp .Lct_install
 .Lct_qwen:
  xor edi,edi
- test r13,r13
- setnz dil
+ cmp qword ptr [rsp+16],0
+ setne dil
  call json_object_new_boolean@PLT
  mov [rsp+8],rax
  lea r14,[rip+.Lct_enable]
@@ -1373,4 +1438,9 @@ pg_mimo_apply_options:
 .Lct_zai_off: .asciz "{\"type\":\"disabled\"}"
 .section .data.rel.ro
 .Lct_formats: .quad .Lct_deepseek,.Lct_zai_format,.Lct_qwen_format,.Lct_router_format,0
+.section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lct_level_map: .asciz "thinkingLevelMap"
+.Lct_off: .asciz "off"
 .section .note.GNU-stack,"",@progbits
