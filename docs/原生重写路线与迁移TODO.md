@@ -129,7 +129,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Bedrock静态共享profile接入实际签名：默认/显式/环境profile、config与credentials、环境密钥优先级、profile区域及临时令牌；实际curl回放与ASan/UBSan通过。
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
-- [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
+- [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩、可取消的请求内重试及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -326,8 +326,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：compressRequestBodyZstd和SSE fetch调用者，结合既有Generation失败/持久重试路径核对。本批沿固定快照。
-- 实际调用链：Codex SSE在同一li_start请求中用系统libzstd level 3压缩；汇编设置content-encoding和curl二进制字节长度，持有压缩缓冲至curl关闭后释放，取消/重开复用原生命周期。原始JSON继续用于请求身份和持久事实，压缩不可用时按上游回退原文；公共服务ABI不变，内部模型布局与依赖登记同步。
-- 验证：模型O0/O2/UBSan与既有Pi差分通过；实际TLS接收端按Content-Length读取含NUL的压缩请求，独立解压核对Codex字段、账户与会话身份。压缩错误回退、头插入/curl设置失败及关闭释放通过最终传输ASan/UBSan；产品资源/Generation配置链ASan/UBSan通过，Assembly/diff通过。自审核对二进制借用期、curl销毁顺序和无压缩回退。已核对参考传输默认maxRetries=0；自定义传输重试仍保留待移植。
-- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存、专用重试/预算/费用和完整高级选项；Copilot OAuth与其余网关特例；其余协议认证和高级行为按K05保留。
-- 下一交付物：成组移植Codex传输的自定义重试、超时和错误处理，与既有Generation持久重试协调，再推进完整网关链。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：isTerminalRateLimitError、isRetryableError、getRetryAfterDelayMs、validateRetryDelayMs与SSE fetch重试循环；结合既有Generation持久失败调用者。
+- 实际调用链：Codex options.maxRetries默认0，配置可启用请求内重试。汇编按瞬时状态/文本及网络失败分类，429额度错误终止；单调时钟推进指数退避与Retry-After-Ms/秒数/HTTP日期，maxRetryDelayMs限制服务器延迟。等待返回既有WAIT，截止后复用同一curl配置、账户身份和压缩正文；已进入HTTP 200流的错误不重放。关闭/取消清理等待状态；超过服务器延迟上限时显式阻止Generation外层再次重试该失败。公共服务ABI不变，内部状态布局同步静态断言。
+- 验证：模型O0/O2/UBSan及Pi协议差分通过；11组传输用例覆盖状态/额度、等待/取消、毫秒延迟/日期/负数/空白、超过延迟上限、耗尽与成功续接；最终ASan/UBSan通过。实际TLS先返回503及Retry-After-Ms，再接收重发请求并返回SSE终态，核对两次压缩正文完全一致；产品失败适配核对重试阻止标记，产品资源/Generation配置链ASan/UBSan通过。Assembly/diff通过。自审核对等待时句柄摘除、重加、最后响应事实和缓冲清理。
+- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存、分阶段超时、友好错误与等待超限诊断、预算/费用和完整高级选项；Copilot OAuth与其余网关特例；其余协议认证和高级行为按K05保留。
+- 下一交付物：沿Codex完整连接/错误生命周期和预算结算继续成组移植，接入既有Generation消费者，再推进完整网关链。

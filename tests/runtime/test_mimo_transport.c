@@ -12,12 +12,16 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <time.h>
 
 /* 可控 curl 替身：perform/getinfo/info_read/add_handle/init 按脚本演出，
  * setopt 记录并转发真实 libcurl（校验变参 ABI 被真实现接受），
  * cleanup 计数用于验证 close 的释放恰好一次；显式签名验收使用本地 TLS。 */
 
-static int zstd_fail;
+static int zstd_fail,real_multi;
+extern CURLMcode __real_curl_multi_perform(CURLM *,int *);
+extern CURLMsg *__real_curl_multi_info_read(CURLM *,int *);
+extern CURLMcode __real_curl_multi_add_handle(CURLM *,CURL *);
 extern size_t __real_ZSTD_compress(void *,size_t,const void *,size_t,int);
 size_t __wrap_ZSTD_compress(void *out,size_t capacity,const void *source,size_t size,int level){return zstd_fail?(size_t)-1:__real_ZSTD_compress(out,capacity,source,size,level);}
 extern CURL *__real_curl_easy_init(void);
@@ -136,6 +140,7 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
 }
 
 CURLMcode __wrap_curl_multi_perform(CURLM *multi, int *running) {
+    if(real_multi)return __real_curl_multi_perform(multi,running);
     (void)multi;
     *running = script_running;
     return (CURLMcode)script_perform_rc;
@@ -149,11 +154,13 @@ CURLcode __wrap_curl_easy_getinfo(CURL *easy, CURLINFO info, ...) {
     va_start(ap, info);
     long *out = va_arg(ap, long *);
     va_end(ap);
+    if(real_multi)return __real_curl_easy_getinfo(easy,info,out);
     *out = script_http;
     return CURLE_OK;
 }
 
 CURLMsg *__wrap_curl_multi_info_read(CURLM *multi, int *left) {
+    if(real_multi)return __real_curl_multi_info_read(multi,left);
     (void)multi;
     static CURLMsg msg;
     *left = 0;
@@ -165,6 +172,7 @@ CURLMsg *__wrap_curl_multi_info_read(CURLM *multi, int *left) {
 }
 
 CURLMcode __wrap_curl_multi_add_handle(CURLM *multi, CURL *easy) {
+    if(real_multi)return __real_curl_multi_add_handle(multi,easy);
     (void)multi;
     (void)easy;
     return (CURLMcode)script_add_rc;
@@ -205,7 +213,7 @@ static void reset_script(void) {
     captured_write_data = NULL;
     captured_url = captured_post = captured_protocols = NULL;
     captured_headers = NULL;captured_sigv4[0]=captured_userpwd[0]=0;
-    zstd_fail=0;free(captured_decoded);captured_decoded=NULL;captured_post_size=-1;
+    real_multi=getenv("PANGU_TEST_REAL_MULTI")!=NULL;zstd_fail=0;free(captured_decoded);captured_decoded=NULL;captured_post_size=-1;
     captured_http_version = -1;
     captured_timeout = captured_connect_timeout = captured_nosignal = -1;
 }
@@ -548,7 +556,7 @@ static void test_responses_transport(void){
 }
 
 static int codex_compressed_wire(void){
- const char *endpoint=getenv("PANGU_TEST_CODEX_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-wire\",\"options\":{\"sessionId\":\"wire-codex-session\"}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&m.wire_request&&m.wire_size);assert(!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);assert(!m.wire_request&&!m.wire_size);free(captured_decoded);captured_decoded=NULL;puts("PASS: Codex binary Zstd body, declared byte length and request identity verified by actual TLS receiver");return 0;
+ const char *endpoint=getenv("PANGU_TEST_CODEX_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-wire\",\"options\":{\"sessionId\":\"wire-codex-session\",\"maxRetries\":1}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&m.wire_request&&m.wire_size);if(real_multi){pg_model_event event={0};for(unsigned tick=0;tick<10000;tick++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;struct timespec pause={0,1000000};nanosleep(&pause,NULL);}assert(event.kind==PG_MODEL_DONE&&m.retry_attempt==1);}else assert(!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);assert(!m.wire_request&&!m.wire_size);free(captured_decoded);captured_decoded=NULL;puts("PASS: Codex binary Zstd body, declared byte length and request identity verified by actual TLS receiver");return 0;
 }
 static void test_codex_compression_failures(void){
  unsigned setopts=0,headers=0;
@@ -559,6 +567,21 @@ static void test_codex_compression_failures(void){
   model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.request&&!m.wire_request&&!m.wire_size);
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex compression fallback, header/setopt failure and binary request ownership cleanup");
+}
+static void test_codex_transport_retries(void){
+ for(unsigned scenario=0;scenario<11;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-retry\",\"options\":{\"maxRetries\":2,\"maxRetryDelayMs\":10000}}");if(scenario==8)json_object_object_del(json_object_object_get(cfg,"options"),"maxRetries");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start());void *wire=m.wire_request;size_t wire_size=m.wire_size;
+  script_http=scenario==2?400:scenario==5?0:scenario==6?200:scenario==1||scenario==0?429:503;feed(scenario==1?"{\"error\":\"insufficient_quota billing\"}":"{\"error\":\"provider unavailable\"}");finish_transport();if(scenario==5||scenario==6)script_info=INFO_RESULT_ERROR;
+  const char *header=scenario==3?"Retry-After-Ms: 20000\r\n":scenario==4?"Retry-After-Ms: -5\r\n":scenario==9?"Retry-After: Thu, 01 Jan 1970 00:00:00 GMT\r\n":scenario==10?"Retry-After-Ms:  \t\r\n":"Retry-After-Ms: 5000\r\n";assert(captured_header((char *)header,1,strlen(header),captured_header_data)==strlen(header));
+  pg_model_event event={0};int status=nxt(&event);if(scenario==1||scenario==2||scenario==3||scenario==6||scenario==8){assert(status&&!m.retry_attempt&&!m.retry_at);assert(m.retry_blocked==(scenario==3));}else{
+   assert(!status&&event.kind==PG_MODEL_WAIT&&m.retry_attempt==1&&m.retry_at&&m.wire_request==wire&&m.wire_size==wire_size);
+   m.retry_at=UINT64_MAX;assert(!nxt(&event)&&event.kind==PG_MODEL_WAIT&&m.retry_attempt==1);
+   if(scenario==7){for(unsigned attempt=1;attempt<=2;attempt++){m.retry_at=1;script_running=1;script_http=0;script_info=INFO_OK;assert(!nxt(&event)&&!m.retry_at);script_http=503;feed("failure");finish_transport();status=nxt(&event);if(attempt==1)assert(!status&&m.retry_attempt==2&&m.retry_at);else assert(status&&m.retry_attempt==2&&!m.retry_at);}}
+   else if(scenario!=5){m.retry_at=1;script_running=1;script_http=200;script_info=INFO_OK;assert(!nxt(&event)&&!m.retry_at&&!m.retry_after[0]&&!m.retry_after_ms[0]);feed("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n");finish_transport();for(unsigned n=0;n<5;n++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;}assert(event.kind==PG_MODEL_DONE);}
+  }
+  model.cancel(model.context);assert(!m.easy&&!m.multi&&!m.request&&!m.wire_request&&!m.retry_at&&!m.retry_attempt);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex transient/quota classification, retry deadlines, header bounds/date/negative delays, success, exhaustion and cancel without body reconstruction");
 }
 static void test_codex_auth_failures(void){
  const char *tokens[]={"invalid","a.e30=.b","a.!!!!.b","a.e30=.b.extra"};
@@ -856,6 +879,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_codex_transport_retries();
     test_codex_compression_failures();
     test_responses_arguments();
     test_anthropic_transport();

@@ -251,7 +251,7 @@ static int native_model_configure(void *ctx,const struct json_object *configurat
 static void native_model_failure(void *ctx,pg_model_failure *out){
  pg_mimo *source=ctx;static char message[128];int n=snprintf(message,sizeof(message),"Model request failed (HTTP %ld, transport %u)",source->http,source->transport_error);
  pg_slice detail={message,(size_t)n},body={source->body,source->used},structured_detail={0},structured_body={0};if(!pg_mimo_failure_data(source,&structured_detail,&structured_body)){if(structured_detail.size)detail=structured_detail;if(structured_body.size)body=structured_body;}
- *out=(pg_model_failure){.message=detail,.retryable=(unsigned)pg_model_retryable(body,source->http,source->transport_error),.http_status=(unsigned)source->http,.transport_error=source->transport_error,.flags=PG_MODEL_FAILURE_CONTEXT_CHECKED|((unsigned)pg_model_context_overflow(body,source->http)*PG_MODEL_FAILURE_CONTEXT_OVERFLOW)};
+ *out=(pg_model_failure){.message=detail,.retryable=source->retry_blocked?0:(unsigned)pg_model_retryable(body,source->http,source->transport_error),.http_status=(unsigned)source->http,.transport_error=source->transport_error,.flags=PG_MODEL_FAILURE_CONTEXT_CHECKED|((unsigned)pg_model_context_overflow(body,source->http)*PG_MODEL_FAILURE_CONTEXT_OVERFLOW)};
 }
 static int native_model_complete(void *ctx,struct json_object *assistant){return pg_mimo_complete(ctx,assistant);}
 static int acquire_model(const struct json_object *configuration,const pg_tool_registry *tools,pg_model *out){

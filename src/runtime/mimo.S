@@ -155,6 +155,11 @@ li_close:
  call free@PLT
  mov qword ptr [rbx+PG_MM_WIRE_REQUEST],0
  mov qword ptr [rbx+PG_MM_WIRE_SIZE],0
+ mov qword ptr [rbx+PG_MM_RETRY_ATTEMPT],0
+ mov qword ptr [rbx+PG_MM_RETRY_AT],0
+ mov dword ptr [rbx+PG_MM_RETRY_BLOCKED],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER_MS],0
  mov qword ptr [rbx + PG_MM_EASY], 0
  mov qword ptr [rbx + PG_MM_MULTI], 0
  mov qword ptr [rbx + PG_MM_HEADERS], 0
@@ -692,6 +697,11 @@ li_next:
  rep stosq                           /* *event = {WAIT} */
  cmp dword ptr [rbx+PG_MM_FAILED],0
  jne .Lnx_bad
+ mov rdi,rbx
+ call .Lcr_resume
+ test eax,eax
+ js .Lnx_bad
+ jnz .Lnx_wait
  cmp dword ptr [rbx + PG_MM_DELIVERED], 0
  jne .Lnx_delivered
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
@@ -730,12 +740,16 @@ li_next:
  mov ecx,[rax + PG_MM_CURLMSG_RESULT]
  mov [rbx+PG_MM_TRANSPORT_ERROR],ecx
  cmp ecx,PG_MM_CURLE_OK
- jne .Lnx_bad                         /* 传输错误不得伪造成功 */
+ jne .Lnx_codex_retry                         /* 传输错误不得伪造成功 */
  cmp qword ptr [rbx + PG_MM_HTTP], 200
  jne .Lnx_strict_retry
  mov dword ptr [rbx + PG_MM_TRANSPORT_DONE], 1
  jmp .Lnx_lines
 .Lnx_strict_retry:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Lnx_codex_retry
  mov rdi,rbx
  call pg_mimo_anthropic_strict_retry
  test eax,eax
@@ -763,6 +777,12 @@ li_next:
  mov qword ptr [rbx+PG_MM_HTTP],0
  mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
  jmp .Lnx_wait
+.Lnx_codex_retry:
+ mov rdi,rbx
+ call .Lcr_schedule
+ test eax,eax
+ jnz .Lnx_wait
+ jmp .Lnx_bad
 .Lnx_lines:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call pg_mimo_config_bedrock@PLT
@@ -1091,6 +1111,10 @@ pg_mimo_configure:
  jnz .Lcfg_end
  mov rdi,[rsp]
  call .Lcp_prepare
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Lcr_validate
  test eax,eax
  jnz .Lcfg_end
  mov rdi,[rsp]
@@ -4190,8 +4214,14 @@ pg_mimo_complete:
  test eax,eax
  jnz .Lhd_find
  mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER_MS],0
  jmp .Lhd_return
 .Lhd_find:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ call .Lcr_header
  xor ebp,ebp
  lea r14,[rip+.Lhd_names]
 .Lhd_name:
@@ -5428,3 +5458,471 @@ pg_mimo_complete:
  ret
 .section .rodata
 .Lcd_encoding: .asciz "content-encoding: zstd"
+
+.text
+/* Cooperative request-local retries retain the exact encoded/signed body. */
+.Lcr_now:
+ mov edi,1
+ jmp .Lcr_clock
+.Lcr_wall_now:
+ xor edi,edi
+.Lcr_clock:
+ sub rsp,24
+ mov rsi,rsp
+ call clock_gettime@PLT
+ test eax,eax
+ jnz .Lcr_now_bad
+ imul rcx,[rsp],1000
+ mov rax,[rsp+8]
+ xor edx,edx
+ mov esi,1000000
+ div rsi
+ add rax,rcx
+ add rsp,24
+ ret
+.Lcr_now_bad:
+ mov rax,-1
+ add rsp,24
+ ret
+/* Borrowed config and key; negative or noninteger options fail closed. */
+.Lcr_integer:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,r12
+ call json_object_object_get@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lcr_integer_default
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcr_integer_bad
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lcr_integer_bad
+ jmp .Lcr_integer_return
+.Lcr_integer_default:
+ mov rax,r13
+ jmp .Lcr_integer_return
+.Lcr_integer_bad:
+ mov rax,-1
+.Lcr_integer_return:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lcr_schedule:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcr_schedule_no
+ cmp qword ptr [rbx+PG_MM_HTTP],200
+ je .Lcr_schedule_no
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lcr_max_retries]
+ xor edx,edx
+ call .Lcr_integer
+ test rax,rax
+ js .Lcr_schedule_no
+ cmp [rbx+PG_MM_RETRY_ATTEMPT],rax
+ jae .Lcr_schedule_no
+ cmp dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
+ jne .Lcr_schedule_delay
+ cmp qword ptr [rbx+PG_MM_HTTP],429
+ jne .Lcr_schedule_status
+ xor r12d,r12d
+.Lcr_quota_each:
+ lea rax,[rip+.Lcr_quota_words]
+ mov rsi,[rax+r12*8]
+ test rsi,rsi
+ jz .Lcr_schedule_delay
+ lea rdi,[rbx+PG_MM_BODY]
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lcr_schedule_no
+ inc r12
+ jmp .Lcr_quota_each
+.Lcr_schedule_status:
+ mov rax,[rbx+PG_MM_HTTP]
+ cmp rax,500
+ je .Lcr_schedule_delay
+ cmp rax,502
+ je .Lcr_schedule_delay
+ cmp rax,503
+ je .Lcr_schedule_delay
+ cmp rax,504
+ je .Lcr_schedule_delay
+ xor r12d,r12d
+.Lcr_transient_each:
+ lea rax,[rip+.Lcr_transient_pairs]
+ mov rdx,r12
+ shl rdx,4
+ mov rsi,[rax+rdx]
+ test rsi,rsi
+ jz .Lcr_schedule_no
+ mov rdx,[rax+rdx+8]
+ lea rdi,[rbx+PG_MM_BODY]
+ call .Lcr_match_pair
+ test rax,rax
+ jnz .Lcr_schedule_delay
+ inc r12
+ jmp .Lcr_transient_each
+.Lcr_schedule_delay:
+ mov rcx,[rbx+PG_MM_RETRY_ATTEMPT]
+ cmp rcx,53
+ jae .Lcr_schedule_no
+ mov r12d,1000
+ shl r12,cl
+ cmp dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
+ jne .Lcr_default_delay
+ mov rdi,rbx
+ call .Lcr_header_delay
+ test rax,rax
+ js .Lcr_default_delay
+ mov r12,rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rip+.Lcr_max_delay]
+ mov edx,60000
+ call .Lcr_integer
+ test rax,rax
+ js .Lcr_schedule_no
+ jz .Lcr_default_delay
+ cmp r12,rax
+ ja .Lcr_schedule_block
+.Lcr_default_delay:
+ call .Lcr_now
+ cmp rax,-1
+ je .Lcr_schedule_no
+ add r12,rax
+ jc .Lcr_schedule_no
+ mov rdi,[rbx+PG_MM_MULTI]
+ mov rsi,[rbx+PG_MM_EASY]
+ call curl_multi_remove_handle@PLT
+ test eax,eax
+ jnz .Lcr_schedule_no
+ mov [rbx+PG_MM_RETRY_AT],r12
+ inc qword ptr [rbx+PG_MM_RETRY_ATTEMPT]
+ mov eax,1
+ jmp .Lcr_schedule_end
+.Lcr_schedule_block:
+ mov dword ptr [rbx+PG_MM_RETRY_BLOCKED],1
+.Lcr_schedule_no:
+ xor eax,eax
+.Lcr_schedule_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lcr_resume:
+ push rbx
+ mov rbx,rdi
+ cmp qword ptr [rdi+PG_MM_RETRY_AT],0
+ je .Lcr_resume_active
+ call .Lcr_now
+ cmp rax,-1
+ je .Lcr_resume_bad
+ cmp rax,[rbx+PG_MM_RETRY_AT]
+ jb .Lcr_resume_wait
+ mov qword ptr [rbx+PG_MM_USED],0
+ mov qword ptr [rbx+PG_MM_CONSUMED],0
+ mov byte ptr [rbx+PG_MM_BODY],0
+ mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER],0
+ mov byte ptr [rbx+PG_MM_RETRY_AFTER_MS],0
+ mov qword ptr [rbx+PG_MM_HTTP],0
+ mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
+ mov rdi,[rbx+PG_MM_MULTI]
+ mov rsi,[rbx+PG_MM_EASY]
+ call curl_multi_add_handle@PLT
+ test eax,eax
+ jnz .Lcr_resume_bad
+ mov qword ptr [rbx+PG_MM_RETRY_AT],0
+.Lcr_resume_active:
+ xor eax,eax
+ jmp .Lcr_resume_end
+.Lcr_resume_wait:
+ mov eax,1
+ jmp .Lcr_resume_end
+.Lcr_resume_bad:
+ mov eax,-1
+.Lcr_resume_end:
+ pop rbx
+ ret
+.section .rodata
+.Lcr_max_retries: .asciz "maxRetries"
+.Lcr_q1: .asciz "GoUsageLimitError"
+.Lcr_q2: .asciz "FreeUsageLimitError"
+.Lcr_q3: .asciz "Monthly usage limit reached"
+.Lcr_q4: .asciz "available balance"
+.Lcr_q5: .asciz "insufficient_quota"
+.Lcr_q6: .asciz "out of budget"
+.Lcr_q7: .asciz "quota exceeded"
+.Lcr_q8: .asciz "billing"
+.section .data.rel.ro
+.Lcr_quota_words: .quad .Lcr_q1,.Lcr_q2,.Lcr_q3,.Lcr_q4,.Lcr_q5,.Lcr_q6,.Lcr_q7,.Lcr_q8,0
+
+
+.text
+.Lcr_header:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+.Lcr_header_each:
+ lea rax,[rip+.Lcr_header_names]
+ mov rdi,[rax+r14*8]
+ call strlen@PLT
+ mov rbp,rax
+ cmp r13,rax
+ jb .Lcr_header_next
+ lea rax,[rip+.Lcr_header_names]
+ mov rsi,[rax+r14*8]
+ mov rdi,r12
+ mov rdx,rbp
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lcr_header_next
+ sub r13,rbp
+ cmp r13,127
+ ja .Lcr_header_done
+ lea rdi,[rbx+PG_MM_RETRY_AFTER]
+ test r14d,r14d
+ jz .Lcr_header_copy
+ lea rdi,[rbx+PG_MM_RETRY_AFTER_MS]
+.Lcr_header_copy:
+ mov rbx,rdi
+ lea rsi,[r12+rbp]
+ mov rdx,r13
+ call memcpy@PLT
+ mov byte ptr [rbx+r13],0
+ jmp .Lcr_header_done
+.Lcr_header_next:
+ inc r14
+ cmp r14,2
+ jb .Lcr_header_each
+.Lcr_header_done:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Number headers share JavaScript finite-number and nonnegative delay semantics. */
+.Lcr_number:
+ push rbx
+ sub rsp,16
+ mov rbx,rdi
+ lea rsi,[rip+.Lcr_space]
+ call strspn@PLT
+ cmp byte ptr [rbx+rax],0
+ jne .Lcr_number_parse
+ pxor xmm0,xmm0
+ xor eax,eax
+ jmp .Lcr_number_end
+.Lcr_number_parse:
+ mov rdi,rbx
+ mov qword ptr [rsp],0
+ lea rsi,[rsp]
+ call strtod@PLT
+ movsd [rsp+8],xmm0
+ mov rdi,[rsp]
+ cmp rdi,rbx
+ je .Lcr_number_bad
+ lea rsi,[rip+.Lcr_space]
+ call strspn@PLT
+ mov rdi,[rsp]
+ cmp byte ptr [rdi+rax],0
+ jne .Lcr_number_bad
+ movsd xmm0,[rsp+8]
+ movq rax,xmm0
+ shr rax,52
+ and eax,2047
+ cmp eax,2047
+ je .Lcr_number_bad
+ pxor xmm1,xmm1
+ maxsd xmm0,xmm1
+ xor eax,eax
+ jmp .Lcr_number_end
+.Lcr_number_bad:
+ mov eax,1
+.Lcr_number_end:
+ add rsp,16
+ pop rbx
+ ret
+.Lcr_header_delay:
+ push rbp
+ push rbx
+ sub rsp,8
+ mov rbx,rdi
+ lea rdi,[rbx+PG_MM_RETRY_AFTER_MS]
+ cmp byte ptr [rdi],0
+ je .Lcr_seconds_delay
+ call .Lcr_number
+ test eax,eax
+ jz .Lcr_delay_convert
+.Lcr_seconds_delay:
+ lea rdi,[rbx+PG_MM_RETRY_AFTER]
+ cmp byte ptr [rdi],0
+ je .Lcr_delay_absent
+ call .Lcr_number
+ test eax,eax
+ jnz .Lcr_date_delay
+ mulsd xmm0,[rip+.Lcr_thousand]
+.Lcr_delay_convert:
+ cvttsd2si rax,xmm0
+ test rax,rax
+ js .Lcr_delay_absent
+ jmp .Lcr_delay_end
+.Lcr_date_delay:
+ lea rdi,[rbx+PG_MM_RETRY_AFTER]
+ xor esi,esi
+ call curl_getdate@PLT
+ cmp rax,-1
+ je .Lcr_delay_absent
+ imul rbp,rax,1000
+ jo .Lcr_delay_absent
+ call .Lcr_wall_now
+ cmp rax,-1
+ je .Lcr_delay_absent
+ sub rbp,rax
+ mov rax,rbp
+ xor edx,edx
+ test rax,rax
+ cmovs rax,rdx
+ jmp .Lcr_delay_end
+.Lcr_delay_absent:
+ mov rax,-1
+.Lcr_delay_end:
+ add rsp,8
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcr_after: .asciz "retry-after:"
+.Lcr_after_ms: .asciz "retry-after-ms:"
+.Lcr_max_delay: .asciz "maxRetryDelayMs"
+.Lcr_space: .asciz " \t\r\n"
+.p2align 3
+.Lcr_thousand: .double 1000
+.section .data.rel.ro
+.Lcr_header_names: .quad .Lcr_after,.Lcr_after_ms
+
+.text
+.Lcr_validate:
+ push rbx
+ mov rbx,rdi
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcr_validate_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcr_max_retries]
+ xor edx,edx
+ call .Lcr_integer
+ test rax,rax
+ js .Lcr_validate_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lcr_max_delay]
+ mov edx,60000
+ call .Lcr_integer
+ test rax,rax
+ js .Lcr_validate_bad
+.Lcr_validate_ok:
+ xor eax,eax
+ pop rbx
+ ret
+.Lcr_validate_bad:
+ mov eax,1
+ pop rbx
+ ret
+
+.text
+/* Fixed upstream alternatives: prefix, optional non-newline byte, suffix. */
+.Lcr_match_pair:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsi
+ call strlen@PLT
+ mov r14,rax
+.Lcr_match_find:
+ mov rdi,rbx
+ mov rsi,r12
+ call strcasestr@PLT
+ test rax,rax
+ jz .Lcr_match_end
+ lea rbx,[rax+1]
+ lea rdi,[rax+r14]
+ mov [rsp],rdi
+ mov rsi,r13
+ mov rdi,r13
+ call strlen@PLT
+ mov rdx,rax
+ mov rdi,[rsp]
+ mov rsi,r13
+ call strncasecmp@PLT
+ test eax,eax
+ jz .Lcr_match_yes
+ mov rdi,[rsp]
+ cmp byte ptr [rdi],0
+ je .Lcr_match_find
+ cmp byte ptr [rdi],10
+ je .Lcr_match_find
+ inc rdi
+ mov [rsp],rdi
+ mov rdi,r13
+ call strlen@PLT
+ mov rdx,rax
+ mov rdi,[rsp]
+ mov rsi,r13
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lcr_match_find
+.Lcr_match_yes:
+ mov eax,1
+.Lcr_match_end:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lcr_rate: .asciz "rate"
+.Lcr_limit: .asciz "limit"
+.Lcr_overloaded: .asciz "overloaded"
+.Lcr_empty: .asciz ""
+.Lcr_service: .asciz "service"
+.Lcr_unavailable: .asciz "unavailable"
+.Lcr_upstream: .asciz "upstream"
+.Lcr_connect: .asciz "connect"
+.Lcr_connection: .asciz "connection"
+.Lcr_refused: .asciz "refused"
+.section .data.rel.ro
+.Lcr_transient_pairs: .quad .Lcr_rate,.Lcr_limit,.Lcr_overloaded,.Lcr_empty,.Lcr_service,.Lcr_unavailable,.Lcr_upstream,.Lcr_connect,.Lcr_connection,.Lcr_refused,0,0

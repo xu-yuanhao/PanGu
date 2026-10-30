@@ -365,12 +365,14 @@ def sigv4_wire(binary, directory):
 def codex_compressed_wire(binary, directory):
     failures=[]
     received=[]
+    failed_once=False
     codec=C.CDLL('libzstd.so.1')
     codec.ZSTD_getFrameContentSize.argtypes=[C.c_void_p,C.c_size_t];codec.ZSTD_getFrameContentSize.restype=C.c_ulonglong
     codec.ZSTD_decompress.argtypes=[C.c_void_p,C.c_size_t,C.c_void_p,C.c_size_t];codec.ZSTD_decompress.restype=C.c_size_t
     class Receiver(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def do_POST(self):
+            nonlocal failed_once
             try:
                 raw=self.rfile.read(int(self.headers['Content-Length']))
                 assert self.headers['Content-Encoding']=='zstd' and b'\x00' in raw
@@ -383,20 +385,26 @@ def codex_compressed_wire(binary, directory):
                 assert body['prompt_cache_key']=='wire-codex-session'
                 assert self.headers['session-id']==self.headers['x-client-request-id']=='wire-codex-session'
                 assert self.headers['chatgpt-account-id']=='pangu-test-account' and self.headers['originator']=='pangu'
-                received.append(True);self.send_response(200)
+                received.append(raw)
+                if 'retry=1' in self.path and not failed_once:
+                    failed_once=True;payload=b'{"error":"overloaded"}';self.send_response(503);self.send_header('Retry-After-Ms','0')
+                else:
+                    payload=b'data: {"type":"response.completed","response":{"status":"completed"}}\n\n';self.send_response(200)
             except Exception as error:
-                failures.append(type(error).__name__);self.send_response(400)
-            self.send_header('Content-Length','0');self.end_headers()
+                failures.append(type(error).__name__);payload=b'';self.send_response(400)
+            self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload)
     server=HTTPServer(('127.0.0.1',0),Receiver)
     tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(Path(directory)/'sigv4-cert.pem',Path(directory)/'sigv4-key.pem')
     server.socket=tls.wrap_socket(server.socket,server_side=True);server.timeout=15
-    worker=threading.Thread(target=server.handle_request,daemon=True);worker.start()
+    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(3)],daemon=True);worker.start()
     env=os.environ.copy()
     payload=base64.b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-test-account'}}).encode()).decode()
     env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',PANGU_MODEL_API_KEY='e30.'+payload+'.signature',PANGU_TEST_SIGV4_CA=str(Path(directory)/'sigv4-cert.pem'),PANGU_TEST_CODEX_ENDPOINT=f'https://127.0.0.1:{server.server_port}/codex/responses')
     try:
+        subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20)
+        env.update(PANGU_TEST_REAL_MULTI='1',PANGU_TEST_CODEX_ENDPOINT=env['PANGU_TEST_CODEX_ENDPOINT']+'?retry=1')
         subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20);worker.join(2)
-        assert received==[True] and not failures,failures
+        assert len(received)==3 and received[1]==received[2] and not failures,failures
     finally: server.server_close()
 
 def main():
