@@ -587,6 +587,17 @@ static void test_google_transport(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google/Vertex actual model transport replay, API-key/bearer headers, text/tool, finish barrier, EOF and structured errors");
 }
+
+static void test_google_endpoint_config(void){
+ const char *configurations[]={"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\"}","{\"api\":\"google-generative-ai\",\"model\":\"model with space\",\"baseUrl\":\"https://proxy.invalid/v1beta/\"}","{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"options\":{\"authMode\":\"api-key\"}}","{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"options\":{\"project\":\"pangu-project\",\"location\":\"global\"}}","{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"options\":{\"project\":\"pangu-project\",\"location\":\"us-central1\"}}","{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"baseUrl\":\"https://proxy.invalid\",\"options\":{\"authMode\":\"api-key\"}}","{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"baseUrl\":\"https://proxy.invalid/v1/projects/custom/locations/global\",\"options\":{\"project\":\"custom\",\"location\":\"global\"}}"};
+ const char *urls[]={"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent?alt=sse","https://proxy.invalid/v1beta/models/model%20with%20space:streamGenerateContent?alt=sse","https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3-flash:streamGenerateContent?alt=sse","https://aiplatform.googleapis.com/v1/projects/pangu-project/locations/global/publishers/google/models/gemini-3-flash:streamGenerateContent?alt=sse","https://us-central1-aiplatform.googleapis.com/v1/projects/pangu-project/locations/us-central1/publishers/google/models/gemini-3-flash:streamGenerateContent?alt=sse","https://proxy.invalid/v1/publishers/google/models/gemini-3-flash:streamGenerateContent?alt=sse","https://proxy.invalid/v1/projects/custom/locations/global/publishers/google/models/gemini-3-flash:streamGenerateContent?alt=sse"};
+ for(unsigned n=0;n<7;n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse(configurations[n]);assert(!pg_mimo_configure(&m,cfg)&&!json_object_object_get(cfg,"endpoint"));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","route-unit-key",1);assert(!start()&&!strcmp(captured_url,urls[n]));unsigned key=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)key+=!strcmp(h->data,n<3||n==5?"x-goog-api-key: route-unit-key":"Authorization: Bearer route-unit-key");assert(key==1);model.close(model.context);
+ }
+
+ reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -610,6 +621,7 @@ int main(void) {
     test_anthropic_affinity();
     test_anthropic_strict_retry();
     test_google_transport();
+    test_google_endpoint_config();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

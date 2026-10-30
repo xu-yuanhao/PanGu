@@ -325,7 +325,14 @@ li_start:
  mov rdi,rbx
  call pg_mimo_uses_google
  cmp eax,1
+ je .Lauth_google_key
+ cmp eax,2
  jne .Lauth_anthropic_prefix
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lge_key_mode
+ test eax,eax
+ jz .Lauth_prefix_ready
+.Lauth_google_key:
  lea r14,[rip+.Lgoogle_key]
  mov r15d,16
  jmp .Lauth_prefix_ready
@@ -860,17 +867,21 @@ pg_mimo_configure:
  test eax,eax
  jnz .Lcfg_end
  mov rdi,r12
+ mov rsi,rsp
+ xor edx,edx
+ call json_object_deep_copy@PLT
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Lge_prepare
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
  lea rsi,[rip+.Lcfg_endpoint]
  call json_object_object_get@PLT
  mov rdi,rax
  mov esi,2048
  call .Lcfg_string
- test eax,eax
- jnz .Lcfg_end
- mov rdi,r12
- mov rsi,rsp
- xor edx,edx
- call json_object_deep_copy@PLT
  test eax,eax
  jnz .Lcfg_end
  call json_object_new_object@PLT
@@ -1661,3 +1672,358 @@ pg_mimo_complete:
 
 .section .rodata
 .Lgoogle_unfinished: .asciz "{\"error\":{\"message\":\"Google stream ended without a finish reason\"}}"
+
+/* Native credential binding keeps secrets outside the configuration. */
+.text
+.Lge_key_mode:
+ push rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_authMode]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lge_not_key
+ mov rdi,rax
+ lea rsi,[rip+.Lge_api_key]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.Lge_not_key:
+ xor eax,eax
+ pop rbx
+ ret
+/* Option string with environment fallback; borrowed through this configure. */
+.Lge_option:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ mov r12,rdx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,rbx
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lge_option_end
+ mov rdi,r12
+ call getenv@PLT
+.Lge_option_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Complete only an absent endpoint on a detached candidate. */
+.Lge_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,10
+ rep stosq
+ mov rdi,rbx
+ call pg_mimo_config_google
+ mov r12d,eax
+ test eax,eax
+ jz .Lge_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_authMode]
+ lea rdx,[rsp+64]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lge_mode_checked
+ mov rdi,[rsp+64]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lge_bad
+ mov rdi,[rsp+64]
+ call json_object_get_string@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lge_api_key]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lge_mode_checked
+ cmp r12d,1
+ je .Lge_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lge_bearer]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lge_bad
+.Lge_mode_checked:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ lea rdx,[rsp+64]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lge_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rsi,rax
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lge_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lge_base_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+.Lge_base_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lge_default_base
+ cmp byte ptr [rax],0
+ je .Lge_default_base
+ mov rdi,rax
+ lea rsi,[rip+.Lge_marker]
+ call strstr@PLT
+ test rax,rax
+ jnz .Lge_default_base
+ mov qword ptr [rsp+72],1
+ jmp .Lge_base_ready
+.Lge_default_base:
+ lea r14,[rip+.Lge_google_base]
+ cmp r12d,1
+ je .Lge_base_ready
+ lea r14,[rip+.Lge_vertex_base]
+.Lge_base_ready:
+ mov rdi,r14
+ call strdup@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lge_bad
+ mov rdi,rax
+ call strlen@PLT
+ mov rdx,[rsp+8]
+.Lge_trim:
+ test rax,rax
+ jz .Lge_bad
+ cmp byte ptr [rdx+rax-1],'/'
+ jne .Lge_route
+ dec rax
+ mov byte ptr [rdx+rax],0
+ jmp .Lge_trim
+.Lge_route:
+ cmp r12d,1
+ je .Lge_version_ready
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lge_version_path]
+ call strstr@PLT
+ test rax,rax
+ jz .Lge_append_version
+ movzx eax,byte ptr [rax+2]
+ sub eax,'0'
+ cmp eax,9
+ jbe .Lge_version_ready
+.Lge_append_version:
+ lea rdi,[rsp+48]
+ lea rsi,[rip+.Lge_version_format]
+ mov rdx,[rsp+8]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lge_bad
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov rax,[rsp+48]
+ mov [rsp+8],rax
+ mov qword ptr [rsp+48],0
+.Lge_version_ready:
+ cmp r12d,1
+ je .Lge_google_route
+ mov rdi,rbx
+ call .Lge_key_mode
+ test eax,eax
+ jnz .Lge_publisher_route
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_project]
+ lea rdx,[rip+.Lge_project_env]
+ call .Lge_option
+ test rax,rax
+ jnz .Lge_project_ready
+ lea rdi,[rip+.Lge_project_alias]
+ call getenv@PLT
+.Lge_project_ready:
+ test rax,rax
+ jz .Lge_bad
+ cmp byte ptr [rax],0
+ je .Lge_bad
+ mov rsi,rax
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lge_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_location]
+ lea rdx,[rip+.Lge_location_env]
+ call .Lge_option
+ test rax,rax
+ jz .Lge_bad
+ cmp byte ptr [rax],0
+ je .Lge_bad
+ mov [rsp+56],rax
+ mov rsi,rax
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lge_bad
+ # Use the regional host only when no custom base overrides it.
+ cmp qword ptr [rsp+72],0
+ jne .Lge_project_route
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lge_vertex_base]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lge_project_route
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lge_global]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lge_project_route
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov qword ptr [rsp+8],0
+ lea rdi,[rsp+8]
+ lea rsi,[rip+.Lge_regional_base]
+ mov rdx,[rsp+24]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lge_bad
+.Lge_project_route:
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lge_projects_path]
+ call strstr@PLT
+ test rax,rax
+ jnz .Lge_publisher_route
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lge_vertex_format]
+ mov rdx,[rsp+8]
+ mov rcx,[rsp+16]
+ mov r8,[rsp+24]
+ mov r9,[rsp]
+ xor eax,eax
+ call asprintf@PLT
+ jmp .Lge_formatted
+.Lge_publisher_route:
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lge_publisher_format]
+ mov rdx,[rsp+8]
+ mov rcx,[rsp]
+ xor eax,eax
+ call asprintf@PLT
+ jmp .Lge_formatted
+.Lge_google_route:
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lge_google_format]
+ mov rdx,[rsp+8]
+ mov rcx,[rsp]
+ xor eax,eax
+ call asprintf@PLT
+.Lge_formatted:
+ test eax,eax
+ js .Lge_bad
+ cmp eax,2048
+ jae .Lge_bad
+ mov rdi,[rsp+32]
+ mov esi,eax
+ call json_object_new_string_len@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lge_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lge_bad
+ mov qword ptr [rsp+40],0
+.Lge_ok:
+ xor ebp,ebp
+ jmp .Lge_end
+.Lge_bad:
+ mov ebp,1
+.Lge_end:
+ mov rdi,[rsp]
+ call curl_free@PLT
+ mov rdi,[rsp+16]
+ call curl_free@PLT
+ mov rdi,[rsp+24]
+ call curl_free@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov rdi,[rsp+32]
+ call free@PLT
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call free@PLT
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lge_authMode: .asciz "authMode"
+.Lge_api_key: .asciz "api-key"
+.Lge_baseUrl: .asciz "baseUrl"
+.Lge_marker: .asciz "{location}"
+.Lge_google_base: .asciz "https://generativelanguage.googleapis.com/v1beta"
+.Lge_vertex_base: .asciz "https://aiplatform.googleapis.com/v1"
+.Lge_global: .asciz "global"
+.Lge_regional_base: .asciz "https://%s-aiplatform.googleapis.com/v1"
+.Lge_projects_path: .asciz "/projects/"
+.Lge_google_format: .asciz "%s/models/%s:streamGenerateContent?alt=sse"
+.Lge_publisher_format: .asciz "%s/publishers/google/models/%s:streamGenerateContent?alt=sse"
+.Lge_vertex_format: .asciz "%s/projects/%s/locations/%s/publishers/google/models/%s:streamGenerateContent?alt=sse"
+.Lge_project: .asciz "project"
+.Lge_location: .asciz "location"
+.Lge_project_env: .asciz "GOOGLE_CLOUD_PROJECT"
+.Lge_project_alias: .asciz "GCLOUD_PROJECT"
+.Lge_location_env: .asciz "GOOGLE_CLOUD_LOCATION"
+
+.section .rodata
+.Lge_version_path: .asciz "/v"
+.Lge_version_format: .asciz "%s/v1"
+
+.section .rodata
+.Lge_bearer: .asciz "bearer"

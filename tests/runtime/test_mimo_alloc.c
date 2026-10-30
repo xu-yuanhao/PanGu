@@ -80,6 +80,16 @@ static void google_decoder_failures(void){
  }
  printf("PASS: Google decoded model lifecycle: %u constructor/insertion failures release ownership\n",total);
 }
+
+static void google_configuration_failures(void){
+ for(unsigned vertex=0;vertex<2;vertex++){
+  unsigned total=0;
+  for(unsigned fault=0;fault<=total;fault++){
+   fail_at=0;calls=tracked=0;pg_model model=pg_mimo_model(&provider);json_object *old=__real_json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"old-model\",\"endpoint\":\"https://example.invalid/explicit\"}");assert(!pg_mimo_configure(&provider,old)&&!live);json_object_put(old);json_object *candidate=__real_json_tokener_parse(vertex?"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"options\":{\"project\":\"pangu\",\"location\":\"us-central1\"}}":"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\"}");fail_at=fault;calls=tracked=0;int status=pg_mimo_configure(&provider,candidate);if(!fault){assert(!status);total=calls;}else{assert(status&&calls>=fault);assert(!strcmp(json_object_get_string(json_object_object_get(provider.configuration,"model")),"old-model"));}assert(!json_object_object_get(candidate,"endpoint"));json_object_put(candidate);model.close(model.context);assert(!live);
+  }
+  printf("PASS: Google configuration protocol %u: %u constructor/insertion failures preserve old config and release candidate\n",vertex,total);
+ }
+}
 int main(void){
  for(unsigned protocol=0;protocol<7;protocol++){
  struct json_object *canonical=0;
@@ -111,5 +121,6 @@ int main(void){
  anthropic_decoder_failures();
  strict_retry_failures();
  google_decoder_failures();
+ google_configuration_failures();
  return 0;
 }
