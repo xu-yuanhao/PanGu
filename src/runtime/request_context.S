@@ -384,6 +384,13 @@ pg_context_messages_model:
  call pg_mimo_config_anthropic
  add eax,eax
  mov [rsp+180],eax
+ test eax,eax
+ jnz .Lri_protocol_ready
+ mov rdi,[rsp+160]
+ call pg_mimo_config_google
+ test eax,eax
+ jz .Lri_protocol_ready
+ mov dword ptr [rsp+180],3
 .Lri_protocol_ready:
  call json_object_new_array@PLT
  mov [rsp],rax
@@ -494,7 +501,7 @@ pg_context_messages_model:
  mov rdi,[rsp+40]
  lea rsi,[rip+.Lri_responsesOutput]
  cmp dword ptr [rsp+180],2
- jne .Lri_history_key
+ jb .Lri_history_key
  lea rsi,[rip+.Lah_wire]
 .Lri_history_key:
  mov rdx,[rsp+56]
@@ -576,6 +583,22 @@ pg_context_messages_model:
  call json_object_get_string@PLT
  mov rdi,rax
  lea rsi,[rip+.Lra_responses]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lr_project_block_next
+ RG "qword ptr [rsp+24]",api
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgc_generative]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lr_project_block_next
+ RG "qword ptr [rsp+24]",api
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgc_vertex]
  call strcmp@PLT
  test eax,eax
  jz .Lr_project_block_next
@@ -867,7 +890,7 @@ pg_context_messages_model:
  jnz .Lr_project_bad
  .Lri_response_content:
  cmp dword ptr [rsp+180],2
- jne .Lri_result_name_ready
+ jb .Lri_result_name_ready
  RG "qword ptr [rsp+24]",toolName
  mov rdx,rax
  mov rdi,[rsp+40]
@@ -877,7 +900,7 @@ pg_context_messages_model:
  jnz .Lr_project_bad
 .Lri_result_name_ready:
  cmp dword ptr [rsp+180],2
- jne .Lri_result_protocol
+ jb .Lri_result_protocol
  RG "qword ptr [rsp+24]",isError
  mov rdi,rax
  call json_object_get_boolean@PLT
@@ -890,6 +913,15 @@ pg_context_messages_model:
  test eax,eax
  jnz .Lr_project_bad
 .Lri_result_protocol:
+ cmp dword ptr [rsp+180],3
+ jne .Lgh_result_images
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lr_content]
+ mov rdx,[rsp+48]
+ call .Lr_copy
+ test eax,eax
+ jnz .Lr_project_bad
+.Lgh_result_images:
  cmp dword ptr [rsp+180],0
  je .Lr_project_append
  cmp dword ptr [rsp+176],0
@@ -1621,6 +1653,14 @@ pg_mimo_responses_history:
  mov rdi,r12
  call pg_mimo_config_anthropic
  mov [rsp+56],eax
+ test eax,eax
+ jnz .Lgh_mode_ready
+ mov rdi,r12
+ call pg_mimo_config_google
+ test eax,eax
+ jz .Lgh_mode_ready
+ mov dword ptr [rsp+56],2
+.Lgh_mode_ready:
  RHGET rbx,content
  mov r13,rax
  mov rdi,rax
@@ -1663,6 +1703,17 @@ pg_mimo_responses_history:
  cmp dword ptr [rsp+56],0
  je .Lrh_identity_api
  lea rsi,[rip+.Lra_responses]
+ cmp dword ptr [rsp+56],2
+ jne .Lrh_identity_api
+ mov [rsp+48],rdi
+ mov rdi,r12
+ call pg_mimo_config_google
+ mov rdi,[rsp+48]
+ mov qword ptr [rsp+48],0
+ lea rsi,[rip+.Lgc_generative]
+ cmp eax,2
+ jne .Lrh_identity_api
+ lea rsi,[rip+.Lgc_vertex]
 .Lrh_identity_api:
  call strcmp@PLT
  test eax,eax
@@ -1699,6 +1750,10 @@ pg_mimo_responses_history:
  call json_object_get_boolean@PLT
  add eax,eax
  or eax,[rsp+16]
+ cmp dword ptr [rsp+56],2
+ jne .Lgh_policy_ready
+ or eax,6
+.Lgh_policy_ready:
  mov edx,eax
  mov rdi,rbp
  mov rsi,[rsp]
@@ -2058,6 +2113,8 @@ pg_mimo_config_anthropic:
  jnz .Lah_bad
  test r13d,1
  jz .Lah_ok
+ test r13d,4
+ jnz .Lgh_google_thinking
  AHGET rbx,redacted
  mov rdi,rax
  call json_object_get_boolean@PLT
@@ -2076,6 +2133,38 @@ pg_mimo_config_anthropic:
  jz .Lah_bad
  AHCOPY r14,rbx,thinking,thinking
  AHCOPY r14,rbx,thinkingSignature,signature
+ jmp .Lah_ok
+.Lgh_google_thinking:
+ AHGET rbx,thinkingSignature
+ mov rbp,rax
+ mov rdi,rax
+ call pg_google_signature_valid
+ mov r14d,eax
+ AHGET rbx,thinking
+ mov rbp,rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov r13d,eax
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov esi,r13d
+ call pg_context_blank
+ test eax,eax
+ jz .Lgh_google_think_build
+ test r14d,r14d
+ jz .Lah_ok
+.Lgh_google_think_build:
+ lea rdi,[rip+.Lah_think_json]
+ mov rsi,r12
+ call .Lrh_append
+ mov r13,rax
+ test rax,rax
+ jz .Lah_bad
+ AHCOPY r13,rbx,thinking,thinking
+ test r14d,r14d
+ jz .Lah_ok
+ AHCOPY r13,rbx,thinkingSignature,signature
  jmp .Lah_ok
 .Lah_unsigned_thinking:
  test r13d,2
@@ -2105,17 +2194,42 @@ pg_mimo_config_anthropic:
  jmp .Lah_ok
 .Lah_text_block:
  AHGET rbx,text
+ mov rbp,rax
  mov rdi,rax
  call json_object_get_string_len@PLT
+ test r13d,4
+ jz .Lgh_text_length
+ mov r14d,eax
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov esi,r14d
+ call pg_context_blank
+ test eax,eax
+ jz .Lgh_text_build
+ jmp .Lgh_text_signed_empty
+.Lgh_text_length:
+ test eax,eax
+ jnz .Lgh_text_build
+.Lgh_text_signed_empty:
+ test r13d,4
+ jz .Lah_ok
+ test r13d,1
+ jz .Lah_ok
+ AHGET rbx,textSignature
+ mov rdi,rax
+ call pg_google_signature_valid
  test eax,eax
  jz .Lah_ok
+.Lgh_text_build:
  lea rdi,[rip+.Lah_text_json]
  mov rsi,r12
  call .Lrh_append
  test rax,rax
  jz .Lah_bad
- AHCOPY rax,rbx,text,text
- jmp .Lah_ok
+ mov r14,rax
+ AHCOPY r14,rbx,text,text
+ jmp .Lgh_text_signature
 .Lah_tool:
  lea rdi,[rip+.Lah_use_json]
  mov rsi,r12
@@ -2126,6 +2240,30 @@ pg_mimo_config_anthropic:
  AHCOPY r14,rbx,id,id
  AHCOPY r14,rbx,name,name
  AHCOPY r14,rbx,arguments,input
+ test r13d,4
+ jz .Lah_ok
+ test r13d,1
+ jz .Lah_ok
+ AHGET rbx,thoughtSignature
+ jmp .Lgh_signature
+.Lgh_text_signature:
+ test r13d,4
+ jz .Lah_ok
+ test r13d,1
+ jz .Lah_ok
+ AHGET rbx,textSignature
+.Lgh_signature:
+ mov rbp,rax
+ mov rdi,rax
+ call pg_google_signature_valid
+ test eax,eax
+ jz .Lah_ok
+ mov rdi,r14
+ lea rsi,[rip+.Lgh_signature_key]
+ mov rdx,rbp
+ call .Lr_copy
+ test eax,eax
+ jnz .Lah_bad
 .Lah_ok:
  xor eax,eax
  jmp .Lah_end
@@ -2165,3 +2303,197 @@ pg_mimo_config_anthropic:
 .Lah_compat: .asciz "compat"
 .Lah_allowEmptySignature: .asciz "allowEmptySignature"
 .Lah_empty_think_json: .asciz "{\"type\":\"thinking\",\"signature\":\"\"}"
+
+/* Google wire protocols share Content/Part projection; Vertex uses bearer auth. */
+.text
+.globl pg_mimo_config_google
+.type pg_mimo_config_google,@function
+pg_mimo_config_google:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Lgc_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lgc_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lra_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lgc_api]
+ call json_object_object_get@PLT
+.Lgc_api_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lgc_no
+ mov rdi,rax
+ lea rsi,[rip+.Lgc_generative]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgc_one
+ mov rdi,rbx
+ lea rsi,[rip+.Lgc_vertex]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgc_no
+ mov eax,2
+ pop rbx
+ ret
+.Lgc_one:
+ mov eax,1
+ pop rbx
+ ret
+.Lgc_no:
+ xor eax,eax
+ pop rbx
+ ret
+.size pg_mimo_config_google,.-pg_mimo_config_google
+.section .rodata
+.Lgc_api: .asciz "api"
+.Lgc_generative: .asciz "google-generative-ai"
+.Lgc_vertex: .asciz "google-vertex"
+
+.text
+.globl pg_google_signature_valid
+.type pg_google_signature_valid,@function
+pg_google_signature_valid:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgs_bad
+ mov rdi,rbx
+ call json_object_get_string_len@PLT
+ mov r12d,eax
+ test eax,eax
+ jz .Lgs_bad
+ test eax,3
+ jnz .Lgs_bad
+ mov rdi,rbx
+ call json_object_get_string@PLT
+ xor ecx,ecx
+ xor r13d,r13d
+.Lgs_byte:
+ cmp ecx,r12d
+ jae .Lgs_good
+ movzx edx,byte ptr [rax+rcx]
+ cmp dl,'='
+ je .Lgs_padding
+ test r13d,r13d
+ jnz .Lgs_bad
+ cmp dl,'a'
+ jb .Lgs_upper
+ cmp dl,'z'
+ jbe .Lgs_next
+.Lgs_upper:
+ cmp dl,'A'
+ jb .Lgs_digit
+ cmp dl,'Z'
+ jbe .Lgs_next
+.Lgs_digit:
+ cmp dl,'0'
+ jb .Lgs_symbol
+ cmp dl,'9'
+ jbe .Lgs_next
+.Lgs_symbol:
+ cmp dl,'+'
+ je .Lgs_next
+ cmp dl,'/'
+ jne .Lgs_bad
+ jmp .Lgs_next
+.Lgs_padding:
+ test ecx,ecx
+ jz .Lgs_bad
+ inc r13d
+ cmp r13d,2
+ ja .Lgs_bad
+.Lgs_next:
+ inc ecx
+ jmp .Lgs_byte
+.Lgs_good:
+ mov eax,1
+ jmp .Lgs_end
+.Lgs_bad:
+ xor eax,eax
+.Lgs_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.size pg_google_signature_valid,.-pg_google_signature_valid
+.globl pg_google_requires_id
+.type pg_google_requires_id,@function
+pg_google_requires_id:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lgid_no
+ lea rsi,[rip+.Lgid_claude]
+ mov edx,7
+ call strncmp@PLT
+ test eax,eax
+ jz .Lgid_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lgid_gpt]
+ mov edx,8
+ call strncmp@PLT
+ test eax,eax
+ jz .Lgid_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lgid_live]
+ mov edx,12
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lgid_gemini
+ add rbx,12
+ jmp .Lgid_version
+.Lgid_gemini:
+ mov rdi,rbx
+ lea rsi,[rip+.Lgid_gemini_name]
+ mov edx,7
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lgid_no
+ add rbx,7
+.Lgid_version:
+ movzx eax,byte ptr [rbx]
+ sub eax,'0'
+ cmp eax,9
+ ja .Lgid_no
+ mov ecx,eax
+ inc rbx
+.Lgid_digits:
+ movzx eax,byte ptr [rbx]
+ sub eax,'0'
+ cmp eax,9
+ ja .Lgid_result
+ imul ecx,ecx,10
+ add ecx,eax
+ cmp ecx,3
+ jae .Lgid_yes
+ inc rbx
+ jmp .Lgid_digits
+.Lgid_result:
+ cmp ecx,3
+ jae .Lgid_yes
+.Lgid_no:
+ xor eax,eax
+ pop rbx
+ ret
+.Lgid_yes:
+ mov eax,1
+ pop rbx
+ ret
+.size pg_google_requires_id,.-pg_google_requires_id
+.section .rodata
+.Lah_thoughtSignature: .asciz "thoughtSignature"
+.Lah_textSignature: .asciz "textSignature"
+.Lgh_signature_key: .asciz "googleSignature"
+.Lgid_claude: .asciz "claude-"
+.Lgid_gpt: .asciz "gpt-oss-"
+.Lgid_live: .asciz "gemini-live-"
+.Lgid_gemini_name: .asciz "gemini-"

@@ -6,6 +6,8 @@
 #include <json-c/json.h>
 static pg_mimo m;
 static pg_model_event e;
+static pg_model reset_ops;
+static void reset_model(void){if(reset_ops.close)reset_ops.close(reset_ops.context);reset_ops=pg_mimo_model(&m);}
 static int line(const char *s){return pg_mimo_decode_line(&m,s,&e);}
 
 static void responses(void){
@@ -156,30 +158,74 @@ static void tool_sampling_declarations(void){
  }
  puts("PASS: native tool sampling descriptor ordinary/prefer fallback and require rejection before model transmission");
 }
+
+static void google_protocol(void){
+ for(unsigned vertex=0;vertex<2;vertex++){
+  pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse(vertex?"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"modelProvider\":\"vertex\",\"endpoint\":\"https://vertex.invalid/streamGenerateContent\",\"modelInfo\":{\"input\":[\"text\",\"image\"]}}":"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"modelProvider\":\"google\",\"endpoint\":\"https://google.invalid/streamGenerateContent?alt=sse\",\"modelInfo\":{\"input\":[\"text\",\"image\"]}}");assert(!pg_mimo_configure(&m,cfg));
+  const char *frames[]={
+   "data: {\"responseId\":\"google-native-response\",\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"plan\",\"thought\":true,\"thoughtSignature\":\"c2ln\"}]}}]}",
+   "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"},{\"text\":\"世界\",\"thoughtSignature\":\"ZmluYWw=\"}]}}]}",
+   "data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"echo\",\"args\":{\"x\":1}},\"thoughtSignature\":\"Y2FsbA==\"}]}}]}",
+   "data: {\"candidates\":[{\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":4,\"thoughtsTokenCount\":3,\"cachedContentTokenCount\":2,\"totalTokenCount\":29}}",
+   "data: {\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":4,\"thoughtsTokenCount\":3,\"cachedContentTokenCount\":2,\"totalTokenCount\":29}}"
+  };
+  for(size_t n=0;n<sizeof(frames)/sizeof(*frames);n++){int status=line(frames[n]);if(status)fprintf(stderr,"Google frame %zu rejected\n",n);assert(!status);if(n==1)assert(e.kind==PG_MODEL_TEXT&&e.text.size==11&&!memcmp(e.text.data,"Hello世界",11));}
+  assert(m.saw_done&&m.finish_reason==2&&m.call_count==1&&!strcmp(m.arguments,"{\"x\":1}"));json_object *assistant=json_tokener_parse("{\"role\":\"assistant\",\"content\":[]}");assert(!pg_mimo_complete(&m,assistant));json_object *blocks=json_object_object_get(assistant,"content"),*usage=json_object_object_get(assistant,"usage");assert(json_object_array_length(blocks)==3&&!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),vertex?"google-vertex":"google-generative-ai"));assert(!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(blocks,0),"thinkingSignature")),"c2ln")&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(blocks,1),"textSignature")),"ZmluYWw=")&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(blocks,2),"thoughtSignature")),"Y2FsbA=="));assert(json_object_get_int(json_object_object_get(usage,"input"))==8&&json_object_get_int(json_object_object_get(usage,"output"))==7&&json_object_get_int(json_object_object_get(usage,"reasoning"))==3&&json_object_get_int(json_object_object_get(usage,"totalTokens"))==29);assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"rawStopReason")),"STOP"));
+  json_object *ctx=json_tokener_parse("{\"systemPrompt\":\"PanGu\",\"messages\":[]}"),*rows=json_object_object_get(ctx,"messages");assert(!json_object_array_add(rows,assistant));json_object *result=json_tokener_parse("{\"role\":\"toolResult\",\"toolName\":\"echo\",\"isError\":false,\"content\":[{\"type\":\"text\",\"text\":\"native result\"}]}");json_object_object_add(result,"toolCallId",json_object_get(json_object_object_get(json_object_array_get_idx(blocks,2),"id")));assert(!json_object_array_add(json_object_object_get(result,"content"),json_tokener_parse("{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"}")));assert(!json_object_array_add(rows,result));assert(!json_object_array_add(rows,json_tokener_parse("{\"role\":\"user\",\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"Yg==\"}]}")));static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=ctx;pg_tool_registry registry={.entries={{.name="echo",.description="Echo",.schema="{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"integer\"},\"constField\":{\"const\":\"tag\",\"default\":{\"const\":\"preserved\"}},\"const\":{\"const\":42}}}"}},.count=1};pg_mimo_bind_tools(&m,&registry);assert(!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*contents=json_object_object_get(wire,"contents");assert(wire&&json_object_array_length(contents)==3&&!json_object_object_get(wire,"messages")&&!json_object_object_get(wire,"model")&&!json_object_object_get(wire,"stream"));json_object *parts=json_object_object_get(json_object_array_get_idx(contents,0),"parts");assert(json_object_array_length(parts)==3&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(parts,0),"thoughtSignature")),"c2ln")&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(parts,1),"thoughtSignature")),"ZmluYWw="));json_object *call=json_object_object_get(json_object_array_get_idx(parts,2),"functionCall");assert(json_object_object_get(call,"id"));json_object *response=json_object_object_get(json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(contents,1),"parts"),0),"functionResponse");assert(!strcmp(json_object_get_string(json_object_object_get(response,"name")),"echo")&&json_object_equal(json_object_object_get(call,"id"),json_object_object_get(response,"id")));assert(json_object_object_get(wire,"systemInstruction")&&json_object_object_get(json_object_array_get_idx(json_object_object_get(wire,"tools"),0),"functionDeclarations"));json_object *result_images=json_object_object_get(response,"parts");assert(json_object_array_length(result_images)==1&&json_object_object_get(json_object_array_get_idx(result_images,0),"inlineData"));json_object *declaration=json_object_array_get_idx(json_object_object_get(json_object_array_get_idx(json_object_object_get(wire,"tools"),0),"functionDeclarations"),0),*properties=json_object_object_get(json_object_object_get(declaration,"parametersJsonSchema"),"properties"),*constant=json_object_object_get(properties,"constField");assert(json_object_object_get(constant,"enum")&&!json_object_object_get(constant,"const")&&!strcmp(json_object_get_string(json_object_object_get(json_object_object_get(constant,"default"),"const")),"preserved"));json_object_put(wire);
+  json_object_object_add(cfg,"model",json_object_new_string("gemini-2.5-flash"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));wire=json_tokener_parse(m.request);contents=json_object_object_get(wire,"contents");assert(json_object_array_length(contents)==4&&!strstr(m.request,"panguToolImages")&&!strstr(m.request,"c2ln")&&!strstr(m.request,"ZmluYWw="));json_object *legacy_parts=json_object_object_get(json_object_array_get_idx(contents,2),"parts");assert(json_object_array_length(legacy_parts)==2&&!strcmp(json_object_get_string(json_object_object_get(json_object_array_get_idx(legacy_parts,0),"text")),"Tool result image:"));json_object_put(wire);json_object_put(ctx);json_object_put(cfg);model.close(model.context);
+ }
+ puts("PASS: Google Generative/Vertex text/thought/tool stream, signatures, original usage and native request/tool roundtrip");
+}
+
+static void google_thinking_options(void){
+ const char *models[]={"gemini-3-flash","gemini-3.1-pro-preview","gemini-4-argon","gemma4-26b","gemini-2.5-pro","gemini-2.5-flash-lite","gemini-2.5-flash","custom-model"};
+ for(unsigned n=0;n<8;n++){
+  pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"placeholder\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"modelInfo\":{\"reasoning\":true},\"options\":{\"reasoningEffort\":\"minimal\",\"temperature\":0.4,\"maxTokens\":777}}");json_object_object_add(cfg,"model",json_object_new_string(models[n]));assert(!pg_mimo_configure(&m,cfg));static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_USER;session.messages[0].size=2;strcpy(session.messages[0].text,"hi");assert(!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*gen=json_object_object_get(wire,"generationConfig"),*thinking=json_object_object_get(gen,"thinkingConfig");assert(thinking&&json_object_get_boolean(json_object_object_get(thinking,"includeThoughts"))&&json_object_get_int(json_object_object_get(gen,"maxOutputTokens"))==777&&json_object_object_get(gen,"temperature")&&!json_object_object_get(wire,"temperature"));if(n<4)assert(!strcmp(json_object_get_string(json_object_object_get(thinking,"thinkingLevel")),"MINIMAL"));else assert(json_object_get_int(json_object_object_get(thinking,"thinkingBudget"))==(n==5?512:n==7?-1:128));json_object_put(wire);
+  json_object_object_add(cfg,"options",json_tokener_parse("{\"thinking\":{\"enabled\":true,\"budgetTokens\":321}}"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));wire=json_tokener_parse(m.request);thinking=json_object_object_get(json_object_object_get(wire,"generationConfig"),"thinkingConfig");assert(json_object_get_int(json_object_object_get(thinking,"thinkingBudget"))==321);json_object_put(wire);json_object_put(cfg);model.close(model.context);
+ }
+ puts("PASS: Google simple/model-family thinking levels and budgets, direct provider thinking config and generation options");
+}
+
+static void google_empty_signed_blocks(void){
+ pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"modelProvider\":\"google\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}"),*context=json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"provider\":\"google\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"thinkingSignature\":\"c2ln\"},{\"type\":\"text\",\"text\":\"\",\"textSignature\":\"dGV4dA==\"},{\"type\":\"thinking\",\"thinking\":\"\"},{\"type\":\"text\",\"text\":\"   \"},{\"type\":\"toolCall\",\"id\":\"call|native\",\"name\":\"read\",\"arguments\":{},\"thoughtSignature\":\"invalid-signature\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"call|native\",\"toolName\":\"read\",\"content\":[]}]}");static pg_session session;session=(pg_session){0};session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=context;
+ for(unsigned foreign=0;foreign<2;foreign++){
+  json_object_object_add(cfg,"model",json_object_new_string(foreign?"gemini-3-other":"gemini-3-flash"));assert(!pg_mimo_configure(&m,cfg)&&!pg_mimo_encode_request(&m,&session));json_object *wire=json_tokener_parse(m.request),*contents=json_object_object_get(wire,"contents"),*parts=json_object_object_get(json_object_array_get_idx(contents,0),"parts");assert(json_object_array_length(parts)==(foreign?1u:3u));json_object *callpart=json_object_array_get_idx(parts,json_object_array_length(parts)-1),*call=json_object_object_get(callpart,"functionCall");assert(!strcmp(json_object_get_string(json_object_object_get(call,"id")),"call_native")&&!json_object_object_get(callpart,"thoughtSignature"));json_object_put(wire);
+ }
+ json_object_put(context);json_object_put(cfg);model.close(model.context);puts("PASS: Google signed empty block replay, unsigned whitespace removal, invalid signature omission and paired ID normalization");
+}
+
+static void google_long_event(void){
+ pg_model model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);json_object *chunk=json_tokener_parse("{\"candidates\":[{\"content\":{\"parts\":[{},{}]},\"finishReason\":\"STOP\"}]}");char text[7000];memset(text,'L',sizeof(text));json_object *parts=json_object_object_get(json_object_object_get(json_object_array_get_idx(json_object_object_get(chunk,"candidates"),0),"content"),"parts");for(unsigned n=0;n<2;n++)json_object_object_add(json_object_array_get_idx(parts,n),"text",json_object_new_string_len(text,sizeof(text)));const char *payload=json_object_to_json_string_ext(chunk,JSON_C_TO_STRING_PLAIN);size_t size=strlen(payload);char *frame=malloc(size+7);assert(frame);memcpy(frame,"data: ",6);memcpy(frame+6,payload,size+1);assert(!line(frame)&&e.kind==PG_MODEL_TEXT&&e.text.size==14000);for(size_t n=0;n<e.text.size;n++)assert(e.text.data[n]=='L');json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant));assert(json_object_get_string_len(json_object_object_get(json_object_array_get_idx(json_object_object_get(assistant,"content"),0),"text"))==14000);json_object_put(assistant);free(frame);json_object_put(chunk);model.close(model.context);assert(!m.google_text);puts("PASS: Google multi-part 14 KiB streamed event and final content share dynamic ownership");
+}
 int main(void){
+ reset_model();
+ google_protocol();
+ google_thinking_options();
+ google_empty_signed_blocks();
+ google_long_event();
  anthropic();
  anthropic_failures();
  openai_cache();
  chat_raw_stops();
  tool_sampling_declarations();
- m=(pg_mimo){0};
+ reset_model();
  assert(!line(": heartbeat"));assert(!line(""));
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}"));assert(e.kind==PG_MODEL_TEXT&&e.text.size==6);
  assert(!line("data: {\"choices\":[{\"delta\":{\"content\":\"世界\"},\"finish_reason\":null}]}"));assert(e.text.size==6);
  assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}"));assert(m.finish_reason==1);
  assert(!line("data: [DONE]"));assert(m.saw_done);assert(line("data: [DONE]"));
- m=(pg_mimo){0};assert(line("data: [DONE]"));assert(line("data: broken"));assert(line("data: {\"choices\":[]}junk"));
+ reset_model();assert(line("data: [DONE]"));assert(line("data: broken"));assert(line("data: {\"choices\":[]}junk"));
  assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}"));assert(m.finish_reason==3);
- m=(pg_mimo){0};
+ reset_model();
  assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"echo\",\"arguments\":\"{\"}}]}}]}"));
  assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"}\"}}]}}]}"));
  assert(!strcmp(m.arguments,"{}"));assert(!strcmp(m.id,"call1"));assert(!strcmp(m.name,"echo"));
  assert(!line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));assert(m.finish_reason==2);assert(!line("data: [DONE]"));
- m=(pg_mimo){0};assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));
- m=(pg_mimo){0};
+ reset_model();assert(!line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}"));assert(line("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"));
+ reset_model();
  assert(line("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\u0000\"}}]}}]}"));
  const char *indices[]={"-1","8","4294967296","9223372036854775807","0.5","true","\"1\""};
- for(size_t i=0;i<sizeof(indices)/sizeof(*indices);++i){m=(pg_mimo){0};char text[512];snprintf(text,sizeof(text),"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":%s}]}}]}",indices[i]);assert(line(text));}
- responses();responses_final_roundtrip();responses_settlement();
- puts("PASS: incremental text, UTF-8, split tool arguments, terminal protocol, malformed/truncated and capacity rejection");return 0;
+ for(size_t i=0;i<sizeof(indices)/sizeof(*indices);++i){reset_model();char text[512];snprintf(text,sizeof(text),"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":%s}]}}]}",indices[i]);assert(line(text));}
+ reset_model();responses();responses_final_roundtrip();responses_settlement();
+ puts("PASS: incremental text, UTF-8, split tool arguments, terminal protocol, malformed/truncated and capacity rejection");reset_ops.close(reset_ops.context);return 0;
 }

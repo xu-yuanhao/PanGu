@@ -116,12 +116,15 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
 const base=readFileSync(process.argv[1],'utf8').replace(/^import.*$/mg,'');
 const provider=readFileSync(process.argv[2],'utf8');
 const check=provider.slice(provider.indexOf('const ANTHROPIC_STRICT_UNSUPPORTED_KEYWORDS'),provider.indexOf('\nfunction convertTools('));
-const text=stripTypeScriptTypes(base+'\n'+check+'\nexport {isAnthropicStrictUnsupportedKeyword};',{mode:'strip'});
+const google=readFileSync(process.argv[3],'utf8');
+const rewrite=google.slice(google.indexOf('const JSON_SCHEMA_NAME_MAPS'),google.indexOf('/**\n * Convert tools to Gemini'));
+const text=stripTypeScriptTypes(base+'\n'+check+'\n'+rewrite+'\nexport {isAnthropicStrictUnsupportedKeyword,rewriteConstAsEnum};',{mode:'strip'});
 const lib=await import('data:text/javascript;base64,'+Buffer.from(text).toString('base64'));
 const cases=JSON.parse(readFileSync(0,'utf8'));
-console.log(JSON.stringify([false,true].map(a=>cases.map(s=>{try{return lib.makeStrictJsonSchema(s,a?lib.isAnthropicStrictUnsupportedKeyword:undefined)}catch{return null}}))));
+const result=[false,true].map(a=>cases.map(s=>{try{return lib.makeStrictJsonSchema(s,a?lib.isAnthropicStrictUnsupportedKeyword:undefined)}catch{return null}}));
+result.push(cases.map(s=>{try{return lib.rewriteConstAsEnum(lib.makeStrictJsonSchema(s))}catch{return null}}));result.push(cases.map(s=>lib.rewriteConstAsEnum(s)));console.log(JSON.stringify(result));
 """
-    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle,str(ROOT/'references/pi/packages/ai/src/api/constrained-sampling.ts'),str(ROOT/'references/pi/packages/ai/src/api/anthropic-messages.ts')],input=json.dumps(cases).encode()))
+    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle,str(ROOT/'references/pi/packages/ai/src/api/constrained-sampling.ts'),str(ROOT/'references/pi/packages/ai/src/api/anthropic-messages.ts'),str(ROOT/'references/pi/packages/ai/src/api/google-shared.ts')],input=json.dumps(cases).encode()))
     bridge=r"""
 #include "src/runtime/mimo.h"
 #include <json-c/json.h>
@@ -130,6 +133,7 @@ console.log(JSON.stringify([false,true].map(a=>cases.map(s=>{try{return lib.make
 int schema_request(const char *schema,unsigned protocol,unsigned required,char **out){
  pg_mimo *m=calloc(1,sizeof(*m));pg_session *s=calloc(1,sizeof(*s));if(!m||!s)abort();pg_model model=pg_mimo_model(m);
  json_object *cfg=json_tokener_parse(protocol==2?"{\"api\":\"anthropic-messages\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/messages\",\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true}}}":protocol==1?"{\"api\":\"openai-responses\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/responses\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}":"{\"api\":\"openai-completions\",\"model\":\"test\",\"endpoint\":\"https://example.invalid/chat/completions\",\"modelInfo\":{\"compat\":{\"supportsStrictMode\":true}}}");
+ if(protocol>=3){json_object_put(cfg);cfg=json_tokener_parse(protocol==3?"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}":"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}");}
  int rc=pg_mimo_configure(m,cfg);json_object_put(cfg);if(rc)abort();pg_tool_options options={.max_bytes=51200,.max_lines=2000,.constrained_sampling=required?"{\"type\":\"json_schema\",\"strict\":\"require\"}":"{\"type\":\"json_schema\",\"strict\":\"prefer\"}"};pg_tool_registry registry={.entries={{.name="check",.description="Check",.schema=schema,.options=&options}},.count=1};pg_mimo_bind_tools(m,&registry);s->count=1;s->messages[0].role=PG_USER;s->messages[0].size=2;memcpy(s->messages[0].text,"hi",2);rc=pg_mimo_encode_request(m,s);*out=rc?0:strdup(m->request);model.close(m);free(s);free(m);return rc;
 }
 """
@@ -139,9 +143,9 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
         subprocess.run([CC,'-shared','-fPIC','-D_POSIX_C_SOURCE=200809L','-O2','-I'+str(ROOT),str(source),*SRC,*libs,'-o',str(output)],check=True)
         native=C.CDLL(str(output));native.schema_request.argtypes=[C.c_char_p,C.c_uint,C.c_uint,C.POINTER(C.c_void_p)];native.schema_request.restype=C.c_int;native.free.argtypes=[C.c_void_p]
         count=0
-        for protocol in range(3):
+        for protocol in range(5):
             for index,schema in enumerate(cases):
-                wanted=expected[protocol==2][index]
+                wanted=expected[2 if protocol>=3 else protocol==2][index]
                 if protocol==2 and wanted is not None:wanted={**wanted,'properties':wanted.get('properties',{})}
                 for required in range(2):
                     out=C.c_void_p();rc=native.schema_request(json.dumps(schema).encode(),protocol,required,C.byref(out));count+=1
@@ -149,13 +153,16 @@ int schema_request(const char *schema,unsigned protocol,unsigned required,char *
                     else:
                         assert not rc and out.value,(protocol,index,schema)
                         wire=json.loads(C.string_at(out));native.free(out)
-                        tool=wire['tools'][0];tool=tool['function'] if protocol==0 else tool
+                        tool=wire['tools'][0];tool=tool['functionDeclarations'][0] if protocol>=3 else tool['function'] if protocol==0 else tool
+                        strict=wire.get('toolConfig',{}).get('functionCallingConfig',{}).get('mode')=='VALIDATED' if protocol>=3 else tool.get('strict') is True
                         if wanted is not None:
-                            assert tool.get('strict') is True,(protocol,index,tool)
-                            actual=tool['input_schema' if protocol==2 else 'parameters']
+                            assert strict,(protocol,index,tool)
+                            actual=tool['parametersJsonSchema' if protocol>=3 else 'input_schema' if protocol==2 else 'parameters']
                             assert actual==wanted,(protocol,index,schema,actual,wanted)
-                        else:assert not tool.get('strict'),(protocol,index,tool)
-    print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses and Anthropic')
+                        else:
+                            assert not strict,(protocol,index,tool)
+                            if protocol>=3:assert tool['parametersJsonSchema']==expected[3][index],(protocol,index,tool)
+    print(f'PASS: {count} strict/prefer native tool requests match fixed Pi schema conversion across Chat, Responses, Anthropic, Google and Vertex')
 
 def main():
     failures = 0

@@ -118,7 +118,8 @@
 #define PG_MM_ANTHROPIC_USAGE 173928
 #define PG_MM_STRICT_RETRY 173936
 #define PG_MM_STRICT_DIAGNOSTICS 173944
-#define PG_MM_BYTES 173952
+#define PG_MM_GOOGLE_TEXT 173952
+#define PG_MM_BYTES 173960
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -250,6 +251,7 @@ _Static_assert(sizeof(pg_mimo_anthropic_block)==40&&offsetof(pg_mimo_anthropic_b
 _Static_assert(sizeof(struct json_object_iterator)==sizeof(void *),"json-c public iterator ABI");
 PG_MM_ASSERT_OFF(pg_mimo, strict_retry, PG_MM_STRICT_RETRY);
 PG_MM_ASSERT_OFF(pg_mimo, strict_diagnostics, PG_MM_STRICT_DIAGNOSTICS);
+PG_MM_ASSERT_OFF(pg_mimo, google_text, PG_MM_GOOGLE_TEXT);
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
 _Static_assert(CURLE_COULDNT_RESOLVE_PROXY==5 && CURLE_COULDNT_RESOLVE_HOST==6 && CURLE_COULDNT_CONNECT==7 && CURLE_HTTP2==16 && CURLE_PARTIAL_FILE==18 && CURLE_OPERATION_TIMEDOUT==28 && CURLE_GOT_NOTHING==52 && CURLE_SEND_ERROR==55 && CURLE_RECV_ERROR==56 && CURLE_HTTP2_STREAM==92,"native retry CURL mapping");
 PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);

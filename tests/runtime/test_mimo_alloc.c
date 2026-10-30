@@ -71,8 +71,17 @@ static void strict_retry_failures(void){
  }
  printf("PASS: strict retry request/diagnostic: %u allocation/insertion failures release ownership\n",total);
 }
+
+static void google_decoder_failures(void){
+ const char *frames[]={"data: {\"responseId\":\"fault-response\",\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"plan\",\"thought\":true,\"thoughtSignature\":\"c2ln\"},{\"text\":\"text\"}]}}]}","data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"read\",\"args\":{\"path\":\"file.txt\"}},\"thoughtSignature\":\"Y2FsbA==\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":5,\"thoughtsTokenCount\":2,\"candidatesTokenCount\":3,\"cachedContentTokenCount\":1,\"totalTokenCount\":10}}"};
+ unsigned total=0;
+ for(unsigned fault=0;fault<=total;fault++){
+  fail_at=0;calls=tracked=0;pg_model model=pg_mimo_model(&provider);provider.configuration=__real_json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\"}");json_object *assistant=__real_json_tokener_parse("{\"content\":[]}");fail_at=fault;calls=0;int status=0;pg_model_event event={0};for(size_t n=0;n<2&&!status;n++)status=pg_mimo_decode_line(&provider,frames[n],&event);if(!status)status=pg_mimo_complete(&provider,assistant);if(!fault){assert(!status);total=calls;}else{if(!status)fprintf(stderr,"Google ignored fault %u/%u\n",fault,total);assert(status&&calls>=fault);}json_object_put(assistant);model.close(model.context);if(live)fprintf(stderr,"Google fault %u leaks %u owners\n",fault,live);assert(!live);
+ }
+ printf("PASS: Google decoded model lifecycle: %u constructor/insertion failures release ownership\n",total);
+}
 int main(void){
- for(unsigned protocol=0;protocol<5;protocol++){
+ for(unsigned protocol=0;protocol<7;protocol++){
  struct json_object *canonical=0;
  memset(&session,0,sizeof(session));
  session.system_size=3;memcpy(session.system_prompt,"sys",4);session.count=5;
@@ -86,8 +95,11 @@ int main(void){
  if(protocol>=3){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse("{\"api\":\"anthropic-messages\",\"model\":\"claude-test\",\"endpoint\":\"https://example.invalid/messages\",\"options\":{\"toolChoice\":{\"type\":\"tool\",\"name\":\"read\",\"disable_parallel_tool_use\":true},\"metadata\":{\"user_id\":\"native-user\"}},\"modelInfo\":{\"compat\":{\"supportsStrictTools\":true,\"allowedFallbackModels\":[{\"model\":\"fallback-native\"}]}}}");}
  if(protocol==2){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"openai-responses\",\"model\":\"native-responses\",\"provider\":\"openai\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"saved thought\",\"thinkingSignature\":\"{\\\"type\\\":\\\"reasoning\\\",\\\"id\\\":\\\"rs_saved\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"saved thought\\\"}],\\\"encrypted_content\\\":\\\"cipher-saved\\\"}\"},{\"type\":\"text\",\"text\":\"saved text\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_saved\\\",\\\"phase\\\":\\\"commentary\\\"}\"},{\"type\":\"toolCall\",\"id\":\"call-saved\",\"name\":\"read\",\"arguments\":{},\"responseItemId\":\"fc_saved\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"call-saved\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}]}");assert(canonical);session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
 
+
+ if(protocol>=5){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse(protocol==5?"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}":"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"modelProvider\":\"vertex\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"modelInfo\":{\"input\":[\"text\",\"image\"]}}");}
+ if(protocol==6){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"provider\":\"vertex\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"plan\",\"thinkingSignature\":\"c2ln\"},{\"type\":\"text\",\"text\":\"check\",\"textSignature\":\"dGV4dA==\"},{\"type\":\"toolCall\",\"id\":\"google-fault\",\"name\":\"read\",\"arguments\":{},\"thoughtSignature\":\"Y2FsbA==\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"google-fault\",\"toolName\":\"read\",\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"},{\"type\":\"text\",\"text\":\"result\"}]}]}");session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
  if(protocol==4){json_object_object_add(json_object_object_get(provider.configuration,"modelInfo"),"input",__real_json_tokener_parse("[\"text\",\"image\"]"));canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"image-fault\",\"name\":\"read\",\"arguments\":{}}]},{\"role\":\"toolResult\",\"toolCallId\":\"image-fault\",\"toolName\":\"read\",\"isError\":true,\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"},{\"type\":\"text\",\"text\":\"error\"}]}]}");session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
- for(unsigned n=1;n<=(protocol==2||protocol==4?1u:8u);n+=7){
+ for(unsigned n=1;n<=(protocol==2||protocol==4||protocol==6?1u:8u);n+=7){
  if(n==8){memset(session.messages,0,sizeof(session.messages));session.count=18;session.messages[0].role=PG_USER;session.messages[1].role=PG_ASSISTANT;for(unsigned j=0;j<n;++j){pg_message *c=&session.messages[2+j],*r=&session.messages[10+j];c->role=PG_TOOL_CALL;c->size=2;strcpy(c->text,"{}");strcpy(c->tool_name,"read");snprintf(c->call_id,sizeof(c->call_id),"id-%u",j);r->role=PG_TOOL_RESULT;r->size=2;strcpy(r->text,"ok");strcpy(r->call_id,c->call_id);}}
  fail_at=0;calls=0;tracked=0;
  int baseline=pg_mimo_encode_request(&provider,&session);if(baseline||live)fprintf(stderr,"projection baseline protocol=%u calls=%u status=%d live=%u\n",protocol,n,baseline,live);assert(!baseline&&provider.request&&!live);free(provider.request);provider.request=0;unsigned total=calls;
@@ -98,5 +110,6 @@ int main(void){
  const char *finished[]={"{\"x\":1}","{\"x\":\"a\\q\"}","{broken"};for(unsigned c=0;c<3;c++){struct json_object *value=0;fail_at=0;calls=tracked=0;assert(!pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value));unsigned total=calls;json_object_put(value);assert(!live);for(unsigned i=1;i<=total;i++){fail_at=i;calls=tracked=0;value=0;assert(pg_mimo_arguments_parse((pg_slice){finished[c],strlen(finished[c])},&value)&&!value&&!live);}printf("PASS: final arguments case %u: %u constructor/insertion failures release ownership\n",c,total);}
  anthropic_decoder_failures();
  strict_retry_failures();
+ google_decoder_failures();
  return 0;
 }

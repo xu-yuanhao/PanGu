@@ -118,6 +118,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Responses最终参数接通修复、错误元数据与Tool结算：空白为{}，修复字符串控制字符/非法转义，失败保留原文并生成argumentsError；模型调用先交付准备后的对象，complete保存最终元数据，Tool在效果前返回错误。416组固定Pi源码差分、构造失败释放、SQLite/JSONL无写入副作用与NUL错误文本、真实DeepSeek错误后重试写入通过。
 - [x] Anthropic Messages基础链接入原生模型服务：system/文本/图片、签名思考、tool_use/tool_result分组、工具声明及API-key/version头；有序块关闭后解析最终参数，message_stop确认流终态，输入/缓存用量按增量合并。实际模型服务回放覆盖文本/工具、错误参数、长度终态、结构化错误与提前EOF；canonical历史按模型身份重放思考，预算/自适应思考编码及分配失败清理通过。
 - [x] PanGu会话身份接通OpenAI Chat/Responses请求缓存：按上游选择prompt_cache_key、按64个Unicode字符截取，短/长/关闭及Responses显式缓存模式映射；模型O0/O2/UBSan、传输与所有权专项通过。
+- [x] Google Generative/Vertex基础模型链接入同一服务：Content/Part请求、systemInstruction、图片与函数声明/结果、文本/思考流、唯一工具ID、原始停止原因及用量；同模型base64签名重放、Gemini 3函数结果图片与旧模型后置图片、const转enum、严格工具/选择模式和思考参数接通。显式端点与Google API-key/Vertex Bearer通过实际curl回放；原生事件正文动态借用，14 KiB单响应块与SQLite/JSONL重开通过。Google/Vertex其余认证和提供者兼容项继续按下项覆盖。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -315,8 +316,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/{anthropic-messages,transform-messages,simple-options,constrained-sampling}.ts` 与 streaming-tool-arguments、anthropic-sse-parsing、strict-tool-fallback 用例。
-- 实际调用链：Messages已接入原生模型服务、Generation/Tool和PanGu存储。`mimo_projection.S`处理文本/图片/工具与配置，`mimo_stream.S`处理动态块、最终参数、签名和用量，`mimo.S`处理传输、beta与会话亲和头；`request_context.S`按模型身份重放历史。公开model ABI保持；工具定义尺寸保持，统一选项描述携带采样声明，extensions ABI11/tools.provider ABI5同步更新。OpenAI编码器共用PanGu sessionId生成上游缓存键与保留配置；Chat成功消息保存原始停止原因，content_filter/network_error等失败携带明确错误及原始原因。
-- 验证：模型O0/O2/UBSan、ABI、curl入口协议回放、构造/插入失败清理通过；Chat原始停止/错误与固定Pi raw-stop用例一致；工具选项迁移及递归转换后，模型失败清理、产品资源ASan/UBSan、Durable双后端通过；900组Chat/Responses/Anthropic实际请求与固定Pi严格schema结果/回退决定一致，必填查询采用json-c哈希映射；实际curl入口验证三种限额错误回退、require保留、无关错误拒绝、二次失败及后续请求恢复，14个重试构造失败点清理通过；SQLite/JSONL验证流解析→Entry提交→重开→后继请求。本次集成`build_test.py`全套、产品构建及`test_product_resources.py --sanitize --live-agent`通过，真实DeepSeek完成声明收窄、工具写入及后继回答；Assembly与登记快照G00通过。Anthropic使用协议回放。
-- 具体缺口：Messages的managed effort、native tools、OAuth和网关完整覆盖，以及后续协议。`pg_tool_options.constrained_sampling`已随定义、扩展快照和提示目录传递，模型按提供者能力递归转换严格schema；不支持的schema对prefer回退、对require在发送前拒绝，原生分配失败独立返回。Anthropic指定HTTP 400限额错误在流开始前最多重试一次：prefer恢复原始schema，require保持严格；下一请求重新启用偏好严格模式，成功canonical消息记录回退诊断。
-- 下一交付物：按K05继续成组完成提供者行为；严格工具从上述声明调用链实施，其他协议按覆盖表顺序移植。接口或构建调整随同一批集成。
+- 来源：Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/{google-generative-ai,google-vertex,google-shared,transform-messages,constrained-sampling}.ts`；Google工具声明、图片路由、签名/空块、ID、思考和停止原因用例。
+- 实际调用链：Google/Vertex经现有模型提供者与Generation/Tool执行。`mimo_projection.S`将共享上下文投影为Content/Part并适配schema/参数；`mimo_stream.S`沿既有动态块累积文本/思考/调用，保存最终canonical消息与用量；`mimo.S`发送显式端点，Google使用API-key头、Vertex使用已注入Bearer。`request_context.S`按模型身份处理签名和历史，SQLite/JSONL重开后进入同一请求编码器。公开model ABI保持，模型内部事件正文有独立借用存储。
+- 验证：模型O0/O2/UBSan、ABI、实际curl入口回放和112个解码生命周期失败点清理通过；1500组五协议严格/偏好请求对照固定Pi转换结果。已验证文本/工具/提前EOF/错误、14 KiB流事件、签名与空白块、图片路由及模型切换。直接模型流/分配失败ASan/UBSan、Durable双后端ASan/UBSan、产品资源专项与构建通过；Assembly/G00通过，实施自审核对公开model ABI、内部事件借用与新导出登记一致。
+- 具体缺口：Google/Vertex的完整认证解析（含ADC和Vertex API-key路径）、自动端点组合、提供者自定义头/重试/输入变换、完整模型思考映射及其余协议；Messages的managed effort、native tools、OAuth/网关完整覆盖仍保留。当前Google/Vertex为确定性协议回放，没有对应真实凭据。
+- 下一交付物：沿K05继续补齐Google/Vertex的提供者行为与实际消费者，再按覆盖顺序推进Bedrock/Azure等协议；接口、登记和受影响验证同批集成。

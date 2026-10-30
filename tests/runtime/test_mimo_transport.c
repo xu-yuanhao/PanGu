@@ -574,6 +574,19 @@ static void test_anthropic_strict_retry(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Anthropic rejected strict-prefer request retries once, restores original schema, preserves required tools and emits diagnostic; unrelated/status/auth/required-only errors never downgrade");
 }
+
+static void test_google_transport(void){
+ for(unsigned scenario=0;scenario<6;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();unsigned vertex=scenario&1;json_object *cfg=json_tokener_parse(vertex?"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://vertex.invalid/streamGenerateContent\"}":"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://google.invalid/streamGenerateContent?alt=sse\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","google-transport-unit-key",1);assert(!start());unsigned auth=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)auth+=!strcmp(h->data,vertex?"Authorization: Bearer google-transport-unit-key":"x-goog-api-key: google-transport-unit-key");assert(auth==1&&strstr(captured_post,"\"contents\"")&&!strstr(captured_post,"\"messages\""));
+  if(scenario==4)feed("data: {\"error\":{\"code\":429,\"message\":\"quota exhausted\"}}\n");
+  else if(scenario==5)feed("data: {\"candidates\":[{\"finishReason\":\"SAFETY\"}]}\n");
+  else if(scenario==2)feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"id\":\"google-call\",\"name\":\"read\",\"args\":{\"path\":\"file.txt\"}}}]},\"finishReason\":\"STOP\"}]}\n");
+  else{feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"},{\"text\":\" world\"}]}}]}\r\n");if(scenario<2)feed("data: {\"candidates\":[{\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":2,\"candidatesTokenCount\":1,\"totalTokenCount\":3}}\n");}
+  finish_transport();pg_model_event event={0};int status=0;unsigned texts=0;for(unsigned n=0;n<12;n++){status=nxt(&event);if(status)break;if(event.kind==PG_MODEL_TEXT){texts++;assert(event.text.size==11&&!memcmp(event.text.data,"Hello world",11));continue;}if(event.kind!=PG_MODEL_WAIT)break;}
+  if(scenario<3){assert(!status&&m.saw_done&&event.kind==(scenario==2?PG_MODEL_CALL:PG_MODEL_DONE));if(scenario==2)assert(!strcmp(event.text.data,"{\"path\":\"file.txt\"}"));else assert(texts==1);json_object *assistant=json_tokener_parse("{\"content\":[]}");assert(!pg_mimo_complete(&m,assistant)&&!json_object_object_get(assistant,"responseId"));json_object_put(assistant);}else{assert(status&&!m.saw_done);pg_slice message={0},body={0};assert(!pg_mimo_failure_data(&m,&message,&body));assert(strstr(message.data,scenario==3?"without a finish reason":scenario==4?"quota exhausted":"Provider stopped with: SAFETY"));}model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google/Vertex actual model transport replay, API-key/bearer headers, text/tool, finish barrier, EOF and structured errors");
+}
 int main(void) {
     unsetenv("PANGU_MODEL_ENDPOINT");unsetenv("PANGU_MODEL_NAME");unsetenv("PANGU_MODEL_API_KEY");
     test_start_setup();
@@ -596,6 +609,7 @@ int main(void) {
     test_anthropic_feature_headers();
     test_anthropic_affinity();
     test_anthropic_strict_retry();
+    test_google_transport();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

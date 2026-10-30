@@ -1,4 +1,4 @@
-/* mimo_projection.S — MiMo 请求投影（encode_request）。
+/* mimo_projection.S — 原生模型请求投影（encode_request）。
  *
  * 契约见 mimo.h/pg_session（session.h）：system/user/assistant/tool_call/tool_result
  * 投影为 OpenAI Chat Completions messages；assistant 文本与紧随的 tool_call 合并为
@@ -654,6 +654,32 @@ pg_mimo_encode_request:
  call li_field
  test eax,eax
  jnz .Linvalid
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lmsg_append
+ lea rdx,[r13+PG_MM_MSG_TOOL_NAME]
+ cmp byte ptr [rdx],0
+ jne .Lg_legacy_result_name
+ mov rax,[rsp+48]
+ sub rax,[rsp+120]
+ add rax,[rsp+112]
+ imul rax,rax,PG_MM_MSG_BYTES
+ lea rdx,[r12+rax+PG_MM_MSG_TOOL_NAME]
+.Lg_legacy_result_name:
+ mov rdi,r15
+ lea rsi,[rip+.Lap_toolName]
+ call li_field
+ test eax,eax
+ jnz .Linvalid
+ mov edi,[r13+PG_MM_MSG_IS_ERROR]
+ call json_object_new_boolean@PLT
+ mov rdi,r15
+ lea rsi,[rip+.Lap_isError]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Linvalid
  jmp .Lmsg_append
 .Lbuild_content:
  lea rdi, [r13 + PG_MM_MSG_TEXT]
@@ -852,6 +878,22 @@ pg_mimo_encode_request:
  jnz .Linvalid
  jmp .Lserialize_ready
 .Lserialize_openai:
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lserialize_responses
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lap_request
+ test eax,eax
+ jnz .Linvalid
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lg_request
+ test eax,eax
+ jnz .Linvalid
+ jmp .Lserialize_ready
+.Lserialize_responses:
  mov rdi,rbx
  call pg_mimo_uses_responses
  test eax,eax
@@ -2152,6 +2194,10 @@ pg_mimo_uses_anthropic:
  inc r14
  jmp .Lap_each
 .Lap_messages_done:
+ mov rdi,r12
+ call pg_mimo_config_google
+ test eax,eax
+ jnz .Lap_google_messages_done
  mov rdi,[rsp]
  call .Lap_error_images
  test eax,eax
@@ -2160,6 +2206,24 @@ pg_mimo_uses_anthropic:
  call .Lap_normalize_messages
  test eax,eax
  jnz .Lap_bad
+ jmp .Lap_google_root
+.Lap_google_messages_done:
+ mov rdi,r12
+ call pg_mimo_config_google
+ test eax,eax
+ jz .Lap_google_root
+ APGET r12,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call pg_google_requires_id
+ test eax,eax
+ jz .Lap_google_root
+ mov rdi,[rsp]
+ call .Lap_normalize_messages
+ test eax,eax
+ jnz .Lap_bad
+.Lap_google_root:
  mov rdi,rbx
  lea rsi,[rip+.Lap_messages]
  mov rdx,[rsp]
@@ -2242,6 +2306,10 @@ pg_mimo_uses_anthropic:
  test eax,eax
  jnz .Lap_bad
 .Lap_success:
+ mov rdi,r12
+ call pg_mimo_config_google
+ test eax,eax
+ jnz .Lap_success_ready
  mov rdi,rbx
  mov rsi,r12
  call .Lap_cache_options
@@ -2257,6 +2325,7 @@ pg_mimo_uses_anthropic:
  call .Lap_thinking_options
  test eax,eax
  jnz .Lap_bad
+.Lap_success_ready:
  xor ebp,ebp
  jmp .Lap_cleanup
 .Lap_bad:
@@ -3466,11 +3535,16 @@ pg_mimo_uses_anthropic:
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
+ mov rdi,rdx
+ call pg_mimo_config_google
+ test eax,eax
+ jnz .Lap_schema_preserve
  APGET rbx,strict
  mov rdi,rax
  call json_object_get_boolean@PLT
  test eax,eax
  jz .Lap_schema_legacy
+.Lap_schema_preserve:
  mov rdi,r12
  call json_object_get@PLT
  mov rdi,rbx
@@ -3479,6 +3553,10 @@ pg_mimo_uses_anthropic:
  call .Lrp_set
  test eax,eax
  jnz .Lap_schema_bad
+ mov rdi,r13
+ call pg_mimo_config_google
+ test eax,eax
+ jnz .Lap_schema_ok
  APGET r12,properties
  test rax,rax
  jnz .Lap_schema_compat
@@ -3572,6 +3650,10 @@ pg_mimo_uses_anthropic:
  mov qword ptr [rsp+16],0
  mov rdi,r12
  call pg_mimo_uses_anthropic
+ test eax,eax
+ jnz .Loc_ok
+ mov rdi,r12
+ call pg_mimo_uses_google
  test eax,eax
  jnz .Loc_ok
  mov rdi,r12
@@ -3848,6 +3930,26 @@ pg_mimo_uses_anthropic:
  mov rdi,[rsp]
  call pg_mimo_config_anthropic
  mov [rsp+16],eax
+ mov rdi,[rsp]
+ call pg_mimo_config_google
+ test eax,eax
+ jz .Lsampling_non_google_support
+ APGET "qword ptr [rsp]",model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lsampling_unsupported
+ mov rdi,rax
+ lea rsi,[rip+.Lg_gemini_prefix]
+ mov edx,7
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lsampling_unsupported
+ mov rdi,r14
+ call pg_google_requires_id
+ jmp .Lsampling_support_value
+.Lsampling_non_google_support:
  APGET "qword ptr [rsp]",modelInfo
  APGET rax,compat
  mov rdi,rax
@@ -3859,6 +3961,7 @@ pg_mimo_uses_anthropic:
  call json_object_object_get@PLT
  mov rdi,rax
  call json_object_get_boolean@PLT
+.Lsampling_support_value:
  test eax,eax
  jz .Lsampling_unsupported
  APGET r13,parameters
@@ -4850,3 +4953,1569 @@ pg_mimo_anthropic_strict_retry:
 
 .section .rodata
 .Lsr_timestamp: .asciz "timestamp"
+.text
+.globl pg_mimo_uses_google
+.type pg_mimo_uses_google,@function
+pg_mimo_uses_google:
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ jmp pg_mimo_config_google
+.size pg_mimo_uses_google,.-pg_mimo_uses_google
+
+.macro GG obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lg_\key]
+ call json_object_object_get@PLT
+.endm
+.macro GC dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lg_\from]
+ lea rcx,[rip+.Lg_\to]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_bad
+.endm
+/* Shared Content/Part wire layout for Generative Language and Vertex. */
+.text
+.Lg_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+48],0
+ GG rbx,messages
+ mov r13,rax
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_bad
+ xor r14d,r14d
+.Lg_message:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lg_system_begin
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ lea rdi,[rip+.Lg_content_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lg_bad
+ GC rax,rbp,role,role
+ GG rbp,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lg_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lg_message_parts
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lg_role]
+ lea rdx,[rip+.Lg_model]
+ call li_field
+ test eax,eax
+ jnz .Lg_bad
+.Lg_message_parts:
+ GG rbp,content
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rsp+8]
+ call .Lg_parts
+ test eax,eax
+ jnz .Lg_bad
+ mov rdi,[rsp+8]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lg_empty_message
+ mov rdi,[rsp]
+ mov rsi,[rsp+24]
+ mov rdx,[rsp+8]
+ call .Lg_split_parts
+ test eax,eax
+ jnz .Lg_bad
+ jmp .Lg_message_parts_done
+.Lg_empty_message:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ lea rsi,[rax-1]
+ mov rdi,[rsp]
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Lg_bad
+.Lg_message_parts_done:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov qword ptr [rsp+8],0
+ inc r14
+ jmp .Lg_message
+.Lg_system_begin:
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_contents]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_bad
+ GG rbx,system
+ test rax,rax
+ jz .Lg_config
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rsp+8]
+ call .Lg_parts
+ test eax,eax
+ jnz .Lg_bad
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lg_parts_key]
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_systemInstruction]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_bad
+.Lg_config:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_bad
+ GC rax,rbx,max_tokens,maxOutputTokens
+ GC "qword ptr [rsp]",rbx,temperature,temperature
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_generationConfig]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_bad
+ GG rbx,tools
+ mov r13,rax
+ test rax,rax
+ jz .Lg_clean
+ lea rdi,[rip+.Lg_tools_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ GG rax,functionDeclarations
+ mov rbp,rax
+ xor r14d,r14d
+.Lg_tool:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lg_tools_adopt
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ lea rdi,[rip+.Lap_empty_json]
+ mov rsi,rbp
+ call .Lrp_append
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lg_bad
+ GC rax,"qword ptr [rsp+24]",name,name
+ GC "qword ptr [rsp+32]","qword ptr [rsp+24]",description,description
+ GC "qword ptr [rsp+32]","qword ptr [rsp+24]",input_schema,parametersJsonSchema
+ GG "qword ptr [rsp+32]",parametersJsonSchema
+ mov rdi,rax
+ xor esi,esi
+ xor edx,edx
+ call .Lg_const_enum
+ test eax,eax
+ jnz .Lg_bad
+ GG "qword ptr [rsp+24]",strict
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lg_tool_next
+ mov qword ptr [rsp+48],1
+.Lg_tool_next:
+ inc r14
+ jmp .Lg_tool
+.Lg_tools_adopt:
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_tools]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_bad
+ mov rdi,rbx
+ mov rsi,r12
+ mov edx,[rsp+48]
+ call .Lg_tool_mode
+ test eax,eax
+ jnz .Lg_bad
+.Lg_clean:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lgt_options
+ test eax,eax
+ jnz .Lg_bad
+ lea r13,[rip+.Lg_delete_keys]
+ xor r14d,r14d
+.Lg_delete:
+ mov rsi,[r13+r14*8]
+ test rsi,rsi
+ jz .Lg_ok
+ mov rdi,rbx
+ call json_object_object_del@PLT
+ inc r14
+ jmp .Lg_delete
+.Lg_ok:
+ xor ebp,ebp
+ jmp .Lg_end
+.Lg_bad:
+ mov ebp,1
+.Lg_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Translate already-owned content blocks, preserving nested result/image data. */
+.Lg_parts:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,80
+ mov rbx,rdi
+ mov r12,rsi
+ mov [rsp+8],rdx
+ mov qword ptr [rdx],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ mov qword ptr [rsp+48],0
+ mov qword ptr [rsp+56],0
+ mov qword ptr [rsp+64],0
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_parts_bad
+ xor r13d,r13d
+.Lg_part:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lg_parts_ok
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ GG rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lg_parts_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lg_text]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_text_part
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lg_image]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_image_part
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lg_tool_use]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_call_part
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lg_tool_result]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_result_part
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lg_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_thinking_part
+ jmp .Lg_parts_bad
+.Lg_text_part:
+ lea rdi,[rip+.Lap_empty_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ mov rbp,rax
+ test rax,rax
+ jz .Lg_parts_bad
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lg_text]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lg_googleSignature]
+ call .Lg_copy_signature
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_part_next
+.Lg_thinking_part:
+ lea rdi,[rip+.Lg_thought_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ mov rbp,rax
+ test rax,rax
+ jz .Lg_parts_bad
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lg_thinking]
+ lea rcx,[rip+.Lg_text]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lg_signature]
+ call .Lg_copy_signature
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_part_next
+.Lg_image_part:
+ lea rdi,[rip+.Lg_image_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ test rax,rax
+ jz .Lg_parts_bad
+ GG rax,inlineData
+ mov rbp,rax
+ GG r14,source
+ mov [rsp+32],rax
+ mov rdi,rbp
+ mov rsi,rax
+ lea rdx,[rip+.Lg_media_type]
+ lea rcx,[rip+.Lg_mimeType]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,rbp
+ mov rsi,[rsp+32]
+ lea rdx,[rip+.Lg_data]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_part_next
+.Lg_call_part:
+ lea rdi,[rip+.Lg_call_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ test rax,rax
+ jz .Lg_parts_bad
+ GG rax,functionCall
+ mov rbp,rax
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lg_name]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lg_input]
+ lea rcx,[rip+.Lg_args]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ GG r12,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call pg_google_requires_id
+ test eax,eax
+ jz .Lg_call_signature
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lg_id]
+ mov rcx,rdx
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+.Lg_call_signature:
+ # The signature belongs to the enclosing Part, not functionCall.
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ lea rsi,[rax-1]
+ mov rdi,[rsp]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lg_googleSignature]
+ call .Lg_copy_signature
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_part_next
+.Lg_result_part:
+ lea rdi,[rip+.Lg_result_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ test rax,rax
+ jz .Lg_parts_bad
+ GG rax,functionResponse
+ mov rbp,rax
+ mov rdi,rax
+ mov rsi,r14
+ lea rdx,[rip+.Lg_toolName]
+ lea rcx,[rip+.Lg_name]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+ GG r12,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call pg_google_requires_id
+ test eax,eax
+ jz .Lg_result_parts
+ mov rdi,rbp
+ mov rsi,r14
+ lea rdx,[rip+.Lg_tool_use_id]
+ lea rcx,[rip+.Lg_id]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lg_parts_bad
+.Lg_result_parts:
+ GG r14,content
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rsp+16]
+ call .Lg_parts
+ test eax,eax
+ jnz .Lg_parts_bad
+ lea rdi,[rip+.Lap_empty_json]
+ call json_tokener_parse@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lg_parts_bad
+ call json_object_new_array@PLT
+ mov [rsp+64],rax
+ test rax,rax
+ jz .Lg_parts_bad
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+48],0
+.Lg_result_text:
+ mov rdi,[rsp+16]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lg_result_value
+ mov rdi,[rsp+16]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov [rsp+72],rax
+ GG rax,text
+ test rax,rax
+ jz .Lg_result_image
+ lea rdi,[rsp+48]
+ mov rsi,rax
+ mov edx,1
+ call pg_context_append
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_result_next
+.Lg_result_image:
+ GG "qword ptr [rsp+72]",inlineData
+ test rax,rax
+ jz .Lg_result_next
+ mov rdi,[rsp+72]
+ call json_object_get@PLT
+ mov rdi,[rsp+64]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lg_parts_bad
+.Lg_result_next:
+ inc qword ptr [rsp+40]
+ jmp .Lg_result_text
+.Lg_result_value:
+ cmp qword ptr [rsp+48],0
+ je .Lg_result_empty_value
+ mov rdi,[rsp+48]
+ call json_object_get_string_len@PLT
+ mov [rsp+32],eax
+ mov rdi,[rsp+48]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov esi,[rsp+32]
+ call pg_context_blank
+ test eax,eax
+ jz .Lg_result_value_ready
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov qword ptr [rsp+48],0
+.Lg_result_empty_value:
+ mov rdi,[rsp+64]
+ call json_object_array_length@PLT
+ lea rdi,[rip+.Lg_empty]
+ test rax,rax
+ jz .Lg_result_placeholder
+ lea rdi,[rip+.Lg_attached]
+.Lg_result_placeholder:
+ call json_object_new_string@PLT
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lg_parts_bad
+.Lg_result_value_ready:
+ GG r14,is_error
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ lea rsi,[rip+.Lg_output]
+ test eax,eax
+ jz .Lg_result_key
+ lea rsi,[rip+.Lg_error]
+.Lg_result_key:
+ mov rdi,[rsp+56]
+ mov rdx,[rsp+48]
+ mov qword ptr [rsp+48],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,rbp
+ lea rsi,[rip+.Lg_response]
+ mov rdx,[rsp+56]
+ mov qword ptr [rsp+56],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_parts_bad
+ mov rdi,[rsp+64]
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lg_result_images_done
+ mov rdi,r12
+ call .Lg_old_model
+ test eax,eax
+ jnz .Lg_legacy_result_images
+ mov rdi,rbp
+ lea rsi,[rip+.Lg_parts_key]
+ mov rdx,[rsp+64]
+ mov qword ptr [rsp+64],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_parts_bad
+ jmp .Lg_result_images_done
+.Lg_legacy_result_images:
+ lea rdi,[rip+.Lg_legacy_images_json]
+ mov rsi,[rsp]
+ call .Lrp_append
+ test rax,rax
+ jz .Lg_parts_bad
+ GG rax,panguToolImages
+ mov [rsp+72],rax
+ mov qword ptr [rsp+40],0
+.Lg_legacy_image:
+ mov rdi,[rsp+64]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lg_result_images_done
+ mov rdi,[rsp+64]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp+72]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lg_parts_bad
+ inc qword ptr [rsp+40]
+ jmp .Lg_legacy_image
+.Lg_result_images_done:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov qword ptr [rsp+64],0
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+.Lg_part_next:
+ inc r13
+ jmp .Lg_part
+.Lg_parts_ok:
+ mov rdx,[rsp+8]
+ mov rax,[rsp]
+ mov [rdx],rax
+ mov qword ptr [rsp],0
+ xor ebp,ebp
+ jmp .Lg_parts_end
+.Lg_parts_bad:
+ mov ebp,1
+.Lg_parts_end:
+ mov rdi,[rsp+64]
+ call json_object_put@PLT
+ mov rdi,[rsp+48]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,80
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lg_messages: .asciz "messages"
+.Lg_role: .asciz "role"
+.Lg_assistant: .asciz "assistant"
+.Lg_model: .asciz "model"
+.Lg_content: .asciz "content"
+.Lg_parts_key: .asciz "parts"
+.Lg_contents: .asciz "contents"
+.Lg_system: .asciz "system"
+.Lg_systemInstruction: .asciz "systemInstruction"
+.Lg_max_tokens: .asciz "max_tokens"
+.Lg_maxOutputTokens: .asciz "maxOutputTokens"
+.Lg_temperature: .asciz "temperature"
+.Lg_generationConfig: .asciz "generationConfig"
+.Lg_tools: .asciz "tools"
+.Lg_functionDeclarations: .asciz "functionDeclarations"
+.Lg_name: .asciz "name"
+.Lg_description: .asciz "description"
+.Lg_input_schema: .asciz "input_schema"
+.Lg_parametersJsonSchema: .asciz "parametersJsonSchema"
+.Lg_type: .asciz "type"
+.Lg_text: .asciz "text"
+.Lg_image: .asciz "image"
+.Lg_tool_use: .asciz "tool_use"
+.Lg_tool_result: .asciz "tool_result"
+.Lg_thinking: .asciz "thinking"
+.Lg_signature: .asciz "signature"
+.Lg_thoughtSignature: .asciz "thoughtSignature"
+.Lg_inlineData: .asciz "inlineData"
+.Lg_source: .asciz "source"
+.Lg_media_type: .asciz "media_type"
+.Lg_mimeType: .asciz "mimeType"
+.Lg_data: .asciz "data"
+.Lg_functionCall: .asciz "functionCall"
+.Lg_input: .asciz "input"
+.Lg_args: .asciz "args"
+.Lg_functionResponse: .asciz "functionResponse"
+.Lg_toolName: .asciz "toolName"
+.Lg_is_error: .asciz "is_error"
+.Lg_output: .asciz "output"
+.Lg_error: .asciz "error"
+.Lg_response: .asciz "response"
+.Lg_empty: .asciz ""
+.Lg_stream: .asciz "stream"
+.Lg_stream_options: .asciz "stream_options"
+.Lg_reasoning_effort: .asciz "reasoning_effort"
+.Lg_max_completion_tokens: .asciz "max_completion_tokens"
+.Lg_content_json: .asciz "{}"
+.Lg_tools_json: .asciz "[{\"functionDeclarations\":[]}]"
+.Lg_thought_json: .asciz "{\"thought\":true}"
+.Lg_image_json: .asciz "{\"inlineData\":{}}"
+.Lg_call_json: .asciz "{\"functionCall\":{}}"
+.Lg_result_json: .asciz "{\"functionResponse\":{\"response\":{}}}"
+
+.section .data.rel.ro
+.Lg_delete_keys: .quad .Lg_messages,.Lg_system,.Lg_max_tokens,.Lg_model,.Lg_stream,.Lg_stream_options,.Lg_reasoning_effort,.Lg_thinking,.Lg_max_completion_tokens,.Lg_temperature,0
+
+.text
+.Lg_copy_signature:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov rdi,rsi
+ mov rsi,rdx
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rax
+ call pg_google_signature_valid
+ test eax,eax
+ jz .Lg_signature_ok
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_thoughtSignature]
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lg_signature_end
+.Lg_signature_ok:
+ xor eax,eax
+.Lg_signature_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lg_id: .asciz "id"
+.Lg_tool_use_id: .asciz "tool_use_id"
+.Lg_googleSignature: .asciz "googleSignature"
+
+.section .rodata
+.Lg_attached: .asciz "(see attached image)"
+
+.text
+/* Gemini <3 carries tool images in a separate user turn. */
+.Lg_old_model:
+ push rbx
+ GG rdi,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Lg_old_no
+ mov rdi,rax
+ lea rsi,[rip+.Lg_gemini_live]
+ mov edx,12
+ call strncasecmp@PLT
+ test eax,eax
+ jz .Lg_old_live
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_gemini_prefix]
+ mov edx,7
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lg_old_no
+ movzx eax,byte ptr [rbx+7]
+ jmp .Lg_old_digit
+.Lg_old_live:
+ movzx eax,byte ptr [rbx+12]
+.Lg_old_digit:
+ sub eax,'0'
+ cmp eax,9
+ ja .Lg_old_no
+ mov rdi,rbx
+ call pg_google_requires_id
+ xor eax,1
+ pop rbx
+ ret
+.Lg_old_no:
+ xor eax,eax
+ pop rbx
+ ret
+/* Split only the temporary image markers; wire output contains Content/Part. */
+.Lg_split_parts:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ xor r14d,r14d
+ mov qword ptr [rsp],0
+.Lg_split_each:
+ mov rdi,r13
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lg_split_adopt
+ mov rdi,r13
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ GG rax,panguToolImages
+ mov [rsp+8],rax
+ test rax,rax
+ jnz .Lg_split_marker
+ test r12,r12
+ jnz .Lg_split_array
+ lea rdi,[rip+.Lg_user_content_json]
+ mov rsi,rbx
+ call .Lrp_append
+ mov r12,rax
+ test rax,rax
+ jz .Lg_split_bad
+.Lg_split_array:
+ cmp qword ptr [rsp],0
+ jne .Lg_split_append
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_split_bad
+.Lg_split_append:
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lg_split_bad
+ jmp .Lg_split_next
+.Lg_split_marker:
+ test r12,r12
+ jz .Lg_split_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lg_parts_key]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_split_bad
+ lea rdi,[rip+.Lg_user_content_json]
+ mov rsi,rbx
+ call .Lrp_append
+ mov r12,rax
+ test rax,rax
+ jz .Lg_split_bad
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lg_parts_key]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_split_bad
+ xor r12d,r12d
+.Lg_split_next:
+ inc r14
+ jmp .Lg_split_each
+.Lg_split_adopt:
+ test r12,r12
+ jz .Lg_split_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lg_parts_key]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_split_bad
+.Lg_split_ok:
+ xor ebp,ebp
+ jmp .Lg_split_end
+.Lg_split_bad:
+ mov ebp,1
+.Lg_split_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lg_panguToolImages: .asciz "panguToolImages"
+.Lg_legacy_images_json: .asciz "{\"panguToolImages\":[{\"text\":\"Tool result image:\"}]}"
+.Lg_user_content_json: .asciz "{\"role\":\"user\"}"
+.Lg_gemini_live: .asciz "gemini-live-"
+.Lg_gemini_prefix: .asciz "gemini-"
+
+/* rewriteConstAsEnum only traverses schema keywords, never default/example data. */
+.text
+.Lg_const_enum:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13d,edx
+ mov qword ptr [rsp],0
+ cmp edx,128
+ jae .Lg_const_bad
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lg_const_object
+ xor r14d,r14d
+.Lg_const_array:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lg_const_ok
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ xor esi,esi
+ lea edx,[r13+1]
+ call .Lg_const_enum
+ test eax,eax
+ jnz .Lg_const_bad
+ inc r14
+ jmp .Lg_const_array
+.Lg_const_object:
+ mov rdi,rbx
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lg_const_ok
+ mov rdi,rbx
+ call json_object_iter_begin@PLT
+ mov [rsp+8],rax
+ mov rdi,rbx
+ call json_object_iter_end@PLT
+ mov [rsp+16],rax
+.Lg_const_field:
+ lea rdi,[rsp+8]
+ lea rsi,[rsp+16]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lg_const_rewrite
+ lea rdi,[rsp+8]
+ call json_object_iter_peek_name@PLT
+ mov rbp,rax
+ test r12d,r12d
+ jnz .Lg_const_child_schema
+ lea r14,[rip+.Lg_schema_keys]
+.Lg_const_schema_key:
+ mov rsi,[r14]
+ test rsi,rsi
+ jz .Lg_const_maps_begin
+ mov rdi,rbp
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_const_child_schema
+ add r14,8
+ jmp .Lg_const_schema_key
+.Lg_const_maps_begin:
+ lea r14,[rip+.Lg_map_keys]
+.Lg_const_map_key:
+ mov rsi,[r14]
+ test rsi,rsi
+ jz .Lg_const_next
+ mov rdi,rbp
+ call strcmp@PLT
+ test eax,eax
+ jz .Lg_const_child_map
+ add r14,8
+ jmp .Lg_const_map_key
+.Lg_const_child_map:
+ mov dword ptr [rsp+32],1
+ jmp .Lg_const_child
+.Lg_const_child_schema:
+ mov dword ptr [rsp+32],0
+.Lg_const_child:
+ lea rdi,[rsp+8]
+ call json_object_iter_peek_value@PLT
+ mov rdi,rax
+ mov esi,[rsp+32]
+ lea edx,[r13+1]
+ call .Lg_const_enum
+ test eax,eax
+ jnz .Lg_const_bad
+.Lg_const_next:
+ lea rdi,[rsp+8]
+ call json_object_iter_next@PLT
+ jmp .Lg_const_field
+.Lg_const_rewrite:
+ test r12d,r12d
+ jnz .Lg_const_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_enum]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jnz .Lg_const_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_const]
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lg_const_ok
+ mov rdi,[rsp+24]
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lg_const_convert
+ mov rdi,[rsp+24]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lg_const_convert
+ mov rdi,[rsp+24]
+ mov esi,2
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lg_const_ok
+.Lg_const_convert:
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_const_bad
+ mov rdi,[rsp+24]
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ mov rsi,rax
+ call .Lap_ei_append_owned
+ test eax,eax
+ jnz .Lg_const_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_const]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lst_enum]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_const_bad
+.Lg_const_ok:
+ xor ebp,ebp
+ jmp .Lg_const_end
+.Lg_const_bad:
+ mov ebp,1
+.Lg_const_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lg_tool_mode:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13d,edx
+ mov qword ptr [rsp],0
+ GG r12,options
+ GG rax,toolChoice
+ mov r14,rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lg_mode_default
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_none]
+ call strcmp@PLT
+ lea r14,[rip+.Lg_NONE]
+ test eax,eax
+ jz .Lg_mode_create
+ mov rdi,rbp
+ lea rsi,[rip+.Lg_any]
+ call strcmp@PLT
+ lea r14,[rip+.Lg_ANY]
+ test eax,eax
+ jz .Lg_mode_create
+ test r13d,r13d
+ jnz .Lg_mode_validated
+ lea r14,[rip+.Lg_AUTO]
+ jmp .Lg_mode_create
+.Lg_mode_default:
+ test r13d,r13d
+ jz .Lg_mode_ok
+.Lg_mode_validated:
+ lea r14,[rip+.Lg_VALIDATED]
+.Lg_mode_create:
+ lea rdi,[rip+.Lg_tool_mode_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lg_mode_bad
+ GG rax,functionCallingConfig
+ mov rdi,rax
+ lea rsi,[rip+.Lg_mode]
+ mov rdx,r14
+ call li_field
+ test eax,eax
+ jnz .Lg_mode_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_toolConfig]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lg_mode_bad
+.Lg_mode_ok:
+ xor ebp,ebp
+ jmp .Lg_mode_end
+.Lg_mode_bad:
+ mov ebp,1
+.Lg_mode_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lg_options: .asciz "options"
+.Lg_toolChoice: .asciz "toolChoice"
+.Lg_strict: .asciz "strict"
+.Lg_any: .asciz "any"
+.Lg_NONE: .asciz "NONE"
+.Lg_ANY: .asciz "ANY"
+.Lg_AUTO: .asciz "AUTO"
+.Lg_VALIDATED: .asciz "VALIDATED"
+.Lg_functionCallingConfig: .asciz "functionCallingConfig"
+.Lg_mode: .asciz "mode"
+.Lg_toolConfig: .asciz "toolConfig"
+.Lg_tool_mode_json: .asciz "{\"functionCallingConfig\":{}}"
+.Lg_schema_name_0: .asciz "properties"
+.Lg_schema_name_1: .asciz "patternProperties"
+.Lg_schema_name_2: .asciz "$defs"
+.Lg_schema_name_3: .asciz "definitions"
+.Lg_schema_name_4: .asciz "dependentSchemas"
+.Lg_schema_name_5: .asciz "dependencies"
+.Lg_schema_name_6: .asciz "additionalProperties"
+.Lg_schema_name_7: .asciz "unevaluatedProperties"
+.Lg_schema_name_8: .asciz "propertyNames"
+.Lg_schema_name_9: .asciz "items"
+.Lg_schema_name_10: .asciz "prefixItems"
+.Lg_schema_name_11: .asciz "additionalItems"
+.Lg_schema_name_12: .asciz "unevaluatedItems"
+.Lg_schema_name_13: .asciz "contains"
+.Lg_schema_name_14: .asciz "allOf"
+.Lg_schema_name_15: .asciz "anyOf"
+.Lg_schema_name_16: .asciz "oneOf"
+.Lg_schema_name_17: .asciz "not"
+.Lg_schema_name_18: .asciz "if"
+.Lg_schema_name_19: .asciz "then"
+.Lg_schema_name_20: .asciz "else"
+.Lg_schema_name_21: .asciz "contentSchema"
+
+.section .data.rel.ro
+.Lg_map_keys: .quad .Lg_schema_name_0,.Lg_schema_name_1,.Lg_schema_name_2,.Lg_schema_name_3,.Lg_schema_name_4,.Lg_schema_name_5,0
+.Lg_schema_keys: .quad .Lg_schema_name_6,.Lg_schema_name_7,.Lg_schema_name_8,.Lg_schema_name_9,.Lg_schema_name_10,.Lg_schema_name_11,.Lg_schema_name_12,.Lg_schema_name_13,.Lg_schema_name_14,.Lg_schema_name_15,.Lg_schema_name_16,.Lg_schema_name_17,.Lg_schema_name_18,.Lg_schema_name_19,.Lg_schema_name_20,.Lg_schema_name_21,0
+
+/* Google native thinking options and simple reasoning-level adaptation. */
+.text
+.Lgt_options:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ GG r12,modelInfo
+ mov r13,rax
+ GG rax,reasoning
+ test rax,rax
+ jz .Lgt_explicit
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lgt_ok
+.Lgt_explicit:
+ GG r12,options
+ mov [rsp+16],rax
+ GG rax,thinking
+ mov r14,rax
+ test rax,rax
+ jz .Lgt_simple
+ GG r14,enabled
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lgt_disabled
+ lea rdi,[rip+.Lgt_thinking_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgt_bad
+ GG r14,level
+ test rax,rax
+ jz .Lgt_explicit_budget
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call .Lgt_level
+ test rax,rax
+ jz .Lgt_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingLevel]
+ mov rdx,rax
+ call li_field
+ test eax,eax
+ jnz .Lgt_bad
+ jmp .Lgt_adopt
+.Lgt_explicit_budget:
+ mov rdi,[rsp]
+ mov rsi,r14
+ lea rdx,[rip+.Lgt_budgetTokens]
+ lea rcx,[rip+.Lgt_thinkingBudget]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lgt_bad
+ jmp .Lgt_adopt
+.Lgt_simple:
+ GG rbx,reasoning_effort
+ test rax,rax
+ jnz .Lgt_simple_value
+ GG "qword ptr [rsp+16]",reasoningEffort
+ test rax,rax
+ jnz .Lgt_simple_value
+ GG r13,reasoning
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lgt_ok
+ jmp .Lgt_disabled
+.Lgt_simple_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lgt_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lap_off]
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lgt_disabled
+ mov rdi,r14
+ call .Lgt_level
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lgt_bad
+ lea rdi,[rip+.Lgt_thinking_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgt_bad
+ GG r12,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lgt_bad
+ mov rdi,rax
+ call .Lgt_uses_level
+ test eax,eax
+ jz .Lgt_budget
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingLevel]
+ mov rdx,[rsp+24]
+ call li_field
+ test eax,eax
+ jnz .Lgt_bad
+ jmp .Lgt_adopt
+.Lgt_budget:
+ GG "qword ptr [rsp+16]",thinkingBudgets
+ mov rdi,rax
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lgt_default_budget
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingBudget]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lgt_bad
+ jmp .Lgt_adopt
+.Lgt_default_budget:
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lgt_pro25]
+ call strstr@PLT
+ mov ebp,32768
+ test rax,rax
+ jnz .Lgt_budget_kind
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lgt_flash25]
+ call strstr@PLT
+ mov ebp,24576
+ test rax,rax
+ jnz .Lgt_budget_kind
+ mov rdi,-1
+ jmp .Lgt_budget_set
+.Lgt_budget_kind:
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lgt_MINIMAL]
+ call strcmp@PLT
+ mov edi,128
+ test eax,eax
+ jnz .Lgt_budget_low
+ mov [rsp+40],rdi
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lgt_lite25]
+ call strstr@PLT
+ mov rdi,[rsp+40]
+ test rax,rax
+ jz .Lgt_budget_set
+ mov edi,512
+ jmp .Lgt_budget_set
+.Lgt_budget_low:
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lgt_LOW]
+ call strcmp@PLT
+ mov edi,2048
+ test eax,eax
+ jz .Lgt_budget_set
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lgt_MEDIUM]
+ call strcmp@PLT
+ mov edi,8192
+ test eax,eax
+ jz .Lgt_budget_set
+ mov edi,ebp
+.Lgt_budget_set:
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingBudget]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lgt_bad
+ jmp .Lgt_adopt
+.Lgt_disabled:
+ lea rdi,[rip+.Lgt_disabled_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgt_bad
+ GG r13,thinkingLevelMap
+ GG rax,off
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgt_adopt
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_off]
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lgt_adopt
+ GG r12,model
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call .Lgt_uses_level
+ test eax,eax
+ jz .Lgt_adopt
+ mov rdi,r14
+ call .Lgt_level
+ test rax,rax
+ jz .Lgt_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingLevel]
+ mov rdx,rax
+ call li_field
+ test eax,eax
+ jnz .Lgt_bad
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lgt_thinkingBudget]
+ call json_object_object_del@PLT
+.Lgt_adopt:
+ GG rbx,generationConfig
+ mov rdi,rax
+ lea rsi,[rip+.Lgt_thinkingConfig]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lgt_bad
+.Lgt_ok:
+ xor ebp,ebp
+ jmp .Lgt_end
+.Lgt_bad:
+ mov ebp,1
+.Lgt_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lgt_level:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lgt_level_bad
+ lea r12,[rip+.Lgt_level_names]
+ xor r13d,r13d
+.Lgt_level_each:
+ mov rsi,[r12+r13*8]
+ test rsi,rsi
+ jz .Lgt_level_bad
+ mov rdi,rbx
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lgt_level_found
+ inc r13
+ jmp .Lgt_level_each
+.Lgt_level_found:
+ lea rax,[rip+.Lgt_level_values]
+ mov rax,[rax+r13*8]
+ jmp .Lgt_level_end
+.Lgt_level_bad:
+ xor eax,eax
+.Lgt_level_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lgt_uses_level:
+ push rbx
+ mov rbx,rdi
+ test rdi,rdi
+ jz .Lgt_uses_no
+ lea rsi,[rip+.Lgt_gemini3]
+ call strcasestr@PLT
+ test rax,rax
+ jz .Lgt_uses_later
+ lea rdx,[rax+8]
+ cmp byte ptr [rdx],'.'
+ jne .Lgt_uses_family
+ inc rdx
+ movzx eax,byte ptr [rdx]
+ sub eax,'0'
+ cmp eax,9
+ ja .Lgt_uses_later
+.Lgt_minor:
+ inc rdx
+ movzx eax,byte ptr [rdx]
+ sub eax,'0'
+ cmp eax,9
+ jbe .Lgt_minor
+.Lgt_uses_family:
+ cmp dword ptr [rdx],0x6f72702d
+ je .Lgt_uses_yes
+ cmp dword ptr [rdx],0x616c662d
+ jne .Lgt_uses_later
+ cmp word ptr [rdx+4],0x6873
+ je .Lgt_uses_yes
+.Lgt_uses_later:
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_gemini_prefix]
+ call strcasestr@PLT
+ test rax,rax
+ jz .Lgt_uses_alias
+ movzx edx,byte ptr [rax+7]
+ cmp dl,'4'
+ jb .Lgt_uses_two_digits
+ cmp dl,'9'
+ jbe .Lgt_uses_yes
+.Lgt_uses_two_digits:
+ cmp dl,'1'
+ jb .Lgt_uses_alias
+ cmp dl,'9'
+ ja .Lgt_uses_alias
+ movzx edx,byte ptr [rax+8]
+ sub edx,'0'
+ cmp edx,9
+ jbe .Lgt_uses_yes
+.Lgt_uses_alias:
+ mov rdi,rbx
+ lea rsi,[rip+.Lgt_flash_latest]
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lgt_uses_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lgt_lite_latest]
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lgt_uses_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lgt_gemma4]
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lgt_uses_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lgt_gemma_dash4]
+ call strcasestr@PLT
+ test rax,rax
+ jnz .Lgt_uses_yes
+.Lgt_uses_no:
+ xor eax,eax
+ pop rbx
+ ret
+.Lgt_uses_yes:
+ mov eax,1
+ pop rbx
+ ret
+.section .rodata
+.Lg_reasoning: .asciz "reasoning"
+.Lg_enabled: .asciz "enabled"
+.Lg_level: .asciz "level"
+.Lg_reasoningEffort: .asciz "reasoningEffort"
+.Lg_thinkingBudgets: .asciz "thinkingBudgets"
+.Lg_thinkingLevelMap: .asciz "thinkingLevelMap"
+.Lg_off: .asciz "off"
+.Lgt_budgetTokens: .asciz "budgetTokens"
+.Lgt_thinkingConfig: .asciz "thinkingConfig"
+.Lgt_thinkingLevel: .asciz "thinkingLevel"
+.Lgt_thinkingBudget: .asciz "thinkingBudget"
+.Lgt_thinking_json: .asciz "{\"includeThoughts\":true}"
+.Lgt_disabled_json: .asciz "{\"thinkingBudget\":0}"
+.Lgt_pro25: .asciz "2.5-pro"
+.Lgt_flash25: .asciz "2.5-flash"
+.Lgt_lite25: .asciz "2.5-flash-lite"
+.Lgt_gemini3: .asciz "gemini-3"
+.Lgt_flash_latest: .asciz "gemini-flash-latest"
+.Lgt_lite_latest: .asciz "gemini-flash-lite-latest"
+.Lgt_gemma4: .asciz "gemma4"
+.Lgt_gemma_dash4: .asciz "gemma-4"
+.Lgt_MINIMAL: .asciz "MINIMAL"
+.Lgt_LOW: .asciz "LOW"
+.Lgt_MEDIUM: .asciz "MEDIUM"
+.Lgt_HIGH: .asciz "HIGH"
+.Lgt_minimal: .asciz "minimal"
+.Lgt_low: .asciz "low"
+.Lgt_medium: .asciz "medium"
+.Lgt_high: .asciz "high"
+.section .data.rel.ro
+.Lgt_level_names: .quad .Lgt_minimal,.Lgt_low,.Lgt_medium,.Lgt_high,0
+.Lgt_level_values: .quad .Lgt_MINIMAL,.Lgt_LOW,.Lgt_MEDIUM,.Lgt_HIGH
+.section .rodata
+.Lg_modelInfo: .asciz "modelInfo"

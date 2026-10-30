@@ -63,6 +63,9 @@ pg_mimo_bind_tools:
  sub rsp,8
  mov rbx,rdi
  call pg_mimo_anthropic_clear
+ mov rdi,[rbx+PG_MM_GOOGLE_TEXT]
+ mov qword ptr [rbx+PG_MM_GOOGLE_TEXT],0
+ call json_object_put@PLT
  mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
  mov qword ptr [rbx+PG_MM_STRICT_DIAGNOSTICS],0
  mov dword ptr [rbx+PG_MM_STRICT_RETRY],0
@@ -319,6 +322,14 @@ li_start:
  /* auth = "Authorization: Bearer " + key + NUL（总长 < 512） */
  lea r14,[rip+.Lstr_auth_prefix]
  mov r15d,PG_MM_AUTH_PREFIX_LEN
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ cmp eax,1
+ jne .Lauth_anthropic_prefix
+ lea r14,[rip+.Lgoogle_key]
+ mov r15d,16
+ jmp .Lauth_prefix_ready
+.Lauth_anthropic_prefix:
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
@@ -612,7 +623,7 @@ li_next:
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
  je .Lnx_wait
  cmp dword ptr [rbx + PG_MM_SAW_DONE], 0
- je .Lnx_bad
+ je .Lnx_unfinished
  cmp dword ptr [rbx + PG_MM_FINISH_REASON], 0
  je .Lnx_bad
  cmp dword ptr [rbx + PG_MM_FINISH_REASON], 2
@@ -656,6 +667,19 @@ li_next:
 .Lnx_wait:
  xor eax, eax
  jmp .Lnx_out
+.Lnx_unfinished:
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lnx_bad
+ lea rdi,[rip+.Lgoogle_unfinished]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lnx_bad
+ mov r13,rax
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ call json_object_put@PLT
+ mov [rbx+PG_MM_RESPONSE_TERMINAL],r13
 .Lnx_bad:
  mov dword ptr [rbx+PG_MM_FAILED],1
  mov eax, 1
@@ -1631,3 +1655,9 @@ pg_mimo_complete:
 .Laffinity_format_key: .asciz "sessionAffinityFormat"
 .Laffinity_native_prefix: .asciz "x-session-affinity: "
 .Laffinity_router_prefix: .asciz "x-session-id: "
+
+.section .rodata
+.Lgoogle_key: .asciz "x-goog-api-key: "
+
+.section .rodata
+.Lgoogle_unfinished: .asciz "{\"error\":{\"message\":\"Google stream ended without a finish reason\"}}"

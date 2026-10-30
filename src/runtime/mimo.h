@@ -30,8 +30,9 @@ typedef struct {
  pg_mimo_anthropic_block *anthropic_blocks;size_t anthropic_count,anthropic_capacity;
  struct json_object *anthropic_usage;
  unsigned strict_retry;struct json_object *strict_diagnostics;
+ struct json_object *google_text; /* owned event slice, borrowed until next Google decode/close */
 } pg_mimo;
-/* OpenAI Chat Completions / Responses and Anthropic Messages SSE transport. Explicit PANGU_MODEL_ENDPOINT,
+/* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
    requires its explicit key. Default MiMo connection reads MIMO_API_KEY/MODEL.
    Environment stays immutable throughout active requests. Initialize
@@ -57,6 +58,10 @@ int pg_mimo_uses_responses(const pg_mimo *);
 int pg_mimo_config_responses(const struct json_object *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
+int pg_mimo_uses_google(const pg_mimo *);
+int pg_mimo_config_google(const struct json_object *);
+int pg_google_signature_valid(const struct json_object *);
+int pg_google_requires_id(const char *);
 void pg_mimo_anthropic_clear(pg_mimo *);
 int pg_mimo_anthropic_strict_retry(pg_mimo *);
 /* Internal protocol-selected final-item/canonical replay adapters; history returns an owned array.

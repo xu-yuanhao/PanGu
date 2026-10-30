@@ -147,7 +147,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics",
+      "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -171,7 +171,11 @@
         "pg_mimo_uses_anthropic",
         "pg_mimo_config_anthropic",
         "pg_mimo_anthropic_clear",
-        "pg_mimo_anthropic_strict_retry"
+        "pg_mimo_anthropic_strict_retry",
+        "pg_mimo_uses_google",
+        "pg_mimo_config_google",
+        "pg_google_signature_valid",
+        "pg_google_requires_id"
       ],
       "reference_basis": [
         {
@@ -246,6 +250,24 @@
           "semantics": "detached recursive strict JSON-schema conversion, nullable optional properties, required ordering, unsupported-schema prefer fallback versus require rejection; Anthropic provider keyword subset",
           "tests_to_read": [
             "packages/ai/test/anthropic-strict-tool-fallback.test.ts"
+          ]
+        },
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/api/google-generative-ai.ts",
+            "packages/ai/src/api/google-vertex.ts",
+            "packages/ai/src/api/google-shared.ts"
+          ],
+          "semantics": "Content/Part request and function response grouping, text/thought stream coalescing, distinct generated tool IDs, final reason and usage, same-model base64 signature replay, Gemini tool image routing, const-to-enum schema conversion and validated calling mode",
+          "tests_to_read": [
+            "packages/ai/test/google-shared-convert-tools.test.ts",
+            "packages/ai/test/google-shared-image-tool-result-routing.test.ts",
+            "packages/ai/test/google-shared-signed-empty-blocks.test.ts",
+            "packages/ai/test/google-shared-gemini3-unsigned-tool-call.test.ts",
+            "packages/ai/test/google-thinking-signature.test.ts",
+            "packages/ai/test/google-raw-stop-reason.test.ts"
           ]
         }
       ]

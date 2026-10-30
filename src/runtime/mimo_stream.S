@@ -343,6 +343,15 @@ pg_mimo_decode_line:
  pop rdi
  test eax,eax
  jnz .Lrs_decode
+ push rdi
+ push rsi
+ push rdx
+ call pg_mimo_uses_google
+ pop rdx
+ pop rsi
+ pop rdi
+ test eax,eax
+ jnz .Lrs_decode
 .Lchat_decode:
  push rbx
  push r12
@@ -848,8 +857,13 @@ pg_mimo_decode_line:
  call strncmp@PLT
  test eax,eax
  jnz .Lrs_bad
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jnz .Lgo_parse_allowed
  cmp dword ptr [rbx+PG_MM_SAW_DONE],0
  jne .Lrs_bad
+.Lgo_parse_allowed:
  add r12,5
  cmp byte ptr [r12],32
  jne .Lrs_parse
@@ -877,6 +891,17 @@ pg_mimo_decode_line:
  call json_tokener_get_parse_end@PLT
  cmp byte ptr [r12+rax],0
  jne .Lrs_bad
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lgo_parsed_not_google
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lgo_event
+ mov ebp,eax
+ jmp .Lrs_cleanup
+.Lgo_parsed_not_google:
  RSGET "qword ptr [rsp]",type
  mov rdi,rax
  call json_object_get_string@PLT
@@ -1493,6 +1518,10 @@ pg_mimo_responses_complete:
  jnz .Lrc_responses
  mov rdi,rbx
  call pg_mimo_uses_anthropic
+ test eax,eax
+ jnz .Lrc_anthropic
+ mov rdi,rbx
+ call pg_mimo_uses_google
  test eax,eax
  jnz .Lrc_anthropic
  mov rdi,[rsp+8]
@@ -2825,6 +2854,10 @@ pg_mimo_anthropic_clear:
  call .Lan_append
  test eax,eax
  jnz .Lan_bad
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jnz .Lan_ok
  mov rdi,[rsp+56]
  call json_object_get@PLT
  mov rdi,[rsp+16]
@@ -2940,13 +2973,21 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_bad
  cmp dword ptr [r14+8],1
+ jne .Lan_block_signature
+ mov rax,[r14+24]
+ cmp dword ptr [rax+8],0
  je .Lan_block_closed
+.Lan_block_signature:
  mov rax,[r14+24]
  mov rdi,[rax]
  mov esi,[rax+8]
  call json_object_new_string_len@PLT
  mov rdi,[r14+32]
  lea rsi,[rip+.Lan_thinkingSignature]
+ cmp dword ptr [r14+8],1
+ jne .Lgo_signature_key_ready
+ lea rsi,[rip+.Lgo_textSignature]
+.Lgo_signature_key_ready:
  mov rdx,rax
  call .Lrs_set
  test eax,eax
@@ -3312,7 +3353,16 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lan_complete_api:
+ mov rdi,rbx
+ call pg_mimo_uses_google
  lea rdi,[rip+.Lan_api_value]
+ test eax,eax
+ jz .Lgo_complete_api_ready
+ lea rdi,[rip+.Lgo_generative]
+ cmp eax,2
+ jne .Lgo_complete_api_ready
+ lea rdi,[rip+.Lgo_vertex]
+.Lgo_complete_api_ready:
  call json_object_new_string@PLT
  mov rdi,r12
  lea rsi,[rip+.Lrc_api]
@@ -3330,6 +3380,16 @@ pg_mimo_anthropic_clear:
  mov rdi,[rbx+PG_MM_RESPONSE_ID]
  test rdi,rdi
  jz .Lan_complete_ok
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lgo_complete_id
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lan_complete_ok
+.Lgo_complete_id:
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
  call json_object_get@PLT
  mov rdi,r12
  lea rsi,[rip+.Lrc_responseId]
@@ -3357,6 +3417,33 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lan_complete_usage_done:
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jz .Lgo_complete_usage_done
+ ANGET r12,usage
+ mov r14,rax
+ test rax,rax
+ jz .Lgo_complete_usage_done
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ lea rsi,[rip+.Lgo_totalTokenCount]
+ call li_get
+ test rax,rax
+ jz .Lgo_zero_total
+ mov rdi,rax
+ call json_object_get@PLT
+ jmp .Lgo_set_total
+.Lgo_zero_total:
+ xor edi,edi
+ call json_object_new_int64@PLT
+.Lgo_set_total:
+ mov rdi,r14
+ lea rsi,[rip+.Lgo_totalTokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lan_complete_bad
+.Lgo_complete_usage_done:
  mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
  test rdi,rdi
  jz .Lan_complete_diagnostics_done
@@ -3549,8 +3636,14 @@ pg_mimo_anthropic_clear:
  mov rbp,rax
  test rax,rax
  jz .Lan_stop_failure_end
- mov rdi,rax
+ mov rdi,rbx
+ call pg_mimo_uses_google
  lea rsi,[rip+.Lan_unknown_format]
+ test eax,eax
+ jz .Lgo_stop_error_format
+ lea rsi,[rip+.Lgo_error_format]
+.Lgo_stop_error_format:
+ mov rdi,rbp
  mov rdx,r14
  xor eax,eax
  call sprintf@PLT
@@ -3635,6 +3728,10 @@ pg_mimo_anthropic_clear:
  call pg_mimo_uses_anthropic
  test eax,eax
  jnz .Lchat_stop_skip
+ mov rdi,rbx
+ call pg_mimo_uses_google
+ test eax,eax
+ jnz .Lchat_stop_skip
  lea rdi,[rip+.Lan_error_json]
  call json_tokener_parse@PLT
  mov [rsp],rax
@@ -3714,3 +3811,831 @@ pg_mimo_anthropic_clear:
 
 .section .rodata
 .Lan_diagnostics: .asciz "diagnostics"
+
+.macro GO obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lgo_\key]
+ call li_get
+.endm
+/* Google's part stream feeds the existing ordered native block accumulator. */
+.text
+.Lgo_event:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,128
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,16
+ rep stosq
+ mov rdi,[rbx+PG_MM_GOOGLE_TEXT]
+ mov qword ptr [rbx+PG_MM_GOOGLE_TEXT],0
+ call json_object_put@PLT
+ call printbuf_new@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lgo_bad
+ GO r12,error
+ test rax,rax
+ jz .Lgo_start
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lrt_save
+ jmp .Lgo_bad
+.Lgo_start:
+ cmp qword ptr [rbx+PG_MM_RESPONSE_ID],0
+ jne .Lgo_candidate
+ lea rdi,[rip+.Lgo_start_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ GO rax,message
+ mov r14,rax
+ GO r12,responseId
+ test rax,rax
+ jz .Lgo_start_send
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lan_id]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+.Lgo_start_send:
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+.Lgo_candidate:
+ GO r12,candidates
+ test rax,rax
+ jz .Lgo_candidate_missing
+ mov [rsp+16],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgo_bad
+ mov rdi,[rsp+16]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+.Lgo_candidate_missing:
+ mov [rsp+16],rax
+ GO rax,content
+ GO rax,parts
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lgo_parts_valid
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgo_bad
+.Lgo_parts_valid:
+ mov qword ptr [rsp+32],0
+.Lgo_part:
+ mov rdi,[rsp+24]
+ test rdi,rdi
+ jz .Lgo_finish
+ call json_object_array_length@PLT
+ cmp [rsp+32],rax
+ jae .Lgo_finish
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ jne .Lgo_bad
+ mov rdi,[rsp+24]
+ mov rsi,[rsp+32]
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov [rsp+40],rax
+ GO rax,functionCall
+ mov [rsp+56],rax
+ test rax,rax
+ jnz .Lgo_call
+ GO r14,text
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lgo_part_next
+ GO r14,thought
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ add eax,1
+ mov [rsp+64],eax
+ /* Coalesce adjacent text/thinking chunks just as the SDK adapter does. */
+ mov rdi,rbx
+ mov esi,eax
+ mov rdx,r13
+ call .Lgo_open_text
+ test eax,eax
+ jnz .Lgo_bad
+ lea rdi,[rip+.Lgo_delta_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ mov rax,[rbx+PG_MM_ANTHROPIC_COUNT]
+ dec rax
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov [rsp+72],rax
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ GO "qword ptr [rsp]",delta
+ mov rbp,rax
+ lea rsi,[rip+.Lan_text_delta_type]
+ cmp dword ptr [rsp+64],1
+ je .Lgo_delta_type
+ lea rsi,[rip+.Lan_thinking_delta]
+.Lgo_delta_type:
+ mov rdi,rsi
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_type]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp+48]
+ call json_object_get@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_text]
+ cmp dword ptr [rsp+64],1
+ je .Lgo_delta_field
+ lea rsi,[rip+.Lan_thinking]
+.Lgo_delta_field:
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ cmp dword ptr [rsp+64],1
+ jne .Lgo_part_signature
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+48]
+ call .Lan_append
+ test eax,eax
+ jnz .Lgo_bad
+ jmp .Lgo_part_signature
+.Lgo_call:
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lgo_close_block
+ test eax,eax
+ jnz .Lgo_bad
+ GO "qword ptr [rsp+56]",id
+ mov [rsp+80],rax
+ test rax,rax
+ jz .Lgo_generate_id
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lgo_generate_id
+ mov rdi,[rsp+80]
+ call json_object_get_string@PLT
+ mov [rsp+88],rax
+ xor ebp,ebp
+.Lgo_unique_id:
+ cmp ebp,[rbx+PG_MM_CALL_COUNT]
+ jae .Lgo_id_ready
+ mov eax,ebp
+ PG_MM_CALL_SLOT rdx,rax
+ lea rdi,[rdx+PG_MM_TEXT_LIMIT]
+ mov rsi,[rsp+88]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lgo_generate_id
+ inc ebp
+ jmp .Lgo_unique_id
+.Lgo_generate_id:
+ lea rdi,[rsp+96]
+ xor esi,esi
+ call gettimeofday@PLT
+ test eax,eax
+ jnz .Lgo_bad
+ mov rax,[rsp+104]
+ xor edx,edx
+ mov ecx,1000
+ div rcx
+ imul rbp,[rsp+96],1000
+ add rbp,rax
+ mov rax,1
+ lock xadd [rip+.Lgo_call_counter],rax
+ inc rax
+ mov [rsp+112],rax
+ GO "qword ptr [rsp+56]",name
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgo_bad
+ lea rdi,[rbx+PG_MM_TEXT]
+ mov esi,PG_MM_TEXT_LIMIT
+ lea rdx,[rip+.Lgo_id_format]
+ mov ecx,24
+ mov r8,rax
+ mov r9,rbp
+ mov rax,[rsp+112]
+ mov [rsp+120],rax
+ # Seventh printf argument is passed on the stack.
+ sub rsp,16
+ mov [rsp],rax
+ xor eax,eax
+ call snprintf@PLT
+ add rsp,16
+ lea rdi,[rbx+PG_MM_TEXT]
+ call json_object_new_string@PLT
+ mov [rsp+80],rax
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lgo_bad
+ jmp .Lgo_id_owned
+.Lgo_id_ready:
+ mov rdi,[rsp+80]
+ call json_object_get@PLT
+ mov [rsp+88],rax
+.Lgo_id_owned:
+ lea rdi,[rip+.Lgo_call_start_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ mov rdi,[rbx+PG_MM_ANTHROPIC_COUNT]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ GO "qword ptr [rsp]",content_block
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lan_id]
+ mov rdx,[rsp+88]
+ mov qword ptr [rsp+88],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,rbp
+ mov rsi,[rsp+56]
+ lea rdx,[rip+.Lan_name]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ GO "qword ptr [rsp+56]",args
+ test rax,rax
+ jz .Lgo_empty_args
+ mov rdi,rax
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ test rax,rax
+ jz .Lgo_bad
+ jmp .Lgo_args_string
+.Lgo_empty_args:
+ lea rax,[rip+.Lrs_empty]
+.Lgo_args_string:
+ mov rdi,rax
+ call json_object_new_string@PLT
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lgo_bad
+ lea rdi,[rip+.Lgo_call_delta_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ mov rdi,[rbx+PG_MM_ANTHROPIC_COUNT]
+ dec rdi
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ GO "qword ptr [rsp]",delta
+ mov rdi,rax
+ lea rsi,[rip+.Lan_partial_json]
+ mov rdx,[rsp+88]
+ mov qword ptr [rsp+88],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lgo_close_block
+ test eax,eax
+ jnz .Lgo_bad
+.Lgo_part_signature:
+ GO "qword ptr [rsp+40]",thoughtSignature
+ mov rbp,rax
+ test rax,rax
+ jz .Lgo_part_next
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jz .Lgo_part_next
+ mov rax,[rbx+PG_MM_ANTHROPIC_COUNT]
+ test rax,rax
+ jz .Lgo_bad
+ dec rax
+ imul rax,rax,40
+ add rax,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ mov r14,rax
+ cmp dword ptr [rax+8],3
+ jne .Lgo_text_signature
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,[r14+32]
+ lea rsi,[rip+.Lgo_thoughtSignature]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ jmp .Lgo_part_next
+.Lgo_text_signature:
+ mov rax,[r14+24]
+ mov dword ptr [rax+8],0
+ mov rdx,[rax]
+ mov byte ptr [rdx],0
+ mov rdi,rax
+ mov rsi,rbp
+ call .Lan_append
+ test eax,eax
+ jnz .Lgo_bad
+.Lgo_part_next:
+ inc qword ptr [rsp+32]
+ jmp .Lgo_part
+.Lgo_finish:
+ GO "qword ptr [rsp+16]",finishReason
+ mov [rsp+48],rax
+ test rax,rax
+ jz .Lgo_usage
+ cmp dword ptr [rbx+PG_MM_FINISH_REASON],0
+ jne .Lgo_usage
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lgo_close_block
+ test eax,eax
+ jnz .Lgo_bad
+ lea rdi,[rip+.Lgo_finish_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ GO rax,delta
+ mov rbp,rax
+ mov rdi,[rsp+48]
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lgo_bad
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lgo_STOP]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgo_length
+ lea rdi,[rip+.Lan_end_turn]
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
+ je .Lgo_finish_reason
+ lea rdi,[rip+.Lan_tool_use]
+ jmp .Lgo_finish_reason
+.Lgo_length:
+ mov rdi,r14
+ lea rsi,[rip+.Lgo_MAX_TOKENS]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lgo_reason_error
+ lea rdi,[rip+.Lan_max_tokens]
+.Lgo_finish_reason:
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_stop_reason]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp+48]
+ call json_object_get@PLT
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ lea rsi,[rip+.Lan_stop_reason]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ lea rdi,[rip+.Lgo_stop_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_bad
+ mov rdi,rbx
+ mov rsi,rax
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lgo_bad
+ jmp .Lgo_usage
+.Lgo_reason_error:
+ mov rdi,[rsp+48]
+ call json_object_get@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_stop_reason]
+ mov rdx,rax
+ call .Lrs_set
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,rbp
+ call .Lan_stop_failure
+ jmp .Lgo_bad
+.Lgo_usage:
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lgo_usage_data
+ test eax,eax
+ jnz .Lgo_bad
+ mov rax,[rsp+8]
+ mov edx,[rax+8]
+ test edx,edx
+ jz .Lgo_ok
+ mov [rsp+112],rdx
+ mov rdi,[rax]
+ mov esi,edx
+ call json_object_new_string_len@PLT
+ test rax,rax
+ jz .Lgo_bad
+ mov [rbx+PG_MM_GOOGLE_TEXT],rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov dword ptr [r13+PG_MM_EVT_KIND],PG_MM_KIND_TEXT
+ mov [r13+8],rax
+ mov rax,[rsp+112]
+ mov [r13+16],rax
+.Lgo_ok:
+ xor ebp,ebp
+ jmp .Lgo_end
+.Lgo_bad:
+ mov ebp,1
+.Lgo_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+88]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call printbuf_free@PLT
+ mov eax,ebp
+ add rsp,128
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Close the sole open text/thinking/call block before switching kinds. */
+.Lgo_close_block:
+ push rbx
+ push r12
+ push r13
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ mov rax,[rbx+PG_MM_ANTHROPIC_COUNT]
+ test rax,rax
+ jz .Lgo_close_ok
+ dec rax
+ imul rcx,rax,40
+ add rcx,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp dword ptr [rcx+12],0
+ jne .Lgo_close_ok
+ mov r13,rax
+ lea rdi,[rip+.Lgo_close_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_close_bad
+ mov rdi,r13
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_close_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r12
+ call .Lan_event
+ mov r13d,eax
+ jmp .Lgo_close_end
+.Lgo_close_ok:
+ xor r13d,r13d
+ jmp .Lgo_close_end
+.Lgo_close_bad:
+ mov r13d,1
+.Lgo_close_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r13d
+ add rsp,16
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.Lgo_open_text:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12d,esi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ mov rax,[rbx+PG_MM_ANTHROPIC_COUNT]
+ test rax,rax
+ jz .Lgo_open_new
+ dec rax
+ imul rax,rax,40
+ add rax,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp dword ptr [rax+12],0
+ jne .Lgo_open_new
+ cmp [rax+8],r12d
+ je .Lgo_open_ok
+.Lgo_open_new:
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lgo_close_block
+ test eax,eax
+ jnz .Lgo_open_bad
+ lea rdi,[rip+.Lgo_text_start_json]
+ cmp r12d,1
+ je .Lgo_open_template
+ lea rdi,[rip+.Lgo_thought_start_json]
+.Lgo_open_template:
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_open_bad
+ mov rdi,[rbx+PG_MM_ANTHROPIC_COUNT]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lan_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_open_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ mov r14d,eax
+ jmp .Lgo_open_end
+.Lgo_open_ok:
+ xor r14d,r14d
+ jmp .Lgo_open_end
+.Lgo_open_bad:
+ mov r14d,1
+.Lgo_open_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,r14d
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.Lgo_count:
+ push rbx
+ call li_get
+ mov rbx,rax
+ test rax,rax
+ jz .Lgo_count_zero
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lgo_count_bad
+ mov rdi,rbx
+ call json_object_get_int64@PLT
+ mov rcx,9007199254740991
+ cmp rax,rcx
+ ja .Lgo_count_bad
+ xor edx,edx
+ pop rbx
+ ret
+.Lgo_count_zero:
+ xor eax,eax
+ xor edx,edx
+ pop rbx
+ ret
+.Lgo_count_bad:
+ xor eax,eax
+ mov edx,1
+ pop rbx
+ ret
+.Lgo_usage_data:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov rdi,rsi
+ lea rsi,[rip+.Lgo_usageMetadata]
+ call li_get
+ mov r12,rax
+ mov qword ptr [rsp],0
+ test rax,rax
+ jz .Lgo_usage_ok
+ xor r13d,r13d
+ lea r14,[rip+.Lgo_count_keys]
+.Lgo_usage_count:
+ mov rdi,r12
+ mov rsi,[r14+r13*8]
+ call .Lgo_count
+ test edx,edx
+ jnz .Lgo_usage_bad
+ mov [rsp+8+r13*8],rax
+ inc r13
+ cmp r13,5
+ jb .Lgo_usage_count
+ lea rdi,[rip+.Lgo_usage_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lgo_usage_bad
+ mov rdi,[rsp+8]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lrs_prompt_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_usage_bad
+ mov rdi,[rsp+16]
+ add rdi,[rsp+24]
+ mov rax,9007199254740991
+ cmp rdi,rax
+ ja .Lgo_usage_bad
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lrs_completion_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_usage_bad
+ RSGET "qword ptr [rsp]",prompt_tokens_details
+ mov rbp,rax
+ mov rdi,[rsp+32]
+ call json_object_new_int64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lan_cached_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_usage_bad
+ RSGET "qword ptr [rsp]",completion_tokens_details
+ mov rbp,rax
+ mov rdi,[rsp+24]
+ call json_object_new_int64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lgo_reasoning_tokens]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lgo_usage_bad
+ mov rdi,[rbx+PG_MM_USAGE]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+PG_MM_USAGE],rax
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ call json_object_get@PLT
+ mov r12,rax
+ mov rdi,[rbx+PG_MM_ANTHROPIC_USAGE]
+ call json_object_put@PLT
+ mov [rbx+PG_MM_ANTHROPIC_USAGE],r12
+.Lgo_usage_ok:
+ xor ebp,ebp
+ jmp .Lgo_usage_end
+.Lgo_usage_bad:
+ mov ebp,1
+.Lgo_usage_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Lgo_error: .asciz "error"
+.Lgo_message: .asciz "message"
+.Lgo_responseId: .asciz "responseId"
+.Lgo_candidates: .asciz "candidates"
+.Lgo_content: .asciz "content"
+.Lgo_parts: .asciz "parts"
+.Lgo_functionCall: .asciz "functionCall"
+.Lgo_text: .asciz "text"
+.Lgo_thought: .asciz "thought"
+.Lgo_delta: .asciz "delta"
+.Lgo_id: .asciz "id"
+.Lgo_name: .asciz "name"
+.Lgo_content_block: .asciz "content_block"
+.Lgo_args: .asciz "args"
+.Lgo_thoughtSignature: .asciz "thoughtSignature"
+.Lgo_finishReason: .asciz "finishReason"
+.Lgo_STOP: .asciz "STOP"
+.Lgo_MAX_TOKENS: .asciz "MAX_TOKENS"
+.Lgo_usageMetadata: .asciz "usageMetadata"
+.Lgo_promptTokenCount: .asciz "promptTokenCount"
+.Lgo_candidatesTokenCount: .asciz "candidatesTokenCount"
+.Lgo_thoughtsTokenCount: .asciz "thoughtsTokenCount"
+.Lgo_cachedContentTokenCount: .asciz "cachedContentTokenCount"
+.Lgo_totalTokenCount: .asciz "totalTokenCount"
+.Lgo_reasoning_tokens: .asciz "reasoning_tokens"
+.Lgo_textSignature: .asciz "textSignature"
+.Lgo_generative: .asciz "google-generative-ai"
+.Lgo_vertex: .asciz "google-vertex"
+.Lgo_start_json: .asciz "{\"type\":\"message_start\",\"message\":{\"id\":\"\",\"usage\":{}}}"
+.Lgo_delta_json: .asciz "{\"type\":\"content_block_delta\",\"delta\":{}}"
+.Lgo_call_start_json: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"input\":{}}}"
+.Lgo_call_delta_json: .asciz "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\"}}"
+.Lgo_finish_json: .asciz "{\"type\":\"message_delta\",\"delta\":{}}"
+.Lgo_stop_json: .asciz "{\"type\":\"message_stop\"}"
+.Lgo_close_json: .asciz "{\"type\":\"content_block_stop\"}"
+.Lgo_text_start_json: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}"
+.Lgo_thought_start_json: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}"
+.Lgo_usage_json: .asciz "{\"prompt_tokens_details\":{},\"completion_tokens_details\":{}}"
+.Lgo_id_format: .asciz "%.*s_%llu_%llu"
+.section .data.rel.ro
+.Lgo_count_keys: .quad .Lgo_promptTokenCount,.Lgo_candidatesTokenCount,.Lgo_thoughtsTokenCount,.Lgo_cachedContentTokenCount,.Lgo_totalTokenCount
+.section .bss
+.balign 8
+.Lgo_call_counter: .zero 8
+
+.section .rodata
+.Lgo_totalTokens: .asciz "totalTokens"
+
+.section .rodata
+.Lgo_error_format: .asciz "Provider stopped with: %s"
