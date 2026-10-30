@@ -274,6 +274,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 来源：Durable `Harness` 与 Coding Agent `core/agent-session.ts` 的模型、资源、会话操作；现有 `src/composition/pangu.c`。
 
 - [x] 产品前台接入Durable Client/Session/Scheduler/Generation/Tool：默认`.pangu` JSONL、模型/工具事件、取消、暂停与已提交历史。核心专项与真实模型编码工作流通过；TUI候选整合见交接区。
+- [x] 基础启动参数接入--session-dir/--session-id、help/version及工作区；Assembly解析后直接打开选定会话，配置/历史与恢复任务使用同一Runtime，目录参数优先于环境设置。
 - [ ] 将 K02–K13 的服务组合成实际程序：工作区、模型/凭据、资源、存储、宿主与TUI桥接；完善启动参数、配置加载与关闭顺序。
 - [ ] 对接TUI TODO的所有操作请求，按已实现头文件逐项联调；完成会话选择、导入/导出、模型/思考配置与扩展刷新所需Runtime服务。
 - [ ] 验收：从干净临时工作区启动，真实模型完成编码工作流、会话管理、压缩、扩展调用、暂停/恢复，操作数据逐项可核对。
@@ -306,8 +307,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Durable Scheduler普通所有权取消、Generation abort与已持久取消意图恢复；沿已有产品seed/resume工作流。
-- 实际调用链：复用任务拥有分叉会话→Submission→Generation→真实模型流。在cancel场景中先等到HTTP 200且实际收到流字节，再提交父Task取消并直接_exit；独立resume进程重读JSONL，沿现有Scheduler级联和Generation abort完成子/父收束。
-- 验证：`test_product_resources.py --live-process-conversations`实际通过普通子会话恢复/真实回答/父等待，以及已开始流传输的父取消跨进程恢复；恢复后子Generation terminal/aborted，未发生新的模型完成回调。本批扩展同一产品工作流，无产品代码/接口改动。
-- 接口与差异：前一批只验证模型开始前的取消，本次覆盖收到真实流数据后的中断边界。仅使用临时工作区、现有模型凭据和当前产品构建；保留已验证路径，不增加另一套运行实现。
-- 下一交付物：继续K05/K08/K11剩余产品能力，避免连续停留在验证与辅助层。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` Coding Agent `cli/args.ts`的session-dir/session-id/help/version入口，结合PanGu自己的持久目录与Conversation ID。
+- 实际调用链：`pg_client_startup_parse`以手写Assembly解析工作区、目录和安全整数会话ID；产品启动直接校验/预载指定Agent并将Client绑定到该会话，启动历史同样读取它。--session-dir优先于PANGU_SESSION_DIR，未给会话ID使用根会话；help/version在凭据和TTY初始化前返回。
+- 验证：两后端会话专项ASan/UBSan通过参数/默认值/缺值/非法ID与未知参数；实际产品help/version及错误参数退出码通过。产品Host ASan/UBSan、构建、Assembly检查通过；真实DeepSeek独立resume进程直接绑定保存的子会话，完成恢复回答/父等待和实际流中父取消跨进程恢复。G00按Git登记文件当前快照核对。
+- 接口与差异：新增32字节只读启动配置及解析导出，argv文本借用至退出；既有Runtime主表不变。PanGu session-id是自己存储中的Conversation ID，所有状态读取自己的JSONL。其余基础参数仍按K14来源范围完成。
+- 下一交付物：继续协议/工具/资源服务和实际TUI操作联调，按覆盖表成组推进。

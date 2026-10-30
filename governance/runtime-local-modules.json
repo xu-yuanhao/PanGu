@@ -1934,6 +1934,7 @@
         "pg_durable_generation_bind_hooks",
         "pg_durable_generation_bind_prepare",
         "pg_durable_client_select",
+        "pg_client_startup_parse",
         "pg_durable_client_create",
         "pg_durable_client_history",
         "pg_durable_client_catalog_service",

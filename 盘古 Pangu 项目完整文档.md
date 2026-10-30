@@ -24,6 +24,8 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 不建设独立 CLI 产品。仅移植固定 Pi 已有基础子命令、启动参数、一次性操作及非交互集成入口，共用 PanGu Runtime/配置/会话。子命令包括 install/remove/uninstall/update/list/config/auth/mcp；帮助、版本、模型和会话启动参数、export/list-models、print 与 text/json/rpc 模式按 Pi 实际解析核对，详见 TUI TODO 的边界清单。基础命令不能替代默认 TUI，也不另造一套 CLI 会话。
 
+可用`pangu [工作区] --session-dir 目录 --session-id 会话ID`直接打开PanGu持久会话；目录参数优先于`PANGU_SESSION_DIR`，默认会话ID为1。`--help`、`--version`提供基础启动信息。
+
 ## 开发入口
 
 1. [核心移植 TODO](docs/原生重写路线与迁移TODO.md)：Runtime、模型、工具、存储、插件宿主与产品组合；交给核心 Agent。

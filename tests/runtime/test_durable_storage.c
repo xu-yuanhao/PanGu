@@ -749,7 +749,11 @@ static void harness_conversation_cases(void){
  }
  puts("PASS: Harness default documents, ordered provider identities, Agent as-of/owner inheritance, transactional init/rollback, idle client creation and two-backend reopen");
 }
+static void startup_options_cases(void){
+ _Static_assert(sizeof(pg_client_startup)==32,"startup ABI");pg_client_startup options={0};char *arguments[]={"pangu","--session-dir","/tmp/pangu-storage","workspace","--session-id","9007199254740991","--help","--version"};assert(!pg_client_startup_parse(8,arguments,&options)&&options.conversation==9007199254740991ULL&&options.help&&options.version&&!strcmp(options.workspace,"workspace")&&!strcmp(options.session_directory,"/tmp/pangu-storage"));char *plain[]={"pangu"};assert(!pg_client_startup_parse(1,plain,&options)&&options.conversation==1&&!strcmp(options.workspace,".")&&!options.session_directory&&!options.help&&!options.version);const char *invalid[]={"0","-1","1.5","9007199254740992","","1x","18446744073709551615"};for(size_t i=0;i<sizeof(invalid)/sizeof(*invalid);i++){char *bad[]={"pangu","--session-id",(char *)invalid[i]};assert(pg_client_startup_parse(3,bad,&options)==2);}char *missing[]={"pangu","--session-id"};assert(pg_client_startup_parse(2,missing,&options)==2);char *unknown[]={"pangu","--unknown"};assert(pg_client_startup_parse(2,unknown,&options)==2);
+}
 static void conversation_creation_cases(void){
+ startup_options_cases();
  harness_conversation_cases();
  _Static_assert(sizeof(pg_record_tx)==48&&sizeof(pg_document_tx)==48,"conversation transaction frame");
  for(unsigned kind=0;kind<2;kind++){

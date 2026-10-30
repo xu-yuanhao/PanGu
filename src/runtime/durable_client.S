@@ -3408,3 +3408,139 @@ pg_durable_client_reset:
 .Lreset_entry: .asciz "entry"
 .Lreset_model: .asciz "model"
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_client_startup_parse
+.type pg_client_startup_parse,@function
+pg_client_startup_parse:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov ebp,edi
+ mov rbx,rsi
+ mov r12,rdx
+ mov eax,2
+ test r12,r12
+ jz .Lstp_end
+ lea rax,[rip+.Lstp_dot]
+ mov [r12],rax
+ mov qword ptr [r12+8],0
+ mov qword ptr [r12+16],1
+ mov qword ptr [r12+24],0
+ test rbx,rbx
+ jz .Lstp_invalid
+ cmp ebp,1
+ jl .Lstp_invalid
+ mov r13d,1
+ xor r14d,r14d
+.Lstp_each:
+ cmp r13d,ebp
+ jge .Lstp_ok
+ mov rdi,[rbx+r13*8]
+ test rdi,rdi
+ jz .Lstp_invalid
+ lea rsi,[rip+.Lstp_help]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lstp_help_set
+ mov rdi,[rbx+r13*8]
+ lea rsi,[rip+.Lstp_short_help]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lstp_help_set
+ mov rdi,[rbx+r13*8]
+ lea rsi,[rip+.Lstp_version]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lstp_version_set
+ mov rdi,[rbx+r13*8]
+ lea rsi,[rip+.Lstp_directory]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lstp_directory_set
+ mov rdi,[rbx+r13*8]
+ lea rsi,[rip+.Lstp_conversation]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lstp_conversation_set
+ mov rax,[rbx+r13*8]
+ cmp byte ptr [rax],45
+ je .Lstp_invalid
+ test r14d,r14d
+ jnz .Lstp_invalid
+ cmp byte ptr [rax],0
+ je .Lstp_invalid
+ mov [r12],rax
+ mov r14d,1
+ jmp .Lstp_next
+.Lstp_help_set:
+ mov dword ptr [r12+24],1
+ jmp .Lstp_next
+.Lstp_version_set:
+ mov dword ptr [r12+28],1
+ jmp .Lstp_next
+.Lstp_directory_set:
+ inc r13d
+ cmp r13d,ebp
+ jge .Lstp_invalid
+ mov rax,[rbx+r13*8]
+ test rax,rax
+ jz .Lstp_invalid
+ cmp byte ptr [rax],0
+ je .Lstp_invalid
+ mov [r12+8],rax
+ jmp .Lstp_next
+.Lstp_conversation_set:
+ inc r13d
+ cmp r13d,ebp
+ jge .Lstp_invalid
+ mov rdx,[rbx+r13*8]
+ test rdx,rdx
+ jz .Lstp_invalid
+ xor eax,eax
+ xor ecx,ecx
+.Lstp_digit:
+ movzx esi,byte ptr [rdx+rcx]
+ test esi,esi
+ jz .Lstp_number_ready
+ sub esi,48
+ cmp esi,9
+ ja .Lstp_invalid
+ cmp rcx,16
+ jae .Lstp_invalid
+ imul rax,10
+ add rax,rsi
+ mov rdi,9007199254740991
+ cmp rax,rdi
+ ja .Lstp_invalid
+ inc ecx
+ jmp .Lstp_digit
+.Lstp_number_ready:
+ test rax,rax
+ jz .Lstp_invalid
+ mov [r12+16],rax
+.Lstp_next:
+ inc r13d
+ jmp .Lstp_each
+.Lstp_ok:
+ xor eax,eax
+ jmp .Lstp_end
+.Lstp_invalid:
+ mov eax,2
+.Lstp_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lstp_dot: .asciz "."
+.Lstp_help: .asciz "--help"
+.Lstp_short_help: .asciz "-h"
+.Lstp_version: .asciz "--version"
+.Lstp_directory: .asciz "--session-dir"
+.Lstp_conversation: .asciz "--session-id"
+.section .note.GNU-stack,"",@progbits

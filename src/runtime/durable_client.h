@@ -16,6 +16,9 @@ typedef struct {
  uint64_t message_task;
  struct json_object *turns,*inbox;
 } pg_durable_client;
+/* argv strings are borrowed through application shutdown. */
+typedef struct {const char *workspace,*session_directory;uint64_t conversation;unsigned help,version;} pg_client_startup;
+int pg_client_startup_parse(int,char *const *,pg_client_startup *);
 /* Single foreground client on its scheduler, borrowed providers/configuration.
    Submit delegates atomic Submission/Entry/Generation admission to inputs. Poll pumps
    the scheduler and returns detached queued events; slices expire next poll.
