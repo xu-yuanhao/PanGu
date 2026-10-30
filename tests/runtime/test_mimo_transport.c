@@ -37,6 +37,7 @@ static void *captured_header_data;
 static const char *captured_url, *captured_post, *captured_protocols;
 static struct curl_slist *captured_headers;
 static char captured_sigv4[128],captured_userpwd[256];
+static long captured_http_version = -1;
 static long captured_timeout = -1, captured_connect_timeout = -1, captured_nosignal = -1;
 static int token_fail_at,token_calls;
 struct json_tokener *__real_json_tokener_new(void);
@@ -102,11 +103,13 @@ CURLcode __wrap_curl_easy_setopt(CURL *h, CURLoption opt, ...) {
         rc = __real_curl_easy_setopt(h, opt, v);
         break;
     }
+    case CURLOPT_HTTP_VERSION:
     case CURLOPT_TIMEOUT:
     case CURLOPT_TIMEOUT_MS:
     case CURLOPT_CONNECTTIMEOUT:
     case CURLOPT_NOSIGNAL: {
         long v = va_arg(ap, long);
+        if (opt == CURLOPT_HTTP_VERSION) captured_http_version = v;
         if (opt == CURLOPT_TIMEOUT_MS) captured_timeout = v;
         if (opt == CURLOPT_CONNECTTIMEOUT) captured_connect_timeout = v;
         if (opt == CURLOPT_NOSIGNAL) captured_nosignal = v;
@@ -192,6 +195,7 @@ static void reset_script(void) {
     captured_write_data = NULL;
     captured_url = captured_post = captured_protocols = NULL;
     captured_headers = NULL;captured_sigv4[0]=captured_userpwd[0]=0;
+    captured_http_version = -1;
     captured_timeout = captured_connect_timeout = captured_nosignal = -1;
 }
 
@@ -645,8 +649,8 @@ static void test_bedrock_profiles(void){
   assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);
   if(scenario>=5){assert(start());}else{
    assert(!start());const char *expected=scenario==0?"DEFAULT_ACCESS:default-secret":scenario==2?"ENV_ACCESS:env-secret":"PROFILE_ACCESS:profile-secret";
-   assert(!strcmp(captured_userpwd,expected));assert(!strcmp(captured_sigv4,scenario==0?"aws:amz:us-east-2:bedrock":"aws:amz:eu-west-1:bedrock"));
-   assert(strstr(captured_url,scenario==0?"bedrock-runtime.us-east-2.amazonaws.com":"bedrock-runtime.eu-west-1.amazonaws.com"));
+   assert(!strcmp(captured_userpwd,expected));assert(!strcmp(captured_sigv4,scenario==0||scenario==4?"aws:amz:us-east-1:bedrock":"aws:amz:eu-west-1:bedrock"));
+   assert(strstr(captured_url,scenario==0||scenario==4?"bedrock-runtime.us-east-1.amazonaws.com":"bedrock-runtime.eu-west-1.amazonaws.com"));
    unsigned tokens=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)tokens+=!strcmp(h->data,"X-Amz-Security-Token: profile-token");assert(tokens==(scenario!=0&&scenario!=2));
    const char *public_config=json_object_to_json_string(m.configuration);assert(!strstr(public_config,"PROFILE_ACCESS")&&!strstr(public_config,"profile-secret")&&!strstr(public_config,"profile-token")&&!strstr(public_config,"env-secret"));
   }
@@ -654,6 +658,22 @@ static void test_bedrock_profiles(void){
  }
  unsetenv("AWS_PROFILE");unsetenv("AWS_ACCESS_KEY_ID");unsetenv("AWS_SECRET_ACCESS_KEY");unsetenv("AWS_SESSION_TOKEN");unsetenv("AWS_CONFIG_FILE");unsetenv("AWS_SHARED_CREDENTIALS_FILE");assert(!unlink(config)&&!unlink(credentials)&&!rmdir(directory));
  puts("PASS: shared AWS profiles, case-sensitive selection, config/credentials precedence, ambient keys, profile regions and missing/role refusal");
+}
+static void test_bedrock_proxy_modes(void){
+ for(unsigned mode=0;mode<5;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();
+  setenv("AWS_BEDROCK_SKIP_AUTH",mode==4?"true":"1",1);setenv("AWS_BEDROCK_FORCE_HTTP1",mode==3?"true":"1",1);
+  setenv("PANGU_MODEL_API_KEY","explicit-bearer-must-be-skipped",1);setenv("AWS_BEARER_TOKEN_BEDROCK","ambient-bearer-must-be-skipped",1);setenv("AWS_SESSION_TOKEN","ambient-token-must-be-skipped",1);
+  json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"test\",\"endpoint\":\"https://proxy.invalid/converse-stream\",\"options\":{\"region\":\"us-west-2\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);
+  if(mode==1)setopt_fail_at=4;
+  if(mode==1){assert(start());}else{
+   assert(!start());assert(captured_http_version==(mode==3?-1:CURL_HTTP_VERSION_1_1));
+   if(mode==4){assert(!captured_sigv4[0]);}else{assert(!strcmp(captured_userpwd,"dummy-access-key:dummy-secret-key")&&!strcmp(captured_sigv4,"aws:amz:us-west-2:bedrock"));for(const struct curl_slist *h=captured_headers;h;h=h->next)assert(!strstr(h->data,"Bearer")&&!strstr(h->data,"ambient-token"));}
+  }
+  model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);
+ }
+ unsetenv("AWS_BEDROCK_SKIP_AUTH");unsetenv("AWS_BEDROCK_FORCE_HTTP1");unsetenv("PANGU_MODEL_API_KEY");unsetenv("AWS_BEARER_TOKEN_BEDROCK");unsetenv("AWS_SESSION_TOKEN");
+ puts("PASS: Bedrock proxy skip-auth wins Bearer and session credentials; exact switches, HTTP/1.1 and transport failure cleanup");
 }
 static int bedrock_sigv4_wire(void){
  const char *endpoint=getenv("PANGU_TEST_SIGV4_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"options\":{\"region\":\"us-west-2\",\"headers\":{\"X-Project\":\"pangu-wire\"}}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));unsigned timeout=getenv("PANGU_TEST_DEADLINE")!=0;if(timeout)json_object_object_add(json_object_object_get(cfg,"options"),"timeoutMs",json_object_new_int(50));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start());CURLcode result=curl_easy_perform(m.easy);if(timeout){assert(result==CURLE_OPERATION_TIMEDOUT);model.cancel(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);puts("PASS: actual TLS request deadline expires and cancellation releases transport");return 0;}assert(!result&&!strcmp(m.response_request_id,"wire-public-request-id"));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);puts("PASS: native Bedrock request signed by actual libcurl and verified by independent TLS receiver");return 0;
@@ -795,6 +815,7 @@ int main(int argc,char **argv) {
     test_bedrock_transport();
     test_bedrock_auth();
     test_bedrock_profiles();
+    test_bedrock_proxy_modes();
     test_bedrock_multimodal();
     test_bedrock_policies();
     test_bedrock_history_ids();

@@ -320,15 +320,17 @@ def sigv4_wire(binary, directory):
                 assert auth.startswith('AWS4-HMAC-SHA256 ') and match
                 credential,signed,signature=match.groups()
                 access,date,region,service,terminator=credential.split('/')
-                assert (access,region,service,terminator)==('AKID_PANGU_WIRE','us-west-2','bedrock','aws4_request')
-                assert self.headers['X-Amz-Security-Token']=='pangu-wire-session'
+                proxy_mode='proxy=1' in self.path
+                assert (access,region,service,terminator)==('dummy-access-key' if proxy_mode else 'AKID_PANGU_WIRE','us-west-2','bedrock','aws4_request')
+                assert self.headers['X-Amz-Security-Token']==(None if proxy_mode else 'pangu-wire-session')
+                if proxy_mode: assert self.request_version=='HTTP/1.1'
                 assert self.headers['X-Project']=='pangu-wire'
                 headers=''.join(name+':'+ ' '.join(self.headers[name].split())+'\n' for name in signed.split(';'))
                 target=urlsplit(self.path)
                 canonical='\n'.join(('POST',target.path,target.query,headers,signed,hashlib.sha256(body).hexdigest()))
                 scope='/'.join((date,region,service,terminator))
                 to_sign='\n'.join(('AWS4-HMAC-SHA256',self.headers['X-Amz-Date'],scope,hashlib.sha256(canonical.encode()).hexdigest()))
-                signing=b'AWS4pangu-wire-secret'
+                signing=b'AWS4dummy-secret-key' if proxy_mode else b'AWS4pangu-wire-secret'
                 for part in (date,region,service,terminator): signing=hmac.new(signing,part.encode(),hashlib.sha256).digest()
                 assert hmac.compare_digest(signature,hmac.new(signing,to_sign.encode(),hashlib.sha256).hexdigest())
                 received.append(True)
@@ -344,17 +346,20 @@ def sigv4_wire(binary, directory):
     tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(cert,key)
     server.socket=tls.wrap_socket(server.socket,server_side=True)
     server.timeout=15
-    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(2)],daemon=True);worker.start()
+    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(3)],daemon=True);worker.start()
     env=os.environ.copy()
-    for name in ('PANGU_MODEL_API_KEY','AWS_BEARER_TOKEN_BEDROCK','AWS_PROFILE'): env.pop(name,None)
+    for name in ('PANGU_MODEL_API_KEY','AWS_BEARER_TOKEN_BEDROCK','AWS_PROFILE','AWS_BEDROCK_SKIP_AUTH','AWS_BEDROCK_FORCE_HTTP1'): env.pop(name,None)
     env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',AWS_ACCESS_KEY_ID='AKID_PANGU_WIRE',AWS_SECRET_ACCESS_KEY='pangu-wire-secret',AWS_SESSION_TOKEN='pangu-wire-session',PANGU_TEST_SIGV4_CA=str(cert),PANGU_TEST_SIGV4_ENDPOINT=f'https://127.0.0.1:{server.server_port}/model/anthropic.claude-test/converse-stream')
     try:
         subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
         assert received==[True] and not failures,failures
         env.update(PANGU_TEST_DEADLINE='1',PANGU_TEST_SIGV4_ENDPOINT=env['PANGU_TEST_SIGV4_ENDPOINT']+'?deadline=1')
         subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
+        env.pop('PANGU_TEST_DEADLINE',None)
+        env.update(AWS_BEDROCK_SKIP_AUTH='1',AWS_BEDROCK_FORCE_HTTP1='1',PANGU_MODEL_API_KEY='ignored-explicit-token',PANGU_TEST_SIGV4_ENDPOINT=env['PANGU_TEST_SIGV4_ENDPOINT'].split('?')[0]+'?proxy=1')
+        subprocess.run([binary,'--sigv4-wire'],env=env,check=True,timeout=20)
         worker.join(2)
-        assert received==[True,True] and not failures,failures
+        assert received==[True,True,True] and not failures,failures
     finally: server.server_close()
 
 def main():

@@ -276,6 +276,15 @@ li_start:
  mov byte ptr [rbx + PG_MM_ID], 0
  mov byte ptr [rbx + PG_MM_NAME], 0
 
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lst_explicit_key
+ lea rdi,[rip+.Lbe_skip_env]
+ call .Lbe_enabled
+ test eax,eax
+ jnz .Lst_aws_iam
+.Lst_explicit_key:
  lea rdi,[rip+.Lstr_pangu_key]
  call getenv@PLT
  test rax,rax
@@ -496,6 +505,22 @@ li_start:
  test eax,eax
  jnz .Lst_bad
 .Lst_signed_ready:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lst_http_version_ready
+ lea rdi,[rip+.Lbe_http1_env]
+ call .Lbe_enabled
+ test eax,eax
+ jz .Lst_http_version_ready
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_HTTP_VERSION
+ mov edx,PG_MM_CURL_HTTP_VERSION_1_1
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+.Lst_http_version_ready:
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_HTTPHEADER
  mov rdx,[rbx+PG_MM_HEADERS]
@@ -3269,6 +3294,23 @@ pg_mimo_complete:
  mov eax,1
  pop rbx
  ret
+/* Environment switches follow the upstream exact "1" convention. */
+.Lbe_enabled:
+ sub rsp,8
+ call getenv@PLT
+ test rax,rax
+ jz .Lbe_enabled_no
+ cmp byte ptr [rax],49
+ jne .Lbe_enabled_no
+ cmp byte ptr [rax+1],0
+ sete al
+ movzx eax,al
+ add rsp,8
+ ret
+.Lbe_enabled_no:
+ xor eax,eax
+ add rsp,8
+ ret
 /* libcurl copies USERPWD/SIGV4 strings; temporary credentials never enter JSON. */
 .Lbe_sign:
  push rbp
@@ -3283,6 +3325,14 @@ pg_mimo_complete:
  mov ecx,6
  mov rdi,rsp
  rep stosq
+ lea rdi,[rip+.Lbe_skip_env]
+ call .Lbe_enabled
+ test eax,eax
+ jz .Lbe_sign_load
+ lea r13,[rip+.Lbe_dummy_access]
+ lea r14,[rip+.Lbe_dummy_secret]
+ jmp .Lbe_sign_validate
+.Lbe_sign_load:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call .Lapf_load
  mov [rsp+24],rax
@@ -3292,6 +3342,7 @@ pg_mimo_complete:
  jne .Lbe_sign_bad
  mov r13,[rax]
  mov r14,[rax+8]
+.Lbe_sign_validate:
  mov rdi,r13
  call .Lbe_credential
  test eax,eax
@@ -3346,6 +3397,8 @@ pg_mimo_complete:
  test eax,eax
  jnz .Lbe_sign_bad
  mov rax,[rsp+24]
+ test rax,rax
+ jz .Lbe_sign_ok
  mov rax,[rax+16]
  mov r13,rax
  test rax,rax
@@ -3401,6 +3454,10 @@ pg_mimo_complete:
  pop rbp
  ret
 .section .rodata
+.Lbe_skip_env: .asciz "AWS_BEDROCK_SKIP_AUTH"
+.Lbe_http1_env: .asciz "AWS_BEDROCK_FORCE_HTTP1"
+.Lbe_dummy_access: .asciz "dummy-access-key"
+.Lbe_dummy_secret: .asciz "dummy-secret-key"
 .Lbe_bearer_env: .asciz "AWS_BEARER_TOKEN_BEDROCK"
 .Lbe_access_env: .asciz "AWS_ACCESS_KEY_ID"
 .Lbe_secret_env: .asciz "AWS_SECRET_ACCESS_KEY"
@@ -3679,6 +3736,8 @@ pg_mimo_complete:
  mov rax,[rsp+16]
  test rax,rax
  jnz .Lbr_copy_region
+ lea rax,[rip+.Lbe_region_default]
+ jmp .Lbr_copy_region
 .Lapf_resolve_profile_region:
  mov rdi,rbx
  call .Lapf_load
