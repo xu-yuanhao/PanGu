@@ -19,7 +19,9 @@ typedef struct {
  /* Optional provider failure query, before close; absent means non-retryable. */
  void (*failure)(void *,const pg_model *,pg_model_failure *);
  struct pg_durable_inputs *inputs;
- /* Before provider close, complete the private assistant with terminal facts. */
+ /* Before provider close, complete successful or failed private assistants with
+    terminal facts. Failure completion preserves stopReason/errorMessage and may
+    add diagnostics; it must accept providers that failed before stream start. */
  int (*complete)(void *,const pg_model *,struct json_object *assistant);
  /* Fetch begins a provider event stream; cancellation may cooperatively pend.
     Both borrow the durable handle and acquired provider until cleanup. */

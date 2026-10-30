@@ -69,6 +69,7 @@ pg_mimo_bind_tools:
  mov rdi,[rbx+PG_MM_STRICT_DIAGNOSTICS]
  mov qword ptr [rbx+PG_MM_STRICT_DIAGNOSTICS],0
  mov dword ptr [rbx+PG_MM_STRICT_RETRY],0
+ mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID],0
  call json_object_put@PLT
  xor r12d,r12d
 .Lclear_arg_loop:
@@ -513,6 +514,20 @@ li_start:
  mov esi, PG_MM_CURLOPT_WRITEFUNCTION
  lea rdx, [rip + li_receive]
  xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_HEADERFUNCTION
+ lea rdx,[rip+.Lhd_receive]
+ xor eax,eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_HEADERDATA
+ mov rdx,rbx
+ xor eax,eax
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lst_bad
@@ -1122,6 +1137,24 @@ pg_mimo_complete:
  jz .Lmu_end
  test rsi,rsi
  jz .Lmu_end
+ mov rdi,r12
+ lea rsi,[rip+.Lhd_stop]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lhd_normal_complete
+ mov rdi,rax
+ lea rsi,[rip+.Lhd_error]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lhd_normal_complete
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lhd_failure_complete
+ mov ebp,eax
+ jmp .Lmu_end
+.Lhd_normal_complete:
  mov eax,[rbx+PG_MM_FINISH_REASON]
  lea rdi,[rip+.Lmu_stop]
  cmp eax,1
@@ -3966,3 +3999,218 @@ pg_mimo_complete:
  jmp .Ltm_end
 .section .rodata
 .Ltm_key: .asciz "timeoutMs"
+
+.text
+/* Header callback borrows curl bytes; retain only bounded public request identity. */
+.Lhd_receive:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rcx
+ mov r12,rdi
+ mov rax,rsi
+ mul rdx
+ test rdx,rdx
+ jnz .Lhd_overflow
+ mov r13,rax
+ cmp rax,5
+ jb .Lhd_return
+ mov rdi,r12
+ lea rsi,[rip+.Lhd_http]
+ mov edx,5
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lhd_find
+ mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID],0
+ jmp .Lhd_return
+.Lhd_find:
+ xor ebp,ebp
+ lea r14,[rip+.Lhd_names]
+.Lhd_name:
+ mov rdi,[r14+rbp*8]
+ test rdi,rdi
+ jz .Lhd_return
+ call strlen@PLT
+ cmp rax,r13
+ jae .Lhd_next
+ mov rdi,r12
+ mov rsi,[r14+rbp*8]
+ mov rdx,rax
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lhd_next
+ mov rdi,[r14+rbp*8]
+ call strlen@PLT
+ cmp byte ptr [r12+rax],58
+ jne .Lhd_next
+ lea r12,[r12+rax+1]
+ mov r14,r13
+ sub r14,rax
+ dec r14
+.Lhd_trim_head:
+ test r14,r14
+ jz .Lhd_drop
+ cmp byte ptr [r12],32
+ je .Lhd_trim_advance
+ cmp byte ptr [r12],9
+ jne .Lhd_trim_tail
+.Lhd_trim_advance:
+ inc r12
+ dec r14
+ jmp .Lhd_trim_head
+.Lhd_trim_tail:
+ test r14,r14
+ jz .Lhd_drop
+ mov al,[r12+r14-1]
+ cmp al,32
+ je .Lhd_trim_cut
+ cmp al,9
+ je .Lhd_trim_cut
+ cmp al,13
+ je .Lhd_trim_cut
+ cmp al,10
+ jne .Lhd_value
+.Lhd_trim_cut:
+ dec r14
+ jmp .Lhd_trim_tail
+.Lhd_value:
+ cmp r14,200
+ ja .Lhd_drop
+ mov rdi,r12
+ xor esi,esi
+ mov rdx,r14
+ call memchr@PLT
+ test rax,rax
+ jnz .Lhd_drop
+ lea rdi,[rbx+PG_MM_RESPONSE_REQUEST_ID]
+ mov rsi,r12
+ mov rdx,r14
+ call memcpy@PLT
+ mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID+r14],0
+ jmp .Lhd_return
+.Lhd_drop:
+ mov byte ptr [rbx+PG_MM_RESPONSE_REQUEST_ID],0
+ jmp .Lhd_return
+.Lhd_next:
+ inc ebp
+ jmp .Lhd_name
+.Lhd_return:
+ mov rax,r13
+ jmp .Lhd_end
+.Lhd_overflow:
+ xor eax,eax
+.Lhd_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lhd_failure_complete:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov qword ptr [rsp],0
+ cmp byte ptr [rdi+PG_MM_RESPONSE_REQUEST_ID],0
+ je .Lhd_complete_ok
+ lea rdi,[rip+.Lhd_json]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lhd_complete_bad
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ lea rdi,[rip+.Lhd_generic]
+ test eax,eax
+ jz .Lhd_type_ready
+ lea rdi,[rip+.Lhd_bedrock]
+.Lhd_type_ready:
+ call json_object_new_string@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lhd_type]
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lhd_complete_bad
+ xor edi,edi
+ lea rsi,[rsp+8]
+ call clock_gettime@PLT
+ test eax,eax
+ jnz .Lhd_complete_bad
+ cvtsi2sd xmm0,qword ptr [rsp+8]
+ mulsd xmm0,[rip+.Lhd_thousand]
+ cvtsi2sd xmm1,qword ptr [rsp+16]
+ divsd xmm1,[rip+.Lmc_million]
+ addsd xmm0,xmm1
+ call json_object_new_double@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lhd_timestamp]
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lhd_complete_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lhd_details]
+ call json_object_object_get@PLT
+ mov r14,rax
+ lea rdi,[rbx+PG_MM_RESPONSE_REQUEST_ID]
+ call json_object_new_string@PLT
+ mov rdi,r14
+ lea rsi,[rip+.Lhd_request_id]
+ mov rdx,rax
+ call .Lmc_set
+ test eax,eax
+ jnz .Lhd_complete_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lhd_diagnostics]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lmc_set
+ mov ebp,eax
+ jmp .Lhd_complete_end
+.Lhd_complete_ok:
+ xor ebp,ebp
+ jmp .Lhd_complete_end
+.Lhd_complete_bad:
+ mov ebp,1
+.Lhd_complete_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lhd_http: .asciz "HTTP/"
+.Lhd_amzn: .asciz "x-amzn-requestid"
+.Lhd_openai: .asciz "x-request-id"
+.Lhd_anthropic: .asciz "request-id"
+.Lhd_stop: .asciz "stopReason"
+.Lhd_error: .asciz "error"
+.Lhd_json: .asciz "[{\"details\":{}}]"
+.Lhd_generic: .asciz "provider_response_failure"
+.Lhd_bedrock: .asciz "bedrock_response_failure"
+.Lhd_type: .asciz "type"
+.Lhd_timestamp: .asciz "timestamp"
+.Lhd_details: .asciz "details"
+.Lhd_request_id: .asciz "requestId"
+.Lhd_diagnostics: .asciz "diagnostics"
+.p2align 3
+.Lhd_thousand: .double 1000
+.section .data.rel.ro
+.Lhd_names: .quad .Lhd_amzn,.Lhd_openai,.Lhd_anthropic,0

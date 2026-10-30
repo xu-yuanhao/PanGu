@@ -31,6 +31,7 @@ typedef struct {
  struct json_object *anthropic_usage;
  unsigned strict_retry;struct json_object *strict_diagnostics;
  struct json_object *google_text; /* owned event slice, borrowed until next Google decode/close */
+ char response_request_id[201]; /* public header value, reset at each HTTP response/start */
 } pg_mimo;
 /* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -46,7 +47,8 @@ pg_model pg_mimo_model(pg_mimo *);
 int pg_mimo_configure(pg_mimo *,const struct json_object *);
 /* Complete a private assistant JSON before close with stopReason and reported
    token usage (input/output/cacheRead/cacheWrite/reasoning/totalTokens).
-   Absent provider usage stays absent; this API reports token counts only.
+   Absent provider usage stays absent; public prices compute optional cost.
+   Error assistants receive available provider diagnostics before close.
    Responses consumers complete before tool dispatch to retain final
    argumentsError metadata alongside the prepared argument object. */
 int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);

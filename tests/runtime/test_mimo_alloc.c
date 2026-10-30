@@ -90,6 +90,11 @@ static void google_configuration_failures(void){
   printf("PASS: Google configuration protocol %u: %u constructor/insertion failures preserve old config and release candidate\n",vertex,total);
  }
 }
+static void failure_diagnostic_ownership(void){
+ unsigned total=0;for(unsigned fault=0;fault<=total;fault++){
+  fail_at=0;calls=tracked=0;pg_model model=pg_mimo_model(&provider);provider.configuration=__real_json_tokener_parse("{\"api\":\"bedrock-converse-stream\"}");strcpy(provider.response_request_id,"public-request-id");json_object *assistant=__real_json_tokener_parse("{\"role\":\"assistant\",\"stopReason\":\"error\",\"errorMessage\":\"original failure\"}");fail_at=fault;calls=tracked=0;int status=pg_mimo_complete(&provider,assistant);if(!fault){assert(!status);total=calls;}else assert(status&&calls>=fault);assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"errorMessage")),"original failure"));json_object_put(assistant);model.close(model.context);assert(!live);
+ }printf("PASS: failed assistant request identity: %u constructor/insertion failures preserve original error and release ownership\n",total);
+}
 int main(void){
  for(unsigned protocol=0;protocol<10;protocol++){
  struct json_object *canonical=0;
@@ -125,5 +130,6 @@ int main(void){
  strict_retry_failures();
  google_decoder_failures();
  google_configuration_failures();
+ failure_diagnostic_ownership();
  return 0;
 }

@@ -322,8 +322,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi Durable失败assistant提交语义与Bedrock `appendBedrockFailureDiagnostic`的已观察HTTP状态记录；PanGu适配额外保留libcurl传输错误码。
-- 实际调用链：既有提供者failure接口返回HTTP/传输事实，`durable_generation.S`在错误assistant构造时追加provider_response_failure诊断，附实际时钟与已知字段，随错误Entry/任务重试状态同事务提交；未知字段省略，服务接口与错误分类保持。
-- 验证：Client ASan/UBSan完整专项通过；SQLite/JSONL错误Entry核对503/429和超时28事实，既有退避、睡眠重开、取消与事务行为保持；产品资源ASan/UBSan与Assembly/diff检查通过。压缩自身错误按其来源验证，未推断提供者状态。自审核对事实借用期、诊断JSON归属及事务边界。
-- 具体缺口：提供者请求ID/错误类别的响应头采集与持久诊断；Bedrock profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
-- 下一交付物：成组接入提供者响应头/请求身份和失败诊断，继续凭据配置及其Generation消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的Bedrock响应头request-id回退与`appendBedrockFailureDiagnostic/normalizeDiagnosticValue`，以及Durable失败assistant提交路径。
+- 实际调用链：`mimo.S`通过实际curl header回调采集公开请求ID，忽略其他响应头，trim后最多200字节，超限丢弃；每个HTTP响应/start/close重置。Generation在失败时也调用既有complete回调，提供者保留原始errorMessage/stopReason并补充requestId/timestamp诊断，再与HTTP/传输事实同事务提交。服务ABI保持；内部模型布局追加定长身份缓冲并同步静态断言，complete契约明确覆盖请求启动失败。
+- 验证：模型O0/O2/UBSan、ABI与七个诊断构造失败点清理通过；头名称大小写/空白/超限/新响应/关闭检查，真实本地TLS头采集及SigV4/超时检查通过。SQLite/JSONL失败assistant核对请求ID、HTTP/传输事实，退避重开与取消保持；Client和产品资源ASan/UBSan、产品构建与Assembly/diff通过。自审核对响应头借用期、内部布局、回调清理与提交顺序。
+- 具体缺口：错误类别/状态诊断整合与非ASCII请求ID长度的完整参考规则；Bedrock profile/凭据链、分区策略、simple token预算及高级选项；其他协议剩余行为保持K05覆盖范围。
+- 下一交付物：成组补齐提供者凭据配置和完整错误/响应元数据，继续Generation实际消费者与协议覆盖。

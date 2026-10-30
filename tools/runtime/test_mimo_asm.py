@@ -337,6 +337,7 @@ def sigv4_wire(binary, directory):
             except Exception as error:
                 failures.append(type(error).__name__)
                 self.send_response(403)
+            self.send_header('X-Amzn-RequestId','wire-public-request-id')
             self.send_header('Content-Length','0')
             self.end_headers()
     server=HTTPServer(('127.0.0.1',0),Receiver)

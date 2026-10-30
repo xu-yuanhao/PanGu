@@ -3118,6 +3118,16 @@ pg_durable_context_order:
  call .Lgg_set
  test eax,eax
  jnz .Lgg_failure_error
+ mov rax,[r12]
+ cmp qword ptr [rax+72],0
+ je .Lgd_metadata_done
+ mov rdi,[rax]
+ lea rsi,[r14+32]
+ mov rdx,[r14+24]
+ call [rax+72]
+ test eax,eax
+ jnz .Lgg_failure_error
+.Lgd_metadata_done:
  mov rax,[rbx+8]
  mov rdi,[rax]
  call [rax+40]
