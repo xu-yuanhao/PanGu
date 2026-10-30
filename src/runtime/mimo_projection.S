@@ -867,6 +867,22 @@ pg_mimo_encode_request:
  call .Lsampling_admit
  test eax,eax
  jnz .Linvalid
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lserialize_anthropic
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lap_request
+ test eax,eax
+ jnz .Linvalid
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lbd_request
+ test eax,eax
+ jnz .Linvalid
+ jmp .Lserialize_ready
+.Lserialize_anthropic:
  mov rdi,rbx
  call pg_mimo_uses_anthropic
  test eax,eax
@@ -6538,3 +6554,451 @@ pg_mimo_uses_google:
 .section .rodata
 .Lrp_model_field: .asciz "model"
 .Lrp_azureDeploymentName: .asciz "azureDeploymentName"
+
+
+.text
+.Lbd_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov [rsp+48],rsi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_system]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lbd_messages_flow
+ xor r13d,r13d
+.Lbd_system_flow:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lbd_messages_flow
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_type]
+ call json_object_object_del@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_cache_control]
+ call json_object_object_del@PLT
+ inc r13
+ jmp .Lbd_system_flow
+.Lbd_messages_flow:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_messages]
+ call json_object_object_get@PLT
+ mov r12,rax
+ xor r13d,r13d
+.Lbd_message_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lbd_tools_flow
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_content]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lbd_blocks
+ test eax,eax
+ jnz .Lbd_bad
+ inc r13
+ jmp .Lbd_message_each
+.Lbd_tools_flow:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_tools]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lbd_inference
+ xor r13d,r13d
+.Lbd_tool_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lbd_tool_attach
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_bad
+ mov rdi,qword ptr [rsp]
+ mov rsi,rbp
+ lea rdx,[rip+.Lbd_input_schema]
+ lea rcx,[rip+.Lbd_json]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_input_schema]
+ call json_object_object_del@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_inputSchema]
+ mov rdx,qword ptr [rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_bad
+ mov qword ptr [rsp],0
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_bad
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,qword ptr [rsp]
+ lea rsi,[rip+.Lbd_toolSpec]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,r12
+ mov rsi,r13
+ mov rdx,[rsp]
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lbd_bad
+ mov qword ptr [rsp],0
+ inc r13
+ jmp .Lbd_tool_each
+.Lbd_tool_attach:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_bad
+ mov rdi,qword ptr [rsp]
+ mov rsi,rbx
+ lea rdx,[rip+.Lbd_tools]
+ lea rcx,[rip+.Lbd_tools]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_toolConfig]
+ mov rdx,qword ptr [rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_bad
+ mov qword ptr [rsp],0
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_tools]
+ call json_object_object_del@PLT
+.Lbd_inference:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_bad
+ mov rdi,qword ptr [rsp]
+ mov rsi,rbx
+ lea rdx,[rip+.Lbd_max_tokens]
+ lea rcx,[rip+.Lbd_maxTokens]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,qword ptr [rsp]
+ mov rsi,rbx
+ lea rdx,[rip+.Lbd_temperature]
+ lea rcx,[rip+.Lbd_temperature]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,qword ptr [rsp]
+ mov rsi,rbx
+ lea rdx,[rip+.Lbd_top_p]
+ lea rcx,[rip+.Lbd_topP]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_inferenceConfig]
+ mov rdx,qword ptr [rsp]
+ mov qword ptr [rsp],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_bad
+ mov qword ptr [rsp],0
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_model]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_max_tokens]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_temperature]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_top_p]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_stream]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_thinking]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_tool_choice]
+ call json_object_object_del@PLT
+ xor ebp,ebp
+ jmp .Lbd_end
+.Lbd_bad:
+ mov ebp,1
+.Lbd_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lbd_blocks:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ xor r12d,r12d
+.Lbd_block_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r12,rax
+ jae .Lbd_blocks_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call json_object_array_get_idx@PLT
+ mov r13,rax
+
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_text]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_text
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_tool_use]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_use
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_tool_result]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_result
+ mov rdi,r14
+ lea rsi,[rip+.Lbd_thinking]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbd_block_thinking
+ jmp .Lbd_blocks_bad
+.Lbd_block_text:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_type]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_cache_control]
+ call json_object_object_del@PLT
+ jmp .Lbd_block_next
+.Lbd_block_use:
+ mov rdi,r13
+ mov rsi,r13
+ lea rdx,[rip+.Lbd_id]
+ lea rcx,[rip+.Lbd_toolUseId]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_id]
+ call json_object_object_del@PLT
+ lea r14,[rip+.Lbd_toolUse]
+ jmp .Lbd_block_wrap
+.Lbd_block_result:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_content]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lbd_blocks
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,r13
+ mov rsi,r13
+ lea rdx,[rip+.Lbd_tool_use_id]
+ lea rcx,[rip+.Lbd_toolUseId]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_tool_use_id]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_toolName]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_is_error]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ lea rdi,[rip+.Lbd_success]
+ test eax,eax
+ jz .Lbd_result_status
+ lea rdi,[rip+.Lbd_error]
+.Lbd_result_status:
+ call json_object_new_string@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_status]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_is_error]
+ call json_object_object_del@PLT
+ lea r14,[rip+.Lbd_toolResult]
+ jmp .Lbd_block_wrap
+.Lbd_block_thinking:
+ mov rdi,r13
+ mov rsi,r13
+ lea rdx,[rip+.Lbd_thinking]
+ lea rcx,[rip+.Lbd_text]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_thinking]
+ call json_object_object_del@PLT
+ call json_object_new_object@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_type]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ call json_object_get@PLT
+ mov rdi,qword ptr [rsp+8]
+ lea rsi,[rip+.Lbd_reasoningText]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov r13,[rsp+8]
+ lea r14,[rip+.Lbd_reasoningContent]
+ jmp .Lbd_wrap_owned
+.Lbd_block_wrap:
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_type]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lbd_cache_control]
+ call json_object_object_del@PLT
+ mov rdi,r13
+ call json_object_get@PLT
+ mov [rsp+8],rax
+.Lbd_wrap_owned:
+ call json_object_new_object@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbd_blocks_bad
+ mov rdi,rax
+ mov rsi,r14
+ mov rdx,[rsp+8]
+ mov qword ptr [rsp+8],0
+ call .Lrp_set
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov qword ptr [rsp+8],0
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,[rsp]
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jnz .Lbd_blocks_bad
+ mov qword ptr [rsp],0
+.Lbd_block_next:
+ inc r12
+ jmp .Lbd_block_each
+.Lbd_blocks_ok:
+ xor ebp,ebp
+ jmp .Lbd_blocks_end
+.Lbd_blocks_bad:
+ mov ebp,1
+.Lbd_blocks_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbd_cache_control: .asciz "cache_control"
+.Lbd_content: .asciz "content"
+.Lbd_error: .asciz "error"
+.Lbd_id: .asciz "id"
+.Lbd_inferenceConfig: .asciz "inferenceConfig"
+.Lbd_inputSchema: .asciz "inputSchema"
+.Lbd_input_schema: .asciz "input_schema"
+.Lbd_is_error: .asciz "is_error"
+.Lbd_json: .asciz "json"
+.Lbd_maxTokens: .asciz "maxTokens"
+.Lbd_max_tokens: .asciz "max_tokens"
+.Lbd_messages: .asciz "messages"
+.Lbd_model: .asciz "model"
+.Lbd_reasoningContent: .asciz "reasoningContent"
+.Lbd_reasoningText: .asciz "reasoningText"
+.Lbd_status: .asciz "status"
+.Lbd_stream: .asciz "stream"
+.Lbd_success: .asciz "success"
+.Lbd_system: .asciz "system"
+.Lbd_temperature: .asciz "temperature"
+.Lbd_text: .asciz "text"
+.Lbd_thinking: .asciz "thinking"
+.Lbd_toolConfig: .asciz "toolConfig"
+.Lbd_toolName: .asciz "toolName"
+.Lbd_toolResult: .asciz "toolResult"
+.Lbd_toolSpec: .asciz "toolSpec"
+.Lbd_toolUse: .asciz "toolUse"
+.Lbd_toolUseId: .asciz "toolUseId"
+.Lbd_tool_choice: .asciz "tool_choice"
+.Lbd_tool_result: .asciz "tool_result"
+.Lbd_tool_use: .asciz "tool_use"
+.Lbd_tool_use_id: .asciz "tool_use_id"
+.Lbd_tools: .asciz "tools"
+.Lbd_topP: .asciz "topP"
+.Lbd_top_p: .asciz "top_p"
+.Lbd_type: .asciz "type"

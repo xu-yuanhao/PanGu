@@ -290,7 +290,7 @@ int main(int argc,char **argv){
   assert(!json_object_object_get(request,"endpoint"));
   assert(!native_model_configure(&provider,request,durable.declared_tools));
   const char *endpoint=json_object_get_string(json_object_object_get(provider.configuration,"endpoint"));
-  assert(endpoint&&strstr(endpoint,!strcmp(getenv("PANGU_MODEL_API"),"azure-openai-responses")?"/openai/v1/responses?api-version=v1":":streamGenerateContent?alt=sse"));
+  assert(endpoint&&strstr(endpoint,!strcmp(getenv("PANGU_MODEL_API"),"bedrock-converse-stream")?"/model/gemini-3-flash/converse-stream":!strcmp(getenv("PANGU_MODEL_API"),"azure-openai-responses")?"/openai/v1/responses?api-version=v1":":streamGenerateContent?alt=sse"));
   const char *base=getenv("PANGU_MODEL_BASE_URL");if(base)assert(!strncmp(endpoint,base,strlen(base)));
   json_object_put(request);durable.model_provider->model.close(durable.model_provider->model.context);
   assert(!pg_host_close(&agent_scope)&&!pg_host_close(&host));curl_global_cleanup();

@@ -91,7 +91,7 @@ static void google_configuration_failures(void){
  }
 }
 int main(void){
- for(unsigned protocol=0;protocol<7;protocol++){
+ for(unsigned protocol=0;protocol<8;protocol++){
  struct json_object *canonical=0;
  memset(&session,0,sizeof(session));
  session.system_size=3;memcpy(session.system_prompt,"sys",4);session.count=5;
@@ -107,6 +107,7 @@ int main(void){
 
 
  if(protocol>=5){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse(protocol==5?"{\"api\":\"google-generative-ai\",\"model\":\"gemini-3-flash\",\"endpoint\":\"https://example.invalid/streamGenerateContent\"}":"{\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"modelProvider\":\"vertex\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"modelInfo\":{\"input\":[\"text\",\"image\"]}}");}
+ if(protocol==7){json_object_put(provider.configuration);provider.configuration=__real_json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"endpoint\":\"https://example.invalid/model/test/converse-stream\"}");}
  if(protocol==6){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"google-vertex\",\"model\":\"gemini-3-flash\",\"provider\":\"vertex\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"plan\",\"thinkingSignature\":\"c2ln\"},{\"type\":\"text\",\"text\":\"check\",\"textSignature\":\"dGV4dA==\"},{\"type\":\"toolCall\",\"id\":\"google-fault\",\"name\":\"read\",\"arguments\":{},\"thoughtSignature\":\"Y2FsbA==\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"google-fault\",\"toolName\":\"read\",\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"},{\"type\":\"text\",\"text\":\"result\"}]}]}");session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
  if(protocol==4){json_object_object_add(json_object_object_get(provider.configuration,"modelInfo"),"input",__real_json_tokener_parse("[\"text\",\"image\"]"));canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"image-fault\",\"name\":\"read\",\"arguments\":{}}]},{\"role\":\"toolResult\",\"toolCallId\":\"image-fault\",\"toolName\":\"read\",\"isError\":true,\"content\":[{\"type\":\"image\",\"mimeType\":\"image/png\",\"data\":\"YQ==\"},{\"type\":\"text\",\"text\":\"error\"}]}]}");session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
  for(unsigned n=1;n<=(protocol==2||protocol==4||protocol==6?1u:8u);n+=7){

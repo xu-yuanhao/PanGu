@@ -35,6 +35,7 @@ def main():
                 ('google-vertex',None,'{"authMode":"api-key"}'),
                 ('google-vertex',None,'{"project":"pangu","location":"global"}'),
                 ('azure-openai-responses',None,'{"azureResourceName":"pangu","azureDeploymentName":"pangu-deployment"}'),
+                ('bedrock-converse-stream',None,'{"region":"us-west-2"}'),
             ):
                 env=os.environ.copy()
                 for key in ('PANGU_MODEL_ENDPOINT','PANGU_MODEL_BASE_URL'):

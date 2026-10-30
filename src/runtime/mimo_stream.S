@@ -328,6 +328,16 @@ pg_mimo_decode_line:
  push rdi
  push rsi
  push rdx
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ pop rdx
+ pop rsi
+ pop rdi
+ test eax,eax
+ jnz .Lbt_decode
+ push rdi
+ push rsi
+ push rdx
  call pg_mimo_uses_responses
  pop rdx
  pop rsi
@@ -1522,6 +1532,10 @@ pg_mimo_responses_complete:
  jnz .Lrc_anthropic
  mov rdi,rbx
  call pg_mimo_uses_google
+ test eax,eax
+ jnz .Lrc_anthropic
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
  test eax,eax
  jnz .Lrc_anthropic
  mov rdi,[rsp+8]
@@ -2874,6 +2888,10 @@ pg_mimo_anthropic_clear:
  call pg_mimo_uses_google
  test eax,eax
  jnz .Lan_ok
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lan_ok
  mov rdi,[rsp+56]
  call json_object_get@PLT
  mov rdi,[rsp+16]
@@ -3049,6 +3067,16 @@ pg_mimo_anthropic_clear:
  mov rdi,rbx
  mov rsi,[rsp+32]
  call .Lrt_save
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbt_reason_other
+ mov rdi,[rsp+80]
+ lea rsi,[rip+.LbtK_context_limit]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lan_length
+.Lbt_reason_other:
  mov rdi,[rsp+80]
  lea rsi,[rip+.Lan_max_tokens]
  call strcmp@PLT
@@ -3369,6 +3397,13 @@ pg_mimo_anthropic_clear:
  test eax,eax
  jnz .Lan_complete_bad
 .Lan_complete_api:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbt_complete_other
+ lea rdi,[rip+.LbtK_api]
+ jmp .Lgo_complete_api_ready
+.Lbt_complete_other:
  mov rdi,rbx
  call pg_mimo_uses_google
  lea rdi,[rip+.Lan_api_value]
@@ -4655,3 +4690,605 @@ pg_mimo_anthropic_clear:
 
 .section .rodata
 .Lgo_error_format: .asciz "Provider stopped with: %s"
+
+.text
+/* IEEE CRC-32 for AWS event-stream prelude and message checksums. */
+.Lbt_crc:
+ mov eax,-1
+.Lbt_crc_byte:
+ test rsi,rsi
+ jz .Lbt_crc_done
+ movzx edx,byte ptr [rdi]
+ xor eax,edx
+ mov ecx,8
+.Lbt_crc_bit:
+ mov edx,eax
+ and edx,1
+ neg edx
+ and edx,0xedb88320
+ shr eax,1
+ xor eax,edx
+ dec ecx
+ jnz .Lbt_crc_bit
+ inc rdi
+ dec rsi
+ jmp .Lbt_crc_byte
+.Lbt_crc_done:
+ not eax
+ ret
+.macro BTGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.LbtK_\key]
+ call json_object_object_get@PLT
+.endm
+.macro BTCOPY dst,src,old,new
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.LbtK_\old]
+ lea rcx,[rip+.LbtK_\new]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lbt_bad
+.endm
+/* A complete validated transport frame; payload and normalized events are owned here. */
+.Lbt_decode:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,192
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,24
+ rep stosq
+ mov rdi,[rbx+PG_MM_GOOGLE_TEXT]
+ mov qword ptr [rbx+PG_MM_GOOGLE_TEXT],0
+ call json_object_put@PLT
+ mov r14d,[r12]
+ bswap r14d
+ mov [rsp+48],r14
+ mov ebp,[r12+4]
+ bswap ebp
+ mov [rsp+56],rbp
+ mov eax,r14d
+ sub eax,16
+ cmp ebp,eax
+ ja .Lbt_bad
+ mov rdi,r12
+ mov esi,8
+ call .Lbt_crc
+ mov edx,[r12+8]
+ bswap edx
+ cmp eax,edx
+ jne .Lbt_bad
+ mov rdi,r12
+ lea rsi,[r14-4]
+ call .Lbt_crc
+ mov edx,[r12+r14-4]
+ bswap edx
+ cmp eax,edx
+ jne .Lbt_bad
+ lea rbp,[r12+12]
+ mov r14,[rsp+56]
+ add r14,rbp
+.Lbt_header:
+ cmp rbp,r14
+ je .Lbt_payload
+ ja .Lbt_bad
+ movzx eax,byte ptr [rbp]
+ test eax,eax
+ jz .Lbt_bad
+ mov [rsp+64],rax
+ lea rdx,[rbp+rax+2]
+ cmp rdx,r14
+ ja .Lbt_bad
+ movzx ecx,byte ptr [rdx-1]
+ cmp ecx,7
+ jne .Lbt_header_scalar
+ lea rax,[rdx+2]
+ cmp rax,r14
+ ja .Lbt_bad
+ movzx eax,word ptr [rdx]
+ rol ax,8
+ movzx eax,ax
+ lea rcx,[rdx+rax+2]
+ cmp rcx,r14
+ ja .Lbt_bad
+ mov [rsp+72],rcx
+ mov [rsp+80],rax
+ mov [rsp+88],rdx
+ cmp qword ptr [rsp+64],13
+ je .Lbt_message_header
+ cmp qword ptr [rsp+64],11
+ jne .Lbt_header_next
+ lea rdi,[rbp+1]
+ lea rsi,[rip+.LbtK_event_header]
+ mov edx,11
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lbt_header_next
+ cmp dword ptr [rsp+104],0
+ jne .Lbt_bad
+ mov dword ptr [rsp+104],1
+ cmp qword ptr [rsp+80],63
+ ja .Lbt_bad
+ lea rdi,[rsp+112]
+ mov rsi,[rsp+88]
+ add rsi,2
+ mov rdx,[rsp+80]
+ call memcpy@PLT
+ jmp .Lbt_header_next
+.Lbt_message_header:
+ lea rdi,[rbp+1]
+ lea rsi,[rip+.LbtK_message_header]
+ mov edx,13
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lbt_header_next
+ cmp dword ptr [rsp+108],0
+ jne .Lbt_bad
+ mov dword ptr [rsp+108],2
+ cmp qword ptr [rsp+80],5
+ jne .Lbt_header_next
+ mov rdi,[rsp+88]
+ add rdi,2
+ lea rsi,[rip+.LbtK_event_value]
+ mov edx,5
+ call memcmp@PLT
+ test eax,eax
+ jnz .Lbt_header_next
+ mov dword ptr [rsp+108],1
+.Lbt_header_next:
+ mov rbp,[rsp+72]
+ jmp .Lbt_header
+.Lbt_header_scalar:
+ cmp ecx,1
+ jbe .Lbt_header_bool
+ cmp ecx,2
+ je .Lbt_header_byte
+ cmp ecx,3
+ je .Lbt_header_short
+ cmp ecx,4
+ je .Lbt_header_int
+ cmp ecx,5
+ je .Lbt_header_long
+ cmp ecx,8
+ je .Lbt_header_long
+ cmp ecx,9
+ je .Lbt_header_uuid
+ cmp ecx,6
+ jne .Lbt_bad
+ lea rax,[rdx+2]
+ cmp rax,r14
+ ja .Lbt_bad
+ movzx eax,word ptr [rdx]
+ rol ax,8
+ movzx eax,ax
+ lea rbp,[rdx+rax+2]
+ jmp .Lbt_header
+.Lbt_header_bool:
+ mov rbp,rdx
+ jmp .Lbt_header
+.Lbt_header_byte:
+ lea rbp,[rdx+1]
+ jmp .Lbt_header
+.Lbt_header_short:
+ lea rbp,[rdx+2]
+ jmp .Lbt_header
+.Lbt_header_int:
+ lea rbp,[rdx+4]
+ jmp .Lbt_header
+.Lbt_header_long:
+ lea rbp,[rdx+8]
+ jmp .Lbt_header
+.Lbt_header_uuid:
+ lea rbp,[rdx+16]
+ jmp .Lbt_header
+.Lbt_payload:
+ call json_tokener_new@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbt_bad
+ mov rdi,rax
+ mov esi,17
+ call json_tokener_set_flags@PLT
+ mov rdi,[rsp]
+ mov rsi,r14
+ mov rdx,[rsp+48]
+ sub rdx,[rsp+56]
+ sub rdx,16
+ mov [rsp+96],rdx
+ call json_tokener_parse_ex@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_tokener_get_error@PLT
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[rsp]
+ call json_tokener_get_parse_end@PLT
+ cmp rax,[rsp+96]
+ jne .Lbt_bad
+ mov rdi,[rsp+8]
+ mov esi,4
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lbt_bad
+ cmp dword ptr [rsp+108],1
+ je .Lbt_dispatch
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Lrt_save
+ jmp .Lbt_bad
+.Lbt_dispatch:
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_messageStart]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_message_start
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_contentBlockStart]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_block_start
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_contentBlockDelta]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_block_delta
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_contentBlockStop]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_block_stop
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_messageStop]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_message_stop
+ lea rdi,[rsp+112]
+ lea rsi,[rip+.LbtK_metadata]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lbt_metadata
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ call .Lrt_save
+ jmp .Lbt_bad
+.Lbt_message_start:
+ BTGET "qword ptr [rsp+8]",role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbt_bad
+ mov rdi,rax
+ lea rsi,[rip+.LbtK_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lbt_bad
+ lea rdi,[rip+.LbtJ_start]
+ jmp .Lbt_parse_emit
+.Lbt_block_start:
+ BTGET "qword ptr [rsp+8]",start
+ BTGET rax,toolUse
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lbt_ok
+ lea rdi,[rip+.LbtJ_tool]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ BTGET "qword ptr [rsp+16]",content_block
+ mov r14,rax
+ BTCOPY r14,"qword ptr [rsp+24]",toolUseId,id
+ BTCOPY r14,"qword ptr [rsp+24]",name,name
+ jmp .Lbt_emit
+.Lbt_block_delta:
+ BTGET "qword ptr [rsp+8]",delta
+ mov [rsp+24],rax
+ BTGET rax,text
+ test rax,rax
+ jnz .Lbt_text
+ BTGET "qword ptr [rsp+24]",toolUse
+ test rax,rax
+ jnz .Lbt_input
+ jmp .Lbt_bad
+.Lbt_text:
+ mov [rsp+40],rax
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov rdx,r13
+ call .Lbt_ensure_text
+ test eax,eax
+ jnz .Lbt_bad
+ lea rdi,[rip+.LbtJ_text]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ BTGET "qword ptr [rsp+16]",delta
+ BTCOPY rax,"qword ptr [rsp+24]",text,text
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[rsp+40]
+ call json_object_get@PLT
+ mov [rbx+PG_MM_GOOGLE_TEXT],rax
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+ mov [r13+16],rax
+ mov rdi,[rsp+40]
+ call json_object_get_string@PLT
+ mov [r13+8],rax
+ mov dword ptr [r13],PG_MM_KIND_TEXT
+ jmp .Lbt_ok
+.Lbt_input:
+ mov [rsp+24],rax
+ lea rdi,[rip+.LbtJ_input]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ BTGET "qword ptr [rsp+16]",delta
+ BTCOPY rax,"qword ptr [rsp+24]",input,partial_json
+ jmp .Lbt_emit
+.Lbt_block_stop:
+ lea rdi,[rip+.LbtJ_stop_block]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+8]",contentBlockIndex,index
+ jmp .Lbt_emit
+.Lbt_message_stop:
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lbt_flush
+ test eax,eax
+ jnz .Lbt_bad
+ lea rdi,[rip+.LbtJ_stop]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTGET rax,delta
+ BTCOPY rax,"qword ptr [rsp+8]",stopReason,stop_reason
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_bad
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ lea rdi,[rip+.LbtJ_done]
+ jmp .Lbt_parse_emit
+.Lbt_metadata:
+ BTGET "qword ptr [rsp+8]",usage
+ mov [rsp+24],rax
+ call json_object_new_object@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+ BTCOPY rax,"qword ptr [rsp+24]",inputTokens,input_tokens
+ BTCOPY "qword ptr [rsp+16]","qword ptr [rsp+24]",outputTokens,output_tokens
+ BTCOPY "qword ptr [rsp+16]","qword ptr [rsp+24]",cacheReadInputTokens,cache_read_input_tokens
+ BTCOPY "qword ptr [rsp+16]","qword ptr [rsp+24]",cacheWriteInputTokens,cache_creation_input_tokens
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ call .Lan_update_usage_object
+ test eax,eax
+ jnz .Lbt_bad
+ jmp .Lbt_ok
+.Lbt_parse_emit:
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lbt_bad
+.Lbt_emit:
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_bad
+.Lbt_ok:
+ xor ebp,ebp
+ jmp .Lbt_cleanup
+.Lbt_bad:
+ mov ebp,1
+.Lbt_cleanup:
+ mov rdi,[rsp]
+ call json_tokener_free@PLT
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,192
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+/* Bedrock starts text on its first delta. Reuse the existing block index table. */
+.Lbt_ensure_text:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov qword ptr [rsp],0
+ BTGET r12,contentBlockIndex
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ xor ecx,ecx
+.Lbt_ensure_find:
+ cmp rcx,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lbt_ensure_create
+ imul rdx,rcx,40
+ add rdx,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp [rdx],rax
+ je .Lbt_ensure_ok
+ inc rcx
+ jmp .Lbt_ensure_find
+.Lbt_ensure_create:
+ lea rdi,[rip+.LbtJ_start_text]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbt_ensure_bad
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rip+.LbtK_contentBlockIndex]
+ lea rcx,[rip+.LbtK_index]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lbt_ensure_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r13
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_ensure_bad
+.Lbt_ensure_ok:
+ xor ebp,ebp
+ jmp .Lbt_ensure_end
+.Lbt_ensure_bad:
+ mov ebp,1
+.Lbt_ensure_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lbt_flush:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov qword ptr [rsp],0
+.Lbt_flush_each:
+ cmp r13,[rbx+PG_MM_ANTHROPIC_COUNT]
+ jae .Lbt_flush_ok
+ imul r14,r13,40
+ add r14,[rbx+PG_MM_ANTHROPIC_BLOCKS]
+ cmp dword ptr [r14+12],0
+ jne .Lbt_flush_next
+ lea rdi,[rip+.LbtJ_stop_block]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbt_flush_bad
+ mov rdi,[r14]
+ call json_object_new_int64@PLT
+ mov rdi,[rsp]
+ lea rsi,[rip+.LbtK_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lbt_flush_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov rdx,r12
+ call .Lan_event
+ test eax,eax
+ jnz .Lbt_flush_bad
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov qword ptr [rsp],0
+.Lbt_flush_next:
+ inc r13
+ jmp .Lbt_flush_each
+.Lbt_flush_ok:
+ xor ebp,ebp
+ jmp .Lbt_flush_end
+.Lbt_flush_bad:
+ mov ebp,1
+.Lbt_flush_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.LbtK_api: .asciz "bedrock-converse-stream"
+.LbtK_event_header: .asciz ":event-type"
+.LbtK_messageStart: .asciz "messageStart"
+.LbtK_contentBlockStart: .asciz "contentBlockStart"
+.LbtK_contentBlockDelta: .asciz "contentBlockDelta"
+.LbtK_contentBlockStop: .asciz "contentBlockStop"
+.LbtK_messageStop: .asciz "messageStop"
+.LbtK_metadata: .asciz "metadata"
+.LbtK_role: .asciz "role"
+.LbtK_assistant: .asciz "assistant"
+.LbtK_start: .asciz "start"
+.LbtK_toolUse: .asciz "toolUse"
+.LbtK_toolUseId: .asciz "toolUseId"
+.LbtK_name: .asciz "name"
+.LbtK_content_block: .asciz "content_block"
+.LbtK_contentBlockIndex: .asciz "contentBlockIndex"
+.LbtK_index: .asciz "index"
+.LbtK_id: .asciz "id"
+.LbtK_delta: .asciz "delta"
+.LbtK_text: .asciz "text"
+.LbtK_input: .asciz "input"
+.LbtK_partial_json: .asciz "partial_json"
+.LbtK_stopReason: .asciz "stopReason"
+.LbtK_stop_reason: .asciz "stop_reason"
+.LbtK_usage: .asciz "usage"
+.LbtK_inputTokens: .asciz "inputTokens"
+.LbtK_outputTokens: .asciz "outputTokens"
+.LbtK_cacheReadInputTokens: .asciz "cacheReadInputTokens"
+.LbtK_cacheWriteInputTokens: .asciz "cacheWriteInputTokens"
+.LbtK_input_tokens: .asciz "input_tokens"
+.LbtK_output_tokens: .asciz "output_tokens"
+.LbtK_cache_read_input_tokens: .asciz "cache_read_input_tokens"
+.LbtK_cache_creation_input_tokens: .asciz "cache_creation_input_tokens"
+.LbtJ_start: .asciz "{\"type\":\"message_start\",\"message\":{\"id\":\"\",\"usage\":{}}}"
+.LbtJ_tool: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"input\":{}}}"
+.LbtJ_text: .asciz "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\"}}"
+.LbtJ_input: .asciz "{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\"}}"
+.LbtJ_stop_block: .asciz "{\"type\":\"content_block_stop\"}"
+.LbtJ_stop: .asciz "{\"type\":\"message_delta\",\"delta\":{}}"
+.LbtJ_done: .asciz "{\"type\":\"message_stop\"}"
+.LbtJ_start_text: .asciz "{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}"
+
+.section .rodata
+.LbtK_message_header: .asciz ":message-type"
+.LbtK_event_value: .asciz "event"
+
+.section .rodata
+.LbtK_context_limit: .asciz "model_context_window_exceeded"

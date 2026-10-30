@@ -123,6 +123,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Google/Vertex端点与显式认证接入产品配置链：Google默认/代理、Vertex API-key/global/regional/project collection路径由模型汇编组合；产品读取`PANGU_MODEL_API`、`PANGU_MODEL_BASE_URL`及现有options，沿资源/Generation准备进入同一提供者。配置失败保留旧值；传输回放、配置故障与产品ASan/UBSan专项通过。
 - [x] 五协议公共请求头接入实际传输：按Pi `utils/headers.ts`大小写无关合并modelInfo/连接/options三层，后层覆盖、null移除、空值及默认头替换；非法名称/CRLF/NUL拒绝，新增节点分配失败清理。模型O0/O2/UBSan、真实curl入口回放和产品ASan/UBSan专项通过。
 - [x] Azure Responses基础链复用现有Responses编码/流：资源名/baseUrl与API版本组合端点，Azure域名路径规范化、代理查询保留、API版本替换；部署名映射按最后值优先并允许显式覆盖，最终部署名进入请求model，api-key认证，canonical保留Azure协议和原模型身份；文本/工具/错误/提前EOF、配置构造失败保留旧值及实际产品配置链通过。
+- [x] Bedrock Converse文本/工具基础链接入同一模型服务：区域/代理端点、注入Bearer、system/messages/inference/toolSpec投影、旧调用/结果重放；AWS二进制事件帧校验后复用内容块状态机，处理文本、调用、补齐关闭、停止和基础用量。模型专项、分配失败及产品配置链通过；完整认证、图片/推理和高级行为按下项继续覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -319,8 +320,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/azure-openai-config.ts`、`azure-openai-base-url.test.ts` 与Azure Responses客户端；Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：`mimo.S`的Azure配置副本解析显式部署与环境映射，按上游最后值/显式优先规则决定请求部署名；使用现有libcurl URL API解析地址，Assembly处理Azure域名/路径规范化、空白修整、代理路径/查询保留及API版本替换。配置结果由既有产品资源/Generation链消费，不新增公开ABI或文件。
-- 验证：模型O0/O2/UBSan与ABI、实际curl入口回放通过，覆盖三类Azure域名、根/旧响应路径、代理路径/查询、空白选项回落、重复映射、显式覆盖、版本与无效URL保留旧配置；现有流/工具/配置故障专项保持。产品资源ASan/UBSan专项通过；Assembly与diff检查通过。自审核对配置副本、URL对象/字符串所有权和失败保留。
-- 具体缺口：Azure模型/提供者高级选项、Bedrock协议；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Azure和Google当前为确定性协议与配置验证，没有对应真实凭据。
-- 下一交付物：沿K05推进Bedrock请求、鉴权及二进制事件流，按完整协议行为组接入现有Generation/Tool消费者。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/bedrock-converse-stream.ts`、`bedrock-convert-messages.test.ts`、`bedrock-raw-stop-reason.test.ts`；二进制传输按[Smithy Event Stream](https://smithy.io/2.0/aws/amazon-eventstream.html)适配。Harness保持`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：`mimo_projection.S`沿共享上下文/工具投影转换Converse文本与工具声明/结果；`mimo.S`组合区域/代理端点，以环境注入的Bearer发送，按完整帧交付；`mimo_stream.S`校验长度/CRC/头/JSON，将事件接入既有动态内容块、工具参数与完成消息。产品API/options经资源/Generation准备进入同一提供者，公开服务ABI保持，仅新增内部协议选择函数登记。
+- 验证：模型O0/O2/UBSan、ABI与构造/插入失败专项通过；实际curl回调入口验证跨块二进制、两种CRC损坏、文本、稀疏工具索引、旧结果请求重放、停止时补齐关闭、缺失终态与基础用量。产品资源ASan/UBSan、Client集成、构建、Assembly通过；登记G00通过（本地原生范围，非生产放行）。自审核对接收缓冲、帧范围、JSON/临时所有权、协议分派及完成身份。
+- 具体缺口：Bedrock SigV4/配置档与凭据链、ARN/标准端点优先级、图片、推理/签名、工具选择/ID规范化、缓存/完整用量与高级选项/错误诊断；Azure高级选项；Google/Vertex ADC/令牌刷新、提供者重试/输入变换、完整思考映射；Messages的managed effort、native tools及OAuth/网关完整覆盖。Bedrock/Azure/Google当前为确定性协议与配置验证，没有对应真实凭据。
+- 下一交付物：沿K05成组补齐Bedrock鉴权/配置与多模态/推理的完整模型—工具往返，继续复用当前传输和内容块状态机。

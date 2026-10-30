@@ -211,12 +211,17 @@ li_receive:
  sub rcx, rax                         /* 剩余容量（含终止 NUL 位） */
  cmp r14, rcx
  jae .Lrx_zero
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lrx_copy
  mov rdi,r12
  xor esi,esi
  mov rdx,r14
  call memchr@PLT
  test rax,rax
  jnz .Lrx_zero
+.Lrx_copy:
  mov rax,[rbx + PG_MM_USED]
  lea rdi, [rbx + rax + PG_MM_BODY]
  mov rsi, r12
@@ -604,6 +609,10 @@ li_next:
  mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
  jmp .Lnx_wait
 .Lnx_lines:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lnx_bedrock_frame
  mov r14, qword ptr [rbx + PG_MM_CONSUMED]
  cmp r14, qword ptr [rbx + PG_MM_USED]
  jae .Lnx_drain
@@ -638,6 +647,35 @@ li_next:
  test eax,eax
  jnz .Lnx_bad
  jmp .Lnx_out
+.Lnx_bedrock_frame:
+ mov r14,[rbx+PG_MM_CONSUMED]
+ mov rax,[rbx+PG_MM_USED]
+ sub rax,r14
+ jz .Lnx_drain
+ cmp rax,12
+ jb .Lnx_bedrock_partial
+ lea r13,[rbx+r14+PG_MM_BODY]
+ mov edx,[r13]
+ bswap edx
+ cmp edx,16
+ jb .Lnx_bad
+ cmp edx,PG_MM_BODY_LIMIT
+ jae .Lnx_bad
+ cmp rax,rdx
+ jb .Lnx_bedrock_partial
+ add r14,rdx
+ mov [rbx+PG_MM_CONSUMED],r14
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,r12
+ call pg_mimo_decode_line
+ test eax,eax
+ jnz .Lnx_bad
+ jmp .Lnx_out
+.Lnx_bedrock_partial:
+ cmp dword ptr [rbx+PG_MM_TRANSPORT_DONE],0
+ jne .Lnx_bad
+ jmp .Lnx_wait
 .Lnx_drain:
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
  je .Lnx_wait
@@ -890,6 +928,10 @@ pg_mimo_configure:
  jnz .Lcfg_end
  mov rdi,[rsp]
  call .Laz_prepare
+ test eax,eax
+ jnz .Lcfg_end
+ mov rdi,[rsp]
+ call .Lbe_prepare
  test eax,eax
  jnz .Lcfg_end
  mov rdi,[rsp]
@@ -2945,3 +2987,145 @@ pg_mimo_complete:
 
 .section .rodata
 .Laz_query_key: .asciz "api-version="
+
+.text
+.Lbe_prepare:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,48
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,6
+ mov rdi,rsp
+ rep stosq
+ mov rdi,rbx
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lbe_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lbe_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lbe_base_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_modelInfo]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lge_baseUrl]
+ call json_object_object_get@PLT
+.Lbe_base_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbe_region
+ mov rdi,rax
+ call strdup@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lbe_bad
+ jmp .Lbe_model
+.Lbe_region:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbe_region_key]
+ lea rdx,[rip+.Lbe_region_env]
+ call .Lge_option
+ test rax,rax
+ jnz .Lbe_region_ready
+ lea rdi,[rip+.Lbe_default_region_env]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lbe_region_ready
+ lea rax,[rip+.Lbe_region_default]
+.Lbe_region_ready:
+ lea rdi,[rsp]
+ lea rsi,[rip+.Lbe_base_format]
+ mov rdx,rax
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_bad
+.Lbe_model:
+ mov rdi,[rsp]
+ call strlen@PLT
+ mov r13,[rsp]
+.Lbe_trim:
+ test rax,rax
+ jz .Lbe_bad
+ cmp byte ptr [r13+rax-1],47
+ jne .Lbe_escape
+ dec rax
+ mov byte ptr [r13+rax],0
+ jmp .Lbe_trim
+.Lbe_escape:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ xor edi,edi
+ mov rsi,rax
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lbe_bad
+ lea rdi,[rsp+16]
+ lea rsi,[rip+.Lbe_endpoint_format]
+ mov rdx,r13
+ mov rcx,rax
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lbe_bad
+ cmp eax,2048
+ jae .Lbe_bad
+ mov rdi,[rsp+16]
+ mov esi,eax
+ call json_object_new_string_len@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lbe_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lcfg_endpoint]
+ mov rdx,rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lbe_bad
+ mov qword ptr [rsp+24],0
+.Lbe_ok:
+ xor ebp,ebp
+ jmp .Lbe_end
+.Lbe_bad:
+ mov ebp,1
+.Lbe_end:
+ mov rdi,[rsp]
+ call free@PLT
+ mov rdi,[rsp+8]
+ call curl_free@PLT
+ mov rdi,[rsp+16]
+ call free@PLT
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,48
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lbe_region_key: .asciz "region"
+.Lbe_region_env: .asciz "AWS_REGION"
+.Lbe_default_region_env: .asciz "AWS_DEFAULT_REGION"
+.Lbe_region_default: .asciz "us-east-1"
+.Lbe_base_format: .asciz "https://bedrock-runtime.%s.amazonaws.com"
+.Lbe_endpoint_format: .asciz "%s/model/%s/converse-stream"

@@ -2526,3 +2526,40 @@ pg_google_requires_id:
 
 .section .rodata
 .Lrp_azure: .asciz "azure-openai-responses"
+
+.text
+.globl pg_mimo_config_bedrock
+.type pg_mimo_config_bedrock,@function
+pg_mimo_config_bedrock:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lbr_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+.Lbr_api_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lbr_no
+ mov rdi,rax
+ lea rsi,[rip+.Lbr_api]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.Lbr_no:
+ xor eax,eax
+ pop rbx
+ ret
+.size pg_mimo_config_bedrock,.-pg_mimo_config_bedrock
+.section .rodata
+.Lbr_api: .asciz "bedrock-converse-stream"

@@ -600,6 +600,25 @@ static void test_google_endpoint_config(void){
  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);json_object *cfg=json_tokener_parse("{\"api\":\"google-generative-ai\",\"model\":\"valid\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);char *stable=strdup(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN));assert(stable);const char *invalid[]={"{\"api\":\"google-vertex\",\"model\":\"missing-project-and-location\"}","{\"api\":\"google-vertex\",\"model\":\"bad-mode\",\"endpoint\":\"https://example.invalid/streamGenerateContent\",\"options\":{\"authMode\":\"invalid\"}}"};for(unsigned n=0;n<2;n++){cfg=json_tokener_parse(invalid[n]);assert(pg_mimo_configure(&m,cfg)&&!strcmp(json_object_to_json_string_ext(m.configuration,JSON_C_TO_STRING_PLAIN),stable));json_object_put(cfg);}free(stable);model.close(model.context);
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Google default/custom and Vertex API-key/global/regional/collection endpoints reach transport with matching auth");
 }
+static uint32_t bedrock_crc(const unsigned char *data,size_t size){uint32_t crc=~0u;while(size--){crc^=*data++;for(unsigned bit=0;bit<8;bit++)crc=(crc>>1)^((0u-(crc&1u))&0xedb88320u);}return ~crc;}
+static void bedrock_u32(unsigned char *out,uint32_t value){out[0]=(unsigned char)(value>>24);out[1]=(unsigned char)(value>>16);out[2]=(unsigned char)(value>>8);out[3]=(unsigned char)value;}
+static void bedrock_feed(const char *type,const char *payload,unsigned corrupt){
+ size_t name=strlen(type),headers=37+name,body=strlen(payload),size=16+headers+body;unsigned char *frame=calloc(1,size);assert(frame&&name<64);bedrock_u32(frame,(uint32_t)size);bedrock_u32(frame+4,(uint32_t)headers);bedrock_u32(frame+8,bedrock_crc(frame,8));frame[12]=13;memcpy(frame+13,":message-type",13);frame[26]=7;frame[27]=0;frame[28]=5;memcpy(frame+29,"event",5);frame[34]=11;memcpy(frame+35,":event-type",11);frame[46]=7;frame[47]=(unsigned char)(name>>8);frame[48]=(unsigned char)name;memcpy(frame+49,type,name);memcpy(frame+12+headers,payload,body);bedrock_u32(frame+size-4,bedrock_crc(frame,size-4));if(corrupt==1)frame[8]^=1;if(corrupt==2)frame[size-1]^=1;
+ if(!corrupt&&!strcmp(type,"messageStart")){assert(captured_write((char *)frame,1,7,captured_write_data)==7);pg_model_event partial={0};assert(!nxt(&partial)&&partial.kind==PG_MODEL_WAIT);assert(captured_write((char *)frame+7,1,size-7,captured_write_data)==size-7);}else assert(captured_write((char *)frame,1,size,captured_write_data)==size);free(frame);
+}
+static void test_bedrock_transport(void){
+ assert(bedrock_crc((const unsigned char *)"123456789",9)==0xcbf43926u);
+ for(unsigned scenario=0;scenario<6;scenario++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"bedrock-converse-stream\",\"model\":\"anthropic.claude-test\",\"endpoint\":\"https://bedrock.invalid/model/test/converse-stream\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);session.count=3;session.messages[1].role=PG_TOOL_CALL;strcpy(session.messages[1].call_id,"previous-call");strcpy(session.messages[1].tool_name,"read");strcpy(session.messages[1].text,"{\"path\":\"before.txt\"}");session.messages[1].size=strlen(session.messages[1].text);session.messages[2].role=PG_TOOL_RESULT;strcpy(session.messages[2].call_id,"previous-call");strcpy(session.messages[2].tool_name,"read");strcpy(session.messages[2].text,"previous result");session.messages[2].size=strlen(session.messages[2].text);setenv("PANGU_MODEL_API_KEY","bedrock-unit-token",1);assert(!start());json_object *wire=json_tokener_parse(captured_post);assert(json_object_object_get(wire,"inferenceConfig")&&!json_object_object_get(wire,"model")&&!json_object_object_get(wire,"stream")&&strstr(captured_post,"toolUse")&&strstr(captured_post,"toolResult")&&strstr(captured_post,"previous result"));json_object_put(wire);
+  bedrock_feed("messageStart","{\"role\":\"assistant\"}",scenario==2?1:scenario==3?2:0);
+  bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":0,\"delta\":{\"text\":\"hello\"}}",0);
+  if(scenario==1){bedrock_feed("contentBlockStart","{\"contentBlockIndex\":5,\"start\":{\"toolUse\":{\"toolUseId\":\"call-bedrock\",\"name\":\"read\"}}}",0);bedrock_feed("contentBlockDelta","{\"contentBlockIndex\":5,\"delta\":{\"toolUse\":{\"input\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}}}",0);}
+  if(scenario!=4)bedrock_feed("messageStop",scenario==1?"{\"stopReason\":\"tool_use\"}":scenario==5?"{\"stopReason\":\"model_context_window_exceeded\"}":"{\"stopReason\":\"end_turn\"}",0);
+  bedrock_feed("metadata","{\"usage\":{\"inputTokens\":3,\"outputTokens\":2,\"totalTokens\":5}}",0);finish_transport();pg_model_event event={0};int status=0;unsigned texts=0;for(unsigned n=0;n<20;n++){status=nxt(&event);if(status)break;if(event.kind==PG_MODEL_TEXT){texts++;assert(event.text.size==5&&!memcmp(event.text.data,"hello",5));}if(event.kind==PG_MODEL_DONE||event.kind==PG_MODEL_CALL)break;}
+  if(scenario<2||scenario==5){assert(!status&&texts==1&&event.kind==(scenario==1?PG_MODEL_CALL:PG_MODEL_DONE));json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),"bedrock-converse-stream"));json_object_put(assistant);}else assert(status);model.close(model.context);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Bedrock binary event transport, prelude/message CRC, text/tool finalization, metadata, corrupt frames and missing stop");
+}
 static void test_azure_configuration(void){
  const char *bases[]={" https://r.openai.azure.com/ ","https://r.cognitiveservices.azure.com/openai/","https://r.services.ai.azure.com/openai/v1/responses?old=yes","https://proxy.invalid/v1?api-version=old&custom=true&api-version=old2","https://r.openai.azure.com/custom/path/"};
  const char *expected[]={"https://r.openai.azure.com/openai/v1/responses?api-version=v1","https://r.cognitiveservices.azure.com/openai/v1/responses?api-version=v1","https://r.services.ai.azure.com/openai/v1/responses?api-version=v1","https://proxy.invalid/v1/responses?custom=true&api-version=v1","https://r.openai.azure.com/custom/path/responses?api-version=v1"};
@@ -655,6 +674,7 @@ int main(void) {
     test_google_endpoint_config();
     test_provider_headers();
     test_azure_configuration();
+    test_bedrock_transport();
     puts("PASS: mimo transport lifecycle via scripted curl stand-in (no network): line split/CRLF, "
          "terminal ordering, HTTP/curl failures, receive overflow/capacity, partial-init close, idempotent close, atomic 2/8-call batches and rejection/faults");
     return 0;

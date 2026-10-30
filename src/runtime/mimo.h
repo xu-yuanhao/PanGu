@@ -59,6 +59,7 @@ int pg_mimo_config_responses(const struct json_object *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
 int pg_mimo_uses_google(const pg_mimo *);
+int pg_mimo_config_bedrock(const struct json_object *);
 int pg_mimo_config_google(const struct json_object *);
 int pg_google_signature_valid(const struct json_object *);
 int pg_google_requires_id(const char *);
@@ -73,7 +74,8 @@ int pg_mimo_failure_data(const pg_mimo *,pg_slice *,pg_slice *);
 /* Owned {arguments, argumentsError?}; raw input stays borrowed. */
 int pg_mimo_arguments_parse(pg_slice,struct json_object **);
 int pg_mimo_prepare_arguments(pg_mimo *,unsigned);
-/* Internal decoder: one complete SSE line; api/modelInfo.api selects protocol,
+/* Internal decoder: one complete SSE line or complete Bedrock binary frame;
+   the transport checks available frame length first. api/modelInfo.api selects protocol,
    with a /responses endpoint fallback. No network operations. */
 int pg_mimo_decode_line(pg_mimo *, const char *, pg_model_event *);
 #endif
