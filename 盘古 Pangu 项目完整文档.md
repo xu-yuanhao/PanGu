@@ -20,6 +20,8 @@ Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACC
 
 Copilot模型使用`github-copilot`提供者身份与显式`PANGU_MODEL_API_KEY`令牌，Chat、Responses和Anthropic共用现有模型服务；默认端点按协议组合，发起者和图片请求头从实际会话推导。
 
+Codex基础SSE连接使用`PANGU_MODEL_API=openai-codex-responses`与显式`PANGU_MODEL_API_KEY` JWT；账户身份由令牌解析，默认Codex端点和请求结构由模型服务适配。
+
 图片处理由可替换的`image.processor`服务提供：汇编负责处理策略，系统libvips通过C桥接完成编解码。构建用`pkg-config vips`取得该动态依赖。
 
 当前实现平台是 Linux x86-64；平台与指令集相关部分通过适配层组织，服务契约采用 C ABI。

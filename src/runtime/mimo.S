@@ -469,6 +469,17 @@ li_start:
  mov r13,rax
  mov [rbx+PG_MM_HEADERS],rax
 .Lauth_headers_ready:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_originator_ready
+ mov rdi,[rbx+PG_MM_HEADERS]
+ lea rsi,[rip+.Lcd_originator]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lst_bad
+ mov [rbx+PG_MM_HEADERS],rax
+.Lcd_originator_ready:
  mov rdi,rbx
  call .Lanthropic_beta_headers
  test eax,eax
@@ -480,6 +491,10 @@ li_start:
  mov rdi,rbx
  mov rsi,r12
  call .Lprovider_headers
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi,rbx
+ call .Lcd_headers
  test eax,eax
  jnz .Lst_bad
  call curl_easy_init@PLT
@@ -2418,6 +2433,18 @@ pg_mimo_complete:
  call json_object_iter_next@PLT
  jmp .Lph_emit
 .Lph_emit_name:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_emit_allowed
+ mov rdi,r12
+ call .Lcd_reserved
+ test eax,eax
+ jz .Lcd_emit_allowed
+ lea rdi,[rsp+32]
+ call json_object_iter_next@PLT
+ jmp .Lph_emit
+.Lcd_emit_allowed:
  mov rdi,r12
  call strlen@PLT
  mov rbp,rax
@@ -4865,9 +4892,16 @@ pg_mimo_complete:
  sub rsp,16
  mov rbx,rdi
  mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ call pg_mimo_config_codex@PLT
+ mov [rsp+8],eax
+ test eax,eax
+ jnz .Lcp_prepare_active
+ mov rdi,rbx
  call .Lcp_is
  test eax,eax
  jz .Lcp_prepare_ok
+.Lcp_prepare_active:
  mov rdi,rbx
  lea rsi,[rip+.Lcfg_endpoint]
  call json_object_object_get@PLT
@@ -4891,6 +4925,9 @@ pg_mimo_complete:
  test rax,rax
  jnz .Lcp_base_ready
  lea r12,[rip+.Lcp_base]
+ cmp dword ptr [rsp+8],0
+ je .Lcp_base_ready
+ lea r12,[rip+.Lcd_base]
 .Lcp_base_ready:
  mov rdi,r12
  call strlen@PLT
@@ -4903,6 +4940,8 @@ pg_mimo_complete:
  dec rbp
  jmp .Lcp_base_trim
 .Lcp_base_path:
+ cmp dword ptr [rsp+8],0
+ jne .Lcd_base_path
  lea r13,[rip+.Lcp_chat_path]
  mov rdi,rbx
  call pg_mimo_config_responses@PLT
@@ -4916,6 +4955,29 @@ pg_mimo_complete:
  test eax,eax
  jz .Lcp_url
  lea r13,[rip+.Lcp_messages_path]
+ jmp .Lcp_url
+.Lcd_base_path:
+ lea r13,[rip+.Lcd_full_path]
+ cmp rbp,16
+ jb .Lcd_short_path
+ lea rdi,[r12+rbp-16]
+ lea rsi,[rip+.Lcd_full_path]
+ mov edx,16
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lcd_short_path
+ lea r13,[rip+.Lcd_empty]
+ jmp .Lcp_url
+.Lcd_short_path:
+ cmp rbp,6
+ jb .Lcp_url
+ lea rdi,[r12+rbp-6]
+ lea rsi,[rip+.Lcd_codex_suffix]
+ mov edx,6
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lcp_url
+ lea r13,[rip+.Lcp_responses_path]
 .Lcp_url:
  lea rdi,[rsp]
  lea rsi,[rip+.Lcp_url_format]
@@ -4954,3 +5016,188 @@ pg_mimo_complete:
 .Lcp_responses_path: .asciz "/responses"
 .Lcp_messages_path: .asciz "/v1/messages"
 .Lcp_url_format: .asciz "%.*s%s"
+
+.text
+.Lcd_headers:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ xor eax,eax
+ mov ecx,8
+ mov rdi,rsp
+ rep stosq
+ xor ebp,ebp
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_headers_cleanup
+ mov ebp,1
+ lea rdi,[rip+.Lstr_pangu_key]
+ call getenv@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov r12,rax
+ mov rdi,rax
+ mov esi,46
+ call strchr@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ lea r13,[rax+1]
+ mov rdi,r13
+ mov esi,46
+ call strchr@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov r14,rax
+ lea rdi,[rax+1]
+ mov esi,46
+ call strchr@PLT
+ test rax,rax
+ jnz .Lcd_headers_cleanup
+ mov rdi,r13
+ mov rsi,r14
+ sub rsi,r13
+ call json_object_new_string_len@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov rdi,rax
+ lea rsi,[rsp+8]
+ lea rdx,[rsp+16]
+ call pg_mimo_base64_decode@PLT
+ test eax,eax
+ jnz .Lcd_headers_cleanup
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+16]
+ call strndup@PLT
+ mov [rsp+24],rax
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov rdi,rax
+ call json_tokener_parse@PLT
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_claim]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_account]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcd_headers_cleanup
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lcd_claim]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_account]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r13,rax
+ mov rdi,rax
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lcd_headers_cleanup
+ lea rdi,[rsp+40]
+ lea rsi,[rip+.Lcd_account_format]
+ mov rdx,r13
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_headers_cleanup
+ mov rdi,[rbx+PG_MM_HEADERS]
+ mov rsi,[rsp+40]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov [rbx+PG_MM_HEADERS],rax
+ xor r14d,r14d
+.Lcd_header_each:
+ lea rax,[rip+.Lcd_headers_table]
+ mov rsi,[rax+r14*8]
+ mov rdi,[rbx+PG_MM_HEADERS]
+ call curl_slist_append@PLT
+ test rax,rax
+ jz .Lcd_headers_cleanup
+ mov [rbx+PG_MM_HEADERS],rax
+ inc r14
+ cmp r14,2
+ jb .Lcd_header_each
+ xor ebp,ebp
+.Lcd_headers_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+8]
+ call free@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov rdi,[rsp+32]
+ call json_object_put@PLT
+ mov rdi,[rsp+40]
+ call free@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcd_claim: .asciz "https://api.openai.com/auth"
+.Lcd_account: .asciz "chatgpt_account_id"
+.Lcd_account_format: .asciz "chatgpt-account-id: %s"
+.Lcd_beta: .asciz "OpenAI-Beta: responses=experimental"
+.Lcd_accept: .asciz "accept: text/event-stream"
+.Lcd_originator: .asciz "originator: pangu"
+.section .data.rel.ro
+.Lcd_headers_table: .quad .Lcd_beta,.Lcd_accept,.Lcd_originator
+
+.section .rodata
+.Lcd_base: .asciz "https://chatgpt.com/backend-api"
+.Lcd_full_path: .asciz "/codex/responses"
+.Lcd_codex_suffix: .asciz "/codex"
+.Lcd_empty: .asciz ""
+
+.text
+.Lcd_reserved:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ xor r12d,r12d
+.Lcd_reserved_each:
+ lea rax,[rip+.Lcd_reserved_keys]
+ mov rsi,[rax+r12*8]
+ mov rdi,rbx
+ call strcasecmp@PLT
+ test eax,eax
+ jz .Lcd_reserved_yes
+ inc r12
+ cmp r12,5
+ jb .Lcd_reserved_each
+ xor eax,eax
+ jmp .Lcd_reserved_end
+.Lcd_reserved_yes:
+ mov eax,1
+.Lcd_reserved_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lcd_auth_key: .asciz "authorization"
+.Lcd_account_key: .asciz "chatgpt-account-id"
+.Lcd_beta_key: .asciz "openai-beta"
+.Lcd_accept_key: .asciz "accept"
+.Lcd_content_key: .asciz "content-type"
+.section .data.rel.ro
+.Lcd_reserved_keys: .quad .Lcd_auth_key,.Lcd_account_key,.Lcd_beta_key,.Lcd_accept_key,.Lcd_content_key

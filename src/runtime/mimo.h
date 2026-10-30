@@ -58,6 +58,7 @@ void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 int pg_mimo_encode_request(pg_mimo *, const pg_session *);
 int pg_mimo_uses_responses(const pg_mimo *);
 int pg_mimo_config_responses(const struct json_object *);
+int pg_mimo_config_codex(const struct json_object *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
 int pg_mimo_uses_google(const pg_mimo *);

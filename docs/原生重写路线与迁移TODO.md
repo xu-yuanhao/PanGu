@@ -129,6 +129,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Bedrock静态共享profile接入实际签名：默认/显式/环境profile、config与credentials、环境密钥优先级、profile区域及临时令牌；实际curl回放与ASan/UBSan通过。
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
+- [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -325,8 +326,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `providers/github-copilot.ts`、`api/github-copilot-headers.ts`，以及Chat/Responses/Anthropic客户端创建入口和调用者。本批复用已核对快照。
-- 实际调用链：同一模型提供者按`modelProvider`或`modelInfo.provider`识别github-copilot；汇编组合默认/自定义基础端点，保留显式endpoint；请求前读取借用canonical上下文或既有消息，推导发起者和历史用户/工具图片。公共请求头合并在模型头后加入动态头，再应用连接/options覆盖。Anthropic Copilot使用Bearer与参考默认头；编码/流/Generation接线沿已有三协议。
-- 验证：模型O0/O2/UBSan与既有协议差分通过；三协议18组实际curl请求覆盖user/agent、历史图片、legacy输入、提供者隔离、头覆盖和默认端点，最终传输ASan/UBSan通过。新增三协议配置构造失败用例核对旧配置保留与候选释放；产品构建、Assembly/diff通过。自审核对借用消息、JSON插入所有权、头覆盖顺序、端点构造和Bearer选择；公共服务ABI不变。
-- 具体缺口：Copilot OAuth/令牌更新与其余网关特例；Codex专用协议；各协议剩余认证与高级行为按K05保留，Bedrock完整凭据链与高级选项仍在其中。
-- 下一交付物：继续Codex/Copilot网关实际模型执行链，复用现有Responses编码/流与Generation持久状态，成组完成参考协议行为。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：buildRequestBody、resolveCodexUrl、extractAccountId和buildSSEHeaders，以及共享Responses转换/流调用者。
+- 实际调用链：原生模型识别`openai-codex-responses`并复用Responses编码/解析/完成；汇编组合Codex端点，转换instructions/input、store、加密推理include、并行工具和输出选项。请求前从显式JWT解析账户claim，追加账户和SSE协议头；调用方不能覆盖强制认证头，originator适配为pangu。账户/解码缓冲按请求释放，凭据未进入公开配置。服务ABI保持，内部协议判别导出已登记。
+- 验证：模型O0/O2/UBSan和现有Pi差分通过；实际模型服务curl回放加入Codex文本/工具、失败、提前EOF和未完成工具终态，canonical保留Codex身份；无效JWT结构/Base64/缺账户拒绝与清理通过，最终传输ASan/UBSan通过。产品构建与Assembly/diff核对通过。自审核对JSON插入所有权、JWT临时缓冲、头优先级和共享端点分支；集成发现的Copilot分支回归已修正并复验。
+- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存、压缩、专用重试/预算/费用及完整推理映射、会话请求头和高级选项；Copilot OAuth与其余网关特例；其余协议认证和高级行为按K05保留。
+- 下一交付物：沿Codex模块的请求身份、会话与执行生命周期成组补齐，继续接入既有Generation持久链及协议验证。

@@ -1621,6 +1621,11 @@ pg_mimo_config_responses:
  lea rsi,[rip+.Lrp_azure]
  call strcmp@PLT
  test eax,eax
+ jz .Lrp_yes
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_api]
+ call strcmp@PLT
+ test eax,eax
  sete al
  movzx eax,al
  pop rbx
@@ -2600,3 +2605,37 @@ pg_mimo_config_bedrock:
 
 .section .rodata
 .Lbi_foreign: .asciz "panguForeignToolId"
+
+.text
+.globl pg_mimo_config_codex
+.type pg_mimo_config_codex,@function
+pg_mimo_config_codex:
+ push rbx
+ mov rbx,rdi
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcd_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+.Lcd_api_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_api_done
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_api]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+.Lcd_api_done:
+ pop rbx
+ ret
+.size pg_mimo_config_codex,.-pg_mimo_config_codex
+.section .rodata
+.Lcd_api: .asciz "openai-codex-responses"

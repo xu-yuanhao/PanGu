@@ -523,20 +523,27 @@ static void test_saved_connection(void){
 
 
 static void test_responses_transport(void){
- for(unsigned azure=0;azure<2;azure++){
+ for(unsigned azure=0;azure<3;azure++){
  for(unsigned scenario=0;scenario<5;scenario++){
-  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *configuration=json_tokener_parse(azure?"{\"model\":\"native-responses\",\"api\":\"azure-openai-responses\",\"options\":{\"azureResourceName\":\"pangu-resource\",\"azureDeploymentName\":\"deployed-model\"}}":"{\"model\":\"native-responses\",\"api\":\"openai-responses\",\"endpoint\":\"https://provider.invalid/v1/responses\"}");assert(!pg_mimo_configure(&m,configuration));json_object_put(configuration);setenv("PANGU_MODEL_API_KEY","responses-transport-unit-key",1);assert(!start()&&strstr(captured_post,"\"input\"")&&!strstr(captured_post,"\"messages\"")&&!strcmp(captured_url,azure?"https://pangu-resource.openai.azure.com/openai/v1/responses?api-version=v1":"https://provider.invalid/v1/responses"));if(azure){unsigned keys=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){keys+=!strcmp(h->data,"api-key: responses-transport-unit-key");assert(!strstr(h->data,"Authorization:"));}assert(keys==1&&strstr(captured_post,"deployed-model"));}pg_model_event event={0};
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *configuration=json_tokener_parse(azure==2?"{\"model\":\"native-responses\",\"api\":\"openai-codex-responses\"}":azure==1?"{\"model\":\"native-responses\",\"api\":\"azure-openai-responses\",\"options\":{\"azureResourceName\":\"pangu-resource\",\"azureDeploymentName\":\"deployed-model\"}}":"{\"model\":\"native-responses\",\"api\":\"openai-responses\",\"endpoint\":\"https://provider.invalid/v1/responses\"}");assert(!pg_mimo_configure(&m,configuration));json_object_put(configuration);setenv("PANGU_MODEL_API_KEY",azure==2?"e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature":"responses-transport-unit-key",1);assert(!start()&&strstr(captured_post,"\"input\"")&&!strstr(captured_post,"\"messages\"")&&!strcmp(captured_url,azure==2?"https://chatgpt.com/backend-api/codex/responses":azure==1?"https://pangu-resource.openai.azure.com/openai/v1/responses?api-version=v1":"https://provider.invalid/v1/responses"));if(azure==1){unsigned keys=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){keys+=!strcmp(h->data,"api-key: responses-transport-unit-key");assert(!strstr(h->data,"Authorization:"));}assert(keys==1&&strstr(captured_post,"deployed-model"));}if(azure==2){assert(strstr(captured_post,"instructions")&&strstr(captured_post,"reasoning.encrypted_content")&&!strstr(captured_post,"max_output_tokens"));unsigned accounts=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)accounts+=!strcmp(h->data,"chatgpt-account-id: pangu-test-account");assert(accounts==1);}pg_model_event event={0};
   feed("event: response.created\r\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_test\"}}\r\n\r\n");
   feed("data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"delta\":\"he");for(unsigned i=0;i<4;i++)assert(!nxt(&event));feed("llo\"}\n");assert(!nxt(&event)&&event.kind==PG_MODEL_TEXT&&event.text.size==5&&!memcmp(event.text.data,"hello",5));
   if(scenario==1||scenario==4){feed("data: {\"type\":\"response.output_item.added\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"call_id\":\"call-r\",\"name\":\"read\",\"arguments\":\"\"}}\n");feed("data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":4,\"arguments\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}\n");if(scenario==1)feed("data: {\"type\":\"response.output_item.done\",\"output_index\":4,\"item\":{\"type\":\"function_call\",\"id\":\"fc_r\",\"call_id\":\"call-r\",\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"file.txt\\\"}\"}}\n");}
   if(scenario<2||scenario==4)feed("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{\"input_tokens\":3,\"output_tokens\":2,\"total_tokens\":5}}}\n\n");
   if(scenario==3)feed("data: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"message\":\"provider failure\"}}}\n");
-  finish_transport();int status=0;for(unsigned i=0;i<12;i++){status=nxt(&event);if(status||event.kind!=PG_MODEL_WAIT)break;}if(scenario<2){assert(!status&&event.kind==(scenario?PG_MODEL_CALL:PG_MODEL_DONE)&&m.saw_done);if(scenario)assert(event.text.size==19&&!memcmp(event.text.data,"{\"path\":\"file.txt\"}",19));}else assert(status==1&&!m.saw_done);if(scenario<2){json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),azure?"azure-openai-responses":"openai-responses"));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"model")),"native-responses"));json_object_put(assistant);}model.close(model.context);assert(!m.request&&!m.easy&&!m.configuration);
+  finish_transport();int status=0;for(unsigned i=0;i<12;i++){status=nxt(&event);if(status||event.kind!=PG_MODEL_WAIT)break;}if(scenario<2){assert(!status&&event.kind==(scenario?PG_MODEL_CALL:PG_MODEL_DONE)&&m.saw_done);if(scenario)assert(event.text.size==19&&!memcmp(event.text.data,"{\"path\":\"file.txt\"}",19));}else assert(status==1&&!m.saw_done);if(scenario<2){json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"api")),azure==2?"openai-codex-responses":azure==1?"azure-openai-responses":"openai-responses"));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"model")),"native-responses"));json_object_put(assistant);}model.close(model.context);assert(!m.request&&!m.easy&&!m.configuration);
  }
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Responses actual model-service curl replay, split SSE/CRLF, text/tool terminal, early EOF and provider failure");
 }
 
+static void test_codex_auth_failures(void){
+ const char *tokens[]={"invalid","a.e30=.b","a.!!!!.b","a.e30=.b.extra"};
+ for(unsigned i=0;i<4;i++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-test\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY",tokens[i],1);assert(start());model.close(model.context);assert(!m.easy&&!m.multi&&!m.headers&&!m.configuration);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex invalid JWT structure, Base64 and missing account fail before transport and release request state");
+}
 static void test_responses_arguments(void){
  const char *arguments[]={"{\"path\":\"a\\q\"}","{\"path\":\"file\",\"mode\":.5}",""};
  for(unsigned i=0;i<3;i++){
@@ -824,6 +831,7 @@ int main(int argc,char **argv) {
     test_injected_connection();
     test_saved_connection();
     test_responses_transport();
+    test_codex_auth_failures();
     test_responses_arguments();
     test_anthropic_transport();
     test_anthropic_beta_headers();

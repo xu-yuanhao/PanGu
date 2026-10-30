@@ -944,6 +944,11 @@ pg_mimo_encode_request:
  jnz .Linvalid
 .Lserialize_ready:
  mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcd_request
+ test eax,eax
+ jnz .Linvalid
+ mov rdi,[rsp]
  mov rsi,rbx
  call .Loc_cache
  test eax,eax
@@ -8301,3 +8306,198 @@ pg_mimo_uses_google:
  ret
 .section .rodata
 .Lbi_foreign: .asciz "panguForeignToolId"
+
+.text
+.Lcd_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsi
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_request_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_max]
+ call json_object_object_del@PLT
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_input]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov r14,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_role]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lcd_default_instructions
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_system]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcd_default_instructions
+ mov rdi,r14
+ lea rsi,[rip+.Lcd_content]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcd_instruction_value
+ mov rdi,rbp
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_text]
+ call json_object_object_get@PLT
+ mov rbp,rax
+.Lcd_instruction_value:
+ mov rdi,rbp
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lcd_default_instructions
+ cmp byte ptr [rax],0
+ je .Lcd_default_instructions
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_instructions]
+ mov rdx,rbp
+ call li_field
+ test eax,eax
+ jnz .Lcd_request_end
+ mov rdi,r13
+ xor esi,esi
+ mov edx,1
+ call json_object_array_del_idx@PLT
+ test eax,eax
+ jnz .Lcd_request_bad
+ jmp .Lcd_request_defaults
+.Lcd_default_instructions:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_instructions]
+ lea rdx,[rip+.Lcd_default_prompt]
+ call li_field
+ test eax,eax
+ jnz .Lcd_request_end
+.Lcd_request_defaults:
+ lea rdi,[rip+.Lcd_defaults]
+ call json_tokener_parse@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lcd_request_bad
+ xor r14d,r14d
+.Lcd_default_each:
+ cmp r14,2
+ jne .Lcd_default_copy
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_choice]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcd_default_next
+.Lcd_default_copy:
+ lea rax,[rip+.Lcd_keys]
+ mov r13,[rax+r14*8]
+ mov rdi,rbp
+ mov rsi,r13
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lcd_defaults_bad
+.Lcd_default_next:
+ inc r14
+ cmp r14,4
+ jb .Lcd_default_each
+ mov rdi,rbp
+ call json_object_put@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lcd_options]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rbx
+ mov rsi,r12
+ lea rdx,[rip+.Lcd_service_option]
+ lea rcx,[rip+.Lcd_service]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lcd_request_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_text]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,r12
+ lea rdx,[rip+.Lcd_verbosity_option]
+ lea rcx,[rip+.Lcd_verbosity]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lcd_request_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_reasoning]
+ call json_object_object_get@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lcd_request_ok
+ mov rdi,rax
+ lea rsi,[rip+.Lcd_summary]
+ lea rdx,[rip+.Lcd_auto]
+ call li_field
+ test eax,eax
+ jnz .Lcd_request_bad
+ mov rdi,r13
+ mov rsi,r12
+ lea rdx,[rip+.Lcd_summary_option]
+ lea rcx,[rip+.Lcd_summary]
+ call .Lrp_copy
+ jmp .Lcd_request_end
+.Lcd_defaults_bad:
+ mov rdi,rbp
+ call json_object_put@PLT
+.Lcd_request_bad:
+ mov eax,1
+ jmp .Lcd_request_end
+.Lcd_request_ok:
+ xor eax,eax
+.Lcd_request_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lcd_max: .asciz "max_output_tokens"
+.Lcd_input: .asciz "input"
+.Lcd_role: .asciz "role"
+.Lcd_system: .asciz "system"
+.Lcd_content: .asciz "content"
+.Lcd_text: .asciz "text"
+.Lcd_instructions: .asciz "instructions"
+.Lcd_default_prompt: .asciz "You are a helpful assistant."
+.Lcd_defaults: .asciz "{\"text\":{\"verbosity\":\"low\"},\"include\":[\"reasoning.encrypted_content\"],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true}"
+.Lcd_include: .asciz "include"
+.Lcd_choice: .asciz "tool_choice"
+.Lcd_parallel: .asciz "parallel_tool_calls"
+.section .data.rel.ro
+.Lcd_keys: .quad .Lcd_text,.Lcd_include,.Lcd_choice,.Lcd_parallel
+
+.section .rodata
+.Lcd_options: .asciz "options"
+.Lcd_service_option: .asciz "serviceTier"
+.Lcd_service: .asciz "service_tier"
+.Lcd_verbosity_option: .asciz "textVerbosity"
+.Lcd_verbosity: .asciz "verbosity"
+.Lcd_summary_option: .asciz "reasoningSummary"
+.Lcd_summary: .asciz "summary"
+.Lcd_auto: .asciz "auto"
