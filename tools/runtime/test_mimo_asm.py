@@ -39,7 +39,7 @@ CURL_WRAPS = ['-Wl,--wrap=' + n for n in (
     'curl_multi_info_read', 'curl_multi_add_handle', 'curl_multi_cleanup',
     'curl_slist_free_all', 'curl_slist_append', 'json_tokener_new')]
 
-ALLOC_WRAPS = ['-Wl,--wrap=' + name for name in ('json_object_new_object', 'json_object_new_array', 'json_object_new_string', 'json_object_new_string_len', 'json_object_new_boolean', 'json_object_new_int', 'json_object_object_add', 'json_object_array_add', 'json_tokener_parse', 'json_object_to_json_string_ext', 'strdup')]
+ALLOC_WRAPS = ['-Wl,--wrap=' + name for name in ('json_object_deep_copy', 'json_object_new_object', 'json_object_new_array', 'json_object_new_string', 'json_object_new_string_len', 'json_object_new_boolean', 'json_object_new_int', 'json_object_object_add', 'json_object_array_add', 'json_tokener_parse', 'json_object_to_json_string_ext', 'strdup')]
 
 
 def flags(opt, extra=()):

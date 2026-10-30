@@ -34,11 +34,16 @@ int __wrap_json_object_array_add(struct json_object *o,struct json_object *v){re
 struct json_object *__wrap_json_tokener_parse(const char *s){return reject()?0:owned(__real_json_tokener_parse(s));}
 const char *__wrap_json_object_to_json_string_ext(struct json_object *o,int flags){return reject()?0:__real_json_object_to_json_string_ext(o,flags);}
 char *__wrap_strdup(const char *s){return reject()?0:__real_strdup(s);}
+/* Tracking userdata belongs to this fixture, not to detached JSON copies. */
+int __real_json_object_deep_copy(struct json_object *,struct json_object **,json_c_shallow_copy_fn *);
+static int plain_copy(struct json_object *src,struct json_object *parent,const char *key,size_t index,struct json_object **out){int rc=json_c_shallow_copy_default(src,parent,key,index,out);return rc<0?rc:2;}
+int __wrap_json_object_deep_copy(struct json_object *src,struct json_object **out,json_c_shallow_copy_fn *copy){return __real_json_object_deep_copy(src,out,copy?copy:plain_copy);}
 static pg_session session;
 static pg_mimo provider;
 static pg_tool_registry registry;
 int main(void){
- for(unsigned protocol=0;protocol<2;protocol++){
+ for(unsigned protocol=0;protocol<3;protocol++){
+ struct json_object *canonical=0;
  memset(&session,0,sizeof(session));
  session.system_size=3;memcpy(session.system_prompt,"sys",4);session.count=5;
  const char *texts[]={"hi","checking","{}","result","done"};
@@ -46,13 +51,14 @@ int main(void){
  for(unsigned i=0;i<5;++i){session.messages[i].role=roles[i];session.messages[i].size=strlen(texts[i]);strcpy(session.messages[i].text,texts[i]);}
  strcpy(session.messages[2].call_id,"one");strcpy(session.messages[2].tool_name,"read");strcpy(session.messages[3].call_id,"one");
  registry.count=1;registry.entries[0].name="read";registry.entries[0].description="read text";registry.entries[0].schema="{\"type\":\"object\"}";provider.tools=&registry;
- provider.configuration=protocol?__real_json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"native-responses\",\"endpoint\":\"https://example.invalid/responses\"}"):0;
- for(unsigned n=1;n<=8;n+=7){
+ provider.configuration=protocol?__real_json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"native-responses\",\"modelProvider\":\"openai\",\"endpoint\":\"https://example.invalid/responses\"}"):0;
+ if(protocol==2){canonical=__real_json_tokener_parse("{\"messages\":[{\"role\":\"assistant\",\"api\":\"openai-responses\",\"model\":\"native-responses\",\"provider\":\"openai\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"saved thought\",\"thinkingSignature\":\"{\\\"type\\\":\\\"reasoning\\\",\\\"id\\\":\\\"rs_saved\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"saved thought\\\"}],\\\"encrypted_content\\\":\\\"cipher-saved\\\"}\"},{\"type\":\"text\",\"text\":\"saved text\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_saved\\\",\\\"phase\\\":\\\"commentary\\\"}\"},{\"type\":\"toolCall\",\"id\":\"call-saved\",\"name\":\"read\",\"arguments\":{},\"responseItemId\":\"fc_saved\"}]},{\"role\":\"toolResult\",\"toolCallId\":\"call-saved\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}]}");assert(canonical);session.count=1;session.messages[0].role=PG_CONTEXT_VIEW;session.messages[0].context_view=canonical;}
+ for(unsigned n=1;n<=(protocol==2?1u:8u);n+=7){
  if(n==8){memset(session.messages,0,sizeof(session.messages));session.count=18;session.messages[0].role=PG_USER;session.messages[1].role=PG_ASSISTANT;for(unsigned j=0;j<n;++j){pg_message *c=&session.messages[2+j],*r=&session.messages[10+j];c->role=PG_TOOL_CALL;c->size=2;strcpy(c->text,"{}");strcpy(c->tool_name,"read");snprintf(c->call_id,sizeof(c->call_id),"id-%u",j);r->role=PG_TOOL_RESULT;r->size=2;strcpy(r->text,"ok");strcpy(r->call_id,c->call_id);}}
  fail_at=0;calls=0;tracked=0;
- assert(!pg_mimo_encode_request(&provider,&session)&&provider.request&&!live);free(provider.request);provider.request=0;unsigned total=calls;
- for(unsigned i=1;i<=total;++i){fail_at=i;calls=0;tracked=0;assert(pg_mimo_encode_request(&provider,&session)&&!provider.request);assert(calls>=i&&!live);}
+ int baseline=pg_mimo_encode_request(&provider,&session);if(baseline||live)fprintf(stderr,"projection baseline protocol=%u calls=%u status=%d live=%u\n",protocol,n,baseline,live);assert(!baseline&&provider.request&&!live);free(provider.request);provider.request=0;unsigned total=calls;
+ for(unsigned i=1;i<=total;++i){fail_at=i;calls=0;tracked=0;assert(pg_mimo_encode_request(&provider,&session)&&!provider.request);if(live)fprintf(stderr,"projection failure protocol=%u index=%u calls=%u live=%u\n",protocol,i,calls,live);assert(calls>=i&&!live);}
  printf("PASS: %u-call projection: %u allocation/insertion/serialization failures release JSON ownership\n",n,total);
- }json_object_put(provider.configuration);provider.configuration=0;
+ }json_object_put(canonical);json_object_put(provider.configuration);provider.configuration=0;
  }return 0;
 }

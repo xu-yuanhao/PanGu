@@ -72,6 +72,12 @@ pg_mimo_bind_tools:
  inc r12d
  cmp r12d,PG_MM_CALL_LIMIT
  jb .Lclear_arg_loop
+ mov rdi,[rbx+PG_MM_RESPONSE_OUTPUT]
+ mov qword ptr [rbx+PG_MM_RESPONSE_OUTPUT],0
+ call json_object_put@PLT
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
+ mov qword ptr [rbx+PG_MM_RESPONSE_ID],0
+ call json_object_put@PLT
  /* Preserve the request metadata and registry between the two buffers. */
  lea rdi,[rbx+PG_MM_ARGUMENTS]
  xor esi,esi
@@ -1039,7 +1045,10 @@ pg_mimo_complete:
  jnz .Lmu_end
  xor r13d,r13d
 .Lmu_success:
- xor ebp,ebp
+ mov rdi,rbx
+ mov rsi,r12
+ call pg_mimo_responses_complete
+ mov ebp,eax
 .Lmu_end:
  mov rdi,[rsp+64]
  call json_object_put@PLT

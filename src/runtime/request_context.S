@@ -475,7 +475,23 @@ pg_context_messages_model:
  call .Lr_set
  test eax,eax
  jnz .Lr_project_bad
-.Lri_assistant_ready:
+ .Lri_assistant_ready:
+ cmp dword ptr [rsp+180],0
+ je .Lri_assistant_blocks
+ mov rdi,[rsp+24]
+ mov rsi,[rsp+160]
+ lea rdx,[rsp+56]
+ call pg_mimo_responses_history@PLT
+ test eax,eax
+ jnz .Lr_project_bad
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lri_responsesOutput]
+ mov rdx,[rsp+56]
+ mov qword ptr [rsp+56],0
+ call .Lr_set
+ test eax,eax
+ jnz .Lr_project_bad
+.Lri_assistant_blocks:
  RG "qword ptr [rsp+24]",content
  mov [rsp+112],rax
  mov rdi,rax
@@ -532,6 +548,19 @@ pg_context_messages_model:
  call strcmp@PLT
  test eax,eax
  jnz .Lr_project_call
+ cmp dword ptr [rsp+180],0
+ jne .Lr_project_block_next
+ RG "qword ptr [rsp+24]",api
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lri_regular_thinking
+ mov rdi,rax
+ lea rsi,[rip+.Lri_responses_api]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lr_project_block_next
+.Lri_regular_thinking:
  RG r14,thinkingSignature
  test rax,rax
  jz .Lr_project_bad
@@ -1448,3 +1477,10 @@ pg_context_blank:
 .Lric_requires: .asciz "requiresAssistantAfterToolResult"
 .Lric_tool: .asciz "tool"
 .Lric_bridge: .asciz "{\"role\":\"assistant\",\"content\":\"I have processed the tool results.\"}"
+
+.section .rodata
+.Lri_responsesOutput: .asciz "responsesOutput"
+
+.section .rodata
+.Lr_api: .asciz "api"
+.Lri_responses_api: .asciz "openai-responses"

@@ -157,6 +157,8 @@
         "pg_mimo_complete",
         "pg_mimo_uses_responses",
         "pg_mimo_config_responses",
+        "pg_mimo_responses_complete",
+        "pg_mimo_responses_history",
         "pg_context_append",
         "pg_context_text",
         "pg_context_project",
@@ -179,6 +181,7 @@
           "tests_to_read": [
             "packages/ai/test/openai-completions-provider-stream-event.test.ts",
             "packages/ai/test/openai-responses-terminal-event.test.ts",
+            "packages/ai/test/azure-openai-responses-reasoning-replay.test.ts",
             "packages/ai/test/openai-responses-empty-tool-result.test.ts",
             "packages/ai/test/openai-responses-tool-result-images.test.ts",
             "packages/ai/test/streaming-tool-arguments.test.ts",

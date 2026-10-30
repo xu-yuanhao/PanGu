@@ -924,7 +924,15 @@ pg_mimo_decode_line:
 .Lrs_item_handler:
  RSGET "qword ptr [rsp]",item
  mov [rsp+40],rax
- RSGET rax,type
+ cmp ebp,7
+ jne .Lrs_item_type
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lrc_capture_item
+ test eax,eax
+ jnz .Lrs_bad
+.Lrs_item_type:
+ RSGET "qword ptr [rsp+40]",type
  mov rdi,rax
  call json_object_get_string@PLT
  test rax,rax
@@ -1046,6 +1054,11 @@ pg_mimo_decode_line:
  mov r12,rax
  test rax,rax
  jz .Lrs_bad
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lrc_capture_terminal
+ test eax,eax
+ jnz .Lrs_bad
  RSGET r12,usage
  mov [rsp+88],rax
  test rax,rax
@@ -1195,3 +1208,626 @@ pg_mimo_decode_line:
 .Lrs_set_end:
  pop rbx
  ret
+
+.text
+.Lrc_capture_item:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov rdi,r12
+ lea rsi,[rip+.Lrs_output_index]
+ call li_get
+ mov rbp,rax
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrc_capture_bad
+ mov rdi,rbp
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lrc_capture_bad
+ mov [rsp],rax
+ cmp qword ptr [rbx+PG_MM_RESPONSE_OUTPUT],0
+ jne .Lrc_capture_slot
+ call json_object_new_array@PLT
+ mov [rbx+PG_MM_RESPONSE_OUTPUT],rax
+ test rax,rax
+ jz .Lrc_capture_bad
+.Lrc_capture_slot:
+ call json_object_new_object@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lrc_capture_bad
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lrc_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_capture_bad
+ mov rdi,r13
+ mov rsi,r12
+ lea rdx,[rip+.Lrc_item]
+ mov rcx,rdx
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lrc_capture_bad
+ xor r14d,r14d
+.Lrc_capture_find:
+ mov rdi,[rbx+PG_MM_RESPONSE_OUTPUT]
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lrc_capture_insert
+ mov rdi,[rbx+PG_MM_RESPONSE_OUTPUT]
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrc_index]
+ call li_get
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ cmp rax,[rsp]
+ ja .Lrc_capture_insert
+ je .Lrc_capture_replace
+ inc r14
+ jmp .Lrc_capture_find
+.Lrc_capture_insert:
+ mov rdi,[rbx+PG_MM_RESPONSE_OUTPUT]
+ mov rsi,r14
+ mov rdx,r13
+ call json_object_array_insert_idx@PLT
+ jmp .Lrc_capture_adopt
+.Lrc_capture_replace:
+ mov rdi,[rbx+PG_MM_RESPONSE_OUTPUT]
+ mov rsi,r14
+ mov rdx,r13
+ call json_object_array_put_idx@PLT
+.Lrc_capture_adopt:
+ test eax,eax
+ jnz .Lrc_capture_bad
+ xor r13d,r13d
+ xor ebp,ebp
+ jmp .Lrc_capture_end
+.Lrc_capture_bad:
+ mov ebp,1
+.Lrc_capture_end:
+ mov rdi,r13
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lrc_capture_terminal:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ mov rdi,rsi
+ lea rsi,[rip+.Lrc_id]
+ call li_get
+ test rax,rax
+ jz .Lrc_capture_output
+ mov rdi,rax
+ call json_object_get@PLT
+ mov [rsp],rax
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
+ call json_object_put@PLT
+ mov rax,[rsp]
+ mov [rbx+PG_MM_RESPONSE_ID],rax
+.Lrc_capture_output:
+ mov rdi,r12
+ lea rsi,[rip+.Lrc_output]
+ call li_get
+ mov r12,rax
+ test rax,rax
+ jz .Lrc_terminal_ok
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrc_terminal_bad
+ mov rdi,r12
+ call json_object_array_length@PLT
+ test rax,rax
+ jz .Lrc_terminal_ok
+ mov rdi,rbx
+ mov rsi,r12
+ call .Lrc_merge_output
+ test eax,eax
+ jnz .Lrc_terminal_bad
+.Lrc_terminal_ok:
+ xor eax,eax
+ jmp .Lrc_terminal_end
+.Lrc_terminal_bad:
+ mov eax,1
+.Lrc_terminal_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.macro RCGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lrc_\key]
+ call li_get
+.endm
+.macro RCCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lrc_\from]
+ lea rcx,[rip+.Lrc_\to]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lrc_bad
+.endm
+.Lrc_append:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lrc_append_end
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lrc_append_ok
+ mov rdi,r12
+ call json_object_put@PLT
+ xor r12d,r12d
+.Lrc_append_ok:
+ mov rax,r12
+.Lrc_append_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Final item payloads, including terminal-only encrypted reasoning, become
+   detached canonical content before the Generation transaction adopts it. */
+.globl pg_mimo_responses_complete
+.type pg_mimo_responses_complete,@function
+pg_mimo_responses_complete:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ mov r12,[rdi+PG_MM_RESPONSE_OUTPUT]
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,8
+ rep stosq
+ mov [rsp+8],rsi
+ mov rdi,rbx
+ call pg_mimo_uses_responses@PLT
+ test eax,eax
+ jz .Lrc_ok
+ test r12,r12
+ jz .Lrc_metadata
+ call json_object_new_array@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lrc_bad
+ xor r13d,r13d
+.Lrc_each:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lrc_publish
+ mov rdi,r12
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ RCGET rax,item
+ mov r14,rax
+ RCGET r14,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrc_bad
+ mov [rsp+56],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lrc_function_call]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrc_tool
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrc_reasoning]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrc_reason
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrc_message]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrc_bad
+ lea rdi,[rip+.Lrc_text_json]
+ mov qword ptr [rsp+48],0
+ jmp .Lrc_textual
+.Lrc_reason:
+ lea rdi,[rip+.Lrc_think_json]
+ mov qword ptr [rsp+48],1
+.Lrc_textual:
+ mov rsi,[rsp]
+ call .Lrc_append
+ mov rbp,rax
+ test rax,rax
+ jz .Lrc_bad
+ lea rdi,[rip+.Lrc_empty]
+ call json_object_new_string@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lrc_bad
+ RCGET r14,content
+ cmp qword ptr [rsp+48],0
+ je .Lrc_parts_ready
+ RCGET r14,summary
+ test rax,rax
+ jz .Lrc_reason_content
+ mov [rsp+32],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrc_bad
+ mov rdi,[rsp+32]
+ call json_object_array_length@PLT
+ test rax,rax
+ jnz .Lrc_parts_loaded
+.Lrc_reason_content:
+ RCGET r14,content
+.Lrc_parts_ready:
+ mov [rsp+32],rax
+.Lrc_parts_loaded:
+ mov qword ptr [rsp+40],0
+ cmp qword ptr [rsp+32],0
+ je .Lrc_joined
+ mov rdi,[rsp+32]
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrc_bad
+.Lrc_part:
+ mov rdi,[rsp+32]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lrc_joined
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov [rsp+24],rax
+ RCGET rax,text
+ test rax,rax
+ jnz .Lrc_part_text
+ RCGET "qword ptr [rsp+24]",refusal
+ test rax,rax
+ jz .Lrc_part_next
+.Lrc_part_text:
+ mov rsi,rax
+ lea rdi,[rsp+16]
+ mov edx,[rsp+48]
+ add edx,edx
+ call pg_context_append@PLT
+ test eax,eax
+ jnz .Lrc_bad
+.Lrc_part_next:
+ inc qword ptr [rsp+40]
+ jmp .Lrc_part
+.Lrc_joined:
+ mov qword ptr [rsp+24],0
+ lea rdi,[rip+.Lrc_text]
+ cmp qword ptr [rsp+48],0
+ je .Lrc_text_field
+ lea rdi,[rip+.Lrc_thinking]
+.Lrc_text_field:
+ mov [rsp+56],rdi
+ mov rdi,[rsp+16]
+ call json_object_get@PLT
+ mov rdi,rbp
+ mov rsi,[rsp+56]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ cmp qword ptr [rsp+48],0
+ jne .Lrc_reason_signature
+ lea rdi,[rip+.Lrc_sig_json]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lrc_bad
+ RCCOPY "qword ptr [rsp+16]",r14,id,id
+ RCCOPY "qword ptr [rsp+16]",r14,phase,phase
+ mov rdi,[rsp+16]
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ mov rdi,rax
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lrc_textSignature]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+ jmp .Lrc_next_release
+.Lrc_reason_signature:
+ mov rdi,r14
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ mov rdi,rax
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lrc_thinkingSignature]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+ jmp .Lrc_next_release
+.Lrc_tool:
+ lea rdi,[rip+.Lrc_tool_json]
+ mov rsi,[rsp]
+ call .Lrc_append
+ mov rbp,rax
+ test rax,rax
+ jz .Lrc_bad
+ RCCOPY rbp,r14,call_id,id
+ RCCOPY rbp,r14,name,name
+ RCCOPY rbp,r14,id,responseItemId
+ RCCOPY rbp,r14,namespace,namespace
+ RCGET r14,arguments
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrc_bad
+ mov rdi,rax
+ call json_tokener_parse@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lrc_arguments]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+.Lrc_next_release:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov qword ptr [rsp+16],0
+ inc r13
+ jmp .Lrc_each
+.Lrc_publish:
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lrc_content]
+ mov rdx,[rsp]
+ mov qword ptr [rsp],0
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+.Lrc_metadata:
+ mov r14,[rbx+PG_MM_CONFIGURATION]
+ RCCOPY "qword ptr [rsp+8]",r14,model,model
+ RCCOPY "qword ptr [rsp+8]",r14,modelProvider,provider
+ RCGET "qword ptr [rsp+8]",provider
+ test rax,rax
+ jnz .Lrc_api_metadata
+ RCGET r14,modelInfo
+ mov r14,rax
+ RCCOPY "qword ptr [rsp+8]",r14,provider,provider
+.Lrc_api_metadata:
+ lea rdi,[rip+.Lrc_api_value]
+ call json_object_new_string@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lrc_api]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+ mov rdi,[rbx+PG_MM_RESPONSE_ID]
+ test rdi,rdi
+ jz .Lrc_ok
+ call json_object_get@PLT
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lrc_responseId]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrc_bad
+.Lrc_ok:
+ xor ebp,ebp
+ jmp .Lrc_cleanup
+.Lrc_bad:
+ mov ebp,1
+.Lrc_cleanup:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_responses_complete,.-pg_mimo_responses_complete
+.section .rodata
+.Lrc_id: .asciz "id"
+.Lrc_output: .asciz "output"
+.Lrc_type: .asciz "type"
+.Lrc_function_call: .asciz "function_call"
+.Lrc_reasoning: .asciz "reasoning"
+.Lrc_message: .asciz "message"
+.Lrc_content: .asciz "content"
+.Lrc_summary: .asciz "summary"
+.Lrc_text: .asciz "text"
+.Lrc_refusal: .asciz "refusal"
+.Lrc_thinking: .asciz "thinking"
+.Lrc_phase: .asciz "phase"
+.Lrc_textSignature: .asciz "textSignature"
+.Lrc_thinkingSignature: .asciz "thinkingSignature"
+.Lrc_call_id: .asciz "call_id"
+.Lrc_name: .asciz "name"
+.Lrc_responseItemId: .asciz "responseItemId"
+.Lrc_namespace: .asciz "namespace"
+.Lrc_arguments: .asciz "arguments"
+.Lrc_model: .asciz "model"
+.Lrc_modelProvider: .asciz "modelProvider"
+.Lrc_provider: .asciz "provider"
+.Lrc_api: .asciz "api"
+.Lrc_api_value: .asciz "openai-responses"
+.Lrc_responseId: .asciz "responseId"
+.Lrc_empty: .asciz ""
+.Lrc_text_json: .asciz "{\"type\":\"text\"}"
+.Lrc_think_json: .asciz "{\"type\":\"thinking\"}"
+.Lrc_tool_json: .asciz "{\"type\":\"toolCall\"}"
+.Lrc_sig_json: .asciz "{\"v\":1}"
+
+.text
+.Lrc_inherit:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rsi,rdx
+ call li_get
+ test rax,rax
+ jz .Lrc_inherit_copy
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrc_inherit_string
+ mov rdi,rbx
+ mov rsi,r13
+ call li_get
+ mov rdi,rax
+ call json_object_array_length@PLT
+ jmp .Lrc_inherit_length
+.Lrc_inherit_string:
+ mov rdi,rbx
+ mov rsi,r13
+ call li_get
+ mov rdi,rax
+ call json_object_get_string_len@PLT
+.Lrc_inherit_length:
+ test rax,rax
+ jnz .Lrc_inherit_done
+.Lrc_inherit_copy:
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ mov rcx,r13
+ call .Lrs_copy
+ jmp .Lrc_inherit_end
+.Lrc_inherit_done:
+ xor eax,eax
+.Lrc_inherit_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+/* A terminal reasoning item may contain only the encrypted backfill. Keep
+   the completed summary/content while adopting that terminal signature. */
+.Lrc_merge_output:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,[rdi+PG_MM_RESPONSE_OUTPUT]
+ mov r12,rsi
+ test rbx,rbx
+ jz .Lrc_merge_ok
+ xor r13d,r13d
+.Lrc_merge_each:
+ mov rdi,rbx
+ call json_object_array_length@PLT
+ cmp r13,rax
+ jae .Lrc_merge_ok
+ mov rdi,rbx
+ mov rsi,r13
+ call json_object_array_get_idx@PLT
+ RCGET rax,item
+ mov r14,rax
+ RCGET r14,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrc_merge_next
+ mov rdi,rax
+ lea rsi,[rip+.Lrc_reasoning]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrc_merge_next
+ RCGET r14,id
+ mov [rsp+16],rax
+ mov qword ptr [rsp+8],0
+.Lrc_merge_find:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp [rsp+8],rax
+ jae .Lrc_merge_next
+ mov rdi,r12
+ mov rsi,[rsp+8]
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ RCGET rbp,id
+ mov rdi,rax
+ mov rsi,[rsp+16]
+ call json_object_equal@PLT
+ test eax,eax
+ jnz .Lrc_merge_fields
+ inc qword ptr [rsp+8]
+ jmp .Lrc_merge_find
+.Lrc_merge_fields:
+ mov rdi,r14
+ mov rsi,rbp
+ lea rdx,[rip+.Lrc_encrypted_content]
+ call .Lrc_inherit
+ test eax,eax
+ jnz .Lrc_merge_bad
+.Lrc_merge_next:
+ inc r13
+ jmp .Lrc_merge_each
+.Lrc_merge_ok:
+ xor eax,eax
+ jmp .Lrc_merge_end
+.Lrc_merge_bad:
+ mov eax,1
+.Lrc_merge_end:
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lrc_encrypted_content: .asciz "encrypted_content"
+
+.section .rodata
+.Lrc_modelInfo: .asciz "modelInfo"
+
+.section .rodata
+.Lrc_index: .asciz "index"
+.Lrc_item: .asciz "item"
