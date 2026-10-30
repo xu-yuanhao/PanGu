@@ -38,17 +38,21 @@ static pg_session session;
 static pg_mimo provider;
 static pg_tool_registry registry;
 int main(void){
+ for(unsigned protocol=0;protocol<2;protocol++){
+ memset(&session,0,sizeof(session));
  session.system_size=3;memcpy(session.system_prompt,"sys",4);session.count=5;
  const char *texts[]={"hi","checking","{}","result","done"};
  const pg_role roles[]={PG_USER,PG_ASSISTANT,PG_TOOL_CALL,PG_TOOL_RESULT,PG_ASSISTANT};
  for(unsigned i=0;i<5;++i){session.messages[i].role=roles[i];session.messages[i].size=strlen(texts[i]);strcpy(session.messages[i].text,texts[i]);}
  strcpy(session.messages[2].call_id,"one");strcpy(session.messages[2].tool_name,"read");strcpy(session.messages[3].call_id,"one");
  registry.count=1;registry.entries[0].name="read";registry.entries[0].description="read text";registry.entries[0].schema="{\"type\":\"object\"}";provider.tools=&registry;
+ provider.configuration=protocol?__real_json_tokener_parse("{\"api\":\"openai-responses\",\"model\":\"native-responses\",\"endpoint\":\"https://example.invalid/responses\"}"):0;
  for(unsigned n=1;n<=8;n+=7){
  if(n==8){memset(session.messages,0,sizeof(session.messages));session.count=18;session.messages[0].role=PG_USER;session.messages[1].role=PG_ASSISTANT;for(unsigned j=0;j<n;++j){pg_message *c=&session.messages[2+j],*r=&session.messages[10+j];c->role=PG_TOOL_CALL;c->size=2;strcpy(c->text,"{}");strcpy(c->tool_name,"read");snprintf(c->call_id,sizeof(c->call_id),"id-%u",j);r->role=PG_TOOL_RESULT;r->size=2;strcpy(r->text,"ok");strcpy(r->call_id,c->call_id);}}
  fail_at=0;calls=0;tracked=0;
  assert(!pg_mimo_encode_request(&provider,&session)&&provider.request&&!live);free(provider.request);provider.request=0;unsigned total=calls;
  for(unsigned i=1;i<=total;++i){fail_at=i;calls=0;tracked=0;assert(pg_mimo_encode_request(&provider,&session)&&!provider.request);assert(calls>=i&&!live);}
  printf("PASS: %u-call projection: %u allocation/insertion/serialization failures release JSON ownership\n",n,total);
+ }json_object_put(provider.configuration);provider.configuration=0;
  }return 0;
 }

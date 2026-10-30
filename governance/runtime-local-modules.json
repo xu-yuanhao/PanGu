@@ -147,7 +147,7 @@
         "system libc",
         "tools.registry.local.v0"
       ],
-      "role": "handwritten replaceable MiMo projection/SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts",
+      "role": "handwritten replaceable OpenAI Chat Completions/Responses projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -155,6 +155,8 @@
         "pg_mimo_encode_request (internal projection test seam)",
         "pg_mimo_configure",
         "pg_mimo_complete",
+        "pg_mimo_uses_responses",
+        "pg_mimo_config_responses",
         "pg_context_append",
         "pg_context_text",
         "pg_context_project",
@@ -168,12 +170,17 @@
           "commit": "38ff99177fba21e9c57a670f4e95adcf407c99c7",
           "paths": [
             "packages/ai/src/api/openai-completions.ts",
+            "packages/ai/src/api/openai-responses.ts",
+            "packages/ai/src/api/openai-responses-shared.ts",
             "packages/ai/src/api/transform-messages.ts",
             "packages/durable/src/harness/generation.ts"
           ],
           "semantics": "projection, fragment accumulation and provider/harness lifecycle boundary; native single-choice protocol and bounded function-tool groups remain intentionally narrower",
           "tests_to_read": [
             "packages/ai/test/openai-completions-provider-stream-event.test.ts",
+            "packages/ai/test/openai-responses-terminal-event.test.ts",
+            "packages/ai/test/openai-responses-empty-tool-result.test.ts",
+            "packages/ai/test/openai-responses-tool-result-images.test.ts",
             "packages/ai/test/streaming-tool-arguments.test.ts",
             "packages/ai/test/openai-completions-tool-choice.test.ts"
           ]

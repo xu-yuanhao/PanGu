@@ -375,6 +375,9 @@ pg_context_messages_model:
  call .Lri_capability
  mov [rsp+176],eax
 .Lri_capability_ready:
+ mov rdi,r15
+ call pg_mimo_config_responses@PLT
+ mov [rsp+180],eax
  call json_object_new_array@PLT
  mov [rsp],rax
  test rax,rax
@@ -796,7 +799,7 @@ pg_context_messages_model:
  mov rdi,r14
  call pg_context_blank
  test eax,eax
- jz .Lr_project_append
+ jz .Lri_response_content
  lea rdi,[rip+.Lr_no_output]
  mov [rsp+120],rdi
  mov rdi,[rsp+184]
@@ -808,6 +811,25 @@ pg_context_messages_model:
 .Lri_placeholder_ready:
  mov rdi,[rsp+120]
  call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lr_content]
+ mov rdx,rax
+ call .Lr_set
+ test eax,eax
+ jnz .Lr_project_bad
+ .Lri_response_content:
+ cmp dword ptr [rsp+180],0
+ je .Lr_project_append
+ cmp dword ptr [rsp+176],0
+ je .Lr_project_append
+ mov rdi,[rsp+184]
+ call .Lri_has_image
+ test eax,eax
+ jz .Lr_project_append
+ mov rdi,[rsp+184]
+ call .Lri_user_content
+ test rax,rax
+ jz .Lr_project_bad
  mov rdi,[rsp+40]
  lea rsi,[rip+.Lr_content]
  mov rdx,rax
@@ -829,6 +851,8 @@ pg_context_messages_model:
  call strcmp@PLT
  test eax,eax
  jnz .Lr_project_next
+ cmp dword ptr [rsp+180],0
+ jne .Lr_project_next
  cmp dword ptr [rsp+176],0
  je .Lr_project_next
  mov rdi,[rsp+184]

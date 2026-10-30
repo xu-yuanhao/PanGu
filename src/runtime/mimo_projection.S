@@ -811,6 +811,15 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-33
 .Lserialize:
+ mov rdi,rbx
+ call pg_mimo_uses_responses
+ test eax,eax
+ jz .Lserialize_ready
+ mov rdi,[rsp]
+ call .Lrp_request
+ test eax,eax
+ jnz .Linvalid
+.Lserialize_ready:
  mov rdi, qword ptr [rsp]
  mov esi, PG_MM_TO_JSON_PLAIN
  call json_object_to_json_string_ext@PLT
@@ -1444,3 +1453,491 @@ pg_mimo_apply_options:
 .Lct_level_map: .asciz "thinkingLevelMap"
 .Lct_off: .asciz "off"
 .section .note.GNU-stack,"",@progbits
+
+.text
+/* Selection belongs to the request identity, shared by encoder and decoder. */
+.globl pg_mimo_uses_responses
+.type pg_mimo_uses_responses,@function
+pg_mimo_uses_responses:
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ jmp pg_mimo_config_responses
+.size pg_mimo_uses_responses,.-pg_mimo_uses_responses
+.globl pg_mimo_config_responses
+.type pg_mimo_config_responses,@function
+pg_mimo_config_responses:
+ push rbx
+ mov rbx,rdi
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lrp_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_api]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lrp_api_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_endpoint]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jnz .Lrp_endpoint_value
+ lea rdi,[rip+.Lrp_env]
+ call getenv@PLT
+ test rax,rax
+ jz .Lrp_no
+.Lrp_endpoint_value:
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_suffix]
+ call strstr@PLT
+ test rax,rax
+ setne al
+ movzx eax,al
+ pop rbx
+ ret
+.Lrp_api_value:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrp_no
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_responses]
+ call strcmp@PLT
+ test eax,eax
+ sete al
+ movzx eax,al
+ pop rbx
+ ret
+.Lrp_no:
+ xor eax,eax
+ pop rbx
+ ret
+.size pg_mimo_config_responses,.-pg_mimo_config_responses
+
+/* Copy a field to another key, retaining its JSON owner. Missing is optional. */
+.Lrp_copy:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rcx
+ mov rdi,rsi
+ mov rsi,rdx
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lrp_copy_ok
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lrp_copy_end
+.Lrp_copy_ok:
+ xor eax,eax
+.Lrp_copy_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.macro RPGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lrp_\key]
+ call json_object_object_get@PLT
+.endm
+.macro RPCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lrp_\from]
+ lea rcx,[rip+.Lrp_\to]
+ call .Lrp_copy
+ test eax,eax
+ jnz .Lrp_bad
+.endm
+.macro RPDEL obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lrp_\key]
+ call json_object_object_del@PLT
+.endm
+/* Parse and attach immediately, so the root owns every intermediate. */
+.Lrp_append:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rsi
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lrp_append_end
+ mov rdi,rbx
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lrp_append_ok
+ mov rdi,r12
+ call json_object_put@PLT
+ xor r12d,r12d
+.Lrp_append_ok:
+ mov rax,r12
+.Lrp_append_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+
+/* Chat projection and Responses share canonical context and tool selection. */
+.Lrp_request:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,64
+ mov rbx,rdi
+ RPGET rbx,messages
+ mov r12,rax
+ call json_object_new_array@PLT
+ mov r13,rax
+ test rax,rax
+ jz .Lrp_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_input]
+ mov rdx,r13
+ call .Lrp_set
+ test eax,eax
+ jnz .Lrp_bad
+ xor r14d,r14d
+.Lrp_message:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lrp_tools_handler
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ mov rbp,rax
+ RPGET rbp,content
+ test rax,rax
+ jz .Lrp_calls
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,5
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrp_message_add
+ mov qword ptr [rsp+8],0
+.Lrp_content_handler:
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ cmp [rsp+8],rax
+ jae .Lrp_message_add
+ mov rdi,[rsp]
+ mov rsi,[rsp+8]
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ RPGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_image_url]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrp_image
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lrp_type]
+ lea rdx,[rip+.Lrp_input_text]
+ call li_field
+ test eax,eax
+ jnz .Lrp_bad
+ RPGET rbp,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_assistant]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrp_content_next
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lrp_type]
+ lea rdx,[rip+.Lrp_output_text]
+ call li_field
+ test eax,eax
+ jnz .Lrp_bad
+ jmp .Lrp_content_next
+.Lrp_image:
+ mov rax,[rsp+16]
+ RPGET rax,image_url
+ mov [rsp+24],rax
+ RPCOPY "qword ptr [rsp+16]","qword ptr [rsp+24]",url,image_url
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lrp_type]
+ lea rdx,[rip+.Lrp_input_image]
+ call li_field
+ test eax,eax
+ jnz .Lrp_bad
+.Lrp_content_next:
+ inc qword ptr [rsp+8]
+ jmp .Lrp_content_handler
+.Lrp_message_add:
+ RPGET rbp,role
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lrp_tool]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrp_tool_result
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,r13
+ mov rsi,rax
+ call json_object_array_add@PLT
+ test eax,eax
+ jz .Lrp_calls
+ mov rdi,rbp
+ call json_object_put@PLT
+ jmp .Lrp_bad
+.Lrp_calls:
+ RPGET rbp,tool_calls
+ mov [rsp+32],rax
+ mov qword ptr [rsp+40],0
+ test rax,rax
+ jz .Lrp_next
+.Lrp_call:
+ mov rdi,[rsp+32]
+ call json_object_array_length@PLT
+ cmp [rsp+40],rax
+ jae .Lrp_calls_done
+ mov rdi,[rsp+32]
+ mov rsi,[rsp+40]
+ call json_object_array_get_idx@PLT
+ mov [rsp+48],rax
+ lea rdi,[rip+.Lrp_call_json]
+ mov rsi,r13
+ call .Lrp_append
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lrp_bad
+ RPCOPY "qword ptr [rsp+56]","qword ptr [rsp+48]",id,call_id
+ mov rax,[rsp+48]
+ RPGET rax,function
+ mov [rsp+48],rax
+ RPCOPY "qword ptr [rsp+56]","qword ptr [rsp+48]",name,name
+ RPCOPY "qword ptr [rsp+56]","qword ptr [rsp+48]",arguments,arguments
+ inc qword ptr [rsp+40]
+ jmp .Lrp_call
+.Lrp_calls_done:
+ RPDEL rbp,tool_calls
+ jmp .Lrp_next
+.Lrp_tool_result:
+ lea rdi,[rip+.Lrp_result_json]
+ mov rsi,r13
+ call .Lrp_append
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lrp_bad
+ RPCOPY "qword ptr [rsp+56]",rbp,tool_call_id,call_id
+ RPCOPY "qword ptr [rsp+56]",rbp,content,output
+ mov rax,[rsp+56]
+ RPGET rax,output
+ mov [rsp],rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrp_next
+ mov rdi,[rsp]
+ call json_object_get_string_len@PLT
+ mov [rsp+8],rax
+ mov rdi,[rsp]
+ call json_object_get_string@PLT
+ mov rdi,rax
+ mov rsi,[rsp+8]
+ call pg_context_blank@PLT
+ test eax,eax
+ jz .Lrp_next
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrp_output]
+ lea rdx,[rip+.Lrp_no_output]
+ call li_field
+ test eax,eax
+ jnz .Lrp_bad
+.Lrp_next:
+ inc r14
+ jmp .Lrp_message
+.Lrp_tools_handler:
+ RPGET rbx,tools
+ mov r12,rax
+ test rax,rax
+ jz .Lrp_options
+ xor r14d,r14d
+.Lrp_tool_loop:
+ mov rdi,r12
+ call json_object_array_length@PLT
+ cmp r14,rax
+ jae .Lrp_options
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_array_get_idx@PLT
+ RPGET rax,function
+ mov rbp,rax
+ test rax,rax
+ jz .Lrp_bad
+ mov rdi,rbp
+ lea rsi,[rip+.Lrp_type]
+ lea rdx,[rip+.Lrp_function]
+ call li_field
+ test eax,eax
+ jnz .Lrp_bad
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,r12
+ mov rsi,r14
+ mov rdx,rax
+ call json_object_array_put_idx@PLT
+ test eax,eax
+ jz .Lrp_tool_inserted
+ mov rdi,rbp
+ call json_object_put@PLT
+ jmp .Lrp_bad
+.Lrp_tool_inserted:
+ inc r14
+ jmp .Lrp_tool_loop
+.Lrp_options:
+ RPGET rbx,max_tokens
+ test rax,rax
+ jnz .Lrp_max
+ RPGET rbx,max_completion_tokens
+ test rax,rax
+ jz .Lrp_reasoning_handler
+.Lrp_max:
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ cmp rax,16
+ mov edx,16
+ cmovl rax,rdx
+ mov rdi,rax
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lrp_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_max_output_tokens]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lrp_bad
+.Lrp_reasoning_handler:
+ RPGET rbx,reasoning_effort
+ mov rbp,rax
+ test rax,rax
+ jz .Lrp_clean
+ lea rdi,[rip+.Lrp_reason_json]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lrp_bad
+ mov r12,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_reasoning]
+ mov rdx,r12
+ call .Lrp_set
+ test eax,eax
+ jnz .Lrp_bad
+ mov rdi,rbp
+ call json_object_get@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lrp_effort]
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lrp_bad
+.Lrp_clean:
+ RPDEL rbx,messages
+ RPDEL rbx,stream_options
+ RPDEL rbx,max_tokens
+ RPDEL rbx,max_completion_tokens
+ RPDEL rbx,reasoning_effort
+ RPDEL rbx,thinking
+ xor edi,edi
+ call json_object_new_boolean@PLT
+ test rax,rax
+ jz .Lrp_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lrp_store]
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lrp_end
+.Lrp_bad:
+ mov eax,1
+.Lrp_end:
+ add rsp,64
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lrp_api: .asciz "api"
+.Lrp_info: .asciz "modelInfo"
+.Lrp_endpoint: .asciz "endpoint"
+.Lrp_env: .asciz "PANGU_MODEL_ENDPOINT"
+.Lrp_suffix: .asciz "/responses"
+.Lrp_responses: .asciz "openai-responses"
+.Lrp_messages: .asciz "messages"
+.Lrp_input: .asciz "input"
+.Lrp_type: .asciz "type"
+.Lrp_role: .asciz "role"
+.Lrp_content: .asciz "content"
+.Lrp_tool: .asciz "tool"
+.Lrp_assistant: .asciz "assistant"
+.Lrp_image_url: .asciz "image_url"
+.Lrp_url: .asciz "url"
+.Lrp_input_image: .asciz "input_image"
+.Lrp_input_text: .asciz "input_text"
+.Lrp_output_text: .asciz "output_text"
+.Lrp_tool_calls: .asciz "tool_calls"
+.Lrp_tool_call_id: .asciz "tool_call_id"
+.Lrp_call_id: .asciz "call_id"
+.Lrp_id: .asciz "id"
+.Lrp_tools: .asciz "tools"
+.Lrp_function: .asciz "function"
+.Lrp_name: .asciz "name"
+.Lrp_arguments: .asciz "arguments"
+.Lrp_output: .asciz "output"
+.Lrp_max_tokens: .asciz "max_tokens"
+.Lrp_max_completion_tokens: .asciz "max_completion_tokens"
+.Lrp_max_output_tokens: .asciz "max_output_tokens"
+.Lrp_reasoning_effort: .asciz "reasoning_effort"
+.Lrp_reasoning: .asciz "reasoning"
+.Lrp_effort: .asciz "effort"
+.Lrp_thinking: .asciz "thinking"
+.Lrp_stream_options: .asciz "stream_options"
+.Lrp_store: .asciz "store"
+.Lrp_call_json: .asciz "{\"type\":\"function_call\"}"
+.Lrp_result_json: .asciz "{\"type\":\"function_call_output\"}"
+.Lrp_reason_json: .asciz "{\"summary\":\"auto\"}"
+
+.section .rodata
+.Lrp_no_output: .asciz "(no tool output)"
+
+.text
+.Lrp_set:
+ push rbx
+ mov rbx,rdx
+ test rdx,rdx
+ jz .Lrp_set_bad
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lrp_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+.Lrp_set_bad:
+ mov eax,1
+.Lrp_set_end:
+ pop rbx
+ ret

@@ -15,6 +15,7 @@
 | 持久存储 | `record_sqlite.S`、`record_jsonl.S`：混合事务、重开、损坏/截断、失败锁存；JSONL task/doc sidecar维护 |
 | 指定任务取消 | `task_graph.S`：Host task.control/TUI独立入口保存abort意图，重复无写入，Scheduler沿owned子会话收束；产品父取消/调度器重开/子Generation aborted通过 |
 | 任务图 | `task_graph.S`：Host task.graph/TUI可选只读查询，live任务分页、裁剪状态/owner/wait、所属会话分页与注册元数据分类；Session readOnLine保护，重开图一致 |
+| Responses基础协议 | `mimo_projection.S` / `mimo_stream.S` / `request_context.S`：配置协议选择、input/函数/图片结果、稀疏工具槽、最终参数替换、文本/思考/用量/终态；同一模型服务的curl回放与提前EOF/错误检查通过，最终item及签名重放仍属K05 |
 | Generation hooks与请求准入 | `durable_generation.S`/`extensions.S`：beforeRequest临时消息、afterResponse/afterTools观察、onYield原子续接与队列优先；phase固定扩展，挂起/取消释放；声明名单保存到请求及并行/串行Tool输入，效果前拒绝未提供工具 |
 | 嵌套Live生命周期 | `tool_live.S`/`durable_tool.S`/`durable_client.S`：pending随创建、running随意图、done随结果；开始事件取最终checkpoint，执行前取消只结束；OUTPUT发布实时块并合并持久UTF-8窗口/丢弃量，done清除进度，Task/Live保留父调用关系 |
 | 工具输出合并 | `tool_live.S`以a或t+a提交文本增量，Tool按实际原生Op payload与100KiB/s、至少100ms安排后续刷新；同步details/diagnostic确认后共用暂停期限。模型/嵌套10KB追加及Unicode滚动、零变化零提交、取消重开通过；统一异步元数据调度仍待补齐 |

@@ -112,6 +112,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 默认model.metadata接通原生内置聊天模型元数据、用户agent目录models.json的容量/输出覆盖与自定义模型元数据；按provider/model或endpoint/model选择，只输出公开字段。默认prepare按canonical provider/model逐字段应用compaction.modelOverrides，刷新、隔离所有权和真实自动/后台压缩通过。
 - [x] models.catalog/TUI可选入口提供公开模型目录，支持provider筛选、内置/用户models.json同名覆盖去重，复用describe输出能力/容量，结果排除私有认证；与已有Agent模型选择共同提供模型面板Runtime入口。
 - [x] OpenAI编码器采纳modelInfo.compat的supportsUsageInStreaming与maxTokensField，按模型移除不支持的用量选项并选择输出字段，显式options覆盖模型默认；思考参数按DeepSeek/Zai/Qwen/OpenRouter格式和supportsReasoningEffort映射，普通端点不带提供商专用thinking字段；公开reasoning/thinkingLevelMap贯通目录、覆盖和请求，支持级别/关闭映射及off:null省略；实际编码与模型传输/ABI专项通过。
+- [x] OpenAI Responses基础请求/流接入同一模型服务：按api/modelInfo.api或端点选择，投影input、扁平函数声明/调用/结果、图片结果、max_output_tokens与reasoning；解析文本/思考、稀疏工具索引、最终参数替换、用量及完成/长度/失败终态。实际curl服务回放覆盖跨块/CRLF、工具调用、提前EOF和失败；O0/O2/UBSan、ABI及分配失败检查通过。完整Responses行为仍按下项覆盖。
 - [ ] 将模型/协议、端点、目录、能力、认证和凭据配置变为可注入提供者；完成 text/thinking/image/tool blocks、usage、stop reason、流终态、取消、超时、错误分类、重试与缓存身份。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
@@ -309,8 +310,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `tools/bash.ts`、`env/node.ts` 和 `tools.test.ts` 的bash输出/溢出/超时用例。已fetch核对Pi/Harness上游变化，本批保持固定快照。
-- 实际调用链：`bash_tool.S`保留50 KiB/2000行UTF-8尾部；snapshot同时提供完整内容块、structuredOutput及诊断，Durable Tool原子提交，再经动态上下文进入模型请求。回调预览遵循调用者容量，完整持久结果独立持有。超过预算的完整原始字节保留在私有临时文件。
-- 验证：Bash UBSan专项通过；`build_test.py --client` 的Session/工具/调度/恢复ASan+UBSan通过，覆盖SQLite/JSONL的50 KiB结果与实际请求编码；`test_product_resources.py --sanitize --live-agent` 使用真实DeepSeek完成Bash长输出与回答，核对模型实际收到完整尾部、结构化结果及60018字节原始文件。产品构建、Assembly和登记检查通过。真实测试中的元数据通知先排空，再断言独立注入事件。
-- 接口与差异：`pg_bash_tool`调用者所有存储随公开头同步增大；无新增文件、服务或TUI私有接口。原生16 MiB捕获上限、同步磁盘IO和显式环境保持既有行为；K08其他行为仍按覆盖表完成。
-- 下一交付物：推进K05下一组完整模型协议的请求、流事件和Generation调用链，按协议组织实现与回放。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-responses.ts`、`openai-responses-shared.ts`，以及terminal-event、empty-tool-result、tool-result-images用例；沿用本批固定Pi/Harness快照。
+- 实际调用链：Generation原有配置与canonical请求→`mimo_projection.S`协议选择及Responses输入→同一libcurl模型服务→`mimo_stream.S`事件/稀疏工具槽→现有Generation/Tool。`request_context.S`为Responses将图片留在对应函数结果；Chat Completions保持其后置图片消息。流事件转换后直接复用原生累积器，省去重复序列化/解析。
+- 验证：`test_mimo_asm.py`全部O0/O2/UBSan、ABI、传输和分配失败专项通过，包含Responses文本/思考/多调用、done参数替换、图片结果、用量、完成/长度/失败和提前EOF；`build_test.py --client`的Session/工具/调度/恢复ASan+UBSan通过。真实DeepSeek Chat Completions验证配置、工具、Bash长输出与后续回答通过；一次标签问法歧义已明确为读取instructions区。产品构建通过。Responses使用确定性流回放验证，未使用真实Responses提供者。
+- 接口与差异：原生模型实例追加稀疏output_index表，调用者随公开头重建；配置/端点选择共用协议查询，公开model服务ABI保持。Responses的最终消息/思考签名与ID重放、高级工具和网关/缓存兼容继续在K05补齐；本次未勾选完整协议或K05验收。
+- 下一交付物：按同一Responses上游完成最终item、签名/调用身份和后继请求的完整往返，再推进下一协议。

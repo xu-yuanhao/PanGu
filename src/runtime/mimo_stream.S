@@ -325,6 +325,16 @@ li_accumulate_argument:
 .globl pg_mimo_decode_line
 .type pg_mimo_decode_line,@function
 pg_mimo_decode_line:
+ push rdi
+ push rsi
+ push rdx
+ call pg_mimo_uses_responses
+ pop rdx
+ pop rsi
+ pop rdi
+ test eax,eax
+ jnz .Lrs_decode
+.Lchat_decode:
  push rbx
  push r12
  push r13
@@ -411,6 +421,7 @@ pg_mimo_decode_line:
 1:
  mov rdi, qword ptr [rsp]
  call json_tokener_free@PLT
+.Ldl_decoded:
  mov rdi,r14
  lea rsi,[rip+.Lstr_usage]
  call li_get
@@ -734,3 +745,453 @@ pg_mimo_decode_line:
 
 .section .rodata
 .Lstr_reasoning_content: .asciz "reasoning_content"
+
+.macro RSGET obj,key
+ mov rdi,\obj
+ lea rsi,[rip+.Lrs_\key]
+ call li_get
+.endm
+.macro RSCOPY dst,src,from,to
+ mov rdi,\dst
+ mov rsi,\src
+ lea rdx,[rip+.Lrs_\from]
+ lea rcx,[rip+.Lrs_\to]
+ call .Lrs_copy
+ test eax,eax
+ jnz .Lrs_bad
+.endm
+.text
+.Lrs_copy:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rcx
+ mov rdi,rsi
+ mov rsi,rdx
+ call li_get
+ test rax,rax
+ jz .Lrs_copy_end
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,rax
+ call .Lrs_set
+.Lrs_copy_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* The normalized object borrows its caller's tree; the common accumulator
+   releases one retained reference, without serializing and parsing it again. */
+.Lchat_object:
+ push rbx
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,128
+ mov rbx,rdi
+ mov r14,rsi
+ mov r13,rdx
+ xor r15d,r15d
+ mov rdi,r14
+ call json_object_get@PLT
+ jmp .Ldl_decoded
+/* Normalize Responses items onto the existing bounded native event accumulator.
+   output_index is sparse: only function calls consume a dense tool slot. */
+.Lrs_decode:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,112
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov rdi,rsp
+ xor eax,eax
+ mov ecx,14
+ rep stosq
+ mov rdi,r13
+ mov ecx,7
+ rep stosq
+ cmp byte ptr [r12],0
+ je .Lrs_ok
+ cmp byte ptr [r12],':'
+ je .Lrs_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lrs_event_prefix]
+ mov edx,6
+ call strncmp@PLT
+ test eax,eax
+ jz .Lrs_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lstr_data]
+ mov edx,5
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lrs_bad
+ cmp dword ptr [rbx+PG_MM_SAW_DONE],0
+ jne .Lrs_bad
+ add r12,5
+ cmp byte ptr [r12],32
+ jne .Lrs_parse
+ inc r12
+.Lrs_parse:
+ call json_tokener_new@PLT
+ mov [rsp+80],rax
+ test rax,rax
+ jz .Lrs_bad
+ mov rdi,rax
+ mov esi,17
+ call json_tokener_set_flags@PLT
+ mov rdi,r12
+ call strlen@PLT
+ lea edx,[eax+1]
+ mov rdi,[rsp+80]
+ mov rsi,r12
+ call json_tokener_parse_ex@PLT
+ mov [rsp],rax
+ mov rdi,[rsp+80]
+ call json_tokener_get_error@PLT
+ test eax,eax
+ jnz .Lrs_bad
+ mov rdi,[rsp+80]
+ call json_tokener_get_parse_end@PLT
+ cmp byte ptr [r12+rax],0
+ jne .Lrs_bad
+ RSGET "qword ptr [rsp]",type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov [rsp+56],rax
+ test rax,rax
+ jz .Lrs_bad
+ lea rdi,[rip+.Lrs_base]
+ call json_tokener_parse@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lrs_bad
+ RSGET rax,choices
+ mov rdi,rax
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ RSGET rax,delta
+ mov [rsp+24],rax
+ lea r14,[rip+.Lrs_events]
+ xor ebp,ebp
+.Lrs_find:
+ mov rdi,[rsp+56]
+ mov rsi,[r14+rbp*8]
+ test rsi,rsi
+ jz .Lrs_ok
+ call strcmp@PLT
+ test eax,eax
+ jz .Lrs_dispatch
+ inc ebp
+ jmp .Lrs_find
+.Lrs_dispatch:
+ cmp ebp,0
+ je .Lrs_text_handler
+ cmp ebp,1
+ je .Lrs_text_handler
+ cmp ebp,2
+ je .Lrs_thinking_handler
+ cmp ebp,3
+ je .Lrs_thinking_handler
+ cmp ebp,4
+ je .Lrs_item_handler
+ cmp ebp,5
+ je .Lrs_arguments_handler
+ cmp ebp,6
+ je .Lrs_arguments_handler
+ cmp ebp,7
+ je .Lrs_item_handler
+ cmp ebp,8
+ je .Lrs_terminal
+ cmp ebp,9
+ je .Lrs_terminal
+ jmp .Lrs_bad
+.Lrs_text_handler:
+ RSCOPY "qword ptr [rsp+24]","qword ptr [rsp]",delta,content
+ jmp .Lrs_emit
+.Lrs_thinking_handler:
+ RSCOPY "qword ptr [rsp+24]","qword ptr [rsp]",delta,reasoning_content
+ jmp .Lrs_emit
+.Lrs_item_handler:
+ RSGET "qword ptr [rsp]",item
+ mov [rsp+40],rax
+ RSGET rax,type
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lrs_function_call]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrs_ok
+.Lrs_arguments_handler:
+ RSGET "qword ptr [rsp]",output_index
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lrs_bad
+ RSGET "qword ptr [rsp]",output_index
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lrs_bad
+ mov [rsp+96],rax
+ xor r14d,r14d
+.Lrs_slot:
+ cmp r14d,[rbx+PG_MM_CALL_COUNT]
+ jae .Lrs_new_slot
+ cmp rax,[rbx+PG_MM_RESPONSE_INDEX+r14*8]
+ je .Lrs_slot_ready
+ inc r14d
+ jmp .Lrs_slot
+.Lrs_new_slot:
+ cmp ebp,4
+ je .Lrs_create_slot
+ cmp ebp,7
+ jne .Lrs_bad
+.Lrs_create_slot:
+ cmp r14d,PG_MM_CALL_LIMIT
+ jae .Lrs_bad
+ mov [rbx+PG_MM_RESPONSE_INDEX+r14*8],rax
+.Lrs_slot_ready:
+ mov [rsp+64],r14
+ lea rdi,[rip+.Lrs_calls_json]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov [rsp+32],rax
+ mov rdi,[rsp+24]
+ lea rsi,[rip+.Lrs_tool_calls]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ mov rdi,[rsp+32]
+ xor esi,esi
+ call json_object_array_get_idx@PLT
+ mov [rsp+32],rax
+ mov rdi,r14
+ call json_object_new_int64@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lrs_index]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ RSGET "qword ptr [rsp+32]",function
+ mov [rsp+88],rax
+ cmp ebp,4
+ je .Lrs_added_handler
+ cmp ebp,7
+ je .Lrs_item_done_handler
+ cmp ebp,6
+ je .Lrs_replace_arguments
+ RSCOPY "qword ptr [rsp+88]","qword ptr [rsp]",delta,arguments
+ jmp .Lrs_emit
+.Lrs_added_handler:
+ /* Only a new slot may introduce identity; done events replace arguments. */
+ cmp r14d,[rbx+PG_MM_CALL_COUNT]
+ jb .Lrs_bad
+ RSCOPY "qword ptr [rsp+32]","qword ptr [rsp+40]",call_id,id
+ RSCOPY "qword ptr [rsp+88]","qword ptr [rsp+40]",name,name
+ RSCOPY "qword ptr [rsp+88]","qword ptr [rsp+40]",arguments,arguments
+ jmp .Lrs_emit
+.Lrs_item_done_handler:
+ cmp r14d,[rbx+PG_MM_CALL_COUNT]
+ jb .Lrs_item_existing
+ RSCOPY "qword ptr [rsp+32]","qword ptr [rsp+40]",call_id,id
+ RSCOPY "qword ptr [rsp+88]","qword ptr [rsp+40]",name,name
+.Lrs_item_existing:
+ RSGET "qword ptr [rsp+40]",arguments
+ jmp .Lrs_replace_value
+.Lrs_replace_arguments:
+ RSGET "qword ptr [rsp]",arguments
+.Lrs_replace_value:
+ test rax,rax
+ jz .Lrs_bad
+ mov [rsp+96],rax
+ mov qword ptr [rbx+PG_MM_ARGUMENT_LENGTH+r14*8],0
+ mov rax,r14
+ PG_MM_CALL_SLOT rdx,rax
+ mov byte ptr [rdx],0
+ mov rax,[rbx+PG_MM_ARGUMENT_OVERFLOW+r14*8]
+ test rax,rax
+ jz .Lrs_replace_field
+ mov byte ptr [rax],0
+.Lrs_replace_field:
+ mov rdi,[rsp+96]
+ call json_object_get@PLT
+ mov rdi,[rsp+88]
+ lea rsi,[rip+.Lrs_arguments]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ jmp .Lrs_emit
+.Lrs_terminal:
+ RSGET "qword ptr [rsp]",response
+ mov r12,rax
+ test rax,rax
+ jz .Lrs_bad
+ RSGET r12,usage
+ mov [rsp+88],rax
+ test rax,rax
+ jz .Lrs_finish
+ lea rdi,[rip+.Lrs_empty]
+ call json_tokener_parse@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov r14,rax
+ mov rdi,[rsp+8]
+ lea rsi,[rip+.Lrs_usage]
+ mov rdx,r14
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ RSCOPY r14,"qword ptr [rsp+88]",input_tokens,prompt_tokens
+ RSCOPY r14,"qword ptr [rsp+88]",output_tokens,completion_tokens
+ RSCOPY r14,"qword ptr [rsp+88]",input_tokens_details,prompt_tokens_details
+ RSCOPY r14,"qword ptr [rsp+88]",output_tokens_details,completion_tokens_details
+.Lrs_finish:
+ lea r14,[rip+.Lstr_stop]
+ cmp dword ptr [rbx+PG_MM_CALL_COUNT],0
+ je .Lrs_finish_reason
+ lea r14,[rip+.Lstr_reason_calls]
+.Lrs_finish_reason:
+ cmp ebp,9
+ jne .Lrs_finish_field
+ RSGET r12,incomplete_details
+ RSGET rax,reason
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov rdi,rax
+ lea rsi,[rip+.Lrs_max_output_tokens]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lrs_bad
+ lea r14,[rip+.Lstr_length]
+.Lrs_finish_field:
+ mov rdi,r14
+ call json_object_new_string@PLT
+ test rax,rax
+ jz .Lrs_bad
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.Lrs_finish_reason_key]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrs_bad
+ mov qword ptr [rsp+72],1
+.Lrs_emit:
+ mov rdi,rbx
+ mov rsi,[rsp+8]
+ mov rdx,r13
+ call .Lchat_object
+ test eax,eax
+ jnz .Lrs_bad
+ cmp qword ptr [rsp+72],0
+ je .Lrs_ok
+ mov dword ptr [rbx+PG_MM_SAW_DONE],1
+.Lrs_ok:
+ xor ebp,ebp
+ jmp .Lrs_cleanup
+.Lrs_bad:
+ mov ebp,1
+.Lrs_cleanup:
+ mov rdi,[rsp+80]
+ test rdi,rdi
+ jz .Lrs_put
+ call json_tokener_free@PLT
+.Lrs_put:
+ mov rdi,[rsp+8]
+ call json_object_put@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,112
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lrs_event_prefix: .asciz "event:"
+.Lrs_base: .asciz "{\"choices\":[{\"delta\":{}}]}"
+.Lrs_calls_json: .asciz "[{\"index\":0,\"function\":{}}]"
+.Lrs_empty: .asciz "{}"
+.Lrs_type: .asciz "type"
+.Lrs_choices: .asciz "choices"
+.Lrs_delta: .asciz "delta"
+.Lrs_content: .asciz "content"
+.Lrs_reasoning_content: .asciz "reasoning_content"
+.Lrs_item: .asciz "item"
+.Lrs_function_call: .asciz "function_call"
+.Lrs_output_index: .asciz "output_index"
+.Lrs_tool_calls: .asciz "tool_calls"
+.Lrs_index: .asciz "index"
+.Lrs_function: .asciz "function"
+.Lrs_call_id: .asciz "call_id"
+.Lrs_id: .asciz "id"
+.Lrs_name: .asciz "name"
+.Lrs_arguments: .asciz "arguments"
+.Lrs_response: .asciz "response"
+.Lrs_usage: .asciz "usage"
+.Lrs_input_tokens: .asciz "input_tokens"
+.Lrs_output_tokens: .asciz "output_tokens"
+.Lrs_input_tokens_details: .asciz "input_tokens_details"
+.Lrs_output_tokens_details: .asciz "output_tokens_details"
+.Lrs_prompt_tokens: .asciz "prompt_tokens"
+.Lrs_completion_tokens: .asciz "completion_tokens"
+.Lrs_prompt_tokens_details: .asciz "prompt_tokens_details"
+.Lrs_completion_tokens_details: .asciz "completion_tokens_details"
+.Lrs_incomplete_details: .asciz "incomplete_details"
+.Lrs_reason: .asciz "reason"
+.Lrs_max_output_tokens: .asciz "max_output_tokens"
+.Lrs_finish_reason_key: .asciz "finish_reason"
+.Lrs_text: .asciz "response.output_text.delta"
+.Lrs_refusal: .asciz "response.refusal.delta"
+.Lrs_thinking: .asciz "response.reasoning_summary_text.delta"
+.Lrs_reasoning_text: .asciz "response.reasoning_text.delta"
+.Lrs_added: .asciz "response.output_item.added"
+.Lrs_arg_delta: .asciz "response.function_call_arguments.delta"
+.Lrs_arg_done: .asciz "response.function_call_arguments.done"
+.Lrs_item_done: .asciz "response.output_item.done"
+.Lrs_completed: .asciz "response.completed"
+.Lrs_incomplete: .asciz "response.incomplete"
+.Lrs_failed: .asciz "response.failed"
+.Lrs_error: .asciz "error"
+.section .data.rel.ro
+.Lrs_events: .quad .Lrs_text,.Lrs_refusal,.Lrs_thinking,.Lrs_reasoning_text,.Lrs_added,.Lrs_arg_delta,.Lrs_arg_done,.Lrs_item_done,.Lrs_completed,.Lrs_incomplete,.Lrs_failed,.Lrs_error,0
+
+.text
+.Lrs_set:
+ push rbx
+ mov rbx,rdx
+ test rdx,rdx
+ jz .Lrs_set_bad
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lrs_set_end
+ mov rdi,rbx
+ call json_object_put@PLT
+.Lrs_set_bad:
+ mov eax,1
+.Lrs_set_end:
+ pop rbx
+ ret

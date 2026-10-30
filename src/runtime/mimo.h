@@ -20,8 +20,9 @@ typedef struct {
  /* Provider owns overflow; call slices borrow it until decode/start/close. */
  char *argument_overflow[PG_TOOL_BATCH_LIMIT];
  size_t argument_length[PG_TOOL_BATCH_LIMIT],argument_capacity[PG_TOOL_BATCH_LIMIT];
+ uint64_t response_indices[PG_TOOL_BATCH_LIMIT]; /* output_index to dense call slot */
 } pg_mimo;
-/* OpenAI-compatible SSE transport. Explicit PANGU_MODEL_ENDPOINT,
+/* OpenAI Chat Completions / Responses SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
    requires its explicit key. Default MiMo connection reads MIMO_API_KEY/MODEL.
    Environment stays immutable throughout active requests. Initialize
@@ -41,6 +42,9 @@ int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 /* Internal projection test seam: creates owned request; no network/credentials. */
 int pg_mimo_encode_request(pg_mimo *, const pg_session *);
-/* Internal decoder: one complete OpenAI SSE data line, no network operations. */
+int pg_mimo_uses_responses(const pg_mimo *);
+int pg_mimo_config_responses(const struct json_object *);
+/* Internal decoder: one complete SSE line; api/modelInfo.api selects protocol,
+   with a /responses endpoint fallback. No network operations. */
 int pg_mimo_decode_line(pg_mimo *, const char *, pg_model_event *);
 #endif
