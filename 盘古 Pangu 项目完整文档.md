@@ -20,7 +20,7 @@ Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACC
 
 Copilot模型使用`github-copilot`提供者身份与显式`PANGU_MODEL_API_KEY`令牌，Chat、Responses和Anthropic共用现有模型服务；默认端点按协议组合，发起者和图片请求头从实际会话推导。
 
-Codex基础SSE连接使用`PANGU_MODEL_API=openai-codex-responses`与显式`PANGU_MODEL_API_KEY` JWT；账户身份由令牌解析，默认Codex端点和请求结构由模型服务适配；SSE请求复用系统libzstd进行压缩，二进制缓冲由提供者持有至传输关闭。Codex的`options.maxRetries`控制请求内重试，默认0；`maxRetryDelayMs`限制服务器要求的等待，等待期间仍可取消。
+Codex基础SSE连接使用`PANGU_MODEL_API=openai-codex-responses`与显式`PANGU_MODEL_API_KEY` JWT；账户身份由令牌解析，默认Codex端点和请求结构由模型服务适配；SSE请求复用系统libzstd进行压缩，二进制缓冲由提供者持有至传输关闭。Codex的`options.maxRetries`控制请求内重试，默认0；`maxRetryDelayMs`限制服务器要求的等待，等待期间仍可取消。Codex的`timeoutMs`用于等待最终响应头，未设置或为0时不设该时限，响应头完成后继续接收正文。
 
 图片处理由可替换的`image.processor`服务提供：汇编负责处理策略，系统libvips通过C桥接完成编解码。构建用`pkg-config vips`取得该动态依赖。
 

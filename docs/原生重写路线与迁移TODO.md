@@ -129,7 +129,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Bedrock静态共享profile接入实际签名：默认/显式/环境profile、config与credentials、环境密钥优先级、profile区域及临时令牌；实际curl回放与ASan/UBSan通过。
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
-- [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩、可取消的请求内重试、服务等级费用和额度错误展示、Codex终态规范化与SSE分帧及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
+- [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩、可取消的请求内重试、服务等级费用和额度错误展示、Codex终态规范化、SSE分帧和响应头超时及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -326,8 +326,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：mapCodexEvents、normalizeCodexStatus和parseSSE；`test/openai-codex-stream.test.ts`终态构造及共享Responses完成调用者。
-- 实际调用链：Codex传输按SSE空行合并data行，EOF提交残余帧，忽略注释/非data字段与DONE哨兵；printbuf持有有界帧并在解析/取消时释放。done/completed/incomplete别名进入共享完成路径，按规范化status决定stop/length/error，未知/非字符串status按参考移除，成功canonical消息保留endTurn。终态后立即结束本次模型流，忽略后续数据。新增内部帧入口与布局同步登记，服务ABI不变。
-- 验证：终态别名、全部合法status与未知/缺失/非字符串status、endTurn、CRLF/多行/EOF/无效帧/终态后数据/取消通过实际模型传输回放和ASan/UBSan；模型O0/O2/UBSan及既有Pi差分通过。真实TLS的503重试后改用response.done/end_turn，原生next及complete正常结束。产品资源/Generation配置链ASan/UBSan通过，Assembly/diff通过。自审核对帧边界、内部布局、借用切片与printbuf释放顺序；已修复接线中暴露的单次轮询消费行为差异。
-- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存、分阶段超时、simple预算和完整高级选项；失败终态的完整元数据展示仍需覆盖；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
-- 下一交付物：复用本机libcurl WebSocket能力接入Codex连接生命周期，并补齐超时/simple预算；继续同一Generation消费者与协议覆盖。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：normalizeTimeoutMs、SSE headerTimeoutSignal/combinedSignal与每次fetch重试；复用已读调用者和stream测试。
+- 实际调用链：Codex timeoutMs只限制等待最终响应头，未设置/0关闭本层计时，小数按参考取整。汇编在请求启动和重试时按单调时钟设置截止，完整最终响应头到达后停止计时，100响应不提前解除；libcurl抑制CONNECT代理头，避免误认代理完成。Codex关闭原整段curl时限，正文可持续流式输出。超时沿现有网络重试/取消链处理，最终失败显示实际毫秒数。公共服务ABI不变，内部布局同步断言。
+- 验证：配置缺省/0/小数、100与最终头边界、超时信息、重试重设和取消通过模型传输专项ASan/UBSan；真实TLS分别验证延迟响应头失败、及时头+慢正文成功、0允许慢头，原503重试和response.done仍成立。模型O0/O2/UBSan及既有Pi差分通过；产品资源/Generation配置链ASan/UBSan、Assembly/diff通过。自审核对计时起点、重试等待与响应头完成的互斥，以及超时失败信息借用期。
+- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存及其连接/空闲超时、simple预算和完整高级选项；失败终态完整元数据展示仍需覆盖；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
+- 下一交付物：复用本机libcurl WebSocket能力接入Codex连接生命周期，并补齐simple预算；继续同一Generation消费者与协议覆盖。

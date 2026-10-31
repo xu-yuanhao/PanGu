@@ -164,6 +164,11 @@ li_close:
  mov qword ptr [rbx+PG_MM_RETRY_ATTEMPT],0
  mov qword ptr [rbx+PG_MM_RETRY_AT],0
  mov dword ptr [rbx+PG_MM_RETRY_BLOCKED],0
+ mov qword ptr [rbx+PG_MM_HEADER_TIMEOUT_MS],0
+ mov qword ptr [rbx+PG_MM_HEADER_UNTIL],0
+ mov dword ptr [rbx+PG_MM_HEADER_STATUS],0
+ mov dword ptr [rbx+PG_MM_HEADER_COMPLETE],0
+ mov dword ptr [rbx+PG_MM_HEADER_TIMED_OUT],0
  mov byte ptr [rbx+PG_MM_RETRY_AFTER],0
  mov byte ptr [rbx+PG_MM_RETRY_AFTER_MS],0
  mov qword ptr [rbx + PG_MM_EASY], 0
@@ -637,7 +642,20 @@ li_start:
  call .Ltm_timeout
  test edx,edx
  jnz .Lst_bad
- mov rdx,rax
+ mov r13,rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ mov [rsp+520],eax
+ test eax,eax
+ jz .Lht_whole_timeout
+ mov [rbx+PG_MM_HEADER_TIMEOUT_MS],r13
+ mov rdi,rbx
+ call .Lht_arm
+ test eax,eax
+ jnz .Lst_bad
+ xor r13d,r13d
+.Lht_whole_timeout:
+ mov rdx,r13
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_TIMEOUT_MS
  xor eax, eax
@@ -647,6 +665,10 @@ li_start:
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_CONNECTTIMEOUT
  mov edx, 15
+ cmp dword ptr [rsp+520],0
+ je .Lht_connect_ready
+ xor edx,edx
+.Lht_connect_ready:
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax
@@ -662,6 +684,13 @@ li_start:
  mov esi, PG_MM_CURLOPT_PROTOCOLS_STR
  lea rdx, [rip + .Lstr_https]
  xor eax, eax
+ call curl_easy_setopt@PLT
+ test eax,eax
+ jnz .Lst_bad
+ mov rdi,r14
+ mov esi,PG_MM_CURLOPT_SUPPRESS_CONNECT_HEADERS
+ mov edx,1
+ xor eax,eax
  call curl_easy_setopt@PLT
  test eax,eax
  jnz .Lst_bad
@@ -708,6 +737,11 @@ li_next:
  test eax,eax
  js .Lnx_bad
  jnz .Lnx_wait
+ mov rdi,rbx
+ call .Lht_expired
+ test eax,eax
+ js .Lnx_bad
+ jnz .Lnx_codex_retry
  cmp dword ptr [rbx + PG_MM_DELIVERED], 0
  jne .Lnx_delivered
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
@@ -4212,6 +4246,10 @@ pg_mimo_complete:
  push r12
  sub rsp,8
  mov rbx,rdi
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Lht_timeout_option
+ mov rdi,rbx
  lea rsi,[rip+.Lbeta_options]
  call json_object_object_get@PLT
  mov rdi,rax
@@ -4264,7 +4302,11 @@ pg_mimo_complete:
  test rdx,rdx
  jnz .Lhd_overflow
  mov r13,rax
- cmp rax,5
+ mov rdi,rbx
+ mov rsi,r12
+ mov rdx,r13
+ call .Lht_header
+ cmp r13,5
  jb .Lhd_return
  mov rdi,r12
  lea rsi,[rip+.Lhd_http]
@@ -5591,7 +5633,12 @@ pg_mimo_complete:
  test eax,eax
  jz .Lcr_schedule_no
  cmp qword ptr [rbx+PG_MM_HTTP],200
+ jne .Lht_retry_before_stream
+ cmp qword ptr [rbx+PG_MM_HEADER_UNTIL],0
  je .Lcr_schedule_no
+ cmp dword ptr [rbx+PG_MM_HEADER_COMPLETE],0
+ jne .Lcr_schedule_no
+.Lht_retry_before_stream:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  lea rsi,[rip+.Lcr_max_retries]
  xor edx,edx
@@ -5675,6 +5722,7 @@ pg_mimo_complete:
  test eax,eax
  jnz .Lcr_schedule_no
  mov [rbx+PG_MM_RETRY_AT],r12
+ mov qword ptr [rbx+PG_MM_HEADER_UNTIL],0
  inc qword ptr [rbx+PG_MM_RETRY_ATTEMPT]
  mov eax,1
  jmp .Lcr_schedule_end
@@ -5707,6 +5755,10 @@ pg_mimo_complete:
  mov byte ptr [rbx+PG_MM_RETRY_AFTER_MS],0
  mov qword ptr [rbx+PG_MM_HTTP],0
  mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],0
+ mov rdi,rbx
+ call .Lht_arm
+ test eax,eax
+ jnz .Lcr_resume_bad
  mov rdi,[rbx+PG_MM_MULTI]
  mov rsi,[rbx+PG_MM_EASY]
  call curl_multi_add_handle@PLT
@@ -6161,6 +6213,8 @@ pg_mimo_complete:
  call pg_mimo_config_codex@PLT
  test eax,eax
  jz .Lcd_failure_end
+ cmp dword ptr [rbx+PG_MM_HEADER_TIMED_OUT],0
+ jne .Lht_failure_message
  cmp qword ptr [rbx+PG_MM_HTTP],400
  jb .Lcd_failure_end
  lea rdi,[rbx+PG_MM_BODY]
@@ -6320,6 +6374,23 @@ pg_mimo_complete:
  call asprintf@PLT
  test eax,eax
  js .Lcd_failure_end
+ jmp .Lcd_failure_install
+.Lht_failure_message:
+ lea rdi,[rip+.Lcd_failure_empty]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lcd_failure_end
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ call json_object_put@PLT
+ mov [rbx+PG_MM_RESPONSE_TERMINAL],r12
+ lea rdi,[rsp+32]
+ lea rsi,[rip+.Lht_failure_format]
+ mov rdx,[rbx+PG_MM_HEADER_TIMEOUT_MS]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lcd_failure_end
 .Lcd_failure_install:
  mov rdi,[rsp+32]
  call json_object_new_string@PLT
@@ -6362,3 +6433,162 @@ pg_mimo_complete:
 .Lcd_minute: .double 60000
 .section .data.rel.ro
 .Lcd_limit_codes: .quad .Lcd_limit1,.Lcd_limit2,.Lcd_limit3
+
+.text
+.Lht_timeout_option:
+ mov rdi,rbx
+ lea rsi,[rip+.Lbeta_options]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Ltm_key]
+ call json_object_object_get@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lht_timeout_zero
+ mov rdi,rax
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jnz .Lht_timeout_number
+ mov rdi,r12
+ mov esi,2
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Ltm_bad
+.Lht_timeout_number:
+ mov rdi,r12
+ call json_object_get_double@PLT
+ movq rax,xmm0
+ shr rax,52
+ and eax,2047
+ cmp eax,2047
+ je .Ltm_bad
+ pxor xmm1,xmm1
+ ucomisd xmm0,xmm1
+ jb .Ltm_bad
+ cvttsd2si rax,xmm0
+ test rax,rax
+ js .Ltm_bad
+ xor edx,edx
+ jmp .Ltm_end
+.Lht_timeout_zero:
+ xor eax,eax
+ xor edx,edx
+ jmp .Ltm_end
+.Lht_arm:
+ push rbx
+ mov rbx,rdi
+ mov dword ptr [rdi+PG_MM_HEADER_STATUS],0
+ mov dword ptr [rdi+PG_MM_HEADER_COMPLETE],0
+ mov dword ptr [rdi+PG_MM_HEADER_TIMED_OUT],0
+ mov qword ptr [rdi+PG_MM_HEADER_UNTIL],0
+ cmp qword ptr [rdi+PG_MM_HEADER_TIMEOUT_MS],0
+ je .Lht_arm_ok
+ call .Lcr_now
+ cmp rax,-1
+ je .Lht_arm_bad
+ add rax,[rbx+PG_MM_HEADER_TIMEOUT_MS]
+ jc .Lht_arm_bad
+ mov [rbx+PG_MM_HEADER_UNTIL],rax
+.Lht_arm_ok:
+ xor eax,eax
+ pop rbx
+ ret
+.Lht_arm_bad:
+ mov eax,1
+ pop rbx
+ ret
+.Lht_expired:
+ push rbx
+ mov rbx,rdi
+ cmp qword ptr [rdi+PG_MM_HEADER_UNTIL],0
+ je .Lht_expired_no
+ call .Lcr_now
+ cmp rax,-1
+ je .Lht_expired_error
+ cmp rax,[rbx+PG_MM_HEADER_UNTIL]
+ jb .Lht_expired_no
+ mov dword ptr [rbx+PG_MM_HEADER_TIMED_OUT],1
+ mov dword ptr [rbx+PG_MM_TRANSPORT_ERROR],28
+ mov eax,1
+ pop rbx
+ ret
+.Lht_expired_no:
+ xor eax,eax
+ pop rbx
+ ret
+.Lht_expired_error:
+ mov eax,-1
+ pop rbx
+ ret
+/* Complete final headers, excluding informational and CONNECT proxy headers. */
+.Lht_header:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ cmp qword ptr [rbx+PG_MM_HEADER_TIMEOUT_MS],0
+ je .Lht_header_end
+ cmp r13,2
+ ja .Lht_header_status
+ test r13,r13
+ jz .Lht_header_end
+ cmp byte ptr [r12],10
+ je .Lht_header_blank
+ cmp r13,2
+ jne .Lht_header_end
+ cmp word ptr [r12],0x0a0d
+ jne .Lht_header_end
+.Lht_header_blank:
+ cmp dword ptr [rbx+PG_MM_HEADER_STATUS],200
+ jb .Lht_header_end
+ mov dword ptr [rbx+PG_MM_HEADER_COMPLETE],1
+ mov qword ptr [rbx+PG_MM_HEADER_UNTIL],0
+ jmp .Lht_header_end
+.Lht_header_status:
+ cmp r13,5
+ jb .Lht_header_end
+ mov rdi,r12
+ lea rsi,[rip+.Lhd_http]
+ mov edx,5
+ call strncasecmp@PLT
+ test eax,eax
+ jnz .Lht_header_end
+ mov dword ptr [rbx+PG_MM_HEADER_STATUS],0
+ mov dword ptr [rbx+PG_MM_HEADER_COMPLETE],0
+ xor ecx,ecx
+.Lht_header_space:
+ cmp rcx,r13
+ jae .Lht_header_end
+ cmp byte ptr [r12+rcx],32
+ je .Lht_header_digits
+ inc rcx
+ jmp .Lht_header_space
+.Lht_header_digits:
+ inc rcx
+ lea rax,[rcx+3]
+ cmp rax,r13
+ ja .Lht_header_end
+ xor eax,eax
+ mov edx,3
+.Lht_header_digit:
+ movzx esi,byte ptr [r12+rcx]
+ sub esi,48
+ cmp esi,9
+ ja .Lht_header_end
+ imul eax,eax,10
+ add eax,esi
+ inc rcx
+ dec edx
+ jnz .Lht_header_digit
+ mov [rbx+PG_MM_HEADER_STATUS],eax
+.Lht_header_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+
+.section .rodata
+.Lht_failure_format: .asciz "Codex SSE response headers timed out after %ldms"

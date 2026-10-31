@@ -28,7 +28,7 @@ import math
 import hashlib
 import hmac
 import re
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlsplit
 import random
 import tempfile
@@ -403,25 +403,35 @@ def codex_compressed_wire(binary, directory):
                 assert self.headers['session-id']==self.headers['x-client-request-id']=='wire-codex-session'
                 assert self.headers['chatgpt-account-id']=='pangu-test-account' and self.headers['originator']=='pangu'
                 received.append(raw)
+                if 'headers-timeout=1' in self.path or 'headers-disabled=1' in self.path: time.sleep(0.25)
                 if 'retry=1' in self.path and not failed_once:
                     failed_once=True;payload=b'{"error":"overloaded"}';self.send_response(503);self.send_header('Retry-After-Ms','0')
                 else:
                     payload=b'data: {"type":"response.done","response":{"status":"completed","end_turn":true}}\n\n';self.send_response(200)
             except Exception as error:
                 failures.append(type(error).__name__);payload=b'';self.send_response(400)
-            self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload)
-    server=HTTPServer(('127.0.0.1',0),Receiver)
+            try:
+                self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.flush()
+                if 'slow-body=1' in self.path: time.sleep(0.25)
+                self.wfile.write(payload)
+            except OSError as error:
+                if 'headers-timeout=1' not in self.path: failures.append(type(error).__name__)
+    server=ThreadingHTTPServer(('127.0.0.1',0),Receiver)
     tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(Path(directory)/'sigv4-cert.pem',Path(directory)/'sigv4-key.pem')
     server.socket=tls.wrap_socket(server.socket,server_side=True);server.timeout=15
-    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(3)],daemon=True);worker.start()
+    worker=threading.Thread(target=lambda:[server.handle_request() for _ in range(6)],daemon=True);worker.start()
     env=os.environ.copy()
     payload=base64.b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-test-account'}}).encode()).decode()
     env.update(NO_PROXY='127.0.0.1',no_proxy='127.0.0.1',PANGU_MODEL_API_KEY='e30.'+payload+'.signature',PANGU_TEST_SIGV4_CA=str(Path(directory)/'sigv4-cert.pem'),PANGU_TEST_CODEX_ENDPOINT=f'https://127.0.0.1:{server.server_port}/codex/responses')
     try:
         subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20)
         env.update(PANGU_TEST_REAL_MULTI='1',PANGU_TEST_CODEX_ENDPOINT=env['PANGU_TEST_CODEX_ENDPOINT']+'?retry=1')
-        subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20);worker.join(2)
-        assert len(received)==3 and received[1]==received[2] and not failures,failures
+        subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20)
+        for mode,query in (('deadline','headers-timeout'),('slow','slow-body'),('zero','headers-disabled')):
+            env.update(PANGU_TEST_HEADER_MODE=mode,PANGU_TEST_CODEX_ENDPOINT=env['PANGU_TEST_CODEX_ENDPOINT'].split('?')[0]+'?'+query+'=1')
+            subprocess.run([binary,'--codex-wire'],env=env,check=True,timeout=20)
+        worker.join(2)
+        assert len(received)==6 and received[1]==received[2] and not failures,failures
     finally: server.server_close()
 
 def main():

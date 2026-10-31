@@ -37,6 +37,8 @@ typedef struct {
  char retry_after[128],retry_after_ms[128]; /* bounded public response delay headers */
  unsigned retry_blocked; /* provider terminal policy prevents an outer retry */
  struct printbuf *codex_frame; /* owned pending SSE data frame */
+ uint64_t header_timeout_ms,header_until;
+ unsigned header_status,header_complete,header_timed_out;
 } pg_mimo;
 /* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
