@@ -116,4 +116,22 @@ int pg_copilot_policy_models(const struct json_object *,int,int (*)(const char *
 int pg_copilot_merge_models(const struct json_object *,const struct json_object *,struct json_object **);
 int pg_oauth_http_headers(struct pg_oauth_http *,const char *const *,size_t,unsigned);
 const char *pg_oauth_http_retry_after(const struct pg_oauth_http *);
+/* Native redirect policy consumes parsed libcurl URL components. */
+typedef struct pg_oauth_url {
+ char *url,*scheme,*host,*port,*user,*password;
+} pg_oauth_url;
+typedef struct pg_oauth_redirect {
+ pg_oauth_url current;
+ unsigned count,post,stripped;
+} pg_oauth_redirect;
+_Static_assert(sizeof(pg_oauth_url)==48,"OAuth URL ABI");
+_Static_assert(offsetof(pg_oauth_redirect,count)==48,"OAuth redirect ABI");
+int pg_oauth_url_resolve(const char *,const char *,pg_oauth_url *);
+void pg_oauth_url_clear(pg_oauth_url *);
+int pg_oauth_url_allowed(const pg_oauth_url *);
+int pg_oauth_redirect_keep_header(const char *,unsigned);
+int pg_oauth_http_raw_step(struct pg_oauth_http *,long *,const char **);
+pg_oauth_redirect *pg_oauth_http_redirect(struct pg_oauth_http *);
+const char *pg_oauth_http_location(const struct pg_oauth_http *);
+int pg_oauth_http_follow(struct pg_oauth_http *,pg_oauth_url *,unsigned);
 #endif
