@@ -14,7 +14,7 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 默认模型元数据服务使用固定Pi生成器产出的聊天目录；用户agent目录的`models.json`可定义模型容量和输出上限。模型请求复用共享上下文估算，按模型默认上限与上下文余量准备输出预算；Anthropic/Bedrock的推理预算同时保留回答空间。用户/项目`settings.json`中的`compaction.modelOverrides["provider/model"]`逐字段覆盖压缩策略；配置刷新沿既有资源服务采纳，公开模型描述保存身份、协议、容量和输入内容能力。
 
-模型连接通过`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`及显式`PANGU_MODEL_ENDPOINT`配置；`PANGU_MODEL_API`选择参考协议，Google/Vertex可由提供者组合默认端点，`PANGU_MODEL_BASE_URL`设置其代理基础地址。`PANGU_MODEL_OPTIONS`传入JSON对象；Chat/Responses/Azure的采样字段按模型`samplingParams`、有效推理档位的`samplingParamsByThinkingLevel`、请求`samplingParams`依次覆盖；Vertex的`authMode`为`api-key`或`bearer`，Bearer模式使用已注入访问令牌，并从options或Google环境变量解析project/location。
+模型连接通过`PANGU_MODEL_NAME`、`PANGU_MODEL_API_KEY`及显式`PANGU_MODEL_ENDPOINT`配置；`PANGU_MODEL_API_KEY`优先，否则按公开模型提供者读取其环境变量，如`DEEPSEEK_API_KEY`、`OPENAI_API_KEY`、`GEMINI_API_KEY`和`ANTHROPIC_API_KEY`；Anthropic的`ANTHROPIC_AUTH_TOKEN`使用Bearer请求头。凭据在请求开始时解析，配置与会话只保留公开模型身份。`PANGU_MODEL_API`选择参考协议，Google/Vertex可由提供者组合默认端点，`PANGU_MODEL_BASE_URL`设置其代理基础地址。`PANGU_MODEL_OPTIONS`传入JSON对象；Chat/Responses/Azure的采样字段按模型`samplingParams`、有效推理档位的`samplingParamsByThinkingLevel`、请求`samplingParams`依次覆盖；Vertex的`authMode`为`api-key`或`bearer`，Bearer模式使用已注入访问令牌，并从options或Google环境变量解析project/location。
 
 Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`及可选`AWS_SESSION_TOKEN`；`PANGU_MODEL_API_KEY`显式Bearer优先。共享凭据从`AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE`或`~/.aws/config`、`~/.aws/credentials`读取，`options.profile`显式选择profile，环境密钥优先于环境`AWS_PROFILE`的静态密钥。区域遵循参考的ARN、options.region、AWS区域环境及环境profile解析顺序；默认`us-east-1`。自定义代理可用`AWS_BEDROCK_SKIP_AUTH=1`采用参考的代理签名凭据，`AWS_BEDROCK_FORCE_HTTP1=1`指定HTTP/1.1。签名由libcurl完成，凭据不写入会话。
 

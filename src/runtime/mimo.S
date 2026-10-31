@@ -276,6 +276,7 @@ li_start:
  push r15                             /* 入口 rsp≡8；5 压栈后 ≡0 */
  sub rsp, 544
  mov qword ptr [rsp+512],0
+ mov dword ptr [rsp+528],0
  mov rbx, rdi                         /* m */
  mov r12, rsi                         /* s */
  call .Ltransport_close               /* 保留已绑定请求配置 */
@@ -323,6 +324,11 @@ li_start:
  mov qword ptr [rsp+512],1
  jmp .Lst_encode
 .Lst_nonaws_key:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ lea rsi,[rsp+528]
+ call pg_mimo_environment_key
+ test rax,rax
+ jnz .Lst_key_ready
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  test rdi,rdi
  jz .Lst_check_environment_endpoint
@@ -415,6 +421,8 @@ li_start:
  mov r15d,16
  jmp .Lauth_prefix_ready
 .Lauth_anthropic_prefix:
+ cmp dword ptr [rsp+528],1
+ je .Lauth_prefix_ready
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call .Laz_is
  test eax,eax
@@ -6592,3 +6600,224 @@ pg_mimo_complete:
 
 .section .rodata
 .Lht_failure_format: .asciz "Codex SSE response headers timed out after %ldms"
+
+.text
+/* Borrowed process-environment value. Secrets remain outside request JSON. */
+.globl pg_mimo_environment_key
+.type pg_mimo_environment_key,@function
+pg_mimo_environment_key:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ test rsi,rsi
+ jz .Lke_explicit
+ mov dword ptr [rsi],0
+.Lke_explicit:
+ lea rdi,[rip+.Lstr_pangu_key]
+ call getenv@PLT
+ test rax,rax
+ jnz .Lke_end
+ mov rdi,rbx
+ lea rsi,[rip+.Lke_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lke_provider]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lke_identity_string
+ mov rdi,rbx
+ lea rsi,[rip+.Lke_model_provider]
+ call json_object_object_get@PLT
+.Lke_identity_string:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rbp,rax
+ test rax,rax
+ jz .Lke_absent
+ mov rdi,rbp
+ lea rsi,[rip+.Lke_anthropic]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lke_table
+ lea rdi,[rip+.Lke_auth_token]
+ call .Lke_env
+ test rax,rax
+ jz .Lke_table
+ test r12,r12
+ jz .Lke_end
+ mov dword ptr [r12],1
+ jmp .Lke_end
+.Lke_table:
+ lea r13,[rip+.Lke_keys]
+.Lke_each:
+ mov rsi,[r13]
+ test rsi,rsi
+ jz .Lke_absent
+ mov rdi,rbp
+ call strcmp@PLT
+ test eax,eax
+ jz .Lke_lookup
+ add r13,16
+ jmp .Lke_each
+.Lke_lookup:
+ mov rdi,[r13+8]
+ call .Lke_env
+ jmp .Lke_end
+.Lke_absent:
+ xor eax,eax
+.Lke_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_mimo_environment_key,.-pg_mimo_environment_key
+.Lke_env:
+ sub rsp,8
+ call getenv@PLT
+ add rsp,8
+ test rax,rax
+ jz .Lke_env_end
+ mov rcx,rax
+.Lke_env_space:
+ movzx edx,byte ptr [rcx]
+ test edx,edx
+ jz .Lke_env_empty
+ cmp edx,32
+ je .Lke_env_next
+ sub edx,9
+ cmp edx,4
+ ja .Lke_env_end
+.Lke_env_next:
+ inc rcx
+ jmp .Lke_env_space
+.Lke_env_empty:
+ xor eax,eax
+.Lke_env_end:
+ ret
+.section .rodata
+.Lke_model_info: .asciz "modelInfo"
+.Lke_provider: .asciz "provider"
+.Lke_model_provider: .asciz "modelProvider"
+.Lke_anthropic: .asciz "anthropic"
+.Lke_auth_token: .asciz "ANTHROPIC_AUTH_TOKEN"
+.Lke_provider_0: .asciz "ant-ling"
+.Lke_env_0: .asciz "ANT_LING_API_KEY"
+.Lke_provider_1: .asciz "azure"
+.Lke_env_1: .asciz "AZURE_OPENAI_API_KEY"
+.Lke_provider_2: .asciz "baseten"
+.Lke_env_2: .asciz "BASETEN_API_KEY"
+.Lke_provider_3: .asciz "cerebras"
+.Lke_env_3: .asciz "CEREBRAS_API_KEY"
+.Lke_provider_4: .asciz "deepseek"
+.Lke_env_4: .asciz "DEEPSEEK_API_KEY"
+.Lke_provider_5: .asciz "fireworks"
+.Lke_env_5: .asciz "FIREWORKS_API_KEY"
+.Lke_provider_6: .asciz "github-copilot"
+.Lke_env_6: .asciz "COPILOT_GITHUB_TOKEN"
+.Lke_provider_7: .asciz "google"
+.Lke_env_7: .asciz "GEMINI_API_KEY"
+.Lke_provider_8: .asciz "groq"
+.Lke_env_8: .asciz "GROQ_API_KEY"
+.Lke_provider_9: .asciz "huggingface"
+.Lke_env_9: .asciz "HF_TOKEN"
+.Lke_provider_10: .asciz "kimi-coding"
+.Lke_env_10: .asciz "KIMI_API_KEY"
+.Lke_provider_11: .asciz "meta"
+.Lke_env_11: .asciz "META_API_KEY"
+.Lke_provider_12: .asciz "minimax-cn"
+.Lke_env_12: .asciz "MINIMAX_CN_API_KEY"
+.Lke_provider_13: .asciz "minimax"
+.Lke_env_13: .asciz "MINIMAX_API_KEY"
+.Lke_provider_14: .asciz "mistral"
+.Lke_env_14: .asciz "MISTRAL_API_KEY"
+.Lke_provider_15: .asciz "moonshotai-cn"
+.Lke_env_15: .asciz "MOONSHOT_API_KEY"
+.Lke_provider_16: .asciz "moonshotai"
+.Lke_env_16: .asciz "MOONSHOT_API_KEY"
+.Lke_provider_17: .asciz "nvidia"
+.Lke_env_17: .asciz "NVIDIA_API_KEY"
+.Lke_provider_18: .asciz "openai"
+.Lke_env_18: .asciz "OPENAI_API_KEY"
+.Lke_provider_19: .asciz "opencode-go"
+.Lke_env_19: .asciz "OPENCODE_API_KEY"
+.Lke_provider_20: .asciz "opencode"
+.Lke_env_20: .asciz "OPENCODE_API_KEY"
+.Lke_provider_21: .asciz "openrouter"
+.Lke_env_21: .asciz "OPENROUTER_API_KEY"
+.Lke_provider_22: .asciz "qwen-token-plan-cn"
+.Lke_env_22: .asciz "QWEN_TOKEN_PLAN_CN_API_KEY"
+.Lke_provider_23: .asciz "qwen-token-plan-individual"
+.Lke_env_23: .asciz "QWEN_TOKEN_PLAN_API_KEY"
+.Lke_provider_24: .asciz "qwen-token-plan"
+.Lke_env_24: .asciz "QWEN_TOKEN_PLAN_API_KEY"
+.Lke_provider_25: .asciz "together"
+.Lke_env_25: .asciz "TOGETHER_API_KEY"
+.Lke_provider_26: .asciz "typesafe"
+.Lke_env_26: .asciz "TYPESAFE_API_KEY"
+.Lke_provider_27: .asciz "vercel-ai-gateway"
+.Lke_env_27: .asciz "AI_GATEWAY_API_KEY"
+.Lke_provider_28: .asciz "xai"
+.Lke_env_28: .asciz "XAI_API_KEY"
+.Lke_provider_29: .asciz "xiaomi-token-plan-ams"
+.Lke_env_29: .asciz "XIAOMI_TOKEN_PLAN_AMS_API_KEY"
+.Lke_provider_30: .asciz "xiaomi-token-plan-cn"
+.Lke_env_30: .asciz "XIAOMI_TOKEN_PLAN_CN_API_KEY"
+.Lke_provider_31: .asciz "xiaomi-token-plan-sgp"
+.Lke_env_31: .asciz "XIAOMI_TOKEN_PLAN_SGP_API_KEY"
+.Lke_provider_32: .asciz "xiaomi"
+.Lke_env_32: .asciz "XIAOMI_API_KEY"
+.Lke_provider_33: .asciz "zai-coding-cn"
+.Lke_env_33: .asciz "ZAI_CODING_CN_API_KEY"
+.Lke_provider_34: .asciz "zai"
+.Lke_env_34: .asciz "ZAI_API_KEY"
+.Lke_provider_35: .asciz "anthropic"
+.Lke_env_35: .asciz "ANTHROPIC_API_KEY"
+.Lke_provider_36: .asciz "google-vertex"
+.Lke_env_36: .asciz "GOOGLE_CLOUD_API_KEY"
+.section .data.rel.ro
+.Lke_keys:
+ .quad .Lke_provider_0,.Lke_env_0
+ .quad .Lke_provider_1,.Lke_env_1
+ .quad .Lke_provider_2,.Lke_env_2
+ .quad .Lke_provider_3,.Lke_env_3
+ .quad .Lke_provider_4,.Lke_env_4
+ .quad .Lke_provider_5,.Lke_env_5
+ .quad .Lke_provider_6,.Lke_env_6
+ .quad .Lke_provider_7,.Lke_env_7
+ .quad .Lke_provider_8,.Lke_env_8
+ .quad .Lke_provider_9,.Lke_env_9
+ .quad .Lke_provider_10,.Lke_env_10
+ .quad .Lke_provider_11,.Lke_env_11
+ .quad .Lke_provider_12,.Lke_env_12
+ .quad .Lke_provider_13,.Lke_env_13
+ .quad .Lke_provider_14,.Lke_env_14
+ .quad .Lke_provider_15,.Lke_env_15
+ .quad .Lke_provider_16,.Lke_env_16
+ .quad .Lke_provider_17,.Lke_env_17
+ .quad .Lke_provider_18,.Lke_env_18
+ .quad .Lke_provider_19,.Lke_env_19
+ .quad .Lke_provider_20,.Lke_env_20
+ .quad .Lke_provider_21,.Lke_env_21
+ .quad .Lke_provider_22,.Lke_env_22
+ .quad .Lke_provider_23,.Lke_env_23
+ .quad .Lke_provider_24,.Lke_env_24
+ .quad .Lke_provider_25,.Lke_env_25
+ .quad .Lke_provider_26,.Lke_env_26
+ .quad .Lke_provider_27,.Lke_env_27
+ .quad .Lke_provider_28,.Lke_env_28
+ .quad .Lke_provider_29,.Lke_env_29
+ .quad .Lke_provider_30,.Lke_env_30
+ .quad .Lke_provider_31,.Lke_env_31
+ .quad .Lke_provider_32,.Lke_env_32
+ .quad .Lke_provider_33,.Lke_env_33
+ .quad .Lke_provider_34,.Lke_env_34
+ .quad .Lke_provider_35,.Lke_env_35
+ .quad .Lke_provider_36,.Lke_env_36
+ .quad 0,0
+.section .note.GNU-stack,"",@progbits

@@ -131,6 +131,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
 - [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩、可取消的请求内重试、服务等级费用和额度错误展示、Codex终态规范化、流错误分类/完整事件保存与incomplete原因、SSE分帧和响应头超时及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
 - [x] Durable canonical上下文与模型输出预算接通：复用共享UTF-16/图片/工具估算及有效usage锚点，按模型默认输出和上下文4096余量准备请求；八协议字段、Responses最低输出及Anthropic/Bedrock推理/回答空间与自定义预算对照上游验证，压缩共用同一消息估算实现。
+- [x] 标准API-key提供者环境解析接通实际请求：按公开模型身份读取固定上游37项映射，显式PanGu密钥优先；Anthropic AUTH_TOKEN采用Bearer，普通key采用协议请求头，空白环境值跳过。密钥不进入请求JSON/配置/会话；实际DeepSeek模型→工具→账本→两次Host重开通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -327,8 +328,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts` mapCodexEvents/extractCodexEventError、`api/openai-responses-shared.ts` 的终态分类及 `utils/error-body.ts`；Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：Codex SSE解码→共享Responses终态→model.provider.failure_data→既有Generation失败/重试链。手写Assembly归一化error、response.failed、failed/cancelled终态：根层字符串优先于嵌套字段，保留代码与完整原始事件，消息缺省沿参考回退。incomplete仅max_output_tokens按长度结算，其他原因或缺省原因返回参考错误消息；分配失败保留原始事件作为回退，关闭时统一释放。
-- 验证：模型完整driver的O0/O2/UBSan、ABI/故障注入、实际TLS及所有既有Pi差分通过；新增九组Codex流失败场景覆盖根/嵌套优先级、非法类型、空消息、代码回退、失败/取消和incomplete。增加原始事件分配回退后重跑O0/O2+UBSan传输专项通过。产品资源ASan/UBSan、Assembly及diff通过。自审核对源事件保留、显示消息与分类分离、JSON引用、分配失败与关闭路径。
-- 具体缺口：legacy Session工具声明估算；Codex OAuth、WebSocket/连接缓存及其超时；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
-- 下一交付物：继续K05的完整提供者连接/认证生命周期，沿现有Generation与真实产品调用链完成接线。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/helpers.ts` envApiKeyAuth、`auth/resolve.ts`、`auth/context.ts` 与各providers定义；Anthropic普通API-key和AUTH_TOKEN分支、Vertex API-key环境分支。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：产品metadata准备公开modelInfo.provider→原生Model.start→Assembly环境解析→协议认证头→libcurl。37项标准映射与显式modelProvider选择接入，PANGU_MODEL_API_KEY优先，普通环境值忽略空白，Anthropic AUTH_TOKEN优先其API_KEY并选择Bearer。启动时将认证判断留到已准备实际模型身份的请求入口；密钥借用环境且不写入配置/会话，既有Bedrock身份解析保持原调用链。
+- 验证：模型完整driver O0/O2/UBSan、ABI/故障注入、实际TLS和既有Pi差分通过；37项映射从固定上游provider定义核对，空白/显式优先和四组实际curl认证头通过。产品资源ASan/UBSan通过；只设置DEEPSEEK_API_KEY的真实模型→工具→费用账本→两次Host重开/继续生成在ASan/UBSan下通过。登记G00与Assembly/diff通过。自审核对环境借用、公开模型身份选择、头认证方式和请求JSON隔离。
+- 具体缺口：持久凭据存储与可注入认证服务、OAuth/刷新、Anthropic订阅专用适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
+- 下一交付物：继续K05认证生命周期，将上游凭据存储/解析与实际产品配置、请求入口成组接通。

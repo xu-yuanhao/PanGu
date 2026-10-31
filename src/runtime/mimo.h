@@ -74,6 +74,8 @@ int pg_mimo_uses_google(const pg_mimo *);
    Encode returns an owned JSON string, or NULL. */
 int pg_mimo_base64_decode(const struct json_object *,unsigned char **,size_t *);
 struct json_object *pg_mimo_base64_encode(const void *,size_t);
+/* Borrowed environment key; optional output is 1 for header-owned Bearer auth. */
+const char *pg_mimo_environment_key(const struct json_object *,unsigned *);
 int pg_mimo_config_bedrock(const struct json_object *);
 int pg_mimo_config_google(const struct json_object *);
 int pg_google_signature_valid(const struct json_object *);

@@ -363,6 +363,29 @@ void release_budget(char *text){free(text);}
             try: assert native.pg_context_estimate(value)==wanted,(case,wanted,native.pg_context_estimate(value))
             finally: native.json_object_put(value)
         native.emit_budget.argtypes=[C.c_char_p,C.c_char_p,C.POINTER(C.c_void_p)];native.release_budget.argtypes=[C.c_void_p]
+        import os,re
+        native.pg_mimo_environment_key.argtypes=[C.c_void_p,C.POINTER(C.c_uint)];native.pg_mimo_environment_key.restype=C.c_char_p
+        environment_cases=[]
+        for source in sorted((base/'providers').glob('*.ts')):
+            code=source.read_text();identity=re.search(r'id:\s*"([^"]+)"',code);auth=re.search(r'envApiKeyAuth\([^\n]+?\[([^]]+)\]',code)
+            if identity and auth: environment_cases.extend((identity[1],key) for key in re.findall(r'"([^"]+)"',auth[1]))
+        environment_cases.extend([('anthropic','ANTHROPIC_API_KEY'),('google-vertex','GOOGLE_CLOUD_API_KEY')])
+        saved={key:os.environ.get(key) for key in {'PANGU_MODEL_API_KEY',*(key for _,key in environment_cases),'ANTHROPIC_AUTH_TOKEN'}}
+        try:
+            for key in saved: os.environ.pop(key,None)
+            for provider,key in environment_cases:
+                cfg=native.json_tokener_parse(json.dumps({'modelInfo':{'provider':provider}}).encode());mode=C.c_uint(99)
+                try:
+                    assert native.pg_mimo_environment_key(cfg,C.byref(mode)) is None and mode.value==0
+                    os.environ[key]=' \t\r\n';assert native.pg_mimo_environment_key(cfg,C.byref(mode)) is None
+                    os.environ[key]='unit-provider-secret';assert native.pg_mimo_environment_key(cfg,C.byref(mode))==b'unit-provider-secret' and mode.value==0
+                    os.environ['PANGU_MODEL_API_KEY']='unit-explicit-secret';assert native.pg_mimo_environment_key(cfg,C.byref(mode))==b'unit-explicit-secret'
+                finally: native.json_object_put(cfg);os.environ.pop(key,None);os.environ.pop('PANGU_MODEL_API_KEY',None)
+        finally:
+            for key,value in saved.items():
+                if value is None: os.environ.pop(key,None)
+                else: os.environ[key]=value
+        print(f'PASS: {len(environment_cases)} fixed Pi provider environment mappings, whitespace and explicit priority')
         count=0
         for api in ('openai-completions','openai-responses','anthropic-messages','google-generative-ai','google-vertex','bedrock-converse-stream','azure-openai-responses','openai-codex-responses'):
             for window in (0,4096,4200,128000):

@@ -614,6 +614,14 @@ static void test_codex_terminal_frames(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex terminal aliases/status/endTurn and SSE multiline, CRLF, EOF, sentinel, trailing events, malformed frames and cancellation");
 }
+static void test_provider_environment_auth(void){
+ const char *providers[]={"deepseek","anthropic","anthropic","google"};const char *variables[]={"DEEPSEEK_API_KEY","ANTHROPIC_API_KEY","ANTHROPIC_AUTH_TOKEN","GEMINI_API_KEY"};const char *apis[]={"openai-completions","anthropic-messages","anthropic-messages","google-generative-ai"};const char *headers[]={"Authorization: Bearer unit-provider-secret","x-api-key: unit-provider-secret","Authorization: Bearer unit-provider-secret","x-goog-api-key: unit-provider-secret"};
+ unsetenv("PANGU_MODEL_API_KEY");
+ for(unsigned n=0;n<4;n++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_object_new_object(),*info=json_object_new_object();json_object_object_add(info,"provider",json_object_new_string(providers[n]));json_object_object_add(cfg,"modelInfo",info);json_object_object_add(cfg,"model",json_object_new_string("provider-auth"));json_object_object_add(cfg,"api",json_object_new_string(apis[n]));json_object_object_add(cfg,"endpoint",json_object_new_string("https://provider.invalid/request"));assert(!pg_mimo_configure(&m,cfg));setenv(variables[n],"unit-provider-secret",1);assert(!start());unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)found+=!strcmp(h->data,headers[n]);assert(found==1&&!strstr(captured_post,"unit-provider-secret")&&!strstr(json_object_to_json_string(cfg),"unit-provider-secret"));model.close(model.context);json_object_put(cfg);unsetenv(variables[n]);
+ }
+ puts("PASS: provider ambient API keys and Anthropic header-owned Bearer reach actual curl headers without entering request/config JSON");
+}
 static void test_codex_stream_failures(void){
  const char *events[]={
  "{\"type\":\"response.done\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"content_filter\"}}}",
@@ -938,6 +946,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_provider_environment_auth();
     test_codex_stream_failures();
     test_codex_header_deadlines();
     test_codex_terminal_frames();
