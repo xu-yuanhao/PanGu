@@ -579,7 +579,8 @@
         "pg_tui_runtime_conversation_catalog",
         "pg_tui_runtime_conversation_actions",
         "pg_tui_runtime_conversation_history",
-        "pg_tui_runtime_models"
+        "pg_tui_runtime_models",
+        "pg_tui_runtime_auth"
       ],
       "reference_basis": [
         {
@@ -2895,7 +2896,8 @@
       "sources": [
         "src/runtime/oauth.S",
         "src/runtime/oauth.h",
-        "src/runtime/oauth_http.c"
+        "src/runtime/oauth_http.c",
+        "src/runtime/oauth_device.S"
       ],
       "dependencies": [
         "credentials.local.v0",
@@ -2911,7 +2913,17 @@
         "pg_oauth_codex_refresh",
         "pg_oauth_realtime (platform bridge)",
         "pg_oauth_post_form (platform bridge)",
-        "pg_oauth_codex_account"
+        "pg_oauth_codex_account",
+        "pg_oauth_codex_token",
+        "pg_oauth_device_init",
+        "pg_oauth_device_begin",
+        "pg_oauth_device_poll",
+        "pg_oauth_device_cancel",
+        "pg_oauth_device_close",
+        "pg_oauth_device_service",
+        "pg_oauth_http_start (platform bridge)",
+        "pg_oauth_http_step (platform bridge)",
+        "pg_oauth_http_close (platform bridge)"
       ],
       "reference_basis": [
         "Pi auth/resolve.ts and auth/oauth/openai-codex.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"

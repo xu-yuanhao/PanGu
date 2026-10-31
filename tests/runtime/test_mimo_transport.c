@@ -257,7 +257,7 @@ static void test_start_setup(void) {
     assert(setopt_errors == 0);
     assert(captured_url && !strcmp(captured_url, "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"));
     assert(captured_post == m.request && m.request);
-    assert(captured_protocols && !strcmp(captured_protocols, "https"));
+    assert(captured_protocols && !strcmp(captured_protocols, "http,https"));
     assert(captured_write && captured_write_data == &m);
     assert(captured_headers == m.headers && m.headers);
     assert(captured_timeout == 60000 && captured_connect_timeout == 15 && captured_nosignal == 1);

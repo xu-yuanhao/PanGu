@@ -130,12 +130,16 @@ static char configured_prompt[4096];
 static pg_mimo provider;
 static pg_credential_store default_credentials;
 static pg_oauth_provider default_codex_oauth;
+static pg_oauth_device default_login;
+static int credentials_stop(void *ctx){(void)ctx;pg_oauth_device_close(&default_login);return 0;}
+
+static pg_auth_ops default_auth;
 static const pg_oauth_provider *model_oauth;
 static const pg_credential_store *model_credentials;
 static char credentials_path[4096];
 static int credentials_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;const char *directory=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");int n;if(directory)n=snprintf(credentials_path,sizeof(credentials_path),"%s/auth.json",directory);else if(home)n=snprintf(credentials_path,sizeof(credentials_path),"%s/.pangu/agent/auth.json",home);else return 1;
- if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth);
+ if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);pg_oauth_device_init(&default_login,&default_credentials,0);pg_oauth_device_service(&default_login,&default_auth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth)||pg_host_provide(scope,owner,"auth",&default_auth);
 }
 static pg_tool_registry registry;
 static pg_tool_registry file_registry;
@@ -191,6 +195,7 @@ static int model_start(void *ctx,pg_host *scope,size_t owner){
  default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1",0,0};
  return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider)||pg_host_provide(scope,owner,"model.metadata",&default_model_metadata);
 }
+const pg_auth_ops *pg_tui_runtime_auth(const tui_runtime_ops *ops){return ops&&ops==inputs_owner&&!((pg_tui_bridge *)ops->ctx)->stopped?pg_host_find(&agent_scope,"auth"):0;}
 static int model_stop(void *ctx){(void)ctx;if(application.model.close)application.model.close(application.model.context);return 0;}
 static uint64_t monotonic(void *ctx){(void)ctx;struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now))abort();return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;}
 static double wall_time(void *ctx){(void)ctx;struct timespec now;if(clock_gettime(CLOCK_REALTIME,&now))abort();return (double)now.tv_sec*1000+(double)now.tv_nsec/1000000;}
@@ -473,9 +478,9 @@ static const char *const image_exports[]={"image.processor"};
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","usage.total","observation","task.graph","task.control","conversation.view","conversation.client","conversation.catalog","conversation.actions","conversation.history","models.catalog","agent.state","extensions.control"},*const storage_exports[]={"session"};
 static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry","credentials","oauth.openai-codex"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,17,agent_start,agent_stop};
-static const char *const credentials_exports[]={"credentials","oauth.openai-codex"};
+static const char *const credentials_exports[]={"credentials","oauth.openai-codex","auth"};
 static const pg_plugin plugins[]={
- {"credentials",0,0,0,credentials_exports,2,credentials_start,no_resources},
+ {"credentials",0,0,0,credentials_exports,3,credentials_start,credentials_stop},
  {"images",0,0,0,image_exports,1,images_start,no_resources},
  {"model",0,model_imports,3,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,2,tools_exports,6,tools_start,tools_stop},

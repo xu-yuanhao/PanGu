@@ -215,13 +215,13 @@ pg_oauth_codex_refresh:
  push r13
  push r14
  push r15
- sub rsp,88
+ sub rsp,40
  mov rbx,rdi
  mov r12,rsi
  mov r13,rdx
  mov qword ptr [rdx],0
  xor eax,eax
- mov ecx,10
+ mov ecx,5
  mov rdi,rsp
  rep stosq
  mov ebp,7
@@ -272,88 +272,12 @@ pg_oauth_codex_refresh:
  call json_tokener_get_error@PLT
  test eax,eax
  jnz .Loc_refresh_end
- mov rdi,[rsp+32]
- lea rsi,[rip+.Lo_access_token]
- call .Loc_token_string
- mov r14,rax
- test rax,rax
- jz .Loc_refresh_end
- mov rdi,[rsp+32]
- lea rsi,[rip+.Lo_refresh_token]
- call .Loc_token_string
- mov r15,rax
- test rax,rax
- jz .Loc_refresh_end
- mov rdi,[rsp+32]
- lea rsi,[rip+.Lo_expires_in]
- call json_object_object_get@PLT
- mov [rsp+72],rax
- mov rdi,rax
- call json_object_get_type@PLT
- cmp eax,2
- je .Loc_expiry_number
- cmp eax,3
- jne .Loc_refresh_end
-.Loc_expiry_number:
- mov rdi,[rsp+72]
- call json_object_get_double@PLT
- mulsd xmm0,[rip+.Lo_thousand]
- movsd [rsp+80],xmm0
  xor edi,edi
  call pg_oauth_realtime@PLT
- addsd xmm0,[rsp+80]
- movapd xmm1,xmm0
- andpd xmm1,[rip+.Lo_absolute]
- ucomisd xmm1,[rip+.Lo_maximum]
- ja .Loc_refresh_end
- jp .Loc_refresh_end
- movsd [rsp+80],xmm0
- mov rdi,r14
- lea rsi,[rsp+56]
- call pg_oauth_codex_account
- test eax,eax
- jnz .Loc_refresh_end
- lea rdi,[rip+.Lo_template]
- call json_tokener_parse@PLT
- mov [rsp+40],rax
- test rax,rax
- jz .Loc_refresh_end
- mov rdi,r14
- call json_object_new_string@PLT
- mov rdi,[rsp+40]
- lea rsi,[rip+.Lo_access]
- mov rdx,rax
- call .Lo_add
- test eax,eax
- jnz .Loc_refresh_end
- mov rdi,r15
- call json_object_new_string@PLT
- mov rdi,[rsp+40]
- lea rsi,[rip+.Lo_refresh]
- mov rdx,rax
- call .Lo_add
- test eax,eax
- jnz .Loc_refresh_end
- movsd xmm0,[rsp+80]
- call json_object_new_double@PLT
- mov rdi,[rsp+40]
- lea rsi,[rip+.Lo_expires]
- mov rdx,rax
- call .Lo_add
- test eax,eax
- jnz .Loc_refresh_end
- mov rdi,[rsp+56]
- call json_object_get@PLT
- mov rdi,[rsp+40]
- lea rsi,[rip+.Lo_account_id]
- mov rdx,rax
- call .Lo_add
- test eax,eax
- jnz .Loc_refresh_end
- mov rax,[rsp+40]
- mov [r13],rax
- mov qword ptr [rsp+40],0
- xor ebp,ebp
+ mov rdi,[rsp+32]
+ mov rsi,r13
+ call pg_oauth_codex_token@PLT
+ mov ebp,eax
 .Loc_refresh_end:
  mov rdi,[rsp]
  call curl_free@PLT
@@ -365,12 +289,8 @@ pg_oauth_codex_refresh:
  call json_tokener_free@PLT
  mov rdi,[rsp+32]
  call json_object_put@PLT
- mov rdi,[rsp+40]
- call json_object_put@PLT
- mov rdi,[rsp+56]
- call json_object_put@PLT
  mov eax,ebp
- add rsp,88
+ add rsp,40
  pop r15
  pop r14
  pop r13
@@ -582,4 +502,119 @@ pg_oauth_codex_account:
 .Lo_zero: .double 0
 .Lo_window: .double 300000
 .Lo_thousand: .double 1000
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_oauth_codex_token
+.type pg_oauth_codex_token,@function
+pg_oauth_codex_token:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,88
+ mov rbx,rdi
+ mov r13,rsi
+ mov qword ptr [rsi],0
+ mov qword ptr [rsp+40],0
+ mov qword ptr [rsp+56],0
+ mov [rsp+32],rdi
+ movsd [rsp+80],xmm0
+ mov ebp,7
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lo_access_token]
+ call .Loc_token_string
+ mov r14,rax
+ test rax,rax
+ jz .Lot_end
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lo_refresh_token]
+ call .Loc_token_string
+ mov r15,rax
+ test rax,rax
+ jz .Lot_end
+ mov rdi,[rsp+32]
+ lea rsi,[rip+.Lo_expires_in]
+ call json_object_object_get@PLT
+ mov [rsp+72],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,2
+ je .Loc_expiry_number
+ cmp eax,3
+ jne .Lot_end
+.Loc_expiry_number:
+ mov rdi,[rsp+72]
+ call json_object_get_double@PLT
+ mulsd xmm0,[rip+.Lo_thousand]
+ addsd xmm0,[rsp+80]
+ movapd xmm1,xmm0
+ andpd xmm1,[rip+.Lo_absolute]
+ ucomisd xmm1,[rip+.Lo_maximum]
+ ja .Lot_end
+ jp .Lot_end
+ movsd [rsp+80],xmm0
+ mov rdi,r14
+ lea rsi,[rsp+56]
+ call pg_oauth_codex_account
+ test eax,eax
+ jnz .Lot_end
+ lea rdi,[rip+.Lo_template]
+ call json_tokener_parse@PLT
+ mov [rsp+40],rax
+ test rax,rax
+ jz .Lot_end
+ mov rdi,r14
+ call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lo_access]
+ mov rdx,rax
+ call .Lo_add
+ test eax,eax
+ jnz .Lot_end
+ mov rdi,r15
+ call json_object_new_string@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lo_refresh]
+ mov rdx,rax
+ call .Lo_add
+ test eax,eax
+ jnz .Lot_end
+ movsd xmm0,[rsp+80]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lo_expires]
+ mov rdx,rax
+ call .Lo_add
+ test eax,eax
+ jnz .Lot_end
+ mov rdi,[rsp+56]
+ call json_object_get@PLT
+ mov rdi,[rsp+40]
+ lea rsi,[rip+.Lo_account_id]
+ mov rdx,rax
+ call .Lo_add
+ test eax,eax
+ jnz .Lot_end
+ mov rax,[rsp+40]
+ mov [r13],rax
+ mov qword ptr [rsp+40],0
+ xor ebp,ebp
+.Lot_end:
+ mov rdi,[rsp+40]
+ call json_object_put@PLT
+ mov rdi,[rsp+56]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,88
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_oauth_codex_token,.-pg_oauth_codex_token
 .section .note.GNU-stack,"",@progbits

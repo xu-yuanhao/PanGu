@@ -15,7 +15,7 @@
 
 .section .rodata
 .Lstr_endpoint:     .asciz "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
-.Lstr_https:        .asciz "https"
+.Lstr_http_protocols: .asciz "http,https"
 .Lstr_content_type: .asciz "Content-Type: application/json"
 .Lstr_auth_prefix:  .asciz "Authorization: Bearer "
 .Lstr_pangu_key: .asciz "PANGU_MODEL_API_KEY"
@@ -721,7 +721,7 @@ li_start:
  jnz .Lst_bad
  mov rdi, r14
  mov esi, PG_MM_CURLOPT_PROTOCOLS_STR
- lea rdx, [rip + .Lstr_https]
+ lea rdx, [rip + .Lstr_http_protocols]
  xor eax, eax
  call curl_easy_setopt@PLT
  test eax,eax

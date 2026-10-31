@@ -42,6 +42,7 @@ SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/context_tokens.S'),
        str(ROOT / 'src/runtime/base64.S'),
        str(ROOT / 'src/runtime/oauth.S'),
+       str(ROOT / 'src/runtime/oauth_device.S'),
        str(ROOT / 'src/runtime/oauth_http.c')]
 ABI_WRAPS = ['-Wl,--wrap=' + n for n in (
     'strlen', 'strcmp', 'strncmp', 'memchr', 'memcpy', 'malloc', 'realloc', 'strchr', 'free',

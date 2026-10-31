@@ -36,19 +36,52 @@ def main():
             from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
             from urllib.parse import parse_qs
             requests=[]
+            device_requests=[];device_polls={}
             payload=base64.urlsafe_b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-oauth-account'},'padding':'\uffff😀'},ensure_ascii=False).encode()).decode().rstrip('=')
             class OAuthReceiver(BaseHTTPRequestHandler):
                 def log_message(self,*args): pass
                 def do_POST(self):
-                    form=parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode());requests.append((self.path,form))
+                    raw=self.rfile.read(int(self.headers['Content-Length']))
+                    if self.path.startswith('/device'):
+                        prefix,action=self.path.rsplit('/',1);mode=int(prefix.removeprefix('/device'));status=200
+                        if action=='model':
+                            device_requests.append((mode,action,{}));assert self.headers['chatgpt-account-id']=='pangu-oauth-account' and self.headers['Authorization']=='Bearer e30.'+payload+'.signature'
+                            wire=b'data: {"type":"response.completed","response":{"status":"completed"}}\n\n'
+                        else:
+                            form=json.loads(raw) if action!='exchange' else parse_qs(raw.decode());device_requests.append((mode,action,form))
+                            if action=='start': body={'device_auth_id':'private-device','user_code':'ABCD-EFGH','interval':'bad' if mode==5 else '0'}
+                            elif action=='poll':
+                                count=device_polls.get(mode,0)+1;device_polls[mode]=count
+                                if mode==4: status=401;body={'error':'access_denied'}
+                                elif mode==3 or (mode==0 and count==4): status=429;body={'error':{'code':'slow_down'}}
+                                elif mode==0 and count in (1,2): status=403 if count==1 else 404;body={'pending':True}
+                                elif mode==0 and count==3: status=400;body={'error':'deviceauth_authorization_pending'}
+                                else: body={'authorization_code':'private-authorization +/&=','code_verifier':'private-verifier +/&='}
+                            else:
+                                body={'access_token':'invalid-token' if mode==8 else 'e30.'+payload+'.signature','refresh_token':'rotated-refresh','expires_in':3600}
+                                if mode==6: status=500
+                            wire=json.dumps(body).encode()
+                        self.send_response(status);self.send_header('Content-Length',str(len(wire)));self.end_headers()
+                        try: self.wfile.write(wire)
+                        except (BrokenPipeError,ConnectionResetError): pass
+                        return
+                    form=parse_qs(raw.decode());requests.append((self.path,form))
                     body={'access_token':'e30.'+payload+'.signature','refresh_token':'rotated-refresh','expires_in':3600}
                     if self.path=='/missing': body.pop('refresh_token')
                     if self.path=='/bad-jwt': body['access_token']='invalid-token'
                     wire=json.dumps(body).encode();self.send_response(401 if self.path=='/denied' else 200);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire)
             server=ThreadingHTTPServer(('127.0.0.1',0),OAuthReceiver);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-            try: subprocess.run([str(output),'--oauth-refresh',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
+            try:
+                subprocess.run([str(output),'--oauth-refresh',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
+                subprocess.run([str(output),'--oauth-device',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
             finally: server.shutdown();server.server_close();thread.join()
             assert len(requests)==4 and all(form=={'grant_type':['refresh_token'],'refresh_token':['refresh +/&='],'client_id':['app_EMoamEEZ73f0CkXaXp7hrann']} for _,form in requests),requests
+            assert device_polls[0]==5 and any(mode==0 and action=='model' for mode,action,_ in device_requests)
+            for mode,action,form in device_requests:
+                if action=='start': assert form=={'client_id':'app_EMoamEEZ73f0CkXaXp7hrann'}
+                elif action=='poll': assert form=={'device_auth_id':'private-device','user_code':'ABCD-EFGH'}
+                elif action=='exchange': assert form=={'grant_type':['authorization_code'],'client_id':['app_EMoamEEZ73f0CkXaXp7hrann'],'code':['private-authorization +/&='],'code_verifier':['private-verifier +/&='],'redirect_uri':['https://login.invalid/callback']}
+
         if not any((args.live_cost,args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
             for api,base,options in (
                 ('google-generative-ai',None,'{}'),

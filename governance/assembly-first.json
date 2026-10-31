@@ -394,6 +394,10 @@
     "src/runtime/base64.S": {
       "role": "assembly-core",
       "reason": "原地提取模型与OAuth共用的Base64字节适配；底层EVP编解码"
+    },
+    "src/runtime/oauth_device.S": {
+      "role": "assembly-core",
+      "reason": "手写设备码登录状态机、pending/slow_down时序、取消、令牌交换和凭据提交"
     }
   }
 }

@@ -142,6 +142,9 @@ const pg_conversation_catalog_ops *pg_tui_runtime_conversation_catalog(const tui
 const pg_conversation_actions_ops *pg_tui_runtime_conversation_actions(const tui_runtime_ops *);
 const pg_conversation_history_ops *pg_tui_runtime_conversation_history(const tui_runtime_ops *);
 const pg_model_catalog_ops *pg_tui_runtime_models(const tui_runtime_ops *);
+struct pg_auth_ops;
+/* Optional authentication operations; snapshots omit private credentials. */
+const struct pg_auth_ops *pg_tui_runtime_auth(const tui_runtime_ops *);
 
 #ifdef __cplusplus
 }
