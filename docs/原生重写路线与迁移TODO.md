@@ -327,8 +327,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/simple-options.ts`、`utils/estimate.ts`、`utils/text.ts`，及Durable generation.ts的models.streamSimple调用；协议streamSimple与Responses最低输出处理一并核对。
-- 实际调用链：从压缩模块原地提取消息/UTF-16/用量估算到共享context_tokens，原算法和调用者一并迁移。模型请求采用modelInfo.maxTokens默认值，按有效assistant usage与后续消息、PanGu独立systemPrompt估算上下文，留4096余量；各协议转换前后接通实际输出字段，保留Responses最低16限制，Codex按参考省略输出字段。Anthropic/Bedrock结合模型上限、自定义thinkingBudgets和回答余量调整推理预算。新模块与实际依赖/构建已登记，C ABI明确借用与结果所有权。
-- 验证：25组上下文估算运行固定Pi源码差分，96组实际请求覆盖八协议默认/显式/上下文边界，144组Anthropic/Bedrock推理预算对照Pi helper通过。模型O0/O2/UBSan、Durable客户端与压缩/SQLite/JSONL恢复回归、产品资源ASan/UBSan通过；最终真实DeepSeek模型→工具→费用账本→两次Host重开/继续生成在ASan/UBSan下通过。Assembly/diff通过。自审核对公共函数签名、共享代码移除、上下文前缀映射、JSON引用与预算转换顺序。
-- 具体缺口：simple推理档位/采样参数及legacy Session工具声明估算差异；Codex OAuth、WebSocket/连接缓存及其超时、失败终态完整元数据；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
-- 下一交付物：继续K05的完整提供者调用链，按共享配置/连接生命周期成组补齐上述功能；保持既有Generation与真实产品闭环。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/simple-options.ts`、`models.ts` 的getSupportedThinkingLevels/clampThinkingLevel、Chat/Responses/Azure的请求构造；Harness沿用固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：模型描述从目录、自定义模型、覆盖和运行时描述传递samplingParams与samplingParamsByThinkingLevel；手写Assembly在最终Chat/Responses/Azure请求上按模型→有效推理档位→请求合并，保留显式null、嵌套值和命名字段覆盖。档位按reasoning与thinkingLevelMap选择，禁用档位向上再向下回退；其他协议保留各自参考行为。沿用既有共享上下文、输出与thinking预算。
+- 验证：256组实际请求对照固定Pi采样合并/档位源码及八协议边界通过，25组上下文、96组输出预算和144组thinking预算差分保持通过。模型O0/O2/UBSan五专项、故障注入及实际TLS传输通过；完整driver首次在新增Google用例非法档位处停止，修正该用例后单独重跑完整context_budget_differential通过。产品资源ASan/UBSan及自定义模型采样字段传递通过。Assembly/diff通过。自审核对JSON引用、null插入、迭代器有效期、源覆盖顺序及原生栈/寄存器保存。
+- 具体缺口：legacy Session工具声明估算；Codex OAuth、WebSocket/连接缓存及其超时、失败终态完整元数据；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
+- 下一交付物：继续K05的完整提供者连接/认证生命周期，沿现有Generation与真实产品调用链完成接线。

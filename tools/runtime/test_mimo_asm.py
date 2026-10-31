@@ -398,6 +398,26 @@ void release_budget(char *text){free(text);}
                 wire=json.loads(C.string_at(result));native.release_budget(result)
                 actual={'maxTokens':wire['max_tokens'] if api=='anthropic-messages' else wire['inferenceConfig']['maxTokens'],'thinkingBudget':(wire['thinking'] if api=='anthropic-messages' else wire['additionalModelRequestFields']['thinking'])['budget_tokens']}
                 assert actual==wanted,(api,case,wanted,actual)
+        models=(base/'models.ts').read_text()
+        level_source=models[models.index('const EXTENDED_THINKING_LEVELS:'):models.index('/**\n * Check if two models are equal')]
+        sample_source=simple[simple.index('export function resolveSamplingParams('):simple.index('export function buildBaseOptions(')]
+        sampling_cases=[]
+        for reasoning in (False,True):
+            for mapping in ({},{'low':None,'medium':None},{'off':None,'minimal':None,'low':None,'medium':None,'high':None},{'xhigh':'high','max':'high'}):
+                for level in ('off','low','xhigh','max'):
+                    sampling_cases.append({'model':{'reasoning':reasoning,'thinkingLevelMap':mapping,'samplingParams':{'temperature':0.25,'native_probe':{'base':True}},'samplingParamsByThinkingLevel':{k:{'native_probe':k,'top_p':0.8} for k in ('off','minimal','low','medium','high','xhigh','max')}},'level':level,'request':{'temperature':None,'model':'sampling-override','extra_probe':{'nested':[1,None]}}})
+        sampling_oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const f=new Function(stripTypeScriptTypes((x.level+x.sample).replace(/^export /gm,''),{mode:'strip'})+';return resolveSamplingParams')();process.stdout.write(JSON.stringify(x.cases.map(c=>f(c.model,c.level,c.request))));"
+        sampling_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',sampling_oracle],input=json.dumps({'level':level_source,'sample':sample_source,'cases':sampling_cases}),text=True))
+        for api in ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages','google-generative-ai','google-vertex','bedrock-converse-stream','openai-codex-responses'):
+            for case,wanted in zip(sampling_cases,sampling_expected):
+                cfg={'api':api,'model':'sampling-test','endpoint':'https://provider.invalid/request','modelInfo':dict(case['model'],maxTokens=2048),'options':{'reasoningEffort':case['level'],'samplingParams':case['request']}}
+                if api not in ('openai-completions','openai-responses','azure-openai-responses'): cfg['options']['reasoningEffort']='off'
+                result=C.c_void_p();status=native.emit_budget(json.dumps(cfg).encode(),json.dumps([{'role':'user','content':'hello'}]).encode(),C.byref(result));assert not status,(api,case)
+                wire=json.loads(C.string_at(result));native.release_budget(result)
+                if api in ('openai-completions','openai-responses','azure-openai-responses'):
+                    assert {k:wire[k] for k in wanted}==wanted,(api,case,wanted,wire)
+                else: assert 'native_probe' not in wire and 'extra_probe' not in wire,(api,wire)
+        print(f'PASS: {len(sampling_cases)*8} requests match Pi sampling merge, thinking selection and protocol boundaries')
         print(f'PASS: {len(thinking_cases)*2} Anthropic/Bedrock thinking ceilings match fixed Pi simple-options helpers')
         print(f'PASS: {len(cases)} shared context estimates match fixed Pi, and {count} protocol requests obey model/context output budgets')
 

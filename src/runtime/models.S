@@ -553,6 +553,13 @@ pg_models_describe:
  jne .Lmc_get
  mov rdi,[rsp+24]
 .Lmc_get:
+ mov r15,rdi
+ mov rsi,rdi
+ mov rdi,[rsp]
+ call .Lm_sampling_copy
+ test eax,eax
+ jnz .Lm_describe_error
+ mov rdi,r15
  lea rsi,[rip+.Lmc_cost]
  call json_object_object_get@PLT
  test rax,rax
@@ -1054,3 +1061,54 @@ pg_models_list:
 
 .section .rodata
 .Lmc_cost: .asciz "cost"
+
+.text
+.Lm_sampling_copy:
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+.Lm_sampling_each:
+ lea rax,[rip+.Lm_sampling_keys]
+ mov r14,[rax+r13*8]
+ mov rdi,r12
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lm_sampling_next
+ mov [rsp],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,4
+ jne .Lm_sampling_bad
+ mov rdi,rbx
+ mov rsi,r14
+ mov rdx,[rsp]
+ call .Lm_copy
+ test eax,eax
+ jnz .Lm_sampling_end
+.Lm_sampling_next:
+ inc r13d
+ cmp r13d,2
+ jb .Lm_sampling_each
+ xor eax,eax
+ jmp .Lm_sampling_end
+.Lm_sampling_bad:
+ mov eax,5
+.Lm_sampling_end:
+ add rsp,8
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lm_sampling_base: .asciz "samplingParams"
+.Lm_sampling_levels: .asciz "samplingParamsByThinkingLevel"
+.section .data.rel.ro
+.Lm_sampling_keys: .quad .Lm_sampling_base,.Lm_sampling_levels
+.section .note.GNU-stack,"",@progbits

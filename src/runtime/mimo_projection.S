@@ -975,6 +975,11 @@ pg_mimo_encode_request:
  call .Loc_cache
  test eax,eax
  jnz .Linvalid
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lsp_apply
+ test eax,eax
+ jnz .Linvalid
  mov rdi, qword ptr [rsp]
  mov esi, PG_MM_TO_JSON_PLAIN
  call json_object_to_json_string_ext@PLT
@@ -8900,3 +8905,221 @@ pg_mimo_uses_google:
 
 .section .rodata
 .Lap_thinkingBudgets: .asciz "thinkingBudgets"
+
+.text
+/* Sampling layers borrow configuration; inserted values retain their owner. */
+.Lsp_apply:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov rbx,rdi
+ mov rbp,rsi
+ mov rdi,rbp
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jnz .Lsp_ok
+ mov rdi,rbp
+ call pg_mimo_config_anthropic@PLT
+ test eax,eax
+ jnz .Lsp_ok
+ mov rdi,rbp
+ call pg_mimo_config_google@PLT
+ test eax,eax
+ jnz .Lsp_ok
+ mov rdi,rbp
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jnz .Lsp_ok
+ mov rdi,rbp
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov r12,rax
+ mov rdi,rbp
+ lea rsi,[rip+.Lopts_options]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lsp_base]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lsp_merge
+ test eax,eax
+ jnz .Lsp_end
+ xor r14d,r14d
+ mov rdi,r12
+ lea rsi,[rip+.Lct_reasoning]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lsp_selected
+ mov rdi,r12
+ lea rsi,[rip+.Lct_level_map]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ xor r15d,r15d
+ mov dword ptr [rsp+16],0
+.Lsp_support:
+ lea rax,[rip+.Lsp_levels]
+ mov rsi,[rax+r15*8]
+ mov rdi,rbp
+ lea rdx,[rsp+24]
+ call json_object_object_get_ex@PLT
+ test eax,eax
+ jz .Lsp_default_support
+ cmp qword ptr [rsp+24],0
+ je .Lsp_support_next
+ jmp .Lsp_enable
+.Lsp_default_support:
+ cmp r15d,5
+ jae .Lsp_support_next
+.Lsp_enable:
+ bts dword ptr [rsp+16],r15d
+.Lsp_support_next:
+ inc r15d
+ cmp r15d,7
+ jb .Lsp_support
+ mov rdi,r13
+ lea rsi,[rip+.Lopts_reasoning_effort]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lsp_level_string
+ mov rdi,r13
+ lea rsi,[rip+.Lct_reasoning]
+ call json_object_object_get@PLT
+.Lsp_level_string:
+ test rax,rax
+ jz .Lsp_find_supported
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lsp_find_supported
+ mov rbp,rax
+ xor r15d,r15d
+.Lsp_find_requested:
+ mov rdi,rbp
+ lea rax,[rip+.Lsp_levels]
+ mov rsi,[rax+r15*8]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lsp_requested
+ inc r15d
+ cmp r15d,7
+ jb .Lsp_find_requested
+ jmp .Lsp_find_supported
+.Lsp_requested:
+ mov r14d,r15d
+.Lsp_search_up:
+ bt dword ptr [rsp+16],r14d
+ jc .Lsp_selected
+ inc r14d
+ cmp r14d,7
+ jb .Lsp_search_up
+ mov r14d,r15d
+.Lsp_search_down:
+ dec r14d
+ js .Lsp_find_supported
+ bt dword ptr [rsp+16],r14d
+ jnc .Lsp_search_down
+ jmp .Lsp_selected
+.Lsp_find_supported:
+ xor r14d,r14d
+ bsf eax,dword ptr [rsp+16]
+ jz .Lsp_selected
+ mov r14d,eax
+.Lsp_selected:
+ mov rdi,r12
+ lea rsi,[rip+.Lsp_by_level]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rax,[rip+.Lsp_levels]
+ mov rsi,[rax+r14*8]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lsp_merge
+ test eax,eax
+ jnz .Lsp_end
+ mov rdi,r13
+ lea rsi,[rip+.Lsp_base]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call .Lsp_merge
+ jmp .Lsp_end
+.Lsp_ok:
+ xor eax,eax
+.Lsp_end:
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+/* rbx is the destination; source iterator is stable across insertions. */
+.Lsp_merge:
+ push rbp
+ sub rsp,32
+ test rdi,rdi
+ jz .Lsp_merge_ok
+ mov rbp,rdi
+ call json_object_get_type@PLT
+ cmp eax,4
+ jne .Lsp_merge_bad
+ mov rdi,rbp
+ call json_object_iter_begin@PLT
+ mov [rsp],rax
+ mov rdi,rbp
+ call json_object_iter_end@PLT
+ mov [rsp+8],rax
+.Lsp_merge_each:
+ mov rdi,rsp
+ lea rsi,[rsp+8]
+ call json_object_iter_equal@PLT
+ test eax,eax
+ jnz .Lsp_merge_ok
+ mov rdi,rsp
+ call json_object_iter_peek_name@PLT
+ mov [rsp+16],rax
+ mov rdi,rsp
+ call json_object_iter_peek_value@PLT
+ mov rdi,rax
+ call json_object_get@PLT
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ mov rdx,rax
+ mov [rsp+24],rax
+ call json_object_object_add@PLT
+ test eax,eax
+ jnz .Lsp_merge_release
+ mov rdi,rsp
+ call json_object_iter_next@PLT
+ jmp .Lsp_merge_each
+.Lsp_merge_release:
+ mov rdi,[rsp+24]
+ call json_object_put@PLT
+.Lsp_merge_bad:
+ mov eax,1
+ jmp .Lsp_merge_end
+.Lsp_merge_ok:
+ xor eax,eax
+.Lsp_merge_end:
+ add rsp,32
+ pop rbp
+ ret
+.section .rodata
+.Lsp_base: .asciz "samplingParams"
+.Lsp_by_level: .asciz "samplingParamsByThinkingLevel"
+.Lsp_minimal: .asciz "minimal"
+.Lsp_low: .asciz "low"
+.Lsp_medium: .asciz "medium"
+.Lsp_high: .asciz "high"
+.Lsp_xhigh: .asciz "xhigh"
+.Lsp_max: .asciz "max"
+.section .data.rel.ro
+.Lsp_levels: .quad .Lct_off,.Lsp_minimal,.Lsp_low,.Lsp_medium,.Lsp_high,.Lsp_xhigh,.Lsp_max
+.section .note.GNU-stack,"",@progbits
