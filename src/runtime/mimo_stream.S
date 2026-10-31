@@ -997,6 +997,18 @@ pg_mimo_decode_line:
  jnz .Lrs_failure_terminal
  mov rax,[rsp]
 .Lrs_failure_terminal:
+ mov [rsp+96],rax
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lrs_failure_original
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov edx,ebp
+ call .Lcx_failure
+ jmp .Lrs_bad
+.Lrs_failure_original:
+ mov rax,[rsp+96]
  mov rdi,rbx
  mov rsi,rax
  call .Lrt_save
@@ -1159,7 +1171,13 @@ pg_mimo_decode_line:
  mov rdi,r12
  call .Lcx_status
  cmp eax,2
- je .Lrs_bad
+ jne .Lcx_terminal_success
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov edx,12
+ call .Lcx_failure
+ jmp .Lrs_bad
+.Lcx_terminal_success:
  mov ebp,8
  test eax,eax
  jz .Lcx_terminal_mapped
@@ -1202,13 +1220,24 @@ pg_mimo_decode_line:
  mov rdi,rax
  call json_object_get_string@PLT
  test rax,rax
- jz .Lrs_bad
+ jz .Lcx_incomplete_error
  mov rdi,rax
  lea rsi,[rip+.Lrs_max_output_tokens]
  call strcmp@PLT
  test eax,eax
- jnz .Lrs_bad
+ jnz .Lcx_incomplete_error
  lea r14,[rip+.Lstr_length]
+ jmp .Lrs_finish_field
+.Lcx_incomplete_error:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lrs_bad
+ mov rdi,rbx
+ mov rsi,[rsp]
+ mov edx,13
+ call .Lcx_failure
+ jmp .Lrs_bad
 .Lrs_finish_field:
  cmp ebp,9
  je .Lrt_finish_ready
@@ -6133,3 +6162,199 @@ pg_mimo_codex_line:
 .section .rodata
 .Lcx_end_turn: .asciz "end_turn"
 .Lcx_endTurn: .asciz "endTurn"
+
+.text
+/* Preserve the provider event beside normalized classification and display. */
+.Lcx_failure:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov rbx,rdi
+ mov r12,rsi
+ mov ebp,edx
+ call .Lrt_save
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+8],0
+ mov qword ptr [rsp+16],0
+ mov rdi,r12
+ cmp ebp,11
+ je .Lcef_source
+ lea rsi,[rip+.Lrs_response]
+ call json_object_object_get@PLT
+ mov rdi,rax
+.Lcef_source:
+ lea rsi,[rip+.Lrt_error]
+ cmp ebp,13
+ jne .Lcef_source_key
+ lea rsi,[rip+.Lrs_incomplete_details]
+.Lcef_source_key:
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,r13
+ lea rsi,[rip+.Lcef_code]
+ call .Lcef_string
+ mov r14,rax
+ mov rdi,r13
+ lea rsi,[rip+.Lrt_message]
+ cmp ebp,13
+ jne .Lcef_message_key
+ lea rsi,[rip+.Lrs_reason]
+.Lcef_message_key:
+ call .Lcef_string
+ mov r15,rax
+ cmp ebp,11
+ jne .Lcef_build
+ mov rdi,r12
+ lea rsi,[rip+.Lcef_code]
+ call .Lcef_string
+ test rax,rax
+ cmovnz r14,rax
+ mov rdi,r12
+ lea rsi,[rip+.Lrt_message]
+ call .Lcef_string
+ test rax,rax
+ cmovnz r15,rax
+.Lcef_build:
+ test r15,r15
+ jz .Lcef_build_root
+ mov rdi,r15
+ call json_object_get_string_len@PLT
+ test eax,eax
+ jnz .Lcef_build_root
+ xor r15d,r15d
+.Lcef_build_root:
+ lea rdi,[rip+.Lcef_template]
+ call json_tokener_parse@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lcef_end
+ mov rdi,rax
+ lea rsi,[rip+.Lrt_error]
+ call json_object_object_get@PLT
+ mov r13,rax
+ mov rdi,r12
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lcef_payload]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lcef_end
+ test r14,r14
+ jz .Lcef_message
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lcef_code]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lcef_end
+.Lcef_message:
+ call printbuf_new@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lcef_end
+ cmp ebp,13
+ jne .Lcef_regular_prefix
+ test r15,r15
+ jz .Lcef_message_value
+ mov rdi,rax
+ lea rsi,[rip+.Lcef_incomplete_prefix]
+ mov edx,21
+ jmp .Lcef_append_prefix
+.Lcef_regular_prefix:
+ cmp ebp,11
+ jne .Lcef_message_value
+ mov rdi,rax
+ lea rsi,[rip+.Lcef_prefix]
+ mov edx,13
+.Lcef_append_prefix:
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lcef_end
+.Lcef_message_value:
+ mov rdi,r15
+ test rdi,rdi
+ jnz .Lcef_value_string
+ cmp ebp,11
+ jne .Lcef_default
+ mov rdi,r14
+ test rdi,rdi
+ jnz .Lcef_value_string
+ mov rdi,r12
+ xor esi,esi
+ call json_object_to_json_string_ext@PLT
+ jmp .Lcef_value_append
+.Lcef_value_string:
+ call json_object_get_string@PLT
+ jmp .Lcef_value_append
+.Lcef_default:
+ lea rax,[rip+.Lcef_default_message]
+ cmp ebp,13
+ jne .Lcef_value_append
+ lea rax,[rip+.Lcef_incomplete_default]
+.Lcef_value_append:
+ mov [rsp+16],rax
+ mov rdi,rax
+ call strlen@PLT
+ mov edx,eax
+ mov rdi,[rsp+8]
+ mov rsi,[rsp+16]
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lcef_end
+ mov rax,[rsp+8]
+ mov rdi,[rax]
+ mov esi,[rax+8]
+ call json_object_new_string_len@PLT
+ mov rdi,r13
+ lea rsi,[rip+.Lrt_message]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lcef_end
+ mov rdi,rbx
+ mov rsi,[rsp]
+ call .Lrt_save
+.Lcef_end:
+ mov rdi,[rsp+8]
+ call printbuf_free@PLT
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.Lcef_string:
+ push rbx
+ call json_object_object_get@PLT
+ mov rbx,rax
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ mov rax,0
+ cmovnz rax,rbx
+ pop rbx
+ ret
+.section .rodata
+.Lcef_code: .asciz "code"
+.Lcef_payload: .asciz "payload"
+.Lcef_template: .asciz "{\"error\":{}}"
+.Lcef_prefix: .asciz "Codex error: "
+.Lcef_default_message: .asciz "Codex response failed"
+.section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lcef_incomplete_prefix: .asciz "Response incomplete: "
+.Lcef_incomplete_default: .asciz "Response incomplete without a provider reason"
+.section .note.GNU-stack,"",@progbits

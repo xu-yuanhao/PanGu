@@ -614,6 +614,24 @@ static void test_codex_terminal_frames(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex terminal aliases/status/endTurn and SSE multiline, CRLF, EOF, sentinel, trailing events, malformed frames and cancellation");
 }
+static void test_codex_stream_failures(void){
+ const char *events[]={
+ "{\"type\":\"response.done\",\"response\":{\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"content_filter\"}}}",
+ "{\"type\":\"response.done\",\"response\":{\"status\":\"incomplete\"}}",
+ "{\"type\":\"error\",\"message\":\"\",\"code\":\"code-only\"}",
+ "{\"type\":\"error\",\"code\":\"root-code\",\"message\":\"root-message\",\"error\":{\"code\":\"nested-code\",\"message\":\"nested-message\"}}",
+ "{\"type\":\"error\",\"code\":7,\"message\":false,\"error\":{\"code\":\"nested-code\",\"message\":\"nested-message\"}}",
+ "{\"type\":\"error\",\"code\":\"code-only\"}",
+ "{\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"failed-code\",\"message\":\"failed-message\"}}}",
+ "{\"type\":\"response.failed\",\"response\":{}}",
+ "{\"type\":\"response.done\",\"response\":{\"status\":\"cancelled\",\"error\":{\"code\":\"cancelled-code\",\"message\":\"cancelled-message\"}}}"
+ };
+ const char *expected[]={"Response incomplete: content_filter","Response incomplete without a provider reason","Codex error: code-only","Codex error: root-message","Codex error: nested-message","Codex error: code-only","failed-message","Codex response failed","cancelled-message"};
+ for(unsigned i=0;i<sizeof(events)/sizeof(*events);i++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-failure\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start());char frame[2048];snprintf(frame,sizeof(frame),"data: %s\n\n",events[i]);size_t length=strlen(frame);assert(captured_write(frame,1,length,captured_write_data)==length);pg_model_event event={0};assert(nxt(&event));pg_slice message={0},raw={0};assert(!pg_mimo_failure_data(&m,&message,&raw)&&message.size==strlen(expected[i])&&!memcmp(message.data,expected[i],message.size));json_object *detail=json_tokener_parse(raw.data),*payload=json_object_object_get(detail,"payload"),*original=json_tokener_parse(events[i]);assert(payload&&json_object_equal(payload,original));json_object_put(detail);json_object_put(original);model.close(model.context);assert(!m.response_terminal&&!m.codex_frame);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex stream errors preserve root/nested precedence, classification and complete provider event through failure_data");
+}
 static void test_codex_header_deadlines(void){
  for(unsigned mode=0;mode<6;mode++){
   reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-timeout\",\"options\":{}}");json_object *options=json_object_object_get(cfg,"options");if(mode!=0)json_object_object_add(options,"timeoutMs",mode==1?json_object_new_int(0):mode==2?json_object_new_double(100.9):json_object_new_int(100));if(mode==5)json_object_object_add(options,"maxRetries",json_object_new_int(1));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start()&&captured_timeout==0&&captured_connect_timeout==0);
@@ -920,6 +938,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_codex_stream_failures();
     test_codex_header_deadlines();
     test_codex_terminal_frames();
     test_codex_failure_display();
