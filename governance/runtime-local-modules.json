@@ -2897,14 +2897,19 @@
         "src/runtime/oauth.S",
         "src/runtime/oauth.h",
         "src/runtime/oauth_http.c",
-        "src/runtime/oauth_device.S"
+        "src/runtime/oauth_device.S",
+        "src/runtime/oauth_browser.S",
+        "src/runtime/oauth_callback.c"
       ],
       "dependencies": [
         "credentials.local.v0",
         "json-c",
         "libcurl",
         "system libc",
-        "base64.local.v0"
+        "base64.local.v0",
+        "libevent",
+        "libcrypto",
+        "glib-2.0"
       ],
       "role": "handwritten stored OAuth resolution, double-checked refresh and Codex token rotation; injected flow/time and bounded HTTP bridge",
       "exports": [
@@ -2923,7 +2928,19 @@
         "pg_oauth_device_service",
         "pg_oauth_http_start (platform bridge)",
         "pg_oauth_http_step (platform bridge)",
-        "pg_oauth_http_close (platform bridge)"
+        "pg_oauth_http_close (platform bridge)",
+        "pg_oauth_pkce",
+        "pg_oauth_authorization_parse",
+        "pg_oauth_browser_configure",
+        "pg_oauth_browser_begin",
+        "pg_oauth_browser_submit",
+        "pg_oauth_browser_poll",
+        "pg_oauth_login_exchange",
+        "pg_oauth_callback_open (library bridge)",
+        "pg_oauth_callback_close (library bridge)",
+        "pg_oauth_callback_pump (library bridge)",
+        "pg_oauth_callback_path (library bridge)",
+        "pg_oauth_query_fields (library bridge)"
       ],
       "reference_basis": [
         "Pi auth/resolve.ts and auth/oauth/openai-codex.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"

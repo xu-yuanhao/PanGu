@@ -398,6 +398,15 @@
     "src/runtime/oauth_device.S": {
       "role": "assembly-core",
       "reason": "手写设备码登录状态机、pending/slow_down时序、取消、令牌交换和凭据提交"
+    },
+    "src/runtime/oauth_browser.S": {
+      "role": "assembly-core",
+      "reason": "手写PKCE、授权输入/状态核对、浏览器登录与共用交换接线"
+    },
+    "src/runtime/oauth_callback.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "libevent HTTP回调监听、事件循环、URI/query接口与资源布局胶水"
     }
   }
 }

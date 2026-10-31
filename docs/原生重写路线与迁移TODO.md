@@ -135,6 +135,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 可注入credentials存储接通产品API-key认证：PanGu用户agent目录auth.json、类型验证、独立读取、公开providerId/type列表、锁内modify/no-change/delete与原子0600持久化；显式密钥优先、存储错误/未匹配类型阻止环境回退。并发更新、失败保留、私有快照关闭及仅用存储密钥的真实模型/工具/两次Host重开通过。
 - [x] Codex存储OAuth接通请求与刷新：五分钟有效期、锁内二次检查、轮换持久化、刷新错误保留、注销竞争处理及同一JWT的Bearer/账户路由；支持长JWT与Base64URL claim，复用共享编解码。实际本地HTTP回放、四进程刷新去重、模型/产品ASan/UBSan和客户端恢复通过。
 - [x] Codex设备码登录接通Host/TUI可选认证服务：获取验证码/验证地址、协作HTTP轮询、pending/slow_down与十五分钟超时、授权码交换、令牌验证/原子保存、取消和注销；公开快照与私有设备数据隔离。九组产品HTTP场景及登录后使用存储JWT的实际模型请求通过，TUI绑定/解绑与真实DeepSeek存储密钥闭环保持通过。
+- [x] Codex浏览器登录接通同一auth服务：PKCE/state、PanGu授权URL、loopback回调和手工URL/query/code#state/纯代码输入、端口占用回退、取消及迟到输入隔离；与设备码共用授权码交换/令牌验证/存储。十二组产品回放与十四组Pi授权输入源码差分通过，TUI操作表提供browser_begin/submit_code。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -331,8 +332,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/oauth/device-code.ts`、`openai-codex.ts` 的start/poll/loginOpenAICodexDeviceCode及授权码交换；现有refresh与CredentialStore调用者。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：Host auth→手写Assembly设备码状态机→libcurl multi协作请求→授权码交换→共享Codex令牌验证→credentials.modify原子保存→Model.start私有JWT/账户路由。覆盖首轮立即轮询、最小1秒、pending/slow_down增量、十五分钟截止、请求/轮询/交换取消与关闭释放；公开验证码快照独立于私有请求数据。同步刷新和设备交换复用同一令牌解析及HTTP桥接。TUI接口为tui_runtime_adapter.h的pg_tui_runtime_auth，返回oauth.h的pg_auth_ops：begin(provider)、poll(owned snapshot)、cancel、list、remove；快照含status、user_code/verification_uri和next_poll，终态complete/failed/cancelled/timed_out。模型HTTP/HTTPS端点沿参考fetch行为接通。
-- 验证：产品ASan/UBSan九组实际本地HTTP场景覆盖登录→pending/slow_down→交换→存储→实际Codex协议模型请求，取消/超时/拒绝/非法回复保持无凭据；核对表单转义、请求字段与公开快照变更隔离，Host/TUI可选服务绑定/解绑通过。字符串interval参数错误已定位修复；模型完整O0/O2/UBSan、ABI/故障注入、TLS与既有Pi差分、产品构建及G00/Assembly/diff通过。仅用存储密钥的真实DeepSeek模型→工具→账本→两次Host重开在ASan/UBSan下通过。自审核对任务状态、网络句柄关闭、令牌提交边界、快照与私有字段所有权和Host关闭顺序。
-- 具体缺口：TUI认证面板消费上述接口；Codex浏览器登录及其余提供者登录/刷新/派生；既有模型认证读取/刷新仍为有界同步调用，等待锁与刷新结果的协作取消待接通。凭据env/命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
-- 下一交付物：继续K05完整认证流程，将浏览器登录与已有设备码/凭据服务接到同一公开操作表，并完成认证等待的协作推进。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/oauth/pkce.ts`、`openai-codex.ts` 的createAuthorizationFlow/parseAuthorizationInput/loginOpenAICodex、callback-server.ts的状态核对与手工回退；设备码与令牌交换调用者一并核对。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：现有Host auth/TUI可选操作表追加browser_begin(provider)/submit_code(input)→手写Assembly PKCE/授权URL→libevent协作回调或手工输入→state与code核对→共用pg_oauth_login_exchange→令牌验证与credentials.modify。默认127.0.0.1:1455，PANGU_OAUTH_CALLBACK_HOST适配PanGu环境；端口占用保留手工输入，错误state/路由继续等待，授权错误/取消终结，迟到手工输入不撤销已开始交换。公开auth_url快照仅含URL与callback_available，PKCE verifier保留私有；设备码与浏览器共用同一状态机/清理入口。C仅承担系统libevent HTTP/URI接口胶水，libcrypto提供随机数与SHA256。
+- 验证：产品ASan/UBSan十二组浏览器回放覆盖PKCE独立摘要核对、四种手工形式、自动回调/非法state/缺代码/授权拒绝、端口占用、取消/迟到输入、交换失败及凭据落盘；十四组授权输入直接运行固定Pi函数差分通过。设备码完整调用链、OAuth刷新/并发存储与Host/TUI绑定回归保持通过。模型O0/O2/UBSan、ABI/故障注入、实际TLS与既有Pi差分、产品构建及G00/Assembly/diff通过。自审核对回调响应后释放、state优先核对、随机缓冲布局、私有字段/公开快照所有权及交换实现原地提取。
+- 具体缺口：TUI认证面板消费browser_begin/submit_code及设备码接口；其余提供者登录/刷新/派生；模型认证读取/刷新仍为有界同步调用，等待锁与刷新结果的协作取消待接通。凭据env/命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
+- 下一交付物：沿同一auth/credentials与实际模型服务，成组接通其余提供者认证及认证等待生命周期。

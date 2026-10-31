@@ -32,7 +32,7 @@ SOFTWARE.*/
 pg_oauth_device_init:
  mov r8,rdi
  xor eax,eax
- mov ecx,9
+ mov ecx,12
  rep stosq
  mov [r8],rsi
  test rdx,rdx
@@ -54,6 +54,8 @@ pg_oauth_device_begin:
  call strcmp@PLT
  test eax,eax
  jnz .Ld_begin_bad
+ cmp dword ptr [rbx+40],10
+ je .Ld_begin_busy
  mov eax,[rbx+40]
  dec eax
  cmp eax,3
@@ -94,6 +96,12 @@ pg_oauth_device_close:
  mov rdi,[rbx+32]
  call json_object_put@PLT
  mov qword ptr [rbx+32],0
+ mov rdi,[rbx+72]
+ call json_object_put@PLT
+ mov qword ptr [rbx+72],0
+ mov rdi,[rbx+88]
+ call pg_oauth_callback_close@PLT
+ mov qword ptr [rbx+88],0
  mov qword ptr [rbx+40],0
  mov qword ptr [rbx+48],0
  mov qword ptr [rbx+56],0
@@ -104,10 +112,13 @@ pg_oauth_device_close:
 .globl pg_oauth_device_cancel
 .type pg_oauth_device_cancel,@function
 pg_oauth_device_cancel:
+ cmp dword ptr [rdi+40],10
+ je .Ld_cancel_active
  mov eax,[rdi+40]
  dec eax
  cmp eax,3
  ja .Ld_cancel_done
+.Ld_cancel_active:
  push rbx
  mov rbx,rdi
  call pg_oauth_device_close
@@ -124,15 +135,21 @@ pg_oauth_device_poll:
  push r12
  push r13
  push r14
- sub rsp,64
+ sub rsp,48
  mov rbx,rdi
  mov r12,rsi
  xor eax,eax
- mov ecx,8
+ mov ecx,6
  mov rdi,rsp
  rep stosq
  mov qword ptr [r12],0
  mov ebp,[rbx+40]
+ cmp ebp,10
+ jne .Ld_poll_device
+ mov rdi,rbx
+ call pg_oauth_browser_poll@PLT
+ jmp .Ld_snapshot
+.Ld_poll_device:
  cmp ebp,2
  je .Ld_waiting
  cmp ebp,1
@@ -286,59 +303,14 @@ pg_oauth_device_poll:
  mov dword ptr [rbx+40],2
  jmp .Ld_snapshot
 .Ld_exchange:
- DGET "qword ptr [rsp]",authorization_code
- mov rdi,rax
- call .Ld_string
- test rax,rax
- jz .Ld_failed
- mov rsi,rax
- xor edi,edi
- xor edx,edx
- call curl_easy_escape@PLT
- mov [rsp+40],rax
- test rax,rax
- jz .Ld_failed
- DGET "qword ptr [rsp]",code_verifier
- mov rdi,rax
- call .Ld_string
- test rax,rax
- jz .Ld_failed
- mov rsi,rax
- xor edi,edi
- xor edx,edx
- call curl_easy_escape@PLT
- mov [rsp+48],rax
- test rax,rax
- jz .Ld_failed
+ mov rdi,rbx
+ mov rsi,[rsp]
  mov rax,[rbx+8]
- mov rsi,[rax+32]
- xor edi,edi
- xor edx,edx
- call curl_easy_escape@PLT
- mov r14,rax
- test rax,rax
- jz .Ld_failed
- lea rdi,[rsp+32]
- lea rsi,[rip+.Ld_exchange_form]
- mov rdx,[rsp+40]
- mov rcx,[rsp+48]
- mov r8,r14
- xor eax,eax
- call asprintf@PLT
- mov ebp,eax
- mov rdi,r14
- call curl_free@PLT
- test ebp,ebp
- js .Ld_failed
- mov rax,[rbx+8]
- mov rsi,[rax+16]
- lea rdi,[rbx+16]
- lea rdx,[rip+.Ld_form_type]
- mov rcx,[rsp+32]
- call pg_oauth_http_start@PLT
+ mov rdx,[rax+32]
+ mov rcx,[rax+16]
+ call pg_oauth_login_exchange
  test eax,eax
  jnz .Ld_failed
- mov dword ptr [rbx+40],4
  jmp .Ld_snapshot
 .Ld_complete:
  mov rdi,rbx
@@ -360,7 +332,7 @@ pg_oauth_device_poll:
  lea rsi,[rip+.Ld_identity]
  lea rdx,[rip+.Ld_save]
  mov rcx,[rbx+32]
- lea r8,[rsp+56]
+ lea r8,[rsp+32]
  call qword ptr [r14+24]
  test eax,eax
  jnz .Ld_failed
@@ -389,15 +361,9 @@ pg_oauth_device_poll:
  mov rdi,[rsp+24]
  call json_object_put@PLT
  mov rdi,[rsp+32]
- call free@PLT
- mov rdi,[rsp+40]
- call curl_free@PLT
- mov rdi,[rsp+48]
- call curl_free@PLT
- mov rdi,[rsp+56]
  call json_object_put@PLT
  mov eax,ebp
- add rsp,64
+ add rsp,48
  pop r14
  pop r13
  pop r12
@@ -592,7 +558,7 @@ pg_oauth_device_poll:
  test rax,rax
  jz .Ld_public_bad
  mov eax,[rbx+40]
- cmp eax,9
+ cmp eax,10
  ja .Ld_public_release
  lea rdx,[rip+.Ld_statuses]
  mov rdi,[rdx+rax*8]
@@ -618,6 +584,32 @@ pg_oauth_device_poll:
  test eax,eax
  jnz .Ld_public_release
 .Ld_public_device:
+ cmp dword ptr [rbx+40],10
+ jne .Ld_public_device_fields
+ mov rdi,[rbx+72]
+ lea rsi,[rip+.LdK_url]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ call json_object_new_string@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.LdK_url]
+ mov rdx,rax
+ call .Ld_add
+ test eax,eax
+ jnz .Ld_public_release
+ xor edi,edi
+ cmp qword ptr [rbx+88],0
+ setne dil
+ call json_object_new_boolean@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.LdK_callback_available]
+ mov rdx,rax
+ call .Ld_add
+ test eax,eax
+ jnz .Ld_public_release
+.Ld_public_device_fields:
  cmp qword ptr [rbx+24],0
  je .Ld_public_done
  DGET "qword ptr [rbx+24]",user_code
@@ -676,6 +668,10 @@ pg_oauth_device_service:
  mov [rsi+32],rax
  lea rax,[rip+.Ld_remove]
  mov [rsi+40],rax
+ mov rax,qword ptr [rip+pg_oauth_browser_begin@GOTPCREL]
+ mov [rsi+48],rax
+ mov rax,qword ptr [rip+pg_oauth_browser_submit@GOTPCREL]
+ mov [rsi+56],rax
  ret
 .size pg_oauth_device_service,.-pg_oauth_device_service
 .Ld_list:
@@ -708,6 +704,9 @@ pg_oauth_device_service:
 .Ld_failed_status: .asciz "failed"
 .Ld_cancelled: .asciz "cancelled"
 .Ld_timed_out_status: .asciz "timed_out"
+.Ld_auth_url: .asciz "auth_url"
+.LdK_url: .asciz "url"
+.LdK_callback_available: .asciz "callback_available"
 .Ld_timeout: .asciz "Device flow timed out"
 .Ld_slow_timeout: .asciz "Device flow timed out after one or more slow_down responses. This is often caused by clock drift in WSL or VM environments. Please sync or restart the VM clock and try again."
 .LdK_device_auth_id: .asciz "device_auth_id"
@@ -725,5 +724,94 @@ pg_oauth_device_service:
 .Ld_thousand: .double 1000
 .section .data.rel.ro
 .Ld_default_config: .quad .Ld_start_url,.Ld_poll_url,.Ld_token_url,.Ld_verify_url,.Ld_redirect,0,0
-.Ld_statuses: .quad .Ld_idle,.Ld_requesting,.Ld_device_code,.Ld_pending_status,.Ld_exchanging,.Ld_exchanging,.Ld_complete_status,.Ld_failed_status,.Ld_cancelled,.Ld_timed_out_status
+.Ld_statuses: .quad .Ld_idle,.Ld_requesting,.Ld_device_code,.Ld_pending_status,.Ld_exchanging,.Ld_exchanging,.Ld_complete_status,.Ld_failed_status,.Ld_cancelled,.Ld_timed_out_status,.Ld_auth_url
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_oauth_login_exchange
+.type pg_oauth_login_exchange,@function
+pg_oauth_login_exchange:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ sub rsp,32
+ mov rbx,rdi
+ mov r12,rsi
+ mov r13,rdx
+ mov r14,rcx
+ xor eax,eax
+ mov [rsp],rax
+ mov [rsp+8],rax
+ mov [rsp+16],rax
+ mov [rsp+24],rax
+ mov ebp,7
+ DGET r12,authorization_code
+ mov rdi,rax
+ call .Ld_string
+ test rax,rax
+ jz .Lx_end
+ mov rsi,rax
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp],rax
+ test rax,rax
+ jz .Lx_end
+ DGET r12,code_verifier
+ mov rdi,rax
+ call .Ld_string
+ test rax,rax
+ jz .Lx_end
+ mov rsi,rax
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jz .Lx_end
+ mov rsi,r13
+ xor edi,edi
+ xor edx,edx
+ call curl_easy_escape@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Lx_end
+ lea rdi,[rsp+24]
+ lea rsi,[rip+.Ld_exchange_form]
+ mov rdx,[rsp]
+ mov rcx,[rsp+8]
+ mov r8,[rsp+16]
+ xor eax,eax
+ call asprintf@PLT
+ test eax,eax
+ js .Lx_end
+ lea rdi,[rbx+16]
+ mov rsi,r14
+ lea rdx,[rip+.Ld_form_type]
+ mov rcx,[rsp+24]
+ call pg_oauth_http_start@PLT
+ test eax,eax
+ jnz .Lx_end
+ mov dword ptr [rbx+40],4
+ xor ebp,ebp
+.Lx_end:
+ mov rdi,[rsp]
+ call curl_free@PLT
+ mov rdi,[rsp+8]
+ call curl_free@PLT
+ mov rdi,[rsp+16]
+ call curl_free@PLT
+ mov rdi,[rsp+24]
+ call free@PLT
+ mov eax,ebp
+ add rsp,32
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_oauth_login_exchange,.-pg_oauth_login_exchange
 .section .note.GNU-stack,"",@progbits
