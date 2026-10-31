@@ -292,6 +292,24 @@ static int credential_next(void *context,const json_object *current,json_object 
 }
 static int credential_no_change(void *context,const json_object *current,json_object **next){(void)current;*next=0;return context?42:0;}
 static int credential_invalid(void *context,const json_object *current,json_object **next){(void)context;(void)current;*next=json_tokener_parse("{\"type\":\"api_key\",\"key\":null}");return 0;}
+typedef struct {unsigned calls,fail;} oauth_fixture;
+static double oauth_now(void *context){(void)context;return 1000000.0;}
+static int oauth_seed(void *context,const json_object *current,json_object **next){(void)current;return json_object_deep_copy(context,next,0)?7:0;}
+static int oauth_rotate(void *context,const json_object *current,json_object **next){
+ oauth_fixture *fixture=context;fixture->calls++;if(fixture->fail)return 42;if(json_object_deep_copy((json_object *)current,next,0))return 7;json_object_object_add(*next,"access",json_object_new_string("rotated-private-access"));json_object_object_add(*next,"refresh",json_object_new_string("rotated-private-refresh"));json_object_object_add(*next,"expires",json_object_new_double(2000000));json_object_object_add(*next,"refreshes",json_object_new_int(json_object_get_int(json_object_object_get(current,"refreshes"))+1));return 0;
+}
+static void check_oauth(void){
+ char root[]="/tmp/pangu-oauth-XXXXXX",path[4096],lock[4100];assert(mkdtemp(root));snprintf(path,sizeof(path),"%s/auth.json",root);snprintf(lock,sizeof(lock),"%s.lock",path);pg_credential_store store={0};assert(!pg_credentials_file_init(&store,path));oauth_fixture fixture={0};pg_oauth_provider flow={&fixture,"fixture",oauth_now,oauth_rotate};json_object *expired=json_tokener_parse("{\"type\":\"oauth\",\"access\":\"old-access\",\"refresh\":\"refresh +/&=\",\"expires\":1300000}"),*out=0;assert(!store.modify(store.context,"fixture",oauth_seed,expired,&out));json_object_put(out);out=0;
+ fixture.fail=1;assert(pg_oauth_resolve(&store,"fixture",&flow,expired,&out)==42&&!out);assert(!store.read(store.context,"fixture",&out)&&json_object_equal(out,expired));json_object_put(out);out=0;fixture.fail=0;fixture.calls=0;
+ assert(!pg_oauth_resolve(&store,"fixture",&flow,expired,&out)&&fixture.calls==1);assert(!strcmp(json_object_get_string(json_object_object_get(out,"refresh")),"rotated-private-refresh"));json_object_put(out);out=0;assert(!pg_oauth_resolve(&store,"fixture",&flow,expired,&out)&&fixture.calls==1);json_object_put(out);out=0;
+ assert(!store.modify(store.context,"fixture",oauth_seed,expired,&out));json_object_put(out);out=0;
+ for(unsigned n=0;n<4;n++){pid_t child=fork();assert(child>=0);if(!child){json_object *value=0;int result=pg_oauth_resolve(&store,"fixture",&flow,expired,&value);json_object_put(value);_exit(result?1:0);}}
+ for(unsigned n=0;n<4;n++){int status=0;assert(wait(&status)>0&&WIFEXITED(status)&&!WEXITSTATUS(status));}assert(!store.read(store.context,"fixture",&out)&&json_object_get_int(json_object_object_get(out,"refreshes"))==1);json_object_put(out);out=0;assert(!store.remove(store.context,"fixture"));assert(pg_oauth_resolve(&store,"fixture",&flow,expired,&out)&&!out);json_object_put(expired);assert(!unlink(path)&&!unlink(lock)&&!rmdir(root));puts("PASS: stored OAuth five-minute boundary, refresh failure preservation, rotation persistence, locked second check, four-process refresh deduplication and logout race");
+}
+static int oauth_http_workflow(const char *base){
+ assert(!curl_global_init(CURL_GLOBAL_DEFAULT));pg_oauth_provider flow;pg_oauth_codex_init(&flow);json_object *old=json_tokener_parse("{\"type\":\"oauth\",\"access\":\"old-access\",\"refresh\":\"refresh +/&=\",\"expires\":0}");
+ const char *paths[]={"/ok","/missing","/bad-jwt","/denied"};for(unsigned i=0;i<4;i++){char url[4096];snprintf(url,sizeof(url),"%s%s",base,paths[i]);json_object *next=0;int status=flow.refresh(url,old,&next);if(i)assert(status&&!next);else{assert(!status&&next&&!strcmp(json_object_get_string(json_object_object_get(next,"refresh")),"rotated-refresh")&&!strcmp(json_object_get_string(json_object_object_get(next,"accountId")),"pangu-oauth-account"));double expires=json_object_get_double(json_object_object_get(next,"expires"));assert(expires>pg_oauth_realtime(0)+3500000);json_object_put(next);}}json_object_put(old);curl_global_cleanup();puts("PASS: actual Codex form refresh HTTP, escaped refresh token, account claim, expiry and invalid/denied responses");return 0;
+}
 static void check_credentials(void){
  char root[]="/tmp/pangu-credentials-XXXXXX",path[4096],lock[4100];assert(mkdtemp(root));snprintf(path,sizeof(path),"%s/auth.json",root);snprintf(lock,sizeof(lock),"%s.lock",path);pg_credential_store store={0};assert(!pg_credentials_file_init(&store,path));json_object *value=0,*list=0;assert(!store.read(store.context,"fixture",&value)&&!value);assert(!store.list(store.context,&list)&&json_object_array_length(list)==0);json_object_put(list);
  assert(!store.modify(store.context,"fixture",credential_next,"private-fixture",&value)&&value);json_object_object_add(value,"count",json_object_new_int(999));json_object_put(value);assert(!store.read(store.context,"fixture",&value)&&json_object_get_int(json_object_object_get(value,"count"))==1);json_object_put(value);assert(!store.list(store.context,&list)&&json_object_array_length(list)==1&&!strstr(json_object_to_json_string(list),"private-fixture"));json_object_put(list);struct stat st;assert(!stat(path,&st)&&(st.st_mode&0777)==0600);
@@ -303,7 +321,8 @@ static void check_credentials(void){
  FILE *file=fopen(path,"w");assert(file&&fputs("{\"fixture\":{\"type\":\"oauth\",\"access\":\"private-access\",\"refresh\":\"private-refresh\",\"expires\":123456789}}",file)>=0&&!fclose(file));assert(!store.list(store.context,&list)&&!strstr(json_object_to_json_string(list),"private-"));json_object_put(list);assert(!store.read(store.context,"fixture",&value));json_object_put(value);assert(!unlink(path)&&!unlink(lock)&&!rmdir(root));puts("PASS: credential store detached read/list, private metadata, no-change/error, 40 concurrent updates, permissions, delete and malformed/OAuth validation");
 }
 int main(int argc,char **argv){
- if(argc==1)check_credentials();
+ if(argc==1){check_credentials();check_oauth();}
+ if(argc==3&&!strcmp(argv[1],"--oauth-refresh"))return oauth_http_workflow(argv[2]);
  if(argc==3&&(!strcmp(argv[1],"--nested-process-seed")||!strcmp(argv[1],"--nested-process-resume")||!strcmp(argv[1],"--nested-process-seed-cancel")||!strcmp(argv[1],"--nested-process-resume-cancel")))return nested_process_workflow(argv[1],argv[2]);
  int live_cost=argc==2&&!strcmp(argv[1],"--live-cost");
  int model_configuration=argc==2&&!strcmp(argv[1],"--model-configuration");

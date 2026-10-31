@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 struct json_object;
 struct pg_credential_store;
+struct pg_oauth_provider;
 typedef struct { char arguments[PG_TEXT_LIMIT],id[PG_ID_LIMIT],name[PG_ID_LIMIT]; } pg_mimo_call_storage;
 struct printbuf;
 typedef struct {uint64_t index;unsigned kind,closed;struct printbuf *text,*signature;struct json_object *item;} pg_mimo_anthropic_block;
@@ -42,6 +43,7 @@ typedef struct {
  unsigned header_status,header_complete,header_timed_out;
  const struct pg_credential_store *credentials; /* borrowed service lifetime */
  struct json_object *credential; /* private owned request credential */
+ const struct pg_oauth_provider *oauth; /* borrowed matching flow */
 } pg_mimo;
 /* Native provider transport. Request identity/options are detached from
    credentials. A bound store and process environment resolve request auth;
@@ -62,6 +64,7 @@ int pg_mimo_configure(pg_mimo *,const struct json_object *);
    argumentsError metadata alongside the prepared argument object. */
 int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 /* Bind the same immutable registry used by the executor before starting runs. */
+void pg_mimo_bind_oauth(pg_mimo *,const struct pg_oauth_provider *);
 void pg_mimo_bind_credentials(pg_mimo *,const struct pg_credential_store *);
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 /* Internal projection test seam: creates owned request; no network/credentials. */

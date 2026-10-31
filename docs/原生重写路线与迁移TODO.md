@@ -133,6 +133,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Durable canonical上下文与模型输出预算接通：复用共享UTF-16/图片/工具估算及有效usage锚点，按模型默认输出和上下文4096余量准备请求；八协议字段、Responses最低输出及Anthropic/Bedrock推理/回答空间与自定义预算对照上游验证，压缩共用同一消息估算实现。
 - [x] 标准API-key提供者环境解析接通实际请求：按公开模型身份读取固定上游37项映射，显式PanGu密钥优先；Anthropic AUTH_TOKEN采用Bearer，普通key采用协议请求头，空白环境值跳过。密钥不进入请求JSON/配置/会话；实际DeepSeek模型→工具→账本→两次Host重开通过。
 - [x] 可注入credentials存储接通产品API-key认证：PanGu用户agent目录auth.json、类型验证、独立读取、公开providerId/type列表、锁内modify/no-change/delete与原子0600持久化；显式密钥优先、存储错误/未匹配类型阻止环境回退。并发更新、失败保留、私有快照关闭及仅用存储密钥的真实模型/工具/两次Host重开通过。
+- [x] Codex存储OAuth接通请求与刷新：五分钟有效期、锁内二次检查、轮换持久化、刷新错误保留、注销竞争处理及同一JWT的Bearer/账户路由；支持长JWT与Base64URL claim，复用共享编解码。实际本地HTTP回放、四进程刷新去重、模型/产品ASan/UBSan和客户端恢复通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -329,8 +330,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/{types,credential-store,resolve}.ts`、Coding Agent `core/auth-storage.ts` 的FileAuthStorageBackend/ReadOnlyAuthStorage与实际调用者；Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：Host credentials服务→model依赖注入→Model.start私有凭据读取→认证头→既有Generation。新增公开pg_credential_store函数表；手写Assembly实现read/list/modify/delete、Credential类型验证与所有权，POSIX C桥接锁、字节读取、0600临时文件/fsync/rename。普通文件锁等待沿同步参考采用10次/20ms上限。产品使用自己的用户agent目录auth.json，每次请求读取最新快照，close释放；显式PANGU_MODEL_API_KEY优先，存储错误或类型无处理器时返回失败。
-- 验证：模型完整driver O0/O2/UBSan、ABI/故障注入、实际TLS及既有Pi差分通过；新增注入存储优先级、错误/未处理OAuth禁止环境回退和关闭释放专项。产品资源ASan/UBSan覆盖独立读取、公开列表、no-change/回调错误/非法候选、40次四进程并发更新、权限/删除、非法类型与OAuth数据。仅存储密钥、清除环境密钥的真实DeepSeek模型→工具→费用账本→两次Host重开/继续生成通过。产品构建、G00、Assembly/diff通过。自审核对文件提交边界、错误输出释放、私有JSON借用、模型布局断言与Host依赖/关闭顺序。
-- 具体缺口：OAuth登录/刷新、凭据env配置与命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
-- 下一交付物：沿同一credentials服务和请求链移植OAuth认证/刷新，完成提供者令牌派生与持久更新。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/resolve.ts`、`auth/oauth/openai-codex.ts` 的refreshAccessToken/readTokenResponse/credentialsFromToken及api Codex请求入口；Coding Agent auth-storage.ts的异步锁等待语义。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：Host注入credentials与oauth.openai-codex→Model.start读取OAuth快照→pg_oauth_resolve检查有效期→store.modify锁内二次检查/刷新/原子保存→同一access JWT生成Bearer与账户头。手写Assembly负责有效期、表单语义、令牌/账户验证和所有权；C仅桥接15秒libcurl HTTP与实时时钟。文件锁等待扩为30秒以覆盖令牌轮换。原有Base64实现原地提取供模型与OAuth共用，旧实现/导出归属及全部构建同步迁移。认证失败保留无敏感信息的model_auth_failed并阻止外层网络重试。
+- 验证：模型完整driver的O0/O2/UBSan、ABI/故障注入、TLS及既有Pi差分通过，新增fresh/rotated/长JWT请求头与私有快照释放通过。产品ASan/UBSan覆盖五分钟边界、刷新错误保留、锁内复核、四进程一次刷新及注销竞争；实际本地HTTP验证表单转义、客户端ID、轮换/过期时间、Base64URL账户claim、缺字段/非法JWT/401。客户端SQLite/JSONL任务、调度、压缩与恢复回归、产品构建及G00/Assembly/diff通过。HTTP接收回调返回值问题已修复并复验。自审核对旋转令牌提交边界、失败清理、共享编解码移除、模型布局与Host生命周期。
+- 具体缺口：OAuth登录交互及其余提供者刷新/派生；当前认证读取/刷新为有界同步调用，等待锁和等待刷新结果的协作取消仍需接入。凭据env/命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
+- 下一交付物：接通原生OAuth登录/认证等待与取消，沿同一Host凭据服务和真实模型请求继续完成K05。

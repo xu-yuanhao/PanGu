@@ -32,6 +32,24 @@ def main():
         sources=compile_inputs([name for name in SOURCES if name!='src/composition/pangu.c'],directory,sanitize)
         subprocess.run(['/usr/bin/clang-23','-D_POSIX_C_SOURCE=200809L','-std=c11','-Wall','-Wextra','-Werror','-pedantic','-O2',*sanitize,*PLUGIN_EXPORTS,*sources,str(ROOT/'tests/runtime/test_product_resources.c'),*flags,'-ldl','-o',str(output)],check=True)
         if not any((args.live_cost,args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
+            import threading,json,base64
+            from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
+            from urllib.parse import parse_qs
+            requests=[]
+            payload=base64.urlsafe_b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-oauth-account'},'padding':'\uffff😀'},ensure_ascii=False).encode()).decode().rstrip('=')
+            class OAuthReceiver(BaseHTTPRequestHandler):
+                def log_message(self,*args): pass
+                def do_POST(self):
+                    form=parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode());requests.append((self.path,form))
+                    body={'access_token':'e30.'+payload+'.signature','refresh_token':'rotated-refresh','expires_in':3600}
+                    if self.path=='/missing': body.pop('refresh_token')
+                    if self.path=='/bad-jwt': body['access_token']='invalid-token'
+                    wire=json.dumps(body).encode();self.send_response(401 if self.path=='/denied' else 200);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire)
+            server=ThreadingHTTPServer(('127.0.0.1',0),OAuthReceiver);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+            try: subprocess.run([str(output),'--oauth-refresh',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
+            finally: server.shutdown();server.server_close();thread.join()
+            assert len(requests)==4 and all(form=={'grant_type':['refresh_token'],'refresh_token':['refresh +/&='],'client_id':['app_EMoamEEZ73f0CkXaXp7hrann']} for _,form in requests),requests
+        if not any((args.live_cost,args.live,args.live_agent,args.live_conversations,args.live_process_conversations,args.live_extensions,args.live_compaction,args.live_auto_compaction,args.live_background_compaction,args.live_dynamic_context)):
             for api,base,options in (
                 ('google-generative-ai',None,'{}'),
                 ('google-generative-ai','https://proxy.invalid/v1beta','{}'),

@@ -25,7 +25,8 @@ int pg_credentials_file_access(const char *path,int writing,int (*visit)(void *,
  if(asprintf(&lockpath,"%s.lock",path)<0){lockpath=0;goto done;}
  lock=open(lockpath,O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW,0600);
  if(lock<0){if(!writing&&(errno==ENOENT||errno==ENOTDIR)){result=visit(context,"{}",2,&next);}goto done;}
- int acquired=0;for(unsigned attempt=0;attempt<10;attempt++){if(!flock(lock,(writing?LOCK_EX:LOCK_SH)|LOCK_NB)){acquired=1;break;}if(errno!=EWOULDBLOCK&&errno!=EAGAIN&&errno!=EINTR)goto done;if(attempt<9){struct timespec pause={0,20000000};while(nanosleep(&pause,&pause)&&errno==EINTR){}}}if(!acquired)goto done;
+ struct timespec started;if(clock_gettime(CLOCK_MONOTONIC,&started))goto done;
+ for(;;){if(!flock(lock,(writing?LOCK_EX:LOCK_SH)|LOCK_NB))break;if(errno!=EWOULDBLOCK&&errno!=EAGAIN&&errno!=EINTR)goto done;struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now)||now.tv_sec-started.tv_sec>30||(now.tv_sec-started.tv_sec==30&&now.tv_nsec>=started.tv_nsec))goto done;struct timespec pause={0,20000000};while(nanosleep(&pause,&pause)&&errno==EINTR){}}
  input=open(path,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
  if(input<0){if(errno!=ENOENT)goto done;result=visit(context,"{}",2,&next);}
  else{

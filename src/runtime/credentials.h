@@ -15,7 +15,7 @@ typedef struct pg_credential_store {
 _Static_assert(sizeof(pg_credential_store)==40,"credential store ABI");
 _Static_assert(offsetof(pg_credential_store,read)==8,"credential read ABI");
 /* Path is borrowed for the store lifetime. Results are detached owned JSON.
-   File transactions use a bounded synchronous lock wait.
+   File transactions use a synchronous lock wait bounded to 30 seconds for token rotation.
    Missing entries return NULL; list exposes providerId/type only. Status 0 is
    success, 5 is invalid data/arguments, 7 is storage/allocation failure. */
 int pg_credentials_file_init(pg_credential_store *,const char *);

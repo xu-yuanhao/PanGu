@@ -1,3 +1,4 @@
+#include "../../src/runtime/oauth.h"
 #include "../../src/runtime/credentials.h"
 #define _POSIX_C_SOURCE 200809L
 #include "../../src/runtime/mimo.h"
@@ -619,10 +620,24 @@ static unsigned stored_mode,stored_reads;
 static int stored_read(void *context,const char *identity,json_object **output){
  (void)context;stored_reads++;assert(!strcmp(identity,"deepseek"));*output=0;if(stored_mode==2)return 7;if(stored_mode==3)return 0;*output=json_tokener_parse(stored_mode==1?"{\"type\":\"oauth\",\"access\":\"private-access\"}":stored_mode==4?"{\"type\":\"api_key\"}":"{\"type\":\"api_key\",\"key\":\"unit-stored-secret\"}");return 0;
 }
+typedef struct {json_object *credential;const char *rotated;unsigned refreshes;} oauth_transport_fixture;
+static double oauth_transport_now(void *context){(void)context;return 1000000;}
+static int oauth_transport_read(void *context,const char *provider_name,json_object **out){oauth_transport_fixture *fixture=context;assert(!strcmp(provider_name,"openai-codex"));return json_object_deep_copy(fixture->credential,out,0)?7:0;}
+static int oauth_transport_modify(void *context,const char *provider_name,pg_credential_update update,void *update_context,json_object **out){
+ oauth_transport_fixture *fixture=context;assert(!strcmp(provider_name,"openai-codex"));json_object *next=0;int status=update(update_context,fixture->credential,&next);if(status){json_object_put(next);return status;}if(next){json_object_put(fixture->credential);fixture->credential=next;}return json_object_deep_copy(fixture->credential,out,0)?7:0;
+}
+static int oauth_transport_refresh(void *context,const json_object *current,json_object **next){oauth_transport_fixture *fixture=context;fixture->refreshes++;if(json_object_deep_copy((json_object *)current,next,0))return 7;json_object_object_add(*next,"access",json_object_new_string(fixture->rotated));json_object_object_add(*next,"refresh",json_object_new_string("rotated-refresh"));json_object_object_add(*next,"expires",json_object_new_double(2000000));return 0;}
+static void test_codex_stored_oauth(void){
+ unsetenv("PANGU_MODEL_API_KEY");const char *jwt="e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature";char long_jwt[3000];strcpy(long_jwt,jwt);memset(long_jwt+strlen(jwt),'s',2000);long_jwt[strlen(jwt)+2000]=0;
+ for(unsigned mode=0;mode<3;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();oauth_transport_fixture fixture={json_tokener_parse("{\"type\":\"oauth\",\"refresh\":\"private-refresh\"}"),long_jwt,0};json_object_object_add(fixture.credential,"access",json_object_new_string(mode==1?long_jwt:jwt));json_object_object_add(fixture.credential,"expires",json_object_new_double(mode==2?0:2000000));pg_credential_store store={&fixture,oauth_transport_read,0,oauth_transport_modify,0};pg_oauth_provider flow={&fixture,"openai-codex",oauth_transport_now,oauth_transport_refresh};pg_mimo_bind_credentials(&m,&store);pg_mimo_bind_oauth(&m,&flow);json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-oauth\",\"modelInfo\":{\"provider\":\"openai-codex\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&fixture.refreshes==(mode==2?1:0));unsigned account=0,key=0;for(const struct curl_slist *h=captured_headers;h;h=h->next){account+=!strcmp(h->data,"chatgpt-account-id: pangu-test-account");if(!strncmp(h->data,"Authorization: Bearer ",22)){key++;assert(!strcmp(h->data+22,mode?long_jwt:jwt));}}assert(account==1&&key==1&&!strstr(m.request,"private-refresh"));model.close(model.context);assert(!m.credential&&!m.easy&&!m.headers);json_object_put(fixture.credential);
+ }
+ puts("PASS: stored Codex OAuth fresh/rotated access token and long JWT reach identical account/Bearer headers with private ownership");
+}
 static void test_stored_credentials(void){
  unsetenv("PANGU_MODEL_API_KEY");setenv("DEEPSEEK_API_KEY","unit-ambient-secret",1);pg_credential_store store={.read=stored_read};
  for(stored_mode=0;stored_mode<6;stored_mode++){
-  stored_reads=0;reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();pg_mimo_bind_credentials(&m,&store);json_object *cfg=json_tokener_parse("{\"model\":\"deepseek-flash\",\"endpoint\":\"https://provider.invalid/request\",\"modelInfo\":{\"provider\":\"deepseek\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);if(stored_mode==5)setenv("PANGU_MODEL_API_KEY","unit-explicit-secret",1);int result=start();if(stored_mode==1||stored_mode==2)assert(result);else{assert(!result);const char *expected=stored_mode==5?"Authorization: Bearer unit-explicit-secret":stored_mode==0?"Authorization: Bearer unit-stored-secret":"Authorization: Bearer unit-ambient-secret";unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)found+=!strcmp(h->data,expected);assert(found==1&&!strstr(captured_post,"secret"));}assert(stored_reads==(stored_mode==5?0:1));model.close(model.context);assert(!m.credential);
+  stored_reads=0;reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();pg_mimo_bind_credentials(&m,&store);json_object *cfg=json_tokener_parse("{\"model\":\"deepseek-flash\",\"endpoint\":\"https://provider.invalid/request\",\"modelInfo\":{\"provider\":\"deepseek\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);if(stored_mode==5)setenv("PANGU_MODEL_API_KEY","unit-explicit-secret",1);int result=start();if(stored_mode==1||stored_mode==2){assert(result&&m.retry_blocked);pg_slice message={0},raw={0};assert(!pg_mimo_failure_data(&m,&message,&raw)&&strstr(raw.data,"model_auth_failed"));}else{assert(!result);const char *expected=stored_mode==5?"Authorization: Bearer unit-explicit-secret":stored_mode==0?"Authorization: Bearer unit-stored-secret":"Authorization: Bearer unit-ambient-secret";unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)found+=!strcmp(h->data,expected);assert(found==1&&!strstr(captured_post,"secret"));}assert(stored_reads==(stored_mode==5?0:1));model.close(model.context);assert(!m.credential);
  }
  unsetenv("PANGU_MODEL_API_KEY");unsetenv("DEEPSEEK_API_KEY");puts("PASS: injected stored credential precedence, read failure and unsupported OAuth block ambient fallback, explicit override and close ownership");
 }
@@ -958,6 +973,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_codex_stored_oauth();
     test_stored_credentials();
     test_provider_environment_auth();
     test_codex_stream_failures();

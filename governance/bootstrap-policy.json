@@ -680,6 +680,10 @@
     "src/runtime/context_tokens.h": "native-source",
     "src/runtime/credentials.S": "native-source",
     "src/runtime/credentials.h": "native-source",
-    "src/runtime/credentials_posix.c": "native-source"
+    "src/runtime/credentials_posix.c": "native-source",
+    "src/runtime/oauth.S": "native-source",
+    "src/runtime/oauth.h": "native-source",
+    "src/runtime/oauth_http.c": "native-source",
+    "src/runtime/base64.S": "native-source"
   }
 }

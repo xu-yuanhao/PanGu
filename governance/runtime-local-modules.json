@@ -146,11 +146,12 @@
         "json-c",
         "system libc",
         "tools.registry.local.v0",
-        "libcrypto (caller-buffer Base64 codec)",
         "glib-2.0 (shared AWS profile INI parsing)",
         "libzstd (Codex SSE request compression)",
         "context.tokens.local.v0",
-        "credentials.local.v0"
+        "credentials.local.v0",
+        "oauth.local.v0",
+        "base64.local.v0"
       ],
       "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
       "exports": [
@@ -185,9 +186,8 @@
         "pg_mimo_config_bedrock",
         "pg_google_signature_valid",
         "pg_google_requires_id",
-        "pg_mimo_base64_decode",
-        "pg_mimo_base64_encode",
-        "pg_mimo_bind_credentials"
+        "pg_mimo_bind_credentials",
+        "pg_mimo_bind_oauth"
       ],
       "reference_basis": [
         {
@@ -561,7 +561,8 @@
         "tool.execution.local.v0",
         "images.prepare.local.v0",
         "execution.env.local.v0",
-        "credentials.local.v0"
+        "credentials.local.v0",
+        "oauth.local.v0"
       ],
       "role": "Static composition of workspace/process/files, model lease and task-owned tool invocation factories, foreground platform timer, Durable Session/Scheduler/Client and TUI; Assembly owns transactions and execution state.",
       "exports": [
@@ -2887,6 +2888,52 @@
       ],
       "reference_basis": [
         "Pi auth/credential-store.ts, auth/types.ts, Coding Agent core/auth-storage.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"
+      ]
+    },
+    {
+      "id": "oauth.local.v0",
+      "sources": [
+        "src/runtime/oauth.S",
+        "src/runtime/oauth.h",
+        "src/runtime/oauth_http.c"
+      ],
+      "dependencies": [
+        "credentials.local.v0",
+        "json-c",
+        "libcurl",
+        "system libc",
+        "base64.local.v0"
+      ],
+      "role": "handwritten stored OAuth resolution, double-checked refresh and Codex token rotation; injected flow/time and bounded HTTP bridge",
+      "exports": [
+        "pg_oauth_resolve",
+        "pg_oauth_codex_init",
+        "pg_oauth_codex_refresh",
+        "pg_oauth_realtime (platform bridge)",
+        "pg_oauth_post_form (platform bridge)",
+        "pg_oauth_codex_account"
+      ],
+      "reference_basis": [
+        "Pi auth/resolve.ts and auth/oauth/openai-codex.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"
+      ]
+    },
+    {
+      "id": "base64.local.v0",
+      "sources": [
+        "src/runtime/base64.S"
+      ],
+      "dependencies": [
+        "json-c",
+        "libcrypto",
+        "system libc"
+      ],
+      "role": "shared existing Base64 ownership and validation adapter for models and OAuth claims",
+      "exports": [
+        "pg_mimo_base64_decode",
+        "pg_mimo_base64_encode"
+      ],
+      "reference_basis": [
+        "Pi utils/base64.ts and OAuth JWT decoding"
       ]
     }
   ],

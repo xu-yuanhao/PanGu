@@ -373,6 +373,16 @@ li_start:
  jnz .Lst_bad
  jmp .Lst_encode
 .Lst_standard_key:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lst_short_key
+ mov rdi,r13
+ call .Lbe_credential
+ test eax,eax
+ jnz .Lst_bad
+ jmp .Lst_encode
+.Lst_short_key:
  mov rdi,r13
  call strlen@PLT
  test rax,rax
@@ -412,6 +422,18 @@ li_start:
  mov r13,[rbx+PG_MM_HEADERS]
  jmp .Lauth_content_type
 .Lst_standard_bearer:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lst_short_bearer
+ mov rdi,rbx
+ mov rsi,r13
+ call .Lbe_bearer_header
+ test eax,eax
+ jnz .Lst_bad
+ mov r13,[rbx+PG_MM_HEADERS]
+ jmp .Lauth_content_type
+.Lst_short_bearer:
  /* auth = "Authorization: Bearer " + key + NUL（总长 < 512） */
  lea r14,[rip+.Lstr_auth_prefix]
  mov r15d,PG_MM_AUTH_PREFIX_LEN
@@ -5208,67 +5230,27 @@ pg_mimo_complete:
  lea rdi,[rip+.Lstr_pangu_key]
  call getenv@PLT
  test rax,rax
- jz .Lcd_headers_cleanup
- mov r12,rax
+ jnz .Lcd_resolved_key
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ lea rsi,[rip+.Lca_access]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lcd_stored_key
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ lea rsi,[rip+.Lca_key_field]
+ call json_object_object_get@PLT
+.Lcd_stored_key:
  mov rdi,rax
- mov esi,46
- call strchr@PLT
+ call json_object_get_string@PLT
  test rax,rax
  jz .Lcd_headers_cleanup
- lea r13,[rax+1]
- mov rdi,r13
- mov esi,46
- call strchr@PLT
- test rax,rax
- jz .Lcd_headers_cleanup
- mov r14,rax
- lea rdi,[rax+1]
- mov esi,46
- call strchr@PLT
- test rax,rax
- jnz .Lcd_headers_cleanup
- mov rdi,r13
- mov rsi,r14
- sub rsi,r13
- call json_object_new_string_len@PLT
- mov [rsp],rax
- test rax,rax
- jz .Lcd_headers_cleanup
+.Lcd_resolved_key:
  mov rdi,rax
- lea rsi,[rsp+8]
- lea rdx,[rsp+16]
- call pg_mimo_base64_decode@PLT
+ lea rsi,[rsp+32]
+ call pg_oauth_codex_account@PLT
  test eax,eax
  jnz .Lcd_headers_cleanup
- mov rdi,[rsp+8]
- mov rsi,[rsp+16]
- call strndup@PLT
- mov [rsp+24],rax
- test rax,rax
- jz .Lcd_headers_cleanup
- mov rdi,rax
- call json_tokener_parse@PLT
- mov [rsp+32],rax
- test rax,rax
- jz .Lcd_headers_cleanup
- mov rdi,rax
- lea rsi,[rip+.Lcd_claim]
- call json_object_object_get@PLT
- mov rdi,rax
- lea rsi,[rip+.Lcd_account]
- call json_object_object_get@PLT
- mov rdi,rax
- mov esi,6
- call json_object_is_type@PLT
- test eax,eax
- jz .Lcd_headers_cleanup
  mov rdi,[rsp+32]
- lea rsi,[rip+.Lcd_claim]
- call json_object_object_get@PLT
- mov rdi,rax
- lea rsi,[rip+.Lcd_account]
- call json_object_object_get@PLT
- mov rdi,rax
  call json_object_get_string@PLT
  mov r13,rax
  mov rdi,rax
@@ -5383,8 +5365,6 @@ pg_mimo_complete:
  pop rbp
  ret
 .section .rodata
-.Lcd_claim: .asciz "https://api.openai.com/auth"
-.Lcd_account: .asciz "chatgpt_account_id"
 .Lcd_account_format: .asciz "chatgpt-account-id: %s"
 .Lcd_beta: .asciz "OpenAI-Beta: responses=experimental"
 .Lcd_accept: .asciz "accept: text/event-stream"
@@ -6842,6 +6822,8 @@ pg_mimo_bind_credentials:
  push rbx
  push r12
  push r13
+ push r14
+ sub rsp,8
  mov rbx,rdi
  mov r12,[rbx+PG_MM_CREDENTIALS]
  test r12,r12
@@ -6865,6 +6847,7 @@ pg_mimo_bind_credentials:
  call json_object_get_string@PLT
  test rax,rax
  jz .Lca_absent
+ mov r14,rax
  mov rsi,rax
  mov rdi,[r12]
  lea rdx,[rbx+PG_MM_CREDENTIAL]
@@ -6884,7 +6867,7 @@ pg_mimo_bind_credentials:
  lea rsi,[rip+.Lca_api_key]
  call strcmp@PLT
  test eax,eax
- jnz .Lca_blocked
+ jnz .Lca_oauth
  mov rdi,[rbx+PG_MM_CREDENTIAL]
  lea rsi,[rip+.Lca_key_field]
  call json_object_object_get@PLT
@@ -6897,6 +6880,7 @@ pg_mimo_bind_credentials:
  jz .Lca_blocked
  cmp byte ptr [rax],0
  je .Lca_absent
+.Lca_key_bytes:
  mov r12,rax
  mov rdi,rax
  call strlen@PLT
@@ -6908,14 +6892,51 @@ pg_mimo_bind_credentials:
  mov rax,r12
  xor edx,edx
  jmp .Lca_end
+.Lca_oauth:
+ mov rdx,[rbx+PG_MM_OAUTH]
+ test rdx,rdx
+ jz .Lca_blocked
+ mov qword ptr [rsp],0
+ mov rdi,r12
+ mov rsi,r14
+ mov rcx,[rbx+PG_MM_CREDENTIAL]
+ mov r8,rsp
+ call pg_oauth_resolve@PLT
+ test eax,eax
+ jnz .Lca_blocked
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ mov rax,[rsp]
+ mov [rbx+PG_MM_CREDENTIAL],rax
+ call json_object_put@PLT
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ lea rsi,[rip+.Lca_access]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lca_blocked
+ mov r13,rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lca_blocked
+ cmp byte ptr [rax],0
+ je .Lca_blocked
+ jmp .Lca_key_bytes
 .Lca_absent:
  xor eax,eax
  xor edx,edx
  jmp .Lca_end
 .Lca_blocked:
+ mov dword ptr [rbx+PG_MM_RETRY_BLOCKED],1
+ lea rdi,[rip+.Lca_failure_json]
+ call json_tokener_parse@PLT
+ mov rdi,[rbx+PG_MM_RESPONSE_TERMINAL]
+ mov [rbx+PG_MM_RESPONSE_TERMINAL],rax
+ call json_object_put@PLT
  xor eax,eax
  mov edx,1
 .Lca_end:
+ add rsp,8
+ pop r14
  pop r13
  pop r12
  pop rbx
@@ -6924,4 +6945,19 @@ pg_mimo_bind_credentials:
 .Lca_type: .asciz "type"
 .Lca_api_key: .asciz "api_key"
 .Lca_key_field: .asciz "key"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_mimo_bind_oauth
+.type pg_mimo_bind_oauth,@function
+pg_mimo_bind_oauth:
+ mov [rdi+PG_MM_OAUTH],rsi
+ ret
+.size pg_mimo_bind_oauth,.-pg_mimo_bind_oauth
+.section .rodata
+.Lca_access: .asciz "access"
+.section .note.GNU-stack,"",@progbits
+
+.section .rodata
+.Lca_failure_json: .asciz "{\"error\":{\"code\":\"model_auth_failed\",\"message\":\"Stored model credential could not be resolved\"}}"
 .section .note.GNU-stack,"",@progbits
