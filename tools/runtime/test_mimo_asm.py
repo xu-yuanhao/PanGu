@@ -38,7 +38,8 @@ CC = '/usr/bin/clang-23'
 SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/mimo_projection.S'),
        str(ROOT / 'src/runtime/mimo_stream.S'),
-       str(ROOT / 'src/runtime/request_context.S')]
+       str(ROOT / 'src/runtime/request_context.S'),
+       str(ROOT / 'src/runtime/context_tokens.S')]
 ABI_WRAPS = ['-Wl,--wrap=' + n for n in (
     'strlen', 'strcmp', 'strncmp', 'memchr', 'memcpy', 'malloc', 'realloc', 'strchr', 'free',
     'getenv', 'strdup', 'json_object_object_add', 'json_object_array_add',
@@ -321,6 +322,85 @@ def cost_differential():
         print(f'PASS: {len(tier_cases)} Codex response/request tier resolution and native prices match fixed Pi functions')
     print(f'PASS: {len(cases)} native cost calculations match fixed Pi tiers, strict thresholds, duplicate ordering, free rates and cache durations')
 
+def context_budget_differential():
+    base=ROOT/'references/pi/packages/ai/src'
+    estimate=(base/'utils/estimate.ts').read_text()
+    text=(base/'utils/text.ts').read_text()
+    simple=(base/'api/simple-options.ts').read_text()
+    clamp=simple[simple.index('const CONTEXT_SAFETY_TOKENS'):]
+    cases=[]
+    for value in ('','hello','中文😀','a'*127):
+        for content in (value,[{'type':'text','text':value}],[{'type':'text','text':value},{'type':'image','data':'','mimeType':'image/png'}]):
+            cases.append([{'role':'user','content':content,'timestamp':1}])
+    for total in (0,999):
+        for stop in ('stop','error','aborted'):
+            for prefix in (False,True):
+                cases.append([{'role':'system','content':'sys','sections':{'empty':'','context':'上下文😀','removed':None},'toolsAdded':[{'name':'check','description':'Check / workspace','parameters':{'type':'object'}}],'timestamp':100 if prefix else 0},{'role':'assistant','content':[{'type':'thinking','thinking':'think'},{'type':'text','text':'answer'},{'type':'toolCall','name':'check','arguments':{'path':'中文/file'}}],'stopReason':stop,'usage':{'totalTokens':total,'input':200,'output':10,'cacheRead':3,'cacheWrite':2},'timestamp':2},{'role':'toolResult','content':[{'type':'text','text':'result'},{'type':'image','mimeType':'image/png','data':''}],'timestamp':3}])
+    oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const clean=s=>s.replace(/^import.*$/gm,'').replace(/^export /gm,'');const f=new Function(stripTypeScriptTypes(clean(x.text)+'\\n'+clean(x.estimate)+'\\n'+clean(x.clamp),{mode:'strip'})+';return {estimateContextTokens,clampMaxTokensToContext,adjustMaxTokensForThinking}')();process.stdout.write(JSON.stringify(x.cases.map(c=>f.estimateContextTokens(c).tokens)));"
+    cases.append({'systemPrompt':'s'*350,'messages':[{'role':'user','content':'hello','timestamp':1}]})
+    oracle=oracle.replace('f.estimateContextTokens(c).tokens',"f.estimateContextTokens(Array.isArray(c)?c:[{role:'system',content:c.systemPrompt,timestamp:0},...c.messages]).tokens")
+    expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',oracle],input=json.dumps({'text':text,'estimate':estimate,'clamp':clamp,'cases':cases}),text=True))
+    bridge=r"""
+#include "src/runtime/mimo.h"
+#include "src/runtime/context_tokens.h"
+#include <json-c/json.h>
+#include <stdlib.h>
+#include <string.h>
+int emit_budget(const char *configuration,const char *messages,char **output){
+ pg_mimo provider={0};pg_model model=pg_mimo_model(&provider);pg_session *session=calloc(1,sizeof(*session));struct json_object *cfg=json_tokener_parse(configuration),*context=json_object_new_object();*output=NULL;if(!session||!cfg||!context)abort();struct json_object *input=json_tokener_parse(messages);if(json_object_is_type(input,json_type_object)){json_object_put(context);context=input;}else json_object_object_add(context,"messages",input);session->count=1;session->messages[0].role=PG_CONTEXT_VIEW;session->messages[0].context_view=context;int status=pg_mimo_configure(&provider,cfg);if(!status)status=pg_mimo_encode_request(&provider,session);if(!status)*output=strdup(provider.request);model.close(model.context);json_object_put(context);json_object_put(cfg);free(session);return status;
+}
+void release_budget(char *text){free(text);}
+"""
+    with tempfile.TemporaryDirectory(prefix='pangu-context-budget-') as directory:
+        adapter=Path(directory)/'adapter.c';adapter.write_text(bridge)
+        output=Path(directory)/'model.so'
+        libs=subprocess.check_output(['pkg-config','--cflags','--libs','json-c','libcurl','libcrypto','glib-2.0','libzstd'],text=True).split()
+        subprocess.run([CC,'-shared','-fPIC','-O2','-D_POSIX_C_SOURCE=200809L','-I'+str(ROOT),str(adapter),*SRC,*libs,'-o',str(output)],check=True)
+        native=C.CDLL(str(output));native.json_tokener_parse.argtypes=[C.c_char_p];native.json_tokener_parse.restype=C.c_void_p;native.json_object_put.argtypes=[C.c_void_p]
+        native.pg_context_estimate.argtypes=[C.c_void_p];native.pg_context_estimate.restype=C.c_uint64
+        for case,wanted in zip(cases,expected):
+            value=native.json_tokener_parse(json.dumps(case).encode())
+            try: assert native.pg_context_estimate(value)==wanted,(case,wanted,native.pg_context_estimate(value))
+            finally: native.json_object_put(value)
+        native.emit_budget.argtypes=[C.c_char_p,C.c_char_p,C.POINTER(C.c_void_p)];native.release_budget.argtypes=[C.c_void_p]
+        count=0
+        for api in ('openai-completions','openai-responses','anthropic-messages','google-generative-ai','google-vertex','bedrock-converse-stream','azure-openai-responses','openai-codex-responses'):
+            for window in (0,4096,4200,128000):
+                for cap in (None,17,10000):
+                    messages=[{'role':'user','content':[{'type':'text','text':'hello'}],'timestamp':1}]
+                    cfg={'api':api,'model':'budget-test','endpoint':'https://provider.invalid/request','modelInfo':{'maxTokens':2048,'contextWindow':window},'options':{} if cap is None else {'maxTokens':cap}}
+                    result=C.c_void_p();status=native.emit_budget(json.dumps(cfg).encode(),json.dumps(messages).encode(),C.byref(result));assert not status,(api,window,cap)
+                    wire=json.loads(C.string_at(result));native.release_budget(result)
+                    wanted=2048 if cap is None else cap
+                    if window>0: wanted=min(wanted,max(1,window-4096-2))
+                    if api=='openai-codex-responses': assert 'max_output_tokens' not in wire
+                    else:
+                        actual=wire.get('max_tokens',wire.get('max_completion_tokens',wire.get('max_output_tokens')))
+                        if api.startswith('google-'): actual=wire['generationConfig']['maxOutputTokens']
+                        if api=='bedrock-converse-stream': actual=wire['inferenceConfig']['maxTokens']
+                        if api in ('openai-responses','azure-openai-responses'): wanted=max(16,wanted)
+                        assert actual==wanted,(api,window,cap,wanted,actual)
+                    count+=1
+        cfg={'api':'openai-completions','model':'budget-prefix','endpoint':'https://provider.invalid/request','modelInfo':{'maxTokens':2048,'contextWindow':4200}}
+        result=C.c_void_p();assert not native.emit_budget(json.dumps(cfg).encode(),json.dumps(cases[-1]).encode(),C.byref(result))
+        wire=json.loads(C.string_at(result));native.release_budget(result);assert wire['max_tokens']==2,wire
+        thinking_cases=[{'model':{'maxTokens':maximum,'contextWindow':window},'context':[{'role':'user','content':[{'type':'text','text':'hello'}],'timestamp':1}],'cap':cap,'budget':budget,'level':level} for maximum in (512,5000) for window in (0,4200,128000) for cap in (None,500) for budget in (None,3333,0) for level in ('low','max')]
+        thinking_oracle=oracle.replace("x.cases.map(c=>f.estimateContextTokens(Array.isArray(c)?c:[{role:'system',content:c.systemPrompt,timestamp:0},...c.messages]).tokens)","x.cases.map(c=>{const base=f.clampMaxTokensToContext(c.model,c.context,c.cap??c.model.maxTokens);const a=f.adjustMaxTokensForThinking(base,c.model.maxTokens,c.level,c.budget===null?undefined:{low:c.budget,high:c.budget});const maxTokens=f.clampMaxTokensToContext(c.model,c.context,a.maxTokens);return {maxTokens,thinkingBudget:Math.min(a.thinkingBudget,Math.max(0,maxTokens-1024))}})")
+        thinking_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',thinking_oracle],input=json.dumps({'text':text,'estimate':estimate,'clamp':clamp,'cases':thinking_cases}),text=True))
+        for api in ('anthropic-messages','bedrock-converse-stream'):
+            for case,wanted in zip(thinking_cases,thinking_expected):
+                descriptor=dict(case['model'],id='anthropic.claude-3-7-sonnet',name='Claude 3.7 Sonnet',reasoning=True)
+                options={'reasoningEffort':case['level']}
+                if case['budget'] is not None: options['thinkingBudgets']={'low':case['budget'],'high':case['budget']}
+                if case['cap'] is not None: options['maxTokens']=case['cap']
+                cfg={'api':api,'model':descriptor['id'],'endpoint':'https://provider.invalid/request','modelInfo':descriptor,'options':options}
+                result=C.c_void_p();status=native.emit_budget(json.dumps(cfg).encode(),json.dumps(case['context']).encode(),C.byref(result));assert not status,(api,case)
+                wire=json.loads(C.string_at(result));native.release_budget(result)
+                actual={'maxTokens':wire['max_tokens'] if api=='anthropic-messages' else wire['inferenceConfig']['maxTokens'],'thinkingBudget':(wire['thinking'] if api=='anthropic-messages' else wire['additionalModelRequestFields']['thinking'])['budget_tokens']}
+                assert actual==wanted,(api,case,wanted,actual)
+        print(f'PASS: {len(thinking_cases)*2} Anthropic/Bedrock thinking ceilings match fixed Pi simple-options helpers')
+        print(f'PASS: {len(cases)} shared context estimates match fixed Pi, and {count} protocol requests obey model/context output budgets')
+
 def sigv4_wire(binary, directory):
     cert=Path(directory)/'sigv4-cert.pem'
     key=Path(directory)/'sigv4-key.pem'
@@ -480,6 +560,7 @@ def main():
     strict_schema_differential()
     bedrock_thinking_differential()
     cost_differential()
+    context_budget_differential()
     print('ALL MIMO ASM RUNS PASSED')
     return 0
 

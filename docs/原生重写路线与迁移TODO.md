@@ -130,6 +130,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] 模型价格/费用接通实际产品与恢复：1593个固定目录价格、用户覆盖、阶梯/分时缓存费用，324组Pi函数差分一致；真实模型→原生工具→后继回答按响应核算，事务账本与总账在两次Host关闭重开及继续生成后保持一致，ASan/UBSan通过。
 - [x] Copilot显式令牌网关基础链接入三协议：Chat/Responses/Anthropic复用既有编码和流，组合默认/显式端点，按上下文推导user/agent和用户图片请求头；模型、动态和options头按参考顺序覆盖，Anthropic使用Bearer及对应默认头。传输回放、构造失败清理及ASan/UBSan通过；OAuth与提供者其余差异按K05继续覆盖。
 - [x] Codex显式JWT的基础SSE链：账户claim解析、专用头、默认/基础端点规范化、instructions与输入分离、加密推理include、store=false、会话请求头/缓存联动、默认推理映射、Zstd请求压缩、可取消的请求内重试、服务等级费用和额度错误展示、Codex终态规范化、SSE分帧和响应头超时及既有Responses文本/工具终态复用；传输回放、无效JWT拒绝与ASan/UBSan通过。完整OAuth、WebSocket和高级选项仍按K05覆盖。
+- [x] Durable canonical上下文与模型输出预算接通：复用共享UTF-16/图片/工具估算及有效usage锚点，按模型默认输出和上下文4096余量准备请求；八协议字段、Responses最低输出及Anthropic/Bedrock推理/回答空间与自定义预算对照上游验证，压缩共用同一消息估算实现。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -326,8 +327,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/openai-codex-responses.ts`：normalizeTimeoutMs、SSE headerTimeoutSignal/combinedSignal与每次fetch重试；复用已读调用者和stream测试。
-- 实际调用链：Codex timeoutMs只限制等待最终响应头，未设置/0关闭本层计时，小数按参考取整。汇编在请求启动和重试时按单调时钟设置截止，完整最终响应头到达后停止计时，100响应不提前解除；libcurl抑制CONNECT代理头，避免误认代理完成。Codex关闭原整段curl时限，正文可持续流式输出。超时沿现有网络重试/取消链处理，最终失败显示实际毫秒数。公共服务ABI不变，内部布局同步断言。
-- 验证：配置缺省/0/小数、100与最终头边界、超时信息、重试重设和取消通过模型传输专项ASan/UBSan；真实TLS分别验证延迟响应头失败、及时头+慢正文成功、0允许慢头，原503重试和response.done仍成立。模型O0/O2/UBSan及既有Pi差分通过；产品资源/Generation配置链ASan/UBSan、Assembly/diff通过。自审核对计时起点、重试等待与响应头完成的互斥，以及超时失败信息借用期。
-- 具体缺口：Codex OAuth/令牌更新、WebSocket/会话连接缓存及其连接/空闲超时、simple预算和完整高级选项；失败终态完整元数据展示仍需覆盖；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
-- 下一交付物：复用本机libcurl WebSocket能力接入Codex连接生命周期，并补齐simple预算；继续同一Generation消费者与协议覆盖。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `api/simple-options.ts`、`utils/estimate.ts`、`utils/text.ts`，及Durable generation.ts的models.streamSimple调用；协议streamSimple与Responses最低输出处理一并核对。
+- 实际调用链：从压缩模块原地提取消息/UTF-16/用量估算到共享context_tokens，原算法和调用者一并迁移。模型请求采用modelInfo.maxTokens默认值，按有效assistant usage与后续消息、PanGu独立systemPrompt估算上下文，留4096余量；各协议转换前后接通实际输出字段，保留Responses最低16限制，Codex按参考省略输出字段。Anthropic/Bedrock结合模型上限、自定义thinkingBudgets和回答余量调整推理预算。新模块与实际依赖/构建已登记，C ABI明确借用与结果所有权。
+- 验证：25组上下文估算运行固定Pi源码差分，96组实际请求覆盖八协议默认/显式/上下文边界，144组Anthropic/Bedrock推理预算对照Pi helper通过。模型O0/O2/UBSan、Durable客户端与压缩/SQLite/JSONL恢复回归、产品资源ASan/UBSan通过；最终真实DeepSeek模型→工具→费用账本→两次Host重开/继续生成在ASan/UBSan下通过。Assembly/diff通过。自审核对公共函数签名、共享代码移除、上下文前缀映射、JSON引用与预算转换顺序。
+- 具体缺口：simple推理档位/采样参数及legacy Session工具声明估算差异；Codex OAuth、WebSocket/连接缓存及其超时、失败终态完整元数据；Copilot OAuth与其余网关特例，其余协议认证和高级行为按K05保留。
+- 下一交付物：继续K05的完整提供者调用链，按共享配置/连接生命周期成组补齐上述功能；保持既有Generation与真实产品闭环。

@@ -148,7 +148,8 @@
         "tools.registry.local.v0",
         "libcrypto (caller-buffer Base64 codec)",
         "glib-2.0 (shared AWS profile INI parsing)",
-        "libzstd (Codex SSE request compression)"
+        "libzstd (Codex SSE request compression)",
+        "context.tokens.local.v0"
       ],
       "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
       "exports": [
@@ -1978,7 +1979,8 @@
         "usage.local.v0",
         "conversation.view.local.v0",
         "tool.live.local.v0",
-        "agent.state.local.v0"
+        "agent.state.local.v0",
+        "context.tokens.local.v0"
       ],
       "role": "Native Generation/Tool/Client, Compaction and Submission/Inbox behavior: owned threshold compaction with atomic summary placement, durable request dedup, text/write admission, ordered one/all queue boundaries, settlement/withdrawal, reset/stale handling, retry and atomic Task/Entry transitions. Coordinated built-in Harness Generation/Inputs/Compaction: measured context threshold, owned blocking child/wait, direct summary Entry and resumed preparation.",
       "exports": [
@@ -2831,6 +2833,35 @@
             "packages/durable/src/images/index.ts",
             "packages/durable/src/tools/image-processor.ts"
           ]
+        }
+      ]
+    },
+    {
+      "id": "context.tokens.local.v0",
+      "sources": [
+        "src/runtime/context_tokens.S",
+        "src/runtime/context_tokens.h"
+      ],
+      "dependencies": [
+        "json-c",
+        "system libc"
+      ],
+      "role": "handwritten shared UTF-16 message/context token estimation for model limits and compaction",
+      "exports": [
+        "pg_context_message_tokens",
+        "pg_context_utf16_units",
+        "pg_context_estimate",
+        "pg_context_usage_tokens"
+      ],
+      "reference_basis": [
+        {
+          "repository": "pi",
+          "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+          "paths": [
+            "packages/ai/src/utils/estimate.ts",
+            "packages/ai/src/api/simple-options.ts"
+          ],
+          "semantics": "per-message character/tool estimates, latest applicable usage plus trailing messages, context safety room"
         }
       ]
     }

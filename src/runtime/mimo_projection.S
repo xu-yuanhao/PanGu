@@ -862,6 +862,17 @@ pg_mimo_encode_request:
  jnz .Linvalid
  and qword ptr [rsp + 104],-33
  .Lserialize:
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ mov rdx,r12
+ call .Lsb_room
+ mov [rsp+136],rax
+ mov rdi,[rsp]
+ mov rsi,rax
+ mov rdx,[rbx+PG_MM_CONFIGURATION]
+ call .Lsb_cap
+ test eax,eax
+ jnz .Linvalid
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call pg_mimo_config_bedrock@PLT
  test eax,eax
@@ -943,6 +954,17 @@ pg_mimo_encode_request:
  test eax,eax
  jnz .Linvalid
 .Lserialize_ready:
+ mov rdi,[rsp]
+ mov rsi,[rbx+PG_MM_CONFIGURATION]
+ call .Lsb_bedrock_adjust
+ test eax,eax
+ jnz .Linvalid
+ mov rdi,[rsp]
+ mov rsi,[rsp+136]
+ mov rdx,[rbx+PG_MM_CONFIGURATION]
+ call .Lsb_cap
+ test eax,eax
+ jnz .Linvalid
  mov rdi,[rsp]
  mov rsi,[rbx+PG_MM_CONFIGURATION]
  call .Lcd_request
@@ -1067,13 +1089,14 @@ pg_mimo_apply_options:
  mov rdx,rsp
  call json_object_object_get_ex@PLT
  test eax,eax
- jz .Lopts_success
+ jz .Lopts_no_options
  mov r13,[rsp]
  mov rdi,r13
  mov esi,4
  call json_object_is_type@PLT
  test eax,eax
  jz .Lopts_bad
+.Lopts_no_options:
  lea r14,[rip+.Lstr_max_tokens]
  mov rdi,r13
  lea rsi,[rip+.Lopts_max_field]
@@ -1138,8 +1161,32 @@ pg_mimo_apply_options:
  call json_object_get@PLT
  jmp .Lopts_maximum_value
 .Lopts_default_maximum:
+ mov rdi,rbx
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lopts_maximum_key]
+ call json_object_object_get@PLT
+ mov [rsp+8],rax
+ test rax,rax
+ jnz .Lsb_default_known
  mov edi,512
  call json_object_new_int@PLT
+ jmp .Lopts_maximum_value
+.Lsb_default_known:
+ mov rdi,[rsp+8]
+ mov esi,3
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get_int64@PLT
+ test rax,rax
+ jle .Lopts_bad
+ cmp rax,2147483647
+ ja .Lopts_bad
+ mov rdi,[rsp+8]
+ call json_object_get@PLT
 .Lopts_maximum_value:
  mov [rsp+16],rax
  test rax,rax
@@ -2806,6 +2853,37 @@ pg_mimo_uses_anthropic:
 .Lap_budget_low:
  mov r14d,2048
 .Lap_thinking_budget:
+ cmp qword ptr [rsp+8],0
+ je .Lsb_flat_budget
+ APGET r13,thinkingBudgets
+ mov [rsp+32],rax
+ test rax,rax
+ jz .Lsb_flat_budget
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.LbcK_xhigh]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lsb_high_budget
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.LbcK_max]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lsb_high_budget
+ mov rsi,[rsp+16]
+ jmp .Lsb_custom_budget
+.Lsb_high_budget:
+ lea rsi,[rip+.LbcK_high]
+.Lsb_custom_budget:
+ mov rdi,[rsp+32]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lsb_flat_budget
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ test rax,rax
+ js .Lap_thinking_bad
+ mov r14,rax
+.Lsb_flat_budget:
  APGET r13,thinkingBudgetTokens
  test rax,rax
  jz .Lap_thinking_cap
@@ -2844,8 +2922,6 @@ pg_mimo_uses_anthropic:
  cmovs rax,rcx
  cmp r14,rax
  cmova r14,rax
- test r14,r14
- jz .Lap_thinking_bad
  mov rdi,rbp
  call json_object_new_int64@PLT
  mov rdi,rbx
@@ -8564,3 +8640,263 @@ pg_mimo_uses_google:
 
 .section .rodata
 .Lcd_default_reason_json: .asciz "{\"effort\":\"none\"}"
+
+.text
+/* Model defaults and Pi's context safety margin share the compaction estimator. */
+.Lsb_room:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rdx
+ mov rdi,rsi
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lsb_context]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_int64@PLT
+ mov r13,rax
+ test rax,rax
+ jle .Lsb_room_unlimited
+ cmp qword ptr [r12+PG_MM_SES_COUNT],1
+ jne .Lsb_room_legacy
+ cmp dword ptr [r12+PG_MM_MSG_ROLE],PG_MM_ROLE_CONTEXT_VIEW
+ jne .Lsb_room_legacy
+ mov rax,[r12+PG_MM_MSG_TEXT]
+ jmp .Lsb_room_estimate
+.Lsb_room_legacy:
+ mov rdi,rbx
+ lea rsi,[rip+.Lstr_messages]
+ call json_object_object_get@PLT
+.Lsb_room_estimate:
+ mov rdi,rax
+ call pg_context_estimate@PLT
+ cmp r13,4096
+ jle .Lsb_room_minimum
+ sub r13,4096
+ cmp rax,r13
+ jae .Lsb_room_minimum
+ mov rdx,r13
+ sub rdx,rax
+ mov rax,rdx
+ jmp .Lsb_room_end
+.Lsb_room_minimum:
+ mov eax,1
+ jmp .Lsb_room_end
+.Lsb_room_unlimited:
+ mov rax,-1
+.Lsb_room_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.Lsb_cap:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ sub rsp,16
+ mov [rsp],rdx
+ mov rbx,rdi
+ mov r12,rsi
+ xor r13d,r13d
+ mov rbp,rdi
+.Lsb_cap_root:
+ lea rax,[rip+.Lsb_root_keys]
+ mov r14,[rax+r13*8]
+ mov rdi,rbx
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lsb_cap_value
+ inc r13
+ cmp r13,3
+ jb .Lsb_cap_root
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_inferenceConfig]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ lea r14,[rip+.Lbd_maxTokens]
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lsb_cap_value
+ mov rdi,rbx
+ lea rsi,[rip+.Lg_generationConfig]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ lea r14,[rip+.Lg_maxOutputTokens]
+ mov rsi,r14
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lsb_cap_ok
+.Lsb_cap_value:
+ mov r13,rax
+ lea rax,[rip+.Lrp_max_output_tokens]
+ cmp r14,rax
+ jne .Lsb_cap_number
+ cmp r12,16
+ jae .Lsb_cap_number
+ mov r12d,16
+.Lsb_cap_number:
+ mov rdi,r13
+ call json_object_get_uint64@PLT
+ mov r13,rax
+ cmp rax,r12
+ jbe .Lsb_thinking_limit
+ mov rdi,r12
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ mov rsi,r14
+ mov rdx,rax
+ call .Lrp_set
+ test eax,eax
+ jnz .Lsb_cap_end
+ mov r13,r12
+.Lsb_thinking_limit:
+ mov rdi,[rsp]
+ call pg_mimo_config_anthropic@PLT
+ test eax,eax
+ jnz .Lsb_shared_thinking
+ mov rdi,[rsp]
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lsb_cap_ok
+.Lsb_shared_thinking:
+ mov rdi,[rsp]
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lopts_maximum_key]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lsb_cap_ok
+ mov rdi,rbx
+ lea rsi,[rip+.Lstr_thinking]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lsb_thinking_owner
+ mov rdi,rbx
+ lea rsi,[rip+.LbcK_additionalModelRequestFields]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lstr_thinking]
+ call json_object_object_get@PLT
+.Lsb_thinking_owner:
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lap_budget_tokens]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lsb_cap_ok
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ xor edx,edx
+ sub r13,1024
+ cmovb r13,rdx
+ cmp rax,r13
+ jbe .Lsb_cap_ok
+ mov rdi,r13
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lap_budget_tokens]
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lsb_cap_end
+.Lsb_cap_ok:
+ xor eax,eax
+.Lsb_cap_end:
+ add rsp,16
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.section .rodata
+.Lsb_context: .asciz "contextWindow"
+.section .data.rel.ro
+.Lsb_root_keys: .quad .Lstr_max_tokens,.Lopts_completion_tokens,.Lrp_max_output_tokens
+
+.text
+.Lsb_bedrock_adjust:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov rbp,rsi
+ mov rdi,rsi
+ call pg_mimo_config_bedrock@PLT
+ test eax,eax
+ jz .Lsb_adjust_ok
+ mov rdi,rbp
+ lea rsi,[rip+.Lcompat_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lopts_maximum_key]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lsb_adjust_ok
+ mov rdi,rbx
+ lea rsi,[rip+.LbcK_additionalModelRequestFields]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lstr_thinking]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lap_budget_tokens]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lsb_adjust_ok
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ mov r14,rax
+ mov rdi,rbx
+ lea rsi,[rip+.Lbd_inferenceConfig]
+ call json_object_object_get@PLT
+ mov rbp,rax
+ mov rdi,rax
+ lea rsi,[rip+.Lbd_maxTokens]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_uint64@PLT
+ add rax,r14
+ jc .Lsb_adjust_bad
+ cmp rax,r12
+ cmova rax,r12
+ mov rdi,rax
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.Lbd_maxTokens]
+ mov rdx,rax
+ call .Lrp_set
+ jmp .Lsb_adjust_end
+.Lsb_adjust_ok:
+ xor eax,eax
+ jmp .Lsb_adjust_end
+.Lsb_adjust_bad:
+ mov eax,1
+.Lsb_adjust_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+
+.section .rodata
+.Lap_thinkingBudgets: .asciz "thinkingBudgets"

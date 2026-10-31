@@ -675,6 +675,8 @@
     "docs/licenses/schema-libraries.md": "document",
     "src/runtime/image_processor.h": "native-source",
     "src/runtime/image_processor.S": "native-source",
-    "src/runtime/image_codec_vips.c": "native-source"
+    "src/runtime/image_codec_vips.c": "native-source",
+    "src/runtime/context_tokens.S": "native-source",
+    "src/runtime/context_tokens.h": "native-source"
   }
 }

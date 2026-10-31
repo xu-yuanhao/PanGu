@@ -8,288 +8,6 @@
  call json_object_object_get@PLT
 .endm
 .text
-/* JS string length counts UTF-16 units; committed JSON has validated UTF-8. */
-.Lcc_chars:
- push rbx
- mov rbx,rdi
- call json_object_get_string_len@PLT
- mov edx,eax
- mov rdi,rbx
- push rdx
- sub rsp,8
- call json_object_get_string@PLT
- add rsp,8
- pop rdx
- mov rdi,rax
- jmp .Lcc_chars_count
-.Lcc_chars_count:
- call .Lcc_count
- pop rbx
- ret
-.Lcc_count:
- xor eax,eax
- test rdx,rdx
- jz .Lcc_chars_done
- xor ecx,ecx
-.Lcc_chars_byte:
- movzx esi,byte ptr [rdi+rcx]
- cmp esi,0x80
- jb .Lcc_chars_one
- cmp esi,0xc0
- jb .Lcc_chars_next
- cmp esi,0xf0
- jb .Lcc_chars_one
- inc rax
-.Lcc_chars_one:
- inc rax
-.Lcc_chars_next:
- inc rcx
- cmp rcx,rdx
- jb .Lcc_chars_byte
-.Lcc_chars_done:
- ret
-.Lcc_serialized_chars:
- push rbx
- mov esi,16
- call json_object_to_json_string_ext@PLT
- mov rbx,rax
- mov rdi,rax
- call strlen@PLT
- mov rdx,rax
- mov rdi,rbx
- jmp .Lcc_chars_count
-/* Content text and images use pi-ai's 4800 estimated image characters. */
-.Lcc_content_chars:
- push rbp
- push rbx
- push r12
- mov rbx,rdi
- mov esi,6
- call json_object_is_type@PLT
- test eax,eax
- jz .Lcc_content_array
- mov rdi,rbx
- call .Lcc_chars
- jmp .Lcc_content_done
-.Lcc_content_array:
- xor ebp,ebp
- xor r12d,r12d
-.Lcc_content_loop:
- mov rdi,rbx
- call json_object_array_length@PLT
- cmp r12,rax
- jae .Lcc_content_end
- mov rdi,rbx
- mov rsi,r12
- call json_object_array_get_idx@PLT
- CGET rax,text
- test rax,rax
- jz .Lcc_content_image
- mov rdi,rax
- call .Lcc_chars
- add rbp,rax
- jmp .Lcc_content_next
-.Lcc_content_image:
- add rbp,4800
-.Lcc_content_next:
- inc r12
- jmp .Lcc_content_loop
-.Lcc_content_end:
- mov rax,rbp
-.Lcc_content_done:
- pop r12
- pop rbx
- pop rbp
- ret
-/* Per-message ceil(chars / 3.5), with separate tool declaration estimates. */
-.Lcc_tokens:
- push rbp
- push rbx
- push r12
- push r13
- push r14
- sub rsp,32
- mov rbx,rdi
- xor ebp,ebp
- mov qword ptr [rsp],0
- CGET rbx,role
- mov rdi,rax
- call json_object_get_string@PLT
- mov r12,rax
- mov rdi,rax
- lea rsi,[rip+.Lcc_assistant]
- call strcmp@PLT
- test eax,eax
- jz .Lcc_tokens_assistant
- mov rdi,r12
- lea rsi,[rip+.Lcc_system]
- call strcmp@PLT
- test eax,eax
- jz .Lcc_tokens_system
- CGET rbx,content
- mov rdi,rax
- call .Lcc_content_chars
- mov rbp,rax
- jmp .Lcc_tokens_round
-.Lcc_tokens_assistant:
- CGET rbx,content
- mov r12,rax
- xor r13d,r13d
-.Lcc_tokens_block:
- mov rdi,r12
- call json_object_array_length@PLT
- cmp r13,rax
- jae .Lcc_tokens_round
- mov rdi,r12
- mov rsi,r13
- call json_object_array_get_idx@PLT
- mov r14,rax
- CGET r14,type
- mov rdi,rax
- call json_object_get_string@PLT
- mov rdi,rax
- lea rsi,[rip+.Lcc_text]
- call strcmp@PLT
- test eax,eax
- jnz .Lcc_tokens_thinking
- CGET r14,text
- jmp .Lcc_tokens_string
-.Lcc_tokens_thinking:
- CGET r14,type
- mov rdi,rax
- call json_object_get_string@PLT
- mov rdi,rax
- lea rsi,[rip+.Lcc_thinking]
- call strcmp@PLT
- test eax,eax
- jnz .Lcc_tokens_call
- CGET r14,thinking
-.Lcc_tokens_string:
- mov rdi,rax
- call .Lcc_chars
- add rbp,rax
- jmp .Lcc_tokens_block_next
-.Lcc_tokens_call:
- CGET r14,name
- mov rdi,rax
- call .Lcc_chars
- add rbp,rax
- CGET r14,arguments
- mov rdi,rax
- call .Lcc_serialized_chars
- add rbp,rax
-.Lcc_tokens_block_next:
- inc r13
- jmp .Lcc_tokens_block
-.Lcc_tokens_system:
- CGET rbx,content
- mov r12,rax
- mov rdi,rax
- mov esi,6
- call json_object_is_type@PLT
- test eax,eax
- jz .Lcc_tokens_system_blocks
- mov rdi,r12
- call .Lcc_chars
- mov rbp,rax
- jmp .Lcc_tokens_sections
-.Lcc_tokens_system_blocks:
- xor r13d,r13d
-.Lcc_tokens_system_block:
- mov rdi,r12
- call json_object_array_length@PLT
- cmp r13,rax
- jae .Lcc_tokens_sections
- mov rdi,r12
- mov rsi,r13
- call json_object_array_get_idx@PLT
- CGET rax,text
- mov rdi,rax
- call .Lcc_chars
- add rbp,rax
- test r13,r13
- jz .Lcc_tokens_system_block_next
- inc rbp
-.Lcc_tokens_system_block_next:
- inc r13
- jmp .Lcc_tokens_system_block
-.Lcc_tokens_sections:
- CGET rbx,sections
- test rax,rax
- jz .Lcc_tokens_tools
- mov r12,rax
- mov rdi,rax
- call json_object_iter_begin@PLT
- mov [rsp+8],rax
- mov rdi,r12
- call json_object_iter_end@PLT
- mov [rsp+16],rax
-.Lcc_tokens_section:
- lea rdi,[rsp+8]
- lea rsi,[rsp+16]
- call json_object_iter_equal@PLT
- test eax,eax
- jnz .Lcc_tokens_tools
- lea rdi,[rsp+8]
- call json_object_iter_peek_value@PLT
- test rax,rax
- jz .Lcc_tokens_section_next
- mov rdi,rax
- call .Lcc_chars
- test rax,rax
- jz .Lcc_tokens_section_next
- test rbp,rbp
- jz .Lcc_tokens_section_append
- add rbp,2
-.Lcc_tokens_section_append:
- add rbp,rax
-.Lcc_tokens_section_next:
- lea rdi,[rsp+8]
- call json_object_iter_next@PLT
- jmp .Lcc_tokens_section
-.Lcc_tokens_tools:
- CGET rbx,toolsAdded
- mov rdi,rax
- call .Lcc_tokens_tools_one
- add [rsp],rax
- CGET rbx,toolsRemoved
- mov rdi,rax
- call .Lcc_tokens_tools_one
- add [rsp],rax
-.Lcc_tokens_round:
- lea rax,[rbp+rbp+6]
- xor edx,edx
- mov ecx,7
- div rcx
- add rax,[rsp]
- add rsp,32
- pop r14
- pop r13
- pop r12
- pop rbx
- pop rbp
- ret
-.Lcc_tokens_tools_one:
- test rdi,rdi
- jz .Lcc_tokens_tools_zero
- push rbx
- mov rbx,rdi
- call json_object_array_length@PLT
- test rax,rax
- jz .Lcc_tokens_tools_empty
- mov rdi,rbx
- call .Lcc_serialized_chars
- lea rax,[rax+rax+6]
- xor edx,edx
- mov ecx,7
- div rcx
- pop rbx
- ret
-.Lcc_tokens_tools_empty:
- pop rbx
-.Lcc_tokens_tools_zero:
- xor eax,eax
- ret
 /* A user Entry cannot split an assistant from its later results. */
 .Lcc_candidate:
  push rbp
@@ -510,7 +228,7 @@ pg_durable_compaction_select:
  mov rsi,rbp
  call json_object_array_get_idx@PLT
  mov rdi,rax
- call .Lcc_tokens
+ call pg_context_message_tokens@PLT
  add [rsp+16],rax
  inc rbp
  jmp .Lcc_select_message
@@ -568,16 +286,12 @@ pg_durable_compaction_select:
 .Lcc_content: .asciz "content"
 .Lcc_type: .asciz "type"
 .Lcc_text: .asciz "text"
-.Lcc_thinking: .asciz "thinking"
 .Lcc_name: .asciz "name"
 .Lcc_arguments: .asciz "arguments"
 .Lcc_id: .asciz "id"
 .Lcc_head: .asciz "head"
 .Lcc_entries: .asciz "entries"
 .Lcc_contributions: .asciz "contributions"
-.Lcc_sections: .asciz "sections"
-.Lcc_toolsAdded: .asciz "toolsAdded"
-.Lcc_toolsRemoved: .asciz "toolsRemoved"
 .section .note.GNU-stack,"",@progbits
 .text
 /* printbuf is json-c owned, with a checked grow operation on every append. */
@@ -835,7 +549,8 @@ pg_durable_compaction_select:
  mov rax,[rsp]
  mov rdi,[rax]
  mov edx,[rax+8]
- call .Lcc_count
+ mov rsi,rdx
+ call pg_context_utf16_units@PLT
  mov [rsp+16],rax
  cmp rax,2000
  jbe .Lcc_serialize_simple
@@ -2495,31 +2210,6 @@ pg_durable_compaction_create:
  mov rax,rbx
  pop rbx
  ret
-.Lcc_usage_tokens:
- CF 16
- mov rbx,rdi
- CGET rbx,totalTokens
- mov rdi,rax
- call json_object_get_uint64@PLT
- test rax,rax
- jnz .Lcc_usage_end
- xor r12d,r12d
- xor ebp,ebp
-.Lcc_usage_component:
- lea rax,[rip+.Lcc_usage_fields]
- movsxd rsi,dword ptr [rax+r12*4]
- add rsi,rax
- mov rdi,rbx
- call json_object_object_get@PLT
- mov rdi,rax
- call json_object_get_uint64@PLT
- add rbp,rax
- inc r12
- cmp r12,4
- jb .Lcc_usage_component
- mov rax,rbp
-.Lcc_usage_end:
- CE 16
 /* estimateContext: newest applicable assistant usage plus trailing estimates. */
 .Lcc_estimate_context:
  CF 64
@@ -2576,7 +2266,7 @@ pg_durable_compaction_create:
  jnz .Lcc_estimate_assistant
  CGET "qword ptr [rsp+32]",usage
  mov rdi,rax
- call .Lcc_usage_tokens
+ call pg_context_usage_tokens@PLT
  test rax,rax
  jz .Lcc_estimate_assistant
  mov [rsp+8],rax
@@ -2611,7 +2301,7 @@ pg_durable_compaction_create:
  mov rsi,r13
  call json_object_array_get_idx@PLT
  mov rdi,rax
- call .Lcc_tokens
+ call pg_context_message_tokens@PLT
  add [rsp+8],rax
  inc r13
  jmp .Lcc_estimate_sum
@@ -2641,7 +2331,7 @@ pg_durable_compaction_create:
  mov rsi,[rsp+56]
  call json_object_array_get_idx@PLT
  mov rdi,rax
- call .Lcc_tokens
+ call pg_context_message_tokens@PLT
  add [rsp+8],rax
  inc qword ptr [rsp+56]
  jmp .Lcc_estimate_planned_message
@@ -2729,14 +2419,7 @@ pg_durable_compaction_threshold:
 .Lcc_backgroundTokens: .asciz "backgroundTokens"
 .Lcc_messages: .asciz "messages"
 .Lcc_usage: .asciz "usage"
-.Lcc_totalTokens: .asciz "totalTokens"
-.Lcc_usage_fields:
- .long .Lcc_usage_input-.Lcc_usage_fields,.Lcc_usage_output-.Lcc_usage_fields
- .long .Lcc_usage_read-.Lcc_usage_fields,.Lcc_usage_write-.Lcc_usage_fields
-.Lcc_usage_input: .asciz "input"
-.Lcc_usage_output: .asciz "output"
-.Lcc_usage_read: .asciz "cacheRead"
-.Lcc_usage_write: .asciz "cacheWrite"
+
 
 .section .rodata
 .Lcc_data: .asciz "data"

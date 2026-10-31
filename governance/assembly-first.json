@@ -368,6 +368,10 @@
       "role": "c-bridge",
       "bridge_kind": "external-library",
       "reason": "libvips解码、EXIF转正、Lanczos缩放与PNG/JPEG编解码的C ABI胶水；选择与预算策略由汇编实现"
+    },
+    "src/runtime/context_tokens.S": {
+      "role": "assembly-core",
+      "reason": "Pi消息/上下文token估算，供模型输出预算和Durable压缩复用"
     }
   }
 }
