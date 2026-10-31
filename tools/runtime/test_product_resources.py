@@ -36,12 +36,35 @@ def main():
             from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
             from urllib.parse import parse_qs
             requests=[]
-            device_requests=[];device_polls={};browser_requests=[]
+            device_requests=[];device_polls={};browser_requests=[];copilot_requests=[]
             payload=base64.urlsafe_b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-oauth-account'},'padding':'\uffff😀'},ensure_ascii=False).encode()).decode().rstrip('=')
             class OAuthReceiver(BaseHTTPRequestHandler):
                 def log_message(self,*args): pass
+                def do_GET(self):
+                    prefix,action=self.path.rsplit('/',1);mode=int(prefix.removeprefix('/copilot'));copilot_requests.append((mode,action));status=200
+                    assert self.headers['User-Agent']=='GitHubCopilotChat/0.35.0' and self.headers['Editor-Version']=='vscode/1.107.0' and self.headers['Editor-Plugin-Version']=='copilot-chat/0.35.0' and self.headers['Copilot-Integration-Id']=='vscode-chat'
+                    if action=='token':
+                        assert self.headers['Authorization']=='Bearer private-github-token'
+                        host='proxy.team.githubcopilot.com' if mode==2 else 'proxy.individual.githubcopilot.com'
+                        body={'token':'tid=fixture;proxy-ep='+host+';','expires_at':__import__('time').time()+3600}
+                        if mode==8: body['token']='token-without-proxy'
+                        if mode==3: status=401
+                        if mode==5: body.pop('token')
+                    else:
+                        assert action=='models' and self.headers['X-GitHub-Api-Version']=='2026-06-01' and self.headers['Authorization'].startswith('Bearer tid=fixture;') if mode!=8 else self.headers['Authorization']=='Bearer token-without-proxy'
+                        body={'data':[{'id':'model-a','model_picker_enabled':mode not in (1,2),'policy':{'state':'enabled'}},{'id':'model-b','policy':{'state':'enabled'}},{'id':'excluded','model_picker_enabled':True,'capabilities':{'supports':{'tool_calls':False}}}]}
+                        if mode==4: status=500
+                        if mode==6: body={'invalid':True}
+                    wire=json.dumps(body).encode();self.send_response(status);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire)
                 def do_POST(self):
                     raw=self.rfile.read(int(self.headers['Content-Length']))
+                    if self.path.startswith('/copilot0/'):
+                        assert self.headers['Authorization']=='Bearer tid=fixture;proxy-ep=proxy.individual.githubcopilot.com;'
+                        route=self.path.rsplit('/',1)[1];copilot_requests.append((0,route));assert 'private-github-token' not in raw.decode()
+                        if route=='chat': wire=b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+                        elif route=='responses': wire=b'data: {"type":"response.completed","response":{"status":"completed"}}\n\n'
+                        else: wire=b'data: {"type":"message_start","message":{"id":"copilot-fixture","usage":{"input_tokens":1}}}\n\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":0}}\n\ndata: {"type":"message_stop"}\n\n'
+                        self.send_response(200);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire);return
                     if self.path.startswith('/browser'):
                         mode=int(self.path.split('/')[1].removeprefix('browser'));form=parse_qs(raw.decode());browser_requests.append((mode,form));wire=json.dumps({'access_token':'e30.'+payload+'.signature','refresh_token':'rotated-refresh','expires_in':3600}).encode();self.send_response(500 if mode==10 else 200);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire);return
                     if self.path.startswith('/device'):
@@ -77,8 +100,10 @@ def main():
                 subprocess.run([str(output),'--oauth-refresh',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
                 subprocess.run([str(output),'--oauth-device',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
                 subprocess.run([str(output),'--oauth-browser',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
+                subprocess.run([str(output),'--oauth-copilot',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
             finally: server.shutdown();server.server_close();thread.join()
             assert len(requests)==4 and all(form=={'grant_type':['refresh_token'],'refresh_token':['refresh +/&='],'client_id':['app_EMoamEEZ73f0CkXaXp7hrann']} for _,form in requests),requests
+            assert not any(mode==7 for mode,_ in copilot_requests) and all((0,route) in copilot_requests for route in ('chat','responses','anthropic'))
             assert {mode for mode,_ in browser_requests}=={0,1,2,3,6,8,10}
             for mode,form in browser_requests:
                 assert form['grant_type']==['authorization_code'] and form['client_id']==['app_EMoamEEZ73f0CkXaXp7hrann'] and form['code']==['private-browser-code'] and len(form['code_verifier'][0])==43 and form['redirect_uri'][0].startswith('http://localhost:')

@@ -407,6 +407,10 @@
       "role": "c-bridge",
       "bridge_kind": "platform-layout",
       "reason": "libevent HTTP回调监听、事件循环、URI/query接口与资源布局胶水"
+    },
+    "src/runtime/oauth_copilot.S": {
+      "role": "assembly-core",
+      "reason": "手写Copilot凭据刷新、账户目录、可用模型选择与令牌网关派生"
     }
   }
 }

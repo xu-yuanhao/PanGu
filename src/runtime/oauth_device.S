@@ -468,6 +468,9 @@ pg_oauth_device_poll:
  add rsp,16
  pop rbx
  ret
+.globl pg_oauth_json_parse
+.type pg_oauth_json_parse,@function
+pg_oauth_json_parse:
 .Ld_parse:
  push rbx
  push r12
@@ -509,6 +512,7 @@ pg_oauth_device_poll:
  pop r12
  pop rbx
  ret
+.size pg_oauth_json_parse,.-pg_oauth_json_parse
 .Ld_copy:
  push rbx
  push r12

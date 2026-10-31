@@ -42,6 +42,7 @@ SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/context_tokens.S'),
        str(ROOT / 'src/runtime/base64.S'),
        str(ROOT / 'src/runtime/oauth.S'),
+       str(ROOT / 'src/runtime/oauth_copilot.S'),
        str(ROOT / 'src/runtime/oauth_device.S'),
        str(ROOT / 'src/runtime/oauth_browser.S'),
        str(ROOT / 'src/runtime/oauth_callback.c'),
@@ -446,6 +447,36 @@ void release_budget(char *text){free(text);}
                 if api in ('openai-completions','openai-responses','azure-openai-responses'):
                     assert {k:wire[k] for k in wanted}==wanted,(api,case,wanted,wire)
                 else: assert 'native_probe' not in wire and 'extra_probe' not in wire,(api,wire)
+        copilot=(base/'auth/oauth/github-copilot.ts').read_text()
+        catalog_source=copilot[copilot.index('function asRecord('):copilot.index('async function fetchWithRateLimitRetry(')]
+        catalog_cases=[]
+        for picker in (True,False,None,'true'):
+            for policy in ('enabled','disabled','unconfigured',None):
+                for tools in (False,True,None,0):
+                    catalog_cases.append({'data':[{'id':'selected','model_picker_enabled':picker,'policy':{'state':policy},'capabilities':{'supports':{'tool_calls':tools}}},{'id':'fallback','policy':{'state':'enabled'}},{'id':7,'model_picker_enabled':True}]})
+        catalog_oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const f=new Function('const GITHUB_COPILOT_MODELS={};'+stripTypeScriptTypes(x.source,{mode:'strip'})+';return parseGitHubCopilotModelCatalog')();process.stdout.write(JSON.stringify(x.cases.flatMap(c=>[f(c,false).availableModelIds,f(c,true).availableModelIds])));"
+        catalog_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',catalog_oracle],input=json.dumps({'source':catalog_source,'cases':catalog_cases}),text=True))
+        native.pg_copilot_catalog.argtypes=[C.c_void_p,C.c_int,C.POINTER(C.c_void_p)]
+        native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
+        for index,case in enumerate(catalog_cases):
+            raw=native.json_tokener_parse(json.dumps(case).encode())
+            try:
+                for fallback in (0,1):
+                    result=C.c_void_p();assert not native.pg_copilot_catalog(raw,fallback,C.byref(result))
+                    try: assert json.loads(native.json_object_to_json_string_ext(result,0))==catalog_expected[index*2+fallback],(case,fallback)
+                    finally: native.json_object_put(result)
+            finally: native.json_object_put(raw)
+        base_source=copilot[copilot.index('function getBaseUrlFromToken('):copilot.index('function asRecord(')]
+        domain_source=copilot[copilot.index('function normalizeDomain('):copilot.index('function getUrls(')]
+        base_cases=[{'access':token,'enterpriseUrl':domain} for token in ('','tid=x;proxy-ep=proxy.individual.githubcopilot.com;exp=x','proxy-ep=custom.internal','proxy-ep=;') for domain in ('','Team.GHE.com',' https://Team.GHE.com/path ','bad url')]
+        base_oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const f=new Function(stripTypeScriptTypes(x.source,{mode:'strip'})+';return {getGitHubCopilotBaseUrl,normalizeDomain}')();process.stdout.write(JSON.stringify(x.cases.map(c=>f.getGitHubCopilotBaseUrl(c.access,f.normalizeDomain(c.enterpriseUrl)??undefined))));"
+        base_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',base_oracle],input=json.dumps({'source':domain_source+base_source,'cases':base_cases}),text=True))
+        native.pg_oauth_copilot_base.argtypes=[C.c_void_p];native.pg_oauth_copilot_base.restype=C.c_void_p
+        for case,wanted in zip(base_cases,base_expected):
+            raw=native.json_tokener_parse(json.dumps(case).encode());result=native.pg_oauth_copilot_base(raw)
+            try: assert json.loads(native.json_object_to_json_string_ext(result,0))==wanted,(case,wanted)
+            finally: native.json_object_put(result);native.json_object_put(raw)
+        print(f'PASS: {len(catalog_cases)*2} Copilot account selections and {len(base_cases)} token/enterprise gateways match fixed Pi source')
         print(f'PASS: {len(sampling_cases)*8} requests match Pi sampling merge, thinking selection and protocol boundaries')
         print(f'PASS: {len(thinking_cases)*2} Anthropic/Bedrock thinking ceilings match fixed Pi simple-options helpers')
         print(f'PASS: {len(cases)} shared context estimates match fixed Pi, and {count} protocol requests obey model/context output budgets')

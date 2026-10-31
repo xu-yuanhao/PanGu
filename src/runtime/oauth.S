@@ -299,6 +299,9 @@ pg_oauth_codex_refresh:
  pop rbx
  ret
 .size pg_oauth_codex_refresh,.-pg_oauth_codex_refresh
+.globl pg_oauth_string_field
+.type pg_oauth_string_field,@function
+pg_oauth_string_field:
 .Loc_token_string:
  push rbx
  push r12
@@ -330,6 +333,7 @@ pg_oauth_codex_refresh:
  pop r12
  pop rbx
  ret
+.size pg_oauth_string_field,.-pg_oauth_string_field
 .Lo_add:
  push rbx
  mov rbx,rdx

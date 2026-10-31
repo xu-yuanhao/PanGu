@@ -153,7 +153,7 @@
         "oauth.local.v0",
         "base64.local.v0"
       ],
-      "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token",
+      "role": "handwritten replaceable OpenAI Chat Completions/Responses and Anthropic Messages projection, sparse function-call accumulation, SSE/lifecycle; libcurl/json-c public ABI, one choice and complete 1..8 indexed calls, all arguments validated before a borrowed CALL/BATCH terminal; Model.next failures latch until start; complete grouped Session projection with ordered paired results; Agent batch consumer, sequential cancellation and explicit recovery integrated; explicit PANGU_MODEL_ENDPOINT/NAME/API_KEY connection injection for OpenAI-compatible providers; custom endpoint never takes implicit MiMo credentials; model.provider ABI3 accepts borrowed explicit-length PG_USER_VIEW requests; optional fetch_deferred/cancel_deferred and model events retain their layouts; one rejected-request Anthropic strict-prefer fallback restores original schemas, preserves required tools and records canonical diagnostics; Google Generative/Vertex Content/Part request, typed function declarations/results, model-scoped thought signatures and SSE finalization reuse native dynamic blocks; explicit endpoint with Google API key or Vertex bearer token; injected OAuth provider table, Copilot account admission and token-derived private gateway with explicit connection precedence",
       "exports": [
         "pg_mimo_model",
         "pg_mimo_decode_line (internal decoder test seam; not stable ABI)",
@@ -187,7 +187,8 @@
         "pg_google_signature_valid",
         "pg_google_requires_id",
         "pg_mimo_bind_credentials",
-        "pg_mimo_bind_oauth"
+        "pg_mimo_bind_oauth",
+        "pg_mimo_bind_oauth_providers"
       ],
       "reference_basis": [
         {
@@ -2899,7 +2900,8 @@
         "src/runtime/oauth_http.c",
         "src/runtime/oauth_device.S",
         "src/runtime/oauth_browser.S",
-        "src/runtime/oauth_callback.c"
+        "src/runtime/oauth_callback.c",
+        "src/runtime/oauth_copilot.S"
       ],
       "dependencies": [
         "credentials.local.v0",
@@ -2940,7 +2942,16 @@
         "pg_oauth_callback_close (library bridge)",
         "pg_oauth_callback_pump (library bridge)",
         "pg_oauth_callback_path (library bridge)",
-        "pg_oauth_query_fields (library bridge)"
+        "pg_oauth_query_fields (library bridge)",
+        "pg_oauth_copilot_init",
+        "pg_oauth_copilot_refresh",
+        "pg_oauth_copilot_base",
+        "pg_copilot_catalog",
+        "pg_copilot_model_allowed",
+        "pg_copilot_filter_catalog",
+        "pg_oauth_string_field",
+        "pg_oauth_json_parse",
+        "pg_oauth_get_json (HTTP bridge)"
       ],
       "reference_basis": [
         "Pi auth/resolve.ts and auth/oauth/openai-codex.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"

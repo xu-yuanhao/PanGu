@@ -44,6 +44,7 @@ typedef struct {
  const struct pg_credential_store *credentials; /* borrowed service lifetime */
  struct json_object *credential; /* private owned request credential */
  const struct pg_oauth_provider *oauth; /* borrowed matching flow */
+ const struct pg_oauth_provider *oauth_providers;size_t oauth_count;
 } pg_mimo;
 /* Native provider transport. Request identity/options are detached from
    credentials. A bound store and process environment resolve request auth;
@@ -64,6 +65,8 @@ int pg_mimo_configure(pg_mimo *,const struct json_object *);
    argumentsError metadata alongside the prepared argument object. */
 int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 /* Bind the same immutable registry used by the executor before starting runs. */
+/* Provider table and contexts are borrowed and immutable through active calls. */
+void pg_mimo_bind_oauth_providers(pg_mimo *,const struct pg_oauth_provider *,size_t);
 void pg_mimo_bind_oauth(pg_mimo *,const struct pg_oauth_provider *);
 void pg_mimo_bind_credentials(pg_mimo *,const struct pg_credential_store *);
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);

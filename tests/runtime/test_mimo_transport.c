@@ -634,6 +634,15 @@ static void test_codex_stored_oauth(void){
  }
  puts("PASS: stored Codex OAuth fresh/rotated access token and long JWT reach identical account/Bearer headers with private ownership");
 }
+static json_object *copilot_saved;
+static int copilot_read(void *context,const char *identity,json_object **out){(void)context;assert(!strcmp(identity,"github-copilot"));return json_object_deep_copy(copilot_saved,out,0)?7:0;}
+static void test_copilot_stored_oauth(void){
+ unsetenv("PANGU_MODEL_API_KEY");const char *apis[]={"openai-completions","openai-responses","anthropic-messages"},*paths[]={"/chat/completions","/responses","/v1/messages"};char access[3000]="tid=fixture;proxy-ep=proxy.team.githubcopilot.com;filler=";size_t prefix=strlen(access);memset(access+prefix,'x',2000);access[prefix+2000]=0;
+ for(unsigned api=0;api<3;api++)for(unsigned mode=0;mode<4;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();copilot_saved=json_tokener_parse("{\"type\":\"oauth\",\"refresh\":\"github-private\",\"expires\":2000000,\"availableModelIds\":[\"gateway-model\"]}");json_object_object_add(copilot_saved,"access",json_object_new_string(access));pg_credential_store store={.read=copilot_read};pg_oauth_provider flows[2]={{0,"openai-codex",oauth_transport_now,oauth_transport_refresh},{0,"github-copilot",oauth_transport_now,oauth_transport_refresh}};pg_mimo_bind_credentials(&m,&store);pg_mimo_bind_oauth_providers(&m,flows,2);json_object *cfg=json_tokener_parse("{\"modelInfo\":{\"provider\":\"github-copilot\"}}");json_object_object_add(cfg,"api",json_object_new_string(apis[api]));json_object_object_add(cfg,"model",json_object_new_string(mode==1?"blocked-model":"gateway-model"));if(mode==2)json_object_object_add(cfg,"endpoint",json_object_new_string("https://explicit.invalid/request"));if(mode==3)json_object_object_add(cfg,"baseUrl",json_object_new_string("https://proxy.invalid"));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);int result=start();if(mode==1)assert(result&&m.retry_blocked&&!m.easy);else{char wanted[256];if(mode==2)strcpy(wanted,"https://explicit.invalid/request");else snprintf(wanted,sizeof(wanted),"https://%s%s",mode==3?"proxy.invalid":"api.team.githubcopilot.com",paths[api]);assert(!result&&!strcmp(captured_url,wanted));unsigned auth=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)if(!strncmp(h->data,"Authorization: Bearer ",22)){assert(!strcmp(h->data+22,access));auth++;}assert(auth==1&&!strstr(m.request,"github-private"));}model.close(model.context);assert(!m.credential);json_object_put(copilot_saved);copilot_saved=0;
+ }
+ puts("PASS: Copilot provider table, account model admission, long OAuth Bearer, token gateway and explicit connection precedence across three protocols");
+}
 static void test_stored_credentials(void){
  unsetenv("PANGU_MODEL_API_KEY");setenv("DEEPSEEK_API_KEY","unit-ambient-secret",1);pg_credential_store store={.read=stored_read};
  for(stored_mode=0;stored_mode<6;stored_mode++){
@@ -973,6 +982,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_copilot_stored_oauth();
     test_codex_stored_oauth();
     test_stored_credentials();
     test_provider_environment_auth();

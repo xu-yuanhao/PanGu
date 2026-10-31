@@ -129,7 +129,7 @@ static struct {
 static char configured_prompt[4096];
 static pg_mimo provider;
 static pg_credential_store default_credentials;
-static pg_oauth_provider default_codex_oauth;
+static pg_oauth_provider default_codex_oauth,default_copilot_oauth,model_oauths[2];
 static pg_oauth_device default_login;
 static int credentials_stop(void *ctx){(void)ctx;pg_oauth_device_close(&default_login);return 0;}
 
@@ -139,7 +139,7 @@ static const pg_credential_store *model_credentials;
 static char credentials_path[4096];
 static int credentials_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;const char *directory=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");int n;if(directory)n=snprintf(credentials_path,sizeof(credentials_path),"%s/auth.json",directory);else if(home)n=snprintf(credentials_path,sizeof(credentials_path),"%s/.pangu/agent/auth.json",home);else return 1;
- if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);pg_oauth_device_init(&default_login,&default_credentials,0);pg_oauth_device_service(&default_login,&default_auth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth)||pg_host_provide(scope,owner,"auth",&default_auth);
+ if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);pg_oauth_copilot_init(&default_copilot_oauth);pg_oauth_device_init(&default_login,&default_credentials,0);pg_oauth_device_service(&default_login,&default_auth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth)||pg_host_provide(scope,owner,"auth",&default_auth)||pg_host_provide(scope,owner,"oauth.github-copilot",&default_copilot_oauth);
 }
 static pg_tool_registry registry;
 static pg_tool_registry file_registry;
@@ -185,13 +185,13 @@ static int tools_start(void *ctx,pg_host *scope,size_t owner){
 }
 static int tools_stop(void *ctx){(void)ctx;int result=application.tools.close?application.tools.close(application.tools.context):0;if(result!=1)pg_edit_tool_clear(&editor);return result;}
 static void catalog_release(json_object *value){json_object_put(value);}
-static int catalog_list(void *ctx,const char *provider_name,json_object **out){(void)ctx;*out=0;if(durable.resources.closed||!durable.resources.current.settings)return 7;return pg_models_list(json_object_object_get(durable.resources.current.settings,"modelCatalog"),provider_name,out);}
+static int catalog_list(void *ctx,const char *provider_name,json_object **out){(void)ctx;*out=0;if(durable.resources.closed||!durable.resources.current.settings)return 7;json_object *raw=0,*credential=0;int result=pg_models_list(json_object_object_get(durable.resources.current.settings,"modelCatalog"),provider_name,&raw);if(!result)result=model_credentials->read(model_credentials->context,"github-copilot",&credential);if(!result)result=pg_copilot_filter_catalog(raw,credential,out);json_object_put(raw);json_object_put(credential);return result;}
 static int native_model_describe(void *ctx,const struct json_object *configuration,struct json_object **out){(void)ctx;return pg_models_describe(json_object_object_get(durable.resources.current.settings,"modelCatalog"),configuration,out);}
 static pg_model_metadata default_model_metadata={PG_MODEL_METADATA_ABI,sizeof(pg_model_metadata),0,native_model_describe};
 static int model_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_tool_registry *tools=pg_host_get(scope,owner,"tool.registry");if(!tools)return 1;
- model_credentials=pg_host_get(scope,owner,"credentials");model_oauth=pg_host_get(scope,owner,"oauth.openai-codex");if(!model_credentials||!model_oauth)return 1;
- application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);pg_mimo_bind_credentials(&provider,model_credentials);pg_mimo_bind_oauth(&provider,model_oauth);
+ model_credentials=pg_host_get(scope,owner,"credentials");model_oauth=pg_host_get(scope,owner,"oauth.openai-codex");const pg_oauth_provider *copilot=pg_host_get(scope,owner,"oauth.github-copilot");if(!model_credentials||!model_oauth||!copilot)return 1;model_oauths[0]=*model_oauth;model_oauths[1]=*copilot;
+ application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);pg_mimo_bind_credentials(&provider,model_credentials);pg_mimo_bind_oauth_providers(&provider,model_oauths,2);
  default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1",0,0};
  return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider)||pg_host_provide(scope,owner,"model.metadata",&default_model_metadata);
 }
@@ -264,7 +264,7 @@ failed:json_object_put(copy);return 1;
 static int prepare(void *ctx,uint64_t conversation,json_object **out){
  (void)ctx;*out=0;pg_prompt_inputs inputs={0};int result=prepare_load(0,conversation,&inputs);if(!result)result=pg_agent_state_prepare(inputs.configuration,inputs.state,out);if(!result)result=prepare_finish(0,*out);json_object_put(inputs.state);json_object_put(inputs.configuration);json_object_put(inputs.view);if(result){json_object_put(*out);*out=0;}return result;
 }
-static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);pg_mimo_bind_credentials(ctx,model_credentials);pg_mimo_bind_oauth(ctx,model_oauth);return pg_mimo_configure(ctx,configuration);}
+static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);pg_mimo_bind_credentials(ctx,model_credentials);pg_mimo_bind_oauth_providers(ctx,model_oauths,2);return pg_mimo_configure(ctx,configuration);}
 static void native_model_failure(void *ctx,pg_model_failure *out){
  pg_mimo *source=ctx;static char message[128];int n=snprintf(message,sizeof(message),"Model request failed (HTTP %ld, transport %u)",source->http,source->transport_error);
  pg_slice detail={message,(size_t)n},body={source->body,source->used},structured_detail={0},structured_body={0};if(!pg_mimo_failure_data(source,&structured_detail,&structured_body)){if(structured_detail.size)detail=structured_detail;if(structured_body.size)body=structured_body;}
@@ -476,13 +476,13 @@ static pg_read_image_processor native_images={0,pg_image_prepare};
 static int images_start(void *ctx,pg_host *scope,size_t owner){(void)ctx;return pg_host_provide(scope,owner,"image.processor",&native_images);}
 static const char *const image_exports[]={"image.processor"};
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","usage.total","observation","task.graph","task.control","conversation.view","conversation.client","conversation.catalog","conversation.actions","conversation.history","models.catalog","agent.state","extensions.control"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry","credentials","oauth.openai-codex"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
+static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry","credentials","oauth.openai-codex","oauth.github-copilot"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,17,agent_start,agent_stop};
-static const char *const credentials_exports[]={"credentials","oauth.openai-codex","auth"};
+static const char *const credentials_exports[]={"credentials","oauth.openai-codex","auth","oauth.github-copilot"};
 static const pg_plugin plugins[]={
- {"credentials",0,0,0,credentials_exports,3,credentials_start,credentials_stop},
+ {"credentials",0,0,0,credentials_exports,4,credentials_start,credentials_stop},
  {"images",0,0,0,image_exports,1,images_start,no_resources},
- {"model",0,model_imports,3,model_exports,4,model_start,model_stop},
+ {"model",0,model_imports,4,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,2,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},

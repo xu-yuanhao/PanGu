@@ -136,6 +136,7 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 - [x] Codex存储OAuth接通请求与刷新：五分钟有效期、锁内二次检查、轮换持久化、刷新错误保留、注销竞争处理及同一JWT的Bearer/账户路由；支持长JWT与Base64URL claim，复用共享编解码。实际本地HTTP回放、四进程刷新去重、模型/产品ASan/UBSan和客户端恢复通过。
 - [x] Codex设备码登录接通Host/TUI可选认证服务：获取验证码/验证地址、协作HTTP轮询、pending/slow_down与十五分钟超时、授权码交换、令牌验证/原子保存、取消和注销；公开快照与私有设备数据隔离。九组产品HTTP场景及登录后使用存储JWT的实际模型请求通过，TUI绑定/解绑与真实DeepSeek存储密钥闭环保持通过。
 - [x] Codex浏览器登录接通同一auth服务：PKCE/state、PanGu授权URL、loopback回调和手工URL/query/code#state/纯代码输入、端口占用回退、取消及迟到输入隔离；与设备码共用授权码交换/令牌验证/存储。十二组产品回放与十四组Pi授权输入源码差分通过，TUI操作表提供browser_begin/submit_code。
+- [x] Copilot存储OAuth运行链接通：多提供者认证注入、GitHub→Copilot令牌刷新与账户目录、锁内持久化、个人账户picker/policy回退、企业域及令牌网关派生；模型目录和三协议请求共用可用模型约束，显式连接优先。九组HTTP产品场景、128/16组Pi目录/网关差分、三协议实际请求及真实DeepSeek存储密钥闭环通过。
 - [ ] 顺序移植对话协议：OpenAI Chat Completions → Responses → Anthropic Messages → Gemini/Vertex → Bedrock → Azure → Codex/Copilot与其上游网关适配。按相同协议复用编码和解析模块。
 - [ ] 验收：上游请求/响应样例与原生字段、事件、错误一致；每个协议有确定性流回放；现有MiMo真实对话、工具、取消、恢复继续成立。
 
@@ -332,8 +333,8 @@ K01–K15是完整功能清单，B01–B05是实际执行顺序。跨K步骤完�
 
 ## 核心交接区
 
-- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/oauth/pkce.ts`、`openai-codex.ts` 的createAuthorizationFlow/parseAuthorizationInput/loginOpenAICodex、callback-server.ts的状态核对与手工回退；设备码与令牌交换调用者一并核对。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
-- 实际调用链：现有Host auth/TUI可选操作表追加browser_begin(provider)/submit_code(input)→手写Assembly PKCE/授权URL→libevent协作回调或手工输入→state与code核对→共用pg_oauth_login_exchange→令牌验证与credentials.modify。默认127.0.0.1:1455，PANGU_OAUTH_CALLBACK_HOST适配PanGu环境；端口占用保留手工输入，错误state/路由继续等待，授权错误/取消终结，迟到手工输入不撤销已开始交换。公开auth_url快照仅含URL与callback_available，PKCE verifier保留私有；设备码与浏览器共用同一状态机/清理入口。C仅承担系统libevent HTTP/URI接口胶水，libcrypto提供随机数与SHA256。
-- 验证：产品ASan/UBSan十二组浏览器回放覆盖PKCE独立摘要核对、四种手工形式、自动回调/非法state/缺代码/授权拒绝、端口占用、取消/迟到输入、交换失败及凭据落盘；十四组授权输入直接运行固定Pi函数差分通过。设备码完整调用链、OAuth刷新/并发存储与Host/TUI绑定回归保持通过。模型O0/O2/UBSan、ABI/故障注入、实际TLS与既有Pi差分、产品构建及G00/Assembly/diff通过。自审核对回调响应后释放、state优先核对、随机缓冲布局、私有字段/公开快照所有权及交换实现原地提取。
-- 具体缺口：TUI认证面板消费browser_begin/submit_code及设备码接口；其余提供者登录/刷新/派生；模型认证读取/刷新仍为有界同步调用，等待锁与刷新结果的协作取消待接通。凭据env/命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
-- 下一交付物：沿同一auth/credentials与实际模型服务，成组接通其余提供者认证及认证等待生命周期。
+- 来源：固定Pi `d5b3de22d0e24a3e9c38a9410d3329b099717283` 的 `auth/oauth/github-copilot.ts` refreshGitHubCopilotToken/refreshGitHubCopilotAccessToken/fetchGitHubCopilotModels/parseGitHubCopilotModelCatalog/getGitHubCopilotBaseUrl、providers/github-copilot.ts的模型过滤，与auth/resolve.ts锁内刷新调用者。Harness固定 `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`。
+- 实际调用链：Host注入Codex/Copilot提供者表→Model.start按公开提供者身份解析存储OAuth→GitHub令牌GET派生Copilot令牌→账户目录GET→同一credentials.modify保存→三协议模型请求。手写Assembly负责令牌/有效期、picker/policy与工具能力选择、个人/企业网关、可用模型约束；C仅扩展有界GET HTTP桥接。总刷新预算15秒、目录请求5秒上限；失败保留原凭据。Host models.catalog消费同一公开availableModelIds；默认端点随令牌网关更新，显式endpoint/baseUrl优先；长Bearer复用现有动态头实现，私有令牌不进入配置或会话。
+- 验证：128组账户选择与16组令牌/企业域网关直接运行固定Pi源码差分通过。九组产品HTTP/ASan/UBSan场景覆盖token→catalog→持久化→Chat/Responses/Anthropic实际请求、fresh跳过网络、企业身份、401/500/缺字段/非法目录保留；Host模型目录实际过滤通过。模型O0/O2/UBSan、ABI/故障注入、TLS及既有Pi差分通过，十二组三协议网关/显式连接/不可用模型/长令牌传输通过。客户端SQLite/JSONL恢复、产品构建及G00/Assembly/diff通过；真实DeepSeek存储密钥→工具→账本→两次Host重开在ASan/UBSan下通过。自审核对提供者表借用、刷新提交边界、头与超时、目录引用、原生布局和Host依赖/关闭。
+- 具体缺口：Copilot设备码登录、模型策略启用及登录时限流处理；TUI认证面板消费现有接口；其余提供者认证。模型认证读取/刷新仍为有界同步调用，等待锁与刷新结果的协作取消待接通。凭据env/命令型密钥、Anthropic订阅适配、Google ADC及AWS动态凭据；Codex WebSocket/连接缓存及其超时；legacy Session工具声明估算；其余协议高级行为按K05保留。
+- 下一交付物：把Copilot设备码、账户策略与已有刷新/存储运行链接到同一auth操作表，继续完成K05认证流程。

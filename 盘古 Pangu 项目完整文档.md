@@ -18,7 +18,7 @@ PanGu使用独立的`.pangu`目录、配置、认证身份、会话与存储格�
 
 Bedrock可用`AWS_BEARER_TOKEN_BEDROCK`，或`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`及可选`AWS_SESSION_TOKEN`；`PANGU_MODEL_API_KEY`显式Bearer优先。共享凭据从`AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE`或`~/.aws/config`、`~/.aws/credentials`读取，`options.profile`显式选择profile，环境密钥优先于环境`AWS_PROFILE`的静态密钥。区域遵循参考的ARN、options.region、AWS区域环境及环境profile解析顺序；默认`us-east-1`。自定义代理可用`AWS_BEDROCK_SKIP_AUTH=1`采用参考的代理签名凭据，`AWS_BEDROCK_FORCE_HTTP1=1`指定HTTP/1.1。签名由libcurl完成，凭据不写入会话。
 
-Copilot模型使用`github-copilot`提供者身份与显式`PANGU_MODEL_API_KEY`令牌，Chat、Responses和Anthropic共用现有模型服务；默认端点按协议组合，发起者和图片请求头从实际会话推导。
+Copilot模型使用`github-copilot`身份，Chat、Responses和Anthropic共用现有模型服务。显式密钥与存储OAuth均可认证；存储OAuth刷新时以GitHub令牌取得Copilot令牌和账户模型目录，并在同一凭据锁内保存。默认网关从令牌的`proxy-ep`或企业域派生，显式连接地址优先；账户可用模型同时用于目录展示和请求准入，发起者与图片请求头从实际会话推导。
 
 Codex基础SSE连接使用`PANGU_MODEL_API=openai-codex-responses`与显式`PANGU_MODEL_API_KEY` JWT；账户身份由令牌解析，默认Codex端点和请求结构由模型服务适配；SSE请求复用系统libzstd进行压缩，二进制缓冲由提供者持有至传输关闭。Codex可从用户agent目录的`auth.json`读取`openai-codex` OAuth条目（`type`、`access`、`refresh`、`expires`）。不足五分钟时在凭据锁内复核、刷新并保存轮换结果；认证头与账户路由使用同一私有JWT。刷新HTTP有15秒上限，凭据锁等待有30秒上限。Host的`auth`服务提供Codex设备码登录、状态轮询、取消、公开账户列表与注销；验证码和验证地址由状态快照返回，网络等待采用协作推进，成功后保存到同一凭据存储。TUI通过`pg_tui_runtime_auth`取得可选操作表。同一操作表的`browser_begin`/`submit_code`提供Codex浏览器授权、PKCE、自动回调与粘贴代码/回调URL；默认监听`127.0.0.1:1455/auth/callback`，可用`PANGU_OAUTH_CALLBACK_HOST`调整监听地址，端口占用时保留手工入口。URI与回调HTTP复用系统libevent，构建通过`pkg-config libevent`取得依赖。模型自定义端点支持HTTP与HTTPS。Codex的`options.maxRetries`控制请求内重试，默认0；`maxRetryDelayMs`限制服务器要求的等待，等待期间仍可取消。Codex的`timeoutMs`用于等待最终响应头，未设置或为0时不设该时限，响应头完成后继续接收正文。
 

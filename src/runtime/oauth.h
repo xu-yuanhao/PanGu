@@ -81,4 +81,18 @@ void pg_oauth_callback_close(struct pg_oauth_callback *);
 int pg_oauth_callback_pump(struct pg_oauth_callback *);
 int pg_oauth_callback_path(const char *,const char *);
 int pg_oauth_query_fields(const char *,int,char **);
+typedef struct pg_copilot_config {
+ const char *token_url,*models_base_url,*enterprise_domain;
+} pg_copilot_config;
+void pg_oauth_copilot_init(pg_oauth_provider *);
+int pg_oauth_copilot_refresh(void *,const struct json_object *,struct json_object **);
+/* Owned JSON base URL derived from access token / enterprise identity. */
+struct json_object *pg_oauth_copilot_base(const struct json_object *);
+int pg_copilot_model_allowed(const struct json_object *,const char *);
+int pg_copilot_catalog(const struct json_object *,int,struct json_object **);
+/* Owned result; an unfiltered catalog retains the input reference. */
+int pg_copilot_filter_catalog(const struct json_object *,const struct json_object *,struct json_object **);
+int pg_oauth_get_json(const char *,const char *const *,size_t,double,char **);
+struct json_object *pg_oauth_json_parse(const char *);
+const char *pg_oauth_string_field(const struct json_object *,const char *);
 #endif

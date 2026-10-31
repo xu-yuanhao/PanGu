@@ -376,7 +376,12 @@ li_start:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call pg_mimo_config_codex@PLT
  test eax,eax
+ jnz .Lst_long_key
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcp_is
+ test eax,eax
  jz .Lst_short_key
+.Lst_long_key:
  mov rdi,r13
  call .Lbe_credential
  test eax,eax
@@ -425,7 +430,12 @@ li_start:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  call pg_mimo_config_codex@PLT
  test eax,eax
+ jnz .Lst_long_bearer
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call .Lcp_is
+ test eax,eax
  jz .Lst_short_bearer
+.Lst_long_bearer:
  mov rdi,rbx
  mov rsi,r13
  call .Lbe_bearer_header
@@ -5103,6 +5113,19 @@ pg_mimo_complete:
  call json_object_object_get@PLT
  test rax,rax
  jnz .Lcp_base_value
+ cmp dword ptr [rsp+8],0
+ jne .Lcp_model_base
+ mov edi,1
+ call json_object_new_boolean@PLT
+ test rax,rax
+ jz .Lcp_prepare_bad
+ mov rdi,rbx
+ lea rsi,[rip+.Lca_gateway_default]
+ mov rdx,rax
+ call .Lrp_local_set
+ test eax,eax
+ jnz .Lcp_prepare_bad
+.Lcp_model_base:
  mov rdi,rbx
  lea rsi,[rip+.Lbeta_modelInfo]
  call json_object_object_get@PLT
@@ -6893,9 +6916,32 @@ pg_mimo_bind_credentials:
  xor edx,edx
  jmp .Lca_end
 .Lca_oauth:
- mov rdx,[rbx+PG_MM_OAUTH]
- test rdx,rdx
+ mov r13,[rbx+PG_MM_OAUTH]
+ test r13,r13
+ jz .Lca_flow_list
+ mov rdi,r14
+ mov rsi,[r13+8]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lca_flow_ready
+.Lca_flow_list:
+ mov r13,[rbx+PG_MM_OAUTH_PROVIDERS]
+ mov rax,[rbx+PG_MM_OAUTH_COUNT]
+ mov [rsp],rax
+ test rax,rax
  jz .Lca_blocked
+.Lca_flow_each:
+ mov rdi,r14
+ mov rsi,[r13+8]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lca_flow_ready
+ add r13,32
+ dec qword ptr [rsp]
+ jnz .Lca_flow_each
+ jmp .Lca_blocked
+.Lca_flow_ready:
+ mov rdx,r13
  mov qword ptr [rsp],0
  mov rdi,r12
  mov rsi,r14
@@ -6908,6 +6954,10 @@ pg_mimo_bind_credentials:
  mov rax,[rsp]
  mov [rbx+PG_MM_CREDENTIAL],rax
  call json_object_put@PLT
+ mov rdi,rbx
+ call .Lca_gateway
+ test eax,eax
+ jnz .Lca_blocked
  mov rdi,[rbx+PG_MM_CREDENTIAL]
  lea rsi,[rip+.Lca_access]
  call json_object_object_get@PLT
@@ -6952,6 +7002,8 @@ pg_mimo_bind_credentials:
 .type pg_mimo_bind_oauth,@function
 pg_mimo_bind_oauth:
  mov [rdi+PG_MM_OAUTH],rsi
+ mov qword ptr [rdi+PG_MM_OAUTH_PROVIDERS],0
+ mov qword ptr [rdi+PG_MM_OAUTH_COUNT],0
  ret
 .size pg_mimo_bind_oauth,.-pg_mimo_bind_oauth
 .section .rodata
@@ -6960,4 +7012,83 @@ pg_mimo_bind_oauth:
 
 .section .rodata
 .Lca_failure_json: .asciz "{\"error\":{\"code\":\"model_auth_failed\",\"message\":\"Stored model credential could not be resolved\"}}"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_mimo_bind_oauth_providers
+.type pg_mimo_bind_oauth_providers,@function
+pg_mimo_bind_oauth_providers:
+ mov qword ptr [rdi+PG_MM_OAUTH],0
+ mov [rdi+PG_MM_OAUTH_PROVIDERS],rsi
+ mov [rdi+PG_MM_OAUTH_COUNT],rdx
+ ret
+.size pg_mimo_bind_oauth_providers,.-pg_mimo_bind_oauth_providers
+.Lca_gateway:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ mov r12,[rbx+PG_MM_CONFIGURATION]
+ mov rdi,r12
+ call .Lcp_is
+ test eax,eax
+ jz .Lca_gateway_ok
+ mov rdi,r12
+ lea rsi,[rip+.Lcfg_model]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ mov rsi,rax
+ call pg_copilot_model_allowed@PLT
+ test eax,eax
+ jz .Lca_gateway_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lca_gateway_default]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Lca_gateway_ok
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ call pg_oauth_copilot_base@PLT
+ test rax,rax
+ jz .Lca_gateway_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lge_baseUrl]
+ mov rdx,rax
+ call .Lrp_local_set
+ test eax,eax
+ jnz .Lca_gateway_bad
+ mov rdi,r12
+ lea rsi,[rip+.Lcfg_endpoint]
+ call json_object_object_del@PLT
+ mov rdi,r12
+ call .Lcp_prepare
+ jmp .Lca_gateway_end
+.Lca_gateway_ok:
+ xor eax,eax
+ jmp .Lca_gateway_end
+.Lca_gateway_bad:
+ mov eax,1
+.Lca_gateway_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+/* Transfer an owned value into a private request identity. */
+.Lrp_local_set:
+ push rbx
+ mov rbx,rdx
+ call json_object_object_add@PLT
+ test eax,eax
+ jz .Lrp_local_done
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,1
+.Lrp_local_done:
+ pop rbx
+ ret
+.section .rodata
+.Lca_gateway_default: .asciz "panguGatewayDefault"
 .section .note.GNU-stack,"",@progbits
