@@ -34,8 +34,14 @@ typedef struct pg_oauth_device {
  struct json_object *browser;
  const struct pg_oauth_browser_config *browser_config;
  struct pg_oauth_callback *callback;
+ const char *identity;
+ const struct pg_copilot_login_config *copilot_config;
+ char *enterprise_domain;
+ unsigned long long retry_deadline;
+ unsigned retry_count,resume_phase;
+ size_t policy_index;
 } pg_oauth_device;
-_Static_assert(sizeof(pg_oauth_device)==96,"device login ABI");
+_Static_assert(sizeof(pg_oauth_device)==144,"device login ABI");
 _Static_assert(offsetof(pg_oauth_device,next_poll)==64,"device timer ABI");
 _Static_assert(offsetof(pg_oauth_device_config,now_ms)==48,"device clock ABI");
 /* Serialized calls. Config/store are borrowed; NULL config selects Codex.
@@ -55,8 +61,9 @@ typedef struct pg_auth_ops {
  int (*remove)(void *,const char *);
  int (*browser_begin)(void *,const char *);
  int (*submit_code)(void *,const char *);
+ int (*copilot_begin)(void *,const char *);
 } pg_auth_ops;
-_Static_assert(sizeof(pg_auth_ops)==64,"auth operations ABI");
+_Static_assert(sizeof(pg_auth_ops)==72,"auth operations ABI");
 void pg_oauth_device_service(pg_oauth_device *,pg_auth_ops *);
 /* Shared final token validation for code exchange and refresh. */
 int pg_oauth_codex_token(const struct json_object *,struct json_object **,double);
@@ -95,4 +102,18 @@ int pg_copilot_filter_catalog(const struct json_object *,const struct json_objec
 int pg_oauth_get_json(const char *,const char *const *,size_t,double,char **);
 struct json_object *pg_oauth_json_parse(const char *);
 const char *pg_oauth_string_field(const struct json_object *,const char *);
+typedef struct pg_copilot_login_config {
+ const char *device_url,*access_url,*token_url,*models_base_url,*enterprise_domain;
+ void *clock_context;double (*now_ms)(void *);
+ int (*known_model)(const char *);
+} pg_copilot_login_config;
+void pg_oauth_copilot_configure(pg_oauth_device *,const pg_copilot_login_config *);
+int pg_oauth_copilot_begin(void *,const char *);
+void pg_oauth_copilot_poll(pg_oauth_device *);
+char *pg_oauth_copilot_domain(const char *);
+int pg_oauth_copilot_token(const struct json_object *,const char *,const char *,struct json_object **);
+int pg_copilot_policy_models(const struct json_object *,int,int (*)(const char *),struct json_object **);
+int pg_copilot_merge_models(const struct json_object *,const struct json_object *,struct json_object **);
+int pg_oauth_http_headers(struct pg_oauth_http *,const char *const *,size_t,unsigned);
+const char *pg_oauth_http_retry_after(const struct pg_oauth_http *);
 #endif

@@ -2407,7 +2407,8 @@
         "pg_models_describe",
         "pg_models_list",
         "pg_models_compaction_policy",
-        "pg_models_builtin_json"
+        "pg_models_builtin_json",
+        "pg_models_copilot_known"
       ],
       "reference_basis": [
         {
@@ -2901,7 +2902,8 @@
         "src/runtime/oauth_device.S",
         "src/runtime/oauth_browser.S",
         "src/runtime/oauth_callback.c",
-        "src/runtime/oauth_copilot.S"
+        "src/runtime/oauth_copilot.S",
+        "src/runtime/oauth_copilot_login.S"
       ],
       "dependencies": [
         "credentials.local.v0",
@@ -2951,7 +2953,16 @@
         "pg_copilot_filter_catalog",
         "pg_oauth_string_field",
         "pg_oauth_json_parse",
-        "pg_oauth_get_json (HTTP bridge)"
+        "pg_oauth_get_json (HTTP bridge)",
+        "pg_oauth_copilot_configure",
+        "pg_oauth_copilot_begin",
+        "pg_oauth_copilot_poll",
+        "pg_oauth_copilot_domain",
+        "pg_oauth_copilot_token",
+        "pg_copilot_policy_models",
+        "pg_copilot_merge_models",
+        "pg_oauth_http_headers (HTTP bridge)",
+        "pg_oauth_http_retry_after (HTTP bridge)"
       ],
       "reference_basis": [
         "Pi auth/resolve.ts and auth/oauth/openai-codex.ts at d5b3de22d0e24a3e9c38a9410d3329b099717283"

@@ -131,6 +131,7 @@ static pg_mimo provider;
 static pg_credential_store default_credentials;
 static pg_oauth_provider default_codex_oauth,default_copilot_oauth,model_oauths[2];
 static pg_oauth_device default_login;
+static const pg_copilot_login_config default_copilot_login={.known_model=pg_models_copilot_known};
 static int credentials_stop(void *ctx){(void)ctx;pg_oauth_device_close(&default_login);return 0;}
 
 static pg_auth_ops default_auth;
@@ -139,7 +140,7 @@ static const pg_credential_store *model_credentials;
 static char credentials_path[4096];
 static int credentials_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;const char *directory=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");int n;if(directory)n=snprintf(credentials_path,sizeof(credentials_path),"%s/auth.json",directory);else if(home)n=snprintf(credentials_path,sizeof(credentials_path),"%s/.pangu/agent/auth.json",home);else return 1;
- if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);pg_oauth_copilot_init(&default_copilot_oauth);pg_oauth_device_init(&default_login,&default_credentials,0);pg_oauth_device_service(&default_login,&default_auth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth)||pg_host_provide(scope,owner,"auth",&default_auth)||pg_host_provide(scope,owner,"oauth.github-copilot",&default_copilot_oauth);
+ if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;pg_oauth_codex_init(&default_codex_oauth);pg_oauth_copilot_init(&default_copilot_oauth);pg_oauth_device_init(&default_login,&default_credentials,0);pg_oauth_copilot_configure(&default_login,&default_copilot_login);pg_oauth_device_service(&default_login,&default_auth);return pg_host_provide(scope,owner,"credentials",&default_credentials)||pg_host_provide(scope,owner,"oauth.openai-codex",&default_codex_oauth)||pg_host_provide(scope,owner,"auth",&default_auth)||pg_host_provide(scope,owner,"oauth.github-copilot",&default_copilot_oauth);
 }
 static pg_tool_registry registry;
 static pg_tool_registry file_registry;

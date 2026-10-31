@@ -36,11 +36,47 @@ def main():
             from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
             from urllib.parse import parse_qs
             requests=[]
-            device_requests=[];device_polls={};browser_requests=[];copilot_requests=[]
+            device_requests=[];device_polls={};browser_requests=[];copilot_requests=[];login_requests=[];login_counts={}
             payload=base64.urlsafe_b64encode(json.dumps({'https://api.openai.com/auth':{'chatgpt_account_id':'pangu-oauth-account'},'padding':'\uffff😀'},ensure_ascii=False).encode()).decode().rstrip('=')
             class OAuthReceiver(BaseHTTPRequestHandler):
                 def log_message(self,*args): pass
+                def copilot_login(self,raw=None):
+                    parts=self.path.split('/');mode=int(parts[1].removeprefix('cl'));action='/'.join(parts[2:]);key=(mode,action);count=login_counts.get(key,0)+1;login_counts[key]=count;login_requests.append((mode,action));status=200;retry=None
+                    assert self.headers['User-Agent']=='GitHubCopilotChat/0.35.0' and self.headers['Accept']=='application/json'
+                    if action in ('device','access'):
+                        form=parse_qs(raw.decode());assert form['client_id']==['Iv1.b507a08c87ecfe98']
+                        if action=='device':
+                            assert form['scope']==['read:user'];body={'device_code':'private-gh-device','user_code':'GITHUB-CODE','verification_uri':'file:///tmp/unsafe' if mode==7 else 'https://login.invalid/device','expires_in':0 if mode==8 else -0.001 if mode==19 else 120,'interval':-5 if mode==18 else 1}
+                        else:
+                            assert form['device_code']==['private-gh-device'] and form['grant_type']==['urn:ietf:params:oauth:grant-type:device_code']
+                            if mode==9: body={'error':'slow_down','interval':2} if count==1 else {'error':'access_denied'}
+                            elif count==1: body={'error':'authorization_pending'}
+                            elif count==2: body={'error':'slow_down','interval':7}
+                            elif count==3: body={'error':'slow_down'}
+                            else: body={'access_token':'private-gh-refresh'}
+                    elif action=='token':
+                        assert self.headers['Authorization']=='Bearer private-gh-refresh';body={'token':'tid=fixture;proxy-ep=proxy.team.githubcopilot.com;' if mode==17 else 'tid=fixture;proxy-ep=proxy.individual.githubcopilot.com;','expires_at':__import__('time').time()+3600}
+                        if mode==10: status=401
+                    elif action=='models':
+                        assert self.headers['X-GitHub-Api-Version']=='2026-06-01'
+                        body={'data':[{'id':'already-enabled','policy':{'state':'enabled'}},{'id':'already-enabled','policy':{'state':'enabled'}},*[{'id':name,'policy':{'state':'unconfigured'}} for name in ('policy-a','policy-b','policy-c','foreign-policy')],{'id':'policy-d','policy':{'state':'unconfigured'},'capabilities':{'supports':{'tool_calls':False}}}]}
+                        if mode==11: status=429;retry='300'
+                        elif count<= (2 if mode==16 else 1): status=429;retry='Thu, 01 Jan 1970 00:00:00 GMT' if mode==16 else '0.3'
+                    else:
+                        assert action.startswith('models/') and action.endswith('/policy') and json.loads(raw)=={'state':'enabled'} and self.headers['openai-intent']=='chat-policy' and self.headers['x-interaction-type']=='chat-policy'
+                        model=parts[3];body={}
+                        if model=='policy-a' and mode==14: self.connection.shutdown(2);self.connection.close();return
+                        if model=='policy-a' and count==1 and mode not in (13,14): status=429;retry='0'
+                        elif model=='policy-a' and mode==13: status=500
+                        elif model=='policy-b' and mode==12: status=429;retry='300'
+                        elif model=='policy-b' and mode not in (13,14): status=500
+                    wire=json.dumps(body).encode();self.send_response(status)
+                    if retry is not None:self.send_header('Retry-After',retry)
+                    self.send_header('Content-Length',str(len(wire)));self.end_headers()
+                    try:self.wfile.write(wire)
+                    except (BrokenPipeError,ConnectionResetError):pass
                 def do_GET(self):
+                    if self.path.startswith('/cl'): self.copilot_login();return
                     prefix,action=self.path.rsplit('/',1);mode=int(prefix.removeprefix('/copilot'));copilot_requests.append((mode,action));status=200
                     assert self.headers['User-Agent']=='GitHubCopilotChat/0.35.0' and self.headers['Editor-Version']=='vscode/1.107.0' and self.headers['Editor-Plugin-Version']=='copilot-chat/0.35.0' and self.headers['Copilot-Integration-Id']=='vscode-chat'
                     if action=='token':
@@ -58,6 +94,7 @@ def main():
                     wire=json.dumps(body).encode();self.send_response(status);self.send_header('Content-Length',str(len(wire)));self.end_headers();self.wfile.write(wire)
                 def do_POST(self):
                     raw=self.rfile.read(int(self.headers['Content-Length']))
+                    if self.path.startswith('/cl'): self.copilot_login(raw);return
                     if self.path.startswith('/copilot0/'):
                         assert self.headers['Authorization']=='Bearer tid=fixture;proxy-ep=proxy.individual.githubcopilot.com;'
                         route=self.path.rsplit('/',1)[1];copilot_requests.append((0,route));assert 'private-github-token' not in raw.decode()
@@ -101,8 +138,10 @@ def main():
                 subprocess.run([str(output),'--oauth-device',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
                 subprocess.run([str(output),'--oauth-browser',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
                 subprocess.run([str(output),'--oauth-copilot',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
+                subprocess.run([str(output),'--copilot-login',f'http://127.0.0.1:{server.server_port}'],check=True,timeout=30)
             finally: server.shutdown();server.server_close();thread.join()
             assert len(requests)==4 and all(form=={'grant_type':['refresh_token'],'refresh_token':['refresh +/&='],'client_id':['app_EMoamEEZ73f0CkXaXp7hrann']} for _,form in requests),requests
+            assert login_counts[(0,'models')]==2 and login_counts[(16,'models')]==3 and not any('foreign-policy' in action or 'policy-d' in action for _,action in login_requests) and (12,'models/policy-c/policy') not in login_counts
             assert not any(mode==7 for mode,_ in copilot_requests) and all((0,route) in copilot_requests for route in ('chat','responses','anthropic'))
             assert {mode for mode,_ in browser_requests}=={0,1,2,3,6,8,10}
             for mode,form in browser_requests:

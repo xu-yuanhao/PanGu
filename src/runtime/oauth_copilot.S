@@ -131,6 +131,9 @@ pg_oauth_copilot_base:
  pop rbx
  ret
 .size pg_oauth_copilot_base,.-pg_oauth_copilot_base
+.globl pg_oauth_copilot_domain
+.type pg_oauth_copilot_domain,@function
+pg_oauth_copilot_domain:
 .Cp_domain:
  push rbx
  push r12
@@ -210,6 +213,7 @@ pg_oauth_copilot_base:
  pop r12
  pop rbx
  ret
+.size pg_oauth_copilot_domain,.-pg_oauth_copilot_domain
 .globl pg_oauth_copilot_refresh
 .type pg_oauth_copilot_refresh,@function
 pg_oauth_copilot_refresh:
@@ -307,59 +311,19 @@ pg_oauth_copilot_refresh:
  mov [rsp+32],rax
  test rax,rax
  jz .Cp_refresh_end
- mov rdi,rax
- lea rsi,[rip+.CpK_token]
- call pg_oauth_string_field@PLT
- mov r15,rax
- test rax,rax
- jz .Cp_refresh_end
- CPGET "qword ptr [rsp+32]",expires_at
- mov [rsp+136],rax
- mov rdi,rax
- call json_object_get_type@PLT
- cmp eax,2
- je .Cp_expiry
- cmp eax,3
- jne .Cp_refresh_end
-.Cp_expiry:
- mov rdi,[rsp+136]
- call json_object_get_double@PLT
- mulsd xmm0,[rip+.Cp_thousand]
- subsd xmm0,[rip+.Cp_margin]
- movsd [rsp+136],xmm0
- lea rdi,[rip+.Cp_template]
- call json_tokener_parse@PLT
- mov [rsp+40],rax
- test rax,rax
- jz .Cp_refresh_end
- mov rdi,rax
- lea rsi,[rip+.CpK_refresh]
- mov rdx,r14
- call .Cp_add_string
+ mov rdi,[rsp+32]
+ mov rsi,r14
+ mov rdx,[rsp+16]
+ lea rcx,[rsp+40]
+ call pg_oauth_copilot_token
  test eax,eax
  jnz .Cp_refresh_end
  mov rdi,[rsp+40]
  lea rsi,[rip+.CpK_access]
- mov rdx,r15
- call .Cp_add_string
- test eax,eax
- jnz .Cp_refresh_end
- movsd xmm0,[rsp+136]
- call json_object_new_double@PLT
- mov rdi,[rsp+40]
- lea rsi,[rip+.CpK_expires]
- mov rdx,rax
- call .Cp_add
- test eax,eax
- jnz .Cp_refresh_end
- cmp qword ptr [rsp+16],0
- je .Cp_refresh_base
- mov rdi,[rsp+40]
- lea rsi,[rip+.CpK_enterpriseUrl]
- mov rdx,[rsp+16]
- call .Cp_add_string
- test eax,eax
- jnz .Cp_refresh_end
+ call pg_oauth_string_field@PLT
+ mov r15,rax
+ test rax,rax
+ jz .Cp_refresh_end
 .Cp_refresh_base:
  mov rdi,[rsp+40]
  call pg_oauth_copilot_base
@@ -937,4 +901,294 @@ pg_copilot_filter_catalog:
 .section .rodata
 .CpK_type: .asciz "type"
 .Cp_oauth: .asciz "oauth"
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_oauth_copilot_token
+.type pg_oauth_copilot_token,@function
+pg_oauth_copilot_token:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,40
+ mov [rsp],rdi
+ mov r12,rsi
+ mov [rsp+8],rdx
+ mov r14,rcx
+ mov qword ptr [rcx],0
+ mov qword ptr [rsp+16],0
+ mov ebp,7
+ mov rdi,[rsp]
+ lea rsi,[rip+.CpK_token]
+ call pg_oauth_string_field@PLT
+ mov r15,rax
+ test rax,rax
+ jz .Ct_end
+ CPGET "qword ptr [rsp]",expires_at
+ mov [rsp+24],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,2
+ je .Ct_expiry
+ cmp eax,3
+ jne .Ct_end
+.Ct_expiry:
+ mov rdi,[rsp+24]
+ call json_object_get_double@PLT
+ mulsd xmm0,[rip+.Cp_thousand]
+ subsd xmm0,[rip+.Cp_margin]
+ movsd [rsp+24],xmm0
+ lea rdi,[rip+.Cp_template]
+ call json_tokener_parse@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Ct_end
+ mov rdi,rax
+ lea rsi,[rip+.CpK_refresh]
+ mov rdx,r12
+ call .Cp_add_string
+ test eax,eax
+ jnz .Ct_end
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.CpK_access]
+ mov rdx,r15
+ call .Cp_add_string
+ test eax,eax
+ jnz .Ct_end
+ movsd xmm0,[rsp+24]
+ call json_object_new_double@PLT
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.CpK_expires]
+ mov rdx,rax
+ call .Cp_add
+ test eax,eax
+ jnz .Ct_end
+ cmp qword ptr [rsp+8],0
+ je .Ct_success
+ mov rdi,[rsp+16]
+ lea rsi,[rip+.CpK_enterpriseUrl]
+ mov rdx,[rsp+8]
+ call .Cp_add_string
+ test eax,eax
+ jnz .Ct_end
+.Ct_success:
+ mov rax,[rsp+16]
+ mov [r14],rax
+ mov qword ptr [rsp+16],0
+ xor ebp,ebp
+.Ct_end:
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebp
+ add rsp,40
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_oauth_copilot_token,.-pg_oauth_copilot_token
+.section .note.GNU-stack,"",@progbits
+.text
+.globl pg_copilot_policy_models
+.type pg_copilot_policy_models,@function
+pg_copilot_policy_models:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,72
+ mov rbx,rdi
+ mov ebp,esi
+ mov r12,rdx
+ mov r13,rcx
+ mov qword ptr [rcx],0
+ mov qword ptr [rsp],0
+ mov qword ptr [rsp+16],0
+ xor esi,esi
+ mov rdx,rsp
+ call pg_copilot_catalog
+ test eax,eax
+ jnz .Pl_bad
+ mov rdi,[rsp]
+ call json_object_array_length@PLT
+ test rax,rax
+ setz al
+ movzx eax,al
+ test ebp,ebp
+ jnz .Pl_fallback
+ xor eax,eax
+.Pl_fallback:
+ mov [rsp+56],eax
+ CPGET rbx,data
+ mov [rsp+8],rax
+ mov rdi,rax
+ call json_object_array_length@PLT
+ mov r14,rax
+ call json_object_new_array@PLT
+ mov [rsp+16],rax
+ test rax,rax
+ jz .Pl_bad
+ xor r15d,r15d
+.Pl_each:
+ cmp r15,r14
+ jae .Pl_success
+ mov rdi,[rsp+8]
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov rbx,rax
+ CPGET rbx,capabilities
+ CPGET rax,supports
+ CPGET rax,tool_calls
+ mov [rsp+40],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,1
+ jne .Pl_policy
+ mov rdi,[rsp+40]
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Pl_next
+.Pl_policy:
+ CPGET rbx,policy
+ CPGET rax,state
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Pl_next
+ mov rdi,rax
+ lea rsi,[rip+.Pl_unconfigured]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Pl_next
+ test r12,r12
+ jz .Pl_next
+ mov rdi,rbx
+ lea rsi,[rip+.CpK_id]
+ call pg_oauth_string_field@PLT
+ test rax,rax
+ jz .Pl_next
+ mov rdi,rax
+ call r12
+ test eax,eax
+ jz .Pl_next
+ cmp dword ptr [rsp+56],0
+ jne .Pl_add
+ CPGET rbx,model_picker_enabled
+ mov [rsp+40],rax
+ mov rdi,rax
+ call json_object_get_type@PLT
+ cmp eax,1
+ jne .Pl_next
+ mov rdi,[rsp+40]
+ call json_object_get_boolean@PLT
+ test eax,eax
+ jz .Pl_next
+.Pl_add:
+ CPGET rbx,id
+ mov rdi,[rsp+16]
+ mov rsi,rax
+ call .Cp_push_id
+ test eax,eax
+ jnz .Pl_bad
+.Pl_next:
+ inc r15
+ jmp .Pl_each
+.Pl_success:
+ mov rax,[rsp+16]
+ mov [r13],rax
+ mov qword ptr [rsp+16],0
+ xor ebx,ebx
+ jmp .Pl_end
+.Pl_bad:
+ mov ebx,7
+.Pl_end:
+ mov rdi,[rsp]
+ call json_object_put@PLT
+ mov rdi,[rsp+16]
+ call json_object_put@PLT
+ mov eax,ebx
+ add rsp,72
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_copilot_policy_models,.-pg_copilot_policy_models
+.globl pg_copilot_merge_models
+.type pg_copilot_merge_models,@function
+pg_copilot_merge_models:
+ push rbx
+ push rbp
+ push r12
+ push r13
+ push r14
+ push r15
+ sub rsp,24
+ mov [rsp],rdi
+ mov [rsp+8],rsi
+ mov r13,rdx
+ mov qword ptr [rdx],0
+ call json_object_new_array@PLT
+ mov rbx,rax
+ test rax,rax
+ jz .Pm_bad
+ xor ebp,ebp
+.Pm_array:
+ mov r12,[rsp+rbp*8]
+ mov rdi,r12
+ call json_object_array_length@PLT
+ mov r14,rax
+ xor r15d,r15d
+.Pm_each:
+ cmp r15,r14
+ jae .Pm_next_array
+ mov rdi,r12
+ mov rsi,r15
+ call json_object_array_get_idx@PLT
+ mov [rsp+16],rax
+ mov rdi,rbx
+ mov rsi,rax
+ call .Cp_contains
+ test eax,eax
+ jnz .Pm_next
+ mov rdi,rbx
+ mov rsi,[rsp+16]
+ call .Cp_push_id
+ test eax,eax
+ jnz .Pm_bad
+.Pm_next:
+ inc r15
+ jmp .Pm_each
+.Pm_next_array:
+ inc ebp
+ cmp ebp,2
+ jb .Pm_array
+ mov [r13],rbx
+ xor eax,eax
+ jmp .Pm_end
+.Pm_bad:
+ mov rdi,rbx
+ call json_object_put@PLT
+ mov eax,7
+.Pm_end:
+ add rsp,24
+ pop r15
+ pop r14
+ pop r13
+ pop r12
+ pop rbp
+ pop rbx
+ ret
+.size pg_copilot_merge_models,.-pg_copilot_merge_models
+.section .rodata
+.Pl_unconfigured: .asciz "unconfigured"
 .section .note.GNU-stack,"",@progbits

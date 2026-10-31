@@ -688,6 +688,7 @@
     "src/runtime/oauth_device.S": "native-source",
     "src/runtime/oauth_browser.S": "native-source",
     "src/runtime/oauth_callback.c": "native-source",
-    "src/runtime/oauth_copilot.S": "native-source"
+    "src/runtime/oauth_copilot.S": "native-source",
+    "src/runtime/oauth_copilot_login.S": "native-source"
   }
 }

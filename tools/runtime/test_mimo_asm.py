@@ -43,6 +43,7 @@ SRC = [str(ROOT / 'src/runtime/mimo.S'),
        str(ROOT / 'src/runtime/base64.S'),
        str(ROOT / 'src/runtime/oauth.S'),
        str(ROOT / 'src/runtime/oauth_copilot.S'),
+       str(ROOT / 'src/runtime/oauth_copilot_login.S'),
        str(ROOT / 'src/runtime/oauth_device.S'),
        str(ROOT / 'src/runtime/oauth_browser.S'),
        str(ROOT / 'src/runtime/oauth_callback.c'),
@@ -457,6 +458,10 @@ void release_budget(char *text){free(text);}
         catalog_oracle="import{readFileSync}from'node:fs';import{stripTypeScriptTypes}from'node:module';const x=JSON.parse(readFileSync(0,'utf8'));const f=new Function('const GITHUB_COPILOT_MODELS={};'+stripTypeScriptTypes(x.source,{mode:'strip'})+';return parseGitHubCopilotModelCatalog')();process.stdout.write(JSON.stringify(x.cases.flatMap(c=>[f(c,false).availableModelIds,f(c,true).availableModelIds])));"
         catalog_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',catalog_oracle],input=json.dumps({'source':catalog_source,'cases':catalog_cases}),text=True))
         native.pg_copilot_catalog.argtypes=[C.c_void_p,C.c_int,C.POINTER(C.c_void_p)]
+        policy_expected=json.loads(subprocess.check_output(['node','--input-type=module','-e',catalog_oracle.replace('GITHUB_COPILOT_MODELS={}','GITHUB_COPILOT_MODELS={selected:{}}').replace('.availableModelIds','.policyModelIds')],input=json.dumps({'source':catalog_source,'cases':catalog_cases}),text=True))
+        KnownModel=C.CFUNCTYPE(C.c_int,C.c_char_p);known_model=KnownModel(lambda identity:int(identity==b'selected'))
+        native.pg_copilot_policy_models.argtypes=[C.c_void_p,C.c_int,KnownModel,C.POINTER(C.c_void_p)]
+
         native.json_object_to_json_string_ext.argtypes=[C.c_void_p,C.c_int];native.json_object_to_json_string_ext.restype=C.c_char_p
         for index,case in enumerate(catalog_cases):
             raw=native.json_tokener_parse(json.dumps(case).encode())
@@ -465,6 +470,9 @@ void release_budget(char *text){free(text);}
                     result=C.c_void_p();assert not native.pg_copilot_catalog(raw,fallback,C.byref(result))
                     try: assert json.loads(native.json_object_to_json_string_ext(result,0))==catalog_expected[index*2+fallback],(case,fallback)
                     finally: native.json_object_put(result)
+                    policy=C.c_void_p();assert not native.pg_copilot_policy_models(raw,fallback,known_model,C.byref(policy))
+                    try: assert json.loads(native.json_object_to_json_string_ext(policy,0))==policy_expected[index*2+fallback],(case,fallback)
+                    finally: native.json_object_put(policy)
             finally: native.json_object_put(raw)
         base_source=copilot[copilot.index('function getBaseUrlFromToken('):copilot.index('function asRecord(')]
         domain_source=copilot[copilot.index('function normalizeDomain('):copilot.index('function getUrls(')]
@@ -476,7 +484,7 @@ void release_budget(char *text){free(text);}
             raw=native.json_tokener_parse(json.dumps(case).encode());result=native.pg_oauth_copilot_base(raw)
             try: assert json.loads(native.json_object_to_json_string_ext(result,0))==wanted,(case,wanted)
             finally: native.json_object_put(result);native.json_object_put(raw)
-        print(f'PASS: {len(catalog_cases)*2} Copilot account selections and {len(base_cases)} token/enterprise gateways match fixed Pi source')
+        print(f'PASS: {len(catalog_cases)*2} Copilot account/policy selections and {len(base_cases)} token/enterprise gateways match fixed Pi source')
         print(f'PASS: {len(sampling_cases)*8} requests match Pi sampling merge, thinking selection and protocol boundaries')
         print(f'PASS: {len(thinking_cases)*2} Anthropic/Bedrock thinking ceilings match fixed Pi simple-options helpers')
         print(f'PASS: {len(cases)} shared context estimates match fixed Pi, and {count} protocol requests obey model/context output budgets')

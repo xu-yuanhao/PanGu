@@ -1112,3 +1112,40 @@ pg_models_list:
 .section .data.rel.ro
 .Lm_sampling_keys: .quad .Lm_sampling_base,.Lm_sampling_levels
 .section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_models_copilot_known
+.type pg_models_copilot_known,@function
+pg_models_copilot_known:
+ push rbx
+ push r12
+ sub rsp,8
+ mov rbx,rdi
+ lea rdi,[rip+pg_models_builtin_json]
+ call json_tokener_parse@PLT
+ mov r12,rax
+ test rax,rax
+ jz .Lknown_missing
+ mov rdi,rax
+ lea rsi,[rip+.Lknown_copilot]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ mov rsi,rbx
+ mov rdx,rsp
+ call json_object_object_get_ex@PLT
+ mov ebx,eax
+ mov rdi,r12
+ call json_object_put@PLT
+ mov eax,ebx
+ jmp .Lknown_end
+.Lknown_missing:
+ xor eax,eax
+.Lknown_end:
+ add rsp,8
+ pop r12
+ pop rbx
+ ret
+.size pg_models_copilot_known,.-pg_models_copilot_known
+.section .rodata
+.Lknown_copilot: .asciz "github-copilot"
+.section .note.GNU-stack,"",@progbits

@@ -4,11 +4,16 @@
 #include <json-c/printbuf.h>
 #include <time.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <stdint.h>
 #include <math.h>
-struct pg_oauth_http {CURL *easy;CURLM *multi;struct curl_slist *headers;struct printbuf *body;char *form;int added,done;};
+struct pg_oauth_http {CURL *easy;CURLM *multi;struct curl_slist *headers;struct printbuf *body;char *form;int added,done;char retry_after[128];};
+static size_t receive_headers(char *data,size_t size,size_t count,void *context){
+ if(size&&count>SIZE_MAX/size)return 0;size_t length=size*count;struct pg_oauth_http *http=context;if(length>=5&&!strncasecmp(data,"HTTP/",5))http->retry_after[0]=0;
+ if(length>=12&&!strncasecmp(data,"retry-after:",12)){size_t first=12,last=length;while(first<last&&(data[first]==' '||data[first]=='\t'))first++;while(last>first&&(data[last-1]==' '||data[last-1]=='\t'||data[last-1]=='\r'||data[last-1]=='\n'))last--;if(last-first>=sizeof(http->retry_after))http->retry_after[0]=0;else{memcpy(http->retry_after,data+first,last-first);http->retry_after[last-first]=0;}}return length;
+}
 static size_t receive_token(char *data,size_t size,size_t count,void *context){
  if(size&&count>SIZE_MAX/size)return 0;size_t bytes=size*count;struct printbuf *buffer=context;
  if(bytes>INT_MAX||(size_t)buffer->bpos+bytes>INT_MAX-1)return 0;
@@ -21,7 +26,7 @@ void pg_oauth_http_close(struct pg_oauth_http *http){
 int pg_oauth_http_start(struct pg_oauth_http **output,const char *url,const char *content_type,const char *form){
  *output=0;struct pg_oauth_http *http=calloc(1,sizeof(*http));if(!http)return 7;
  http->easy=curl_easy_init();http->multi=curl_multi_init();http->body=printbuf_new();http->form=form?strdup(form):0;http->headers=content_type?curl_slist_append(0,content_type):0;if(!http->easy||!http->multi||!http->body||(form&&!http->form)||(content_type&&!http->headers))goto failed;
- if((form&&curl_easy_setopt(http->easy,CURLOPT_POSTFIELDS,http->form))||curl_easy_setopt(http->easy,CURLOPT_URL,url)||curl_easy_setopt(http->easy,CURLOPT_PROTOCOLS_STR,"https,http")||curl_easy_setopt(http->easy,CURLOPT_HTTPHEADER,http->headers)||curl_easy_setopt(http->easy,CURLOPT_TIMEOUT_MS,15000L)||curl_easy_setopt(http->easy,CURLOPT_NOSIGNAL,1L)||curl_easy_setopt(http->easy,CURLOPT_WRITEFUNCTION,receive_token)||curl_easy_setopt(http->easy,CURLOPT_WRITEDATA,http->body))goto failed;
+ if((form&&curl_easy_setopt(http->easy,CURLOPT_POSTFIELDS,http->form))||curl_easy_setopt(http->easy,CURLOPT_URL,url)||curl_easy_setopt(http->easy,CURLOPT_PROTOCOLS_STR,"https,http")||curl_easy_setopt(http->easy,CURLOPT_HTTPHEADER,http->headers)||curl_easy_setopt(http->easy,CURLOPT_TIMEOUT_MS,15000L)||curl_easy_setopt(http->easy,CURLOPT_NOSIGNAL,1L)||curl_easy_setopt(http->easy,CURLOPT_WRITEFUNCTION,receive_token)||curl_easy_setopt(http->easy,CURLOPT_WRITEDATA,http->body)||curl_easy_setopt(http->easy,CURLOPT_HEADERFUNCTION,receive_headers)||curl_easy_setopt(http->easy,CURLOPT_HEADERDATA,http))goto failed;
  if(curl_multi_add_handle(http->multi,http->easy))goto failed;http->added=1;*output=http;return 0;
 failed:pg_oauth_http_close(http);return 7;
 }
@@ -45,3 +50,7 @@ int pg_oauth_get_json(const char *url,const char *const *headers,size_t count,do
  if(!result){if(status<200||status>=300)result=7;else{*output=strdup(body);if(!*output)result=7;}}
 done:pg_oauth_http_close(http);return result;
 }
+int pg_oauth_http_headers(struct pg_oauth_http *http,const char *const *headers,size_t count,unsigned timeout){
+ if(!http||!timeout)return 7;for(size_t i=0;i<count;i++){if(strpbrk(headers[i],"\r\n"))return 7;struct curl_slist *next=curl_slist_append(http->headers,headers[i]);if(!next)return 7;http->headers=next;}return curl_easy_setopt(http->easy,CURLOPT_HTTPHEADER,http->headers)||curl_easy_setopt(http->easy,CURLOPT_TIMEOUT_MS,(long)timeout)?7:0;
+}
+const char *pg_oauth_http_retry_after(const struct pg_oauth_http *http){return http?http->retry_after:0;}

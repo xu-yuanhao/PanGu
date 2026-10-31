@@ -281,7 +281,7 @@ pg_oauth_browser_begin:
  test eax,eax
  jnz .Lb_begin_bad
  cmp dword ptr [rbx+40],10
- je .Lb_begin_busy
+ jae .Lb_begin_busy
  mov eax,[rbx+40]
  dec eax
  cmp eax,3

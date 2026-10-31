@@ -3,6 +3,7 @@
 struct json_object;
 /* Owned private catalog from built-ins and optional user models.json.
    Missing/malformed file follows settings diagnostics; release with json_object_put. */
+int pg_models_copilot_known(const char *);
 int pg_models_load(const char *,struct json_object **);
 /* Owned public metadata, selected by modelProvider/model or endpoint/model.
    An unknown model yields {}. Catalog/configuration remain borrowed. */

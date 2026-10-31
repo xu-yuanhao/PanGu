@@ -32,7 +32,7 @@ SOFTWARE.*/
 pg_oauth_device_init:
  mov r8,rdi
  xor eax,eax
- mov ecx,12
+ mov ecx,18
  rep stosq
  mov [r8],rsi
  test rdx,rdx
@@ -49,13 +49,28 @@ pg_oauth_device_begin:
  mov rbx,rdi
  test rsi,rsi
  jz .Ld_begin_bad
+ mov rdx,rsi
+ sub rsp,16
+ mov [rsp],rdx
  mov rdi,rsi
+ lea rsi,[rip+.Ld_copilot]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Ld_begin_codex
+ mov rdi,rbx
+ xor esi,esi
+ call pg_oauth_copilot_begin@PLT
+ add rsp,16
+ jmp .Ld_begin_end
+.Ld_begin_codex:
+ mov rdi,[rsp]
+ add rsp,16
  lea rsi,[rip+.Ld_identity]
  call strcmp@PLT
  test eax,eax
  jnz .Ld_begin_bad
  cmp dword ptr [rbx+40],10
- je .Ld_begin_busy
+ jae .Ld_begin_busy
  mov eax,[rbx+40]
  dec eax
  cmp eax,3
@@ -102,6 +117,13 @@ pg_oauth_device_close:
  mov rdi,[rbx+88]
  call pg_oauth_callback_close@PLT
  mov qword ptr [rbx+88],0
+ mov rdi,[rbx+112]
+ call free@PLT
+ mov qword ptr [rbx+112],0
+ mov qword ptr [rbx+96],0
+ mov qword ptr [rbx+120],0
+ mov qword ptr [rbx+128],0
+ mov qword ptr [rbx+136],0
  mov qword ptr [rbx+40],0
  mov qword ptr [rbx+48],0
  mov qword ptr [rbx+56],0
@@ -113,7 +135,7 @@ pg_oauth_device_close:
 .type pg_oauth_device_cancel,@function
 pg_oauth_device_cancel:
  cmp dword ptr [rdi+40],10
- je .Ld_cancel_active
+ jae .Ld_cancel_active
  mov eax,[rdi+40]
  dec eax
  cmp eax,3
@@ -144,6 +166,12 @@ pg_oauth_device_poll:
  rep stosq
  mov qword ptr [r12],0
  mov ebp,[rbx+40]
+ cmp ebp,11
+ jb .Ld_poll_browser
+ mov rdi,rbx
+ call pg_oauth_copilot_poll@PLT
+ jmp .Ld_snapshot
+.Ld_poll_browser:
  cmp ebp,10
  jne .Ld_poll_device
  mov rdi,rbx
@@ -562,7 +590,7 @@ pg_oauth_json_parse:
  test rax,rax
  jz .Ld_public_bad
  mov eax,[rbx+40]
- cmp eax,10
+ cmp eax,17
  ja .Ld_public_release
  lea rdx,[rip+.Ld_statuses]
  mov rdi,[rdx+rax*8]
@@ -627,11 +655,36 @@ pg_oauth_json_parse:
  call .Ld_add
  test eax,eax
  jnz .Ld_public_release
+ cmp qword ptr [rbx+96],0
+ je .Ld_public_codex_uri
+ DGET "qword ptr [rbx+24]",verification_uri
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov rdi,rax
+ jmp .Ld_public_uri_ready
+.Ld_public_codex_uri:
  mov rax,[rbx+8]
  mov rdi,[rax+24]
+.Ld_public_uri_ready:
  call json_object_new_string@PLT
  mov rdi,rbp
  lea rsi,[rip+.LdK_verification_uri]
+ mov rdx,rax
+ call .Ld_add
+ test eax,eax
+ jnz .Ld_public_release
+ mov rdi,[rbx+48]
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.LdK_interval_ms]
+ mov rdx,rax
+ call .Ld_add
+ test eax,eax
+ jnz .Ld_public_release
+ mov rdi,[rbx+56]
+ call json_object_new_uint64@PLT
+ mov rdi,rbp
+ lea rsi,[rip+.LdK_expires_at]
  mov rdx,rax
  call .Ld_add
  test eax,eax
@@ -676,6 +729,8 @@ pg_oauth_device_service:
  mov [rsi+48],rax
  mov rax,qword ptr [rip+pg_oauth_browser_submit@GOTPCREL]
  mov [rsi+56],rax
+ mov rax,qword ptr [rip+pg_oauth_copilot_begin@GOTPCREL]
+ mov [rsi+64],rax
  ret
 .size pg_oauth_device_service,.-pg_oauth_device_service
 .Ld_list:
@@ -688,6 +743,10 @@ pg_oauth_device_service:
  jmp qword ptr [rax+32]
 .section .rodata
 .Ld_identity: .asciz "openai-codex"
+.Ld_copilot: .asciz "github-copilot"
+.Ld_models_status: .asciz "models"
+.Ld_enable_status: .asciz "enabling_models"
+.Ld_retry_status: .asciz "retrying"
 .Ld_json_type: .asciz "Content-Type: application/json"
 .Ld_form_type: .asciz "Content-Type: application/x-www-form-urlencoded"
 .Ld_start_body: .asciz "{\"client_id\":\"app_EMoamEEZ73f0CkXaXp7hrann\"}"
@@ -724,11 +783,13 @@ pg_oauth_device_service:
 .LdK_message: .asciz "message"
 .LdK_verification_uri: .asciz "verification_uri"
 .LdK_next_poll: .asciz "next_poll"
+.LdK_interval_ms: .asciz "interval_ms"
+.LdK_expires_at: .asciz "expires_at"
 .Ld_zero: .double 0
 .Ld_thousand: .double 1000
 .section .data.rel.ro
 .Ld_default_config: .quad .Ld_start_url,.Ld_poll_url,.Ld_token_url,.Ld_verify_url,.Ld_redirect,0,0
-.Ld_statuses: .quad .Ld_idle,.Ld_requesting,.Ld_device_code,.Ld_pending_status,.Ld_exchanging,.Ld_exchanging,.Ld_complete_status,.Ld_failed_status,.Ld_cancelled,.Ld_timed_out_status,.Ld_auth_url
+.Ld_statuses: .quad .Ld_idle,.Ld_requesting,.Ld_device_code,.Ld_pending_status,.Ld_exchanging,.Ld_exchanging,.Ld_complete_status,.Ld_failed_status,.Ld_cancelled,.Ld_timed_out_status,.Ld_auth_url,.Ld_requesting,.Ld_device_code,.Ld_pending_status,.Ld_exchanging,.Ld_models_status,.Ld_enable_status,.Ld_retry_status
 .section .note.GNU-stack,"",@progbits
 
 .text

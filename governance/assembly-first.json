@@ -411,6 +411,10 @@
     "src/runtime/oauth_copilot.S": {
       "role": "assembly-core",
       "reason": "手写Copilot凭据刷新、账户目录、可用模型选择与令牌网关派生"
+    },
+    "src/runtime/oauth_copilot_login.S": {
+      "role": "assembly-core",
+      "reason": "手写Copilot设备码、协作轮询/退避、账户模型策略与完整登录持久化"
     }
   }
 }
