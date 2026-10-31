@@ -677,6 +677,9 @@
     "src/runtime/image_processor.S": "native-source",
     "src/runtime/image_codec_vips.c": "native-source",
     "src/runtime/context_tokens.S": "native-source",
-    "src/runtime/context_tokens.h": "native-source"
+    "src/runtime/context_tokens.h": "native-source",
+    "src/runtime/credentials.S": "native-source",
+    "src/runtime/credentials.h": "native-source",
+    "src/runtime/credentials_posix.c": "native-source"
   }
 }

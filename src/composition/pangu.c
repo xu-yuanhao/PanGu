@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 #include "../runtime/mimo.h"
+#include "../runtime/credentials.h"
 #include "../runtime/host.h"
 #include "../runtime/native_plugin.h"
 #include "../runtime/model_provider.h"
@@ -126,6 +127,13 @@ static struct {
 } durable;
 static char configured_prompt[4096];
 static pg_mimo provider;
+static pg_credential_store default_credentials;
+static const pg_credential_store *model_credentials;
+static char credentials_path[4096];
+static int credentials_start(void *ctx,pg_host *scope,size_t owner){
+ (void)ctx;const char *directory=getenv("PANGU_AGENT_DIR"),*home=getenv("HOME");int n;if(directory)n=snprintf(credentials_path,sizeof(credentials_path),"%s/auth.json",directory);else if(home)n=snprintf(credentials_path,sizeof(credentials_path),"%s/.pangu/agent/auth.json",home);else return 1;
+ if(n<0||(size_t)n>=sizeof(credentials_path)||pg_credentials_file_init(&default_credentials,credentials_path))return 1;return pg_host_provide(scope,owner,"credentials",&default_credentials);
+}
 static pg_tool_registry registry;
 static pg_tool_registry file_registry;
 static pg_read_tool reader={.directory=-1};
@@ -175,7 +183,8 @@ static int native_model_describe(void *ctx,const struct json_object *configurati
 static pg_model_metadata default_model_metadata={PG_MODEL_METADATA_ABI,sizeof(pg_model_metadata),0,native_model_describe};
 static int model_start(void *ctx,pg_host *scope,size_t owner){
  (void)ctx;pg_tool_registry *tools=pg_host_get(scope,owner,"tool.registry");if(!tools)return 1;
- application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);
+ model_credentials=pg_host_get(scope,owner,"credentials");if(!model_credentials)return 1;
+ application.model=pg_mimo_model(&provider);pg_mimo_bind_tools(&provider,tools);pg_mimo_bind_credentials(&provider,model_credentials);
  default_model_provider=(pg_model_provider){PG_MODEL_PROVIDER_ABI,sizeof(pg_model_provider),application.model,native_model_configure,native_model_failure,native_model_complete,"pangu.openai-completions.v1",0,0};
  return pg_host_provide(scope,owner,"model",&application.model)||pg_host_provide(scope,owner,"model.provider",&default_model_provider)||pg_host_provide(scope,owner,"model.provider.base",&default_model_provider)||pg_host_provide(scope,owner,"model.metadata",&default_model_metadata);
 }
@@ -247,7 +256,7 @@ failed:json_object_put(copy);return 1;
 static int prepare(void *ctx,uint64_t conversation,json_object **out){
  (void)ctx;*out=0;pg_prompt_inputs inputs={0};int result=prepare_load(0,conversation,&inputs);if(!result)result=pg_agent_state_prepare(inputs.configuration,inputs.state,out);if(!result)result=prepare_finish(0,*out);json_object_put(inputs.state);json_object_put(inputs.configuration);json_object_put(inputs.view);if(result){json_object_put(*out);*out=0;}return result;
 }
-static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);return pg_mimo_configure(ctx,configuration);}
+static int native_model_configure(void *ctx,const struct json_object *configuration,const pg_tool_registry *tools){pg_mimo_bind_tools(ctx,tools);pg_mimo_bind_credentials(ctx,model_credentials);return pg_mimo_configure(ctx,configuration);}
 static void native_model_failure(void *ctx,pg_model_failure *out){
  pg_mimo *source=ctx;static char message[128];int n=snprintf(message,sizeof(message),"Model request failed (HTTP %ld, transport %u)",source->http,source->transport_error);
  pg_slice detail={message,(size_t)n},body={source->body,source->used},structured_detail={0},structured_body={0};if(!pg_mimo_failure_data(source,&structured_detail,&structured_body)){if(structured_detail.size)detail=structured_detail;if(structured_body.size)body=structured_body;}
@@ -459,11 +468,13 @@ static pg_read_image_processor native_images={0,pg_image_prepare};
 static int images_start(void *ctx,pg_host *scope,size_t owner){(void)ctx;return pg_host_provide(scope,owner,"image.processor",&native_images);}
 static const char *const image_exports[]={"image.processor"};
 static const char *const workspace_exports[]={"workspace"},*const process_exports[]={"process"},*const files_exports[]={"files"},*const tools_exports[]={"tools","tool.registry","tools.base","tool.registry.base","tools.provider","tools.provider.base"},*const model_exports[]={"model","model.provider","model.provider.base","model.metadata"},*const agent_exports[]={"client","inputs","resources","compaction","usage","usage.total","observation","task.graph","task.control","conversation.view","conversation.client","conversation.catalog","conversation.actions","conversation.history","models.catalog","agent.state","extensions.control"},*const storage_exports[]={"session"};
-static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
+static const char *const file_imports[]={"workspace"},*const execution_imports[]={"workspace","files","process"},*const execution_exports[]={"execution.env"},*const tool_imports[]={"execution.env","image.processor"},*const model_imports[]={"tool.registry","credentials"},*const agent_imports[]={"model.provider","tools.provider","session","files","workspace"};
 static const pg_plugin agent_plugin={"agent",0,agent_imports,5,agent_exports,17,agent_start,agent_stop};
+static const char *const credentials_exports[]={"credentials"};
 static const pg_plugin plugins[]={
+ {"credentials",0,0,0,credentials_exports,1,credentials_start,no_resources},
  {"images",0,0,0,image_exports,1,images_start,no_resources},
- {"model",0,model_imports,1,model_exports,4,model_start,model_stop},
+ {"model",0,model_imports,2,model_exports,4,model_start,model_stop},
  {"tools",0,tool_imports,2,tools_exports,6,tools_start,tools_stop},
  {"files",0,file_imports,1,files_exports,1,files_start,no_resources},
  {"process",0,0,0,process_exports,1,process_start,process_stop},

@@ -372,6 +372,15 @@
     "src/runtime/context_tokens.S": {
       "role": "assembly-core",
       "reason": "Pi消息/上下文token估算，供模型输出预算和Durable压缩复用"
+    },
+    "src/runtime/credentials.S": {
+      "role": "assembly-core",
+      "reason": "手写凭据类型验证、可注入存储读改写、公开元数据列表和所有权"
+    },
+    "src/runtime/credentials_posix.c": {
+      "role": "c-bridge",
+      "bridge_kind": "platform-layout",
+      "reason": "POSIX文件锁、目录/描述符与原子rename/fsync平台调用；凭据语义由Assembly回调实现"
     }
   }
 }

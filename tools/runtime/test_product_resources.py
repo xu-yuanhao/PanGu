@@ -11,6 +11,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live',action='store_true')
     parser.add_argument('--live-cost',action='store_true')
+    parser.add_argument('--stored-auth',action='store_true')
     parser.add_argument('--live-agent',action='store_true')
     parser.add_argument('--live-conversations',action='store_true')
     parser.add_argument('--live-process-conversations',action='store_true')
@@ -23,6 +24,7 @@ def main():
     parser.add_argument('--live-background-compaction',action='store_true')
     parser.add_argument('--live-dynamic-context',action='store_true')
     args=parser.parse_args()
+    if args.stored_auth: os.environ['PANGU_TEST_STORED_AUTH']='1'
     with tempfile.TemporaryDirectory(prefix='pangu-product-resource-test-') as directory:
         output=Path(directory)/'test-product-resources'
         flags=subprocess.check_output(['pkg-config','--cflags','--libs','libcurl', 'libcrypto', 'glib-2.0', 'libzstd','json-c','libutf8proc','sqlite3','libgit2','yaml-0.1','libpcre2-8','vips'],text=True).split()

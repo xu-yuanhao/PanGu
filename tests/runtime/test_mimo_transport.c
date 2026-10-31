@@ -1,3 +1,4 @@
+#include "../../src/runtime/credentials.h"
 #define _POSIX_C_SOURCE 200809L
 #include "../../src/runtime/mimo.h"
 #include "../../src/runtime/mimo_layout.h"
@@ -614,6 +615,17 @@ static void test_codex_terminal_frames(void){
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex terminal aliases/status/endTurn and SSE multiline, CRLF, EOF, sentinel, trailing events, malformed frames and cancellation");
 }
+static unsigned stored_mode,stored_reads;
+static int stored_read(void *context,const char *identity,json_object **output){
+ (void)context;stored_reads++;assert(!strcmp(identity,"deepseek"));*output=0;if(stored_mode==2)return 7;if(stored_mode==3)return 0;*output=json_tokener_parse(stored_mode==1?"{\"type\":\"oauth\",\"access\":\"private-access\"}":stored_mode==4?"{\"type\":\"api_key\"}":"{\"type\":\"api_key\",\"key\":\"unit-stored-secret\"}");return 0;
+}
+static void test_stored_credentials(void){
+ unsetenv("PANGU_MODEL_API_KEY");setenv("DEEPSEEK_API_KEY","unit-ambient-secret",1);pg_credential_store store={.read=stored_read};
+ for(stored_mode=0;stored_mode<6;stored_mode++){
+  stored_reads=0;reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();pg_mimo_bind_credentials(&m,&store);json_object *cfg=json_tokener_parse("{\"model\":\"deepseek-flash\",\"endpoint\":\"https://provider.invalid/request\",\"modelInfo\":{\"provider\":\"deepseek\"}}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);if(stored_mode==5)setenv("PANGU_MODEL_API_KEY","unit-explicit-secret",1);int result=start();if(stored_mode==1||stored_mode==2)assert(result);else{assert(!result);const char *expected=stored_mode==5?"Authorization: Bearer unit-explicit-secret":stored_mode==0?"Authorization: Bearer unit-stored-secret":"Authorization: Bearer unit-ambient-secret";unsigned found=0;for(const struct curl_slist *h=captured_headers;h;h=h->next)found+=!strcmp(h->data,expected);assert(found==1&&!strstr(captured_post,"secret"));}assert(stored_reads==(stored_mode==5?0:1));model.close(model.context);assert(!m.credential);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");unsetenv("DEEPSEEK_API_KEY");puts("PASS: injected stored credential precedence, read failure and unsupported OAuth block ambient fallback, explicit override and close ownership");
+}
 static void test_provider_environment_auth(void){
  const char *providers[]={"deepseek","anthropic","anthropic","google"};const char *variables[]={"DEEPSEEK_API_KEY","ANTHROPIC_API_KEY","ANTHROPIC_AUTH_TOKEN","GEMINI_API_KEY"};const char *apis[]={"openai-completions","anthropic-messages","anthropic-messages","google-generative-ai"};const char *headers[]={"Authorization: Bearer unit-provider-secret","x-api-key: unit-provider-secret","Authorization: Bearer unit-provider-secret","x-goog-api-key: unit-provider-secret"};
  unsetenv("PANGU_MODEL_API_KEY");
@@ -946,6 +958,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_stored_credentials();
     test_provider_environment_auth();
     test_codex_stream_failures();
     test_codex_header_deadlines();

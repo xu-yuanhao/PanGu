@@ -4,6 +4,7 @@
 #include "tools.h"
 #include <curl/curl.h>
 struct json_object;
+struct pg_credential_store;
 typedef struct { char arguments[PG_TEXT_LIMIT],id[PG_ID_LIMIT],name[PG_ID_LIMIT]; } pg_mimo_call_storage;
 struct printbuf;
 typedef struct {uint64_t index;unsigned kind,closed;struct printbuf *text,*signature;struct json_object *item;} pg_mimo_anthropic_block;
@@ -39,12 +40,13 @@ typedef struct {
  struct printbuf *codex_frame; /* owned pending SSE data frame */
  uint64_t header_timeout_ms,header_until;
  unsigned header_status,header_complete,header_timed_out;
+ const struct pg_credential_store *credentials; /* borrowed service lifetime */
+ struct json_object *credential; /* private owned request credential */
 } pg_mimo;
-/* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
-   PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
-   requires its explicit key. Default MiMo connection reads MIMO_API_KEY/MODEL.
-   Environment stays immutable throughout active requests. Initialize
-   fresh/released storage only; close before discarding an instance. */
+/* Native provider transport. Request identity/options are detached from
+   credentials. A bound store and process environment resolve request auth;
+   borrowed services remain valid through close. Initialize fresh/released
+   storage; close releases private snapshots and transport resources. */
 pg_model pg_mimo_model(pg_mimo *);
 /* Bind a detached credential-free {model,endpoint,options?} while idle.
    options: maxTokens, temperature, reasoningEffort (DeepSeek thinking toggle),
@@ -60,6 +62,7 @@ int pg_mimo_configure(pg_mimo *,const struct json_object *);
    argumentsError metadata alongside the prepared argument object. */
 int pg_mimo_complete(const pg_mimo *,struct json_object *assistant);
 /* Bind the same immutable registry used by the executor before starting runs. */
+void pg_mimo_bind_credentials(pg_mimo *,const struct pg_credential_store *);
 void pg_mimo_bind_tools(pg_mimo *, const pg_tool_registry *);
 /* Internal projection test seam: creates owned request; no network/credentials. */
 int pg_mimo_encode_request(pg_mimo *, const pg_session *);

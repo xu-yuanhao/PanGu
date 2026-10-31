@@ -129,6 +129,9 @@ li_close:
 .Ltransport_close:
  push rbx                             /* 入口 rsp≡8 → 0，可调用 */
  mov rbx, rdi
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ mov qword ptr [rbx+PG_MM_CREDENTIAL],0
+ call json_object_put@PLT
  mov rdi, qword ptr [rbx + PG_MM_MULTI]
  mov rsi, qword ptr [rbx + PG_MM_EASY]
  test rdi, rdi
@@ -324,6 +327,12 @@ li_start:
  mov qword ptr [rsp+512],1
  jmp .Lst_encode
 .Lst_nonaws_key:
+ mov rdi,rbx
+ call .Lca_key
+ test edx,edx
+ jnz .Lst_bad
+ test rax,rax
+ jnz .Lst_key_ready
  mov rdi,[rbx+PG_MM_CONFIGURATION]
  lea rsi,[rsp+528]
  call pg_mimo_environment_key
@@ -6820,4 +6829,99 @@ pg_mimo_environment_key:
  .quad .Lke_provider_35,.Lke_env_35
  .quad .Lke_provider_36,.Lke_env_36
  .quad 0,0
+.section .note.GNU-stack,"",@progbits
+
+.text
+.globl pg_mimo_bind_credentials
+.type pg_mimo_bind_credentials,@function
+pg_mimo_bind_credentials:
+ mov [rdi+PG_MM_CREDENTIALS],rsi
+ ret
+.size pg_mimo_bind_credentials,.-pg_mimo_bind_credentials
+.Lca_key:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ mov r12,[rbx+PG_MM_CREDENTIALS]
+ test r12,r12
+ jz .Lca_absent
+ cmp qword ptr [r12+8],0
+ je .Lca_blocked
+ mov r13,[rbx+PG_MM_CONFIGURATION]
+ mov rdi,r13
+ lea rsi,[rip+.Lke_model_info]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ lea rsi,[rip+.Lke_provider]
+ call json_object_object_get@PLT
+ test rax,rax
+ jnz .Lca_identity
+ mov rdi,r13
+ lea rsi,[rip+.Lke_model_provider]
+ call json_object_object_get@PLT
+.Lca_identity:
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lca_absent
+ mov rsi,rax
+ mov rdi,[r12]
+ lea rdx,[rbx+PG_MM_CREDENTIAL]
+ call qword ptr [r12+8]
+ test eax,eax
+ jnz .Lca_blocked
+ cmp qword ptr [rbx+PG_MM_CREDENTIAL],0
+ je .Lca_absent
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ lea rsi,[rip+.Lca_type]
+ call json_object_object_get@PLT
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lca_blocked
+ mov rdi,rax
+ lea rsi,[rip+.Lca_api_key]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lca_blocked
+ mov rdi,[rbx+PG_MM_CREDENTIAL]
+ lea rsi,[rip+.Lca_key_field]
+ call json_object_object_get@PLT
+ test rax,rax
+ jz .Lca_absent
+ mov r13,rax
+ mov rdi,rax
+ call json_object_get_string@PLT
+ test rax,rax
+ jz .Lca_blocked
+ cmp byte ptr [rax],0
+ je .Lca_absent
+ mov r12,rax
+ mov rdi,rax
+ call strlen@PLT
+ mov rdi,r13
+ mov r13,rax
+ call json_object_get_string_len@PLT
+ cmp rax,r13
+ jne .Lca_blocked
+ mov rax,r12
+ xor edx,edx
+ jmp .Lca_end
+.Lca_absent:
+ xor eax,eax
+ xor edx,edx
+ jmp .Lca_end
+.Lca_blocked:
+ xor eax,eax
+ mov edx,1
+.Lca_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.section .rodata
+.Lca_type: .asciz "type"
+.Lca_api_key: .asciz "api_key"
+.Lca_key_field: .asciz "key"
 .section .note.GNU-stack,"",@progbits
