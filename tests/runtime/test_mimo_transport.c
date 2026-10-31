@@ -231,6 +231,7 @@ static int nxt(pg_model_event *e) { return model.next(model.context, e); }
 static void feed(const char *data) {
     size_t n = strlen(data);
     assert(captured_write((char *)data, 1, n, captured_write_data) == n);
+    if(pg_mimo_config_codex(m.configuration)&&n&&data[n-1]=='\n'&&!(n>=2&&data[n-2]=='\n')&&!(n>=4&&!memcmp(data+n-4,"\r\n\r\n",4)))assert(captured_write("\n",1,1,captured_write_data)==1);
 }
 static void finish_transport(void) {
     script_running = 0;
@@ -556,7 +557,7 @@ static void test_responses_transport(void){
 }
 
 static int codex_compressed_wire(void){
- const char *endpoint=getenv("PANGU_TEST_CODEX_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-wire\",\"options\":{\"sessionId\":\"wire-codex-session\",\"maxRetries\":1}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&m.wire_request&&m.wire_size);if(real_multi){pg_model_event event={0};for(unsigned tick=0;tick<10000;tick++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;struct timespec pause={0,1000000};nanosleep(&pause,NULL);}assert(event.kind==PG_MODEL_DONE&&m.retry_attempt==1);}else assert(!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);assert(!m.wire_request&&!m.wire_size);free(captured_decoded);captured_decoded=NULL;puts("PASS: Codex binary Zstd body, declared byte length and request identity verified by actual TLS receiver");return 0;
+ const char *endpoint=getenv("PANGU_TEST_CODEX_ENDPOINT");assert(endpoint);reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-wire\",\"options\":{\"sessionId\":\"wire-codex-session\",\"maxRetries\":1}}");json_object_object_add(cfg,"endpoint",json_object_new_string(endpoint));assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);assert(!start()&&m.wire_request&&m.wire_size);if(real_multi){pg_model_event event={0};for(unsigned tick=0;tick<10000;tick++){assert(!nxt(&event));if(event.kind==PG_MODEL_DONE)break;struct timespec pause={0,1000000};nanosleep(&pause,NULL);}assert(event.kind==PG_MODEL_DONE&&m.retry_attempt==1);json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant)&&json_object_get_boolean(json_object_object_get(assistant,"endTurn")));json_object_put(assistant);}else assert(!curl_easy_perform(m.easy));long status=0;assert(!__real_curl_easy_getinfo(m.easy,CURLINFO_RESPONSE_CODE,&status)&&status==200);model.close(model.context);assert(!m.wire_request&&!m.wire_size);free(captured_decoded);captured_decoded=NULL;puts("PASS: Codex binary Zstd body, declared byte length and request identity verified by actual TLS receiver");return 0;
 }
 static void test_codex_compression_failures(void){
  unsigned setopts=0,headers=0;
@@ -590,6 +591,27 @@ static void test_codex_failure_display(void){
   reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-error\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start());script_http=scenario==1||scenario==2?400:scenario==3?503:429;feed(bodies[scenario]);finish_transport();pg_model_event event={0};assert(nxt(&event));pg_slice detail={0},raw={0};int status=pg_mimo_failure_data(&m,&detail,&raw);if(expected[scenario]){assert(!status&&detail.size==strlen(expected[scenario])&&!memcmp(detail.data,expected[scenario],detail.size));if(scenario==0)assert(strstr(raw.data,"raw quota detail")&&strstr(raw.data,"rate_limit_exceeded"));}else assert(status);model.close(model.context);
  }
  unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex quota plan/reset display preserves raw error classification, ordinary JSON errors and non-JSON fallback");
+}
+static void test_codex_terminal_frames(void){
+ const char *types[]={"response.done","response.completed","response.incomplete"};const char *statuses[]={"completed","incomplete","failed","cancelled","queued","in_progress","unknown",NULL,NULL};
+ for(unsigned type=0;type<3;type++)for(unsigned state=0;state<9;state++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-frame\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start());json_object *event=json_object_new_object(),*response=json_object_new_object();json_object_object_add(event,"type",json_object_new_string(types[type]));json_object_object_add(event,"response",response);if(statuses[state])json_object_object_add(response,"status",json_object_new_string(statuses[state]));if(state==8)json_object_object_add(response,"status",json_object_new_int(37));json_object_object_add(response,"end_turn",json_object_new_boolean(state%2));if(state==1)json_object_object_add(response,"incomplete_details",json_tokener_parse("{\"reason\":\"max_output_tokens\"}"));char frame[2048];int length=snprintf(frame,sizeof(frame),"data: %s\n\n",json_object_to_json_string_ext(event,JSON_C_TO_STRING_PLAIN));assert(length>0&&(size_t)length<sizeof(frame));assert(captured_write(frame,1,(size_t)length,captured_write_data)==(size_t)length);json_object_put(event);
+  pg_model_event result={0};int status=nxt(&result);if(state==2||state==3)assert(status);else{assert(!status&&result.kind==PG_MODEL_DONE&&m.saw_done);json_object *assistant=json_object_new_object();assert(!pg_mimo_complete(&m,assistant));json_object *end=json_object_object_get(assistant,"endTurn");assert(end&&json_object_get_boolean(end)==(int)(state%2));assert(!strcmp(json_object_get_string(json_object_object_get(assistant,"stopReason")),state==1?"length":"stop"));if(state>=6)assert(!json_object_object_get(assistant,"rawStopReason"));json_object_put(assistant);}model.close(model.context);assert(!m.codex_frame);
+ }
+ for(unsigned mode=0;mode<8;mode++){
+  reset_script();m=(pg_mimo){0};model=pg_mimo_model(&m);make_session();json_object *cfg=json_tokener_parse("{\"api\":\"openai-codex-responses\",\"model\":\"codex-frame\"}");assert(!pg_mimo_configure(&m,cfg));json_object_put(cfg);setenv("PANGU_MODEL_API_KEY","e30.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoicGFuZ3UtdGVzdC1hY2NvdW50In19.signature",1);assert(!start());
+  const char *frame=mode==0?"data: {\"type\":\"response.done\",\n" : "";
+  if(mode==0)frame="data: {\"type\":\"response.done\",\n" "data: \"response\":{\"status\":\"completed\"}}\n\n";
+  else if(mode==1)frame="data: {\"type\":\"response.done\",\"response\":{\"status\":\"completed\"}}";
+  else if(mode==2)frame="data: {\"type\":\"response.done\",\"response\":{\"status\":\"completed\"}}\n";
+  else if(mode==3)frame="data: {bad JSON}\n\n";
+  else if(mode==4)frame="data: [DONE]\n\ndata: {\"type\":\"response.done\",\"response\":{\"status\":\"completed\"}}\n\n";
+  else if(mode==5)frame=": ping\r\nevent: ignored\r\nretry: 10\r\ndata: {\"type\":\"response.done\",\"response\":{\"status\":\"completed\"}}\r\n\r\n";
+  else if(mode==6)frame="data: {\"type\":\"response.done\",\"response\":{\"status\":\"completed\"}}\n\ndata: {bad trailing JSON}\n\n";
+  else frame="data: {\"type\":\"response.done\",\n";
+  size_t length=strlen(frame);assert(captured_write((char *)frame,1,length,captured_write_data)==length);if(mode==1||mode==2)finish_transport();pg_model_event result={0};int status=nxt(&result);if(mode==3)assert(status);else if(mode==7)assert(!status&&result.kind==PG_MODEL_WAIT&&m.codex_frame);else{for(unsigned n=0;n<4&&!status&&result.kind!=PG_MODEL_DONE;n++)status=nxt(&result);assert(!status&&result.kind==PG_MODEL_DONE);}model.cancel(model.context);assert(!m.codex_frame&&!m.easy);
+ }
+ unsetenv("PANGU_MODEL_API_KEY");puts("PASS: Codex terminal aliases/status/endTurn and SSE multiline, CRLF, EOF, sentinel, trailing events, malformed frames and cancellation");
 }
 static void test_codex_auth_failures(void){
  const char *tokens[]={"invalid","a.e30=.b","a.!!!!.b","a.e30=.b.extra"};
@@ -887,6 +909,7 @@ int main(int argc,char **argv) {
     test_saved_connection();
     test_responses_transport();
     test_codex_auth_failures();
+    test_codex_terminal_frames();
     test_codex_failure_display();
     test_codex_transport_retries();
     test_codex_compression_failures();

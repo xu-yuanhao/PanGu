@@ -161,6 +161,7 @@
         "pg_mimo_uses_responses",
         "pg_mimo_config_responses",
         "pg_mimo_config_codex",
+        "pg_mimo_codex_line",
         "pg_mimo_responses_complete",
         "pg_mimo_responses_history",
         "pg_mimo_failure_data",

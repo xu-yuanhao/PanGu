@@ -406,7 +406,7 @@ def codex_compressed_wire(binary, directory):
                 if 'retry=1' in self.path and not failed_once:
                     failed_once=True;payload=b'{"error":"overloaded"}';self.send_response(503);self.send_header('Retry-After-Ms','0')
                 else:
-                    payload=b'data: {"type":"response.completed","response":{"status":"completed"}}\n\n';self.send_response(200)
+                    payload=b'data: {"type":"response.done","response":{"status":"completed","end_turn":true}}\n\n';self.send_response(200)
             except Exception as error:
                 failures.append(type(error).__name__);payload=b'';self.send_response(400)
             self.send_header('Content-Length',str(len(payload)));self.end_headers();self.wfile.write(payload)

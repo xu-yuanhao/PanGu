@@ -151,6 +151,12 @@ li_close:
  call curl_slist_free_all@PLT
  mov rdi, qword ptr [rbx + PG_MM_REQUEST]
  call free@PLT
+ mov rdi,[rbx+PG_MM_CODEX_FRAME]
+ test rdi,rdi
+ jz .Lcd_frame_closed
+ call printbuf_free@PLT
+ mov qword ptr [rbx+PG_MM_CODEX_FRAME],0
+.Lcd_frame_closed:
  mov rdi,[rbx+PG_MM_WIRE_REQUEST]
  call free@PLT
  mov qword ptr [rbx+PG_MM_WIRE_REQUEST],0
@@ -785,6 +791,16 @@ li_next:
  jmp .Lnx_bad
 .Lnx_lines:
  mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_lines_regular
+ cmp dword ptr [rbx+PG_MM_SAW_DONE],0
+ je .Lcd_lines_regular
+ mov rax,[rbx+PG_MM_USED]
+ mov [rbx+PG_MM_CONSUMED],rax
+ jmp .Lnx_drain
+.Lcd_lines_regular:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
  call pg_mimo_config_bedrock@PLT
  test eax,eax
  jnz .Lnx_bedrock_frame
@@ -800,7 +816,15 @@ li_next:
  test rax, rax
  jnz .Lnx_have_line
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
- jne .Lnx_bad                         /* 传输已结束仍无换行：截断 */
+ je .Lcd_line_wait
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lnx_bad
+ mov rax,[rbx+PG_MM_USED]
+ mov [rbx+PG_MM_CONSUMED],rax
+ jmp .Lcd_line_dispatch
+.Lcd_line_wait:
  xor eax, eax                         /* 行未完整：WAIT */
  jmp .Lnx_out
 .Lnx_have_line:
@@ -815,10 +839,26 @@ li_next:
  sub rax, PG_MM_BODY
  inc rax
  mov qword ptr [rbx + PG_MM_CONSUMED], rax
+.Lcd_line_dispatch:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcd_decode_regular
+ mov rdi,rbx
+ mov rsi,r13
+ mov rdx,r12
+ call pg_mimo_codex_line@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ cmp dword ptr [r12+PG_MM_EVT_KIND],0
+ je .Lnx_lines
+ jmp .Lnx_out
+.Lcd_decode_regular:
  mov rdi, rbx
  mov rsi, r13
  mov rdx, r12
  call pg_mimo_decode_line
+.Lcd_decoded:
  test eax,eax
  jnz .Lnx_bad
  jmp .Lnx_out
@@ -854,6 +894,16 @@ li_next:
 .Lnx_drain:
  cmp dword ptr [rbx + PG_MM_TRANSPORT_DONE], 0
  je .Lnx_wait
+ cmp qword ptr [rbx+PG_MM_CODEX_FRAME],0
+ je .Lcd_frame_drained
+ mov rdi,rbx
+ lea rsi,[rip+.Lcd_empty]
+ mov rdx,r12
+ call pg_mimo_codex_line@PLT
+ test eax,eax
+ jnz .Lnx_bad
+ jmp .Lnx_out
+.Lcd_frame_drained:
  cmp dword ptr [rbx + PG_MM_SAW_DONE], 0
  je .Lnx_unfinished
  cmp dword ptr [rbx + PG_MM_FINISH_REASON], 0

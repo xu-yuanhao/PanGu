@@ -127,7 +127,8 @@
 #define PG_MM_RETRY_AFTER 174200
 #define PG_MM_RETRY_AFTER_MS 174328
 #define PG_MM_RETRY_BLOCKED 174456
-#define PG_MM_BYTES 174464
+#define PG_MM_CODEX_FRAME 174464
+#define PG_MM_BYTES 174472
 
 /* json-c 公开枚举（<json-c/json.h>） */
 #define PG_MM_JSON_NULL 0
@@ -186,6 +187,7 @@
 #include <stddef.h>
 #include "mimo.h"
 #include <json-c/json.h>
+#include <json-c/printbuf.h>
 #include <curl/multi.h>
 #define PG_MM_ASSERT_OFF(t, f, v) _Static_assert(offsetof(t, f) == (v), #t "." #f " layout drifted")
 #define PG_MM_ASSERT_SIZE(t, v) _Static_assert(sizeof(t) == (v), #t " size drifted")
@@ -276,6 +278,8 @@ PG_MM_ASSERT_OFF(pg_mimo, retry_at, PG_MM_RETRY_AT);
 PG_MM_ASSERT_OFF(pg_mimo, retry_after, PG_MM_RETRY_AFTER);
 PG_MM_ASSERT_OFF(pg_mimo, retry_after_ms, PG_MM_RETRY_AFTER_MS);
 PG_MM_ASSERT_OFF(pg_mimo, retry_blocked, PG_MM_RETRY_BLOCKED);
+PG_MM_ASSERT_OFF(pg_mimo, codex_frame, PG_MM_CODEX_FRAME);
+_Static_assert(offsetof(struct printbuf,buf)==0&&offsetof(struct printbuf,bpos)==8,"printbuf public ABI");
 PG_MM_ASSERT_SIZE(pg_mimo, PG_MM_BYTES);
 _Static_assert(CURLE_COULDNT_RESOLVE_PROXY==5 && CURLE_COULDNT_RESOLVE_HOST==6 && CURLE_COULDNT_CONNECT==7 && CURLE_HTTP2==16 && CURLE_PARTIAL_FILE==18 && CURLE_OPERATION_TIMEDOUT==28 && CURLE_GOT_NOTHING==52 && CURLE_SEND_ERROR==55 && CURLE_RECV_ERROR==56 && CURLE_HTTP2_STREAM==92,"native retry CURL mapping");
 PG_MM_ASSERT_SIZE(pg_mimo_call_storage, PG_MM_SLOT_BYTES);

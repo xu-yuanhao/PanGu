@@ -929,6 +929,24 @@ pg_mimo_decode_line:
  mov ebp,eax
  jmp .Lrs_cleanup
 .Lrs_openai_event:
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcx_event_mapped
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lcx_done]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcx_terminal_type
+ mov rdi,[rsp+56]
+ lea rsi,[rip+.Lrs_incomplete]
+ call strcmp@PLT
+ test eax,eax
+ jnz .Lcx_event_mapped
+.Lcx_terminal_type:
+ lea rax,[rip+.Lrs_completed]
+ mov [rsp+56],rax
+.Lcx_event_mapped:
  lea rdi,[rip+.Lrs_base]
  call json_tokener_parse@PLT
  mov [rsp+8],rax
@@ -1134,6 +1152,19 @@ pg_mimo_decode_line:
  mov rdi,rbx
  mov rsi,r12
  call .Lrt_save
+ mov rdi,[rbx+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcx_terminal_mapped
+ mov rdi,r12
+ call .Lcx_status
+ cmp eax,2
+ je .Lrs_bad
+ mov ebp,8
+ test eax,eax
+ jz .Lcx_terminal_mapped
+ mov ebp,9
+.Lcx_terminal_mapped:
  mov rdi,rbx
  mov rsi,r12
  call .Lrc_capture_terminal
@@ -2143,6 +2174,28 @@ pg_mimo_failure_data:
  xor ebp,ebp
  test rbx,rbx
  jz .Lrt_stop_end
+ mov rdi,[rdi+PG_MM_CONFIGURATION]
+ call pg_mimo_config_codex@PLT
+ test eax,eax
+ jz .Lcx_end_turn_ready
+ mov rdi,rbx
+ lea rsi,[rip+.Lcx_end_turn]
+ call li_get
+ mov r14,rax
+ mov rdi,rax
+ mov esi,1
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcx_end_turn_ready
+ mov rdi,r14
+ call json_object_get@PLT
+ mov rdi,r12
+ lea rsi,[rip+.Lcx_endTurn]
+ mov rdx,rax
+ call .Lrs_set
+ test eax,eax
+ jnz .Lrt_stop_bad
+.Lcx_end_turn_ready:
  mov rdi,r12
  mov rsi,rbx
  lea rdx,[rip+.Lrt_status]
@@ -5890,3 +5943,193 @@ pg_mimo_base64_encode:
 
 .section .rodata
 .Lrt_friendly_key: .asciz "panguFriendlyMessage"
+
+.text
+/* Codex's adapter maps its terminal aliases before shared Responses processing. */
+.Lcx_status:
+ push rbx
+ push r12
+ push r13
+ mov rbx,rdi
+ lea rsi,[rip+.Lrt_status]
+ call li_get
+ mov rdi,rax
+ mov esi,6
+ call json_object_is_type@PLT
+ test eax,eax
+ jz .Lcx_unknown
+ mov rdi,rbx
+ lea rsi,[rip+.Lrt_status]
+ call li_get
+ mov rdi,rax
+ call json_object_get_string@PLT
+ mov r12,rax
+ xor r13d,r13d
+.Lcx_status_each:
+ lea rax,[rip+.Lcx_status_names]
+ mov rsi,[rax+r13*8]
+ mov rdi,r12
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcx_status_found
+ inc r13
+ cmp r13,6
+ jb .Lcx_status_each
+.Lcx_unknown:
+ mov rdi,rbx
+ lea rsi,[rip+.Lrt_status]
+ call json_object_object_del@PLT
+ xor eax,eax
+ jmp .Lcx_status_end
+.Lcx_status_found:
+ xor eax,eax
+ cmp r13,1
+ je .Lcx_status_incomplete
+ cmp r13,2
+ je .Lcx_status_error
+ cmp r13,3
+ jne .Lcx_status_end
+.Lcx_status_error:
+ mov eax,2
+ jmp .Lcx_status_end
+.Lcx_status_incomplete:
+ mov eax,1
+.Lcx_status_end:
+ pop r13
+ pop r12
+ pop rbx
+ ret
+.globl pg_mimo_codex_line
+.type pg_mimo_codex_line,@function
+pg_mimo_codex_line:
+ push rbp
+ push rbx
+ push r12
+ push r13
+ push r14
+ mov rbx,rdi
+ mov r12,rsi
+ mov rbp,rdx
+ cmp byte ptr [r12],0
+ je .Lcf_flush
+ mov rdi,r12
+ lea rsi,[rip+.Lstr_data]
+ mov edx,5
+ call strncmp@PLT
+ test eax,eax
+ jnz .Lcf_ok
+ add r12,5
+ mov rdi,r12
+ call g_strchug@PLT
+ mov rdi,rax
+ call g_strchomp@PLT
+ mov r12,rax
+ mov rdi,rax
+ call strlen@PLT
+ mov r13,rax
+ mov r14,[rbx+PG_MM_CODEX_FRAME]
+ test r14,r14
+ jnz .Lcf_existing
+ call printbuf_new@PLT
+ mov r14,rax
+ test rax,rax
+ jz .Lcf_bad
+ mov [rbx+PG_MM_CODEX_FRAME],rax
+ mov rdi,rax
+ lea rsi,[rip+.Lcf_prefix]
+ mov edx,6
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lcf_bad
+ jmp .Lcf_append
+.Lcf_existing:
+ mov eax,[r14+8]
+ add rax,r13
+ cmp rax,PG_MM_BODY_LIMIT-2
+ jae .Lcf_bad
+ cmp dword ptr [r14+8],6
+ jbe .Lcf_append
+ mov rdi,r14
+ lea rsi,[rip+.Lcf_newline]
+ mov edx,1
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lcf_bad
+.Lcf_append:
+ mov eax,[r14+8]
+ add rax,r13
+ cmp rax,PG_MM_BODY_LIMIT
+ jae .Lcf_bad
+ mov rdi,r14
+ mov rsi,r12
+ mov edx,r13d
+ call printbuf_memappend@PLT
+ test eax,eax
+ js .Lcf_bad
+ jmp .Lcf_ok
+.Lcf_flush:
+ mov r14,[rbx+PG_MM_CODEX_FRAME]
+ test r14,r14
+ jz .Lcf_ok
+ mov qword ptr [rbx+PG_MM_CODEX_FRAME],0
+ mov rdi,[r14]
+ add rdi,6
+ call g_strchug@PLT
+ mov rdi,rax
+ call g_strchomp@PLT
+ mov r12,rax
+ cmp byte ptr [rax],0
+ je .Lcf_flush_empty
+ mov rdi,rax
+ lea rsi,[rip+.Lstr_done]
+ call strcmp@PLT
+ test eax,eax
+ jz .Lcf_flush_empty
+ mov rdi,rbx
+ mov rsi,[r14]
+ mov rdx,rbp
+ call pg_mimo_decode_line
+ mov r13d,eax
+ jmp .Lcf_flush_free
+.Lcf_flush_empty:
+ xor r13d,r13d
+.Lcf_flush_free:
+ mov rdi,r14
+ call printbuf_free@PLT
+ test r13d,r13d
+ jnz .Lcf_flush_result
+ cmp dword ptr [rbx+PG_MM_SAW_DONE],0
+ je .Lcf_flush_result
+ mov dword ptr [rbx+PG_MM_TRANSPORT_DONE],1
+.Lcf_flush_result:
+ mov eax,r13d
+ jmp .Lcf_end
+.Lcf_bad:
+ mov eax,1
+ jmp .Lcf_end
+.Lcf_ok:
+ xor eax,eax
+.Lcf_end:
+ pop r14
+ pop r13
+ pop r12
+ pop rbx
+ pop rbp
+ ret
+.size pg_mimo_codex_line,.-pg_mimo_codex_line
+.section .rodata
+.Lcx_done: .asciz "response.done"
+.Lcx_completed: .asciz "completed"
+.Lcx_incomplete: .asciz "incomplete"
+.Lcx_failed: .asciz "failed"
+.Lcx_cancelled: .asciz "cancelled"
+.Lcx_queued: .asciz "queued"
+.Lcx_progress: .asciz "in_progress"
+.Lcf_prefix: .asciz "data: "
+.Lcf_newline: .asciz "\n"
+.section .data.rel.ro
+.Lcx_status_names: .quad .Lcx_completed,.Lcx_incomplete,.Lcx_failed,.Lcx_cancelled,.Lcx_queued,.Lcx_progress
+
+.section .rodata
+.Lcx_end_turn: .asciz "end_turn"
+.Lcx_endTurn: .asciz "endTurn"

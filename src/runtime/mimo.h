@@ -36,6 +36,7 @@ typedef struct {
  uint64_t retry_attempt,retry_at; /* request-local monotonic milliseconds; zero means active */
  char retry_after[128],retry_after_ms[128]; /* bounded public response delay headers */
  unsigned retry_blocked; /* provider terminal policy prevents an outer retry */
+ struct printbuf *codex_frame; /* owned pending SSE data frame */
 } pg_mimo;
 /* OpenAI Chat Completions / Responses Anthropic Messages and Google/Vertex SSE transport. Explicit PANGU_MODEL_ENDPOINT,
    PANGU_MODEL_NAME and PANGU_MODEL_API_KEY select a connection; custom endpoint
@@ -63,6 +64,7 @@ int pg_mimo_encode_request(pg_mimo *, const pg_session *);
 int pg_mimo_uses_responses(const pg_mimo *);
 int pg_mimo_config_responses(const struct json_object *);
 int pg_mimo_config_codex(const struct json_object *);
+int pg_mimo_codex_line(pg_mimo *,char *,pg_model_event *);
 int pg_mimo_config_anthropic(const struct json_object *);
 int pg_mimo_uses_anthropic(const pg_mimo *);
 int pg_mimo_uses_google(const pg_mimo *);
