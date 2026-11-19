@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "name": "bun-porting.md",
+      "url": "https://raw.githubusercontent.com/oven-sh/bun/46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md",
+      "sha256": "6f02194397ed377b7ebd533efd530d4fc1b5f9d70f86d9d383a3ea61a44598ec"
+    },
+    {
+      "name": "phase-a-port.workflow.js",
+      "url": "https://raw.githubusercontent.com/oven-sh/bun/23427dbc12fdcff30c23a96a3d6a66d62fdc091d/.claude/workflows/phase-a-port.workflow.js",
+      "sha256": "9379a7def06ac5a0af963ed7fab21fbdae95b15eadbf94638c1079c2b325fe0c"
+    },
+    {
+      "name": "phase-e-proper-port.workflow.js",
+      "url": "https://raw.githubusercontent.com/oven-sh/bun/23427dbc12fdcff30c23a96a3d6a66d62fdc091d/.claude/workflows/phase-e-proper-port.workflow.js",
+      "sha256": "a55cd5ecd95a4c5e28aef15e7541469c565a9d377ce2eee9db071c0638471659"
+    },
+    {
+      "name": "lifetime-classify.workflow.js",
+      "url": "https://raw.githubusercontent.com/oven-sh/bun/23427dbc12fdcff30c23a96a3d6a66d62fdc091d/.claude/workflows/lifetime-classify.workflow.js",
+      "sha256": "6c12adf9755c0f564e70d9047fe0c9f6a10e67dcce164d0a7252377e79dcb7b1"
+    },
+    {
+      "name": "port-batch.ts",
+      "url": "https://raw.githubusercontent.com/oven-sh/bun/23427dbc12fdcff30c23a96a3d6a66d62fdc091d/scripts/port-batch.ts",
+      "sha256": "51dbcf6d039f1db852d324247f0a1b8ff9a6e69a57e201986545ec8a3a5eadc5"
+    }
+  ],
+  "metadata": {
+    "bun-pr.json": "https://api.github.com/repos/oven-sh/bun/pulls/30412",
+    "bun-merge.json": "https://api.github.com/repos/oven-sh/bun/commits/23427dbc12fdcff30c23a96a3d6a66d62fdc091d"
+  },
+  "source": "# Bun porting references\n\n- PORTING.md: 46d3bc29f270fa881dd5730ef1549e88407701a5/docs/PORTING.md\n- Workflow/script files: merge 23427dbc12fdcff30c23a96a3d6a66d62fdc091d, PR #30412\n- Origin: https://github.com/oven-sh/bun\n"
+}

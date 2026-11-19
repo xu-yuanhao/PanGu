@@ -1,0 +1,128 @@
+[
+  {
+    "name": "BearSSL",
+    "url": "https://www.bearssl.org/git/BearSSL",
+    "commit": "7bea48e5e850ab4cafbe68d3765cdaba13a86d6f",
+    "source_rev": null
+  },
+  {
+    "name": "Claude-Code",
+    "url": "https://github.com/pengchengneo/Claude-Code.git",
+    "commit": "b78dd22a091b717c8938ab98c736bc04825a8ee8",
+    "source_rev": null
+  },
+  {
+    "name": "claude-code-rust",
+    "url": "https://github.com/lorryjovens-hub/claude-code-rust.git",
+    "commit": "3a65531dd25d61823521b15137a2651f60203562",
+    "source_rev": null
+  },
+  {
+    "name": "codex",
+    "url": "https://github.com/openai/codex.git",
+    "commit": "8dd6099e265f14b80cb1b3fcf10c29a12bb6b23d",
+    "source_rev": null
+  },
+  {
+    "name": "cordis",
+    "url": "https://github.com/cordiverse/cordis.git",
+    "commit": "df4431eb43086bd1f8263a0e8c03e9b7c5233b68",
+    "source_rev": null
+  },
+  {
+    "name": "deepseek-harness",
+    "url": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "commit": "22ddee3792402c3e70ec5f86a63c3e3e895a2f60",
+    "source_rev": null
+  },
+  {
+    "name": "fasm",
+    "url": "https://github.com/tgrysztar/fasm.git",
+    "commit": "225ce90e81e69877ab42505f7713e3d3fd531d42",
+    "source_rev": null
+  },
+  {
+    "name": "grok-build",
+    "url": "https://github.com/xai-org/grok-build.git",
+    "commit": "2bdd1d6a6369de0e8c68132ea4539e9abd9e14a8",
+    "source_rev": "559751fdcec02d413e4c57c8832ab275e4f44980"
+  },
+  {
+    "name": "kolibrios",
+    "url": "https://github.com/KolibriOS/kolibrios.git",
+    "commit": "b6ad17997692b66bc42f6775404824842971e831",
+    "source_rev": null
+  },
+  {
+    "name": "llama.cpp",
+    "url": "https://github.com/ggml-org/llama.cpp.git",
+    "commit": "f3fb2fcdbc93a8f677e893b8dbd36462b3190ffd",
+    "source_rev": null
+  },
+  {
+    "name": "pi",
+    "url": "https://github.com/earendil-works/pi.git",
+    "commit": "d5b3de22d0e24a3e9c38a9410d3329b099717283",
+    "source_rev": null
+  },
+  {
+    "name": "pi-python-vamsi",
+    "url": "https://github.com/vamsi/pi.git",
+    "commit": "dc6b092508ce471a4f57064f3d4700dc2ab78b83",
+    "source_rev": null
+  },
+  {
+    "name": "pi-rust-bigfish",
+    "url": "https://github.com/bigfish1913/pi-rust.git",
+    "commit": "fcfc9314304f53662127782f551c589b0919965a",
+    "source_rev": null
+  },
+  {
+    "name": "pi-rust-nktkt",
+    "url": "https://github.com/nktkt/pi.git",
+    "commit": "0808c756fa1991940def7f0f9837464417149419",
+    "source_rev": null
+  },
+  {
+    "name": "pi-rust-yannelli",
+    "url": "https://github.com/yannelli/pi-rust.git",
+    "commit": "66ea9a61ac5dfa828aa216ab84cfbd45106cb2b0",
+    "source_rev": null
+  },
+  {
+    "name": "pi_agent_rust",
+    "url": "https://github.com/Dicklesworthstone/pi_agent_rust.git",
+    "commit": "9fd02e42438fb01ca7766764a36bceb0330b9a87",
+    "source_rev": null
+  },
+  {
+    "name": "pie",
+    "url": "https://github.com/c4pt0r/pie.git",
+    "commit": "b72579680bdfe616edbc05808fb1395a1be3660f",
+    "source_rev": null
+  },
+  {
+    "name": "ripgrep",
+    "url": "https://github.com/BurntSushi/ripgrep.git",
+    "commit": "3fce3b5bb0236da2df6d99672afb8a719642eca7",
+    "source_rev": null
+  },
+  {
+    "name": "simdjson",
+    "url": "https://github.com/simdjson/simdjson.git",
+    "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+    "source_rev": null
+  },
+  {
+    "name": "termbox2",
+    "url": "https://github.com/termbox/termbox2.git",
+    "commit": "48cda6f83a4a1a98d3546beafe55b31a5861c21d",
+    "source_rev": null
+  },
+  {
+    "name": "vscode",
+    "url": "https://github.com/microsoft/vscode.git",
+    "commit": "113947563a3837013dbff0095e2bf29880b5d354",
+    "source_rev": null
+  }
+]

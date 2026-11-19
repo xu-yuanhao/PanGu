@@ -1,0 +1,463 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "machine": "x86_64",
+  "native": "/home/xu-yuanhao/Documents/PanGu/build/product-profile/pangu_agent_profile",
+  "native_sha256": "74e0b93063e35ffa70ae2f3e74697e88ec6b0dfe674e4bc5ee9d06074c95867b",
+  "scope": "Agent app/Core execution plugin, injected model, real JSONL/SQLite stores; no TUI or provider/tool/resource plugins",
+  "caveats": [
+    "Sessions remain allocated together; execution is sequential, not concurrent.",
+    "Startup includes process/plugins and opening all new stores.",
+    "Work includes model streaming, durable commits and exact final-message verification.",
+    "Cleanup includes closing and reopening every store with byte-exact content verification.",
+    "Peak RSS is /proc VmHWM through retained final state; excludes subsequent reopen/exit.",
+    "Store bytes are logical regular-file lengths after close/reopen, not filesystem allocated blocks.",
+    "No Pi product comparison, live model/network, actual tools, external MCP child or other-platform result."
+  ],
+  "results": {
+    "small": {
+      "shape": {
+        "instances": 1,
+        "turns": 1,
+        "chunks": 16,
+        "chunk_bytes": 256
+      },
+      "backends": {
+        "jsonl": {
+          "samples": [
+            {
+              "startup_ms": 2.335908997338265,
+              "work_ms": 0.2669749956112355,
+              "cleanup_ms": 7.908432016847655,
+              "peak_rss_kib": 5988,
+              "retained_rss_kib": 5988,
+              "idle_rss_kib": 5780,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.55334700737149,
+              "process_cpu_ms": 2.67,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 14105
+            },
+            {
+              "startup_ms": 2.2617419890593737,
+              "work_ms": 0.4207259917166084,
+              "cleanup_ms": 0.7341419986914843,
+              "peak_rss_kib": 5912,
+              "retained_rss_kib": 5912,
+              "idle_rss_kib": 5704,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.43100998736918,
+              "process_cpu_ms": 2.8109999999999995,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 14105
+            },
+            {
+              "startup_ms": 2.2255509975366294,
+              "work_ms": 0.4195359942968935,
+              "cleanup_ms": 0.6752640183549374,
+              "peak_rss_kib": 6100,
+              "retained_rss_kib": 6100,
+              "idle_rss_kib": 5916,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.44862202485092,
+              "process_cpu_ms": 2.745,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 14105
+            }
+          ],
+          "median": {
+            "startup_ms": 2.2617419890593737,
+            "work_ms": 0.4195359942968935,
+            "cleanup_ms": 0.7341419986914843,
+            "peak_rss_kib": 5988,
+            "retained_rss_kib": 5988,
+            "idle_rss_kib": 5780,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.44862202485092,
+            "process_cpu_ms": 2.745,
+            "store_bytes": 14105
+          }
+        },
+        "sqlite": {
+          "samples": [
+            {
+              "startup_ms": 3.048982995096594,
+              "work_ms": 0.4797670117113739,
+              "cleanup_ms": 0.8443350088782609,
+              "peak_rss_kib": 7440,
+              "retained_rss_kib": 7440,
+              "idle_rss_kib": 7300,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.58358198730275,
+              "process_cpu_ms": 3.835,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 16384
+            },
+            {
+              "startup_ms": 2.8365799807943404,
+              "work_ms": 0.39134101825766265,
+              "cleanup_ms": 0.7112249732017517,
+              "peak_rss_kib": 7444,
+              "retained_rss_kib": 7444,
+              "idle_rss_kib": 7328,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.42798199574463,
+              "process_cpu_ms": 3.4339999999999997,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 16384
+            },
+            {
+              "startup_ms": 2.6626420149113983,
+              "work_ms": 0.40009000804275274,
+              "cleanup_ms": 0.7239280093926936,
+              "peak_rss_kib": 7516,
+              "retained_rss_kib": 7516,
+              "idle_rss_kib": 7400,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.41342900367454,
+              "process_cpu_ms": 3.2680000000000002,
+              "outcome": {
+                "messages": 2,
+                "bytes": 4103,
+                "events": 23
+              },
+              "store_bytes": 16384
+            }
+          ],
+          "median": {
+            "startup_ms": 2.8365799807943404,
+            "work_ms": 0.40009000804275274,
+            "cleanup_ms": 0.7239280093926936,
+            "peak_rss_kib": 7444,
+            "retained_rss_kib": 7444,
+            "idle_rss_kib": 7328,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.42798199574463,
+            "process_cpu_ms": 3.4339999999999997,
+            "store_bytes": 16384
+          }
+        }
+      }
+    },
+    "stream_1mib": {
+      "shape": {
+        "instances": 1,
+        "turns": 1,
+        "chunks": 256,
+        "chunk_bytes": 4096
+      },
+      "backends": {
+        "jsonl": {
+          "samples": [
+            {
+              "startup_ms": 2.814556995872408,
+              "work_ms": 12.512470013462007,
+              "cleanup_ms": 5.05597100709565,
+              "peak_rss_kib": 19184,
+              "retained_rss_kib": 15128,
+              "idle_rss_kib": 6808,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.53565598209389,
+              "process_cpu_ms": 19.631999999999998,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2103065
+            },
+            {
+              "startup_ms": 3.1763369916006923,
+              "work_ms": 14.318461006041616,
+              "cleanup_ms": 4.721306991996244,
+              "peak_rss_kib": 19060,
+              "retained_rss_kib": 15084,
+              "idle_rss_kib": 6744,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.4513650026638,
+              "process_cpu_ms": 21.544,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2103065
+            },
+            {
+              "startup_ms": 2.656625001691282,
+              "work_ms": 14.38894000602886,
+              "cleanup_ms": 4.673218005336821,
+              "peak_rss_kib": 19220,
+              "retained_rss_kib": 15164,
+              "idle_rss_kib": 6844,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.50101898959838,
+              "process_cpu_ms": 21.065,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2103065
+            }
+          ],
+          "median": {
+            "startup_ms": 2.814556995872408,
+            "work_ms": 14.318461006041616,
+            "cleanup_ms": 4.721306991996244,
+            "peak_rss_kib": 19184,
+            "retained_rss_kib": 15128,
+            "idle_rss_kib": 6808,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.50101898959838,
+            "process_cpu_ms": 21.065,
+            "store_bytes": 2103065
+          }
+        },
+        "sqlite": {
+          "samples": [
+            {
+              "startup_ms": 3.3549710060469806,
+              "work_ms": 18.935853004222736,
+              "cleanup_ms": 7.12146598380059,
+              "peak_rss_kib": 24552,
+              "retained_rss_kib": 18620,
+              "idle_rss_kib": 8400,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.38693299284205,
+              "process_cpu_ms": 28.369,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2109440
+            },
+            {
+              "startup_ms": 2.965535008115694,
+              "work_ms": 14.634294027928263,
+              "cleanup_ms": 6.6635469847824425,
+              "peak_rss_kib": 24684,
+              "retained_rss_kib": 18652,
+              "idle_rss_kib": 8408,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.54404099937528,
+              "process_cpu_ms": 23.395,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2109440
+            },
+            {
+              "startup_ms": 3.1123059743549675,
+              "work_ms": 14.852445019641891,
+              "cleanup_ms": 5.174858990358189,
+              "peak_rss_kib": 24812,
+              "retained_rss_kib": 18756,
+              "idle_rss_kib": 8512,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.4480820032768,
+              "process_cpu_ms": 22.288999999999998,
+              "outcome": {
+                "messages": 2,
+                "bytes": 1048583,
+                "events": 263
+              },
+              "store_bytes": 2109440
+            }
+          ],
+          "median": {
+            "startup_ms": 3.1123059743549675,
+            "work_ms": 14.852445019641891,
+            "cleanup_ms": 6.6635469847824425,
+            "peak_rss_kib": 24684,
+            "retained_rss_kib": 18652,
+            "idle_rss_kib": 8408,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.4480820032768,
+            "process_cpu_ms": 23.395,
+            "store_bytes": 2109440
+          }
+        }
+      }
+    },
+    "many_sessions": {
+      "shape": {
+        "instances": 32,
+        "turns": 4,
+        "chunks": 16,
+        "chunk_bytes": 256
+      },
+      "backends": {
+        "jsonl": {
+          "samples": [
+            {
+              "startup_ms": 2.9208659834694117,
+              "work_ms": 20.722013985505328,
+              "cleanup_ms": 11.182713991729543,
+              "peak_rss_kib": 15160,
+              "retained_rss_kib": 15160,
+              "idle_rss_kib": 5924,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.43229701695964,
+              "process_cpu_ms": 33.745,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 6235264
+            },
+            {
+              "startup_ms": 2.9937320214230567,
+              "work_ms": 20.2634799934458,
+              "cleanup_ms": 11.829925002530217,
+              "peak_rss_kib": 15172,
+              "retained_rss_kib": 15172,
+              "idle_rss_kib": 5904,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.50327500212006,
+              "process_cpu_ms": 33.961999999999996,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 6235264
+            },
+            {
+              "startup_ms": 2.920952974818647,
+              "work_ms": 23.643422027816996,
+              "cleanup_ms": 12.874821986770257,
+              "peak_rss_kib": 15220,
+              "retained_rss_kib": 15220,
+              "idle_rss_kib": 5960,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.44090802548453,
+              "process_cpu_ms": 38.071,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 6235264
+            }
+          ],
+          "median": {
+            "startup_ms": 2.920952974818647,
+            "work_ms": 20.722013985505328,
+            "cleanup_ms": 11.829925002530217,
+            "peak_rss_kib": 15172,
+            "retained_rss_kib": 15172,
+            "idle_rss_kib": 5924,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.44090802548453,
+            "process_cpu_ms": 33.961999999999996,
+            "store_bytes": 6235264
+          }
+        },
+        "sqlite": {
+          "samples": [
+            {
+              "startup_ms": 10.53996101836674,
+              "work_ms": 38.1547269935254,
+              "cleanup_ms": 6.753502006176859,
+              "peak_rss_kib": 16760,
+              "retained_rss_kib": 16760,
+              "idle_rss_kib": 12140,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.4485559882596,
+              "process_cpu_ms": 53.964999999999996,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 2752512
+            },
+            {
+              "startup_ms": 10.746365995146334,
+              "work_ms": 30.90095697552897,
+              "cleanup_ms": 6.23110102606006,
+              "peak_rss_kib": 16796,
+              "retained_rss_kib": 16796,
+              "idle_rss_kib": 12176,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.50838598399423,
+              "process_cpu_ms": 46.461999999999996,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 2752512
+            },
+            {
+              "startup_ms": 9.8356060043443,
+              "work_ms": 34.32088700355962,
+              "cleanup_ms": 6.555419007781893,
+              "peak_rss_kib": 16548,
+              "retained_rss_kib": 16548,
+              "idle_rss_kib": 11928,
+              "idle_cpu_ms": 0.0,
+              "idle_sample_ms": 200.506917986786,
+              "process_cpu_ms": 49.355,
+              "outcome": {
+                "messages": 256,
+                "bytes": 525184,
+                "events": 2944
+              },
+              "store_bytes": 2752512
+            }
+          ],
+          "median": {
+            "startup_ms": 10.53996101836674,
+            "work_ms": 34.32088700355962,
+            "cleanup_ms": 6.555419007781893,
+            "peak_rss_kib": 16760,
+            "retained_rss_kib": 16760,
+            "idle_rss_kib": 12140,
+            "idle_cpu_ms": 0.0,
+            "idle_sample_ms": 200.506917986786,
+            "process_cpu_ms": 49.355,
+            "store_bytes": 2752512
+          }
+        }
+      }
+    }
+  },
+  "configuration": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "PANGU_BUILD_AGENT:BOOL=ON",
+    "PANGU_BUILD_OVERFLOW:BOOL=OFF",
+    "PANGU_BUILD_PROFILES:BOOL=ON",
+    "PANGU_BUILD_PROXY_HTTP:BOOL=OFF",
+    "PANGU_BUILD_SERVICES:BOOL=ON",
+    "PANGU_BUILD_TUI:BOOL=ON",
+    "PANGU_SERVICES_IMAGES:BOOL=OFF",
+    "PANGU_SERVICES_MCP:BOOL=ON",
+    "PANGU_SERVICES_RESOURCES:BOOL=ON"
+  ]
+}

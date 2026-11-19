@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">PanGu — 开界 · V2</title>
+  <desc id="desc">Two point-symmetric geometric plates, separated by a precisely 9-unit perpendicular diagonal gap at 18 degrees. Built from two four-point paths.</desc>
+  <path id="sky" d="M8 8 H56 V19.470347 L8 35.066493 Z" fill="currentColor"/>
+  <path id="earth" d="M8 44.529653 L56 28.933507 V56 H8 Z" fill="currentColor"/>
+</svg>

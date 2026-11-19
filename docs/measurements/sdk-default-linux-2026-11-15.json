@@ -1,0 +1,738 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "machine": "x86_64",
+  "scope": "Release SDK install; system shared dependencies inspected separately, not bundled",
+  "build_directory": "/home/xu-yuanhao/Documents/PanGu/build/product-profile",
+  "install_command": [
+    "cmake",
+    "--install",
+    "/home/xu-yuanhao/Documents/PanGu/build/product-profile",
+    "--prefix",
+    "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-install-all-approval-baseline",
+    "--config",
+    "Release"
+  ],
+  "label": "approval-baseline",
+  "cmake_cache_sha256": "d9e69dde4c151c0a2dd9891c69caa2ee8ab6cbc96ecc6946609c8219e268a2c3",
+  "configuration": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "PANGU_BUILD_AGENT:BOOL=ON",
+    "PANGU_BUILD_OVERFLOW:BOOL=OFF",
+    "PANGU_BUILD_PROFILES:BOOL=OFF",
+    "PANGU_BUILD_PROXY_HTTP:BOOL=OFF",
+    "PANGU_BUILD_SERVICES:BOOL=ON",
+    "PANGU_BUILD_TUI:BOOL=ON",
+    "PANGU_SERVICES_IMAGES:BOOL=OFF",
+    "PANGU_SERVICES_MCP:BOOL=ON",
+    "PANGU_SERVICES_RESOURCES:BOOL=ON",
+    "PANGU_GIT2_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_GIT2_CFLAGS_I:INTERNAL=",
+    "PANGU_GIT2_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_GIT2_FOUND:INTERNAL=1",
+    "PANGU_GIT2_INCLUDEDIR:INTERNAL=/usr/include",
+    "PANGU_GIT2_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_GIT2_LDFLAGS:INTERNAL=-L/usr/lib;-lgit2",
+    "PANGU_GIT2_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_GIT2_LIBDIR:INTERNAL=/usr/lib",
+    "PANGU_GIT2_LIBRARIES:INTERNAL=git2",
+    "PANGU_GIT2_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_GIT2_LIBS:INTERNAL=",
+    "PANGU_GIT2_LIBS_L:INTERNAL=",
+    "PANGU_GIT2_LIBS_OTHER:INTERNAL=",
+    "PANGU_GIT2_LIBS_PATHS:INTERNAL=",
+    "PANGU_GIT2_MODULE_NAME:INTERNAL=libgit2",
+    "PANGU_GIT2_PREFIX:INTERNAL=/usr",
+    "PANGU_GIT2_STATIC_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_GIT2_STATIC_CFLAGS_I:INTERNAL=",
+    "PANGU_GIT2_STATIC_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_GIT2_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_GIT2_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lgit2;-lllhttp;-lrt;-lssl;-lpcre2-8;-pthread;-lpthread;-lssh2;-L/usr/lib;-lssl;-L/usr/lib;-L/usr/lib;-lz;-lcrypto;-lbrotlienc;-lbrotlidec;-lbrotlicommon;-lm;-lzstd;-ldl;-pthread;-lz",
+    "PANGU_GIT2_STATIC_LDFLAGS_OTHER:INTERNAL=-pthread;-pthread",
+    "PANGU_GIT2_STATIC_LIBDIR:INTERNAL=",
+    "PANGU_GIT2_STATIC_LIBRARIES:INTERNAL=git2;llhttp;rt;ssl;pcre2-8;pthread;ssh2;ssl;z;crypto;brotlienc;brotlidec;brotlicommon;m;zstd;dl;z",
+    "PANGU_GIT2_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib;/usr/lib;/usr/lib;/usr/lib",
+    "PANGU_GIT2_STATIC_LIBS:INTERNAL=",
+    "PANGU_GIT2_STATIC_LIBS_L:INTERNAL=",
+    "PANGU_GIT2_STATIC_LIBS_OTHER:INTERNAL=",
+    "PANGU_GIT2_STATIC_LIBS_PATHS:INTERNAL=",
+    "PANGU_GIT2_VERSION:INTERNAL=1.9.7",
+    "PANGU_GIT2_libgit2_INCLUDEDIR:INTERNAL=",
+    "PANGU_GIT2_libgit2_LIBDIR:INTERNAL=",
+    "PANGU_GIT2_libgit2_PREFIX:INTERNAL=",
+    "PANGU_GIT2_libgit2_VERSION:INTERNAL=",
+    "PANGU_PCRE2_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_PCRE2_CFLAGS_I:INTERNAL=",
+    "PANGU_PCRE2_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_PCRE2_FOUND:INTERNAL=1",
+    "PANGU_PCRE2_INCLUDEDIR:INTERNAL=/usr/include",
+    "PANGU_PCRE2_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_PCRE2_LDFLAGS:INTERNAL=-L/usr/lib;-lpcre2-8",
+    "PANGU_PCRE2_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_PCRE2_LIBDIR:INTERNAL=/usr/lib",
+    "PANGU_PCRE2_LIBRARIES:INTERNAL=pcre2-8",
+    "PANGU_PCRE2_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_PCRE2_LIBS:INTERNAL=",
+    "PANGU_PCRE2_LIBS_L:INTERNAL=",
+    "PANGU_PCRE2_LIBS_OTHER:INTERNAL=",
+    "PANGU_PCRE2_LIBS_PATHS:INTERNAL=",
+    "PANGU_PCRE2_MODULE_NAME:INTERNAL=libpcre2-8",
+    "PANGU_PCRE2_PREFIX:INTERNAL=/usr",
+    "PANGU_PCRE2_STATIC_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_PCRE2_STATIC_CFLAGS_I:INTERNAL=",
+    "PANGU_PCRE2_STATIC_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_PCRE2_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_PCRE2_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lpcre2-8;-pthread;-lpthread",
+    "PANGU_PCRE2_STATIC_LDFLAGS_OTHER:INTERNAL=-pthread",
+    "PANGU_PCRE2_STATIC_LIBDIR:INTERNAL=",
+    "PANGU_PCRE2_STATIC_LIBRARIES:INTERNAL=pcre2-8;pthread",
+    "PANGU_PCRE2_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_PCRE2_STATIC_LIBS:INTERNAL=",
+    "PANGU_PCRE2_STATIC_LIBS_L:INTERNAL=",
+    "PANGU_PCRE2_STATIC_LIBS_OTHER:INTERNAL=",
+    "PANGU_PCRE2_STATIC_LIBS_PATHS:INTERNAL=",
+    "PANGU_PCRE2_VERSION:INTERNAL=10.49",
+    "PANGU_PCRE2_libpcre2-8_INCLUDEDIR:INTERNAL=",
+    "PANGU_PCRE2_libpcre2-8_LIBDIR:INTERNAL=",
+    "PANGU_PCRE2_libpcre2-8_PREFIX:INTERNAL=",
+    "PANGU_PCRE2_libpcre2-8_VERSION:INTERNAL=",
+    "PANGU_UV_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_UV_CFLAGS_I:INTERNAL=",
+    "PANGU_UV_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_UV_FOUND:INTERNAL=1",
+    "PANGU_UV_INCLUDEDIR:INTERNAL=/usr/include",
+    "PANGU_UV_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_UV_LDFLAGS:INTERNAL=-L/usr/lib;-luv",
+    "PANGU_UV_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_UV_LIBDIR:INTERNAL=/usr/lib",
+    "PANGU_UV_LIBRARIES:INTERNAL=uv",
+    "PANGU_UV_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_UV_LIBS:INTERNAL=",
+    "PANGU_UV_LIBS_L:INTERNAL=",
+    "PANGU_UV_LIBS_OTHER:INTERNAL=",
+    "PANGU_UV_LIBS_PATHS:INTERNAL=",
+    "PANGU_UV_MODULE_NAME:INTERNAL=libuv",
+    "PANGU_UV_PREFIX:INTERNAL=/usr",
+    "PANGU_UV_STATIC_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_UV_STATIC_CFLAGS_I:INTERNAL=",
+    "PANGU_UV_STATIC_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_UV_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_UV_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-luv",
+    "PANGU_UV_STATIC_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_UV_STATIC_LIBDIR:INTERNAL=",
+    "PANGU_UV_STATIC_LIBRARIES:INTERNAL=uv",
+    "PANGU_UV_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_UV_STATIC_LIBS:INTERNAL=",
+    "PANGU_UV_STATIC_LIBS_L:INTERNAL=",
+    "PANGU_UV_STATIC_LIBS_OTHER:INTERNAL=",
+    "PANGU_UV_STATIC_LIBS_PATHS:INTERNAL=",
+    "PANGU_UV_VERSION:INTERNAL=1.52.1",
+    "PANGU_UV_libuv_INCLUDEDIR:INTERNAL=",
+    "PANGU_UV_libuv_LIBDIR:INTERNAL=",
+    "PANGU_UV_libuv_PREFIX:INTERNAL=",
+    "PANGU_UV_libuv_VERSION:INTERNAL=",
+    "PANGU_YAML_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_YAML_CFLAGS_I:INTERNAL=",
+    "PANGU_YAML_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_YAML_FOUND:INTERNAL=1",
+    "PANGU_YAML_INCLUDEDIR:INTERNAL=/usr/include",
+    "PANGU_YAML_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_YAML_LDFLAGS:INTERNAL=-L/usr/lib;-lyaml",
+    "PANGU_YAML_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_YAML_LIBDIR:INTERNAL=/usr/lib",
+    "PANGU_YAML_LIBRARIES:INTERNAL=yaml",
+    "PANGU_YAML_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_YAML_LIBS:INTERNAL=",
+    "PANGU_YAML_LIBS_L:INTERNAL=",
+    "PANGU_YAML_LIBS_OTHER:INTERNAL=",
+    "PANGU_YAML_LIBS_PATHS:INTERNAL=",
+    "PANGU_YAML_MODULE_NAME:INTERNAL=yaml-0.1",
+    "PANGU_YAML_PREFIX:INTERNAL=/usr",
+    "PANGU_YAML_STATIC_CFLAGS:INTERNAL=-I/usr/include",
+    "PANGU_YAML_STATIC_CFLAGS_I:INTERNAL=",
+    "PANGU_YAML_STATIC_CFLAGS_OTHER:INTERNAL=",
+    "PANGU_YAML_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include",
+    "PANGU_YAML_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lyaml",
+    "PANGU_YAML_STATIC_LDFLAGS_OTHER:INTERNAL=",
+    "PANGU_YAML_STATIC_LIBDIR:INTERNAL=",
+    "PANGU_YAML_STATIC_LIBRARIES:INTERNAL=yaml",
+    "PANGU_YAML_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib",
+    "PANGU_YAML_STATIC_LIBS:INTERNAL=",
+    "PANGU_YAML_STATIC_LIBS_L:INTERNAL=",
+    "PANGU_YAML_STATIC_LIBS_OTHER:INTERNAL=",
+    "PANGU_YAML_STATIC_LIBS_PATHS:INTERNAL=",
+    "PANGU_YAML_VERSION:INTERNAL=0.2.5",
+    "PANGU_YAML_yaml-0.1_INCLUDEDIR:INTERNAL=",
+    "PANGU_YAML_yaml-0.1_LIBDIR:INTERNAL=",
+    "PANGU_YAML_yaml-0.1_PREFIX:INTERNAL=",
+    "PANGU_YAML_yaml-0.1_VERSION:INTERNAL="
+  ],
+  "installed_files": [
+    {
+      "path": "bin/pangu_agent_cli",
+      "bytes": 1356240,
+      "sha256": "3ce91b95a0d7eca1765aa76a5fb2c4b82a2db4dbc98ab32f8ff2ac2f061de1d3"
+    },
+    {
+      "path": "include/pangu/agent/app.h",
+      "bytes": 8531,
+      "sha256": "025069c15cdf3b837e9de8f697c6d3fafbef63d788b6de825dbc1595009b0ef0"
+    },
+    {
+      "path": "include/pangu/agent/approval.h",
+      "bytes": 3145,
+      "sha256": "6054e691509d537d3afff76d372b8f01dead8ac31e04d88dbb2af69e09020233"
+    },
+    {
+      "path": "include/pangu/agent/plugin.h",
+      "bytes": 3102,
+      "sha256": "a1c4f884003afa7a981f63af69a7e2b62aec239829ff2dc5ac84606898ce91c7"
+    },
+    {
+      "path": "include/pangu/agent/recovery.h",
+      "bytes": 1859,
+      "sha256": "5901d6d3ab758fe09002d8b60f9092ed5277a2f239d160a42b7ddf30f98ddcda"
+    },
+    {
+      "path": "include/pangu/agent/session.h",
+      "bytes": 8558,
+      "sha256": "892e53197fd397def7329ccf1b8facb50cb1217fce55eff7619e525077ccf0d6"
+    },
+    {
+      "path": "include/pangu/agent/tree.h",
+      "bytes": 5487,
+      "sha256": "67a52839644f6aafae9ee6bd08759ad4111957f5862ba9ad73deb8de19f8d101"
+    },
+    {
+      "path": "include/pangu/core/core.h",
+      "bytes": 5729,
+      "sha256": "e1b7d738dabb89f666c184bcef281bbd405b9110a7f24d503533ef6af82640a9"
+    },
+    {
+      "path": "include/pangu/core/loop.h",
+      "bytes": 24340,
+      "sha256": "f755bdc9635a65acc889388cee273962d8a6a157656796e3d2ec78a393ff9376"
+    },
+    {
+      "path": "include/pangu/core/overflow.h",
+      "bytes": 1933,
+      "sha256": "b9477f8d6a99e7d296b0056c5d919be78e77aaefdd1919e940c4a2290eafdf2c"
+    },
+    {
+      "path": "include/pangu/core/proxy.h",
+      "bytes": 2926,
+      "sha256": "d4817ba1b70192f657deba01fd2e731ff028afd96cf521b83876137c11d9b61a"
+    },
+    {
+      "path": "include/pangu/core/proxy_http.h",
+      "bytes": 1446,
+      "sha256": "628e478538c1c1df168a9ff8579e298e85b68caead875f1e4056830d56908662"
+    },
+    {
+      "path": "include/pangu/core/proxy_request.h",
+      "bytes": 1255,
+      "sha256": "5f2377697813fe0fed0870bc09d52982715434ddbd9d30b034c0f5cd4e1cb364"
+    },
+    {
+      "path": "include/pangu/core/state.h",
+      "bytes": 4501,
+      "sha256": "069ab5722656ce6fbafc3cb0763907b8aa14f7a28ec540247140c19138fc33ac"
+    },
+    {
+      "path": "include/pangu/core/transcript.h",
+      "bytes": 628,
+      "sha256": "209aa3afae6e8e7374c417fb5482ba675c1e708298af222ce1d5df626080d05b"
+    },
+    {
+      "path": "include/pangu/services/approval.h",
+      "bytes": 4627,
+      "sha256": "6c0bd5fe9914d9121e5ee76a1332f73f0c4e2427f22b1cd51efafe1225952fc7"
+    },
+    {
+      "path": "include/pangu/services/dynamic.h",
+      "bytes": 4097,
+      "sha256": "8edff325555a2d6c158852e9d4a0f2fb5ba56ac2b9b46aa1398f115cd351923f"
+    },
+    {
+      "path": "include/pangu/services/execution.h",
+      "bytes": 2341,
+      "sha256": "63d4205e8e22bc175eb5832c02bb4b0af55d112773b144bc0560d83e2e5b515c"
+    },
+    {
+      "path": "include/pangu/services/host.h",
+      "bytes": 3722,
+      "sha256": "5ab1593824d816bd35fb490aea6db757353eca4f5b4b6f654941f4a7caae952b"
+    },
+    {
+      "path": "include/pangu/services/images.h",
+      "bytes": 1167,
+      "sha256": "fb0e458a539f1c4390e6bcad5fe2461cc351f2716ccc44f9fff5b17a4943bd44"
+    },
+    {
+      "path": "include/pangu/services/mcp.h",
+      "bytes": 2537,
+      "sha256": "c1b2aee5a05bd816bc6966838ceb65edfeff66768b76e0a94d98d390eccff7b8"
+    },
+    {
+      "path": "include/pangu/services/model.h",
+      "bytes": 1541,
+      "sha256": "cb8a2a57c7c459ee8e983340914331f06609ef464d6c9190c1f7d70396c3b200"
+    },
+    {
+      "path": "include/pangu/services/resources.h",
+      "bytes": 3589,
+      "sha256": "35c7651e1e990854e24fa01502e1543c0a511b4f72e7546ecb8ea988dcd75233"
+    },
+    {
+      "path": "include/pangu/services/schema.h",
+      "bytes": 687,
+      "sha256": "28194adff2ec539f1cc2d7cd4356023529faf9fd72e24e5c6d33c714e2cddb1a"
+    },
+    {
+      "path": "include/pangu/services/tools.h",
+      "bytes": 3617,
+      "sha256": "83e1a7d5924b35f4230261de3f695a67c0b6e376049c16262d0d156f3461e343"
+    },
+    {
+      "path": "include/pangu/tui/buffer.h",
+      "bytes": 3032,
+      "sha256": "12d90fe84654bb71c8201c95857d4d6139af6cc0d0b51c6bcd537041e81150a0"
+    },
+    {
+      "path": "include/pangu/tui/chat.h",
+      "bytes": 6542,
+      "sha256": "24abb8cb8a6b326387f3a9c91e7f8a897cabb10ee22cdd3169b921f165347866"
+    },
+    {
+      "path": "include/pangu/tui/completion.h",
+      "bytes": 952,
+      "sha256": "ca2f1d448f787e90d464127713d684b8b37d119c4fc1d580f0c558356b4abf2e"
+    },
+    {
+      "path": "include/pangu/tui/editor.h",
+      "bytes": 3805,
+      "sha256": "2f52120e66c86f1bf3240b1aab0db9acbd41be1252de81c4c753005dabaab82d"
+    },
+    {
+      "path": "include/pangu/tui/keys.h",
+      "bytes": 2602,
+      "sha256": "7ad670cd0328d7494aaa2667d0a2cedae5a720cbd756fc0fa9a5bded34b7dbb5"
+    },
+    {
+      "path": "include/pangu/tui/plugin.h",
+      "bytes": 5452,
+      "sha256": "fddc845a79644a6c4f728facfec698872b3c0da06253329c7e59bb06c7327081"
+    },
+    {
+      "path": "include/pangu/tui/terminal.h",
+      "bytes": 2942,
+      "sha256": "1b767c6ede1a3a86615b90ac6bce1470d0e6ac972b9775ee311525f2566b210d"
+    },
+    {
+      "path": "include/pangu/tui/view.h",
+      "bytes": 716,
+      "sha256": "30418225e1c61110335acc82b82ac29efcce67acd2873890cae7371e855c7ec7"
+    },
+    {
+      "path": "lib/cmake/PanGuAgent/PanGuAgentConfig.cmake",
+      "bytes": 1432,
+      "sha256": "8977278b78bb64088e271902fd90a44f18d121dbf0dee5009610c855a64766d7"
+    },
+    {
+      "path": "lib/cmake/PanGuAgent/PanGuAgentTargets-release.cmake",
+      "bytes": 1332,
+      "sha256": "1e9e5e90b07862961cbf2fc4c456d4f4ef72d9476d1ff14c74d192de59fe1bf3"
+    },
+    {
+      "path": "lib/cmake/PanGuAgent/PanGuAgentTargets.cmake",
+      "bytes": 5413,
+      "sha256": "887e4c0e48e2716103ff577f477899e96ec49e6346b0ed8763e73e2622ea41d5"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreConfig.cmake",
+      "bytes": 979,
+      "sha256": "4d030c9984101af22ce25f0a4df6221fb02ad5891597d6c72eec45cb2db605d4"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreTargets-release.cmake",
+      "bytes": 834,
+      "sha256": "9f06c0eccbbe477e83a76dff3b20f604ab2a99edaa8f89f0f973f4d50e5429c5"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreTargets.cmake",
+      "bytes": 4106,
+      "sha256": "3aa4dcb8b8d726a33b586a0439ab6797e7ddd31f710b7b2eb4ebde35a734c6ca"
+    },
+    {
+      "path": "lib/cmake/PanGuServices/PanGuServicesConfig.cmake",
+      "bytes": 1432,
+      "sha256": "e901a8a4eece0f980646e31f4281944469e4316768432571a805460782e57d0a"
+    },
+    {
+      "path": "lib/cmake/PanGuServices/PanGuServicesTargets-release.cmake",
+      "bytes": 3536,
+      "sha256": "88bec8c308377f3dcfa592803f916404e9c97c22426a15f06db996497b1bdb47"
+    },
+    {
+      "path": "lib/cmake/PanGuServices/PanGuServicesTargets.cmake",
+      "bytes": 6303,
+      "sha256": "ab9944ca88732fd5f16b88a2ac4e8c10e5972874e2a7a1d585cc48252b8377de"
+    },
+    {
+      "path": "lib/cmake/PanGuTUI/PanGuTUIConfig.cmake",
+      "bytes": 1251,
+      "sha256": "525c4c027ce1419a680ab6b8cd5e14839d23f516824e5b694229f484705be479"
+    },
+    {
+      "path": "lib/cmake/PanGuTUI/PanGuTUITargets-release.cmake",
+      "bytes": 827,
+      "sha256": "a5b5223b4bffae9851a36a88d8d6b651585cb631448d30a34c76b741fbc379fb"
+    },
+    {
+      "path": "lib/cmake/PanGuTUI/PanGuTUITargets.cmake",
+      "bytes": 4193,
+      "sha256": "85382525ecbdf1160274906bb3d6a16786a5c787d93a653b91c78bb35f6e3b82"
+    },
+    {
+      "path": "lib/cmake/PanGuTUIPresentation/PanGuTUIPresentationConfig.cmake",
+      "bytes": 1114,
+      "sha256": "a727f48756bc9f4b9a771ea9525a89140faf36207e1a90021367483435e9e031"
+    },
+    {
+      "path": "lib/cmake/PanGuTUIPresentation/PanGuTUIPresentationTargets-release.cmake",
+      "bytes": 876,
+      "sha256": "d4ff9f21f90bfef08b7d2e7f0731f33a3e1a59ad651a6933ac814f75acb41565"
+    },
+    {
+      "path": "lib/cmake/PanGuTUIPresentation/PanGuTUIPresentationTargets.cmake",
+      "bytes": 4995,
+      "sha256": "f4e6a07c116e318ca04fb87e9583463057562d475213dd45d86f1a7f101c1bd1"
+    },
+    {
+      "path": "lib/libpangu_agent.a",
+      "bytes": 171612,
+      "sha256": "72c3fb46d900261b3e4095ca8fa73f98b8f6d67ee609c414265a73a25ed483fa"
+    },
+    {
+      "path": "lib/libpangu_agent_app.a",
+      "bytes": 38138,
+      "sha256": "b8ae038b66002ef90fb2c14f8b449898636dc5679dc7f147a885708b05707ca7"
+    },
+    {
+      "path": "lib/libpangu_core.a",
+      "bytes": 498550,
+      "sha256": "783a5be712c18d714d58b3309af9b59f3359b21d574d5c83b08d15da49760539"
+    },
+    {
+      "path": "lib/libpangu_services.a",
+      "bytes": 21150,
+      "sha256": "0be735e8a00605a95c97a9d3d27721dcdd092bf9d634f5a3881441d18a3ad3f9"
+    },
+    {
+      "path": "lib/libpangu_services_deepseek.a",
+      "bytes": 34140,
+      "sha256": "00d615708bfa845740cc8cefc763df5578bce09f29ed946b9ffbab0f99de605d"
+    },
+    {
+      "path": "lib/libpangu_services_mcp.a",
+      "bytes": 35196,
+      "sha256": "f6da3850d2323c5de79e5b756b52b42828f202e6d918fc45a3680847b55488e7"
+    },
+    {
+      "path": "lib/libpangu_services_resources.a",
+      "bytes": 87864,
+      "sha256": "1d7c2525b98f8299a57385e88176c85e13032a4803504527adcb77d95c66adf5"
+    },
+    {
+      "path": "lib/libpangu_services_schema.a",
+      "bytes": 1282186,
+      "sha256": "9793b286ca812232df05eee4b927f1e5838771734c057fec75e38a66d201e362"
+    },
+    {
+      "path": "lib/libpangu_services_tools.a",
+      "bytes": 68820,
+      "sha256": "e9969b2eb9563ec64f977859a94e86836e38c26b8262d62b414a44bdbc6084fb"
+    },
+    {
+      "path": "lib/libpangu_tui.a",
+      "bytes": 143138,
+      "sha256": "95b8c4a0537907c4b32dfcc325bd38a933010adb1e3d7cbb4de7e9c5836ccfd0"
+    },
+    {
+      "path": "lib/libpangu_tui_plugin.a",
+      "bytes": 22146,
+      "sha256": "96af569c42f8b394fd0d1302a3f7bd7f5fcaa577cb6d68867e24a2437c04ab8b"
+    },
+    {
+      "path": "share/licenses/PanGu/Pi-LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+    },
+    {
+      "path": "share/licenses/PanGu/curl-LICENSE",
+      "bytes": 1088,
+      "sha256": "82f2f4427d6545ee5aaac4f0b80428da6cc8ba41c2cf5da3a03680ec327b9681"
+    },
+    {
+      "path": "share/licenses/PanGu/libgit2-COPYING",
+      "bytes": 72970,
+      "sha256": "e0938121c0554985fe17196ac38fc590d149268e9c46e0c0e7a2eae1354fae71"
+    },
+    {
+      "path": "share/licenses/PanGu/libuv-LICENSE",
+      "bytes": 1079,
+      "sha256": "16de0c32b265cb7d46a6d3bd614f259dd4d693a5e26b3407b04aae8d73041f0c"
+    },
+    {
+      "path": "share/licenses/PanGu/libyaml-LICENSE",
+      "bytes": 1101,
+      "sha256": "c40112449f254b9753045925248313e9270efa36d226b22d82d4cc6c43c57f29"
+    },
+    {
+      "path": "share/licenses/PanGu/picojson-LICENSE",
+      "bytes": 1336,
+      "sha256": "5585fe141cc7bb08c953f3859db608852968d0bbc625b9b6d95c0bd6349bacb6"
+    },
+    {
+      "path": "share/licenses/PanGu/services-NOTICES",
+      "bytes": 4527,
+      "sha256": "6b2f01fa5d6571000aee5ae428a9e4d43d8395bf5b91276640706a9e2a9774af"
+    },
+    {
+      "path": "share/licenses/PanGu/sqlite-LICENSE",
+      "bytes": 3518,
+      "sha256": "4e57d9ac979f1c9872e69799c2597eeef4c6ce7224f3ede0bf9dc8d217b1e65d"
+    },
+    {
+      "path": "share/licenses/PanGu/utf8proc-LICENSE.md",
+      "bytes": 5125,
+      "sha256": "3b510150d34f248a221bb88e1d811238d6c6c18b51231822c42974c39bb07256"
+    },
+    {
+      "path": "share/licenses/PanGu/valijson-LICENSE",
+      "bytes": 1346,
+      "sha256": "61b5766db38eaa3f320c366357956d7743424bfbf90fd78f5943866ba237589e"
+    },
+    {
+      "path": "share/licenses/PanGu/yyjson-LICENSE",
+      "bytes": 1084,
+      "sha256": "45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947"
+    }
+  ],
+  "installed_bytes": 4019454,
+  "installed_groups": {
+    "bin": 1356240,
+    "include": 127408,
+    "lib": 2441563,
+    "share": 94243
+  },
+  "sdk_archive_bytes": 1366919,
+  "sdk_archive_sha256": "e2495f0dcc37a3219c6979e608de89b1b66a28c01c99bf4c17fb9408b1670088",
+  "sdk_archive_path": "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-sdk-all-approval-baseline.tar.gz",
+  "cli_executable": {
+    "installed_bytes": 1356240,
+    "gzip_bytes": 585437,
+    "sha256": "3ce91b95a0d7eca1765aa76a5fb2c4b82a2db4dbc98ab32f8ff2ac2f061de1d3",
+    "scope": "CLI executable only; excludes notices, SDK and shared dependencies",
+    "stripped": {
+      "command": [
+        "/usr/bin/strip",
+        "--strip-unneeded",
+        "-o",
+        "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-cli-all-approval-baseline.stripped",
+        "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-install-all-approval-baseline/bin/pangu_agent_cli"
+      ],
+      "path": "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-cli-all-approval-baseline.stripped",
+      "bytes": 1192472,
+      "sha256": "d940f3205aa70e407e2c14a48cfc390dd6a2fb0a60a95aa4cb9c116d7811e3a2",
+      "gzip_bytes": 552192
+    }
+  },
+  "shared_dependencies": [
+    {
+      "path": "/usr/lib/ld-linux-x86-64.so.2",
+      "bytes": 263152,
+      "sha256": "f5e11cc62f8f2c24dff532982559f4303dba3b17e7450551372a88c8e7ea8757"
+    },
+    {
+      "path": "/usr/lib/libbrotlicommon.so.1.2.0",
+      "bytes": 141264,
+      "sha256": "4f895094b7b6ff9c82909e6516bc9cf212e2ec5af451d39bf1bcbc5e5fa225b2"
+    },
+    {
+      "path": "/usr/lib/libbrotlidec.so.1.2.0",
+      "bytes": 55168,
+      "sha256": "0883fb05fa42aa6a883722098530ab08551ed317e38a2311f5c96e94dd460979"
+    },
+    {
+      "path": "/usr/lib/libbrotlienc.so.1.2.0",
+      "bytes": 780768,
+      "sha256": "8dbc539197d276310ce2750dcb73de5465a1259d46a5d1894e6138fd354bf5c7"
+    },
+    {
+      "path": "/usr/lib/libc.so.6",
+      "bytes": 2215072,
+      "sha256": "02c8c3d06180beee9c7d0392aa85736c7d19f274a81e7f8f0b3d9e28e0641524"
+    },
+    {
+      "path": "/usr/lib/libcom_err.so.2.1",
+      "bytes": 18376,
+      "sha256": "67ed8a11c44542ffdbaa04b3521f48729afddf936568632b6aa9d04c595316cd"
+    },
+    {
+      "path": "/usr/lib/libcrypto.so.3",
+      "bytes": 5926392,
+      "sha256": "a75a864dcda6ef9e4dc29fad4b7988ca832b904c3915a63c920062c40763dae1"
+    },
+    {
+      "path": "/usr/lib/libcurl.so.4.8.0",
+      "bytes": 1091176,
+      "sha256": "d53ce30e973b9120643dfb53b9c99986330f28d2db245189e6bda6bc1aa55bdd"
+    },
+    {
+      "path": "/usr/lib/libgcc_s.so.1",
+      "bytes": 182512,
+      "sha256": "e618cb9c90c2eb3a1dad1cfea5b6c1eebcf2e799ad805976f4ae47bdd61c716a"
+    },
+    {
+      "path": "/usr/lib/libgit2.so.1.9.7",
+      "bytes": 1426880,
+      "sha256": "e4e661a3710e057627d92282a30518560d060faf2e0bacb6ddbfb4b1a4f6464b"
+    },
+    {
+      "path": "/usr/lib/libgssapi_krb5.so.2.2",
+      "bytes": 360736,
+      "sha256": "db71de39831ad557f7c75fadf772575f1180c4e1e7f83ec7318fabd78e129296"
+    },
+    {
+      "path": "/usr/lib/libidn2.so.0.4.0",
+      "bytes": 133064,
+      "sha256": "9a36fa67dc82ce0e5dc38ef190c76231f532676f7ba13e363fc1df16a9c50a15"
+    },
+    {
+      "path": "/usr/lib/libk5crypto.so.3.1",
+      "bytes": 182320,
+      "sha256": "e9ea7950674f25a6951b830036f95a595e1fc112247a69d11bc0003124ab7338"
+    },
+    {
+      "path": "/usr/lib/libkeyutils.so.1.10",
+      "bytes": 22480,
+      "sha256": "a82e692581b6215475c03538fa4b25681b5c71e8554c67afa7e34074b968b0d7"
+    },
+    {
+      "path": "/usr/lib/libkrb5.so.3.3",
+      "bytes": 845896,
+      "sha256": "eb8369680ba30529b30abeaca57429b67f9af42ac43efdd5d95ca1901bb9c44c"
+    },
+    {
+      "path": "/usr/lib/libkrb5support.so.0.1",
+      "bytes": 55544,
+      "sha256": "941f17df15bc3ed160b392dee2930bd68565f445b8fe8d87ad522256c972967f"
+    },
+    {
+      "path": "/usr/lib/libllhttp.so.9.3.1",
+      "bytes": 75648,
+      "sha256": "e3e100294a1b3a8bff6305a45fa081418fd51409c22c46677feebd2312bcded0"
+    },
+    {
+      "path": "/usr/lib/libm.so.6",
+      "bytes": 1268336,
+      "sha256": "965106704753eefe8c31ae7da6daba3ead3d18c52b19b5fcc41178bcc4aa999d"
+    },
+    {
+      "path": "/usr/lib/libnghttp2.so.14.29.5",
+      "bytes": 165928,
+      "sha256": "dc9f6c8c911dc14aef9585aed5cadf35ae5037175130753cd058d7eb353fb717"
+    },
+    {
+      "path": "/usr/lib/libnghttp3.so.9.9.0",
+      "bytes": 160768,
+      "sha256": "7d826dfe4128cab08a32609c56d67c9ce1383295cbce7ac0fa50449704b7479a"
+    },
+    {
+      "path": "/usr/lib/libngtcp2.so.16.11.0",
+      "bytes": 374768,
+      "sha256": "524535e51383d20818e3878e0c819cae6249662dcfc168c0bfbb30aa8ba4f2b3"
+    },
+    {
+      "path": "/usr/lib/libngtcp2_crypto_ossl.so.0.3.1",
+      "bytes": 47064,
+      "sha256": "867135c8d1f2787c1bd5eca09f204e086d6c2c1e3030613f1b5792d92034fb2f"
+    },
+    {
+      "path": "/usr/lib/libpcre2-8.so.0.16.1",
+      "bytes": 727336,
+      "sha256": "bfe4fd9948f4ad1e907ec22525515f578eb9eeb181a44741948d99746d0f8e58"
+    },
+    {
+      "path": "/usr/lib/libpsl.so.5.3.5",
+      "bytes": 75640,
+      "sha256": "b5189c9a4b32b15f0bb1bab989069acd2d0dc89723b990266ad5566cd16f1924"
+    },
+    {
+      "path": "/usr/lib/libresolv.so.2",
+      "bytes": 67904,
+      "sha256": "ee828b251a61761a9e529a791758ec8a1fbefd85693e2dc23501fedb8cf2f31d"
+    },
+    {
+      "path": "/usr/lib/libsqlite3.so.3.54.0",
+      "bytes": 1697864,
+      "sha256": "758544266d5060aff683efcc94ee9abf2625c6ff9d02b70bb6d1296e0ee9128f"
+    },
+    {
+      "path": "/usr/lib/libssh2.so.1.0.1",
+      "bytes": 317984,
+      "sha256": "8e31bb8758d4f780fd635aa47ca3c0306ccbfbadd7de6c85478a7d712d5ae4b4"
+    },
+    {
+      "path": "/usr/lib/libssl.so.3",
+      "bytes": 1015768,
+      "sha256": "f6409e9f083faae79a622c9534be6ed2456d0102cd8ea2b52eb18c9d72f1f41e"
+    },
+    {
+      "path": "/usr/lib/libstdc++.so.6.0.36",
+      "bytes": 2939928,
+      "sha256": "f5fc7380f2ae46fa4053a64be04e7b98109f1066a4bbfff3c37042488aa0be0e"
+    },
+    {
+      "path": "/usr/lib/libunistring.so.5.2.1",
+      "bytes": 1992752,
+      "sha256": "ba7a4afb4b6f823d64ebe324416e182cd42a981dba049e3ddcfa1c9af03cb7f3"
+    },
+    {
+      "path": "/usr/lib/libutf8proc.so.3.3.0",
+      "bytes": 366464,
+      "sha256": "f772cc6dfe69b42fcf98cbc1a0f744d14cc7efcd10bfc177dc9af1f430a64615"
+    },
+    {
+      "path": "/usr/lib/libuv.so.1.0.0",
+      "bytes": 231528,
+      "sha256": "407e3422efb45bb97856fc517c34656ad1292debdb7bc29c5f3e06195aed1c6a"
+    },
+    {
+      "path": "/usr/lib/libyaml-0.so.2.0.9",
+      "bytes": 133064,
+      "sha256": "99ba6c51d26236be1bfa81404023c9da25469c6e9079171c6b067accc1aeda95"
+    },
+    {
+      "path": "/usr/lib/libz.so.1.3.2",
+      "bytes": 108560,
+      "sha256": "6c78c5e58c3bb49a1cd151a95cdf1a17fe07a91a57a59e0279b984c533075ca9"
+    },
+    {
+      "path": "/usr/lib/libzstd.so.1.5.7",
+      "bytes": 939976,
+      "sha256": "f023d49e85fb22057bfdd21857263d2638b73356c06f3b342f678a75212379f8"
+    }
+  ],
+  "ldd_output": "\tlinux-vdso.so.1 (0x00007f3af304d000)\n\tlibyaml-0.so.2 => /usr/lib/libyaml-0.so.2 (0x00007f3af2ed3000)\n\tlibgit2.so.1.9 => /usr/lib/libgit2.so.1.9 (0x00007f3af2d76000)\n\tlibsqlite3.so.0 => /usr/lib/libsqlite3.so.0 (0x00007f3af2bd6000)\n\tlibutf8proc.so.3 => /usr/lib/libutf8proc.so.3 (0x00007f3af2b7b000)\n\tlibcurl.so.4 => /usr/lib/libcurl.so.4 (0x00007f3af2a6e000)\n\tlibstdc++.so.6 => /usr/lib/libstdc++.so.6 (0x00007f3af2600000)\n\tlibgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0x00007f3af2a41000)\n\tlibc.so.6 => /usr/lib/libc.so.6 (0x00007f3af2200000)\n\tlibuv.so.1 => /usr/lib/libuv.so.1 (0x00007f3af2a07000)\n\tlibm.so.6 => /usr/lib/libm.so.6 (0x00007f3af24c9000)\n\tlibssl.so.3 => /usr/lib/libssl.so.3 (0x00007f3af290c000)\n\tlibcrypto.so.3 => /usr/lib/libcrypto.so.3 (0x00007f3af1c00000)\n\tlibllhttp.so.9.3 => /usr/lib/libllhttp.so.9.3 (0x00007f3af28f9000)\n\tlibpcre2-8.so.0 => /usr/lib/libpcre2-8.so.0 (0x00007f3af1b4d000)\n\tlibssh2.so.1 => /usr/lib/libssh2.so.1 (0x00007f3af247b000)\n\tlibz.so.1 => /usr/lib/libz.so.1 (0x00007f3af28de000)\n\tlibnghttp3.so.9 => /usr/lib/libnghttp3.so.9 (0x00007f3af2453000)\n\tlibngtcp2_crypto_ossl.so.0 => /usr/lib/libngtcp2_crypto_ossl.so.0 (0x00007f3af2446000)\n\tlibngtcp2.so.16 => /usr/lib/libngtcp2.so.16 (0x00007f3af1af1000)\n\tlibnghttp2.so.14 => /usr/lib/libnghttp2.so.14 (0x00007f3af21d6000)\n\tlibidn2.so.0 => /usr/lib/libidn2.so.0 (0x00007f3af2424000)\n\tlibpsl.so.5 => /usr/lib/libpsl.so.5 (0x00007f3af21c2000)\n\tlibgssapi_krb5.so.2 => /usr/lib/libgssapi_krb5.so.2 (0x00007f3af1a99000)\n\tlibzstd.so.1 => /usr/lib/libzstd.so.1 (0x00007f3af19b3000)\n\tlibbrotlidec.so.1 => /usr/lib/libbrotlidec.so.1 (0x00007f3af21b3000)\n\t/lib64/ld-linux-x86-64.so.2 => /usr/lib64/ld-linux-x86-64.so.2 (0x00007f3af304f000)\n\tlibbrotlienc.so.1 => /usr/lib/libbrotlienc.so.1 (0x00007f3af18f3000)\n\tlibunistring.so.5 => /usr/lib/libunistring.so.5 (0x00007f3af170c000)\n\tlibkrb5.so.3 => /usr/lib/libkrb5.so.3 (0x00007f3af163d000)\n\tlibk5crypto.so.3 => /usr/lib/libk5crypto.so.3 (0x00007f3af160f000)\n\tlibcom_err.so.2 => /usr/lib/libcom_err.so.2 (0x00007f3af21ad000)\n\tlibkrb5support.so.0 => /usr/lib/libkrb5support.so.0 (0x00007f3af1600000)\n\tlibkeyutils.so.1 => /usr/lib/libkeyutils.so.1 (0x00007f3af15f9000)\n\tlibresolv.so.2 => /usr/lib/libresolv.so.2 (0x00007f3af15e6000)\n\tlibbrotlicommon.so.1 => /usr/lib/libbrotlicommon.so.1 (0x00007f3af15c3000)\n",
+  "unique_shared_dependency_bytes": 26408080,
+  "caveats": [
+    "SDK includes static development archives and headers; not just application runtime.",
+    "System dependency bytes are unique resolved files reported by ldd, including transitive libraries.",
+    "No external server executable, dynamically loaded extension, rg/fd, trust store or terminal/font data is bundled.",
+    "No Pi distribution, startup, memory or other-platform comparison is claimed.",
+    "Executables/archives are unstripped CMake Release outputs."
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "machine": "x86_64",
+  "clock_ticks_per_second": 100,
+  "scope": "Installed Release CLI/TUI, isolated JSONL session, deterministic model, one input turn; MCP HTTP compiled availability ON/OFF, no MCP transport installed or called",
+  "caveats": [
+    "Startup ends at first observed command banner; includes process/loader/plugins/storage/UI setup and PTY observation.",
+    "RSS and peak are Linux /proc VmRSS/VmHWM after exec; system libraries are resident only as used.",
+    "Idle CPU is sampled over 500ms at kernel clock granularity, not proof of zero CPU.",
+    "Turn timing includes input parsing, model, persistence, rendering and PTY observation through usage output.",
+    "No network, tool execution, external MCP child, large stream or multi-session workload is exercised.",
+    "No Pi product or other-platform comparison; startup samples use warm filesystem caches."
+  ],
+  "results": {
+    "mcp_http_on": {
+      "cli": "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-install-all-state-schema-http-2026-11-19/bin/pangu_agent_cli",
+      "cli_sha256": "df6c39b9ccbe0d7e316dda715aba5e8a81727498bc1236c0dedb6fb4ff9d01c9",
+      "samples": [
+        {
+          "startup_to_banner_ms": 7.793043012497947,
+          "idle_sample_ms": 500.09228600538336,
+          "idle_cpu_ms": 0.0,
+          "idle_rss_kib": 9312,
+          "retained_rss_kib": 9520,
+          "peak_rss_kib": 9520,
+          "turn_to_usage_ms": 6.158085991046391,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 0.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        },
+        {
+          "startup_to_banner_ms": 11.751433994504623,
+          "idle_sample_ms": 500.0779819965828,
+          "idle_cpu_ms": 0.0,
+          "idle_rss_kib": 9532,
+          "retained_rss_kib": 9736,
+          "peak_rss_kib": 9736,
+          "turn_to_usage_ms": 4.837618995225057,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 0.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        },
+        {
+          "startup_to_banner_ms": 11.564100001123734,
+          "idle_sample_ms": 500.05121699359734,
+          "idle_cpu_ms": 0.0,
+          "idle_rss_kib": 9496,
+          "retained_rss_kib": 9704,
+          "peak_rss_kib": 9704,
+          "turn_to_usage_ms": 5.953209009021521,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 0.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        }
+      ],
+      "median": {
+        "startup_to_banner_ms": 11.564100001123734,
+        "idle_sample_ms": 500.0779819965828,
+        "idle_cpu_ms": 0.0,
+        "idle_rss_kib": 9496,
+        "retained_rss_kib": 9704,
+        "peak_rss_kib": 9704,
+        "turn_to_usage_ms": 5.953209009021521,
+        "turn_cpu_ms": 0.0,
+        "process_cpu_through_turn_ms": 0.0
+      }
+    },
+    "mcp_http_off": {
+      "cli": "/home/xu-yuanhao/Documents/PanGu/build/product-profile/profile-install-all-state-schema-stdio-2026-11-19/bin/pangu_agent_cli",
+      "cli_sha256": "fbc538a02c3b22d9fb08262e9d36226b6151065fd647f81b93452526d1a6c450",
+      "samples": [
+        {
+          "startup_to_banner_ms": 11.70783000998199,
+          "idle_sample_ms": 500.07432099664584,
+          "idle_cpu_ms": 10.0,
+          "idle_rss_kib": 9368,
+          "retained_rss_kib": 9576,
+          "peak_rss_kib": 9576,
+          "turn_to_usage_ms": 5.2795780065935105,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 10.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        },
+        {
+          "startup_to_banner_ms": 9.49699099874124,
+          "idle_sample_ms": 500.11157800327055,
+          "idle_cpu_ms": 0.0,
+          "idle_rss_kib": 9428,
+          "retained_rss_kib": 9636,
+          "peak_rss_kib": 9636,
+          "turn_to_usage_ms": 5.789469010778703,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 0.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        },
+        {
+          "startup_to_banner_ms": 13.736334993154742,
+          "idle_sample_ms": 500.1229659974342,
+          "idle_cpu_ms": 0.0,
+          "idle_rss_kib": 9460,
+          "retained_rss_kib": 9664,
+          "peak_rss_kib": 9664,
+          "turn_to_usage_ms": 4.69841000449378,
+          "turn_cpu_ms": 0.0,
+          "process_cpu_through_turn_ms": 0.0,
+          "validation": "one submitted USER and deterministic assistant reopened; exit/termios restored"
+        }
+      ],
+      "median": {
+        "startup_to_banner_ms": 11.70783000998199,
+        "idle_sample_ms": 500.11157800327055,
+        "idle_cpu_ms": 0.0,
+        "idle_rss_kib": 9428,
+        "retained_rss_kib": 9636,
+        "peak_rss_kib": 9636,
+        "turn_to_usage_ms": 5.2795780065935105,
+        "turn_cpu_ms": 0.0,
+        "process_cpu_through_turn_ms": 0.0
+      }
+    }
+  },
+  "source_fingerprint_sha256": "c886da9b8ce9cdedebd71a8bf8d7f6221a27de49f85941156d9fbf2660873998"
+}

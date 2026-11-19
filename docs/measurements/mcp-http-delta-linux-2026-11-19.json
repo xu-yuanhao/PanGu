@@ -1,0 +1,19 @@
+{
+  "source_fingerprint_sha256": "c886da9b8ce9cdedebd71a8bf8d7f6221a27de49f85941156d9fbf2660873998",
+  "source_files": 157,
+  "configuration_changes": {
+    "PANGU_SERVICES_MCP_HTTP:BOOL": [
+      "OFF",
+      "ON"
+    ]
+  },
+  "baseline": "sdk-mcp-http-off-linux-2026-11-19.json",
+  "enabled": "sdk-default-linux-2026-11-19.json",
+  "installed_bytes_delta": 58684,
+  "sdk_archive_bytes_delta": 26248,
+  "cli_bytes_delta": 21800,
+  "stripped_cli_bytes_delta": 20544,
+  "stripped_cli_gzip_bytes_delta": 11492,
+  "additional_shared_dependencies": 0,
+  "shared_dependency_scope": "identical resolved host files; libcurl already in default direct model closure"
+}

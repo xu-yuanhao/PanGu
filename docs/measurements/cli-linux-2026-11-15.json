@@ -1,0 +1,31 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "scope": "CLI-only follow-up of the existing Linux Release SDK baseline; no SDK rebuild or full distribution measurement",
+  "source_report": "sdk-linux-2026-11-15.json",
+  "source_cli_sha256": "6fc7ff25b539532eab9594a96dfd185115a7eae5be2dab1ad3929f2f1c4fe30f",
+  "measurement": {
+    "installed_bytes": 1346856,
+    "gzip_bytes": 580158,
+    "sha256": "6fc7ff25b539532eab9594a96dfd185115a7eae5be2dab1ad3929f2f1c4fe30f",
+    "scope": "CLI executable only; excludes notices, SDK and shared dependencies",
+    "stripped": {
+      "command": [
+        "/usr/bin/strip",
+        "--strip-unneeded",
+        "-o",
+        "/home/xu-yuanhao/Documents/PanGu/build/profile-tool-fixture/build/profile-cli-all-cli-check.stripped",
+        "/home/xu-yuanhao/Documents/PanGu/build/profile-tool-fixture/build/profile-install-all-cli-check/bin/pangu_agent_cli"
+      ],
+      "path": "/home/xu-yuanhao/Documents/PanGu/build/profile-tool-fixture/build/profile-cli-all-cli-check.stripped",
+      "bytes": 1184248,
+      "sha256": "dbd95ce1ea96b090cdfba6bd3d6030c21a9b2a02a98c5905fbd5b1805ea9ff30",
+      "gzip_bytes": 547037
+    }
+  },
+  "validation": "Strip a copy; deterministic create --demo and open outputs identical in isolated agent directory. Installed original byte comparison unchanged.",
+  "caveats": [
+    "gzip bytes contain the executable only, without tar metadata or license notices.",
+    "Shared libraries remain system dependencies; this is not a portable installer.",
+    "Temporary build-local CMake install fixture exercised profile_install.py; its SDK archive is not a product SDK measurement."
+  ]
+}

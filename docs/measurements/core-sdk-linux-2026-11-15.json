@@ -1,0 +1,119 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "machine": "x86_64",
+  "scope": "Release SDK install; system shared dependencies inspected separately, not bundled",
+  "build_directory": "/home/xu-yuanhao/Documents/PanGu/build/core-profile",
+  "install_command": [
+    "cmake",
+    "--install",
+    "/home/xu-yuanhao/Documents/PanGu/build/core-profile",
+    "--prefix",
+    "/home/xu-yuanhao/Documents/PanGu/build/core-profile/profile-install-Core",
+    "--config",
+    "Release",
+    "--component",
+    "Core"
+  ],
+  "cmake_cache_sha256": "6c1ee77771de85abcc56c76bbf6966939c5c11566acab27bad87db5283bef44b",
+  "configuration": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "PANGU_BUILD_AGENT:BOOL=OFF",
+    "PANGU_BUILD_OVERFLOW:BOOL=OFF",
+    "PANGU_BUILD_PROFILES:BOOL=ON",
+    "PANGU_BUILD_PROXY_HTTP:BOOL=OFF",
+    "PANGU_BUILD_SERVICES:BOOL=OFF",
+    "PANGU_BUILD_TUI:BOOL=OFF"
+  ],
+  "installed_files": [
+    {
+      "path": "include/pangu/core/core.h",
+      "bytes": 5520,
+      "sha256": "ef8394f4f32c719b9ac60424e10c39d824a1c57c18e80370196b114ffa4a31b7"
+    },
+    {
+      "path": "include/pangu/core/loop.h",
+      "bytes": 24340,
+      "sha256": "f755bdc9635a65acc889388cee273962d8a6a157656796e3d2ec78a393ff9376"
+    },
+    {
+      "path": "include/pangu/core/overflow.h",
+      "bytes": 1933,
+      "sha256": "b9477f8d6a99e7d296b0056c5d919be78e77aaefdd1919e940c4a2290eafdf2c"
+    },
+    {
+      "path": "include/pangu/core/proxy.h",
+      "bytes": 2691,
+      "sha256": "21e66dcf6790b8eff19ed3092ef445e1f4a17e4c12c0b61549a955f6095e493c"
+    },
+    {
+      "path": "include/pangu/core/proxy_http.h",
+      "bytes": 1446,
+      "sha256": "628e478538c1c1df168a9ff8579e298e85b68caead875f1e4056830d56908662"
+    },
+    {
+      "path": "include/pangu/core/proxy_request.h",
+      "bytes": 1255,
+      "sha256": "5f2377697813fe0fed0870bc09d52982715434ddbd9d30b034c0f5cd4e1cb364"
+    },
+    {
+      "path": "include/pangu/core/state.h",
+      "bytes": 4501,
+      "sha256": "069ab5722656ce6fbafc3cb0763907b8aa14f7a28ec540247140c19138fc33ac"
+    },
+    {
+      "path": "include/pangu/core/transcript.h",
+      "bytes": 628,
+      "sha256": "209aa3afae6e8e7374c417fb5482ba675c1e708298af222ce1d5df626080d05b"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreConfig.cmake",
+      "bytes": 979,
+      "sha256": "4d030c9984101af22ce25f0a4df6221fb02ad5891597d6c72eec45cb2db605d4"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreTargets-release.cmake",
+      "bytes": 834,
+      "sha256": "9f06c0eccbbe477e83a76dff3b20f604ab2a99edaa8f89f0f973f4d50e5429c5"
+    },
+    {
+      "path": "lib/cmake/PanGuCore/PanGuCoreTargets.cmake",
+      "bytes": 4106,
+      "sha256": "3aa4dcb8b8d726a33b586a0439ab6797e7ddd31f710b7b2eb4ebde35a734c6ca"
+    },
+    {
+      "path": "lib/libpangu_core.a",
+      "bytes": 497442,
+      "sha256": "125240d43279fb0194e47cebb4aba019f8a0d6e216d2b7bb09fd03dc9ac9840c"
+    },
+    {
+      "path": "share/licenses/PanGu/Pi-LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+    },
+    {
+      "path": "share/licenses/PanGu/yyjson-LICENSE",
+      "bytes": 1084,
+      "sha256": "45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947"
+    }
+  ],
+  "installed_bytes": 547828,
+  "installed_groups": {
+    "include": 42314,
+    "lib": 503361,
+    "share": 2153
+  },
+  "sdk_archive_bytes": 223168,
+  "sdk_archive_sha256": "1190137ccd77b3b859a30a70936c35c1515cc89bb089b82b847e6868977fdfc1",
+  "sdk_archive_path": "/home/xu-yuanhao/Documents/PanGu/build/core-profile/profile-sdk-Core.tar.gz",
+  "shared_dependencies": [],
+  "ldd_output": "",
+  "unique_shared_dependency_bytes": 0,
+  "caveats": [
+    "SDK includes static development archives and headers; not just application runtime.",
+    "System dependency bytes are unique resolved files reported by ldd, including transitive libraries.",
+    "No external server executable, dynamically loaded extension, rg/fd, trust store or terminal/font data is bundled.",
+    "No Pi distribution, startup, memory or other-platform comparison is claimed.",
+    "Executables/archives are unstripped CMake Release outputs."
+  ]
+}

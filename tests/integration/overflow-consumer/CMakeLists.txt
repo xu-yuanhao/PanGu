@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+project(PanGuInstalledOverflow LANGUAGES C)
+find_package(PanGuOverflow CONFIG REQUIRED)
+add_executable(overflow_consumer main.c)
+target_link_libraries(overflow_consumer PRIVATE PanGu::overflow)
+set_target_properties(overflow_consumer PROPERTIES C_STANDARD 17 C_STANDARD_REQUIRED YES C_EXTENSIONS NO)
+enable_testing()
+add_test(NAME overflow_consumer COMMAND overflow_consumer)

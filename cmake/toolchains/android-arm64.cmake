@@ -1,0 +1,11 @@
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_ANDROID_NDK)
+if(NOT CMAKE_ANDROID_NDK)
+  if(NOT DEFINED ENV{ANDROID_NDK_HOME} OR "$ENV{ANDROID_NDK_HOME}" STREQUAL "")
+    message(FATAL_ERROR "Set CMAKE_ANDROID_NDK or ANDROID_NDK_HOME to an installed Android NDK")
+  endif()
+  # Persist the initial environment selection for later incremental reconfigure.
+  set(CMAKE_ANDROID_NDK "$ENV{ANDROID_NDK_HOME}" CACHE PATH "Android NDK installation")
+endif()
+set(CMAKE_SYSTEM_NAME Android)
+set(CMAKE_SYSTEM_VERSION 26)
+set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)

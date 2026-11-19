@@ -1,0 +1,14 @@
+/.private/
+/references/
+/build/
+/out/
+/.cache/
+/.pangu/
+**/node_modules/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.pem
+*.key
+CMakeUserPresets.json
